@@ -47,17 +47,17 @@ class Monitor:
         """
         current = observed.curate()
         reference_mean = numpy.asarray(
-            self.reference.profile.get("mean_pixel", (0.0, 0.0, 0.0)),
+            self.reference.profile["pixel"]["mean"],
             dtype=float,
         )
         current_mean = numpy.asarray(
-            current.profile.get("mean_pixel", (0.0, 0.0, 0.0)),
+            current.profile["pixel"]["mean"],
             dtype=float,
         )
         distance = float(
             numpy.mean(numpy.abs(current_mean - reference_mean)) / 255.0
         )
-        duplicate_rate = current.profile["duplicate_count"] / max(
+        duplicate_rate = current.profile["duplicates"] / max(
             current.sample_count, 1
         )
         return Drift(

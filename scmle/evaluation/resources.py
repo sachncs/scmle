@@ -9,10 +9,13 @@ import io
 import platform
 import time
 from typing import Any
+from typing import ClassVar
 
 import joblib
 import numpy
 import pandas
+
+from scmle.contracts import records
 
 BYTES_PER_MB = 1024 * 1024
 LATENCY_ROWS = 30
@@ -28,7 +31,20 @@ class Usage:
         rows_timed: Number of single-row predictions timed.
         machine: Architecture, operating system and Python version the
             numbers belong to.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `size` (megabytes), `latency` (95th percentile,
+            milliseconds) and `timed`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "model_mb": "size",
+                "p95_latency_ms": "latency",
+                "rows_timed": "timed",
+            }
+        ),
+    )
 
     model_mb: float
     p95_latency_ms: float
@@ -41,7 +57,9 @@ class Usage:
         Returns:
             A mapping of every field of the measurement.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 @dataclasses.dataclass(frozen=True)

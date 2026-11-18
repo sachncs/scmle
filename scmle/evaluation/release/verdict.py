@@ -5,14 +5,39 @@ import dataclasses
 import json
 import types
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.evaluation.release.finding import exhaustive
 from scmle.evaluation.release.finding import Finding
 from scmle.evaluation.release.finding import Kind
 from scmle.evaluation.release.finding import Readiness
 from scmle.evaluation.release.finding import tallies
 from scmle.evaluation.release.finding import Tally
+
+
+def recount(step: records.Migration) -> records.Migration:
+    """Builds the step that moves every kind's counts in a by-kind mapping.
+
+    Args:
+        step: The counts' own step.
+
+    Returns:
+        The step over a mapping of kind to counts.
+    """
+    return records.Migration(
+        change=lambda layout: {
+            kind: step.upgrade(dict(counts)) for kind, counts in layout.items()
+        },
+        revert=lambda layout: {
+            kind: step.downgrade(dict(counts))
+            for kind, counts in layout.items()
+        },
+    )
+
+
+KINDS = recount(Tally.migrations[0])
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -35,7 +60,31 @@ class Scorecard:
         non_blocking_failures: Number of failed non-blocking findings.
         counts_by_kind: Counts for every finding kind, keyed by the kind's
             value; stored as a read-only mapping.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `policy`, `findings.{total, passed, failed,
+            blocking}`, `blockers`, `warnings` and `kinds` (each kind's
+            counts at its own version 2).
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {
+                "policy_schema_version": "policy",
+                "blocking_failures": "blockers",
+                "non_blocking_failures": "warnings",
+                "counts_by_kind": "kinds",
+            },
+            parts={"kinds": KINDS},
+            groups={
+                "findings": {
+                    "total_findings": "total",
+                    "passed_findings": "passed",
+                    "failed_findings": "failed",
+                    "blocking_findings": "blocking",
+                }
+            },
+        ),
+    )
 
     task: str
     policy_schema_version: int
@@ -134,9 +183,10 @@ class Scorecard:
 
         Returns:
             A mapping of the summary's fields, with the status as its value
-            and the per-kind counts as mappings in sorted kind order.
+            and the per-kind counts as mappings in sorted kind order, in
+            the current layout.
         """
-        return {
+        legacy = {
             "task": self.task,
             "policy_schema_version": self.policy_schema_version,
             "status": self.status.value,
@@ -147,10 +197,13 @@ class Scorecard:
             "blocking_failures": self.blocking_failures,
             "non_blocking_failures": self.non_blocking_failures,
             "counts_by_kind": {
-                kind: self.counts_by_kind[kind].to_dict()
+                kind: records.downgrade(
+                    Tally.migrations, self.counts_by_kind[kind].to_dict()
+                )
                 for kind in sorted(self.counts_by_kind)
             },
         }
+        return records.upgrade(self.migrations, legacy, records.ORIGIN)
 
     def canonize(self) -> str:
         """Returns stable JSON suitable for release automation.
@@ -179,7 +232,21 @@ class Verdict:
         findings: Every finding, in the order produced.
         blocking_reasons: The reasons of the failed blocking findings, in
             the order of `findings`.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `policy_schema_version` as `policy`,
+            `blocking_reasons` as `blockers` and the readiness summary at
+            its version 2.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {
+                "policy_schema_version": "policy",
+                "blocking_reasons": "blockers",
+            },
+            parts={"readiness": Scorecard.migrations[0]},
+        ),
+    )
 
     task: str
     policy_schema_version: int
@@ -236,15 +303,19 @@ class Verdict:
             flags, blocking reasons, findings as mappings, and the
             readiness summary as a mapping.
         """
-        return {
+        readiness = self.tally()
+        legacy = {
             "task": self.task,
             "policy_schema_version": self.policy_schema_version,
             "passed": self.passed,
             "blocked": self.blocked,
             "blocking_reasons": list(self.blocking_reasons),
             "findings": [item.to_dict() for item in self.findings],
-            "readiness": self.tally().to_dict(),
+            "readiness": records.downgrade(
+                readiness.migrations, readiness.to_dict()
+            ),
         }
+        return records.upgrade(self.migrations, legacy, records.ORIGIN)
 
     def canonize(self) -> str:
         """Returns stable JSON suitable for release evidence storage.

@@ -51,9 +51,19 @@ class Estimation(Envelope):
 
     __module__ = "scmle.evaluation.parameter_estimation"
     label = "estimation"
-    migration: ClassVar[records.Migration] = records.Migration(
-        change=functools.partial(fold, groups=NESTED),
-        revert=functools.partial(unfold, groups=NESTED),
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            change=functools.partial(fold, groups=NESTED),
+            revert=functools.partial(unfold, groups=NESTED),
+        ),
+        records.nest(
+            {},
+            parts={
+                "estimand": Estimand.migrations[0],
+                "policy": Config.migrations[0],
+                "parameters": ParameterEstimate.migrations[0],
+            },
+        ),
     )
 
     estimand: Estimand
@@ -152,6 +162,9 @@ class Estimation(Envelope):
             or a component that fails its own validation propagates the
             error of the lookup or of that component's constructor.
         """
+        # The parts were written in single words at version 3; the fields
+        # keep their version-2 names.
+        record = records.downgrade(cls.migrations[1:], dict(record))
         estimand_record = record["estimand"]
         policy_record = record["policy"]
         parameters = tuple(

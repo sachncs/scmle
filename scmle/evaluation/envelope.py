@@ -9,8 +9,10 @@ The digest names the report's content across runs, so it is anchored at
 schema version 1: it is computed over the report as version 1 laid it out,
 and a report stored at any version keeps the digest it was written with.
 Version 2 nested the row, subject and contrast fields and the input digest
-(`rows.{received, used, dropped}`, `digests.frame`); each kind's
-`migration` moves a report between the two layouts.
+(`rows.{received, used, dropped}`, `digests.frame`); version 3 writes the
+estimand, the policy and the per-period, per-regime and per-parameter
+records in single-word keys (each record's own `migrations`). Each kind's
+`migrations` move a report between the layouts, one version at a time.
 """
 
 from collections.abc import Mapping
@@ -28,7 +30,7 @@ from scmle import durability
 from scmle.contracts import errors
 from scmle.contracts import records
 
-VERSION = 2
+VERSION = 3
 
 Groups = Mapping[str, Mapping[str, str]]
 
@@ -181,18 +183,18 @@ def created_temporary(temporary: Path | None) -> Path:
 class Envelope:
     """A report that writes and reads itself as a digest-bound envelope.
 
-    Subclasses are frozen dataclasses that define `label`, `migration`,
+    Subclasses are frozen dataclasses that define `label`, `migrations`,
     `to_dict` and `from_dict`.
 
     Attributes:
         label: The kind of report, named in the read errors.
-        migration: The step from the report's version-1 layout to its
-            current one.
+        migrations: The report's version steps, oldest first; one step per
+            version after 1, so the current version is `VERSION`.
     """
 
     __slots__ = ()
     label = ""
-    migration: ClassVar[records.Migration] = records.Migration()
+    migrations: ClassVar[tuple[records.Migration, ...]] = ()
 
     def to_dict(self) -> Mapping[str, Any]:
         """Returns the JSON-compatible report.
@@ -223,12 +225,12 @@ class Envelope:
             The hexadecimal SHA-256 digest of the report, laid out as at
             schema version 1, serialized as sorted-key compact JSON.
         """
-        return canon(self.migration.downgrade(dict(self.to_dict())))
+        return canon(records.downgrade(self.migrations, dict(self.to_dict())))
 
     def write(self, path: str | Path) -> str:
         """Atomically writes a digest-bound report.
 
-        The envelope holds `schema_version` 2, the `to_dict` report and its
+        The envelope holds `schema_version` 3, the `to_dict` report and its
         `digest`. It is written as sorted-key JSON to a temporary file in the
         destination directory, flushed, renamed over the destination, and the
         directory is then synced. On any failure the temporary file is
@@ -280,11 +282,11 @@ class Envelope:
         """Reads and verifies an atomic report envelope.
 
         The stored digest is checked before the report is migrated: a
-        version-1 report is hashed as stored, and a version-2 report is
-        hashed in its version-1 layout, which the migration restores
-        exactly. An unreadable or malformed file raises the underlying OS or
-        JSON error; a missing key raises `KeyError`, and invalid fields raise
-        the validation errors of the result classes.
+        version-1 report is hashed as stored, and a later one is hashed in
+        its version-1 layout, which the migrations restore exactly. An
+        unreadable or malformed file raises the underlying OS or JSON error;
+        a missing key raises `KeyError`, and invalid fields raise the
+        validation errors of the result classes.
 
         Args:
             path: File previously written by `write`.
@@ -293,14 +295,17 @@ class Envelope:
             The result rebuilt from the stored report.
 
         Raises:
-            ValueError: If the schema version is not 1 or 2, the report is
+            ValueError: If the schema version is not 1 to 3, the report is
                 not a mapping, the stored digest does not match the report,
                 or the rebuilt result serializes to a different digest.
         """
         envelope = json.loads(Path(path).read_text(encoding="utf-8"))
         version = envelope.get("schema_version")
-        old = version == records.ORIGIN
-        if isinstance(version, bool) or not (old or version == VERSION):
+        if (
+            isinstance(version, bool)
+            or not isinstance(version, int)
+            or not records.ORIGIN <= version <= VERSION
+        ):
             raise errors.InputError(f"unsupported {cls.label} report schema")
         record = envelope.get("report")
         if not isinstance(record, Mapping):
@@ -308,11 +313,11 @@ class Envelope:
                 f"{cls.label} report must contain a mapping"
             )
         stored = dict(record)
-        anchored = stored if old else cls.migration.downgrade(stored)
-        digest = canon(anchored)
+        older = cls.migrations[: version - records.ORIGIN]
+        digest = canon(records.downgrade(older, stored))
         if envelope.get("digest") != digest:
             raise errors.InputError(f"{cls.label} report digest mismatch")
-        result = cls.from_dict(cls.migration.upgrade(stored) if old else stored)
+        result = cls.from_dict(records.upgrade(cls.migrations, stored, version))
         if result.digest() != digest:
             raise errors.InputError(
                 f"{cls.label} report canonicalization mismatch"

@@ -7,8 +7,10 @@ import enum
 import math
 from numbers import Real
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 
 class Kind(enum.StrEnum):
@@ -174,7 +176,13 @@ class Tally:
         failed: Number of failed findings.
         blocking: Number of findings that are blocking gates.
         blocking_failures: Number of failed blocking findings.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `blocking_failures` as `blockers`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"blocking_failures": "blockers"}),
+    )
 
     total: int
     passed: int
@@ -220,15 +228,20 @@ class Tally:
         """Returns deterministic JSON-compatible aggregate counts.
 
         Returns:
-            A mapping from each count's name to its value.
+            A mapping from each count's name to its value, in the current
+            layout.
         """
-        return {
-            "total": self.total,
-            "passed": self.passed,
-            "failed": self.failed,
-            "blocking": self.blocking,
-            "blocking_failures": self.blocking_failures,
-        }
+        return records.upgrade(
+            self.migrations,
+            {
+                "total": self.total,
+                "passed": self.passed,
+                "failed": self.failed,
+                "blocking": self.blocking,
+                "blocking_failures": self.blocking_failures,
+            },
+            records.ORIGIN,
+        )
 
 
 def tallies(values: Mapping[str, Any]) -> None:

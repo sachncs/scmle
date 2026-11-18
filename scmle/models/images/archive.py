@@ -17,6 +17,10 @@ from scmle.contracts import errors
 from scmle.models.images.estimator import Estimator
 from scmle.models.images.records import Package
 
+# Version 2 writes the configuration with its single-word keys (`size`).
+# Load reads 1 and 2 alike: it checks the digests, not the configuration.
+MANIFEST = 2
+
 
 class Archive(Estimator):
     """Saves and loads the fitted estimator as a verified package."""
@@ -54,7 +58,7 @@ class Archive(Estimator):
             joblib.dump(self, model_path, compress=3)
             durability.sync(model_path)
             manifest = {
-                "schema_version": 1,
+                "schema_version": MANIFEST,
                 "model_path": "model.joblib",
                 "artifact_digest": file_digest(model_path),
                 "model_digest": self.model_digest,
@@ -119,7 +123,7 @@ class Archive(Estimator):
             raise errors.InputError("image model package has no manifest")
         with manifest_path.open(encoding="utf-8") as stream:
             manifest = json.load(stream)
-        if manifest.get("schema_version") != 1:
+        if manifest.get("schema_version") not in range(1, MANIFEST + 1):
             raise errors.InputError("unsupported image model package version")
         model_path = target / str(manifest.get("model_path", ""))
         if not model_path.is_file():

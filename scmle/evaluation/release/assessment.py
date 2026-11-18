@@ -13,6 +13,9 @@ from scmle.evaluation.release.finding import finite_real
 from scmle.evaluation.release.finding import Kind
 from scmle.evaluation.release.verdict import Verdict
 
+# The quality record's score keys before version 2 (explainability.quality).
+SCORES = {"stability": "stability_score", "fidelity": "fidelity_score"}
+
 
 def citations(
     policy: evaluation.Criteria,
@@ -91,7 +94,9 @@ def grade(report: Any, field_name: str) -> float | None:
 
     Args:
         report: An explanation report with a `quality` mapping.
-        field_name: Key of the score inside `quality`.
+        field_name: Key of the score inside `quality`; a quality record
+            written before version 2 holds it under its old key (see
+            `SCORES`).
 
     Returns:
         The score as a float, or None if the report, its `quality` entry or
@@ -103,7 +108,7 @@ def grade(report: Any, field_name: str) -> float | None:
     quality = report.get("quality")
     if not isinstance(quality, Mapping):
         return None
-    value = quality.get(field_name)
+    value = quality.get(field_name, quality.get(SCORES.get(field_name, "")))
     if isinstance(value, bool) or not isinstance(value, Real):
         return None
     score = float(value)
@@ -334,13 +339,13 @@ def explanation_findings(
     """
     quality_requirements = (
         (
-            "stability_score",
+            "stability",
             policy.explanations.require_stability,
             policy.explanations.stability_threshold,
             "stability",
         ),
         (
-            "fidelity_score",
+            "fidelity",
             policy.explanations.require_fidelity,
             policy.explanations.fidelity_threshold,
             "fidelity",

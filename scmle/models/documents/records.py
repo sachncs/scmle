@@ -2,8 +2,10 @@
 
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.data.modalities import document
 
 NGRAM_BOUND_COUNT = 2
@@ -88,7 +90,13 @@ class Evaluation:
             precision and recall.
         log_loss: Mean negative log probability of the true class.
         labels: Class labels, as text, in the classifier's class order.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `sample_count` as `samples`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"sample_count": "samples"}),
+    )
 
     sample_count: int
     accuracy: float
@@ -102,7 +110,9 @@ class Evaluation:
         Returns:
             Mapping of field name to value.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -117,7 +127,18 @@ class Explanation:
         terms: Pairs of term and its score, strongest first.
         limitations: Plain statements of what the explanation does not show.
         citations: Source locations of the explained document, if any.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes the two hashes as `digests.{model, payload}`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {},
+            groups={
+                "digests": {"model_digest": "model", "input_hash": "payload"}
+            },
+        ),
+    )
 
     model_digest: str
     input_hash: str | None
@@ -134,8 +155,7 @@ class Explanation:
             and score and `citations` as dictionaries.
         """
         return {
-            "model_digest": self.model_digest,
-            "input_hash": self.input_hash,
+            "digests": {"model": self.model_digest, "payload": self.input_hash},
             "method": self.method,
             "terms": [list(term) for term in self.terms],
             "limitations": list(self.limitations),
@@ -179,7 +199,26 @@ class Drift:
             reference mean.
         duplicate_rate: Share of observed documents in duplicate groups.
         threshold: Level above which a signal counts as shifted.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `digests.{reference, observed}`, `language`,
+            `characters` (the mean character change) and `duplicates`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {
+                "language_distance": "language",
+                "mean_character_delta": "characters",
+                "duplicate_rate": "duplicates",
+            },
+            groups={
+                "digests": {
+                    "reference_hash": "reference",
+                    "observed_hash": "observed",
+                }
+            },
+        ),
+    )
 
     reference_hash: str
     observed_hash: str
@@ -203,7 +242,8 @@ class Drift:
         Returns:
             Mapping of field name to value, plus a `shifted` flag.
         """
-        return {
-            **dataclasses.asdict(self),
-            "shifted": self.shifted,
-        }
+        return records.upgrade(
+            self.migrations,
+            {**dataclasses.asdict(self), "shifted": self.shifted},
+            records.ORIGIN,
+        )

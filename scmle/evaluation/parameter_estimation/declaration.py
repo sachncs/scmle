@@ -3,11 +3,13 @@
 import dataclasses
 import math
 from typing import Any
+from typing import ClassVar
 from typing import Literal
 
 import numpy
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 EstimatorKind = Literal[
     "linear",
@@ -175,7 +177,13 @@ class Estimand:
         feature_names: Names matching the columns supplied to the estimator.
         assumptions: Explicit identification and sampling assumptions.
         description: Optional plain-language interpretation.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `feature_names` as `features`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"feature_names": "features"}),
+    )
 
     __module__ = "scmle.evaluation.parameter_estimation"
 
@@ -212,7 +220,9 @@ class Estimand:
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-compatible scientific metadata."""
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -295,7 +305,13 @@ class ParameterEstimate:
         interval: Lower and upper end of the confidence (or credible)
             interval.
         p_value: Two-sided p-value in ``[0, 1]``.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `standard_error` as `se`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"standard_error": "se"}),
+    )
 
     __module__ = "scmle.evaluation.parameter_estimation"
 
@@ -333,4 +349,6 @@ class ParameterEstimate:
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-compatible coefficient evidence."""
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )

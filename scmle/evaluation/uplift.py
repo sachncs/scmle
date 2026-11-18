@@ -10,6 +10,7 @@ A good model's curve rises above the straight line a random ranking gives.
 import dataclasses
 from typing import Any
 from typing import cast
+from typing import ClassVar
 
 import numpy
 import pandas
@@ -17,6 +18,7 @@ from sklearn import linear_model
 from sklearn import metrics
 from sklearn import model_selection
 
+from scmle.contracts import records
 import scmle.contracts.metrics
 from scmle.evaluation import balance
 
@@ -148,7 +150,16 @@ class Propensity:
         note: Plain-language reading of the result.
         balance_p_value: Permutation p-value of the balance test, or None
             when the test did not run.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `treated_share` as `treated` and
+            `balance_p_value` (the balance test's p-value) as `balance`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"treated_share": "treated", "balance_p_value": "balance"}
+        ),
+    )
 
     treated_share: float
     auc: float
@@ -162,7 +173,9 @@ class Propensity:
         Returns:
             A mapping of the fields.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 def randomised(

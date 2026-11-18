@@ -61,7 +61,34 @@ class PeriodDiagnostics:
         maximum_weight: Largest cumulative weight after the cap.
         effective_sample_size: Kish effective sample size of the capped
             cumulative weights.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `treated`, `control`,
+            `denominator.{low, high}`, `numerator.{low, high}`,
+            `truncated`, `untruncated`, `weight` and `ess`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {
+                "treated_rows": "treated",
+                "control_rows": "control",
+                "fraction_weight_truncated": "truncated",
+                "maximum_untruncated_weight": "untruncated",
+                "maximum_weight": "weight",
+                "effective_sample_size": "ess",
+            },
+            groups={
+                "denominator": {
+                    "denominator_propensity_min": "low",
+                    "denominator_propensity_max": "high",
+                },
+                "numerator": {
+                    "numerator_propensity_min": "low",
+                    "numerator_propensity_max": "high",
+                },
+            },
+        ),
+    )
 
     __module__ = "scmle.evaluation.sequential"
 
@@ -139,7 +166,9 @@ class PeriodDiagnostics:
         Returns:
             The diagnostic fields keyed by field name.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -155,7 +184,19 @@ class RegimeEstimate:
         rows: Number of subjects whose full history follows the regime.
         weight_sum: Sum of the capped cumulative weights of those subjects.
         effective_sample_size: Kish effective sample size of those weights.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `se`, `weights` and `ess`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "standard_error": "se",
+                "weight_sum": "weights",
+                "effective_sample_size": "ess",
+            }
+        ),
+    )
 
     __module__ = "scmle.evaluation.sequential"
 
@@ -206,7 +247,9 @@ class RegimeEstimate:
         Returns:
             The regime fields keyed by field name.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -272,9 +315,20 @@ class Estimation(Envelope):
 
     __module__ = "scmle.evaluation.sequential"
     label = "sequential"
-    migration: ClassVar[records.Migration] = records.Migration(
-        change=functools.partial(fold, groups=NESTED),
-        revert=functools.partial(unfold, groups=NESTED),
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            change=functools.partial(fold, groups=NESTED),
+            revert=functools.partial(unfold, groups=NESTED),
+        ),
+        records.nest(
+            {},
+            parts={
+                "estimand": Estimand.migrations[0],
+                "policy": Config.migrations[0],
+                "periods": PeriodDiagnostics.migrations[0],
+                "regimes": RegimeEstimate.migrations[0],
+            },
+        ),
     )
 
     estimand: Estimand
@@ -386,6 +440,9 @@ class Estimation(Envelope):
             The result built from the record; field validation runs on
             construction.
         """
+        # The parts were written in single words at version 3; the fields
+        # keep their version-2 names.
+        record = records.downgrade(cls.migrations[1:], dict(record))
         estimand_values = dict(record["estimand"])
         estimand_values["baseline_covariates"] = tuple(
             estimand_values["baseline_covariates"]

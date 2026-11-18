@@ -11,11 +11,14 @@ from collections.abc import Sequence
 import dataclasses
 from typing import Any
 from typing import cast
+from typing import ClassVar
 from typing import TYPE_CHECKING
 
 import numpy
 import pandas
 from sklearn import base
+
+from scmle.contracts import records
 
 if TYPE_CHECKING:
     from scmle.contracts import models
@@ -41,7 +44,15 @@ class Curve:
             units (negative when a lower-is-better metric improved).
         total_gain: Change in score from the first point to the last, in the
             same units.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes the two gains as `gains.{last, total}`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {}, groups={"gains": {"last_gain": "last", "total_gain": "total"}}
+        ),
+    )
 
     sizes: tuple[int, ...]
     scores: tuple[float, ...]
@@ -53,12 +64,12 @@ class Curve:
         """Returns a JSON-serializable mapping.
 
         Returns:
-            A mapping of every field of the curve.
+            A mapping of every field of the curve, in the current layout.
         """
         record = dataclasses.asdict(self)
         record["sizes"] = list(self.sizes)
         record["scores"] = list(self.scores)
-        return record
+        return records.upgrade(self.migrations, record, records.ORIGIN)
 
 
 def judge(scores: Sequence[float]) -> tuple[str, float, float]:

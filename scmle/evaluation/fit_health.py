@@ -10,8 +10,11 @@ from collections.abc import Sequence
 import dataclasses
 import math
 from typing import Any
+from typing import ClassVar
 
 import numpy
+
+from scmle.contracts import records
 
 OVERFIT_LOSS_SHARE = 0.25
 UNDERFIT_RELATIVE_GAIN = 0.05
@@ -33,7 +36,22 @@ class Health:
             none was lost).
         noise_share: Validation fold-to-fold spread relative to the gain.
         note: What the verdict means and what could be done.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes the two gains as `gains.{training, validation}`
+            and `noise_share` as `noise`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {"noise_share": "noise"},
+            groups={
+                "gains": {
+                    "train_gain": "training",
+                    "validation_gain": "validation",
+                }
+            },
+        ),
+    )
 
     verdict: str
     train_gain: float
@@ -49,7 +67,9 @@ class Health:
             A mapping of every field of the assessment. `noise_share` is
             infinity when the validation gain is about zero.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 def assess(

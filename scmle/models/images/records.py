@@ -2,8 +2,10 @@
 
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.data.modalities import image
 
 PATCH_DIMENSION_COUNT = 2
@@ -27,7 +29,14 @@ class Config:
             regression; must be positive.
         max_iter: Maximum solver iterations; must be at least 1.
         random_state: Seed for the estimator.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `target_size` as `size`. The model digest is
+            computed on the version-1 layout, so a fitted model keeps it.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"target_size": "size"}),
+    )
 
     __module__ = "scmle.models.images"
 
@@ -55,10 +64,10 @@ class Config:
         """Converts the configuration to JSON-compatible values.
 
         Returns:
-            Mapping of field name to value, with `target_size` as a list.
+            Mapping of field name to value, with the size as a list.
         """
         return {
-            "target_size": list(self.target_size),
+            "size": list(self.target_size),
             "mode": self.mode,
             "normalize": self.normalize,
             "regularization": self.regularization,
@@ -78,7 +87,13 @@ class Evaluation:
             precision and recall.
         log_loss: Mean negative log probability of the true class.
         labels: Class labels, as text, in the classifier's class order.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `sample_count` as `samples`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"sample_count": "samples"}),
+    )
 
     sample_count: int
     accuracy: float
@@ -92,7 +107,9 @@ class Evaluation:
         Returns:
             Mapping of field name to value.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -107,7 +124,18 @@ class Explanation:
         terms: Pairs of feature or region name and its score, strongest
             first.
         limitations: Plain statements of what the explanation does not show.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes the two hashes as `digests.{model, payload}`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {},
+            groups={
+                "digests": {"model_digest": "model", "input_hash": "payload"}
+            },
+        ),
+    )
 
     model_digest: str
     input_hash: str | None
@@ -123,8 +151,7 @@ class Explanation:
             and score.
         """
         return {
-            "model_digest": self.model_digest,
-            "input_hash": self.input_hash,
+            "digests": {"model": self.model_digest, "payload": self.input_hash},
             "method": self.method,
             "terms": [list(term) for term in self.terms],
             "limitations": list(self.limitations),
@@ -165,7 +192,22 @@ class Drift:
             mean pixel values, divided by 255.
         duplicate_rate: Share of observed images that are duplicates.
         threshold: Level above which a signal counts as shifted.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `digests.{reference, observed}`, `pixels` (the
+            mean pixel distance) and `duplicates`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {"mean_pixel_distance": "pixels", "duplicate_rate": "duplicates"},
+            groups={
+                "digests": {
+                    "reference_hash": "reference",
+                    "observed_hash": "observed",
+                }
+            },
+        ),
+    )
 
     reference_hash: str
     observed_hash: str
@@ -187,4 +229,8 @@ class Drift:
         Returns:
             Mapping of field name to value, plus a `shifted` flag.
         """
-        return {**dataclasses.asdict(self), "shifted": self.shifted}
+        return records.upgrade(
+            self.migrations,
+            {**dataclasses.asdict(self), "shifted": self.shifted},
+            records.ORIGIN,
+        )

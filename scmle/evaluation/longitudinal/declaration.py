@@ -3,8 +3,10 @@
 import dataclasses
 import math
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 PROPENSITY_CLIP_CEILING = 0.5
 
@@ -41,7 +43,20 @@ class Estimand:
         population: Non-empty description of the target population.
         assumptions: Declared identification assumptions; must include every
             member of `REQUIRED_ASSUMPTIONS`.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes the three columns as `subject`, `time` and
+            `treatment`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "subject_identity": "subject",
+                "time_column": "time",
+                "treatment_column": "treatment",
+            }
+        ),
+    )
 
     __module__ = "scmle.evaluation.longitudinal"
 
@@ -96,7 +111,9 @@ class Estimand:
         Returns:
             The estimand fields keyed by field name.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -122,7 +139,28 @@ class Config:
             the weights of each arm in each period.
         reference_tolerance: Largest absolute difference allowed between the
             primary period estimates and their independent recomputation.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `confidence`, `clip`, `iterations`,
+            `reference` and `minimums.{period, arm, ess}`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {
+                "confidence_level": "confidence",
+                "propensity_clip": "clip",
+                "max_iterations": "iterations",
+                "reference_tolerance": "reference",
+            },
+            groups={
+                "minimums": {
+                    "minimum_rows_per_period": "period",
+                    "minimum_rows_per_arm": "arm",
+                    "minimum_effective_sample_size": "ess",
+                }
+            },
+        ),
+    )
 
     __module__ = "scmle.evaluation.longitudinal"
 
@@ -208,7 +246,9 @@ class Config:
         Returns:
             The policy fields keyed by field name.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -233,7 +273,31 @@ class PeriodATE:
             control-arm weights.
         converged: Whether the propensity fit converged; must be True.
         iterations: Newton iterations the propensity fit used.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `se`, `treated`, `control`, `clipped`,
+            `propensity.{low, high}` and `ess.{treated, control}`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {
+                "standard_error": "se",
+                "treated_rows": "treated",
+                "control_rows": "control",
+                "fraction_clipped": "clipped",
+            },
+            groups={
+                "propensity": {
+                    "propensity_min": "low",
+                    "propensity_max": "high",
+                },
+                "ess": {
+                    "effective_sample_size_treated": "treated",
+                    "effective_sample_size_control": "control",
+                },
+            },
+        ),
+    )
 
     __module__ = "scmle.evaluation.longitudinal"
 
@@ -315,4 +379,6 @@ class PeriodATE:
         Returns:
             The period fields keyed by field name.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )

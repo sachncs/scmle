@@ -1,9 +1,12 @@
 """The numerical and uncertainty policy of an estimation run."""
 
 import dataclasses
+import functools
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.evaluation.parameter_estimation.declaration import BayesianPrior
 from scmle.evaluation.parameter_estimation.declaration import CAUSAL_ESTIMATORS
 from scmle.evaluation.parameter_estimation.declaration import CausalAssumption
@@ -42,6 +45,30 @@ from scmle.evaluation.parameter_estimation.declaration import (
     REQUIRED_HIERARCHICAL_RANDOM_SLOPE_ASSUMPTIONS,
 )
 from scmle.evaluation.parameter_estimation.rules import Rules
+
+ASSUMPTIONS = {
+    "assumptions": {
+        "causal_assumptions": "causal",
+        "continuous_treatment_assumptions": "continuous",
+        "hierarchical_assumptions": "hierarchical",
+    }
+}
+
+
+def gather(layout: records.Layout) -> records.Layout:
+    """Collects the assumption lists the estimator declares.
+
+    Args:
+        layout: The policy with the flat assumption lists.
+
+    Returns:
+        The policy with `assumptions.{causal, continuous, hierarchical}`;
+        `assumptions` is left out when the estimator declares none.
+    """
+    layout = records.gather(layout, ASSUMPTIONS)
+    if not layout["assumptions"]:
+        del layout["assumptions"]
+    return layout
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -86,7 +113,33 @@ class Config(Rules):
             components in the REML search.
         random_slope_position: Index of the feature carrying a random slope
             in ``hierarchical_linear``, or None for a random intercept only.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `confidence`, `cluster`, `replicates`,
+            `iterations`, `reference`, `treatment`, `clip`, `cap`, `folds`,
+            `hierarchy`, `bounds`, `slope` and
+            `assumptions.{causal, continuous, hierarchical}`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "confidence_level": "confidence",
+                "cluster_name": "cluster",
+                "bootstrap_replicates": "replicates",
+                "max_iterations": "iterations",
+                "reference_tolerance": "reference",
+                "treatment_position": "treatment",
+                "propensity_clip": "clip",
+                "continuous_weight_cap": "cap",
+                "cross_fitting_folds": "folds",
+                "hierarchical_method": "hierarchy",
+                "reml_variance_bounds": "bounds",
+                "random_slope_position": "slope",
+            },
+            change=gather,
+            revert=functools.partial(records.scatter, folds=ASSUMPTIONS),
+        ),
+    )
 
     __module__ = "scmle.evaluation.parameter_estimation"
 
@@ -288,7 +341,7 @@ class Config(Rules):
                 )
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns JSON-compatible policy metadata."""
+        """Returns JSON-compatible policy metadata, in the current layout."""
         values = dataclasses.asdict(self)
         if self.prior is None:
             values.pop("prior")
@@ -315,4 +368,4 @@ class Config(Rules):
             values.pop("random_slope_position")
         if self.prior is not None:
             values["prior"] = self.prior.to_dict()
-        return values
+        return records.upgrade(self.migrations, values, records.ORIGIN)

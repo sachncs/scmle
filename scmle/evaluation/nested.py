@@ -14,6 +14,7 @@ import operator
 import random
 from typing import Any
 from typing import cast
+from typing import ClassVar
 
 import numpy
 import pandas
@@ -21,6 +22,7 @@ from sklearn import base
 from sklearn import model_selection
 
 from scmle.contracts import models
+from scmle.contracts import records
 from scmle.contracts import search
 
 INNER_FOLDS = 3
@@ -40,7 +42,16 @@ class Scores:
         optimism: Mean inner score minus mean outer score.
         folds: Number of outer folds.
         configurations: Configurations compared in each fold.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `outer_scores` as `outer` and `inner_scores` as
+            `inner`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"outer_scores": "outer", "inner_scores": "inner"}
+        ),
+    )
 
     outer_scores: tuple[float, ...]
     inner_scores: tuple[float, ...]
@@ -55,7 +66,9 @@ class Scores:
         Returns:
             A mapping of every field of the result.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 def average(

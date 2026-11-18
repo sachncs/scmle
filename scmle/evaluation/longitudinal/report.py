@@ -51,9 +51,19 @@ class Estimation(Envelope):
 
     __module__ = "scmle.evaluation.longitudinal"
     label = "longitudinal"
-    migration: ClassVar[records.Migration] = records.Migration(
-        change=functools.partial(fold, groups=NESTED),
-        revert=functools.partial(unfold, groups=NESTED),
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            change=functools.partial(fold, groups=NESTED),
+            revert=functools.partial(unfold, groups=NESTED),
+        ),
+        records.nest(
+            {},
+            parts={
+                "estimand": Estimand.migrations[0],
+                "policy": Config.migrations[0],
+                "periods": PeriodATE.migrations[0],
+            },
+        ),
     )
 
     estimand: Estimand
@@ -146,6 +156,9 @@ class Estimation(Envelope):
             The result built from the record; field validation runs on
             construction. A missing key raises `KeyError`.
         """
+        # The parts were written in single words at version 3; the fields
+        # keep their version-2 names.
+        record = records.downgrade(cls.migrations[1:], dict(record))
         estimand_values = dict(record["estimand"])
         estimand_values["covariates"] = tuple(estimand_values["covariates"])
         estimand_values["assumptions"] = tuple(estimand_values["assumptions"])

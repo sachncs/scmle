@@ -10,10 +10,12 @@ recorded either way.
 
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
 import numpy
 import pandas
 
+from scmle.contracts import records
 from scmle.models import thresholds
 
 MIN_POSITIVES = 10
@@ -35,7 +37,23 @@ class Mitigation:
         accuracy_after: Accuracy with group thresholds.
         applied: Whether the thresholds are kept.
         reason: Why they were kept or dropped.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `gap.{before, after}` and
+            `accuracy.{before, after}`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {},
+            groups={
+                "gap": {"gap_before": "before", "gap_after": "after"},
+                "accuracy": {
+                    "accuracy_before": "before",
+                    "accuracy_after": "after",
+                },
+            },
+        ),
+    )
 
     column: str
     criterion: str
@@ -53,7 +71,9 @@ class Mitigation:
         Returns:
             A mapping of every field of the mitigation.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 def rates(

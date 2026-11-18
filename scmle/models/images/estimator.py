@@ -13,6 +13,7 @@ from sklearn.metrics import f1_score
 from sklearn.metrics import log_loss
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.data.modalities import curation
 from scmle.data.modalities import image
 from scmle.models.images.records import Config
@@ -65,6 +66,9 @@ class Estimator:
     def model_digest(self) -> str:
         """The SHA-256 digest of the configuration, classes and coefficients.
 
+        The configuration is hashed in its version-1 layout, so renaming one
+        of its written keys keeps every model's digest.
+
         Raises:
             RuntimeError: If the classifier has not been fitted.
         """
@@ -73,7 +77,9 @@ class Estimator:
         if estimator is None:
             raise errors.OrderError("classifier is not fitted")
         state = {
-            "config": self.config.to_dict(),
+            "config": records.downgrade(
+                self.config.migrations, self.config.to_dict()
+            ),
             "feature_names": self.feature_names,
             "classes": estimator.classes_.tolist(),
             "coef": estimator.coef_.tolist(),
@@ -114,7 +120,7 @@ class Estimator:
                 + "): "
                 + ", ".join(blocking_ids)
             )
-        if report.profile["duplicate_count"]:
+        if report.profile["duplicates"]:
             raise errors.InputError(
                 "training images contain duplicate content; deduplicate "
                 "before fitting"

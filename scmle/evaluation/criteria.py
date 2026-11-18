@@ -8,9 +8,42 @@ direction, and the outcome is reported beside the scores themselves.
 
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.evaluation import metrics
+
+HIGHER = "higher"
+LOWER = "lower"
+
+
+def orient(layout: records.Layout) -> records.Layout:
+    """Writes the stored direction flag as the direction's name.
+
+    Args:
+        layout: The record with `direction` as a bool.
+
+    Returns:
+        The record with `direction` as `higher` or `lower`.
+    """
+    if isinstance(layout.get("direction"), bool):
+        layout["direction"] = HIGHER if layout["direction"] else LOWER
+    return layout
+
+
+def flag(layout: records.Layout) -> records.Layout:
+    """Undoes `orient`: writes the direction's name as a bool.
+
+    Args:
+        layout: The record with `direction` as `higher` or `lower`.
+
+    Returns:
+        The record with `direction` true for `higher`.
+    """
+    if isinstance(layout.get("direction"), str):
+        layout["direction"] = layout["direction"] == HIGHER
+    return layout
 
 
 @dataclasses.dataclass(frozen=True)
@@ -23,7 +56,18 @@ class Criterion:
         achieved: The locked-test score (NaN when it could not be computed).
         higher_is_better: The metric's direction.
         met: Whether the score satisfies the threshold.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `higher_is_better` as `direction`, `higher` or
+            `lower`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"higher_is_better": "direction"},
+            change=orient,
+            revert=flag,
+        ),
+    )
 
     metric: str
     required: float
@@ -35,9 +79,12 @@ class Criterion:
         """Returns the JSON-ready record.
 
         Returns:
-            A mapping of every field of the result.
+            A mapping of every field of the result, with the metric's
+            direction as `higher` or `lower`.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 def check(

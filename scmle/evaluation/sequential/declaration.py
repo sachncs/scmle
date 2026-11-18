@@ -3,8 +3,10 @@
 import dataclasses
 import math
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 PROPENSITY_CLIP_CEILING = 0.5
 
@@ -56,7 +58,31 @@ class Estimand:
             the target regime.
         comparator_treatment: Treatment value (0 or 1) held in every period
             by the comparator regime; differs from `target_treatment`.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `subject`, `time`, `treatment`,
+            `covariates.{baseline, varying}` and
+            `regimes.{target, comparator}`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {
+                "subject_identity": "subject",
+                "time_column": "time",
+                "treatment_column": "treatment",
+            },
+            groups={
+                "covariates": {
+                    "baseline_covariates": "baseline",
+                    "time_varying_covariates": "varying",
+                },
+                "regimes": {
+                    "target_treatment": "target",
+                    "comparator_treatment": "comparator",
+                },
+            },
+        ),
+    )
 
     __module__ = "scmle.evaluation.sequential"
 
@@ -125,7 +151,9 @@ class Estimand:
         Returns:
             The estimand fields keyed by field name.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -155,7 +183,29 @@ class Config:
             regime mean and its independent recomputation that still counts
             as agreement; a larger difference is recorded in the reference
             record and does not raise.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `confidence`, `clip`, `weight`, `iterations`,
+            `reference` and `minimums.{subjects, arm, ess}`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {
+                "confidence_level": "confidence",
+                "propensity_clip": "clip",
+                "maximum_weight": "weight",
+                "max_iterations": "iterations",
+                "reference_tolerance": "reference",
+            },
+            groups={
+                "minimums": {
+                    "minimum_subjects": "subjects",
+                    "minimum_arm_rows": "arm",
+                    "minimum_effective_sample_size": "ess",
+                }
+            },
+        ),
+    )
 
     __module__ = "scmle.evaluation.sequential"
 
@@ -239,4 +289,6 @@ class Config:
         Returns:
             The policy fields keyed by field name.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )

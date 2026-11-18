@@ -5,8 +5,10 @@ from collections.abc import Sequence
 import dataclasses
 import math
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 MIN_REPORTS = 2
 
@@ -44,7 +46,18 @@ class Thresholds:
             None when stability is not required.
         fidelity_minimum: Smallest acceptable fidelity score in [0, 1], or
             None when fidelity is not required.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes the two minimums as `stability` and `fidelity`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "stability_minimum": "stability",
+                "fidelity_minimum": "fidelity",
+            }
+        ),
+    )
 
     stability_minimum: float | None = None
     fidelity_minimum: float | None = None
@@ -72,12 +85,12 @@ class Thresholds:
         """Returns JSON-compatible threshold declarations.
 
         Returns:
-            A mapping with the keys `stability_minimum` and
-            `fidelity_minimum`, each a float or None.
+            A mapping with the keys `stability` and `fidelity`, each a float
+            or None.
         """
         return {
-            "stability_minimum": self.stability_minimum,
-            "fidelity_minimum": self.fidelity_minimum,
+            "stability": self.stability_minimum,
+            "fidelity": self.fidelity_minimum,
         }
 
 
@@ -95,7 +108,21 @@ class Evaluation:
         thresholds: The declared thresholds the scores were compared with.
         passed: Whether every declared threshold was met.
         findings: Human-readable statements explaining the outcome.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `samples`, `stability`, `fidelity` and the
+            thresholds at their version 2.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {
+                "sample_count": "samples",
+                "stability_score": "stability",
+                "fidelity_score": "fidelity",
+            },
+            parts={"thresholds": Thresholds.migrations[0]},
+        ),
+    )
 
     method: str
     sample_count: int
@@ -130,13 +157,13 @@ class Evaluation:
 
         Returns:
             A mapping of every field, with thresholds as a mapping and
-            findings as a list.
+            findings as a list, in the current layout.
         """
         return {
             "method": self.method,
-            "sample_count": self.sample_count,
-            "stability_score": self.stability_score,
-            "fidelity_score": self.fidelity_score,
+            "samples": self.sample_count,
+            "stability": self.stability_score,
+            "fidelity": self.fidelity_score,
             "thresholds": self.thresholds.to_dict(),
             "passed": self.passed,
             "findings": list(self.findings),
@@ -159,7 +186,18 @@ class Truth:
         minimum_overlap: Smallest acceptable fraction of the expected
             features found in the observed top ranking, in [0, 1].
         limitations: Stated limits of the reference.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `expected` and `overlap`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "expected_features": "expected",
+                "minimum_overlap": "overlap",
+            }
+        ),
+    )
 
     method: str
     reference: str
@@ -199,13 +237,14 @@ class Truth:
         """Returns the reference declaration as JSON-native evidence.
 
         Returns:
-            A mapping of every field, with sequences as lists.
+            A mapping of every field, with sequences as lists, in the
+            current layout.
         """
         return {
             "method": self.method,
             "reference": self.reference,
-            "expected_features": list(self.expected_features),
-            "minimum_overlap": self.minimum_overlap,
+            "expected": list(self.expected_features),
+            "overlap": self.minimum_overlap,
             "limitations": list(self.limitations),
         }
 
@@ -227,7 +266,22 @@ class Comparison:
         passed: Whether `overlap_score` reached `minimum_overlap`.
         findings: Human-readable statements explaining the outcome.
         limitations: Stated limits of the reference.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `sample`, `expected`, `observed`, `agreement`
+            (the overlap score) and `overlap` (its minimum).
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "sample_id": "sample",
+                "expected_features": "expected",
+                "observed_features": "observed",
+                "overlap_score": "agreement",
+                "minimum_overlap": "overlap",
+            }
+        ),
+    )
 
     sample_id: str
     method: str
@@ -267,17 +321,17 @@ class Comparison:
 
         Returns:
             A mapping of every field plus `status` set to "available", with
-            sequences as lists.
+            sequences as lists, in the current layout.
         """
         return {
             "status": "available",
-            "sample_id": self.sample_id,
+            "sample": self.sample_id,
             "method": self.method,
             "reference": self.reference,
-            "expected_features": list(self.expected_features),
-            "observed_features": list(self.observed_features),
-            "overlap_score": self.overlap_score,
-            "minimum_overlap": self.minimum_overlap,
+            "expected": list(self.expected_features),
+            "observed": list(self.observed_features),
+            "agreement": self.overlap_score,
+            "overlap": self.minimum_overlap,
             "passed": self.passed,
             "findings": list(self.findings),
             "limitations": list(self.limitations),
@@ -296,7 +350,17 @@ class Suite:
         passed: Whether every sample has a reference and every comparison
             passed.
         findings: Human-readable statements explaining the outcome.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `samples`, `references` and the comparisons at
+            their version 2.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {"sample_count": "samples", "reference_count": "references"},
+            parts={"evaluations": Comparison.migrations[0]},
+        ),
+    )
 
     sample_count: int
     reference_count: int
@@ -350,8 +414,8 @@ class Suite:
         )
         return {
             "status": self.status,
-            "sample_count": self.sample_count,
-            "reference_count": self.reference_count,
+            "samples": self.sample_count,
+            "references": self.reference_count,
             "minimum_overlap_score": min(overlaps) if overlaps else None,
             "mean_overlap_score": (
                 sum(overlaps) / len(overlaps) if overlaps else None

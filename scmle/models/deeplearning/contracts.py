@@ -9,11 +9,13 @@ for the same numeric representation seen by the model.
 
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
 import numpy
 
 from scmle.contracts import capabilities
 from scmle.contracts import errors
+from scmle.contracts import records
 
 ATTRIBUTION_MATRIX_RANK = 2
 
@@ -28,7 +30,19 @@ class Checkpoint:
         trusted_local_storage: Whether checkpoints may only be loaded from
             trusted local storage.
         atomic_replace: Whether saving replaces the file atomically.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `trusted` and `atomic`. `schema_version` is the
+            checkpoint file's version, not this declaration's.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "trusted_local_storage": "trusted",
+                "atomic_replace": "atomic",
+            }
+        ),
+    )
 
     format: str
     schema_version: int
@@ -50,12 +64,16 @@ class Checkpoint:
 
     def to_dict(self) -> dict[str, object]:
         """Returns a stable JSON-compatible description."""
-        return {
-            "format": self.format,
-            "schema_version": self.schema_version,
-            "trusted_local_storage": self.trusted_local_storage,
-            "atomic_replace": self.atomic_replace,
-        }
+        return records.upgrade(
+            self.migrations,
+            {
+                "format": self.format,
+                "schema_version": self.schema_version,
+                "trusted_local_storage": self.trusted_local_storage,
+                "atomic_replace": self.atomic_replace,
+            },
+            records.ORIGIN,
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -69,7 +87,15 @@ class Contract:
         methods: Inference methods offered, sorted and de-duplicated.
         output: Description of what the methods return.
         deterministic: Whether repeated inference gives identical output.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `rank` and `dtype`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"input_rank": "rank", "input_dtype": "dtype"}
+        ),
+    )
 
     modality: capabilities.Modality
     input_rank: int
@@ -101,14 +127,18 @@ class Contract:
 
     def to_dict(self) -> dict[str, object]:
         """Returns a stable JSON-compatible description."""
-        return {
-            "modality": self.modality.value,
-            "input_rank": self.input_rank,
-            "input_dtype": self.input_dtype,
-            "methods": list(self.methods),
-            "output": self.output,
-            "deterministic": self.deterministic,
-        }
+        return records.upgrade(
+            self.migrations,
+            {
+                "modality": self.modality.value,
+                "input_rank": self.input_rank,
+                "input_dtype": self.input_dtype,
+                "methods": list(self.methods),
+                "output": self.output,
+                "deterministic": self.deterministic,
+            },
+            records.ORIGIN,
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -166,7 +196,13 @@ class Contribution:
         method: Name of the attribution method.
         target: What the attribution is taken with respect to.
         feature_count: Number of input features, equal to the column count.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `feature_count` as `features`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"feature_count": "features"}),
+    )
 
     values: numpy.ndarray
     method: str
@@ -200,13 +236,17 @@ class Contribution:
 
     def to_dict(self) -> dict[str, object]:
         """Returns JSON-compatible metadata without silently losing values."""
-        return {
-            "method": self.method,
-            "target": self.target,
-            "feature_count": self.feature_count,
-            "row_count": int(self.values.shape[0]),
-            "values": self.values.tolist(),
-        }
+        return records.upgrade(
+            self.migrations,
+            {
+                "method": self.method,
+                "target": self.target,
+                "feature_count": self.feature_count,
+                "row_count": int(self.values.shape[0]),
+                "values": self.values.tolist(),
+            },
+            records.ORIGIN,
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -223,7 +263,20 @@ class Boundary:
         explanation: Explanation contract, or None when the family offers no
             explanations.
         limitations: Caveats of the family, sorted and de-duplicated.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `family`, `extras`, and the checkpoint and
+            inference contracts at their version 2.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {"model_family": "family", "required_extras": "extras"},
+            parts={
+                "checkpoint": Checkpoint.migrations[0],
+                "inference": Contract.migrations[0],
+            },
+        ),
+    )
 
     model_family: str
     status: capabilities.Status
@@ -331,10 +384,10 @@ class Boundary:
     def to_dict(self) -> dict[str, object]:
         """Returns the complete declaration for evidence and diagnostics."""
         return {
-            "model_family": self.model_family,
+            "family": self.model_family,
             "status": self.status.value,
             "modalities": [item.value for item in self.modalities],
-            "required_extras": list(self.required_extras),
+            "extras": list(self.required_extras),
             "checkpoint": self.checkpoint.to_dict(),
             "inference": self.inference.to_dict(),
             "explanation": (

@@ -30,12 +30,14 @@ import dataclasses
 import itertools
 import operator
 from typing import Any
+from typing import ClassVar
 
 import numpy
 import pandas
 from sklearn import neighbors
 
 from scmle.contracts import models
+from scmle.contracts import records
 
 MIN_PREDICTIONS = 3
 MIN_NOISE_ROWS = 50
@@ -76,7 +78,16 @@ class Decomposition:
         variance_share: Variance as a share of bias plus variance.
         verdict: `variance-dominated`, `bias-dominated` or `balanced`.
         advice: What the verdict suggests.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `bias_plus_noise` as `confounded` and
+            `variance_share` as `share`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"bias_plus_noise": "confounded", "variance_share": "share"}
+        ),
+    )
 
     kind: str
     replicates: int
@@ -94,9 +105,12 @@ class Decomposition:
         """Returns the JSON-ready record.
 
         Returns:
-            A mapping of every field of the decomposition.
+            A mapping of every field of the decomposition, in the current
+            layout.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 def noise_floor(
