@@ -69,3 +69,20 @@ def test_a_reply_without_the_contract_keys_fails(monkeypatch) -> None:
     absent = [key for key in serving.RESPONSE_KEYS if key not in body]
     assert report["passed"] is False
     assert report["mismatches"] == [f"response lacks {absent}"]
+
+
+def test_the_goldens_read_each_file_by_its_exact_name(monkeypatch) -> None:
+    read = []
+    real = parity.read_json
+
+    def spy(path):
+        read.append(pathlib.Path(path).name)
+        return real(path)
+
+    monkeypatch.setattr(parity, "read_json", spy)
+    parity.goldens(GOLDEN)
+    assert sorted(read) == [
+        "model_spec.json",
+        "records.json",
+        "tolerances.json",
+    ]
