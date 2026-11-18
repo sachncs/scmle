@@ -5,6 +5,7 @@ import datetime
 import json
 import math
 from typing import Any
+from typing import ClassVar
 from typing import Literal
 from urllib.parse import urlparse
 
@@ -175,8 +176,19 @@ class Method(Contract):
         return normalized
 
 
-class Clearance(Contract):
-    """Decision describing whether explanation content may be disclosed."""
+class Clearance(Contract, records.Spelled):
+    """Decision describing whether explanation content may be disclosed.
+
+    Attributes:
+        decision: Whether the content is allowed, redacted or denied.
+        reason: The auditable reason for the decision.
+        redacted_fields: Names of the redacted fields, stored as `redacted`.
+        spelling: Field names to stored keys.
+    """
+
+    spelling: ClassVar[records.Migration] = records.Migration(
+        renames={"redacted_fields": "redacted"}
+    )
 
     decision: PrivacyStatus
     reason: str
@@ -270,7 +282,27 @@ class Link(Contract):
         return None if value is None else require_text(value, "link.digest")
 
 
-class Evidence(Contract, records.Record):
+RENAMES = {
+    "dataset_snapshot": "snapshot",
+    "feature_graph": "lineage",
+    "software_version": "software",
+    "causal_warning": "caveat",
+    "privacy_decision": "clearance",
+    "evidence_links": "links",
+}
+"""Evidence field names to their stored single-word keys."""
+
+DIGESTS = {
+    "digests": {
+        "model_fingerprint": "model",
+        "bundle_digest": "bundle",
+        "input_fingerprint": "payload",
+    }
+}
+"""The evidence hashes, stored together under `digests`."""
+
+
+class Evidence(Contract, records.Spelled, records.Record):
     """Portable evidence record for one global or local explanation.
 
     The record deliberately stores references and JSON-native outputs rather
@@ -296,7 +328,22 @@ class Evidence(Contract, records.Record):
         privacy_decision: Disclosure and redaction decision.
         evidence_links: Supporting artifact or report references.
         schema_version: Version of the evidence record layout; at least one.
+            Version 2 stores single-word keys and the three hashes under
+            `digests` (`model`, `bundle`, `payload`).
+        spelling: Field names to stored keys at the top level.
+        migrations: Version steps of the stored evidence.
     """
+
+    spelling: ClassVar[records.Migration] = records.nest(
+        renames=RENAMES, groups=DIGESTS
+    )
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames=RENAMES,
+            parts={"clearance": Clearance.spelling},
+            groups=DIGESTS,
+        ),
+    )
 
     model_fingerprint: str
     bundle_digest: str
@@ -449,9 +496,13 @@ class Evidence(Contract, records.Record):
         return value.astimezone(datetime.UTC)
 
     def canonize(self) -> str:
-        """Returns deterministic JSON safe to embed in an HTML document."""
+        """Returns deterministic JSON safe to embed in an HTML document.
+
+        The JSON is the evidence at version 1 (`records.anchor`), so a digest
+        of it does not change when a stored key is renamed.
+        """
         payload = json.dumps(
-            self.model_dump(mode="json"),
+            records.anchor(self),
             allow_nan=False,
             ensure_ascii=True,
             separators=(",", ":"),

@@ -206,6 +206,83 @@ class Record(Schema):
         return detect(cls.__name__, layout, cls.legacy)
 
 
+class Spelled(Schema):
+    """A part or record whose stored keys differ from its field names.
+
+    Its `spelling` step moves a layout keyed by field name to the stored
+    layout (one word per key, shared prefixes as objects) and back, so code
+    keeps the field names while files carry the approved vocabulary. Dumping
+    writes the stored layout; loading accepts either layout. A kind that is
+    also a `Record` (listed before it in the bases) migrates the stored
+    version first.
+
+    Attributes:
+        spelling: Field-name layout to stored layout, applied at the top
+            level only; nested parts carry their own.
+    """
+
+    spelling: ClassVar[Migration] = Migration()
+
+    @pydantic.model_validator(mode="before")
+    @classmethod
+    def migrate(cls, raw: Any) -> Any:
+        """Moves a stored layout to the field names before validation.
+
+        Args:
+            raw: The stored record, keyword arguments, or a value pydantic
+                will reject.
+
+        Returns:
+            The layout keyed by field name, or `raw` unchanged when it is not
+            a mapping.
+
+        Raises:
+            InputError: If the stored version is not a positive integer or is
+                newer than this build.
+        """
+        if not isinstance(raw, Mapping):
+            return raw
+        layout = dict(raw)
+        if issubclass(cls, Record):
+            layout = load(cls.__name__, cls.migrations, layout, cls.legacy)
+        if set(layout) - set(cls.model_fields):
+            layout = cls.spelling.downgrade(layout)
+        return layout
+
+    @pydantic.model_serializer(mode="wrap")
+    def spell(self, handler: pydantic.SerializerFunctionWrapHandler) -> Any:
+        """Writes the stored layout.
+
+        Args:
+            handler: pydantic's serializer for the fields.
+
+        Returns:
+            The dumped record with its stored keys.
+        """
+        dumped = handler(self)
+        if not isinstance(dumped, dict):
+            return dumped
+        return type(self).spelling.upgrade(dumped)
+
+
+def anchor(record: Record) -> Layout:
+    """Returns a record's dump at version 1, the layout its digest names.
+
+    Identity digests are computed on this layout, so renaming a stored key
+    never changes the digest of stored content.
+
+    Args:
+        record: The record.
+
+    Returns:
+        The record's JSON dump moved down to version 1, with
+        `schema_version` set to 1.
+    """
+    stored = record.model_dump(mode="json")
+    stored.pop(KEY, None)
+    return {KEY: ORIGIN, **downgrade(type(record).migrations, stored)}
+
+
 def detect(name: str, layout: Layout, legacy: str | None = None) -> int:
     """Removes and returns the stored version of a record.
 

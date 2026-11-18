@@ -253,7 +253,24 @@ class Run:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Comparison:
-    """Decision and measurements from a baseline comparison."""
+    """Decision and measurements from a baseline comparison.
+
+    Version 2 of the stored comparison writes `baselines` (the number of
+    reference runs), `run` and `regressions`; the fields keep their names.
+
+    Attributes:
+        migrations: Version steps of the stored comparison.
+    """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "baseline_run_count": "baselines",
+                "current_run_id": "run",
+                "relative_regressions": "regressions",
+            }
+        ),
+    )
 
     passed: bool
     baseline_run_count: int
@@ -265,16 +282,33 @@ class Comparison:
         """Returns JSON-native comparison evidence."""
         return {
             "passed": self.passed,
-            "baseline_run_count": self.baseline_run_count,
-            "current_run_id": self.current_run_id,
-            "relative_regressions": self.relative_regressions,
+            "baselines": self.baseline_run_count,
+            "run": self.current_run_id,
+            "regressions": self.relative_regressions,
             "violations": list(self.violations),
         }
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Baseline:
-    """Repeated-run performance baseline with a relative regression gate."""
+    """Repeated-run performance baseline with a relative regression gate.
+
+    Version 2 of the stored baseline writes `runs` (each in the `Run`
+    layout) and `regression`; the fields keep their names.
+
+    Attributes:
+        migrations: Version steps of the stored baseline.
+    """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={
+                "reference_runs": "runs",
+                "max_relative_regression": "regression",
+            },
+            parts={"runs": Run.migrations[0]},
+        ),
+    )
 
     reference_runs: tuple[Run, ...]
     max_relative_regression: float = 0.10
@@ -551,8 +585,8 @@ class Baseline:
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-native baseline policy and reference evidence."""
         return {
-            "max_relative_regression": self.max_relative_regression,
-            "reference_runs": [run.to_dict() for run in self.reference_runs],
+            "regression": self.max_relative_regression,
+            "runs": [run.to_dict() for run in self.reference_runs],
         }
 
 
@@ -602,7 +636,23 @@ def weigh(
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Budget:
-    """Explicit time and optional memory ceilings for lifecycle operations."""
+    """Explicit time and optional memory ceilings for lifecycle operations.
+
+    Version 2 of the stored budget writes `seconds` and `memory` (in
+    gigabytes); the fields keep their names.
+
+    Attributes:
+        migrations: Version steps of the stored budget.
+    """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "max_seconds": "seconds",
+                "max_peak_memory_gb": "memory",
+            }
+        ),
+    )
 
     max_seconds: Mapping[Operation, float]
     max_peak_memory_gb: float | None = None
@@ -700,13 +750,13 @@ class Budget:
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-native budget policy."""
         return {
-            "max_seconds": {
+            "seconds": {
                 operation.value: limit
                 for operation, limit in sorted(
                     self.max_seconds.items(), key=lambda item: item[0].value
                 )
             },
-            "max_peak_memory_gb": self.max_peak_memory_gb,
+            "memory": self.max_peak_memory_gb,
         }
 
 

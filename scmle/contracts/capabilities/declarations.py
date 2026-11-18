@@ -2,14 +2,29 @@
 
 import dataclasses
 import math
+from typing import ClassVar
 from typing import TYPE_CHECKING
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.contracts import tasks
 from scmle.contracts.capabilities import axes
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+RESOURCES = records.Migration(
+    renames={
+        "cpu_cores": "cpu",
+        "memory_gb": "memory",
+        "disk_gb": "disk",
+        "gpu_required": "gpu",
+        "network_required": "network",
+        "max_rows": "rows",
+    }
+)
+"""Version 2 of stored resources: Kubernetes-like single words; the units
+(cores, gigabytes) are in the field descriptions."""
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -20,7 +35,24 @@ class Declaration:
     capability. It lets tooling answer whether a family is known, which
     modalities and optional dependencies it claims, and why it remains
     blocked before a complete task/evaluation contract exists.
+
+    Version 2 of the stored declaration writes `family`, `extras`,
+    `failures` and `links` for the fields `model_family`, `required_extras`,
+    `failure_modes` and `evidence_links`; `migrations` moves a stored layout
+    between the versions.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={
+                "model_family": "family",
+                "required_extras": "extras",
+                "failure_modes": "failures",
+                "evidence_links": "links",
+            },
+            parts={"resources": RESOURCES},
+        ),
+    )
 
     model_family: str
     status: axes.Status
@@ -86,13 +118,13 @@ class Declaration:
     def to_dict(self) -> dict[str, object]:
         """Returns a stable JSON-compatible family declaration."""
         return {
-            "model_family": self.model_family,
+            "family": self.model_family,
             "status": self.status.value,
             "modalities": [item.value for item in self.modalities],
-            "required_extras": list(self.required_extras),
+            "extras": list(self.required_extras),
             "resources": self.resources.to_dict(),
-            "failure_modes": list(self.failure_modes),
-            "evidence_links": list(self.evidence_links),
+            "failures": list(self.failure_modes),
+            "links": list(self.evidence_links),
             "limitations": list(self.limitations),
         }
 
@@ -193,7 +225,13 @@ class Coordinate:
         fairness: Fairness contract that must be available.
         explainability: Explanation contract that must be available.
         inference: Inference surface that must be available.
+        migrations: Version steps of the stored key; version 2 writes
+            `model_family` as `family`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"model_family": "family"}),
+    )
 
     modality: axes.Modality
     task: tasks.Task
@@ -240,7 +278,7 @@ class Coordinate:
         return {
             "modality": self.modality.value,
             "task": self.task.value,
-            "model_family": self.model_family,
+            "family": self.model_family,
             "evaluation": self.evaluation.value,
             "uncertainty": self.uncertainty.value,
             "fairness": self.fairness.value,
@@ -254,14 +292,20 @@ class Resources:
     """Minimum resources and environmental assumptions for a capability.
 
     Attributes:
-        cpu_cores: Minimum number of CPU cores required.
-        memory_gb: Minimum working memory required.
-        disk_gb: Minimum temporary disk space required.
-        gpu_required: Whether a compatible GPU is required.
-        network_required: Whether network access is required at runtime.
-        max_rows: Practical row limit, if one is known.
+        cpu_cores: Minimum number of CPU cores required; stored as `cpu`.
+        memory_gb: Minimum working memory required, in gigabytes; stored as
+            `memory`.
+        disk_gb: Minimum temporary disk space required, in gigabytes; stored
+            as `disk`.
+        gpu_required: Whether a compatible GPU is required; stored as `gpu`.
+        network_required: Whether network access is required at runtime;
+            stored as `network`.
+        max_rows: Practical row limit, if one is known; stored as `rows`.
         notes: Human-readable constraints that belong in release evidence.
+        migrations: Version steps of the stored resources.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (RESOURCES,)
 
     cpu_cores: int = 1
     memory_gb: float = 1.0
@@ -298,12 +342,12 @@ class Resources:
     def to_dict(self) -> dict[str, object]:
         """Returns a stable, JSON-compatible representation."""
         return {
-            "cpu_cores": self.cpu_cores,
-            "memory_gb": self.memory_gb,
-            "disk_gb": self.disk_gb,
-            "gpu_required": self.gpu_required,
-            "network_required": self.network_required,
-            "max_rows": self.max_rows,
+            "cpu": self.cpu_cores,
+            "memory": self.memory_gb,
+            "disk": self.disk_gb,
+            "gpu": self.gpu_required,
+            "network": self.network_required,
+            "rows": self.max_rows,
             "notes": list(self.notes),
         }
 
@@ -320,7 +364,24 @@ class Capability:
         failure_modes: Known conditions that must be handled or reported.
         evidence_links: References to tests or evidence artifacts.
         limitations: User-visible limitations of the declaration.
+        migrations: Version steps of the stored capability; version 2
+            writes `extras`, `failures` and `links`, and the key and
+            resources in their version-2 layouts.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={
+                "required_extras": "extras",
+                "failure_modes": "failures",
+                "evidence_links": "links",
+            },
+            parts={
+                "key": Coordinate.migrations[0],
+                "resources": RESOURCES,
+            },
+        ),
+    )
 
     key: Coordinate
     status: axes.Status
@@ -378,10 +439,10 @@ class Capability:
         return {
             "key": self.key.to_dict(),
             "status": self.status.value,
-            "required_extras": list(self.required_extras),
+            "extras": list(self.required_extras),
             "resources": self.resources.to_dict(),
-            "failure_modes": list(self.failure_modes),
-            "evidence_links": list(self.evidence_links),
+            "failures": list(self.failure_modes),
+            "links": list(self.evidence_links),
             "limitations": list(self.limitations),
         }
 

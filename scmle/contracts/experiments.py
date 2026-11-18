@@ -179,7 +179,28 @@ class Trial:
             the libraries its model needs).
         train_scores: Per-fold scores on the rows each model was fitted on,
             for the fit-health check (a bounded sample of those rows).
+        migrations: Version steps of the stored trial. Version 2 writes
+            single-word keys (`identifier`, `model`, `score`, `deviation`,
+            `folds`, `fit` in seconds, `access`, `evaluation`, `training`);
+            the fields keep their names. A trial carries no version key, so
+            `load` reads either layout.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "trial_id": "identifier",
+                "model_name": "model",
+                "score_mean": "score",
+                "score_std": "deviation",
+                "fold_scores": "folds",
+                "fit_seconds": "fit",
+                "observed_access": "access",
+                "evaluation_config": "evaluation",
+                "train_scores": "training",
+            }
+        ),
+    )
 
     trial_id: str
     model_name: str
@@ -213,7 +234,32 @@ class Trial:
             if self.failure
             else ""
         )
-        return record
+        return records.upgrade(self.migrations, record, records.ORIGIN)
+
+    @classmethod
+    def load(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuilds a trial from `to_dict` output of either version.
+
+        Args:
+            record: A stored trial, with the version-1 keys (`trial_id`,
+                `model_name`, ...) or the version-2 keys (`identifier`,
+                `model`, ...).
+
+        Returns:
+            The trial; `failure` is parsed back from its JSON text.
+
+        Raises:
+            InputError: If the record mixes an old key with its new one.
+        """
+        layout = records.load(cls.__name__, cls.migrations, record)
+        layout.pop(records.KEY)
+        fields = records.downgrade(cls.migrations, layout)
+        failure = fields.get("failure") or {}
+        fields["failure"] = (
+            json.loads(failure) if isinstance(failure, str) else failure
+        )
+        fields["status"] = Termination(fields["status"])
+        return cls(**fields)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

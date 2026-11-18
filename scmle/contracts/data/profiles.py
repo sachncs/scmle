@@ -3,14 +3,26 @@
 from collections.abc import Mapping
 import dataclasses
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import errors
 from scmle.contracts import events
+from scmle.contracts import records
 from scmle.contracts.data import findings
 from scmle.contracts.data import provenance
 
 HIGH_CARDINALITY_LEVELS = 20
+
+BLUEPRINT = records.Migration(
+    renames={"extra_inputs": "extras", "high_cardinality": "cardinal"}
+)
+"""Version 2 of a stored feature plan: the two multi-word keys it writes."""
+
+FINDINGS = {
+    "findings": {"quality_findings": "quality", "risk_findings": "risk"}
+}
+"""Quality and risk findings, stored together under `findings`."""
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -46,7 +58,12 @@ class Blueprint:
         embedding_model: Sentence-embedding model for `embedding`.
         informative_missing: Features whose gaps are associated with the
             target; `None` when missingness was not assessed.
+        migrations: Version steps of the stored plan; version 2 writes
+            `extra_inputs` as `extras` and `high_cardinality` as
+            `cardinal`. The other fields are not written.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (BLUEPRINT,)
 
     numeric: tuple[str, ...]
     categorical: tuple[str, ...]
@@ -118,8 +135,8 @@ class Blueprint:
             "dropped": dict(self.dropped),
             "derived": [n.model_dump(mode="json") for n in self.derived],
             "series": [n.model_dump(mode="json") for n in self.series],
-            "extra_inputs": list(self.extra_inputs),
-            "high_cardinality": list(self.high_cardinality),
+            "extras": list(self.extra_inputs),
+            "cardinal": list(self.high_cardinality),
         }
 
 
@@ -142,7 +159,23 @@ class Portrait:
         leakage: The leakage screen (`screen.Screen.to_dict`): its level,
             family size, suspects and the suspects that may block a run. Empty
             when the screen did not apply.
+        migrations: Version steps of the stored profile; version 2 writes
+            the findings as `findings.{quality, risk}`, the feature plan as
+            `plan` (in its version-2 layout), the dataset statistics as
+            `statistics` and the quality evidence as `evidence`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={
+                "feature_plan": "plan",
+                "dataset": "statistics",
+                "quality_evidence": "evidence",
+            },
+            parts={"plan": BLUEPRINT},
+            groups=FINDINGS,
+        ),
+    )
 
     manifest: provenance.DatasetManifest
     column_statistics: Mapping[str, Any]
@@ -185,13 +218,15 @@ class Portrait:
         return {
             "manifest": self.manifest.to_dict(),
             "columns": dict(self.column_statistics),
-            "quality_findings": list(self.quality_findings),
-            "risk_findings": list(self.risk_findings),
+            "findings": {
+                "quality": list(self.quality_findings),
+                "risk": list(self.risk_findings),
+            },
             "target": dict(self.target_summary),
-            "feature_plan": self.feature_plan.to_dict(),
-            "dataset": dict(self.dataset_statistics),
+            "plan": self.feature_plan.to_dict(),
+            "statistics": dict(self.dataset_statistics),
             "missingness": [dict(item) for item in self.missingness],
-            "quality_evidence": [dict(item) for item in self.quality_evidence],
+            "evidence": [dict(item) for item in self.quality_evidence],
             "leakage": dict(self.leakage),
         }
 
@@ -203,7 +238,30 @@ class Curation:
     This report deliberately contains no model scores. It describes the
     source observed at ingestion, the rows used for profiling, repairs made,
     quality and risk findings, and the resulting feature decisions.
+
+    Version 2 of the stored report writes single-word keys:
+    `rows.{source, profiled}`, `read` (seconds), `notes`,
+    `findings.{quality, risk}`, `features`, `dropped`, `ready` and
+    `blockers`; the fields keep their names. `migrations` moves a stored
+    report between the versions.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={
+                "read_seconds": "read",
+                "cleaning_notes": "notes",
+                "feature_columns": "features",
+                "dropped_columns": "dropped",
+                "release_ready": "ready",
+                "unresolved_blocking_findings": "blockers",
+            },
+            groups={
+                "rows": {"source_rows": "source", "profiled_rows": "profiled"},
+                **FINDINGS,
+            },
+        ),
+    )
 
     manifest: provenance.DatasetManifest
     source_rows: int
@@ -215,7 +273,7 @@ class Curation:
     risk_findings: tuple[findings.Finding, ...]
     feature_columns: Mapping[str, tuple[str, ...]]
     dropped_columns: Mapping[str, str]
-    schema_version: int = 1
+    schema_version: int = records.ORIGIN + len(migrations)
 
     @property
     def unresolved_blocking_findings(self) -> tuple[findings.Finding, ...]:
@@ -241,27 +299,29 @@ class Curation:
         return {
             "schema_version": self.schema_version,
             "manifest": self.manifest.to_dict(),
-            "source_rows": self.source_rows,
-            "profiled_rows": self.profiled_rows,
-            "read_seconds": self.read_seconds,
+            "read": self.read_seconds,
             "streamed": self.streamed,
-            "cleaning_notes": list(self.cleaning_notes),
-            "quality_findings": [
-                finding.to_dict() for finding in self.quality_findings
-            ],
-            "risk_findings": [
-                finding.to_dict() for finding in self.risk_findings
-            ],
-            "feature_columns": {
+            "notes": list(self.cleaning_notes),
+            "features": {
                 name: list(columns)
                 for name, columns in self.feature_columns.items()
             },
-            "dropped_columns": dict(self.dropped_columns),
-            "release_ready": self.release_ready,
-            "unresolved_blocking_findings": [
+            "dropped": dict(self.dropped_columns),
+            "ready": self.release_ready,
+            "blockers": [
                 finding.identifier
                 for finding in self.unresolved_blocking_findings
             ],
+            "rows": {
+                "source": self.source_rows,
+                "profiled": self.profiled_rows,
+            },
+            "findings": {
+                "quality": [
+                    finding.to_dict() for finding in self.quality_findings
+                ],
+                "risk": [finding.to_dict() for finding in self.risk_findings],
+            },
         }
 
 
@@ -273,7 +333,27 @@ class Datasheet:
     approval. Its explicit intended use, exclusions, limitations, privacy
     context, and open findings are the minimum context a reviewer needs before
     trusting a model result derived from the snapshot.
+
+    Version 2 of the stored card writes single-word keys: `dataset`,
+    `snapshot`, `use`, `excluded`, `features`, `findings.{quality, risk}`,
+    `review` and `generated`; the fields keep their names. `migrations`
+    moves a stored card between the versions.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={
+                "dataset_id": "dataset",
+                "snapshot_id": "snapshot",
+                "intended_use": "use",
+                "out_of_scope": "excluded",
+                "feature_summary": "features",
+                "review_status": "review",
+                "generated_at": "generated",
+            },
+            groups=FINDINGS,
+        ),
+    )
 
     dataset_id: str
     snapshot_id: str
@@ -292,7 +372,7 @@ class Datasheet:
     privacy: provenance.Confidentiality
     owner: str
     review_status: str = "machine_generated_unreviewed"
-    schema_version: int = 1
+    schema_version: int = records.ORIGIN + len(migrations)
     generated_at: str = dataclasses.field(default_factory=events.stamp)
 
     def __post_init__(self) -> None:
@@ -383,31 +463,31 @@ class Datasheet:
         """Returns a JSON-serializable dataset card."""
         return {
             "schema_version": self.schema_version,
-            "dataset_id": self.dataset_id,
-            "snapshot_id": self.snapshot_id,
+            "dataset": self.dataset_id,
+            "snapshot": self.snapshot_id,
             "modality": self.modality,
             "task": self.task,
             "target": self.target,
-            "intended_use": self.intended_use,
-            "out_of_scope": list(self.out_of_scope),
+            "use": self.intended_use,
+            "excluded": list(self.out_of_scope),
             "composition": dict(self.composition),
-            "feature_summary": {
+            "features": {
                 name: list(columns)
                 for name, columns in self.feature_summary.items()
             },
             "limitations": list(self.limitations),
-            "quality_findings": [
-                finding.to_dict() for finding in self.quality_findings
-            ],
-            "risk_findings": [
-                finding.to_dict() for finding in self.risk_findings
-            ],
             "source": self.source.to_dict(),
             "lineage": self.lineage.to_dict(),
             "privacy": self.privacy.to_dict(),
             "owner": self.owner,
-            "review_status": self.review_status,
-            "generated_at": self.generated_at,
+            "review": self.review_status,
+            "generated": self.generated_at,
+            "findings": {
+                "quality": [
+                    finding.to_dict() for finding in self.quality_findings
+                ],
+                "risk": [finding.to_dict() for finding in self.risk_findings],
+            },
         }
 
 

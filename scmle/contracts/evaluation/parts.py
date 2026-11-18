@@ -1,10 +1,13 @@
 """The parts of an evaluation policy: metrics, promises and release gates.
 
 Each part is nested in a `policy.Criteria` record and versioned with it, so
-it carries no version of its own.
+it carries no version of its own. A part whose stored keys are single words
+while its fields keep their longer names is `records.Spelled`: its
+`spelling` maps the field names to the stored keys.
 """
 
 from typing import Annotated
+from typing import ClassVar
 from typing import Self
 
 import pydantic
@@ -150,8 +153,16 @@ class Hurdle(records.Schema):
         return self
 
 
-class Uncertainty(records.Schema):
+class Uncertainty(records.Spelled):
     """Task-specific uncertainty promise and statistical requirements."""
+
+    spelling: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "confidence_level": "confidence",
+            "coverage_target": "coverage",
+            "minimum_rows": "rows",
+        }
+    )
 
     method: support.UncertaintyMethod
     required: pydantic.StrictBool = False
@@ -206,8 +217,12 @@ class Uncertainty(records.Schema):
         return self
 
 
-class Calibration(records.Schema):
+class Calibration(records.Spelled):
     """Task-specific calibration method and release error threshold."""
+
+    spelling: ClassVar[records.Migration] = records.Migration(
+        renames={"maximum_error": "error"}
+    )
 
     method: support.Procedure
     required: pydantic.StrictBool = False
@@ -239,8 +254,12 @@ class Calibration(records.Schema):
         return self
 
 
-class Fairness(records.Schema):
+class Fairness(records.Spelled):
     """Sensitive-group evaluation or mitigation declaration."""
+
+    spelling: ClassVar[records.Migration] = records.Migration(
+        renames={"sensitive_columns": "sensitive"}
+    )
 
     method: support.Technique
     sensitive_columns: tuple[str, ...] = ()
@@ -272,8 +291,12 @@ class Fairness(records.Schema):
         return self
 
 
-class Equity(records.Schema):
+class Equity(records.Spelled):
     """Explicit release threshold for one fairness diagnostic metric."""
+
+    spelling: ClassVar[records.Migration] = records.Migration(
+        renames={"required_evidence": "evidence"}
+    )
 
     metric: str
     maximum: Finite | None = None
@@ -305,8 +328,15 @@ class Equity(records.Schema):
         return self
 
 
-class Subgroups(records.Schema):
+class Subgroups(records.Spelled):
     """Power warning and release-blocking thresholds for subgroup reports."""
+
+    spelling: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "warning_threshold": "warning",
+            "blocking_threshold": "blocking",
+        }
+    )
 
     warning_threshold: Count
     blocking_threshold: Count | None = None
@@ -337,8 +367,25 @@ class Subgroups(records.Schema):
         return self
 
 
-class Explanations(records.Schema):
+class Explanations(records.Spelled):
     """Availability and evidence requirements for model explanations."""
+
+    spelling: ClassVar[records.Migration] = records.nest(
+        renames={
+            "required_methods": "methods",
+            "required_evidence": "evidence",
+        },
+        groups={
+            "stability": {
+                "require_stability": "required",
+                "stability_threshold": "threshold",
+            },
+            "fidelity": {
+                "require_fidelity": "required",
+                "fidelity_threshold": "threshold",
+            },
+        },
+    )
 
     availability: support.Explicability
     required_methods: tuple[str, ...] = ()
@@ -400,7 +447,7 @@ class Explanations(records.Schema):
         return self
 
 
-class Requirement(records.Schema):
+class Requirement(records.Spelled):
     """Required diagnostic and the action taken when its evidence is absent.
 
     Attributes:
@@ -411,7 +458,13 @@ class Requirement(records.Schema):
             presence gate (a report without error, such as an interval) is
             not decisive; a gate on a test that passes or fails is, and a
             report that omits its verdict then fails it (ERR-5).
+        spelling: Field names to stored keys (`required_evidence` is
+            stored as `evidence`).
     """
+
+    spelling: ClassVar[records.Migration] = records.Migration(
+        renames={"required_evidence": "evidence"}
+    )
 
     name: str
     action: support.Remedy
@@ -436,8 +489,17 @@ class Requirement(records.Schema):
         return self
 
 
-class Gates(records.Schema):
+class Gates(records.Spelled):
     """Evidence-backed thresholds required before a model is released."""
+
+    spelling: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "metric_gates": "metrics",
+            "diagnostic_gates": "diagnostics",
+            "fairness_gates": "fairness",
+            "required_evidence": "evidence",
+        }
+    )
 
     metric_gates: tuple[Hurdle, ...]
     diagnostic_gates: tuple[Requirement, ...]

@@ -8,9 +8,11 @@ import enum
 import json
 import math
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 
 class Indicator(enum.StrEnum):
@@ -140,7 +142,34 @@ class Sample:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Inference:
-    """Redacted metadata for one prediction request."""
+    """Redacted metadata for one prediction request.
+
+    Version 2 of the stored event writes single-word keys (`request`, `run`,
+    `latency` in milliseconds, `error`, `redacted`) and the model and input
+    fingerprints as `digests.{model, payload}`; the fields keep their names,
+    and the serving wire keeps `request_id`.
+
+    Attributes:
+        migrations: Version steps of the stored event.
+    """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={
+                "request_id": "request",
+                "run_id": "run",
+                "latency_ms": "latency",
+                "error_category": "error",
+                "redacted_fields": "redacted",
+            },
+            groups={
+                "digests": {
+                    "model_fingerprint": "model",
+                    "input_fingerprint": "payload",
+                }
+            },
+        ),
+    )
 
     request_id: str
     run_id: str
@@ -189,21 +218,41 @@ class Inference:
     def to_dict(self) -> dict[str, Any]:
         """Returns redacted, JSON-compatible event metadata."""
         return {
-            "request_id": self.request_id,
-            "run_id": self.run_id,
-            "model_fingerprint": self.model_fingerprint,
+            "request": self.request_id,
+            "run": self.run_id,
             "outcome": self.outcome,
-            "latency_ms": float(self.latency_ms),
+            "latency": float(self.latency_ms),
             "timestamp": self.timestamp,
-            "input_fingerprint": self.input_fingerprint,
-            "error_category": self.error_category,
-            "redacted_fields": list(self.redacted_fields),
+            "error": self.error_category,
+            "redacted": list(self.redacted_fields),
+            "digests": {
+                "model": self.model_fingerprint,
+                "payload": self.input_fingerprint,
+            },
         }
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Requirements:
-    """Retention, redaction, and alert requirements for emitted signals."""
+    """Retention, redaction, and alert requirements for emitted signals.
+
+    Version 2 of the stored policy writes `retention` (in days), `signals`,
+    `redacted` and `thresholds`; the fields keep their names.
+
+    Attributes:
+        migrations: Version steps of the stored policy.
+    """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "retention_days": "retention",
+                "required_signals": "signals",
+                "redacted_fields": "redacted",
+                "alert_thresholds": "thresholds",
+            }
+        ),
+    )
 
     retention_days: int
     required_signals: tuple[Indicator, ...]
@@ -247,12 +296,10 @@ class Requirements:
     def to_dict(self) -> dict[str, Any]:
         """Returns a deterministic policy record."""
         return {
-            "retention_days": self.retention_days,
-            "required_signals": sorted(
-                signal.value for signal in self.required_signals
-            ),
-            "redacted_fields": sorted(self.redacted_fields),
-            "alert_thresholds": dict(sorted(self.alert_thresholds.items())),
+            "retention": self.retention_days,
+            "signals": sorted(signal.value for signal in self.required_signals),
+            "redacted": sorted(self.redacted_fields),
+            "thresholds": dict(sorted(self.alert_thresholds.items())),
         }
 
 

@@ -3,6 +3,7 @@
 from collections.abc import Iterable
 import json
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 import pydantic
@@ -14,8 +15,40 @@ from scmle.contracts.evaluation import parts
 from scmle.contracts.evaluation import support
 
 
-class Criteria(records.Record):
-    """Complete task-aware evaluation and release declaration."""
+class Criteria(records.Spelled, records.Record):
+    """Complete task-aware evaluation and release declaration.
+
+    Version 2 stores single-word keys (`primary_metric` as `metric`,
+    `small_groups` as `small`, and the renamed keys of each part); the
+    fields keep their names. A version-1 policy loads through `migrations`.
+
+    Attributes:
+        spelling: Field names to stored keys at the top level.
+        migrations: Version steps of the stored policy and its parts.
+    """
+
+    spelling: ClassVar[records.Migration] = records.Migration(
+        renames={"primary_metric": "metric", "small_groups": "small"}
+    )
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={"primary_metric": "metric", "small_groups": "small"},
+            parts={
+                "uncertainty": parts.Uncertainty.spelling,
+                "calibration": parts.Calibration.spelling,
+                "fairness": parts.Fairness.spelling,
+                "small": parts.Subgroups.spelling,
+                "explanations": parts.Explanations.spelling,
+                "release": records.nest(
+                    renames=dict(parts.Gates.spelling.renames),
+                    parts={
+                        "diagnostics": parts.Requirement.spelling,
+                        "fairness": parts.Equity.spelling,
+                    },
+                ),
+            },
+        ),
+    )
 
     task: tasks.Task
     primary_metric: str
@@ -195,9 +228,13 @@ class Criteria(records.Record):
             )
 
     def canonize(self) -> str:
-        """Returns stable JSON suitable for hashing and evidence storage."""
+        """Returns stable JSON suitable for hashing and evidence storage.
+
+        The JSON is the policy at version 1 (`records.anchor`), so a digest
+        of it does not change when a stored key is renamed.
+        """
         return json.dumps(
-            self.model_dump(mode="json"),
+            records.anchor(self),
             allow_nan=False,
             ensure_ascii=True,
             separators=(",", ":"),

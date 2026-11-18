@@ -12,10 +12,12 @@ import dataclasses
 import enum
 import json
 import re
+from typing import ClassVar
 from typing import NoReturn
 
 from scmle.contracts import capabilities
 from scmle.contracts import errors
+from scmle.contracts import records
 
 
 class Modality(enum.StrEnum):
@@ -166,7 +168,13 @@ class Proof:
             stage.
         evidence: JSON-native structured output produced by the stage.
         notes: Human-readable boundaries or observations for the stage.
+        migrations: Version steps of the stored record; version 2 writes
+            `evidence_links` as `links`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"evidence_links": "links"}),
+    )
 
     stage: Phase
     evidence_links: tuple[str, ...] = ()
@@ -219,7 +227,7 @@ class Proof:
         """Returns a stable JSON-compatible stage record."""
         return {
             "stage": self.stage.value,
-            "evidence_links": list(self.evidence_links),
+            "links": list(self.evidence_links),
             "evidence": dict(self.evidence),
             "notes": list(self.notes),
         }
@@ -255,7 +263,26 @@ class Declaration:
         resources: Minimum runtime and environment assumptions.
         failure_modes: Known failures that must be handled or reported.
         limitations: User-visible boundaries of the declaration.
+        migrations: Version steps of the stored declaration. Version 2
+            writes single-word keys (`evidence`, `extras`, `failures`,
+            `missing`) and its stage records and resources in their
+            version-2 layouts; the fields keep their names.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={
+                "stage_evidence": "evidence",
+                "required_extras": "extras",
+                "failure_modes": "failures",
+                "missing_stages": "missing",
+            },
+            parts={
+                "evidence": Proof.migrations[0],
+                "resources": capabilities.Resources.migrations[0],
+            },
+        ),
+    )
 
     modality: ModalityIdentity
     status: Status
@@ -342,17 +369,17 @@ class Declaration:
         return {
             "modality": serialise(self.modality),
             "status": self.status.value,
-            "stage_evidence": [
+            "evidence": [
                 stage_records[stage].to_dict()
                 for stage in REQUIRED_LIFECYCLE_STAGES
                 if stage in stage_records
             ],
-            "required_extras": list(self.required_extras),
+            "extras": list(self.required_extras),
             "resources": self.resources.to_dict(),
-            "failure_modes": list(self.failure_modes),
+            "failures": list(self.failure_modes),
             "limitations": list(self.limitations),
             "complete": self.complete,
-            "missing_stages": [stage.value for stage in self.missing_stages],
+            "missing": [stage.value for stage in self.missing_stages],
         }
 
 

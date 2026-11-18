@@ -6,11 +6,26 @@ import json
 from typing import NoReturn
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.contracts.capabilities import axes
 from scmle.contracts.capabilities import catalog
 from scmle.contracts.capabilities import declarations
 
-CAPABILITY_SCHEMA_VERSION = 1
+MIGRATIONS = (
+    records.nest(
+        renames={},
+        parts={
+            "model_families": declarations.Declaration.migrations[0],
+            "capabilities": declarations.Capability.migrations[0],
+        },
+    ),
+)
+"""Version steps of the serialized registry: version 2 writes each family
+declaration and capability with single-word keys (`family`, `extras`,
+`failures`, `links`, `resources.{cpu, memory, disk, gpu, network,
+rows}`)."""
+
+CAPABILITY_SCHEMA_VERSION = records.ORIGIN + len(MIGRATIONS)
 """Schema version for serialized capability-registry evidence."""
 
 
