@@ -165,7 +165,12 @@ def tabulate() -> dict[int, tuple[int, int]]:
         if not name.isdigit():
             continue
         try:
-            with (entry / "stat").open(encoding="ascii") as handle:
+            # The command name in parentheses may hold any bytes; only the
+            # fields after the last ")" are read, so undecodable bytes in the
+            # name are replaced rather than skipping the process.
+            with (entry / "stat").open(
+                encoding="utf-8", errors="replace"
+            ) as handle:
                 after_name = handle.read().rsplit(")", 1)[1].split()
             with (entry / "statm").open(encoding="ascii") as handle:
                 resident = int(handle.read().split()[1]) * page

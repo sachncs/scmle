@@ -139,3 +139,51 @@ def test_a_failed_trial_carries_the_child_failure() -> None:
     ) as raised:
         limits.Supervisor(30.0, None).run(explode, 1)
     assert raised.value.details["failure"]["message"] == "boom"
+
+
+class Entry:
+    """A `/proc` entry whose file names match case-sensitively, as on Linux."""
+
+    def __init__(self, name: str, files: dict[str, pathlib.Path]) -> None:
+        self.name = name
+        self.files = files
+
+    def __truediv__(self, name: str) -> pathlib.Path:
+        return self.files.get(name, self.files["stat"].parent / "absent")
+
+
+def test_the_proc_table_reads_the_lowercase_statm(
+    monkeypatch, tmp_path
+) -> None:
+    stat = tmp_path / "stat"
+    stat.write_text("42 (a b) S 7 0 0", encoding="ascii")
+    statm = tmp_path / "statm"
+    statm.write_text("100 25 0", encoding="ascii")
+    entry = Entry("42", {"stat": stat, "statm": statm})
+    root = types.SimpleNamespace(iterdir=lambda: [entry])
+    monkeypatch.setattr(
+        limits, "pathlib", types.SimpleNamespace(Path=lambda text: root)
+    )
+    page = limits.resource.getpagesize()
+    assert limits.tabulate() == {42: (7, 25 * page)}
+
+
+def test_a_process_with_a_non_ascii_name_is_still_counted(
+    tmp_path, monkeypatch
+):
+    # /proc/<pid>/stat holds the command name in parentheses; a name with
+    # non-ASCII bytes used to fail decoding, the process was skipped and the
+    # memory check undercounted.
+    proc = tmp_path / "proc"
+    entry = proc / "4242"
+    entry.mkdir(parents=True)
+    (entry / "stat").write_bytes("4242 (café) S 1 4242".encode())
+    (entry / "statm").write_text("10 3 0 0 0 0 0", encoding="ascii")
+    real = pathlib.Path
+    monkeypatch.setattr(
+        limits.pathlib,
+        "Path",
+        lambda path: real(proc) if path == "/proc" else real(path),
+    )
+    table = limits.tabulate()
+    assert table[4242] == (1, 3 * limits.resource.getpagesize())
