@@ -80,7 +80,7 @@
     },
     "battery_pretrend": {
       "alpha_falsify": 0.01,
-      "code_hash": "d134f697cd524fb9eb9f903592eaa9e9d667a2fd13fe8cce61381e358b7cec84",
+      "code_hash": "5c876a8d7c87998113fe7ef67e080b446f8a2bb02c3c823dd745ce1dcc9a5104",
       "curve": {
         "0.0": {
           "hits": 21,
@@ -148,7 +148,7 @@
         ]
       },
       "false_alarm_bound": 0.014449719092257398,
-      "method_hash": "a67416e3acc1dbdd73313565a81dfa78b8236b8ff114a6ef65f2a84c62d86d13",
+      "method_hash": "2b0b5285e6d70b97196370c818faa06814c90c37072e8e443e4fff7fd5860852",
       "passed": true,
       "seeds": [
         0,
@@ -157,7 +157,7 @@
     },
     "battery_rd": {
       "alpha_falsify": 0.01,
-      "code_hash": "587805a335069cea4662515fba6d3a8c244e8fb345da1b9ea8f258e893e86864",
+      "code_hash": "af429584411c5ace9ab9fcb8e1a5d9ca45d4660f53dbbc2e2e07a1e39754a4f0",
       "curve": {
         "0.0": {
           "hits": 15,
@@ -225,7 +225,7 @@
         ]
       },
       "false_alarm_bound": 0.01629285308902091,
-      "method_hash": "b41b5da185f21f51fe47cebae081defe3b1dc2cd57336ca9c334abc20be11f1c",
+      "method_hash": "129ea9600016714e7d359eca502cef063dca33e4da33cb55b4e1f93a9fcb0008",
       "passed": true,
       "seeds": [
         0,
@@ -280,8 +280,8 @@
       }
     },
     "coverage_did": {
-      "code_hash": "87fb46c16f29db8558333044bf6910a99355aaa4e0a07f128e58053cd1b61b73",
-      "method_hash": "995c0c45ea78dd8f4eff6f6bc93475e3fe2496fc8a22beff0a1ca255668cfacc",
+      "code_hash": "b8c85094935940bfd9f4a720d8750157ed7a8485c4be752b321139a5042dce19",
+      "method_hash": "5d557daac22c41a56ddc0f130abb1fedd8a5588187636b2ced978238c36c3ee7",
       "passed": true,
       "seeds": [
         0,
@@ -354,7 +354,7 @@
       ]
     },
     "coverage_rd": {
-      "code_hash": "8ed5e2885681947e3ec7d45426877147ca1d2990b195550cb8c86b205222cc56",
+      "code_hash": "12065c5feaced4ed1a1b2747359712ae5354e06a920f25ac74b7a2c273f1ef05",
       "coverage": {
         "hits": 1906,
         "mean_z": -0.01160965707746099,
@@ -367,7 +367,7 @@
         ],
         "z_within_0.1": true
       },
-      "method_hash": "bffc916907b8eaaec119827ca8557f6703183ffe415c4722de6a0e063d58b223",
+      "method_hash": "8edf58af646879d30d1c10bca384d6d1392d5634872ab6d7cb4e407c4922e3d3",
       "passed": true,
       "seeds": [
         0,
@@ -376,7 +376,7 @@
     },
     "density_rd": {
       "alpha_falsify": 0.01,
-      "code_hash": "78957d7d9dfc566bc39be8992334eaa4d9900e4de73b232ca68fe16bf4e98dae",
+      "code_hash": "83dd27730939f11c080b30de6ff8eb8eb971bcd7ce507c5f2108870b9c14d754",
       "curve": {
         "0.0": {
           "hits": 20,
@@ -444,7 +444,7 @@
         ]
       },
       "false_alarm_bound": 0.014449719092257398,
-      "method_hash": "6c28cd744cc84c0c96b2479c4a49a8996bc96fc4c14ecd5f94097bab85359eee",
+      "method_hash": "fdcdca3227c2b0996e8b3e7b082550f418a7472036000cd0aa63c0f59dc8b1b0",
       "passed": true,
       "seeds": [
         0,
@@ -766,7 +766,7 @@
       }
     },
     "sensitivity_did": {
-      "code_hash": "51a14b3dc81f0a7a1074df3b1b4c814f1645f1bce2f16746d57390bdb690af57",
+      "code_hash": "491b6fba850bfb94af71ac2f69a164885ad2c75372bd7b8bd849979ecea833b1",
       "drift_per_period": 0.1,
       "m0_coverage": {
         "hits": 56,
@@ -787,7 +787,7 @@
           0.9918047434734504
         ]
       },
-      "method_hash": "8d18c77bbba212f8755ceddafc939356f70c5f771f67331ffcce5c747b9d3521",
+      "method_hash": "42931936499549e883062a8ea460d69618a9c042b30e868d39f8f87173bb1bcf",
       "passed": true,
       "replicates": 125,
       "seeds": [
@@ -796,8 +796,8 @@
       ]
     },
     "size_synth": {
-      "code_hash": "6ddeec23bdb27e99a0e64e785633b3b2053702819b26d028b08666b3dd50c66f",
-      "method_hash": "04d425f603462b960c732cbd5902b15783b77287e9d0a8e272bc40274a1f055d",
+      "code_hash": "3fbe336f57ba4eb1efe2f87c2519ae99c2df59b5624d68789324747c54fd0ad6",
+      "method_hash": "bd372dfe3ee52e4dd85a86132a954093f53cdd807c059eb81e4c5149e7657cc4",
       "passed": true,
       "power_at_effect_3": {
         "hits": 60,

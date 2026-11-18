@@ -58,6 +58,20 @@ def test_modality_project_runs_and_persists_all_stages(tmp_path):
     assert predictor.predict(project.adapter.samples[:2]).shape == (2,)
 
 
+def test_built_in_modality_states_why_it_stays_experimental(tmp_path):
+    """A built-in modality off the shared engine names its parity gap."""
+    project = scmle.api.project.ModalityProject(
+        text_adapter(), "test-signing-key", output_dir=tmp_path / "run"
+    )
+    project.run()
+
+    declaration = project.declaration()
+
+    assert declaration.status is modalities.Status.EXPERIMENTAL
+    assert declaration.limitations[-1] == modality_lifecycle.constants.SHORTFALL
+    assert "cross-validation" in declaration.limitations[-1]
+
+
 def test_modality_project_rejects_invalid_configuration(tmp_path):
     """Configuration errors are explicit before a lifecycle can start."""
     with pytest.raises(TypeError, match="Preparer"):
@@ -145,6 +159,7 @@ def test_modality_project_preserves_extension_identity_and_status(tmp_path):
     assert declaration.modality == ExtensionTextAdapter.modality
     assert declaration.status is modalities.Status.EXTENSION_ONLY
     assert declaration.complete
+    assert modality_lifecycle.constants.SHORTFALL not in declaration.limitations
     assert pathlib.PurePath(report.package.path).name == "model"
 
 

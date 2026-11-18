@@ -214,7 +214,7 @@
       "without_bypass_slice": "unverified"
     },
     "H9": {
-      "code_hash": "be53b50202a2856efadaae87b780ce8d4ded087fc4d373364e275e5a86dca699",
+      "code_hash": "8c7e1e136c30c8fbe4b46a15c18312843a71d776093480ebd1ba77dddd2cc4fd",
       "everything_escalates_rate": 0.008,
       "mean_coverage_at_tau": 0.6387600806451614,
       "naive_best_cut_violation_rate": 0.464,

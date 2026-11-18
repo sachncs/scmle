@@ -2,6 +2,7 @@
  "binary": {
   "files": [
    "capability_registry.json",
+   "complete.json",
    "config.json",
    "coverage_claim.json",
    "coverage_report.json",
@@ -54,6 +55,14 @@
    "report.html",
    "sbom.json",
    "source_registry.json",
+   "stages/00-ingeststage.json",
+   "stages/01-reservation.json",
+   "stages/02-profilestage.json",
+   "stages/03-planning.json",
+   "stages/04-trainstage.json",
+   "stages/05-selectstage.json",
+   "stages/06-finalevaluationstage.json",
+   "stages/07-packagestage.json",
    "trials/trial_001.json",
    "trials/trial_002.json",
    "trials/trial_003.json",
@@ -141,6 +150,13 @@
      }
     ],
     "schema_version": "int"
+   },
+   "complete.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "schema_version": "int",
+    "time": "str"
    },
    "config.json": {
     "charter_path": "NoneType",
@@ -2895,6 +2911,94 @@
      }
     ]
    },
+   "stages/00-ingeststage.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/01-reservation.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/02-profilestage.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/03-planning.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/04-trainstage.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/05-selectstage.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/06-finalevaluationstage.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/07-packagestage.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
    "trials/trial_001.json": {
     "error": "str",
     "evaluation_config": {
@@ -3293,6 +3397,7 @@
  "multiclass": {
   "files": [
    "capability_registry.json",
+   "complete.json",
    "config.json",
    "coverage_claim.json",
    "coverage_report.json",
@@ -3340,6 +3445,14 @@
    "report.html",
    "sbom.json",
    "source_registry.json",
+   "stages/00-ingeststage.json",
+   "stages/01-reservation.json",
+   "stages/02-profilestage.json",
+   "stages/03-planning.json",
+   "stages/04-trainstage.json",
+   "stages/05-selectstage.json",
+   "stages/06-finalevaluationstage.json",
+   "stages/07-packagestage.json",
    "trials/trial_001.json",
    "trials/trial_002.json",
    "trials/trial_003.json",
@@ -3425,6 +3538,13 @@
      }
     ],
     "schema_version": "int"
+   },
+   "complete.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "schema_version": "int",
+    "time": "str"
    },
    "config.json": {
     "charter_path": "NoneType",
@@ -6204,6 +6324,94 @@
      }
     ]
    },
+   "stages/00-ingeststage.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/01-reservation.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/02-profilestage.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/03-planning.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/04-trainstage.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/05-selectstage.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/06-finalevaluationstage.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/07-packagestage.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
    "trials/trial_001.json": {
     "error": "str",
     "evaluation_config": {
@@ -6602,6 +6810,7 @@
  "regression": {
   "files": [
    "capability_registry.json",
+   "complete.json",
    "config.json",
    "coverage_claim.json",
    "coverage_report.json",
@@ -6654,6 +6863,14 @@
    "report.html",
    "sbom.json",
    "source_registry.json",
+   "stages/00-ingeststage.json",
+   "stages/01-reservation.json",
+   "stages/02-profilestage.json",
+   "stages/03-planning.json",
+   "stages/04-trainstage.json",
+   "stages/05-selectstage.json",
+   "stages/06-finalevaluationstage.json",
+   "stages/07-packagestage.json",
    "trials/trial_001.json",
    "trials/trial_002.json",
    "trials/trial_003.json",
@@ -6739,6 +6956,13 @@
      }
     ],
     "schema_version": "int"
+   },
+   "complete.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "schema_version": "int",
+    "time": "str"
    },
    "config.json": {
     "charter_path": "NoneType",
@@ -9172,6 +9396,94 @@
       "source_id": "str"
      }
     ]
+   },
+   "stages/00-ingeststage.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/01-reservation.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/02-profilestage.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/03-planning.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/04-trainstage.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/05-selectstage.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/06-finalevaluationstage.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
+   },
+   "stages/07-packagestage.json": {
+    "config": "str",
+    "digest": "str",
+    "elapsed": "float",
+    "index": "int",
+    "schema_version": "int",
+    "seconds": "float",
+    "stage": "str",
+    "state": "str",
+    "time": "str"
    },
    "trials/trial_001.json": {
     "error": "str",

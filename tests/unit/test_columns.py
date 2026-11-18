@@ -192,10 +192,10 @@ def test_to_finite_maps_text_and_infinities_to_nan():
 
 
 def test_all_missing_columns_are_reported_as_missing_not_constant():
-    from scmle.pipeline import profiler
+    from scmle.pipeline import inspection
 
     assert (
-        profiler.disqualify(
+        inspection.disqualify(
             columns.Quantitative(),
             pandas.Series([numpy.nan] * 10),
             {"n_unique": 0, "missing_rate": 1.0},

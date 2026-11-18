@@ -1,6 +1,6 @@
 {
   "claim": "C1",
-  "code": "86b334e9aee4e87574d82f8d6d781d6412a8de2cbed6cefa8893d922eae64a51",
+  "code": "a32da16bae6771cdfb5d1d155e3bb57578277ed5d1356d67e2b4c3de1654bb0c",
   "data": "simulated tables and synthetic inputs only",
   "floor": 1.0,
   "gates": [
@@ -28,6 +28,7 @@
     "split.resident.bind",
     "split.resident.journal",
     "split.resident.open",
+    "split.resident.records",
     "split.resident.reopen",
     "split.rolling.partition",
     "split.stratified.folds",
@@ -66,7 +67,7 @@
       "message": "unit verdict coarser: ['customer_id'] is already a key, so rows are coarser than the unit",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.45,
+      "seconds": 0.46,
       "site": "scmle.cli.intake:IngestCommand.execute"
     },
     {
@@ -75,7 +76,7 @@
       "level": "site",
       "outcome": "passed",
       "path": "control",
-      "seconds": 0.45
+      "seconds": 0.46
     },
     {
       "by": "ingest.multiplicity",
@@ -146,7 +147,7 @@
       "message": "PLANNING not approved by reviewer: fault",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.85,
+      "seconds": 0.86,
       "site": "scmle.pipeline.orchestrator:Orchestrator.consult_checkpoints"
     },
     {
@@ -155,7 +156,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 1.61
+      "seconds": 1.65
     },
     {
       "by": "robustness.assessment_present",
@@ -178,7 +179,7 @@
       "message": "unresolved leakage risk (permutation screen, Benjamini-Yekutieli level 0.05): leak",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 1.11,
+      "seconds": 1.12,
       "site": "scmle.pipeline.stages.screening:Screening.enforce_leakage_policy"
     },
     {
@@ -188,7 +189,7 @@
       "outcome": "override",
       "path": "override",
       "record": "leakage suspect(s) leak stay in the features; the test score is provisional until a person settles them (declare the column unavailable at prediction, or attest it)",
-      "seconds": 1.87
+      "seconds": 1.86
     },
     {
       "by": "admissibility.quarantine_all",
@@ -209,7 +210,7 @@
       "outcome": "override",
       "path": "override",
       "record": "ledger check leakage.attestation:copy, tier attested",
-      "seconds": 0.71
+      "seconds": 0.7
     },
     {
       "by": "data.unlabeled",
@@ -241,7 +242,7 @@
       "message": "none of the top 3 candidates satisfies the serving constraints; relax the limits or allow more candidates",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 1.21,
+      "seconds": 1.2,
       "site": "scmle.pipeline.stages.selecting:SelectStage.choose"
     },
     {
@@ -251,7 +252,7 @@
       "outcome": "override",
       "path": "override",
       "record": "decision_log.json: within serving limits (max_model_mb 1000.0)",
-      "seconds": 1.59
+      "seconds": 1.61
     },
     {
       "by": "select.pareto_front",
@@ -262,7 +263,7 @@
       "message": "none of the top 3 candidates satisfies the serving constraints; relax the limits or allow more candidates",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 1.21,
+      "seconds": 1.2,
       "site": "scmle.pipeline.stages.selecting:SelectStage.select_on_front"
     },
     {
@@ -272,7 +273,7 @@
       "outcome": "override",
       "path": "override",
       "record": "decision_log.json: fastest within (max_model_mb 1000.0)",
-      "seconds": 1.7
+      "seconds": 1.73
     },
     {
       "by": "confirm.single_use",
@@ -303,7 +304,7 @@
       "message": "monotonic constraints need numeric feature columns: ['region'] are missing, excluded or not numeric",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.77,
+      "seconds": 0.79,
       "site": "scmle.pipeline.profiler:Profiler.monotonic_features"
     },
     {
@@ -312,7 +313,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 2.0
+      "seconds": 1.97
     },
     {
       "by": "profile.target_and_features",
@@ -323,7 +324,7 @@
       "message": "no usable feature columns remain after exclusions",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.04,
+      "seconds": 0.05,
       "site": "scmle.pipeline.profiler:Profiler.portray"
     },
     {
@@ -384,7 +385,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 1.71
+      "seconds": 1.69
     },
     {
       "by": "split.group.partition",
@@ -407,7 +408,7 @@
       "message": "stratified_events validation does not support binary_classification",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.04,
       "site": "scmle.data.splitting.splitters.partitions:Partitioner.check_task"
     },
     {
@@ -416,7 +417,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 1.61
+      "seconds": 1.59
     },
     {
       "by": "split.resident.bind",
@@ -484,7 +485,7 @@
       "error": "BlockedError",
       "gate": "split.resident.journal",
       "level": "site",
-      "message": "custody journal /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-8tkgii16/custody/run_x.jsonl was edited; run run_x cannot be resumed",
+      "message": "custody journal /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-1dj_oe0c/custody/run_x.jsonl was edited; run run_x cannot be resumed",
       "outcome": "blocked",
       "path": "fault",
       "seconds": 0.0,
@@ -493,6 +494,26 @@
     {
       "cause": "custody journal with a verdict's reviewer rewritten",
       "gate": "split.resident.journal",
+      "level": "site",
+      "outcome": "passed",
+      "path": "control",
+      "seconds": 0.0
+    },
+    {
+      "by": "split.resident.records",
+      "cause": "stage record with its seconds rewritten, then read on resume",
+      "error": "BlockedError",
+      "gate": "split.resident.records",
+      "level": "site",
+      "message": "stage record /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-_blk9yyx/stages/00-profile.json was edited or belongs to another configuration; the run cannot be resumed",
+      "outcome": "blocked",
+      "path": "fault",
+      "seconds": 0.0,
+      "site": "scmle.pipeline.archive:Directory.read"
+    },
+    {
+      "cause": "stage record with its seconds rewritten, then read on resume",
+      "gate": "split.resident.records",
       "level": "site",
       "outcome": "passed",
       "path": "control",
@@ -517,7 +538,7 @@
       "outcome": "override",
       "path": "override",
       "record": "config.json: validation.horizon_rows 10",
-      "seconds": 1.02
+      "seconds": 1.03
     },
     {
       "by": "split.stratified.folds",
@@ -629,7 +650,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 0.81
+      "seconds": 0.8
     },
     {
       "by": "task.resolve",
@@ -670,7 +691,7 @@
       "outcome": "override",
       "path": "override",
       "record": "config.json: task regression",
-      "seconds": 1.27
+      "seconds": 1.3
     },
     {
       "by": "task.classification",
@@ -702,7 +723,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 2.11
+      "seconds": 2.14
     },
     {
       "by": "task.ranking",
@@ -722,7 +743,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 0.82
+      "seconds": 0.84
     },
     {
       "by": "task.regression",
@@ -821,7 +842,7 @@
       "message": "test set is locked: already bound or released",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.98,
+      "seconds": 0.97,
       "site": "scmle.assurance.custody.vault:SealedTestSet.bind"
     },
     {
@@ -841,7 +862,7 @@
       "message": "test set is locked: invalid token",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.98,
+      "seconds": 0.99,
       "site": "scmle.assurance.custody.vault:SealedTestSet.open"
     },
     {
@@ -871,7 +892,7 @@
       "outcome": "override",
       "path": "override",
       "record": "config.json: resources.gpu auto",
-      "seconds": 1.57
+      "seconds": 1.56
     },
     {
       "by": "plan.monotonic",
@@ -882,7 +903,7 @@
       "message": "monotonic constraints are supported for binary classification and regression, not multiclass",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 2.23,
+      "seconds": 2.22,
       "site": "scmle.pipeline.planner:MonotonicFilter.apply"
     },
     {
@@ -892,7 +913,7 @@
       "outcome": "override",
       "path": "override",
       "record": "config.json: data.monotonic_constraints {}",
-      "seconds": 5.35
+      "seconds": 5.3
     },
     {
       "by": "budget.minimum_run",
@@ -939,13 +960,13 @@
   "tally": {
     "controls": {
       "not_passed": [],
-      "passed": 29,
-      "run": 29
+      "passed": 30,
+      "run": 30
     },
     "elsewhere": [],
-    "faults": 47,
+    "faults": 48,
     "outcomes": {
-      "blocked": 47,
+      "blocked": 48,
       "failed": 0,
       "not injected": 0,
       "override": 9,
@@ -953,9 +974,9 @@
     },
     "override_blocked": [],
     "overrides": 9,
-    "satisfied": 56,
+    "satisfied": 57,
     "share": 1.0,
-    "units": 56,
+    "units": 57,
     "unsatisfied": []
   },
   "variable": "gate_fault_block_min"

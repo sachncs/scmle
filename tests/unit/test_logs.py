@@ -130,6 +130,6 @@ def test_a_capability_downgrade_and_a_budget_skip_log_a_warning():
     stages = (ROOT / "scmle/pipeline/stages/planning.py").read_text(
         encoding="utf-8"
     )
-    context = (ROOT / "scmle/pipeline/context.py").read_text(encoding="utf-8")
+    context = (ROOT / "scmle/pipeline/journal.py").read_text(encoding="utf-8")
     assert "accepted as extension-only" in stages
     assert 'LOGGER.warning("%s skipped or reduced' in context

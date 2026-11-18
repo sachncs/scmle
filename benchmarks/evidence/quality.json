@@ -1,7 +1,7 @@
 {
   "alpha": 0.05,
   "claim": "C4",
-  "code": "c2815bdcfc2d24f99152ff8bcaf11a89a85e6228454fe4ca67ddfc77c1ea4ed5",
+  "code": "7e56d51333198ca5f220400834116f3ebaad3ae2fbce06b10e8813ef20ca4b50",
   "data": {
     "363612": "d98c8cf8b64d81cbd43aabd76222f4b54ae02f4cb2b67d4fb1c4ee9f309509d8",
     "363621": "8e9fecb0a04af9e4c8d3c625c8cd1c173a15de655254ddaed480d77a9008d00a",
@@ -65,30 +65,30 @@
       "gaps": [
         -0.3952714535901924,
         -8.60104072593224e-05,
-        -0.0010012873694757055,
-        0.07749502915671085,
+        -0.06040629624646853,
+        0.06345970692910434,
         0.009254807692307477
       ],
       "kind": "binary",
       "median": -8.60104072593224e-05,
       "passed": false,
       "tasks": 5,
-      "upper": 0.07749502915671085
+      "upper": 0.06345970692910434
     },
     {
       "failures": 0,
       "gaps": [
-        0.4327863884880567,
+        0.43489490416897864,
         -0.19563161347934965,
         0.04513783667047123,
-        0.02054125063473543,
+        0.01768837640674645,
         0.011430896312339215
       ],
       "kind": "multiclass",
-      "median": 0.02054125063473543,
+      "median": 0.01768837640674645,
       "passed": false,
       "tasks": 5,
-      "upper": 0.4327863884880567
+      "upper": 0.43489490416897864
     },
     {
       "failures": 0,
@@ -115,7 +115,7 @@
     "the default 1800 s budget",
     "AutoGluon-class reference systems"
   ],
-  "seconds": 474.1,
+  "seconds": 443.9,
   "tasks": [
     {
       "gap": -0.3952714535901924,
@@ -129,13 +129,13 @@
         },
         "cv": 0.7049961861174675,
         "score": 0.6514473684210527,
-        "seconds": 1.9,
+        "seconds": 1.3,
         "tried": 6
       },
       "product": {
         "error": "",
         "score": 0.750438596491228,
-        "seconds": 43.5
+        "seconds": 43.1
       },
       "task": 363621,
       "test_rows": 250,
@@ -154,13 +154,13 @@
         },
         "cv": 0.9249292767774712,
         "score": 0.9192844519782161,
-        "seconds": 6.9,
+        "seconds": 5.7,
         "tried": 6
       },
       "product": {
         "error": "",
         "score": 0.9193205179067334,
-        "seconds": 54.5
+        "seconds": 52.0
       },
       "task": 363696,
       "test_rows": 352,
@@ -168,7 +168,7 @@
       "trivial": 0.5
     },
     {
-      "gap": -0.0010012873694757055,
+      "gap": -0.06040629624646853,
       "kind": "binary",
       "metric": "roc_auc",
       "name": "Is-this-a-good-customer",
@@ -179,13 +179,13 @@
         },
         "cv": 0.7449858457972048,
         "score": 0.7078942668333631,
-        "seconds": 5.1,
+        "seconds": 4.2,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 0.708102637375722,
-        "seconds": 48.0
+        "score": 0.7212597487646604,
+        "seconds": 46.9
       },
       "task": 363682,
       "test_rows": 575,
@@ -193,7 +193,7 @@
       "trivial": 0.5
     },
     {
-      "gap": 0.07749502915671085,
+      "gap": 0.06345970692910434,
       "kind": "binary",
       "metric": "roc_auc",
       "name": "Marketing_Campaign",
@@ -204,13 +204,13 @@
         },
         "cv": 0.8886471009305655,
         "score": 0.9238837894498271,
-        "seconds": 7.1,
+        "seconds": 5.6,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 0.8910349028273556,
-        "seconds": 47.8
+        "score": 0.8969842483993429,
+        "seconds": 44.4
       },
       "task": 363684,
       "test_rows": 747,
@@ -229,13 +229,13 @@
         },
         "cv": 0.9723750000000001,
         "score": 0.9679999999999999,
-        "seconds": 19.5,
+        "seconds": 12.2,
         "tried": 6
       },
       "product": {
         "error": "",
         "score": 0.96366875,
-        "seconds": 46.2
+        "seconds": 45.7
       },
       "task": 363674,
       "test_rows": 800,
@@ -243,7 +243,7 @@
       "trivial": 0.5
     },
     {
-      "gap": 0.4327863884880567,
+      "gap": 0.43489490416897864,
       "kind": "multiclass",
       "metric": "log_loss",
       "name": "maternal_health_risk",
@@ -254,13 +254,13 @@
         },
         "cv": -0.6142137520164684,
         "score": 0.48546663635244175,
-        "seconds": 12.2,
+        "seconds": 4.5,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 0.7447993986558477,
-        "seconds": 51.1
+        "score": 0.7460628561268735,
+        "seconds": 48.6
       },
       "task": 363685,
       "test_rows": 338,
@@ -279,13 +279,13 @@
         },
         "cv": -0.539943755367003,
         "score": 0.5720854731110299,
-        "seconds": 29.9,
+        "seconds": 29.3,
         "tried": 6
       },
       "product": {
         "error": "",
         "score": 0.5387225074699317,
-        "seconds": 57.8
+        "seconds": 57.7
       },
       "task": 363711,
       "test_rows": 567,
@@ -304,13 +304,13 @@
         },
         "cv": -0.1352703915148558,
         "score": 0.10093897931994204,
-        "seconds": 18.1,
+        "seconds": 17.8,
         "tried": 6
       },
       "product": {
         "error": "",
         "score": 0.14269355996597444,
-        "seconds": 58.3
+        "seconds": 56.2
       },
       "task": 363702,
       "test_rows": 1064,
@@ -318,7 +318,7 @@
       "trivial": 1.0259850986291528
     },
     {
-      "gap": 0.02054125063473543,
+      "gap": 0.01768837640674645,
       "kind": "multiclass",
       "metric": "log_loss",
       "name": "students_dropout_and_academic_success",
@@ -329,13 +329,13 @@
         },
         "cv": -0.5666573100526844,
         "score": 0.5743308135422269,
-        "seconds": 10.7,
+        "seconds": 9.4,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 0.583473470164409,
-        "seconds": 57.1
+        "score": 0.5822036911272617,
+        "seconds": 50.7
       },
       "task": 363704,
       "test_rows": 1475,
@@ -354,13 +354,13 @@
         },
         "cv": -0.0770035584764098,
         "score": 0.07610715418926961,
-        "seconds": 36.3,
+        "seconds": 33.1,
         "tried": 6
       },
       "product": {
         "error": "",
         "score": 0.08595717956132004,
-        "seconds": 58.4
+        "seconds": 59.0
       },
       "task": 363699,
       "test_rows": 26018,
@@ -379,13 +379,13 @@
         },
         "cv": -0.8978487142958906,
         "score": 0.9357558317886667,
-        "seconds": 1.1,
+        "seconds": 0.9,
         "tried": 6
       },
       "product": {
         "error": "",
         "score": 0.9064343858794519,
-        "seconds": 36.0
+        "seconds": 39.5
       },
       "task": 363698,
       "test_rows": 303,
@@ -404,13 +404,13 @@
         },
         "cv": -4.663018066392686,
         "score": 4.6274459191573,
-        "seconds": 5.0,
+        "seconds": 4.3,
         "tried": 6
       },
       "product": {
         "error": "",
         "score": 4.957829813486843,
-        "seconds": 36.6
+        "seconds": 31.3
       },
       "task": 363625,
       "test_rows": 344,
@@ -429,13 +429,13 @@
         },
         "cv": -1.9820336329797725,
         "score": 1.5941468508296328,
-        "seconds": 7.4,
+        "seconds": 5.8,
         "tried": 6
       },
       "product": {
         "error": "",
         "score": 1.7661598780749972,
-        "seconds": 40.0
+        "seconds": 37.0
       },
       "task": 363612,
       "test_rows": 501,
@@ -454,13 +454,13 @@
         },
         "cv": -0.6619192514665518,
         "score": 0.6286624702421014,
-        "seconds": 7.6,
+        "seconds": 6.6,
         "tried": 6
       },
       "product": {
         "error": "",
         "score": 0.6346562278008367,
-        "seconds": 58.0
+        "seconds": 57.5
       },
       "task": 363708,
       "test_rows": 2166,
@@ -479,13 +479,13 @@
         },
         "cv": -93460.86943069096,
         "score": 94716.99489441738,
-        "seconds": 15.2,
+        "seconds": 13.3,
         "tried": 6
       },
       "product": {
         "error": "",
         "score": 95389.59303734967,
-        "seconds": 50.9
+        "seconds": 49.3
       },
       "task": 363686,
       "test_rows": 4592,

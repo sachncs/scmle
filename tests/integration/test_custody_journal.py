@@ -16,12 +16,19 @@ import scmle.api.project
 from scmle.assurance.custody import journal
 from scmle.contracts import errors
 from scmle.contracts import tasks
+from scmle.pipeline import archive
 from scmle.pipeline import policies
 from scmle.runtime import state
 
 
 def completed(frame, folder):
     return support.make_project(frame, "y", output_dir=folder).run()
+
+
+def uncomplete(run):
+    """Deletes what marks a run complete: the evaluation and the marker."""
+    (run / "evaluation.json").unlink()
+    (run / archive.MARKER).unlink()
 
 
 def rehash(run):
@@ -46,7 +53,7 @@ def test_deleting_the_evaluation_does_not_reopen_the_test_set(
 ):
     # Enforces docs/CLI.md:23.
     run = completed(binary_frame, tmp_path).run_dir
-    (run / "evaluation.json").unlink()
+    uncomplete(run)
     with pytest.raises(errors.BlockedError, match="already opened"):
         scmle.api.project.Project.resume(run, data=binary_frame)
 
@@ -60,7 +67,7 @@ def test_editing_the_config_does_not_score_another_model(
     record["models"]["exclude_models"].append(result.selected_model)
     (run / "config.json").write_text(json.dumps(record), encoding="utf-8")
     rehash(run)
-    (run / "evaluation.json").unlink()
+    uncomplete(run)
     (run / "execution_plan.json").unlink(missing_ok=True)
     with pytest.raises(errors.BlockedError, match="already opened"):
         scmle.api.project.Project.resume(run, data=binary_frame)
@@ -70,7 +77,7 @@ def test_a_copied_run_has_no_custody_record(binary_frame, tmp_path):
     run = completed(binary_frame, tmp_path).run_dir
     copy = tmp_path / "run_copy"
     shutil.copytree(run, copy)
-    (copy / "evaluation.json").unlink()
+    uncomplete(copy)
     with pytest.raises(errors.BlockedError, match="no custody record"):
         scmle.api.project.Project.resume(copy, data=binary_frame)
 

@@ -97,7 +97,7 @@ def test_frame_refuses_a_request_naming_a_missing_column(tmp_path):
 
 def test_frame_replay_without_tau_is_refused(tmp_path):
     # Enforces docs/ARTIFACTS.md:82.
-    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:254.
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:266.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:335.
     inputs(tmp_path)
     sample = {

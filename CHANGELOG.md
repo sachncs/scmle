@@ -170,6 +170,12 @@ marked `Breaking:` and listed first in their group.
 
 ### Added
 
+- Stage records and a completion marker (CON-3). After each stage finishes and
+  its approval gates pass, a run writes `stages/NN-name.json` atomically with
+  the stage, its state, its seconds, the run's elapsed seconds, the
+  configuration hash and its own digest. After the run reaches COMPLETED it
+  writes `complete.json` last of all; a run directory without it is not
+  complete, whatever else it holds.
 - Leakage screen: dates (as day counts), free text (indicators for its 50
   commonest words), pairs of two-level columns (a joint skill test, run
   only while there are no more pairs than columns; otherwise the notes say
@@ -1018,6 +1024,21 @@ marked `Breaking:` and listed first in their group.
 
 ### Changed
 
+- Resume (`Project.resume`, `scmle resume`) keeps the time a run already
+  spent: the largest elapsed seconds in its stage records start the time
+  budget and the run clock, so the budget is not restarted (CON-4). Resume
+  verifies every stage record and refuses (`BlockedError`) one that was
+  edited or written under another configuration or record format, asks the
+  custody journal first, and treats a run as complete when it has
+  `complete.json` (before: when it had `evaluation.json`). Finished stages are
+  still derived again from the same data and seeds.
+- Non-tabular modalities: each built-in modality's declaration (text,
+  document, image, audio, video, graph, geospatial) now states in its
+  limitations why it is experimental: it runs the bounded lifecycle, not the
+  shared pipeline engine, so it has no candidate search, cross-validation,
+  baseline comparison, prediction intervals, locked test set or analysis
+  charter. Extension modalities are unchanged. See
+  [`docs/WHAT_SCMLE_CANNOT_DO.md`](docs/WHAT_SCMLE_CANNOT_DO.md).
 - Restructure: `scmle.core.stages`, `scmle.models.modality_lifecycle`,
   `scmle.evaluation.parameter_estimation`, the six `scmle.data.modalities`
   modules (audio, document, geospatial, graph, image, video) and

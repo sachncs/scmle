@@ -322,7 +322,7 @@ def test_the_calibration_record_lists_its_curve_as_lists():
 
 
 def test_refusal_is_strictly_above_tau_and_always_without_one():
-    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:254.
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:266.
     assert refusal.refuse(0.3, 0.2) is True
     assert refusal.refuse(0.2, 0.2) is False
     assert refusal.refuse(0.1, 0.2) is False

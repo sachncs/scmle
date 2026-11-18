@@ -20,8 +20,9 @@ Each attempt targets one control while the condition it guards holds:
 * `data.unlabeled`: missing target values as NaN, None and empty CSV cells.
 * `policy.checkpoints`: a run rejected by a checkpoint, then resumed.
 * `split.resident.open` and `confirm.single_use` (the exam sets): resuming a
-  completed run, after deleting its evaluation and after editing its
-  configuration; rerunning a charter; resuming a confirmed charter run.
+  completed run, after deleting its evaluation and completion marker and
+  after editing its configuration; rerunning a charter; resuming a confirmed
+  charter run.
 * `charter.verify` (not in gates.toml; `sealing.read_verified`): a signed
   charter edited, with and without its hash recomputed, with and without the
   key.
@@ -708,24 +709,27 @@ def examdone(lab: Lab) -> Callable[[], dict[str, Any]]:
 
 
 def examagain(lab: Lab) -> Callable[[], dict[str, Any]]:
-    """Deletes a completed run's evaluation.json and resumes it."""
+    """Deletes a completed run's evaluation and marker and resumes it."""
     frame = table()
     run, before = finished(lab, frame)
     (run / "evaluation.json").unlink()
+    (run / "complete.json").unlink()
     return lambda: reopened(run, frame, before)
 
 
 def examedit(lab: Lab) -> Callable[[], dict[str, Any]]:
     """Excludes the winner in config.json and resumes the completed run.
 
-    The saved plan and evaluation are deleted and the declaration rehashed,
-    so a different model is tested on the same locked rows.
+    The saved plan, evaluation and completion marker are deleted and the
+    declaration rehashed, so a different model is tested on the same locked
+    rows.
     """
     frame = table()
     run, before = finished(lab, frame)
     winner = before["selected_model"]
     edit(run, lambda c: c["models"]["exclude_models"].append(winner))
     (run / "evaluation.json").unlink()
+    (run / "complete.json").unlink()
     (run / "execution_plan.json").unlink(missing_ok=True)
     return lambda: reopened(run, frame, before)
 
@@ -824,12 +828,13 @@ def rerun(lab: Lab) -> Callable[[], dict[str, Any]]:
 
 
 def charterresume(lab: Lab) -> Callable[[], dict[str, Any]]:
-    """Deletes a confirmed charter run's evaluation.json and resumes it."""
+    """Deletes a confirmed charter run's evaluation and marker, resumes it."""
     frame = table(500)
     path = charter(lab)
     with environ(SCMLE_SIGNING_KEY=KEY):
         run = pathlib.Path(project(lab, frame, charter=path).run().run_dir)
     (run / "evaluation.json").unlink()
+    (run / "complete.json").unlink()
 
     def act() -> dict[str, Any]:
         with environ(SCMLE_SIGNING_KEY=KEY):
@@ -1188,7 +1193,8 @@ ATTEMPTS = {
             "exam_resume_deleted",
             "split.resident.open",
             "api",
-            "delete evaluation.json of a completed run and resume",
+            "delete evaluation.json and complete.json of a completed run "
+            "and resume",
             examagain,
         ),
         Attempt(
@@ -1196,8 +1202,8 @@ ATTEMPTS = {
             "split.resident.open",
             "api",
             "exclude the winner in config.json, rehash the "
-            "declaration, delete execution_plan.json and "
-            "evaluation.json, resume",
+            "declaration, delete execution_plan.json, "
+            "evaluation.json and complete.json, resume",
             examedit,
         ),
         Attempt(
@@ -1211,7 +1217,8 @@ ATTEMPTS = {
             "charter_resume",
             "confirm.single_use",
             "api",
-            "delete evaluation.json of a confirmed charter run and resume",
+            "delete evaluation.json and complete.json of a confirmed "
+            "charter run and resume",
             charterresume,
             control=True,
         ),

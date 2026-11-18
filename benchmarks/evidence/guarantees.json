@@ -122,7 +122,7 @@
     }
   },
   "claim": "C12",
-  "content_hash": "3f7be4130ec9b1ee22645424355118b033968911669ed27882c231ad8206a132",
+  "content_hash": "faadde31c56ff167adb7ccaeab8fdcddc84baba4d04f07b8e542eff4faa61d9c",
   "counts": {
     "guarantees": 246,
     "linked": 246,
@@ -3599,8 +3599,8 @@
     {
       "cited": [],
       "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
-      "end": 255,
-      "line": 254,
+      "end": 267,
+      "line": 266,
       "missing": [],
       "section": "scope-of-what-it-models",
       "tests": [

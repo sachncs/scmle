@@ -11,7 +11,7 @@ def test_certificate_file_is_current_and_passing():
     store = certificates.Store.load(ingest_certify.STORE_PATH)
     assert ingest_certify.problems(store) == []
     assert ingest_certify.audit_labels(store)["uncertified"] == []
-    ids = {c.detector_id for c in store.certificates}
+    ids = {c.detector for c in store.certificates}
     assert ids == {ingest_certify.TORN_ID, "ingest-reconcile"}
 
 

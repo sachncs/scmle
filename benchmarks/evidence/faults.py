@@ -820,6 +820,27 @@ def custody(fault: str) -> None:
     record.admit()
 
 
+def resumed(fault: str) -> None:
+    """Reads a run's stage records back once, as a resume does.
+
+    Args:
+        fault: `edited` (a written record's seconds were rewritten, then
+            read) or `none`.
+    """
+    from scmle.pipeline import archive
+    from scmle.runtime import state
+
+    folder = Path(tempfile.mkdtemp(prefix="faults-"))
+    records = archive.Directory(folder, "hash")
+    records.record(0, "Profile", state.Progress.PROFILING, 1.0)
+    path = records.path(0, "Profile")
+    if fault == "edited":
+        body = json.loads(path.read_text(encoding="utf-8"))
+        body["seconds"] = 0.5
+        path.write_text(json.dumps(body), encoding="utf-8")
+    records.read()
+
+
 def rolling(horizon: int) -> str | None:
     """Runs a forecast under rolling validation with a horizon.
 
@@ -1198,6 +1219,12 @@ INJECTIONS: dict[str, Injection] = {
         "custody journal with a verdict's reviewer rewritten",
         bind(custody, "edited"),
         bind(custody, "none"),
+    ),
+    "split.resident.records": Injection(
+        "site",
+        "stage record with its seconds rewritten, then read on resume",
+        bind(resumed, "edited"),
+        bind(resumed, "none"),
     ),
     "split.rolling.partition": Injection(
         "run",

@@ -213,6 +213,15 @@ blocks = "An entry was edited, removed or reordered, so its digest or link to th
 override = "none"
 variables = []
 
+[split.resident.records]
+site = "scmle.pipeline.archive:Directory.read"
+error = "BlockedError"
+claim = "C2, C8"
+passes = "Every stage record under stages/ parses, has the current record format, and its digest and configuration hash match the run being resumed."
+blocks = "A stage record is unreadable or has no digest, has another record format, was edited after it was written, or was written under another configuration; the resumed run is refused."
+override = "none; start a new run (records are only read when a run is resumed)."
+variables = []
+
 [split.rolling.partition]
 site = "scmle.data.splitting.splitters.chronology:RollingSplit.partition"
 error = "BlockedError"

@@ -1,7 +1,7 @@
 {
   "alpha": 0.05,
   "claim": "C3",
-  "code": "f858816231260b51e8f55b29187867091c5a4c73ee532333c2872e82b7be9811",
+  "code": "7d65760d81a2f2e541f624ea6eb41e40990cac212fb3aabed1115420f1247015",
   "design": {
     "fresh_rows": 100000,
     "group_rows": 5,
@@ -66,6 +66,6 @@
     "trials": 2646
   },
   "power": 0.8,
-  "seconds": 140.8,
+  "seconds": 109.6,
   "variable": "interval_coverage_min"
 }

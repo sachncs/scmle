@@ -1,6 +1,9 @@
 """The scorecard has one row per claim, all from evidence (plan section 5)."""
 
+import json
+
 from benchmarks import scorecard
+from benchmarks.evidence import mutation
 
 
 def test_every_claim_has_one_row_in_order():
@@ -29,7 +32,13 @@ def test_measured_rows_come_from_their_evidence():
         assert found[claim].evidence == f"benchmarks/evidence/{stem}.json"
     assert "injected faults" in found["C1"].value
     assert "functions over" in found["C10"].value
-    assert found["C10"].verdict == "fail"
+    counts = json.loads(scorecard.STRUCTURE.read_text(encoding="utf-8"))
+    over = sum(
+        counts[k] for k in ("modules_over", "classes_over", "functions_over")
+    )
+    verdict = mutation.summary()[1]
+    expected = "fail" if over or verdict == "fail" else verdict
+    assert found["C10"].verdict == expected
 
 
 def test_the_table_renders_every_row():
