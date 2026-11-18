@@ -427,6 +427,24 @@ class Admissibility:
         }
 
 
+def authority(
+    gate: certificates.Authority | Mapping[str, certificates.Authority],
+    name: str,
+) -> certificates.Authority:
+    """Reads whether the leakage detector may gate one field.
+
+    Args:
+        gate: The authority for every field, or a mapping per field.
+        name: The field name.
+
+    Returns:
+        The field's authority; descriptive when a mapping omits it.
+    """
+    if isinstance(gate, Mapping):
+        return gate.get(name, certificates.Authority.DESCRIPTIVE)
+    return gate
+
+
 def build_table(
     table: provenance.Dictionary,
     kind: str,
@@ -467,12 +485,6 @@ def build_table(
     if kind not in KINDS:
         raise errors.InputError(f"kind must be one of {KINDS}")
     flags = suspects or {}
-
-    def gate(name: str) -> certificates.Authority:
-        if isinstance(leakage_gate, Mapping):
-            return leakage_gate.get(name, certificates.Authority.DESCRIPTIVE)
-        return leakage_gate
-
     if kind == "predictive":
         decisions = tuple(
             forecastable(
@@ -481,7 +493,7 @@ def build_table(
                 declared_lag_seconds,
                 today,
                 flags.get(f.name, False),
-                gate(f.name),
+                authority(leakage_gate, f.name),
             )
             for f in table.fields
         )
@@ -500,7 +512,7 @@ def build_table(
             declared_lag_seconds,
             today,
             flags.get(f.name, False),
-            gate(f.name),
+            authority(leakage_gate, f.name),
         )
         for f in table.fields
     )

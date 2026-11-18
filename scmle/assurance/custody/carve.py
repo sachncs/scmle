@@ -345,7 +345,7 @@ def restrict(
 def validate(
     size: int,
     fraction: float,
-    arrays: dict[str, numpy.ndarray | None],
+    **arrays: numpy.ndarray | None,
 ) -> None:
     """Validates the fraction and that every array is aligned.
 
@@ -365,6 +365,56 @@ def validate(
             raise errors.InputError(
                 f"{name} must have one entry per development row"
             )
+
+
+def block(
+    times: numpy.ndarray,
+    units: numpy.ndarray,
+    fraction: float,
+    embargo_rows: int,
+    rng: numpy.random.Generator,
+) -> tuple[numpy.ndarray, numpy.ndarray]:
+    """Draws `C` as contiguous time blocks of whole units.
+
+    Args:
+        times: Ordering value per development row.
+        units: Unit id per development row.
+        fraction: Share of development rows to place in `C`.
+        embargo_rows: Rows dropped around the blocks.
+        rng: Random generator of the carve.
+
+    Returns:
+        Masks of the rows in `C` and of the embargoed rows.
+    """
+    in_c, order = choose(numpy.asarray(times), fraction, embargo_rows, rng)
+    in_c = enclose(in_c, units)
+    return in_c, quarantine(in_c, order, embargo_rows)
+
+
+def stratify(
+    units: numpy.ndarray,
+    labels: numpy.ndarray | None,
+    fraction: float,
+    rng: numpy.random.Generator,
+) -> numpy.ndarray:
+    """Draws whole units for `C`, stratified by each unit's first label.
+
+    Args:
+        units: Unit id per development row.
+        labels: Class label per development row, or None for one stratum.
+        fraction: Share of development rows to place in `C`.
+        rng: Random generator of the carve.
+
+    Returns:
+        Mask of the rows in `C`.
+    """
+    strata = (
+        numpy.asarray(labels).astype(str)
+        if labels is not None
+        else numpy.full(len(units), "all")
+    )
+    first = pandas.Series(strata).groupby(units).transform("first").to_numpy()
+    return pick(units, first, fraction, rng)
 
 
 def divide(
@@ -415,37 +465,24 @@ def divide(
     validate(
         size,
         fraction,
-        {
-            "labels": labels,
-            "groups": groups,
-            "times": times,
-            "duplicates": duplicates,
-        },
+        labels=labels,
+        groups=groups,
+        times=times,
+        duplicates=duplicates,
     )
     rng = randomness.component_rng(
         derive(charter_hash, data_hash, seed), COMPONENT
     )
     units = unitize(size, groups, duplicates)
     notes: list[str] = []
-    order = numpy.arange(size)
     if times is not None:
-        in_c, order = choose(numpy.asarray(times), fraction, embargo_rows, rng)
-        in_c = enclose(in_c, units)
-        embargo = quarantine(in_c, order, embargo_rows)
+        in_c, embargo = block(times, units, fraction, embargo_rows, rng)
         notes.append(
             f"confirmation drawn as time blocks with an embargo of "
             f"{embargo_rows} rows"
         )
     else:
-        strata = (
-            numpy.asarray(labels).astype(str)
-            if labels is not None
-            else numpy.full(size, "all")
-        )
-        first = (
-            pandas.Series(strata).groupby(units).transform("first").to_numpy()
-        )
-        in_c = pick(units, first, fraction, rng)
+        in_c = stratify(units, labels, fraction, rng)
         embargo = numpy.zeros(size, dtype=bool)
     if len(numpy.unique(units)) < MIN_UNITS or not in_c.any():
         notes.append("no confirmation set carved: too few units to separate")

@@ -41,6 +41,11 @@ MAX_CURVE_PERMUTATIONS = 200
 MIN_PERMUTATIONS = 99
 MAX_PERMUTATIONS = 499
 MAX_REFERENCE_ROWS = 20000
+TEMPORAL_SKIP = (
+    "F is the final test set, which only the final evaluation opens; "
+    "the forward check was not run in this stage"
+)
+STATIC_SKIP = "the data are not temporal: no forward check"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -87,6 +92,199 @@ class Robustness:
         )
 
 
+def authorize(
+    store: certificates.Store | None, rule: stability.Thresholds
+) -> tuple[certificates.Authority, str]:
+    """Decides whether the stability verdicts may gate.
+
+    Args:
+        store: The certificate store, or None.
+        rule: Survival thresholds. The certificate was measured for
+            `stability.DEFAULT_RULE` only, so any other rule is descriptive:
+            its verdicts are reported and never gate.
+
+    Returns:
+        The stability gate and why the rule is descriptive (or an empty
+        string).
+    """
+    if rule == stability.DEFAULT_RULE:
+        return stability.adjudication(store), ""
+    return certificates.Authority.DESCRIPTIVE, (
+        "the chartered stability thresholds differ from the certified "
+        "rule: the verdicts are descriptive"
+    )
+
+
+def triage(
+    multiclass: bool,
+    survivors: Sequence[str],
+    grid: multiverse.Grid,
+    notes: tuple[str, ...],
+) -> tuple[str, list[str], tuple[str, ...]]:
+    """Chooses the findings whose stability is assessed.
+
+    Args:
+        multiclass: Whether the target has more than two classes; the
+            stability estimator is a rank correlation, so such findings are
+            not evaluated.
+        survivors: Columns of the findings that survived exploration.
+        grid: The specification grid.
+        notes: Notes so far.
+
+    Returns:
+        Why stability is not run (an empty string when it is), the findings
+        to assess (the first `MAX_FINDINGS` survivors; none when stability
+        is not run) and the notes, with one more when survivors were cut.
+    """
+    reason = ""
+    if multiclass:
+        reason = (
+            "the target has more than two classes: findings use Kruskal-Wallis "
+            "and the rank-correlation stability estimator does not apply"
+        )
+    elif not survivors:
+        reason = "no finding survived exploration"
+    elif len(grid.specs) < stability.MIN_SPECS:
+        reason = (
+            f"the declared choices give {len(grid.specs)} specification(s) "
+            f"this estimator can vary; at least {stability.MIN_SPECS} are "
+            "needed, so no finding can be called stable"
+        )
+    chosen = list(survivors)[:MAX_FINDINGS]
+    if len(survivors) > MAX_FINDINGS:
+        notes = (
+            *notes,
+            (
+                f"only the first {MAX_FINDINGS} of {len(survivors)} findings "
+                "were assessed"
+            ),
+        )
+    return reason, [] if reason else chosen, notes
+
+
+def examine(
+    features: pandas.DataFrame,
+    codes: pandas.Series,
+    chosen: Sequence[str],
+    grid: multiverse.Grid,
+    seed: int,
+    strata: numpy.ndarray | None,
+    permutations: int,
+    budget_seconds: float,
+    gate: certificates.Authority,
+    rule: stability.Thresholds,
+) -> tuple[stability.Stability, ...]:
+    """Assesses the stability of each chosen finding.
+
+    Args:
+        features: Exploration features.
+        codes: Encoded exploration target.
+        chosen: Columns of the findings to assess.
+        grid: The specification grid.
+        seed: Charter seed.
+        strata: Group or block labels for resampling and permuting.
+        permutations: Charter permutation count; the specification-curve
+            test uses at most `MAX_CURVE_PERMUTATIONS` of them.
+        budget_seconds: Time allowed for the whole multiverse, divided
+            equally among the chosen findings.
+        gate: Whether a current certificate lets stability act.
+        rule: Survival thresholds.
+
+    Returns:
+        One verdict per chosen finding, in order.
+    """
+    share = budget_seconds / max(len(chosen), 1)
+    curve = min(permutations, MAX_CURVE_PERMUTATIONS)
+    return tuple(
+        stability.assess_finding(
+            name,
+            features[name].to_numpy(dtype=float),
+            codes.to_numpy(dtype=float),
+            grid,
+            seed,
+            bootstrap=MAX_BOOTSTRAP,
+            strata=strata,
+            curve_permutations=curve,
+            budget_seconds=share,
+            gate=gate,
+            rule=rule,
+        )
+        for name in chosen
+    )
+
+
+def compare(
+    features: pandas.DataFrame,
+    candidates: Sequence[str],
+    reference: pandas.DataFrame | None,
+    seed: int,
+    permutations: int,
+    store: certificates.Store | None,
+) -> tuple[shift.Shift, certificates.Authority, certificates.Authority]:
+    """Compares the exploration rows with the deployment sample.
+
+    Args:
+        features: Exploration features.
+        candidates: Feature columns compared with the reference; those not
+            in `features` are skipped.
+        reference: Deployment sample, or None.
+        seed: Charter seed.
+        permutations: Charter permutation count, clamped to
+            `MIN_PERMUTATIONS`..`MAX_PERMUTATIONS`.
+        store: The certificate store, or None.
+
+    Returns:
+        The comparison on at most `MAX_REFERENCE_ROWS` rows of each side,
+        and the gates of the classifier and the kernel test.
+    """
+    c2st_gate, mmd_gate = (
+        certificates.Authority.DESCRIPTIVE
+        if store is None
+        else store.status(detector, shift.code_digest(), shift.DEFECT_TYPE)
+        for detector in (shift.C2ST_ID, shift.MMD_ID)
+    )
+    sample = features[[c for c in candidates if c in features.columns]]
+    found = shift.assess(
+        sample.head(MAX_REFERENCE_ROWS),
+        None if reference is None else reference.head(MAX_REFERENCE_ROWS),
+        seed,
+        permutations=min(max(permutations, MIN_PERMUTATIONS), MAX_PERMUTATIONS),
+        c2st_gate=c2st_gate,
+        mmd_gate=mmd_gate,
+    )
+    return found, c2st_gate, mmd_gate
+
+
+def represent(
+    features: pandas.DataFrame,
+    reference: pandas.DataFrame | None,
+    sensitive: Sequence[str],
+) -> tuple[coverage.Cell, ...]:
+    """Reports the subgroup coverage of the sensitive columns.
+
+    Args:
+        features: Exploration features.
+        reference: Deployment sample, or None.
+        sensitive: Columns whose subgroup coverage is reported; those not
+            in `features` are skipped.
+
+    Returns:
+        The coverage rows, against the deployment shares when the sample
+        holds the column.
+    """
+    rows: list[coverage.Cell] = []
+    for name in sensitive:
+        if name not in features.columns:
+            continue
+        deployment = (
+            coverage.shares(reference[name])
+            if reference is not None and name in reference.columns
+            else None
+        )
+        rows.extend(coverage.represent(features[name], deployment))
+    return tuple(rows)
+
+
 def run(
     features: pandas.DataFrame,
     codes: pandas.Series,
@@ -111,14 +309,10 @@ def run(
         features: Exploration features.
         codes: Encoded exploration target.
         survivors: Columns of the findings that survived exploration.
-        multiclass: Whether the target has more than two classes; the
-            stability estimator is a rank correlation, so such findings are
-            not evaluated.
+        multiclass: Whether the target has more than two classes.
         choices: The charter's multiverse.
         seed: Charter seed.
-        permutations: Charter permutation count. The specification-curve
-            test uses at most `MAX_CURVE_PERMUTATIONS` of them; the shift
-            tests use it clamped to `MIN_PERMUTATIONS`..`MAX_PERMUTATIONS`.
+        permutations: Charter permutation count, capped per test.
         strata: Group or block labels for resampling and permuting.
         reference: Deployment sample, or None.
         candidates: Feature columns compared with the reference.
@@ -126,120 +320,45 @@ def run(
         temporal: Whether the data have a time column; only the wording of
             the skipped forward check depends on it.
         directory: Folder of the certificate store, for tests.
-        budget_seconds: Time allowed for the whole multiverse, divided
-            equally among the assessed findings.
-        rule: Survival thresholds. The certificate was measured for
-            `stability.DEFAULT_RULE` only, so any other rule is descriptive:
-            its verdicts are reported and never gate.
+        budget_seconds: Time allowed for the whole multiverse.
+        rule: Survival thresholds; any but the certified default is
+            descriptive (see `authorize`).
 
     Returns:
-        The stability verdicts (at most `MAX_FINDINGS` findings, in the
-        order of `survivors`), the shift comparison, the subgroup coverage
-        rows, a skipped forward check and the certificate gates. Stability
-        is not run, and `stability_note` says why, for a multiclass target,
-        no survivor or too few specifications.
+        The stability verdicts of the findings `triage` chooses (none, and
+        `stability_note` says why, when it chooses none), the shift test,
+        the subgroup coverage, a skipped forward check and the gates.
     """
     loaded = qualify.load_store(F6_STORE, directory)
-    store = loaded.store
-    stability_gate = stability.adjudication(store)
-    rule_note = ""
-    if rule != stability.DEFAULT_RULE:
-        stability_gate = certificates.Authority.DESCRIPTIVE
-        rule_note = (
-            "the chartered stability thresholds differ from the certified "
-            "rule: the verdicts are descriptive"
-        )
-    c2st_gate, mmd_gate = (
-        certificates.Authority.DESCRIPTIVE
-        if store is None
-        else store.status(detector, shift.code_digest(), shift.DEFECT_TYPE)
-        for detector in (shift.C2ST_ID, shift.MMD_ID)
-    )
+    gate, rule_note = authorize(loaded.store, rule)
     applicable, notes = stability.actionable(choices)
     grid = multiverse.universe(applicable, seed)
-    findings: list[stability.Stability] = []
-    stability_note = ""
-    if multiclass:
-        stability_note = (
-            "the target has more than two classes: findings use Kruskal-Wallis "
-            "and the rank-correlation stability estimator does not apply"
-        )
-    elif not survivors:
-        stability_note = "no finding survived exploration"
-    elif len(grid.specs) < stability.MIN_SPECS:
-        stability_note = (
-            f"the declared choices give {len(grid.specs)} specification(s) "
-            f"this estimator can vary; at least {stability.MIN_SPECS} are "
-            "needed, so no finding can be called stable"
-        )
-    chosen = list(survivors)[:MAX_FINDINGS]
-    if len(survivors) > MAX_FINDINGS:
-        notes = (
-            *notes,
-            (
-                f"only the first {MAX_FINDINGS} of {len(survivors)} findings "
-                "were assessed"
-            ),
-        )
-    if not stability_note:
-        share = budget_seconds / max(len(chosen), 1)
-        curve = min(permutations, MAX_CURVE_PERMUTATIONS)
-        findings.extend(
-            stability.assess_finding(
-                name,
-                features[name].to_numpy(dtype=float),
-                codes.to_numpy(dtype=float),
-                grid,
-                seed,
-                bootstrap=MAX_BOOTSTRAP,
-                strata=strata,
-                curve_permutations=curve,
-                budget_seconds=share,
-                gate=stability_gate,
-                rule=rule,
-            )
-            for name in chosen
-        )
-    sample = features[[c for c in candidates if c in features.columns]]
-    reference_frame = (
-        None if reference is None else reference.head(MAX_REFERENCE_ROWS)
-    )
-    result = shift.assess(
-        sample.head(MAX_REFERENCE_ROWS),
-        reference_frame,
+    note, chosen, notes = triage(multiclass, survivors, grid, notes)
+    findings = examine(
+        features,
+        codes,
+        chosen,
+        grid,
         seed,
-        permutations=min(max(permutations, MIN_PERMUTATIONS), MAX_PERMUTATIONS),
-        c2st_gate=c2st_gate,
-        mmd_gate=mmd_gate,
+        strata,
+        permutations,
+        budget_seconds,
+        gate,
+        rule,
     )
-    rows: list[coverage.Cell] = []
-    for name in sensitive:
-        if name not in features.columns:
-            continue
-        deployment = (
-            coverage.shares(reference[name])
-            if reference is not None and name in reference.columns
-            else None
-        )
-        rows.extend(coverage.represent(features[name], deployment))
-    skipped_forward = (
-        forward.skipped(
-            "F is the final test set, which only the final evaluation opens; "
-            "the forward check was not run in this stage"
-        )
-        if temporal
-        else forward.skipped("the data are not temporal: no forward check")
+    result, c2st_gate, mmd_gate = compare(
+        features, candidates, reference, seed, permutations, loaded.store
     )
     return Robustness(
         grid=grid,
         applicable=applicable,
-        findings=tuple(findings),
-        stability_note=stability_note,
+        findings=findings,
+        stability_note=note,
         notes=tuple(notes),
         shift=result,
-        coverage=tuple(rows),
-        forward=skipped_forward,
-        stability_gate=stability_gate,
+        coverage=represent(features, reference, sensitive),
+        forward=forward.skipped(TEMPORAL_SKIP if temporal else STATIC_SKIP),
+        stability_gate=gate,
         c2st_gate=c2st_gate,
         mmd_gate=mmd_gate,
         store_note=loaded.note,

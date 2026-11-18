@@ -243,6 +243,100 @@ def run_governed(
     )
 
 
+def survey(
+    charter: Any,
+    run_dir: str | Path | None,
+    rule: str,
+    diagnostics: Sequence[tuple[str, qualification.Check]],
+    plan: explore.Plan,
+    features: pandas.DataFrame,
+    codes: pandas.Series,
+    strata: numpy.ndarray | None,
+) -> tuple[scmle.assurance.ledger.ledger.Ledger, controls.Control]:
+    """Opens the ledger, then runs the exploration and its negative control.
+
+    Args:
+        charter: The governing `AnalysisCharter`.
+        run_dir: Directory of the ledger, or None to keep it in memory.
+        rule: Online rule for exploration.
+        diagnostics: (source, check) pairs from detectors run on `X`; they
+            are logged only when the ledger holds no diagnostics yet.
+        plan: The exploration plan.
+        features: Exploration features.
+        codes: The target, coded as numbers.
+        strata: Permutation labels for the permuted-target control.
+
+    Returns:
+        The ledger, holding the diagnostics, the results and the control,
+        and the negative control.
+
+    Raises:
+        LedgerError: If the ledger holds no online rule configuration.
+    """
+    if run_dir is None:
+        ledger = scmle.assurance.ledger.ledger.Ledger.create(
+            None,
+            charter_hash=charter.charter_hash,
+            config=online_fdr.Settings(
+                rule, charter.budget.exploration.initial
+            ),
+            alpha_confirm=charter.budget.confirmation.alpha_confirm,
+            seed=charter.seed,
+        )
+    else:
+        ledger = scmle.assurance.ledger.ledger.Ledger.open(
+            run_dir, charter, rule=rule
+        )
+    if diagnostics and not ledger.diagnostics:
+        for source_name, found in diagnostics:
+            ledger.record_diagnostic(found, source_name)
+    config = ledger.config
+    if config is None:  # pragma: no cover - open() always sets it
+        raise scmle.assurance.ledger.ledger.LedgerError("ledger has no rule")
+    results = explore.run_exploration(ledger, features, codes, plan)
+    observed = sum(1 for r in results if r.rejected)
+
+    def discoveries(frame: pandas.DataFrame, shuffled: pandas.Series) -> int:
+        return explore.tally(config, plan, frame, shuffled)
+
+    control = controls.placebo(
+        discoveries,
+        features,
+        codes,
+        observed=observed,
+        b=charter.budget.permutations,
+        seed=charter.seed,
+        strata=strata,
+    )
+    ledger.negatives(control.to_dict())
+    return ledger, control
+
+
+def withdraw(
+    ledger: scmle.assurance.ledger.ledger.Ledger,
+    second_stage: Callable[
+        [Sequence[scmle.assurance.ledger.ledger.Hypothesis]], confirm.Withdrawal
+    ]
+    | None,
+) -> confirm.Withdrawal | None:
+    """Applies the pre-registered second stage to the survivors.
+
+    Args:
+        ledger: The ledger after exploration; the withdrawal's diagnostics
+            are recorded in it.
+        second_stage: Pre-registered withdrawal rule, or None.
+
+    Returns:
+        The withdrawal, or None when there is no second stage.
+    """
+    if second_stage is None:
+        return None
+    withdrawal = second_stage(ledger.survivors())
+    for source_name, found in withdrawal.diagnostics:
+        ledger.record_diagnostic(found, source_name)
+    return withdrawal
+
+
 def scout(
     *,
     charter: Any,
@@ -304,52 +398,14 @@ def scout(
         else None
     )
     plan = explore.hypothesize(features, kind, exclude)
-    if run_dir is None:
-        ledger = scmle.assurance.ledger.ledger.Ledger.create(
-            None,
-            charter_hash=charter.charter_hash,
-            config=online_fdr.Settings(
-                rule, charter.budget.exploration.initial
-            ),
-            alpha_confirm=charter.budget.confirmation.alpha_confirm,
-            seed=charter.seed,
-        )
-    else:
-        ledger = scmle.assurance.ledger.ledger.Ledger.open(
-            run_dir, charter, rule=rule
-        )
-    config = ledger.config
-    if config is None:  # pragma: no cover - open() always sets it
-        raise scmle.assurance.ledger.ledger.LedgerError("ledger has no rule")
-    if diagnostics and not ledger.diagnostics:
-        for source_name, found in diagnostics:
-            ledger.record_diagnostic(found, source_name)
-    results = explore.run_exploration(ledger, features, codes, plan)
-    observed = sum(1 for r in results if r.rejected)
-
-    def discoveries(frame: pandas.DataFrame, shuffled: pandas.Series) -> int:
-        return explore.tally(config, plan, frame, shuffled)
-
-    control = controls.placebo(
-        discoveries,
-        features,
-        codes,
-        observed=observed,
-        b=charter.budget.permutations,
-        seed=charter.seed,
-        strata=strata,
+    ledger, control = survey(
+        charter, run_dir, rule, diagnostics, plan, features, codes, strata
     )
-    ledger.negatives(control.to_dict())
-    withdrawal = None
-    if second_stage is not None:
-        withdrawal = second_stage(ledger.survivors())
-        for source_name, found in withdrawal.diagnostics:
-            ledger.record_diagnostic(found, source_name)
     return Explored(
         ledger=ledger,
         plan=plan,
         control=control,
-        withdrawal=withdrawal,
+        withdrawal=withdraw(ledger, second_stage),
         scope="global" if strata is None else "strata",
         charter=charter,
         classification=classification,

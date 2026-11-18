@@ -210,6 +210,61 @@ def distinguish(
     )
 
 
+def withhold(
+    note: str | None,
+    seed: int,
+    rows: tuple[int, int],
+    checked: tuple[int, int],
+    shared: tuple[str, ...],
+    error: str | None,
+    limitation: str,
+) -> data.Observation:
+    """Records a comparison that could not be evaluated.
+
+    Args:
+        note: Run note to show, or None.
+        seed: Seed controlling folds and the classifier.
+        rows: Sample and reference row counts.
+        checked: Sample and reference rows that were to be compared; (0, 0)
+            when nothing was compared.
+        shared: Feature columns the two sides share.
+        error: Why the comparison failed, or None.
+        limitation: What the missing comparison means for the evidence.
+
+    Returns:
+        A `not_evaluated` observation with the thresholds and the bounds.
+    """
+    metrics: dict[str, list[str] | str] = {"shared_columns": list(shared)}
+    if error is not None:
+        metrics["error"] = error
+    return data.Observation(
+        note=note,
+        evidence={
+            "observation": "representativeness",
+            "status": "not_evaluated",
+            "method": "out_of_fold_reference_classifier_and_column_gaps",
+            "thresholds": {
+                "minimum_rows_per_side": MIN_ROWS,
+                "maximum_rows_per_side": MAX_ROWS,
+                "unrepresentative_auc": UNREPRESENTATIVE_AUC,
+                "cross_validation_folds": FOLDS,
+            },
+            "sample_bounds": {
+                "sample_rows": rows[0],
+                "reference_rows": rows[1],
+                "checked_sample_rows": checked[0],
+                "checked_reference_rows": checked[1],
+                "maximum_rows_per_side": MAX_ROWS,
+                "truncated": any(checked)
+                and (checked[0] < rows[0] or checked[1] < rows[1]),
+            },
+            "seed": seed,
+            "metrics": metrics,
+            "limitations": [limitation],
+        },
+    )
+
+
 def assess_representativeness(
     sample: pandas.DataFrame, reference: pandas.DataFrame, seed: int = 0
 ) -> data.Observation:
@@ -227,32 +282,14 @@ def assess_representativeness(
     reference_rows = len(reference)
     shared = tuple(name for name in sample.columns if name in reference.columns)
     if not shared:
-        return data.Observation(
-            note="representativeness: the reference shares no feature columns",
-            evidence={
-                "observation": "representativeness",
-                "status": "not_evaluated",
-                "method": "out_of_fold_reference_classifier_and_column_gaps",
-                "thresholds": {
-                    "minimum_rows_per_side": MIN_ROWS,
-                    "maximum_rows_per_side": MAX_ROWS,
-                    "unrepresentative_auc": UNREPRESENTATIVE_AUC,
-                    "cross_validation_folds": FOLDS,
-                },
-                "sample_bounds": {
-                    "sample_rows": sample_rows,
-                    "reference_rows": reference_rows,
-                    "checked_sample_rows": 0,
-                    "checked_reference_rows": 0,
-                    "maximum_rows_per_side": MAX_ROWS,
-                    "truncated": False,
-                },
-                "seed": seed,
-                "metrics": {"shared_columns": []},
-                "limitations": [
-                    "No common feature columns were available for comparison.",
-                ],
-            },
+        return withhold(
+            "representativeness: the reference shares no feature columns",
+            seed,
+            (sample_rows, reference_rows),
+            (0, 0),
+            shared,
+            None,
+            "No common feature columns were available for comparison.",
         )
     checked_sample = sample[list(shared)].head(MAX_ROWS)
     checked_reference = reference[list(shared)].head(MAX_ROWS)
@@ -260,39 +297,17 @@ def assess_representativeness(
         report = distinguish(checked_sample, checked_reference, seed)
     except ValueError as error:
         # handled: returned as failed finding/problem/refusal with error text
-        return data.Observation(
-            note=None,
-            evidence={
-                "observation": "representativeness",
-                "status": "not_evaluated",
-                "method": "out_of_fold_reference_classifier_and_column_gaps",
-                "thresholds": {
-                    "minimum_rows_per_side": MIN_ROWS,
-                    "maximum_rows_per_side": MAX_ROWS,
-                    "unrepresentative_auc": UNREPRESENTATIVE_AUC,
-                    "cross_validation_folds": FOLDS,
-                },
-                "sample_bounds": {
-                    "sample_rows": sample_rows,
-                    "reference_rows": reference_rows,
-                    "checked_sample_rows": len(checked_sample),
-                    "checked_reference_rows": len(checked_reference),
-                    "maximum_rows_per_side": MAX_ROWS,
-                    "truncated": len(checked_sample) < sample_rows
-                    or len(checked_reference) < reference_rows,
-                },
-                "seed": seed,
-                "metrics": {
-                    "shared_columns": list(shared),
-                    "error": str(error),
-                },
-                "limitations": [
-                    (
-                        "The comparison was not evaluated because its data "
-                        "contract was not met."
-                    ),
-                ],
-            },
+        return withhold(
+            None,
+            seed,
+            (sample_rows, reference_rows),
+            (len(checked_sample), len(checked_reference)),
+            shared,
+            str(error),
+            (
+                "The comparison was not evaluated because its data "
+                "contract was not met."
+            ),
         )
     note = None
     if not report.representative:

@@ -684,22 +684,7 @@ class QualityGate:
             rule.evaluate(frame.reset_index(drop=True), record, contract)
             for rule in applicable
         )
-        failed = [f for f in findings if not f.passed]
-        stops = [f for f in failed if f.policy is Severity.FAIL]
-        holds = [
-            f
-            for f in failed
-            if f.policy is Severity.QUARANTINE and not f.row_level
-        ]
-        removed = sorted(
-            {
-                row
-                for f in failed
-                if f.policy is Severity.QUARANTINE and f.row_level
-                for row in f.rows
-            }
-        )
-        decision = self.decide(failed, stops, holds, removed)
+        stops, holds, removed, decision = self.decide(findings)
         kept = frame.reset_index(drop=True).drop(index=removed)
         held = frame.reset_index(drop=True).iloc[removed]
         report = Assessment(
@@ -726,35 +711,46 @@ class QualityGate:
         return Screening(kept, held, report)
 
     def decide(
-        self,
-        failed: list[Finding],
-        stops: list[Finding],
-        holds: list[Finding],
-        removed: list[int],
-    ) -> str:
-        """Chooses the overall decision word for a report.
+        self, findings: tuple[Finding, ...]
+    ) -> tuple[list[Finding], list[Finding], list[int], str]:
+        """Sorts the failed findings and chooses the report's decision word.
 
         Args:
-            failed: The findings that did not pass.
-            stops: The failed findings whose policy is `fail`.
-            holds: The failed dataset-level findings whose policy is
-                `quarantine`.
-            removed: Positions of rows removed by row-level `quarantine`
-                findings.
+            findings: The findings of the applicable rules.
 
         Returns:
-            `failed` if any finding stops the run, else `quarantined` if
-            any holds the snapshot, else `rows_quarantined` if rows were
-            removed, else `passed_with_warnings` if any finding failed,
-            else `passed`.
+            The failed findings whose policy is `fail` (stops), the failed
+            dataset-level `quarantine` findings (holds), the positions of
+            rows removed by row-level `quarantine` findings, and the
+            decision: `failed` if any finding stops the run, else
+            `quarantined` if any holds the snapshot, else `rows_quarantined`
+            if rows were removed, else `passed_with_warnings` if any finding
+            failed, else `passed`.
         """
+        failed = [f for f in findings if not f.passed]
+        stops = [f for f in failed if f.policy is Severity.FAIL]
+        holds = [
+            f
+            for f in failed
+            if f.policy is Severity.QUARANTINE and not f.row_level
+        ]
+        removed = sorted(
+            {
+                row
+                for f in failed
+                if f.policy is Severity.QUARANTINE and f.row_level
+                for row in f.rows
+            }
+        )
         if stops:
-            return "failed"
-        if holds:
-            return "quarantined"
-        if removed:
-            return "rows_quarantined"
-        return "passed_with_warnings" if failed else "passed"
+            decision = "failed"
+        elif holds:
+            decision = "quarantined"
+        elif removed:
+            decision = "rows_quarantined"
+        else:
+            decision = "passed_with_warnings" if failed else "passed"
+        return stops, holds, removed, decision
 
     def persist(
         self,

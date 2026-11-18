@@ -40,6 +40,7 @@ only; a selection that read `C` would void it.
 from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
+import functools
 import json
 from pathlib import Path
 from typing import Any
@@ -417,57 +418,98 @@ def rig(
         registration.registration_hash,
     )
 
-    def run(
-        features: pandas.DataFrame, target: pandas.Series
-    ) -> confirm.Output:
-        """Tests the registered claim on the rows released for confirmation.
-
-        Args:
-            features: Confirmation features.
-            target: Confirmation target.
-
-        Returns:
-            The status of the claim and the report document.
-        """
-        if selection["flagged"]:
-            document = refused(registration, selection)
-        else:
-            y = explore.vectorize(
-                target, classification=True, classes=classes
-            ).to_numpy(float)
-            clusters = (
-                features[group_column].astype(str).to_numpy()
-                if group_column and group_column in features.columns
-                else numpy.arange(len(features))
-            )
-            report = guard.evaluate(
-                y,
-                rule.actions(features),
-                features[baseline_column].to_numpy(dtype=float),
-                clusters,
-                rule=description,
-                model=model,
-                input_tier=ceiling,
-                seed=seed,
-            )
-            document = report.to_dict()
-        document["rule"] = description
-        if reference is not None:
-            document["reference_rule"] = reference.describe()
-            if not selection["flagged"]:
-                document["reference_agreement"] = float(
-                    numpy.mean(
-                        reference.actions(features) == rule.actions(features)
-                    )
-                )
-        document["selection_on_x"] = dict(selection)
-        document["tier_ceiling"] = ceiling.value
-        document = jsonable(document)
-        return confirm.Output(
-            {baseline.CLAIM_ID: str(document["status"])}, {DOCUMENT: document}
-        )
-
+    run = functools.partial(
+        judge,
+        rule=rule,
+        description=description,
+        reference=reference,
+        guard=guard,
+        model=model,
+        baseline_column=baseline_column,
+        group_column=group_column,
+        classes=classes,
+        selection=selection,
+        ceiling=ceiling,
+        seed=seed,
+    )
     return confirm.Docket((claim,), run)
+
+
+def judge(
+    features: pandas.DataFrame,
+    target: pandas.Series,
+    *,
+    rule: Rule,
+    description: Mapping[str, Any],
+    reference: Regression | None,
+    guard: baseline.Evaluator,
+    model: costs.Tariff,
+    baseline_column: str,
+    group_column: str | None,
+    classes: Sequence[Any],
+    selection: Mapping[str, Any],
+    ceiling: qualification.Tier,
+    seed: int,
+) -> confirm.Output:
+    """Tests the registered claim on the rows released for confirmation.
+
+    Args:
+        features: Confirmation features.
+        target: Confirmation target.
+        rule: The rule the claim is about.
+        description: The rule's description, as registered.
+        reference: The frozen logistic rule reported next to a selected
+            model, or None.
+        guard: The evaluator of the registered claim.
+        model: The charter's cost model.
+        baseline_column: Column of the current process's 0/1 decisions.
+        group_column: Entity column for the cluster-robust error, or None.
+        classes: The target's classes in coding order.
+        selection: Selective-label finding on `X`, with the `flagged` key.
+        ceiling: Highest tier the inputs allow.
+        seed: The run seed.
+
+    Returns:
+        The status of the claim and the report document; with a flagged
+        `selection` no test is run.
+    """
+    if selection["flagged"]:
+        document = refused(guard.registration, selection)
+    else:
+        y = explore.vectorize(
+            target, classification=True, classes=classes
+        ).to_numpy(float)
+        clusters = (
+            features[group_column].astype(str).to_numpy()
+            if group_column and group_column in features.columns
+            else numpy.arange(len(features))
+        )
+        report = guard.evaluate(
+            y,
+            rule.actions(features),
+            features[baseline_column].to_numpy(dtype=float),
+            clusters,
+            rule=description,
+            model=model,
+            input_tier=ceiling,
+            seed=seed,
+        )
+        document = report.to_dict()
+    document["rule"] = description
+    if reference is not None:
+        document["reference_rule"] = reference.describe()
+        if not selection["flagged"]:
+            document["reference_agreement"] = float(
+                numpy.mean(
+                    reference.actions(features) == rule.actions(features)
+                )
+            )
+    document["selection_on_x"] = dict(selection)
+    document["tier_ceiling"] = ceiling.value
+    document = jsonable(document)
+    return confirm.Output(
+        {baseline.CLAIM_ID: str(document["status"])}, {DOCUMENT: document}
+    )
 
 
 def refused(

@@ -173,6 +173,167 @@ def gap(
     return carve.acf(ordered)
 
 
+@dataclasses.dataclass(frozen=True)
+class Development:
+    """The development rows a carve divides, with what constrains it.
+
+    Attributes:
+        ids: Row ids of the development rows.
+        folds: Existing (fit, held) folds over them.
+        labels: Class label per row, or None for a task without classes.
+        groups: Entity per row that must stay whole, or None.
+        times: Ordering value per row, or None for a non-temporal strategy.
+        copies: Duplicate group per row.
+    """
+
+    ids: numpy.ndarray
+    folds: list[tuple[numpy.ndarray, numpy.ndarray]]
+    labels: numpy.ndarray | None
+    groups: numpy.ndarray | None
+    times: numpy.ndarray | None
+    copies: numpy.ndarray
+
+    @classmethod
+    def gather(
+        cls,
+        charter: contracts.AnalysisCharter,
+        split: splitters.Split,
+        frame: pandas.DataFrame,
+        spec: tasks.Config,
+        task: tasks.Task,
+    ) -> "Development":
+        """Reads the development rows and their constraints from a split.
+
+        Args:
+            charter: The governing charter.
+            split: Result of the ordinary split.
+            frame: The full dataset (target included), indexed by row id.
+            spec: Project specification.
+            task: Resolved task type.
+
+        Returns:
+            The development rows. A known entity is not a unit, so its
+            groups are None; times are None unless the strategy is temporal
+            and the data names a time column.
+        """
+        data, old = spec.data, split.manifest
+        ids = numpy.asarray(old.train_ids, dtype=int)
+        folds = [
+            (numpy.asarray(a, int), numpy.asarray(b, int)) for a, b in old.folds
+        ]
+        labels = (
+            frame[data.target].iloc[ids].to_numpy()
+            if task.is_classification
+            else None
+        )
+        known_entity = charter.purpose == contracts.KNOWN_ENTITY_FUTURE
+        # A known entity is not a unit: its rows may sit in X and in C, so the
+        # carve (time blocks, with an embargo) does not tie them together.
+        groups = (
+            frame[data.group_column].iloc[ids].to_numpy()
+            if data.group_column and not known_entity
+            else None
+        )
+        times = (
+            frame[data.time_column].iloc[ids].to_numpy()
+            if old.strategy in TEMPORAL and data.time_column
+            else None
+        )
+        columns = splitters.Splitter(spec, task).feature_columns(frame)
+        copies = duplicates.duplicate_groups(frame, columns)[ids]
+        return cls(ids, folds, labels, groups, times, copies)
+
+
+def embargo(
+    charter: contracts.AnalysisCharter,
+    frame: pandas.DataFrame,
+    rows: Development,
+    data: tasks.Dataset,
+    task: tasks.Task,
+) -> tuple[int, str | None]:
+    """Chooses the embargo: the charter's, or the measured one if larger.
+
+    Args:
+        charter: The governing charter.
+        frame: The full dataset, indexed by row id.
+        rows: The development rows.
+        data: Data specification naming the target column.
+        task: Resolved task type.
+
+    Returns:
+        The embargo in rows, and a note when the measured autocorrelation
+        raised it (None otherwise).
+    """
+    declared = charter.sets.embargo
+    measured = gap(frame, rows.ids, data, rows.times, task)
+    if measured <= declared:
+        return declared, None
+    note = (
+        f"embargo raised from {declared} to {measured} rows: "
+        "measured autocorrelation of the target"
+    )
+    return measured, note
+
+
+def attempt(
+    charter: contracts.AnalysisCharter,
+    rows: Development,
+    data_hash: str,
+    embargo_rows: int,
+) -> carve.Carve:
+    """Carves `C` when its planned size is feasible.
+
+    Args:
+        charter: The governing charter.
+        rows: The development rows.
+        data_hash: Hash of the dataset.
+        embargo_rows: Embargo between `X` and `C`, in rows.
+
+    Returns:
+        The carve, or one that leaves every row in `X` (with the reason as
+        its note) when the planned size is infeasible, the carve refuses, or
+        `C` would miss a class.
+    """
+    fraction = charter.sets.confirmation
+    estimate = assess(
+        charter,
+        round(fraction * len(rows.ids)),
+        scarce(rows.labels, fraction),
+    )
+    if estimate.verdict is feasibility.Verdict.INFEASIBLE:
+        return forgo(rows.ids, rows.folds, estimate.reason)
+    try:
+        carved = carve.divide(
+            rows.ids,
+            rows.folds,
+            fraction=fraction,
+            seed=charter.seed,
+            charter_hash=charter.charter_hash,
+            data_hash=data_hash,
+            labels=rows.labels,
+            groups=rows.groups,
+            times=rows.times,
+            duplicates=rows.copies,
+            embargo_rows=embargo_rows,
+        )
+    except errors.ConfigError as refusal:
+        # The carve refuses explicitly (for example when it would leave a
+        # validation fold empty). The run continues with no confirmation
+        # set and an unconfirmed scope, as for an infeasible size.
+        # handled: carve refusal becomes empty carve with reason note,
+        # documented
+        return forgo(
+            rows.ids, rows.folds, f"confirmation set not carved: {refusal}"
+        )
+    if len(carved.confirmation_ids) and not complete(
+        rows.labels, carved, rows.ids
+    ):
+        return forgo(
+            rows.ids, rows.folds, "confirmation set misses a class: not carved"
+        )
+    return carved
+
+
 def sequester(
     *,
     charter: contracts.AnalysisCharter,
@@ -201,87 +362,19 @@ def sequester(
         embargo is the larger of the charter's and the measured one, or the
         charter's when no `C` remains.
     """
-    data, old = spec.data, split.manifest
-    dev_ids = numpy.asarray(old.train_ids, dtype=int)
-    folds = [
-        (numpy.asarray(a, int), numpy.asarray(b, int)) for a, b in old.folds
-    ]
-    labels = (
-        frame[data.target].iloc[dev_ids].to_numpy()
-        if task.is_classification
-        else None
-    )
-    known_entity = charter.purpose == contracts.KNOWN_ENTITY_FUTURE
-    # A known entity is not a unit: its rows may sit in X and in C, so the
-    # carve (time blocks, with an embargo) does not tie them together.
-    groups = (
-        frame[data.group_column].iloc[dev_ids].to_numpy()
-        if data.group_column and not known_entity
-        else None
-    )
-    times = (
-        frame[data.time_column].iloc[dev_ids].to_numpy()
-        if old.strategy in TEMPORAL and data.time_column
-        else None
-    )
-    embargo_rows = charter.sets.embargo
-    measured = gap(frame, dev_ids, data, times, task)
-    acf_note = None
-    if measured > embargo_rows:
-        acf_note = (
-            f"embargo raised from {embargo_rows} to {measured} rows: "
-            "measured autocorrelation of the target"
-        )
-        embargo_rows = measured
-    columns = splitters.Splitter(spec, task).feature_columns(frame)
-    copies = duplicates.duplicate_groups(frame, columns)[dev_ids]
+    rows = Development.gather(charter, split, frame, spec, task)
+    embargo_rows, acf_note = embargo(charter, frame, rows, spec.data, task)
+    carved = attempt(charter, rows, data_hash, embargo_rows)
     fraction = charter.sets.confirmation
-    estimate = assess(
-        charter,
-        round(fraction * len(dev_ids)),
-        scarce(labels, fraction),
-    )
-    if estimate.verdict is feasibility.Verdict.INFEASIBLE:
-        carved = forgo(dev_ids, folds, estimate.reason)
-    else:
-        try:
-            carved = carve.divide(
-                dev_ids,
-                folds,
-                fraction=fraction,
-                seed=charter.seed,
-                charter_hash=charter.charter_hash,
-                data_hash=data_hash,
-                labels=labels,
-                groups=groups,
-                times=times,
-                duplicates=copies,
-                embargo_rows=embargo_rows,
-            )
-        except errors.ConfigError as refusal:
-            # The carve refuses explicitly (for example when it would leave a
-            # validation fold empty). The run continues with no confirmation
-            # set and an unconfirmed scope, as for an infeasible size.
-            # handled: carve refusal becomes empty carve with reason note,
-            # documented
-            carved = forgo(
-                dev_ids, folds, f"confirmation set not carved: {refusal}"
-            )
-        if len(carved.confirmation_ids) and not complete(
-            labels, carved, dev_ids
-        ):
-            carved = forgo(
-                dev_ids, folds, "confirmation set misses a class: not carved"
-            )
     actual = assess(
         charter,
         len(carved.confirmation_ids),
-        scarce(labels, fraction) if len(carved.confirmation_ids) else None,
+        scarce(rows.labels, fraction) if len(carved.confirmation_ids) else None,
     )
     if actual.verdict is feasibility.Verdict.INFEASIBLE and len(
         carved.confirmation_ids
     ):
-        carved = forgo(dev_ids, folds, actual.reason)
+        carved = forgo(rows.ids, rows.folds, actual.reason)
         actual = assess(charter, 0, None)
     if not len(carved.confirmation_ids):
         # ERR-11: the run continues unconfirmed, so it says so loudly.
@@ -299,11 +392,79 @@ def sequester(
         frame,
         spec,
         carved,
-        dev_ids,
+        rows.ids,
         actual,
         data_hash,
         vault,
         embargo_rows,
+    )
+
+
+def seal(
+    vault: sealed.Vault,
+    frame: pandas.DataFrame,
+    target: str,
+    confirmation: tuple[int, ...],
+) -> tuple[tuple[str, str], ...]:
+    """Seals `C` in the vault when it is not empty.
+
+    Args:
+        vault: Where sealed sets are held.
+        frame: The full dataset (target included), indexed by row id.
+        target: Name of the target column.
+        confirmation: Row ids of `C`.
+
+    Returns:
+        The isolation level of each sealed set: `C` (when sealed), then the
+        final test set.
+    """
+    isolation: list[tuple[str, str]] = [("final_test", vault.level)]
+    if confirmation:
+        rows = numpy.asarray(confirmation)
+        vault.seal(
+            "C",
+            frame.drop(columns=[target]).iloc[rows].reset_index(drop=True),
+            frame[target].iloc[rows].reset_index(drop=True),
+            confirmation,
+        )
+        isolation.insert(0, ("C", vault.level))
+    return tuple(isolation)
+
+
+def restrict(
+    split: splitters.Split,
+    dev_ids: numpy.ndarray,
+    exploration: tuple[int, ...],
+    folds: tuple[tuple[tuple[int, ...], tuple[int, ...]], ...],
+    notes: tuple[str, ...],
+) -> splitters.Split:
+    """Restricts a split's development data to the exploration rows.
+
+    Args:
+        split: Result of the ordinary split.
+        dev_ids: Row ids of the development rows, aligned with its data.
+        exploration: Row ids of `X`.
+        folds: The (fit, held) folds over `X`.
+        notes: Notes of the split and the carve.
+
+    Returns:
+        The split whose development data and manifest cover `X` only.
+    """
+    old = split.manifest
+    keep = numpy.flatnonzero(numpy.isin(dev_ids, exploration))
+    restricted = splitters.Manifest(
+        strategy=old.strategy,
+        seed=old.seed,
+        train_ids=exploration,
+        test_ids=old.test_ids,
+        folds=folds,
+        notes=notes,
+    )
+    return splitters.Split(
+        restricted,
+        split.dev_features.iloc[keep].reset_index(drop=True),
+        split.dev_target.iloc[keep].reset_index(drop=True),
+        split.locked_test,
     )
 
 
@@ -339,33 +500,14 @@ def finish(
         feasibility assessment.
     """
     old = split.manifest
-    keep = numpy.flatnonzero(numpy.isin(dev_ids, carved.exploration_ids))
     folds = tuple(
         (tuple(int(i) for i in fit), tuple(int(i) for i in held))
         for fit, held in carved.folds
     )
     exploration = tuple(int(i) for i in carved.exploration_ids)
-    isolation: list[tuple[str, str]] = [("final_test", vault.level)]
     confirmation = tuple(int(i) for i in carved.confirmation_ids)
-    if confirmation:
-        target = spec.data.target
-        rows = numpy.asarray(confirmation)
-        vault.seal(
-            "C",
-            frame.drop(columns=[target]).iloc[rows].reset_index(drop=True),
-            frame[target].iloc[rows].reset_index(drop=True),
-            confirmation,
-        )
-        isolation.insert(0, ("C", vault.level))
+    isolation = seal(vault, frame, spec.data.target, confirmation)
     notes = (*old.notes, *carved.notes)
-    restricted = splitters.Manifest(
-        strategy=old.strategy,
-        seed=old.seed,
-        train_ids=exploration,
-        test_ids=old.test_ids,
-        folds=folds,
-        notes=notes,
-    )
     manifest = scmle.assurance.custody.manifest.Manifest(
         strategy=old.strategy,
         seed=charter.seed,
@@ -380,7 +522,7 @@ def finish(
             final=tuple(old.test_ids),
         ),
         folds=folds,
-        isolation=tuple(isolation),
+        isolation=isolation,
         scope=report.scope,
         notes=notes,
         roots=tuple(
@@ -392,12 +534,7 @@ def finish(
             )
         ),
     )
-    result = splitters.Split(
-        restricted,
-        split.dev_features.iloc[keep].reset_index(drop=True),
-        split.dev_target.iloc[keep].reset_index(drop=True),
-        split.locked_test,
-    )
+    result = restrict(split, dev_ids, exploration, folds, notes)
     view = sealed.View(
         features=result.dev_features,
         target=result.dev_target,

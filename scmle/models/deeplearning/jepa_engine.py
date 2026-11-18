@@ -69,8 +69,8 @@ class Network:
         self.module.load_state_dict(state)
 
 
-class Trainer:
-    """Train a bounded tabular JEPA representation."""
+class Settings:
+    """Self-supervised training settings and their validation."""
 
     def __init__(
         self,
@@ -233,6 +233,34 @@ class Trainer:
         )
         return "cpu" if device == "auto" else device
 
+    def report(
+        self, losses: list[float], device: str
+    ) -> dict[str, str | int | float | list[float]]:
+        """Summarises a finished training run.
+
+        Args:
+            losses: Mean loss of each epoch.
+            device: Device the training ran on.
+
+        Returns:
+            The objective, the settings that shaped it and the losses.
+        """
+        return {
+            "objective": "masked_context_prediction",
+            "epochs": self.epochs,
+            "losses": losses,
+            "final_loss": losses[-1],
+            "embedding_size": self.embedding_size,
+            "mask_probability": self.mask_probability,
+            "ema_decay": self.ema_decay,
+            "variance_regularization": self.variance_weight,
+            "device": device,
+        }
+
+
+class Trainer(Settings):
+    """Train a bounded tabular JEPA representation."""
+
     def learn(
         self,
         torch: Any,
@@ -391,33 +419,22 @@ class Trainer:
         network.module.eval().cpu()
         self.network_ = network
         self.n_iter_ = self.epochs
-        self.training_report_ = {
-            "objective": "masked_context_prediction",
-            "epochs": self.epochs,
-            "losses": losses,
-            "final_loss": losses[-1],
-            "embedding_size": self.embedding_size,
-            "mask_probability": self.mask_probability,
-            "ema_decay": self.ema_decay,
-            "variance_regularization": self.variance_weight,
-            "device": device,
-        }
+        self.training_report_ = self.report(losses, device)
         return self
 
-    def encode(self, features: Any) -> numpy.ndarray:
-        """Encodes rows with the learned context encoder.
+    def conform(self, features: Any) -> numpy.ndarray:
+        """Converts rows to encode to a float32 matrix of the fitted width.
 
         Args:
             features: Numeric matrix with the width seen at fit.
 
         Returns:
-            Embedding matrix of shape `(n_rows, embedding_size)`.
+            The float32 matrix.
 
         Raises:
             ValueError: If the features are not a finite numeric matrix of
                 shape `(rows, input_width)`.
         """
-        torch = importlib.import_module("torch")
         try:
             matrix = numpy.asarray(features, dtype=numpy.float32)
         except (TypeError, ValueError) as error:
@@ -433,6 +450,23 @@ class Trainer:
                 "features must be finite and have shape "
                 f"(rows, {self.input_width_})"
             )
+        return matrix
+
+    def encode(self, features: Any) -> numpy.ndarray:
+        """Encodes rows with the learned context encoder.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            Embedding matrix of shape `(n_rows, embedding_size)`.
+
+        Raises:
+            ValueError: If the features are not a finite numeric matrix of
+                shape `(rows, input_width)`.
+        """
+        torch = importlib.import_module("torch")
+        matrix = self.conform(features)
         with torch.no_grad():
             embedding: numpy.ndarray = self.network_.module.context_encoder(
                 torch.from_numpy(matrix)
@@ -456,21 +490,7 @@ class Trainer:
                 shape `(rows, input_width)`.
         """
         torch = importlib.import_module("torch")
-        try:
-            matrix = numpy.asarray(features, dtype=numpy.float32)
-        except (TypeError, ValueError) as error:
-            raise errors.InputError(
-                "tabular JEPA requires a numeric 2-D feature matrix"
-            ) from error
-        if (
-            matrix.ndim != FEATURE_MATRIX_RANK
-            or matrix.shape[1] != self.input_width_
-            or not numpy.isfinite(matrix).all()
-        ):
-            raise errors.InputError(
-                "features must be finite and have shape "
-                f"(rows, {self.input_width_})"
-            )
+        matrix = self.conform(features)
         tensor = torch.from_numpy(matrix).requires_grad_(requires_grad=True)
         embedding = self.network_.module.context_encoder(tensor)
         energy = embedding.pow(2).mean(dim=1)

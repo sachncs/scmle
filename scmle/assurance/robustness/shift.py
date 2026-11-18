@@ -201,6 +201,40 @@ def decide(
     return certificates.demote(requested, gate)
 
 
+def shuffle(
+    held: numpy.ndarray,
+    labels: numpy.ndarray | None,
+    scores: numpy.ndarray,
+    rng: numpy.random.Generator,
+    permutations: int,
+) -> numpy.ndarray:
+    """Draws the permutation null of the held-out AUC.
+
+    Args:
+        held: Side of each held-out row (0 sample, 1 reference).
+        labels: Stratum of each held-out row, or None.
+        scores: Classifier score of each held-out row.
+        rng: Generator of the test, after the holdout split.
+        permutations: Number of label permutations B.
+
+    Returns:
+        The AUC of each permutation of `held` within its strata.
+    """
+    return numpy.array(
+        list(
+            map(
+                operator.call,
+                itertools.repeat(
+                    lambda: metrics.roc_auc_score(
+                        controls.permute_within(held, labels, rng), scores
+                    ),
+                    permutations,
+                ),
+            )
+        )
+    )
+
+
 def c2st(
     sample: pandas.DataFrame,
     reference: pandas.DataFrame,
@@ -253,19 +287,7 @@ def c2st(
     held = side[test]
     observed = float(metrics.roc_auc_score(held, scores))
     labels = None if strata is None else numpy.asarray(strata)[test]
-    null = numpy.array(
-        list(
-            map(
-                operator.call,
-                itertools.repeat(
-                    lambda: metrics.roc_auc_score(
-                        controls.permute_within(held, labels, rng), scores
-                    ),
-                    permutations,
-                ),
-            )
-        )
-    )
+    null = shuffle(held, labels, scores, rng, permutations)
     p_value = permutation_p_value(observed, null)
     auc, interval = delong(scores, held)
     fires = p_value <= alpha and interval[0] > 0.5 + delta
@@ -399,6 +421,43 @@ def mmds(kernel: numpy.ndarray, first: numpy.ndarray) -> numpy.ndarray:
     return statistics
 
 
+def permute(
+    kernel: numpy.ndarray,
+    indicator: numpy.ndarray,
+    labels: numpy.ndarray | None,
+    rng: numpy.random.Generator,
+    permutations: int,
+) -> numpy.ndarray:
+    """Draws the permutation null of the squared MMD, `CHUNK` at a time.
+
+    Args:
+        kernel: Kernel matrix of the pooled rows.
+        indicator: 1 for each sample row, then 0 for each reference row.
+        labels: Stratum of each pooled row, or None.
+        rng: Generator of the test, after the subsample draw.
+        permutations: Number of label permutations B.
+
+    Returns:
+        The statistic of each permutation of `indicator` within its strata.
+    """
+    null = numpy.empty(permutations)
+    for start in range(0, permutations, CHUNK):
+        stop = min(start + CHUNK, permutations)
+        block = numpy.column_stack(
+            list(
+                map(
+                    operator.call,
+                    itertools.repeat(
+                        lambda: controls.permute_within(indicator, labels, rng),
+                        stop - start,
+                    ),
+                )
+            )
+        )
+        null[start:stop] = mmds(kernel, block)
+    return null
+
+
 def mmd_test(
     sample: pandas.DataFrame,
     reference: pandas.DataFrame,
@@ -456,21 +515,7 @@ def mmd_test(
     )
     indicator = numpy.r_[numpy.ones(len(first)), numpy.zeros(len(second))]
     observed = float(mmds(kernel, indicator[:, None])[0])
-    null = numpy.empty(permutations)
-    for start in range(0, permutations, CHUNK):
-        stop = min(start + CHUNK, permutations)
-        block = numpy.column_stack(
-            list(
-                map(
-                    operator.call,
-                    itertools.repeat(
-                        lambda: controls.permute_within(indicator, labels, rng),
-                        stop - start,
-                    ),
-                )
-            )
-        )
-        null[start:stop] = mmds(kernel, block)
+    null = permute(kernel, indicator, labels, rng, permutations)
     p_value = permutation_p_value(observed, null)
     return qualification.Check(
         identifier=MMD_ID,

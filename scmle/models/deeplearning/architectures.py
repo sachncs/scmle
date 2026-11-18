@@ -178,6 +178,50 @@ class Ensemble(Architecture):
             A network returning one output per ensemble member.
         """
         members = ENSEMBLE_MEMBERS
+        affine = self.affine(torch)
+
+        class Network(torch.nn.Module):  # type: ignore[misc]  # torch is imported lazily and passed in as Any
+            """Repeats the input for every member and stacks the layers."""
+
+            def __init__(self) -> None:
+                super().__init__()
+                layers: list[Any] = []
+                width = inputs
+                for size in hidden_sizes:
+                    layers += [
+                        affine(width, size),
+                        torch.nn.ReLU(),
+                        torch.nn.Dropout(dropout),
+                    ]
+                    width = size
+                layers.append(affine(width, outputs))
+                self.layers = torch.nn.Sequential(*layers)
+
+            def forward(self, features: Any) -> Any:
+                """Returns member outputs of shape (rows, members, outputs).
+
+                Args:
+                    features: Tensor of shape `(rows, inputs)`.
+
+                Returns:
+                    Tensor of shape `(rows, members, outputs)`.
+                """
+                repeated = features.unsqueeze(1).expand(-1, members, -1)
+                return self.layers(repeated)
+
+        return Network()
+
+    @staticmethod
+    def affine(torch: Any) -> Any:
+        """Defines the shared-weight layer of the ensemble.
+
+        Args:
+            torch: The imported torch module.
+
+        Returns:
+            A layer class taking the input and output widths.
+        """
+        members = ENSEMBLE_MEMBERS
 
         class Affine(torch.nn.Module):  # type: ignore[misc]  # torch is imported lazily and passed in as Any
             """Shared weight with per-member input/output scales and bias."""
@@ -214,36 +258,7 @@ class Ensemble(Architecture):
                     features * self.in_scale
                 ) @ self.weight * self.out_scale + self.bias
 
-        class Network(torch.nn.Module):  # type: ignore[misc]  # torch is imported lazily and passed in as Any
-            """Repeats the input for every member and stacks the layers."""
-
-            def __init__(self) -> None:
-                super().__init__()
-                layers: list[Any] = []
-                width = inputs
-                for size in hidden_sizes:
-                    layers += [
-                        Affine(width, size),
-                        torch.nn.ReLU(),
-                        torch.nn.Dropout(dropout),
-                    ]
-                    width = size
-                layers.append(Affine(width, outputs))
-                self.layers = torch.nn.Sequential(*layers)
-
-            def forward(self, features: Any) -> Any:
-                """Returns member outputs of shape (rows, members, outputs).
-
-                Args:
-                    features: Tensor of shape `(rows, inputs)`.
-
-                Returns:
-                    Tensor of shape `(rows, members, outputs)`.
-                """
-                repeated = features.unsqueeze(1).expand(-1, members, -1)
-                return self.layers(repeated)
-
-        return Network()
+        return Affine
 
 
 class Transformer(Architecture):

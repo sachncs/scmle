@@ -173,6 +173,59 @@ def reconcile(
     }
 
 
+def query(
+    source: profile.Sql,
+    numeric: pandas.DataFrame,
+    table: str,
+    measures: list[str],
+    tolerance: float,
+) -> dict[str, tuple[float, float]]:
+    """Reads the source totals that `reconcile.crosscheck` forms a ratio for.
+
+    Args:
+        source: The source to query.
+        numeric: The extracted sum columns, coerced to numbers.
+        table: Source table the view comes from.
+        measures: The declared sum columns.
+        tolerance: Relative gap a sum may have.
+
+    Returns:
+        Quantity name (`row_count` or `sum.<column>`) to its extract and
+        source totals; empty when every source total is zero or null.
+
+    Raises:
+        InputError: If the source returns a total that is not a number.
+    """
+    try:
+        outcome = scmle.assurance.ingest.reconcile.crosscheck(
+            source, numeric, table, measures, tolerance=tolerance
+        )
+    except errors.InputError as error:
+        # handled: every source total was zero or null, so each check
+        # below compares against zero as an absolute gap, as documented
+        LOGGER.warning(
+            "reconciliation of %s formed no ratio (%s); its checks compare "
+            "against zero",
+            table,
+            error,
+        )
+        outcome = None
+    except (TypeError, ValueError) as error:
+        raise errors.InputError(
+            f"source table {table!r} returned a non-numeric total, which "
+            f"cannot be reconciled: {error}"
+        ) from error
+    found: dict[str, tuple[float, float]] = {}
+    prefix = f"{table}."
+    if outcome is not None:
+        for result in outcome.result.results:
+            found[result.item.name.removeprefix(prefix)] = (
+                result.item.extract,
+                result.item.source,
+            )
+    return found
+
+
 def compare(
     view: str,
     frame: pandas.DataFrame,
@@ -217,33 +270,7 @@ def compare(
         },
         index=frame.index,
     )
-    found: dict[str, tuple[float, float]] = {}
-    try:
-        outcome = scmle.assurance.ingest.reconcile.crosscheck(
-            source, numeric, table, measures, tolerance=tolerance
-        )
-    except errors.InputError as error:
-        # handled: every source total was zero or null, so each check
-        # below compares against zero as an absolute gap, as documented
-        LOGGER.warning(
-            "reconciliation of %s formed no ratio (%s); its checks compare "
-            "against zero",
-            table,
-            error,
-        )
-        outcome = None
-    except (TypeError, ValueError) as error:
-        raise errors.InputError(
-            f"source table {table!r} returned a non-numeric total, which "
-            f"cannot be reconciled: {error}"
-        ) from error
-    prefix = f"{table}."
-    if outcome is not None:
-        for result in outcome.result.results:
-            found[result.item.name.removeprefix(prefix)] = (
-                result.item.extract,
-                result.item.source,
-            )
+    found = query(source, numeric, table, measures, tolerance)
     own = {"row_count": float(len(frame))}
     own.update({f"sum.{m}": float(numeric[m].sum()) for m in measures})
     checks = []
@@ -267,14 +294,13 @@ def compare(
         their_sum = sha(pandas.Series([row[0] for row in values or []]))
         my_sum = sha(column)
         checks.append(
-            {
-                "name": f"{view}.checksum.{totals.column}",
-                "extract": my_sum,
-                "source": their_sum,
-                "gap": 0.0 if my_sum == their_sum else 1.0,
-                "limit": 0.0,
-                "passed": my_sum == their_sum,
-            }
+            check(
+                f"{view}.checksum.{totals.column}",
+                my_sum,
+                their_sum,
+                0.0 if my_sum == their_sum else 1.0,
+                0.0,
+            )
         )
     return checks
 

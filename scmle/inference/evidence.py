@@ -65,6 +65,36 @@ class Link:
         """
         return dataclasses.asdict(self)
 
+    def node(self) -> lineage.Node:
+        """Builds the inference node of the event.
+
+        Returns:
+            A node `inference:<event_id>` whose attributes are the identity
+            fields (without the graph digest) and whose digest is the SHA-256
+            of their canonical JSON.
+        """
+        payload = {
+            "event_id": self.event_id,
+            "input_fingerprint": self.input_fingerprint,
+            "output_fingerprint": self.output_fingerprint,
+            "bundle_digest": self.bundle_digest,
+            "timestamp": self.timestamp,
+        }
+        digest = hashlib.sha256(
+            json.dumps(
+                payload,
+                ensure_ascii=True,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode("utf-8")
+        ).hexdigest()
+        return lineage.Node(
+            identifier=f"inference:{self.event_id}",
+            kind=lineage.Kind.INFERENCE,
+            digest=digest,
+            attributes=dict(payload),
+        )
+
 
 class Linker:
     """Appends exact-bundle inference nodes to a durable evidence graph."""
@@ -124,46 +154,14 @@ class Linker:
             raise errors.InputError(
                 "inference bundle digest does not match graph"
             )
-        node_id = f"inference:{event_id}"
-        payload = {
-            "event_id": candidate.event_id,
-            "input_fingerprint": candidate.input_fingerprint,
-            "output_fingerprint": candidate.output_fingerprint,
-            "bundle_digest": candidate.bundle_digest,
-            "timestamp": candidate.timestamp,
-        }
-        node_digest = hashlib.sha256(
-            json.dumps(
-                payload,
-                ensure_ascii=True,
-                separators=(",", ":"),
-                sort_keys=True,
-            ).encode("utf-8")
-        ).hexdigest()
-        node = lineage.Node(
-            identifier=node_id,
-            kind=lineage.Kind.INFERENCE,
-            digest=node_digest,
-            attributes={
-                "event_id": candidate.event_id,
-                "input_fingerprint": candidate.input_fingerprint,
-                "output_fingerprint": candidate.output_fingerprint,
-                "bundle_digest": candidate.bundle_digest,
-                "timestamp": candidate.timestamp,
-            },
-        )
+        node = candidate.node()
         graph.add_node(node)
-        graph.connect(lineage.Edge("bundle", node_id, "serves"))
+        graph.connect(lineage.Edge("bundle", node.identifier, "serves"))
         graph_record = graph.to_dict()
         graph_record["graph_digest"] = graph.digest()
         self.write_atomically(path, graph_record)
-        return Link(
-            event_id=candidate.event_id,
-            input_fingerprint=candidate.input_fingerprint,
-            output_fingerprint=candidate.output_fingerprint,
-            bundle_digest=candidate.bundle_digest,
-            timestamp=candidate.timestamp,
-            graph_digest=str(graph_record["graph_digest"]),
+        return dataclasses.replace(
+            candidate, graph_digest=str(graph_record["graph_digest"])
         )
 
     @staticmethod

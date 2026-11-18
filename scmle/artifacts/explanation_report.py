@@ -7,6 +7,47 @@ from typing import cast
 
 from scmle.contracts import explanations
 
+STYLE = """\
+    :root { color-scheme: light; font-family: system-ui, sans-serif; }
+    body { background: #f6f7f3; color: #18231f; line-height: 1.5; margin: 0; }
+    main { margin: 0 auto; max-width: 960px; padding: 48px 24px 80px; }
+    h1, h2 { letter-spacing: -.03em; }
+    h1 { font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1; }
+    h2 { border-top: 1px solid #cdd4c7; margin-top: 40px; padding-top: 16px; }
+    .meta {
+      color: #53635a;
+      font-family: ui-monospace, monospace;
+      font-size: .8rem;
+    }
+    .status {
+      background: #e8edc7;
+      border-left: 4px solid #9eaf2e;
+      padding: 16px;
+    }
+    pre {
+      background: #18231f;
+      color: #e9efe5;
+      overflow-x: auto;
+      padding: 16px;
+    }
+    code { font-family: ui-monospace, monospace; }
+    li + li { margin-top: 8px; }
+"""
+
+
+def pretty(value: Any) -> str:
+    """Formats a value as escaped, indented JSON.
+
+    Args:
+        value: A JSON-native value without NaN or infinity.
+
+    Returns:
+        The HTML-escaped JSON text with sorted keys.
+    """
+    return html.escape(
+        json.dumps(value, allow_nan=False, indent=2, sort_keys=True)
+    )
+
 
 class Renderer:
     """Renders one explanation record as a self-contained HTML artifact."""
@@ -82,20 +123,6 @@ class Renderer:
             The HTML document.
         """
         escape = html.escape
-
-        def pretty(value: Any) -> str:
-            """Formats a value as escaped, indented JSON.
-
-            Args:
-                value: A JSON-native value without NaN or infinity.
-
-            Returns:
-                The HTML-escaped JSON text with sorted keys.
-            """
-            return escape(
-                json.dumps(value, allow_nan=False, indent=2, sort_keys=True)
-            )
-
         links = "".join(
             "<li><b>"
             + escape(str(link["relation"]))
@@ -116,31 +143,7 @@ class Renderer:
   <meta name="viewport" content="width=device-width">
   <title>{escape(title)} — explanation evidence</title>
   <style>
-    :root {{ color-scheme: light; font-family: system-ui, sans-serif; }}
-    body {{ background: #f6f7f3; color: #18231f; line-height: 1.5; margin: 0; }}
-    main {{ margin: 0 auto; max-width: 960px; padding: 48px 24px 80px; }}
-    h1, h2 {{ letter-spacing: -.03em; }}
-    h1 {{ font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1; }}
-    h2 {{ border-top: 1px solid #cdd4c7; margin-top: 40px; padding-top: 16px; }}
-    .meta {{
-      color: #53635a;
-      font-family: ui-monospace, monospace;
-      font-size: .8rem;
-    }}
-    .status {{
-      background: #e8edc7;
-      border-left: 4px solid #9eaf2e;
-      padding: 16px;
-    }}
-    pre {{
-      background: #18231f;
-      color: #e9efe5;
-      overflow-x: auto;
-      padding: 16px;
-    }}
-    code {{ font-family: ui-monospace, monospace; }}
-    li + li {{ margin-top: 8px; }}
-  </style>
+{STYLE}  </style>
 </head>
 <body>
   <main>

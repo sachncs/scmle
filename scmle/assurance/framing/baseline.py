@@ -581,6 +581,47 @@ class Evaluator:
             endpoints, reasons, selectivity, input_tier, seed, model
         )
 
+    def examine(
+        self,
+        endpoints: tuple[Clustered, ...],
+        tier: qualification.Tier,
+        seed: int,
+    ) -> tuple[qualification.Check, ...]:
+        """Builds one check per endpoint test.
+
+        Args:
+            endpoints: The tests at `t_lo` and `t_hi`, or empty when none
+                was run.
+            tier: Tier of the checks.
+            seed: Run seed, recorded in the checks.
+
+        Returns:
+            The checks, in endpoint order; a test whose p-value is at most
+            the registered level warns, any other passes.
+        """
+        alpha = self.registration.alpha
+        points = (self.registration.t_lo, self.registration.t_hi)
+        return tuple(
+            qualification.Check(
+                identifier=f"{CHECK_PREFIX}:delta@t={t:.4f}",
+                null=f"Delta(t) <= 0 at t = {t:.4f}",
+                statistic=e.statistic if numpy.isfinite(e.statistic) else 0.0,
+                p_value=e.p_value,
+                interval=None,
+                effect=e.mean,
+                n=e.n,
+                decision=(
+                    qualification.Decision.WARN
+                    if e.p_value <= alpha
+                    else qualification.Decision.PASS
+                ),
+                subset=qualification.Subset.CONFIRMATION,
+                seeds=(seed, "framing.baseline", index),
+                tier=tier,
+            )
+            for index, (t, e) in enumerate(zip(points, endpoints, strict=False))
+        )
+
     def assemble(
         self,
         endpoints: tuple[Clustered, ...],
@@ -624,26 +665,7 @@ class Evaluator:
             ]
         tier = input_tier if issued else qualification.Tier.UNVERIFIED
         points = (self.registration.t_lo, self.registration.t_hi)
-        checks = tuple(
-            qualification.Check(
-                identifier=f"{CHECK_PREFIX}:delta@t={t:.4f}",
-                null=f"Delta(t) <= 0 at t = {t:.4f}",
-                statistic=e.statistic if numpy.isfinite(e.statistic) else 0.0,
-                p_value=e.p_value,
-                interval=None,
-                effect=e.mean,
-                n=e.n,
-                decision=(
-                    qualification.Decision.WARN
-                    if e.p_value <= alpha
-                    else qualification.Decision.PASS
-                ),
-                subset=qualification.Subset.CONFIRMATION,
-                seeds=(seed, "framing.baseline", index),
-                tier=tier,
-            )
-            for index, (t, e) in enumerate(zip(points, endpoints, strict=False))
-        )
+        checks = self.examine(endpoints, tier, seed)
         claim = qualification.Claim(
             identifier=CLAIM_ID,
             statement=(

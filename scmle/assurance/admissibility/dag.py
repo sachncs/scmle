@@ -38,6 +38,18 @@ FORMAT_VERSION = 1
 STATUS = "hypothesis"
 MAX_SEARCH_CANDIDATES = 16
 EDGE_LENGTH = 2
+FIELDS = frozenset(
+    {
+        "format_version",
+        "status",
+        "nodes",
+        "edges",
+        "latent",
+        "source",
+        "prompt",
+        "hash",
+    }
+)
 
 Edge = tuple[str, str]
 
@@ -430,17 +442,7 @@ class Dag:
                 that does not match the content, or content that is not a
                 valid graph.
         """
-        names = {
-            "format_version",
-            "status",
-            "nodes",
-            "edges",
-            "latent",
-            "source",
-            "prompt",
-            "hash",
-        }
-        if set(document) != names:
+        if set(document) != FIELDS:
             raise errors.InputError(
                 "unexpected or missing field(s) in dag artifact"
             )

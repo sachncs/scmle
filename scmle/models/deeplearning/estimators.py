@@ -24,8 +24,8 @@ from scmle.models.deeplearning import contracts
 from scmle.runtime import worker
 
 
-class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
-    """Common behaviour of the worker-backed estimators.
+class Settings(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+    """Hyperparameters and model-family contracts of the worker estimators.
 
     Attributes:
         architecture: Name in `architectures.ARCHITECTURES`.
@@ -55,7 +55,6 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
     """
 
     engine_path = ""
-    CHECKPOINT_SCHEMA_VERSION = 1
 
     def __init__(
         self,
@@ -101,16 +100,14 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
             validation_fraction: Share of rows held out for early stopping.
             device: `auto` (CUDA when available), `cpu` or `cuda`.
             random_state: Seed for initialization, shuffling and the split.
-            optimizer: `adam`, `adamw`, `sgd` (with `momentum`), `rmsprop` or
-                `lbfgs` (full-batch second-order steps).
+            optimizer: `adam`, `adamw`, `sgd`, `rmsprop` or `lbfgs`.
             momentum: Momentum of `sgd`.
             loss: `default`, or `focal` (classifier) / `huber` (regressor).
             label_smoothing: Share of probability moved off the true class.
             focal_gamma: Focusing strength of the focal loss.
-            huber_delta: Where the Huber loss turns from squared to linear (in
+            huber_delta: Width of the Huber loss's squared region (in
                 standardized target units).
-            accumulation_steps: Mini-batches whose gradients are summed before
-                one parameter update (a larger effective batch).
+            accumulation_steps: Mini-batches summed per parameter update.
         """
         self.optimizer = optimizer
         self.momentum = momentum
@@ -169,6 +166,16 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
                 "contract"
             )
         return explanation
+
+
+class NetworkEstimator(Settings):
+    """Common behaviour of the worker-backed estimators.
+
+    `Settings` documents the hyperparameters; this layer trains in the
+    worker, calls the fitted engine and keeps authenticated checkpoints.
+    """
+
+    CHECKPOINT_SCHEMA_VERSION = 1
 
     def inventory(self) -> dict[str, object]:
         """Returns the fitted checkpoint metadata, without the weights."""
@@ -432,16 +439,14 @@ class TorchClassifier(base.ClassifierMixin, NetworkEstimator):  # type: ignore[m
             validation_fraction: Share of rows held out for early stopping.
             device: `auto` (CUDA when available), `cpu` or `cuda`.
             random_state: Seed for initialization, shuffling and the split.
-            optimizer: `adam`, `adamw`, `sgd` (with `momentum`), `rmsprop` or
-                `lbfgs` (full-batch second-order steps).
+            optimizer: `adam`, `adamw`, `sgd`, `rmsprop` or `lbfgs`.
             momentum: Momentum of `sgd`.
             loss: `default`, or `focal` (classifier) / `huber` (regressor).
             label_smoothing: Share of probability moved off the true class.
             focal_gamma: Focusing strength of the focal loss.
-            huber_delta: Where the Huber loss turns from squared to linear (in
+            huber_delta: Width of the Huber loss's squared region (in
                 standardized target units).
-            accumulation_steps: Mini-batches whose gradients are summed before
-                one parameter update (a larger effective batch).
+            accumulation_steps: Mini-batches summed per parameter update.
             class_weight: `balanced` for inverse-class-frequency row weights, or
                 None for equal weights.
         """

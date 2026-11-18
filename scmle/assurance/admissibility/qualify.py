@@ -23,6 +23,7 @@ certified suspect that is a strong legitimate predictor is kept only by a
 valid, ledgered per-column attestation (`attestations.py`, tier `attested`).
 """
 
+from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
 import datetime
@@ -251,16 +252,208 @@ def waiver(
     )
 
 
-def admit(
-    frame: pandas.DataFrame,
-    candidates: Sequence[str],
+@dataclasses.dataclass(frozen=True)
+class Sample:
+    """The exploration data one run qualifies, and what it has found so far.
+
+    Attributes:
+        frame: Exploration features with the target as a column.
+        target: Name of the target column.
+        candidates: Candidate covariate columns (structure columns removed).
+        seed: Charter seed.
+        day: Day on which attestations must be valid.
+        result: Detector pipeline result.
+        store: Detector certificates used, or None.
+        notes: Notes so far; the stages append to this list in place.
+    """
+
+    frame: pandas.DataFrame
+    target: str
+    candidates: list[str]
+    seed: int
+    day: datetime.date
+    result: pipeline.Findings
+    store: certificates.Store | None
+    notes: list[str]
+
+    @classmethod
+    def draw(
+        cls,
+        features: pandas.DataFrame,
+        target: pandas.Series,
+        structure: Sequence[str],
+        seed: int,
+        today: datetime.date | None,
+        shelf: Shelf,
+    ) -> "Sample":
+        """Joins the target to the features and runs the detector pipeline.
+
+        Args:
+            features: Exploration features.
+            target: Exploration target.
+            structure: Group and time columns, which are not candidates.
+            seed: Charter seed.
+            today: Day on which attestations must be valid; defaults to the
+                current date.
+            shelf: The detector certificate store and its note.
+
+        Returns:
+            The sample, its notes holding the shelf's note if any.
+        """
+        notes = [n for n in (shelf.note,) if n]
+        frame = features.assign(**{str(target.name): target})
+        result = pipeline.run(
+            frame, str(target.name), shelf.store, seed, provenance=None
+        )
+        candidates = [c for c in features.columns if c not in set(structure)]
+        day = today or datetime.datetime.now().astimezone().date()
+        return cls(
+            frame,
+            str(target.name),
+            candidates,
+            seed,
+            day,
+            result,
+            shelf.store,
+            notes,
+        )
+
+    def conclude(
+        self,
+        table: rules.Admissibility | None,
+        leakage: screen.Screen | None,
+        diagnostics: tuple[tuple[str, qualification.Check], ...] = (),
+    ) -> "Qualification":
+        """Wraps the stage results with the sample's detectors and notes.
+
+        Args:
+            table: Admissibility decisions, or None when not run.
+            leakage: The leakage screen report, or None when not run.
+            diagnostics: Ledger records (source, check).
+
+        Returns:
+            The qualification.
+        """
+        return Qualification(
+            table,
+            leakage,
+            self.result,
+            self.store,
+            tuple(self.notes),
+            diagnostics,
+        )
+
+
+def judge(
+    sample: Sample,
     spec: scmle.assurance.charter.causal.Question,
     graph: scmle.assurance.admissibility.dag.Dag,
-    seed: int,
-    day: datetime.date,
-    result: pipeline.Findings,
-    store: certificates.Store | None,
-    notes: list[str],
+) -> tuple[rules.Admissibility | None, dict[str, str]]:
+    """Applies the graph rules and checks the declared adjustment set.
+
+    Args:
+        sample: The exploration sample; its notes are appended to when the
+            graph rules cannot run, when the declared adjustment set holds a
+            refused member, or when there are too many candidates and no
+            declared adjustment set.
+        spec: The charter's causal block.
+        graph: The declared DAG hypothesis.
+
+    Returns:
+        The admissibility table (None when the graph rules could not be
+        applied) and the refused adjustment members with their reasons.
+    """
+    candidates = sample.candidates
+    records = provenance.Dictionary.covering([str(c) for c in candidates])
+    members = scmle.assurance.charter.causal.adjusters(spec.assumptions) or ()
+    try:
+        table: rules.Admissibility | None = rules.build_table(
+            records,
+            "causal",
+            rules.Mode.PERMISSIVE,
+            today=sample.day,
+            graph=graph,
+            treatment=spec.treatment,
+            outcome=spec.outcome,
+        )
+    except errors.InputError as error:
+        # handled: appended to notes as graph rules not applied
+        table = None
+        sample.notes.append(f"graph rules were not applied: {error}")
+    refused = {
+        d.name: "; ".join(d.reasons)
+        for d in (() if table is None else table.decisions)
+        if d.name in members and d.admission is rules.Admission.QUARANTINE
+    }
+    if refused:
+        sample.notes.append(
+            "backdoor_aipw is ineligible: the declared adjustment set holds "
+            + ", ".join(sorted(refused))
+        )
+    if (
+        not members
+        and len(candidates)
+        > scmle.assurance.admissibility.dag.MAX_SEARCH_CANDIDATES
+    ):
+        sample.notes.append(
+            "more than "
+            f"{scmle.assurance.admissibility.dag.MAX_SEARCH_CANDIDATES} "
+            "candidate covariates and no declared adjustment set: the "
+            "charter must supply the set, and the claim is attested at best"
+        )
+    return table, refused
+
+
+def probe(
+    sample: Sample,
+    graph: scmle.assurance.admissibility.dag.Dag,
+) -> tuple[Mapping[str, object], tuple[tuple[str, qualification.Check], ...]]:
+    """Tests the graph's implied independences on `X`.
+
+    Args:
+        sample: The exploration sample; its notes are appended to when the
+            falsification cannot run or falsifies implications.
+        graph: The declared DAG hypothesis.
+
+    Returns:
+        The `falsification` entry of the `dag` report, and the checks of the
+        falsification (empty when it could not run).
+    """
+    try:
+        found = independence.falsify(
+            graph, sample.frame, alpha=DAG_ALPHA, run_seed=sample.seed
+        )
+    except (errors.InputError, KeyError) as error:
+        # handled: report falsification ran False with reason, plus note
+        sample.notes.append(
+            f"the declared DAG could not be tested on X: {error}"
+        )
+        return {"ran": False, "reason": str(error)}, ()
+    falsification = {
+        "ran": True,
+        "alpha": found.alpha,
+        "level": found.level,
+        "tested": sum(
+            o.verdict is not independence.Verdict.SKIPPED
+            for o in found.outcomes
+        ),
+        "falsified": [o.statement.text() for o in found.falsified],
+        "skipped_nodes": list(found.skipped_nodes),
+        "note": "a graph can only survive, never be confirmed",
+    }
+    if found.falsified:
+        sample.notes.append(
+            f"{len(found.falsified)} implication(s) of the declared DAG "
+            "were falsified on X"
+        )
+    return falsification, tuple((DAG_SOURCE, c) for c in found.checks)
+
+
+def admit(
+    sample: Sample,
+    kind: str,
+    spec: scmle.assurance.charter.causal.Question | None,
+    graph: scmle.assurance.admissibility.dag.Dag | None,
 ) -> Qualification:
     """Applies the graph rules to every candidate and tests the graph.
 
@@ -271,99 +464,191 @@ def admit(
     adjustment set adds a note that the claim is `attested` at best.
 
     Args:
-        frame: Exploration data with the candidates and the target.
-        candidates: Candidate covariate columns.
-        spec: The charter's causal block.
-        graph: The declared DAG hypothesis.
-        seed: Charter seed.
-        day: Day on which attestations must be valid.
-        result: Detector pipeline result to carry into the return value.
-        store: Detector certificates used, to carry into the return value.
-        notes: Notes so far. This list is appended to in place when the graph
-            rules or the falsification cannot run, when the declared
-            adjustment set holds a refused member, when there are too many
-            candidates and no declared adjustment set, or when the graph has
-            falsified implications.
+        sample: The exploration sample; its notes are appended to in place.
+        kind: Estimand kind from the charter, for the note when no graph is
+            declared.
+        spec: The charter's causal block, or None.
+        graph: The declared DAG hypothesis, or None.
 
     Returns:
         The qualification with the admissibility table (None when the graph
         rules could not be applied), no leakage report, and the `dag`
         report holding the graph hash, the refused adjustment members and
         the falsification outcome. Its diagnostics are the checks of the
-        falsification, if it ran.
+        falsification, if it ran. Without both a causal block and a graph,
+        the table and the `dag` report are None and a note says so.
     """
-    records = provenance.Dictionary.covering([str(c) for c in candidates])
-    members = scmle.assurance.charter.causal.adjusters(spec.assumptions) or ()
-    try:
-        table: rules.Admissibility | None = rules.build_table(
-            records,
-            "causal",
-            rules.Mode.PERMISSIVE,
-            today=day,
-            graph=graph,
-            treatment=spec.treatment,
-            outcome=spec.outcome,
+    if spec is None or graph is None:
+        sample.notes.append(
+            f"{kind} estimand without a declared graph: admissibility not run"
         )
-    except errors.InputError as error:
-        # handled: appended to notes as graph rules not applied
-        table = None
-        notes.append(f"graph rules were not applied: {error}")
-    refused = {
-        d.name: "; ".join(d.reasons)
-        for d in (() if table is None else table.decisions)
-        if d.name in members and d.admission is rules.Admission.QUARANTINE
-    }
-    if refused:
-        notes.append(
-            "backdoor_aipw is ineligible: the declared adjustment set holds "
-            + ", ".join(sorted(refused))
-        )
-    if (
-        not members
-        and len(candidates)
-        > scmle.assurance.admissibility.dag.MAX_SEARCH_CANDIDATES
-    ):
-        notes.append(
-            "more than "
-            f"{scmle.assurance.admissibility.dag.MAX_SEARCH_CANDIDATES} "
-            "candidate covariates and no declared adjustment set: the "
-            "charter must supply the set, and the claim is attested at best"
-        )
+        return sample.conclude(None, None)
+    table, refused = judge(sample, spec, graph)
+    falsification, diagnostics = probe(sample, graph)
     report: dict[str, object] = {
         "dag_hash": graph.digest(),
         "adjustment_members_refused": refused,
+        "falsification": falsification,
     }
-    diagnostics: tuple[tuple[str, qualification.Check], ...] = ()
-    try:
-        found = independence.falsify(
-            graph, frame, alpha=DAG_ALPHA, run_seed=seed
-        )
-    except (errors.InputError, KeyError) as error:
-        # handled: report falsification ran False with reason, plus note
-        report["falsification"] = {"ran": False, "reason": str(error)}
-        notes.append(f"the declared DAG could not be tested on X: {error}")
-    else:
-        report["falsification"] = {
-            "ran": True,
-            "alpha": found.alpha,
-            "level": found.level,
-            "tested": sum(
-                o.verdict is not independence.Verdict.SKIPPED
-                for o in found.outcomes
-            ),
-            "falsified": [o.statement.text() for o in found.falsified],
-            "skipped_nodes": list(found.skipped_nodes),
-            "note": "a graph can only survive, never be confirmed",
-        }
-        diagnostics = tuple((DAG_SOURCE, check) for check in found.checks)
-        if found.falsified:
-            notes.append(
-                f"{len(found.falsified)} implication(s) of the declared DAG "
-                "were falsified on X"
-            )
-    return Qualification(
-        table, None, result, store, tuple(notes), diagnostics, report
+    found = sample.conclude(table, None, diagnostics)
+    return dataclasses.replace(found, dag=report)
+
+
+def vouch(
+    sample: Sample,
+    report: screen.Screen,
+    attestations: Sequence[
+        scmle.assurance.admissibility.attestations.Affidavit
+    ],
+    scope: str,
+    declared: Sequence[provenance.Pedigree],
+) -> tuple[
+    dict[str, scmle.assurance.admissibility.attestations.Affidavit],
+    provenance.Dictionary,
+]:
+    """Applies the attestations that cover a flagged candidate.
+
+    Args:
+        sample: The exploration sample; its notes are appended to for every
+            rejected attestation and every valid one the screen did not need.
+        report: The leakage screen report.
+        attestations: Per-column statements that a strong predictor is
+            legitimate.
+        scope: Charter hash the attestations must name.
+        declared: Provenance records for columns the run derived.
+
+    Returns:
+        The attestations used, by column, and the provenance records of the
+        candidates: attested fields, then declared records for candidates
+        that no used attestation covers.
+    """
+    applied = scmle.assurance.admissibility.attestations.apply(
+        attestations, scope, sample.day.isoformat()
     )
+    for column, why in applied.rejected.items():
+        sample.notes.append(f"attestation for '{column}' ignored: {why}")
+    suspect_columns = {f.feature for f in report.suspects}
+    used = {
+        column: item
+        for column, item in applied.valid.items()
+        if column in suspect_columns and column in sample.candidates
+    }
+    sample.notes.extend(
+        f"attestation for '{column}' unused: the screen did not flag it"
+        for column in applied.valid
+        if column not in used
+    )
+    attested = {i.field().name for i in used.values()}
+    names = {str(c) for c in sample.candidates}
+    records = provenance.Dictionary.covering(
+        [str(c) for c in sample.candidates],
+        [
+            *(i.field() for i in used.values()),
+            *(
+                f
+                for f in declared
+                if f.name in names and f.name not in attested
+            ),
+        ],
+    )
+    return used, records
+
+
+def diagnose(
+    report: screen.Screen,
+    used: dict[str, scmle.assurance.admissibility.attestations.Affidavit],
+    seed: int,
+) -> tuple[tuple[str, qualification.Check], ...]:
+    """Builds the ledger records of the screen and the used attestations.
+
+    Args:
+        report: The leakage screen report.
+        used: The attestations that overrode a block, by column.
+        seed: Charter seed.
+
+    Returns:
+        One record per screen finding, then one per used attestation in
+        column order.
+    """
+    diagnostics: list[tuple[str, qualification.Check]] = [
+        (
+            screen.DETECTOR_ID,
+            screened(f, report.rows, seed, index),
+        )
+        for index, f in enumerate(report.findings)
+    ]
+    diagnostics.extend(
+        (
+            ATTESTATION_SOURCE,
+            waiver(
+                item,
+                [f for f in report.findings if f.feature == column],
+                report.rows,
+                seed,
+                index,
+            ),
+        )
+        for index, (column, item) in enumerate(sorted(used.items()))
+    )
+    return tuple(diagnostics)
+
+
+def predict(
+    sample: Sample,
+    classification: bool,
+    group_column: str | None,
+    time_column: str | None,
+    attestations: Sequence[
+        scmle.assurance.admissibility.attestations.Affidavit
+    ],
+    scope: str,
+    declared: Sequence[provenance.Pedigree],
+) -> Qualification:
+    """Runs the leakage screen and the admissibility table of a prediction.
+
+    Args:
+        sample: The exploration sample; its notes are appended to in place.
+        classification: Whether the target holds classes.
+        group_column: Entity column, so permutations keep entities whole.
+        time_column: Time column, so permutations stay within time blocks.
+        attestations: Per-column statements that a strong predictor is
+            legitimate.
+        scope: Charter hash the attestations must name.
+        declared: Provenance records for columns the run derived.
+
+    Returns:
+        The qualification with the leakage screen, the admissibility table
+        and the ledger diagnostics.
+    """
+    task = "classification" if classification else "regression"
+    report = screen.screen_table(
+        sample.frame,
+        sample.target,
+        task,
+        sample.candidates,
+        sample.seed,
+        group_column,
+        time_column,
+    )
+    if not any(
+        g is certificates.Authority.GATING for g in report.gates.values()
+    ):
+        sample.notes.append(
+            "leakage suspicion is descriptive: the screen gave no gate"
+        )
+    sample.notes.extend(report.notes)
+    used, records = vouch(sample, report, attestations, scope, declared)
+    suspect_columns = {f.feature for f in report.suspects}
+    gates = {f.feature: certificates.Authority.GATING for f in report.blocking}
+    table = rules.build_table(
+        records,
+        "predictive",
+        rules.Mode.PERMISSIVE,
+        today=sample.day,
+        suspects=dict.fromkeys(suspect_columns, True),
+        leakage_gate=gates,
+    )
+    return sample.conclude(table, report, diagnose(report, used, sample.seed))
 
 
 def run(
@@ -421,105 +706,22 @@ def run(
         the graph on `X`; without both, its admissibility table and leakage
         report are None and `notes` says so.
     """
-    notes: list[str] = []
-    f5 = load_store(F5_STORE, directory)
-    notes.extend(n for n in (f5.note,) if n)
-    frame = features.assign(**{str(target.name): target})
-    result = pipeline.run(
-        frame, str(target.name), f5.store, seed, provenance=None
-    )
-    candidates = [c for c in features.columns if c not in set(structure)]
-    day = today or datetime.datetime.now().astimezone().date()
-    if kind != "predictive":
-        if causal is None or dag is None:
-            notes.append(
-                f"{kind} estimand without a declared graph: admissibility "
-                "not run"
-            )
-            return Qualification(None, None, result, f5.store, tuple(notes))
-        return admit(
-            frame, candidates, causal, dag, seed, day, result, f5.store, notes
-        )
-    task = "classification" if classification else "regression"
-    report = screen.screen_table(
-        frame,
-        str(target.name),
-        task,
-        candidates,
+    sample = Sample.draw(
+        features,
+        target,
+        structure,
         seed,
+        today,
+        load_store(F5_STORE, directory),
+    )
+    if kind != "predictive":
+        return admit(sample, kind, causal, dag)
+    return predict(
+        sample,
+        classification,
         group_column,
         time_column,
-    )
-    if not any(
-        g is certificates.Authority.GATING for g in report.gates.values()
-    ):
-        notes.append(
-            "leakage suspicion is descriptive: the screen gave no gate"
-        )
-    notes.extend(report.notes)
-    applied = scmle.assurance.admissibility.attestations.apply(
-        attestations, scope, day.isoformat()
-    )
-    for column, why in applied.rejected.items():
-        notes.append(f"attestation for '{column}' ignored: {why}")
-    suspect_columns = {f.feature for f in report.suspects}
-    used = {
-        column: item
-        for column, item in applied.valid.items()
-        if column in suspect_columns and column in candidates
-    }
-    notes.extend(
-        f"attestation for '{column}' unused: the screen did not flag it"
-        for column in applied.valid
-        if column not in used
-    )
-    attested = {i.field().name for i in used.values()}
-    names = {str(c) for c in candidates}
-    records = provenance.Dictionary.covering(
-        [str(c) for c in candidates],
-        [
-            *(i.field() for i in used.values()),
-            *(
-                f
-                for f in declared
-                if f.name in names and f.name not in attested
-            ),
-        ],
-    )
-    gates = {f.feature: certificates.Authority.GATING for f in report.blocking}
-    table = rules.build_table(
-        records,
-        kind,
-        rules.Mode.PERMISSIVE,
-        today=day,
-        suspects=dict.fromkeys(suspect_columns, True),
-        leakage_gate=gates,
-    )
-    diagnostics: list[tuple[str, qualification.Check]] = [
-        (
-            screen.DETECTOR_ID,
-            screened(f, report.rows, seed, index),
-        )
-        for index, f in enumerate(report.findings)
-    ]
-    diagnostics.extend(
-        (
-            ATTESTATION_SOURCE,
-            waiver(
-                item,
-                [f for f in report.findings if f.feature == column],
-                report.rows,
-                seed,
-                index,
-            ),
-        )
-        for index, (column, item) in enumerate(sorted(used.items()))
-    )
-    return Qualification(
-        table,
-        report,
-        result,
-        f5.store,
-        tuple(notes),
-        tuple(diagnostics),
+        attestations,
+        scope,
+        declared,
     )
