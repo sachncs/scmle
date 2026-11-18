@@ -1,11 +1,13 @@
 """The training stage."""
 
+import dataclasses
 import time
 from typing import ClassVar
 
 from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.pipeline import ensemble_search
+from scmle.pipeline import products
 from scmle.pipeline import profiler
 from scmle.pipeline import strategy_search
 from scmle.pipeline import trials
@@ -18,6 +20,23 @@ from scmle.pipeline.stages import reservation
 import scmle.runtime.state
 
 
+@dataclasses.dataclass(frozen=True)
+class Search(products.Kept):
+    """The trials of the candidate search and what was decided on the way.
+
+    Attributes:
+        trials: The trial results, in order.
+        outcomes: The evidence-based decisions so far.
+        trial_counter: The trial identifiers handed out.
+        skipped: The work reduced or skipped for the budget so far.
+    """
+
+    trials: list[experiments.Trial]
+    outcomes: list[experiments.Decision]
+    trial_counter: int
+    skipped: list[dict[str, str]]
+
+
 class TrainStage(interface.Stage):
     """Cross-validates every candidate within the time budget."""
 
@@ -25,6 +44,7 @@ class TrainStage(interface.Stage):
         planning.Planning,
         reservation.Reservation,
     )
+    makes: ClassVar[type[products.Product] | None] = Search
     state: ClassVar[scmle.runtime.state.Progress] = (
         scmle.runtime.state.Progress.TRAINING
     )

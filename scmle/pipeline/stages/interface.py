@@ -3,6 +3,7 @@
 import abc
 from typing import ClassVar
 
+from scmle.pipeline import products
 import scmle.pipeline.context
 import scmle.runtime.state
 
@@ -14,10 +15,16 @@ class Stage(abc.ABC):
         state: Lifecycle state the run is in while the stage executes.
         requires: Stages that must run before this one (the workflow is
             ordered by `engine.order`).
+        makes: What the stage makes (`products.Product`): read from the
+            context after the stage, kept with the stage record, and applied
+            instead of running the stage again when a run resumes. None
+            for a stage that declares none: it, and every stage after it,
+            then runs again on resume.
     """
 
     state: ClassVar[scmle.runtime.state.Progress]
     requires: ClassVar[tuple[type, ...]] = ()
+    makes: ClassVar[type[products.Product] | None] = None
 
     @abc.abstractmethod
     def describe(self, context: scmle.pipeline.context.Context) -> str:

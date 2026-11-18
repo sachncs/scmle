@@ -1,10 +1,12 @@
 """The packaging stage, which assembles the `RunResult`."""
 
+import dataclasses
 from typing import ClassVar
 
 from scmle.artifacts import report
 from scmle.artifacts import results
 import scmle.artifacts.bundle
+from scmle.contracts import lineage
 from scmle.contracts import records
 from scmle.contracts import signing
 from scmle.contracts import tasks
@@ -13,6 +15,7 @@ from scmle.governance import attestation
 from scmle.governance import ledger
 from scmle.governance import model_card
 from scmle.inference import novelty
+from scmle.pipeline import products
 import scmle.pipeline.context
 from scmle.pipeline.stages import assessment
 from scmle.pipeline.stages import tracing
@@ -21,10 +24,34 @@ import scmle.runtime.state
 PARITY_ROWS = 200
 
 
+@dataclasses.dataclass(frozen=True)
+class Package(products.Derived):
+    """The signed bundle and the run's result; the run is then complete.
+
+    Attributes:
+        bundle: The packaged model.
+        result: The run's result.
+        evidence_graph: The graph of the run's evidence.
+    """
+
+    bundle: scmle.artifacts.bundle.Bundle | None
+    result: results.Run | None
+    evidence_graph: lineage.Graph
+
+    def summary(self) -> object:
+        """The digest of the evidence graph, which names every artifact.
+
+        Returns:
+            The graph digest.
+        """
+        return self.evidence_graph.digest()
+
+
 class PackageStage(tracing.Tracing):
     """Writes the model bundle, leaderboard and report."""
 
     requires: ClassVar[tuple[type, ...]] = (assessment.FinalEvaluationStage,)
+    makes: ClassVar[type[products.Product] | None] = Package
     state: ClassVar[scmle.runtime.state.Progress] = (
         scmle.runtime.state.Progress.PACKAGING
     )

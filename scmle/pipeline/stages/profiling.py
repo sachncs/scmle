@@ -1,18 +1,60 @@
 """The profile stage: task, split and development profile."""
 
+import dataclasses
 from typing import ClassVar
 
 import numpy
 import pandas
 
 from scmle.contracts import tasks
+import scmle.contracts.data
+import scmle.contracts.metrics
 from scmle.data.splitting import splitters
 from scmle.evaluation import backtest
 from scmle.pipeline import knowledge
+from scmle.pipeline import products
 import scmle.pipeline.context
 from scmle.pipeline.stages import impounding
 from scmle.pipeline.stages import ingestion
 import scmle.runtime.state
+
+
+@dataclasses.dataclass(frozen=True)
+class Partition(products.Derived):
+    """The task, the split and the development profile; made again on resume.
+
+    It holds the locked test set, which is never written in clear.
+
+    Attributes:
+        task: The resolved task.
+        metric: The primary metric.
+        profile: The development-set profile.
+        curation: The curation report.
+        split: The split, with the locked test set.
+        frame: The rows the later stages use.
+    """
+
+    task: tasks.Task | None
+    metric: scmle.contracts.metrics.Metric | None
+    profile: scmle.contracts.data.Portrait | None
+    curation: scmle.contracts.data.Curation | None
+    split: splitters.Split | None
+    frame: pandas.DataFrame | None
+
+    def summary(self) -> object:
+        """The task, metric, split fingerprint and profile.
+
+        Returns:
+            The identity of the partition.
+        """
+        return {
+            "task": self.task,
+            "metric": None if self.metric is None else self.metric.name,
+            "split": None
+            if self.split is None
+            else self.split.manifest.fingerprint,
+            "profile": None if self.profile is None else self.profile.to_dict(),
+        }
 
 
 class ProfileStage(impounding.Impounding):
@@ -27,6 +69,7 @@ class ProfileStage(impounding.Impounding):
     """
 
     requires: ClassVar[tuple[type, ...]] = (ingestion.IngestStage,)
+    makes: ClassVar[type[products.Product] | None] = Partition
     state: ClassVar[scmle.runtime.state.Progress] = (
         scmle.runtime.state.Progress.PROFILING
     )

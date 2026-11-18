@@ -160,3 +160,29 @@ def test_a_complete_run_ends_completed_with_its_artifacts(tmp_path):
         last = [json.loads(line) for line in handle][-1]
     assert last["kind"] == "state.COMPLETED"
     assert last["artifacts"] == ["model/"]
+
+
+def test_ready_lists_the_stages_whose_needs_are_done():
+    first, second, third = chain()
+    assert engine.ready((), (first, second, third)) == (first,)
+    assert engine.ready((first,), (second, third)) == (second, third)
+
+
+class Step:
+    """Stands in for a workflow step: needs are names, ties go by name."""
+
+    def __init__(self, name, depends_on=()):
+        self.name = name
+        self.depends_on = depends_on
+
+
+def test_steps_are_matched_by_name_and_ordered_by_name():
+    steps = (Step("c", ("a",)), Step("b"), Step("a"))
+    ordered = engine.order(steps, engine.NAMES)
+    assert [step.name for step in ordered] == ["a", "b", "c"]
+    done = (steps[2],)
+    assert engine.ready(done, steps[:2], engine.NAMES) == steps[:2]
+    with pytest.raises(errors.ConfigError, match=r"c requires \['z'\]"):
+        engine.order((Step("c", ("z",)),), engine.NAMES)
+    with pytest.raises(errors.ConfigError, match="more than once"):
+        engine.order((Step("a"), Step("a")), engine.NAMES)

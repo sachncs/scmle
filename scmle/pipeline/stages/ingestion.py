@@ -1,5 +1,6 @@
 """The ingest stage: reading, validating and admitting the data."""
 
+import dataclasses
 import datetime
 import json
 import time
@@ -15,15 +16,49 @@ from scmle.data import feature_graph
 from scmle.data.readers import streaming
 from scmle.data.readers import tabular
 import scmle.data.readers.registry
+from scmle.pipeline import products
 import scmle.pipeline.context
 from scmle.pipeline.stages import interface
 from scmle.preparation import forecasting
 import scmle.runtime.state
 
 
+@dataclasses.dataclass(frozen=True)
+class Intake(products.Derived):
+    """The ingested rows and their identity; read again on resume.
+
+    Attributes:
+        frame: The ingested rows.
+        manifest: The dataset's identity.
+        cleaning_notes: Repairs made while reading.
+        read_seconds: Seconds the read took.
+        stream: The chunked source and its totals, when streamed.
+    """
+
+    frame: pandas.DataFrame | None
+    manifest: provenance.DatasetManifest | None
+    cleaning_notes: list[str]
+    read_seconds: float
+    stream: tuple[streaming.Feed, streaming.Totals] | None
+
+    def summary(self) -> object:
+        """The content and schema digests and the repairs, not the timing.
+
+        Returns:
+            The identity of the ingested data.
+        """
+        digests = None if self.manifest is None else dict(self.manifest.digests)
+        return {
+            "digests": digests,
+            "notes": list(self.cleaning_notes),
+            "streamed": self.stream is not None,
+        }
+
+
 class IngestStage(interface.Stage):
     """Reads the dataset and fingerprints it."""
 
+    makes: ClassVar[type[products.Product] | None] = Intake
     state: ClassVar[scmle.runtime.state.Progress] = (
         scmle.runtime.state.Progress.VALIDATING
     )

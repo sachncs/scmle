@@ -1,13 +1,38 @@
 """The reservation stage: the post-training reserve and the minimum run."""
 
+import dataclasses
 from typing import ClassVar
 
+from scmle.pipeline import products
 from scmle.pipeline import profiler
 import scmle.pipeline.context
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import ingestion
 from scmle.pipeline.stages import interface
+from scmle.runtime import limits
 import scmle.runtime.state
+
+
+@dataclasses.dataclass(frozen=True)
+class Allowance(products.Derived):
+    """The time held back for the final steps; held again on resume.
+
+    Attributes:
+        governor: The run's governor, whose reserve the stage provisioned.
+    """
+
+    governor: limits.Governor | None
+
+    def summary(self) -> object:
+        """The table shape and the seconds held back by part.
+
+        Returns:
+            The reserve, which depends only on the shape and the budget.
+        """
+        if self.governor is None:
+            return None
+        reserve = self.governor.reserve
+        return {"shape": reserve.shape, "parts": reserve.parts}
 
 
 class Reservation(interface.Stage):
@@ -20,6 +45,7 @@ class Reservation(interface.Stage):
     """
 
     requires: ClassVar[tuple[type, ...]] = (ingestion.IngestStage,)
+    makes: ClassVar[type[products.Product] | None] = Allowance
     state: ClassVar[scmle.runtime.state.Progress] = (
         scmle.runtime.state.Progress.VALIDATING
     )

@@ -212,12 +212,15 @@ class Orchestrator:
 
         The configuration must be identical (same hash). The stage records
         are verified and the elapsed seconds they carry are kept, so the
-        time budget is not restarted. The stages before the locked test set
-        are derived again from the same data and seeds; trials whose
-        checkpoints were saved in the run directory are reused instead of
-        recomputed, and a saved `execution_plan.json` is applied as the
-        approved plan. The test set is never opened twice: the custody
-        journal refuses a run whose test set was opened.
+        time budget is not restarted. A finished stage whose product is
+        kept, authenticates with the signing key and was made from the same
+        inputs is not run again: its product is loaded (`products`). The
+        other stages before the locked test set are derived again from the
+        same data and seeds; trials whose checkpoints were saved in the run
+        directory are reused instead of recomputed, and a saved
+        `execution_plan.json` is applied as the approved plan. The test set
+        is never opened twice: the custody journal refuses a run whose test
+        set was opened.
 
         Args:
             run_directory: Directory of a cancelled, failed or crashed run.

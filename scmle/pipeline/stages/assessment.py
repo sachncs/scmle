@@ -1,5 +1,6 @@
 """The final evaluation stage on the locked test set."""
 
+import dataclasses
 import time
 from typing import Any
 from typing import ClassVar
@@ -10,6 +11,7 @@ from scmle.assurance.custody import journal
 from scmle.contracts import experiments
 from scmle.contracts import records
 from scmle.contracts import tasks
+from scmle.pipeline import products
 import scmle.pipeline.context
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import scoring
@@ -19,10 +21,37 @@ from scmle.preparation import strategies
 import scmle.runtime.state
 
 
+@dataclasses.dataclass(frozen=True)
+class Exam(products.Derived):
+    """The final model and its one test-set evaluation; never written.
+
+    It holds the opened test rows. A run whose test set was opened is not
+    resumed (`journal.Journal.admit`), so it is never needed again.
+
+    Attributes:
+        evaluation: The evaluation record.
+        final_pipeline: The model refit on the development data.
+        test_rows: The opened test rows and labels.
+    """
+
+    evaluation: records.Layout | None
+    final_pipeline: Any
+    test_rows: tuple[pandas.DataFrame, pandas.Series] | None
+
+    def summary(self) -> object:
+        """The evaluation record and whether the test rows were opened.
+
+        Returns:
+            The evaluation and the opening.
+        """
+        return {"evaluation": self.evaluation, "opened": bool(self.test_rows)}
+
+
 class FinalEvaluationStage(summary.Summary):
     """Refits the frozen candidate and opens the locked test set once."""
 
     requires: ClassVar[tuple[type, ...]] = (selecting.SelectStage,)
+    makes: ClassVar[type[products.Product] | None] = Exam
     state: ClassVar[scmle.runtime.state.Progress] = (
         scmle.runtime.state.Progress.TESTING
     )

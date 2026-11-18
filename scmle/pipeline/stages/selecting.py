@@ -7,7 +7,10 @@ from typing import ClassVar
 import scmle.assurance.framing.claim
 from scmle.contracts import errors
 from scmle.contracts import experiments
+from scmle.contracts import models
+from scmle.contracts import records
 from scmle.evaluation import resources
+from scmle.pipeline import products
 import scmle.pipeline.context
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import exploration
@@ -18,10 +21,32 @@ from scmle.preparation import strategies
 import scmle.runtime.state
 
 
+@dataclasses.dataclass(frozen=True)
+class Choice(products.Kept):
+    """The selected trial and the refits made to choose it.
+
+    Attributes:
+        selected: The winning trial.
+        refits: Candidates refit on the development data, by trial id.
+        pareto_front: The measured front, when the Pareto option is on.
+        pending_ledger: A charter run's confirmation still to open, if any.
+        outcomes: The evidence-based decisions so far.
+        skipped: The work reduced or skipped for the budget so far.
+    """
+
+    selected: experiments.Trial | None
+    refits: dict[str, models.Estimator]
+    pareto_front: list[records.Layout] | None
+    pending_ledger: Any
+    outcomes: list[experiments.Decision]
+    skipped: list[dict[str, str]]
+
+
 class SelectStage(interface.Stage):
     """Applies the selection policy and the serving constraints."""
 
     requires: ClassVar[tuple[type, ...]] = (training.TrainStage,)
+    makes: ClassVar[type[products.Product] | None] = Choice
     state: ClassVar[scmle.runtime.state.Progress] = (
         scmle.runtime.state.Progress.SELECTING
     )

@@ -1,45 +1,61 @@
 """The pipeline engine: orders the stages and runs them under the run state.
 
-Each stage names the stages it needs (`requires`). `order` checks that every
-dependency is present, rejects duplicates and cycles, and returns a
-deterministic topological order (earlier lifecycle states first, then the
-order the stages were given).
+Each stage names what it needs. How a need is met and how ties are broken
+is a `Dependency`: `CLASSES` for the tabular stages (a need is a stage class,
+met by an instance of it or of a subclass; earlier lifecycle states first,
+then the order the stages were given) and `NAMES` for workflow steps (a need
+is a step name; ties by name). `ready` lists the stages whose needs are
+done, which is what a parallel dispatcher starts next. `order` checks that
+every dependency is present, rejects duplicates and cycles, and returns a
+deterministic topological order.
 `Pipeline` runs that order: before each stage it checks cancellation, it
 moves the state machine only when the stage's state differs from the
 current one, it limits the math-library threads, times the stage, consults
 the reviewers once the last stage of a state has run, and maps a failure to
-the run's terminal state. With an archive it writes each stage's record once
-the stage and its review are done, and the completion marker after the
-completed state. `Pipeline.advance(until=...)` runs only the stages a given
-stage needs, which is the side-effect-free plan preview.
+the run's terminal state. With an archive it writes each stage's product and
+record once the stage and its review are done, and the completion marker
+after the completed state; on a resumed run a stage whose product the
+archive restores is not run again, its product is applied instead
+(`archive.Directory.restore`). `Pipeline.advance(until=...)` runs only the
+stages a given stage needs, which is the side-effect-free plan preview.
 """
 
 from collections.abc import Callable
+from collections.abc import Hashable
+from collections.abc import Iterable
 from collections.abc import Sequence
 import dataclasses
 import time
+from typing import Any
 from typing import ClassVar
+from typing import Generic
 from typing import Protocol
 from typing import TypeVar
 
 from scmle.contracts import errors
 from scmle.pipeline import archive
+from scmle.pipeline import products
 import scmle.pipeline.context
 from scmle.runtime import limits
 from scmle.runtime import state
 
+ContextT = TypeVar("ContextT", contravariant=True)  # noqa: PLC0105 -- no underscores (naming rule)
+ItemT = TypeVar("ItemT")
 
-class Node(Protocol):
+
+class Node(Protocol[ContextT]):
     """The structural contract of a stage the engine can order and run.
 
     The engine depends on this protocol, not on the stage hierarchy, so a
-    replacement stage needs no base class.
+    replacement stage needs no base class. It is generic over the context
+    the stage reads and writes.
     """
 
     state: ClassVar[state.Progress]
     requires: ClassVar[tuple[type, ...]]
+    makes: ClassVar[type[products.Product] | None]
 
-    def describe(self, context: scmle.pipeline.context.Context) -> str:
+    def describe(self, context: ContextT) -> str:
         """Returns the reason recorded on entering the stage's state.
 
         Args:
@@ -50,7 +66,7 @@ class Node(Protocol):
         """
         ...
 
-    def execute(self, context: scmle.pipeline.context.Context) -> None:
+    def execute(self, context: ContextT) -> None:
         """Performs the stage, reading and writing the context.
 
         Args:
@@ -58,63 +74,123 @@ class Node(Protocol):
         """
 
 
-StageT = TypeVar("StageT", bound=Node)
 LIFECYCLE = tuple(state.Progress)
 """The lifecycle states in order; `order` runs earlier states first."""
 
 
-def order(stages: Sequence[StageT]) -> tuple[StageT, ...]:
-    """Orders stages so that every stage runs after the stages it requires.
+@dataclasses.dataclass(frozen=True, slots=True)
+class Dependency(Generic[ItemT]):
+    """How items name their needs, how a need is met and how ties break.
 
-    A requirement is met by an instance of the required class or of a
-    subclass, so a replacement stage satisfies its predecessor's dependents.
-    Among the stages whose requirements have run, the one earliest in the
-    lifecycle runs first, and ties keep the order the stages were given, so
-    the state machine only ever moves forward.
+    Attributes:
+        needs: The needs of an item.
+        meets: Whether a done item meets a need.
+        rank: The tie-break key: among ready items, the smallest runs first;
+            equal keys keep the order the items were given.
+        title: The name of an item or of a need, for records and messages.
+    """
+
+    needs: Callable[[ItemT], Iterable[Hashable]]
+    meets: Callable[[ItemT, Hashable], bool]
+    rank: Callable[[ItemT], tuple[int, str]]
+    title: Callable[[Any], str]
+
+
+CLASSES: Dependency[Any] = Dependency(
+    needs=lambda stage: stage.requires,
+    meets=lambda done, need: isinstance(need, type) and isinstance(done, need),
+    rank=lambda stage: (LIFECYCLE.index(stage.state), ""),
+    title=lambda item: (
+        item.__name__ if isinstance(item, type) else type(item).__name__
+    ),
+)
+"""Tabular stages: a need is a stage class, met by an instance of it or of a
+subclass (so a replacement stage satisfies its predecessor's dependents);
+earlier lifecycle states run first, so the state machine only moves forward.
+"""
+
+NAMES: Dependency[Any] = Dependency(
+    needs=lambda step: step.depends_on,
+    meets=lambda done, need: done.name == need,
+    rank=lambda step: (0, step.name),
+    title=lambda item: item if isinstance(item, str) else item.name,
+)
+"""Workflow steps (`name`, `depends_on`): a need is a step name; ties are
+broken by name."""
+
+
+def ready(
+    done: Iterable[ItemT],
+    remaining: Iterable[ItemT],
+    dependency: Dependency[ItemT] = CLASSES,
+) -> tuple[ItemT, ...]:
+    """Lists the remaining items whose every need a done item meets.
 
     Args:
-        stages: Stage instances, each with a `requires` tuple of classes.
+        done: The items that finished.
+        remaining: The items not started.
+        dependency: How needs are named and met.
 
     Returns:
-        The stages in execution order.
+        The items that may start now, in the order given.
+    """
+    finished = tuple(done)
+    return tuple(
+        item
+        for item in remaining
+        if all(
+            any(dependency.meets(other, need) for other in finished)
+            for need in dependency.needs(item)
+        )
+    )
+
+
+def order(
+    stages: Sequence[ItemT], dependency: Dependency[ItemT] = CLASSES
+) -> tuple[ItemT, ...]:
+    """Orders items so that every item runs after the items it needs.
+
+    Among the items whose needs have run, the one with the smallest
+    `dependency.rank` runs first, and ties keep the order the items were
+    given.
+
+    Args:
+        stages: The stages or steps.
+        dependency: How needs are named and met and how ties break.
+
+    Returns:
+        The items in execution order.
 
     Raises:
-        ConfigError: If a required stage is missing, a stage appears twice,
-            or the dependencies contain a cycle.
+        ConfigError: If a needed item is missing, an item appears twice, or
+            the dependencies contain a cycle.
     """
-    kinds = [type(stage) for stage in stages]
-    if len(set(kinds)) != len(kinds):
+    titles = [dependency.title(stage) for stage in stages]
+    if len(set(titles)) != len(titles):
         raise errors.ConfigError("a stage appears more than once")
     for stage in stages:
         missing = [
-            kind.__name__
-            for kind in stage.requires
-            if not any(isinstance(other, kind) for other in stages)
+            dependency.title(need)
+            for need in dependency.needs(stage)
+            if not any(dependency.meets(other, need) for other in stages)
         ]
         if missing:
             raise errors.ConfigError(
-                f"{type(stage).__name__} requires {missing}, which are not in "
-                "the workflow"
+                f"{dependency.title(stage)} requires {missing}, which are not "
+                "in the workflow"
             )
     remaining = list(stages)
-    ordered: list[StageT] = []
+    ordered: list[ItemT] = []
     while remaining:
-        candidates = [
-            stage
-            for stage in remaining
-            if all(
-                any(isinstance(done, kind) for done in ordered)
-                for kind in stage.requires
-            )
-        ]
+        candidates = ready(ordered, remaining, dependency)
         if not candidates:
-            cycle = [type(stage).__name__ for stage in remaining]
+            cycle = [dependency.title(stage) for stage in remaining]
             raise errors.ConfigError(
                 f"stage dependencies contain a cycle among {cycle}"
             )
-        ready = min(candidates, key=lambda stage: LIFECYCLE.index(stage.state))
-        ordered.append(ready)
-        remaining.remove(ready)
+        first = min(candidates, key=dependency.rank)
+        ordered.append(first)
+        remaining.remove(first)
     return tuple(ordered)
 
 
@@ -140,87 +216,171 @@ class Pipeline:
 
     Attributes:
         stages: The stages in execution order.
-        records: Where each finished stage's record and the completion
-            marker are written, or None for a run that keeps none.
-        timings: The cost of each stage of the latest run, keyed by the
-            stage's class name.
+        records: Where each finished stage's product and record and the
+            completion marker are written, and from which a resumed run
+            restores products, or None for a run that keeps none.
+        dependency: How the stages name and meet their needs.
+        timings: The cost of each stage that ran in the latest run, keyed by
+            the stage's name.
+        digests: The product digest of each stage of the latest run, by
+            name; None when a product could not be digested.
+        restored: The names of the stages whose product was restored instead
+            of running them, in order.
     """
 
     def __init__(
-        self, stages: Sequence[Node], records: archive.Directory | None = None
+        self,
+        stages: Sequence[Node[scmle.pipeline.context.Context]],
+        records: archive.Directory | None = None,
+        dependency: Dependency[Any] = CLASSES,
     ) -> None:
         """Orders the stages.
 
         Args:
             stages: The stages; see `order` for the errors.
             records: The run's stage records, or None.
+            dependency: How the stages name and meet their needs.
         """
-        self.stages = order(stages)
+        self.stages = order(stages, dependency)
         self.records = records
+        self.dependency = dependency
         self.timings: dict[str, Lap] = {}
+        self.digests: dict[str, str | None] = {}
+        self.restored: list[str] = []
 
-    def select(self, until: type) -> tuple[Node, ...]:
-        """Returns the stage `until` and every stage it needs, in order.
+    def select(
+        self, until: Hashable
+    ) -> tuple[Node[scmle.pipeline.context.Context], ...]:
+        """Returns the stages meeting `until` and every stage they need.
 
         Args:
-            until: The class of the last stage to run.
+            until: The need the last stages to run meet (a stage class).
 
         Returns:
             The stages to run, in execution order.
 
         Raises:
-            ConfigError: If no stage is an instance of `until`.
+            ConfigError: If no stage meets `until`.
         """
-        needed = [stage for stage in self.stages if isinstance(stage, until)]
+        needed = [s for s in self.stages if self.dependency.meets(s, until)]
         if not needed:
-            raise errors.ConfigError(f"no {until.__name__} in the workflow")
+            raise errors.ConfigError(
+                f"no {self.dependency.title(until)} in the workflow"
+            )
         for stage in reversed(self.stages):
             if stage not in needed and any(
-                isinstance(stage, kind)
+                self.dependency.meets(stage, need)
                 for dependent in needed
-                for kind in dependent.requires
+                for need in self.dependency.needs(dependent)
             ):
                 needed.append(stage)
         return tuple(stage for stage in self.stages if stage in needed)
+
+    def ancestry(
+        self, stage: Node[scmle.pipeline.context.Context]
+    ) -> dict[str, str | None]:
+        """The product digests of every stage `stage` needs, directly or not.
+
+        Args:
+            stage: A stage that is about to run or be restored.
+
+        Returns:
+            The digests this run made, by stage name.
+        """
+        title = self.dependency.title
+        needed = [
+            other
+            for other in self.select(type(stage))
+            if other is not stage and title(other) in self.digests
+        ]
+        return {title(other): self.digests[title(other)] for other in needed}
 
     def advance(
         self,
         context: scmle.pipeline.context.Context,
         machine: state.Tracker | None = None,
         review: Review | None = None,
-        until: type | None = None,
+        until: Hashable | None = None,
     ) -> None:
         """Runs the stages, or those `until` needs, without ending the run.
+
+        With records, a stage whose product they restore is not executed:
+        its product is applied to the context, its state still entered and
+        its review still consulted, and its record is kept as it is.
 
         Args:
             context: The run context every stage reads and writes.
             machine: The run's state machine, or None for a preview.
             review: Approval gates, consulted after the last stage of each
                 state, or None.
-            until: The class of the last stage to run, or None for all.
+            until: The need the last stages to run meet, or None for all.
         """
         stages = self.stages if until is None else self.select(until)
         for index, stage in enumerate(stages):
             context.check_cancelled()
+            name = self.dependency.title(stage)
+            restored = self.restore(stage)
             if machine is not None and stage.state is not machine.state:
-                machine.transition(stage.state, stage.describe(context))
-            started = time.perf_counter()
-            with context.regulator.cap():
-                stage.execute(context)
-            lap = Lap(time.perf_counter() - started, limits.peak_memory_gb())
-            self.timings[type(stage).__name__] = lap
+                reason = stage.describe(context)
+                if restored is not None:
+                    reason = f"{reason} (restored from its record)"
+                machine.transition(stage.state, reason)
+            lap = Lap(0.0, 0.0)
+            if restored is not None:
+                restored.apply(context)
+                self.restored.append(name)
+            else:
+                started = time.perf_counter()
+                with context.regulator.cap():
+                    stage.execute(context)
+                lap = Lap(
+                    time.perf_counter() - started, limits.peak_memory_gb()
+                )
+                self.timings[name] = lap
             following = stages[index + 1] if index + 1 < len(stages) else None
             if review is not None and (
                 following is None or following.state is not stage.state
             ):
                 review(stage.state, context)
-            if self.records is not None:
-                self.records.record(
+            if self.records is not None and restored is None:
+                needs = self.ancestry(stage)
+                made = (
+                    None
+                    if stage.makes is None
+                    else stage.makes.capture(context)
+                )
+                record = self.records.record(
                     self.stages.index(stage),
-                    type(stage).__name__,
+                    name,
                     stage.state,
                     lap.seconds,
+                    made,
+                    needs,
                 )
+                self.digests[name] = record["product"]
+
+    def restore(
+        self, stage: Node[scmle.pipeline.context.Context]
+    ) -> products.Product | None:
+        """The product of a finished stage a resumed run need not run again.
+
+        Args:
+            stage: The stage about to run.
+
+        Returns:
+            The product the records restore, its digest noted in `digests`,
+            or None when the stage must run.
+        """
+        if self.records is None:
+            return None
+        name = self.dependency.title(stage)
+        found = self.records.restore(
+            self.stages.index(stage), name, stage.makes, self.ancestry(stage)
+        )
+        if found is None:
+            return None
+        made, self.digests[name] = found
+        return made
 
     def run(
         self,

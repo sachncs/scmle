@@ -1,5 +1,6 @@
 """The planning stage and the plan it devises."""
 
+import dataclasses
 import logging
 from typing import Any
 from typing import ClassVar
@@ -8,6 +9,7 @@ from scmle.contracts import capabilities
 from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.contracts import tasks
+from scmle.pipeline import products
 from scmle.pipeline import recommendations
 from scmle.pipeline import roster
 import scmle.pipeline.context
@@ -179,10 +181,27 @@ def advise(context: scmle.pipeline.context.Context) -> tuple[Any, ...]:
     return advice
 
 
+@dataclasses.dataclass(frozen=True)
+class Blueprint(products.Kept):
+    """The execution plan, the advice for the user and the capabilities.
+
+    Attributes:
+        plan: The execution plan.
+        recommendations: The advice derived from the profile.
+        capability_registry: The capabilities, with the refusals planning
+            recorded.
+    """
+
+    plan: experiments.Plan | None
+    recommendations: tuple[recommendations.Recommendation, ...]
+    capability_registry: capabilities.Registry
+
+
 class Planning(interface.Stage):
     """Builds the experiment plan from the development-set profile."""
 
     requires: ClassVar[tuple[type, ...]] = (profiling.ProfileStage,)
+    makes: ClassVar[type[products.Product] | None] = Blueprint
     state: ClassVar[scmle.runtime.state.Progress] = (
         scmle.runtime.state.Progress.PLANNING
     )

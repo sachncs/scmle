@@ -37,7 +37,7 @@ class Impounding(exploration.Exploration):
             The sealed set; this process keeps only the row ids. The
             resident object is emptied so no reference to the rows remains.
         """
-        assert isinstance(locked, splitters.ResidentTestSet)  # noqa: S101 -- narrows the type # nosec B101
+        assert isinstance(locked, splitters.lockbox.Resident)  # noqa: S101 -- narrows the type # nosec B101
         sealed = vault.SealedTestSet(locked.features, locked.target, locked.ids)
         locked.features = locked.features.iloc[0:0]
         locked.target = locked.target.iloc[0:0]
