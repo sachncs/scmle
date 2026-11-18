@@ -9,6 +9,64 @@ import scmle.artifacts.bundle
 from scmle.contracts import data
 from scmle.contracts import errors
 
+EXCLUSIONS = (
+    (
+        "It is not evidence of causal effect or fairness outside "
+        "the declared evaluation slices."
+    ),
+    "It must not be used with inputs that fail the packaged schema.",
+    "It is not a production approval without independent review.",
+)
+"""The out-of-scope uses every machine-generated card states."""
+ARTIFACTS = (
+    "dataset_card.json",
+    "dataset_manifest.json",
+    "evaluation.json",
+    "explanations/permutation_importance.json",
+    "explanations/permutation_importance.html",
+    "explanations/partial_dependence.json",
+    "explanations/partial_dependence.html",
+    "explanations/pairwise_interaction.json",
+    "explanations/pairwise_interaction.html",
+    "provenance.json",
+    "sbom.json",
+)
+"""The evidence files a card points a reviewer to."""
+
+
+def caveat(release: object) -> tuple[str, ...]:
+    """Returns the limitations a card states for a release evaluation.
+
+    Args:
+        release: The evaluation's `release_evaluation` entry, if any.
+
+    Returns:
+        The fixed limitations (human review, snapshot scope, associational
+        explanations) and, when the release evaluation is missing or
+        blocked, a statement that its status is unknown or that it is
+        blocked.
+    """
+    limitations = [
+        "This machine-generated card requires human review before release.",
+        (
+            "Evaluation results describe the declared snapshot and split; "
+            "they do not establish production-population performance."
+        ),
+        "Associational explanations are not causal claims.",
+    ]
+    if not isinstance(release, dict) or "blocked" not in release:
+        # ERR-23: a missing evaluation read as "not blocked".
+        limitations.append(
+            "No release evaluation was recorded, so the release status is "
+            "unknown; treat the model as not approved for release."
+        )
+    elif release["blocked"]:
+        limitations.append(
+            "The release evaluation is blocked until explicit success "
+            "criteria and reviewed evidence are present."
+        )
+    return tuple(limitations)
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Card:
@@ -94,25 +152,6 @@ class Card:
             missing, that it is blocked or that its status is unknown.
         """
         release = evaluation.get("release_evaluation")
-        limitations = [
-            "This machine-generated card requires human review before release.",
-            (
-                "Evaluation results describe the declared snapshot and split; "
-                "they do not establish production-population performance."
-            ),
-            "Associational explanations are not causal claims.",
-        ]
-        if not isinstance(release, dict) or "blocked" not in release:
-            # ERR-23: a missing evaluation read as "not blocked".
-            limitations.append(
-                "No release evaluation was recorded, so the release status is "
-                "unknown; treat the model as not approved for release."
-            )
-        elif release["blocked"]:
-            limitations.append(
-                "The release evaluation is blocked until explicit success "
-                "criteria and reviewed evidence are present."
-            )
         return cls(
             model_name=bundle.info.model_name,
             model_version=bundle.info.model_version,
@@ -125,18 +164,8 @@ class Card:
                 f"Inference for the declared {bundle.schema.task} task using "
                 "the packaged schema and preprocessing pipeline."
             ),
-            out_of_scope=(
-                (
-                    "It is not evidence of causal effect or fairness outside "
-                    "the declared evaluation slices."
-                ),
-                (
-                    "It must not be used with inputs that fail the packaged "
-                    "schema."
-                ),
-                "It is not a production approval without independent review.",
-            ),
-            limitations=tuple(limitations),
+            out_of_scope=EXCLUSIONS,
+            limitations=caveat(release),
             feature_names=tuple(
                 dict.fromkeys(
                     (
@@ -154,19 +183,7 @@ class Card:
                 "release_evaluation": release,
             },
             resources=dict(evaluation.get("resources", {})),
-            evidence_artifacts=(
-                "dataset_card.json",
-                "dataset_manifest.json",
-                "evaluation.json",
-                "explanations/permutation_importance.json",
-                "explanations/permutation_importance.html",
-                "explanations/partial_dependence.json",
-                "explanations/partial_dependence.html",
-                "explanations/pairwise_interaction.json",
-                "explanations/pairwise_interaction.html",
-                "provenance.json",
-                "sbom.json",
-            ),
+            evidence_artifacts=ARTIFACTS,
             support_status="tabular_beta_library_inference",
         )
 

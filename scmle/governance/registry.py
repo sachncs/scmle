@@ -235,48 +235,22 @@ def identify(bundle_directory: str | pathlib.Path) -> str:
     return bundle.shasum(manifest)
 
 
-class ModelRegistryStore:
-    """Versioned model storage with promotion by alias."""
+class Store:
+    """Versioned model storage: the index, the bundles and the audit log."""
 
-    def __init__(
-        self,
-        root: str | pathlib.Path,
-        guard: never_list.Guard | None = None,
-        scope: str = "stream",
-    ) -> None:
+    def __init__(self, root: str | pathlib.Path) -> None:
         """Opens a registry, creating its root directory if needed.
 
         Changes take a per-directory lock shared by every store object over
         the same root, so threads of one process never interleave a
         read-modify-write. Separate processes are not coordinated.
 
-        A registry created with a `guard` asks it for a human attestation
-        (never-list item 1) before the champion alias moves, whatever calls
-        `promote`. Without a guard the registry behaves as before and only
-        the signed approval protects the alias. The guard sits in front of
-        this class: a person or process that edits `registry.json` directly
-        passes neither check.
-
         Args:
             root: Registry directory.
-            guard: Optional never-list guard (see `attach`).
-            scope: Model version hash and stream id attestations must name.
         """
         self.root = pathlib.Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         self.lock = durability.latch(self.root)
-        self.guard = guard
-        self.scope = scope
-
-    def attach(self, guard: never_list.Guard | None, scope: str) -> None:
-        """Routes champion moves through `guard` (None removes it).
-
-        Args:
-            guard: The never-list guard, or None to remove it.
-            scope: The scope attestations must carry.
-        """
-        self.guard = guard
-        self.scope = scope
 
     def read_index(self) -> dict[str, Any]:
         """Loads the registry index (empty when new).
@@ -456,6 +430,98 @@ class ModelRegistryStore:
         entry = self.read_index()["models"].get(model, {"aliases": {}})
         return {alias: int(v) for alias, v in entry["aliases"].items()}
 
+    def resolve(self, model: str, ref: str | int = CHAMPION) -> Release:
+        """Resolves an alias or version number to a record.
+
+        Args:
+            model: Model name.
+            ref: A version number (or its digits) or an alias.
+
+        Returns:
+            The record of the version.
+
+        Raises:
+            ArtifactError: If the model is unknown, the alias is not set or
+                the version is not registered.
+        """
+        versions = {v.version: v for v in self.versions(model)}
+        if isinstance(ref, int) or str(ref).isdigit():
+            number = int(ref)
+        else:
+            aliases = self.aliases(model)
+            if ref not in aliases:
+                raise errors.ArtifactError(f"{model} has no alias '{ref}'")
+            number = aliases[ref]
+        if number not in versions:
+            raise errors.ArtifactError(f"{model} v{number} is not registered")
+        return versions[number]
+
+    def load(
+        self,
+        model: str,
+        ref: str | int = CHAMPION,
+        signing_key: str | bytes | None = None,
+    ) -> bundle.Bundle:
+        """Loads a registered bundle by alias or version.
+
+        A bundle registered as signed is authenticated again with the key; one
+        the registrant vouched for is loaded as vouched (refused when
+        ``$SCMLE_ENV`` is ``production``). An unresolvable `ref` or a bundle
+        that fails verification raises `ArtifactError`.
+
+        Args:
+            model: Model name.
+            ref: Alias or version number.
+            signing_key: HMAC key for signed bundles.
+
+        Returns:
+            The loaded bundle.
+        """
+        record = self.resolve(model, ref)
+        return bundle.Bundle.load(
+            self.root / record.path,
+            trusted=not record.signed,
+            signing_key=signing_key,
+        )
+
+
+class ModelRegistryStore(Store):
+    """Versioned model storage with promotion by alias."""
+
+    def __init__(
+        self,
+        root: str | pathlib.Path,
+        guard: never_list.Guard | None = None,
+        scope: str = "stream",
+    ) -> None:
+        """Opens a registry (see `Store`) with an optional champion guard.
+
+        A registry created with a `guard` asks it for a human attestation
+        (never-list item 1) before the champion alias moves, whatever calls
+        `promote`. Without a guard the registry behaves as before and only
+        the signed approval protects the alias. The guard sits in front of
+        this class: a person or process that edits `registry.json` directly
+        passes neither check.
+
+        Args:
+            root: Registry directory.
+            guard: Optional never-list guard (see `attach`).
+            scope: Model version hash and stream id attestations must name.
+        """
+        super().__init__(root)
+        self.guard = guard
+        self.scope = scope
+
+    def attach(self, guard: never_list.Guard | None, scope: str) -> None:
+        """Routes champion moves through `guard` (None removes it).
+
+        Args:
+            guard: The never-list guard, or None to remove it.
+            scope: The scope attestations must carry.
+        """
+        self.guard = guard
+        self.scope = scope
+
     def promote(
         self,
         model: str,
@@ -586,58 +652,4 @@ class ModelRegistryStore:
             version=version,
             previous=previous,
             approval_record=approval.to_dict() if approval else None,
-        )
-
-    def resolve(self, model: str, ref: str | int = CHAMPION) -> Release:
-        """Resolves an alias or version number to a record.
-
-        Args:
-            model: Model name.
-            ref: A version number (or its digits) or an alias.
-
-        Returns:
-            The record of the version.
-
-        Raises:
-            ArtifactError: If the model is unknown, the alias is not set or
-                the version is not registered.
-        """
-        versions = {v.version: v for v in self.versions(model)}
-        if isinstance(ref, int) or str(ref).isdigit():
-            number = int(ref)
-        else:
-            aliases = self.aliases(model)
-            if ref not in aliases:
-                raise errors.ArtifactError(f"{model} has no alias '{ref}'")
-            number = aliases[ref]
-        if number not in versions:
-            raise errors.ArtifactError(f"{model} v{number} is not registered")
-        return versions[number]
-
-    def load(
-        self,
-        model: str,
-        ref: str | int = CHAMPION,
-        signing_key: str | bytes | None = None,
-    ) -> bundle.Bundle:
-        """Loads a registered bundle by alias or version.
-
-        A bundle registered as signed is authenticated again with the key; one
-        the registrant vouched for is loaded as vouched (refused when
-        ``$SCMLE_ENV`` is ``production``). An unresolvable `ref` or a bundle
-        that fails verification raises `ArtifactError`.
-
-        Args:
-            model: Model name.
-            ref: Alias or version number.
-            signing_key: HMAC key for signed bundles.
-
-        Returns:
-            The loaded bundle.
-        """
-        record = self.resolve(model, ref)
-        return bundle.Bundle.load(
-            self.root / record.path,
-            trusted=not record.signed,
-            signing_key=signing_key,
         )

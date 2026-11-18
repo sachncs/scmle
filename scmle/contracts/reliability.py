@@ -573,6 +573,112 @@ class Registry:
         return cls.from_dict(record)
 
 
+SCENARIOS: tuple[
+    tuple[Contingency, SafeOutcome, Recoverability, tuple[str, ...]], ...
+] = (
+    (
+        Contingency.PROCESS_DEATH,
+        SafeOutcome.RESUME_DURABLE_CHECKPOINT,
+        Recoverability.AUTOMATIC,
+        ("process_termination", "checkpoint_resume", "artifact_integrity"),
+    ),
+    (
+        Contingency.STALE_CHECKPOINT,
+        SafeOutcome.REJECT_STALE_CHECKPOINT,
+        Recoverability.OPERATOR_ASSISTED,
+        ("checkpoint_identity", "stale_checkpoint_rejection", "run_state"),
+    ),
+    (
+        Contingency.DISK_FULL,
+        SafeOutcome.PRESERVE_DURABLE_ARTIFACT,
+        Recoverability.OPERATOR_ASSISTED,
+        (
+            "disk_capacity_exhaustion",
+            "artifact_integrity",
+            "resource_error",
+        ),
+    ),
+    (
+        Contingency.CORRUPT_ARTIFACT,
+        SafeOutcome.QUARANTINE_CORRUPT_ARTIFACT,
+        Recoverability.OPERATOR_ASSISTED,
+        ("corruption_injection", "digest_mismatch", "quarantine_record"),
+    ),
+    (
+        Contingency.WORKER_LOSS,
+        SafeOutcome.RETRY_IDEMPOTENT_WORK,
+        Recoverability.AUTOMATIC,
+        ("worker_termination", "idempotent_retry", "event_deduplication"),
+    ),
+    (
+        Contingency.TIMEOUT,
+        SafeOutcome.CANCEL_AND_RECORD_TERMINAL_FAILURE,
+        Recoverability.OPERATOR_ASSISTED,
+        ("timeout_injection", "cancellation_record", "resource_error"),
+    ),
+    (
+        Contingency.MEMORY_EXHAUSTION,
+        SafeOutcome.ABORT_BEFORE_PUBLICATION,
+        Recoverability.OPERATOR_ASSISTED,
+        ("memory_pressure", "publication_absence", "resource_error"),
+    ),
+    (
+        Contingency.PARTIAL_WRITE,
+        SafeOutcome.PRESERVE_DURABLE_ARTIFACT,
+        Recoverability.AUTOMATIC,
+        ("write_interruption", "atomicity_check", "artifact_integrity"),
+    ),
+    (
+        Contingency.DEPENDENCY_MISMATCH,
+        SafeOutcome.REJECT_INCOMPATIBLE_DEPENDENCY,
+        Recoverability.OPERATOR_ASSISTED,
+        ("environment_identity", "dependency_rejection", "run_state"),
+    ),
+    (
+        Contingency.INVALID_SIGNATURE,
+        SafeOutcome.REJECT_UNTRUSTED_ARTIFACT,
+        Recoverability.OPERATOR_ASSISTED,
+        (
+            "signature_tampering",
+            "verification_failure",
+            "quarantine_record",
+        ),
+    ),
+    (
+        Contingency.RETRY_EXHAUSTION,
+        SafeOutcome.TERMINATE_AFTER_RETRY_EXHAUSTION,
+        Recoverability.TERMINAL_SAFE_FAILURE,
+        ("retry_history", "terminal_event", "partial_publication_check"),
+    ),
+    (
+        Contingency.DUPLICATE_EVENT,
+        SafeOutcome.IGNORE_DUPLICATE_EVENT,
+        Recoverability.AUTOMATIC,
+        ("duplicate_event", "idempotency_key", "state_transition"),
+    ),
+    (
+        Contingency.INCOMPLETE_LINEAGE,
+        SafeOutcome.BLOCK_RELEASE_FOR_MISSING_LINEAGE,
+        Recoverability.TERMINAL_SAFE_FAILURE,
+        ("lineage_gap", "release_block", "audit_record"),
+    ),
+    (
+        Contingency.REJECTED_APPROVAL,
+        SafeOutcome.BLOCK_RELEASE_FOR_REJECTED_APPROVAL,
+        Recoverability.TERMINAL_SAFE_FAILURE,
+        ("approval_rejection", "release_block", "audit_record"),
+    ),
+    (
+        Contingency.CHANGED_SNAPSHOT,
+        SafeOutcome.INVALIDATE_CHANGED_SNAPSHOT,
+        Recoverability.OPERATOR_ASSISTED,
+        ("snapshot_digest_change", "run_invalidation", "lineage_record"),
+    ),
+)
+"""The production-beta fault plan: scenario, safe outcome, recoverability
+and the evidence each drill must record."""
+
+
 def drills() -> tuple[Plan, ...]:
     """Returns the complete, unexecuted production-beta fault plan.
 
@@ -580,106 +686,6 @@ def drills() -> tuple[Plan, ...]:
     release needs. They intentionally remain ``PLANNED`` until an external
     execution harness supplies real evidence records.
     """
-    scenarios = (
-        (
-            Contingency.PROCESS_DEATH,
-            SafeOutcome.RESUME_DURABLE_CHECKPOINT,
-            Recoverability.AUTOMATIC,
-            ("process_termination", "checkpoint_resume", "artifact_integrity"),
-        ),
-        (
-            Contingency.STALE_CHECKPOINT,
-            SafeOutcome.REJECT_STALE_CHECKPOINT,
-            Recoverability.OPERATOR_ASSISTED,
-            ("checkpoint_identity", "stale_checkpoint_rejection", "run_state"),
-        ),
-        (
-            Contingency.DISK_FULL,
-            SafeOutcome.PRESERVE_DURABLE_ARTIFACT,
-            Recoverability.OPERATOR_ASSISTED,
-            (
-                "disk_capacity_exhaustion",
-                "artifact_integrity",
-                "resource_error",
-            ),
-        ),
-        (
-            Contingency.CORRUPT_ARTIFACT,
-            SafeOutcome.QUARANTINE_CORRUPT_ARTIFACT,
-            Recoverability.OPERATOR_ASSISTED,
-            ("corruption_injection", "digest_mismatch", "quarantine_record"),
-        ),
-        (
-            Contingency.WORKER_LOSS,
-            SafeOutcome.RETRY_IDEMPOTENT_WORK,
-            Recoverability.AUTOMATIC,
-            ("worker_termination", "idempotent_retry", "event_deduplication"),
-        ),
-        (
-            Contingency.TIMEOUT,
-            SafeOutcome.CANCEL_AND_RECORD_TERMINAL_FAILURE,
-            Recoverability.OPERATOR_ASSISTED,
-            ("timeout_injection", "cancellation_record", "resource_error"),
-        ),
-        (
-            Contingency.MEMORY_EXHAUSTION,
-            SafeOutcome.ABORT_BEFORE_PUBLICATION,
-            Recoverability.OPERATOR_ASSISTED,
-            ("memory_pressure", "publication_absence", "resource_error"),
-        ),
-        (
-            Contingency.PARTIAL_WRITE,
-            SafeOutcome.PRESERVE_DURABLE_ARTIFACT,
-            Recoverability.AUTOMATIC,
-            ("write_interruption", "atomicity_check", "artifact_integrity"),
-        ),
-        (
-            Contingency.DEPENDENCY_MISMATCH,
-            SafeOutcome.REJECT_INCOMPATIBLE_DEPENDENCY,
-            Recoverability.OPERATOR_ASSISTED,
-            ("environment_identity", "dependency_rejection", "run_state"),
-        ),
-        (
-            Contingency.INVALID_SIGNATURE,
-            SafeOutcome.REJECT_UNTRUSTED_ARTIFACT,
-            Recoverability.OPERATOR_ASSISTED,
-            (
-                "signature_tampering",
-                "verification_failure",
-                "quarantine_record",
-            ),
-        ),
-        (
-            Contingency.RETRY_EXHAUSTION,
-            SafeOutcome.TERMINATE_AFTER_RETRY_EXHAUSTION,
-            Recoverability.TERMINAL_SAFE_FAILURE,
-            ("retry_history", "terminal_event", "partial_publication_check"),
-        ),
-        (
-            Contingency.DUPLICATE_EVENT,
-            SafeOutcome.IGNORE_DUPLICATE_EVENT,
-            Recoverability.AUTOMATIC,
-            ("duplicate_event", "idempotency_key", "state_transition"),
-        ),
-        (
-            Contingency.INCOMPLETE_LINEAGE,
-            SafeOutcome.BLOCK_RELEASE_FOR_MISSING_LINEAGE,
-            Recoverability.TERMINAL_SAFE_FAILURE,
-            ("lineage_gap", "release_block", "audit_record"),
-        ),
-        (
-            Contingency.REJECTED_APPROVAL,
-            SafeOutcome.BLOCK_RELEASE_FOR_REJECTED_APPROVAL,
-            Recoverability.TERMINAL_SAFE_FAILURE,
-            ("approval_rejection", "release_block", "audit_record"),
-        ),
-        (
-            Contingency.CHANGED_SNAPSHOT,
-            SafeOutcome.INVALIDATE_CHANGED_SNAPSHOT,
-            Recoverability.OPERATOR_ASSISTED,
-            ("snapshot_digest_change", "run_invalidation", "lineage_record"),
-        ),
-    )
     return tuple(
         Plan(
             scenario=scenario,
@@ -693,5 +699,5 @@ def drills() -> tuple[Plan, ...]:
             outcome,
             recoverability,
             requirements,
-        ) in scenarios
+        ) in SCENARIOS
     )

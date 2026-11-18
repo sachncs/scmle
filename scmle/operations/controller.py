@@ -131,94 +131,15 @@ def file_digest(path: pathlib.Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-class Controller:
-    """Runs ticks of one deployment's loop (see the module docstring)."""
+class Intake:
+    """Applies inbox files to the loop exactly once.
 
-    def __init__(
-        self,
-        deploy_dir: str | pathlib.Path,
-        *,
-        retrain: Callable[[], str | None] | None = None,
-        verification_keys: Mapping[str, str | bytes] | None = None,
-        system_keys: tuple[str | bytes, ...] = (),
-        today: Callable[[], datetime.date] = datetime.date.today,
-        policy: Limits | None = None,
-        checkpoint: Checkpoint | None = None,
-    ) -> None:
-        """Opens an existing deployment (`scmle loop init` creates one).
+    The input half of `Controller`; a mixin that reads the loop and the
+    crash-test checkpoint.
+    """
 
-        Args:
-            deploy_dir: Directory holding the deployment ledger.
-            retrain: Trains and stages a challenger and returns its name. It
-                runs only with a policy that lets an alarm gate retraining and
-                an envelope that allows it.
-            verification_keys: Map from key id to the key that verifies a
-                person's attestations and envelopes.
-            system_keys: Keys the system holds; signatures under them are
-                refused.
-            today: Callable that returns today's date; replaceable in tests.
-            policy: Dead-man limits.
-            checkpoint: Called with a label at fixed points while a file is
-                applied (after the intent, after the loop took it, after the
-                result) and after the loop has stepped; a seam for crash
-                tests, absent in production.
-        """
-        self.retrain = retrain
-        self.policy = policy or Limits()
-        self.checkpoint = checkpoint
-        self.loop = scmle.governance.loop.Loop.resume(
-            deploy_dir,
-            hooks=scmle.governance.loop.Hooks(retrain=self.train),
-            verification_keys=verification_keys,
-            system_keys=system_keys,
-            today=today,
-        )
-        self.envelopes = envelope.Guard(
-            self.loop.ledger, today, verification_keys
-        )
-        self.envelopes.on_write = self.loop.save_state
-
-    # ------------------------------------------------------------ authority
-
-    def train(self) -> str | None:
-        """The loop's retrain hook: spend an envelope, then train.
-
-        Returns:
-            The name returned by the retrain callable. None if no envelope
-            authorized the retrain, no callable is configured or the training
-            raised (each of these opens an escalation), or if the callable
-            itself returned None.
-        """
-        loop = self.loop
-        try:
-            used = self.envelopes.authorize(
-                envelope.Action.TRAIN_CHALLENGER,
-                loop.policy.scope,
-                {"batch": loop.batch - 1},
-            )
-        except envelope.RefusedError as refused:
-            # handled: returned as failed finding/problem/refusal with error
-            # text
-            loop.escalate("retrain_not_authorized", {"reason": refused.reason})
-            return None
-        if self.retrain is None:
-            loop.escalate("retrain_not_configured", {"envelope": used})
-            return None
-        try:
-            return self.retrain()
-        except Exception as error:  # noqa: BLE001 -- a failed training must not stop the loop
-            # handled: escalated with the message, traceback and causes
-            # (ERR-15: it used to carry the type name only)
-            failure = errors.Failure.of(error)
-            loop.escalate(
-                "retrain_failed",
-                {
-                    "envelope": used,
-                    "error": failure.text,
-                    "failure": dict(failure.dump()),
-                },
-            )
-            return None
+    loop: scmle.governance.loop.Loop
+    checkpoint: Checkpoint | None
 
     # -------------------------------------------------------------- journal
 
@@ -240,29 +161,6 @@ class Controller:
         """
         if self.checkpoint is not None:
             self.checkpoint(label)
-
-    def trailing(self, test: Callable[[Mapping[str, Any]], bool]) -> int:
-        """Consecutive newest tick rows for which `test(body)` holds.
-
-        Args:
-            test: Called with a tick row's body.
-
-        Returns:
-            The number of consecutive newest tick rows that satisfy the test;
-            other rows are skipped.
-        """
-        count = 0
-        for row in reversed(self.loop.ledger.rows):
-            body = row["body"]
-            if (
-                row["kind"] != deployment_ledger.CONTROLLER
-                or body["phase"] != deployment_ledger.TICK
-            ):
-                continue
-            if not test(body):
-                break
-            count += 1
-        return count
 
     # --------------------------------------------------------------- inputs
 
@@ -498,6 +396,121 @@ class Controller:
             if digest not in ledger.consumed and digest not in ledger.rejected:
                 found.append((path, digest))
         return found
+
+
+class Controller(Intake):
+    """Runs ticks of one deployment's loop (see the module docstring)."""
+
+    def __init__(
+        self,
+        deploy_dir: str | pathlib.Path,
+        *,
+        retrain: Callable[[], str | None] | None = None,
+        verification_keys: Mapping[str, str | bytes] | None = None,
+        system_keys: tuple[str | bytes, ...] = (),
+        today: Callable[[], datetime.date] = datetime.date.today,
+        policy: Limits | None = None,
+        checkpoint: Checkpoint | None = None,
+    ) -> None:
+        """Opens an existing deployment (`scmle loop init` creates one).
+
+        Args:
+            deploy_dir: Directory holding the deployment ledger.
+            retrain: Trains and stages a challenger and returns its name. It
+                runs only with a policy that lets an alarm gate retraining and
+                an envelope that allows it.
+            verification_keys: Map from key id to the key that verifies a
+                person's attestations and envelopes.
+            system_keys: Keys the system holds; signatures under them are
+                refused.
+            today: Callable that returns today's date; replaceable in tests.
+            policy: Dead-man limits.
+            checkpoint: Called with a label at fixed points while a file is
+                applied (after the intent, after the loop took it, after the
+                result) and after the loop has stepped; a seam for crash
+                tests, absent in production.
+        """
+        self.retrain = retrain
+        self.policy = policy or Limits()
+        self.checkpoint = checkpoint
+        self.loop = scmle.governance.loop.Loop.resume(
+            deploy_dir,
+            hooks=scmle.governance.loop.Hooks(retrain=self.train),
+            verification_keys=verification_keys,
+            system_keys=system_keys,
+            today=today,
+        )
+        self.envelopes = envelope.Guard(
+            self.loop.ledger, today, verification_keys
+        )
+        self.envelopes.on_write = self.loop.save_state
+
+    # ------------------------------------------------------------ authority
+
+    def train(self) -> str | None:
+        """The loop's retrain hook: spend an envelope, then train.
+
+        Returns:
+            The name returned by the retrain callable. None if no envelope
+            authorized the retrain, no callable is configured or the training
+            raised (each of these opens an escalation), or if the callable
+            itself returned None.
+        """
+        loop = self.loop
+        try:
+            used = self.envelopes.authorize(
+                envelope.Action.TRAIN_CHALLENGER,
+                loop.policy.scope,
+                {"batch": loop.batch - 1},
+            )
+        except envelope.RefusedError as refused:
+            # handled: returned as failed finding/problem/refusal with error
+            # text
+            loop.escalate("retrain_not_authorized", {"reason": refused.reason})
+            return None
+        if self.retrain is None:
+            loop.escalate("retrain_not_configured", {"envelope": used})
+            return None
+        try:
+            return self.retrain()
+        except Exception as error:  # noqa: BLE001 -- a failed training must not stop the loop
+            # handled: escalated with the message, traceback and causes
+            # (ERR-15: it used to carry the type name only)
+            failure = errors.Failure.of(error)
+            loop.escalate(
+                "retrain_failed",
+                {
+                    "envelope": used,
+                    "error": failure.text,
+                    "failure": dict(failure.dump()),
+                },
+            )
+            return None
+
+    # -------------------------------------------------------------- history
+
+    def trailing(self, test: Callable[[Mapping[str, Any]], bool]) -> int:
+        """Consecutive newest tick rows for which `test(body)` holds.
+
+        Args:
+            test: Called with a tick row's body.
+
+        Returns:
+            The number of consecutive newest tick rows that satisfy the test;
+            other rows are skipped.
+        """
+        count = 0
+        for row in reversed(self.loop.ledger.rows):
+            body = row["body"]
+            if (
+                row["kind"] != deployment_ledger.CONTROLLER
+                or body["phase"] != deployment_ledger.TICK
+            ):
+                continue
+            if not test(body):
+                break
+            count += 1
+        return count
 
     # ----------------------------------------------------------------- tick
 

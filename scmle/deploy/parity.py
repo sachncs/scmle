@@ -182,38 +182,18 @@ def objectify(frame: Any) -> Any:
     return pandas.DataFrame(frame).astype(object)
 
 
-def handwrite(spec: dict[str, Any]) -> bundle.Bundle:
-    """Builds the hand-written model as a bundle.
-
-    The pipeline has the structure of a trained one (median imputation,
-    scaling, one-hot encoding, logistic regression). It is fitted on two rows
-    only to create its objects; every learned number is then overwritten with
-    the value from `spec`.
+def assemble(numeric: list[str], categorical: list[str]) -> ColumnTransformer:
+    """Returns the unfitted preprocessing of the hand-written model.
 
     Args:
-        spec: The model specification: numeric columns, categorical
-            columns (only the first is used), its two categories, medians,
-            means, scales, coefficients, intercept, classes, target and model
-            name and version.
+        numeric: Numeric columns: cast to float, median-imputed, scaled.
+        categorical: Categorical columns: cast to object, missing values
+            filled with `MISSING_CATEGORY`, one-hot encoded.
 
     Returns:
-        The bundle holding the hand-written pipeline.
-
-    Raises:
-        ArtifactError: If `spec` lists more than two categories. The
-            encoder is fitted on the first two only, so its categories then
-            differ from the sorted list in `spec`.
+        The column transformer, structured like a trained one.
     """
-    numeric = list(spec["numeric"])
-    categorical = list(spec["categorical"])
-    categories = list(spec["categories"])
-    frame = pandas.DataFrame(
-        {
-            **{name: [0.0, 1.0] for name in numeric},
-            categorical[0]: categories[:2],
-        }
-    )
-    prep = ColumnTransformer(
+    return ColumnTransformer(
         [
             (
                 "numeric",
@@ -250,6 +230,40 @@ def handwrite(spec: dict[str, Any]) -> bundle.Bundle:
             ),
         ]
     )
+
+
+def handwrite(spec: dict[str, Any]) -> bundle.Bundle:
+    """Builds the hand-written model as a bundle.
+
+    The pipeline has the structure of a trained one (median imputation,
+    scaling, one-hot encoding, logistic regression). It is fitted on two rows
+    only to create its objects; every learned number is then overwritten with
+    the value from `spec`.
+
+    Args:
+        spec: The model specification: numeric columns, categorical
+            columns (only the first is used), its two categories, medians,
+            means, scales, coefficients, intercept, classes, target and model
+            name and version.
+
+    Returns:
+        The bundle holding the hand-written pipeline.
+
+    Raises:
+        ArtifactError: If `spec` lists more than two categories. The
+            encoder is fitted on the first two only, so its categories then
+            differ from the sorted list in `spec`.
+    """
+    numeric = list(spec["numeric"])
+    categorical = list(spec["categorical"])
+    categories = list(spec["categories"])
+    frame = pandas.DataFrame(
+        {
+            **{name: [0.0, 1.0] for name in numeric},
+            categorical[0]: categories[:2],
+        }
+    )
+    prep = assemble(numeric, categorical)
     pipeline = Pipeline([("prep", prep), ("model", LogisticRegression())])
     pipeline.fit(frame, [0, 1])
     numeric_steps = prep.named_transformers_["numeric"]

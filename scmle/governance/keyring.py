@@ -334,17 +334,13 @@ class Wrapper:
         )
 
 
-class Keyring:
-    """Metadata registry that enforces signing and verification policy.
+class Roster:
+    """Key records and their lifecycle transitions.
 
     Attributes:
-        migrations: The registry file's version steps, oldest first; each
-            key record moves with the file.
+        lock: Serializes changes to the records.
+        records: The key records by key id.
     """
-
-    migrations: ClassVar[tuple[records.Migration, ...]] = (
-        records.nest({}, parts={"keys": CREDENTIAL}),
-    )
 
     def __init__(self, records: Iterable[Credential] = ()) -> None:
         """Creates a registry from unique key records.
@@ -493,6 +489,19 @@ class Keyring:
                     raise errors.InputError("replacement key must be active")
             self.records[key_id] = updated
             return updated
+
+
+class Keyring(Roster):
+    """Metadata registry that enforces signing and verification policy.
+
+    Attributes:
+        migrations: The registry file's version steps, oldest first; each
+            key record moves with the file.
+    """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest({}, parts={"keys": CREDENTIAL}),
+    )
 
     def sign(
         self,
@@ -676,6 +685,7 @@ class Keyring:
 __all__ = [
     "Credential",
     "Keyring",
+    "Roster",
     "State",
     "Wrapper",
     "parse_timestamp",

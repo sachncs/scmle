@@ -234,6 +234,43 @@ class Assessment:
         }
 
 
+def partition(
+    target: Slo,
+    samples: Sequence[observability.Sample],
+    observed: datetime.datetime,
+) -> tuple[tuple[observability.Sample, ...], ...]:
+    """Sorts a target's samples by where they fall against its window.
+
+    Args:
+        target: The objective.
+        samples: Metric samples of any name and kind.
+        observed: The evaluation time.
+
+    Returns:
+        The samples with the target's metric name and kind; those of them
+        later than `observed`; and those inside the window ending at it.
+    """
+    start = observed - datetime.timedelta(days=target.window_days)
+    matching = tuple(
+        sample
+        for sample in samples
+        if sample.name == target.metric_name and sample.kind is target.kind
+    )
+    future = tuple(
+        sample
+        for sample in matching
+        if parse_timestamp(sample.timestamp, "metric.timestamp") > observed
+    )
+    in_window = tuple(
+        sample
+        for sample in matching
+        if start
+        <= parse_timestamp(sample.timestamp, "metric.timestamp")
+        <= observed
+    )
+    return matching, future, in_window
+
+
 def evaluate(
     target: Slo,
     samples: Sequence[observability.Sample],
@@ -263,27 +300,8 @@ def evaluate(
     """
     if not isinstance(target, Slo):
         raise errors.KindError("target must be Slo")
-    observed_timestamp = parse_timestamp(observed_at, "observed_at")
-    window_start = observed_timestamp - datetime.timedelta(
-        days=target.window_days
-    )
-    matching = tuple(
-        sample
-        for sample in samples
-        if sample.name == target.metric_name and sample.kind is target.kind
-    )
-    future = tuple(
-        sample
-        for sample in matching
-        if parse_timestamp(sample.timestamp, "metric.timestamp")
-        > observed_timestamp
-    )
-    in_window = tuple(
-        sample
-        for sample in matching
-        if window_start
-        <= parse_timestamp(sample.timestamp, "metric.timestamp")
-        <= observed_timestamp
+    matching, future, in_window = partition(
+        target, samples, parse_timestamp(observed_at, "observed_at")
     )
     if future:
         return Assessment(

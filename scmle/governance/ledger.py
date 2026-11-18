@@ -5,6 +5,7 @@ The ledger is derived from the split manifest and the executed trials, then
 the test rows, the test set opened once) are checked facts, not claims.
 """
 
+from collections.abc import Mapping
 import hashlib
 from typing import Any
 
@@ -74,6 +75,58 @@ def observed_access(
     }
 
 
+def itemize(
+    manifest: splitters.Manifest,
+    candidates: int,
+    threshold_used: bool,
+    test_opens: int,
+) -> list[Mapping[str, object]]:
+    """Lists the fitted operations of a run and the rows each one saw.
+
+    Args:
+        manifest: The split manifest (folds and partitions).
+        candidates: How many trials were evaluated.
+        threshold_used: Whether a decision threshold was optimized.
+        test_opens: How many times the locked test set was opened.
+
+    Returns:
+        Cross validation, final refit, threshold optimization and final
+        evaluation, in that order.
+    """
+    development = set(manifest.train_ids)
+    fold_sizes = [
+        {"fit_rows": len(fit), "validation_rows": len(validate)}
+        for fit, validate in manifest.folds
+    ]
+    return [
+        {
+            "operation": "cross_validation",
+            "candidates": candidates,
+            "fits_per_candidate": len(manifest.folds),
+            "fold_structure": fold_sizes,
+            "fit_on": "training rows of each fold (preprocessing, "
+            "resampling, calibration and stacking are fitted inside)",
+            "scored_on": "validation rows of each fold",
+        },
+        {
+            "operation": "final_refit",
+            "rows": len(development),
+            "partition": "development",
+        },
+        {
+            "operation": "threshold_optimization",
+            "used": threshold_used,
+            "scored_on": "out-of-fold development predictions",
+        },
+        {
+            "operation": "final_evaluation",
+            "rows": len(set(manifest.test_ids)),
+            "partition": "locked test",
+            "opened": test_opens,
+        },
+    ]
+
+
 def compose(
     split: splitters.Split,
     trials: list[experiments.Trial],
@@ -98,10 +151,6 @@ def compose(
     manifest = split.manifest
     development = set(manifest.train_ids)
     test = set(manifest.test_ids)
-    fold_sizes = [
-        {"fit_rows": len(fit), "validation_rows": len(validate)}
-        for fit, validate in manifest.folds
-    ]
     positions = set(range(len(development)))
     folds_inside = all(
         set(fit) | set(validate) <= positions
@@ -116,33 +165,9 @@ def compose(
             "split_fingerprint": manifest.fingerprint,
             "strategy": manifest.strategy,
         },
-        "operations": [
-            {
-                "operation": "cross_validation",
-                "candidates": len(evaluated),
-                "fits_per_candidate": len(manifest.folds),
-                "fold_structure": fold_sizes,
-                "fit_on": "training rows of each fold (preprocessing, "
-                "resampling, calibration and stacking are fitted inside)",
-                "scored_on": "validation rows of each fold",
-            },
-            {
-                "operation": "final_refit",
-                "rows": len(development),
-                "partition": "development",
-            },
-            {
-                "operation": "threshold_optimization",
-                "used": threshold_used,
-                "scored_on": "out-of-fold development predictions",
-            },
-            {
-                "operation": "final_evaluation",
-                "rows": len(test),
-                "partition": "locked test",
-                "opened": test_opens,
-            },
-        ],
+        "operations": itemize(
+            manifest, len(evaluated), threshold_used, test_opens
+        ),
         "observed": observed,
         "verified": {
             "observed_fit_and_scoring_rows_match_the_manifest": observed[

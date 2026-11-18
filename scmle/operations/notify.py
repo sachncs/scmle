@@ -256,6 +256,28 @@ class WebhookSender:
             raise errors.InputError("notification is too large")
         return body
 
+    def seal(self, body: bytes, key: str) -> Request:
+        """Stamps and signs one attempt.
+
+        Args:
+            body: The request body.
+            key: The idempotency key.
+
+        Returns:
+            The POST with the current timestamp, its signature and the key.
+        """
+        stamp = f"{self.clock():.3f}"
+        return Request(
+            self.url,
+            {
+                "Content-Type": "application/json",
+                TIMESTAMP_HEADER: stamp,
+                SIGNATURE_HEADER: sign(self.secret, stamp, body),
+                IDEMPOTENCY_HEADER: key,
+            },
+            body,
+        )
+
     def send(self, notification: Mapping[str, Any]) -> Delivery:
         """Posts the notification, retrying what is worth retrying.
 
@@ -284,19 +306,8 @@ class WebhookSender:
         status: int | None = None
         reason = "not sent"
         for attempt in range(1, self.max_attempts + 1):
-            stamp = f"{self.clock():.3f}"
-            request = Request(
-                self.url,
-                {
-                    "Content-Type": "application/json",
-                    TIMESTAMP_HEADER: stamp,
-                    SIGNATURE_HEADER: sign(self.secret, stamp, body),
-                    IDEMPOTENCY_HEADER: key,
-                },
-                body,
-            )
             try:
-                status = self.transport(request)
+                status = self.transport(self.seal(body, key))
             except OSError as error:
                 # handled: recorded as transport error reason
                 status = None

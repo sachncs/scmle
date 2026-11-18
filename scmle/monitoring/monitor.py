@@ -366,6 +366,28 @@ def advise(
     return Recommendation(action, [pair[1] for pair in fired])
 
 
+def reweigh(propensity: pandas.Series) -> numpy.ndarray:
+    """Draws labelled rows in proportion to their Horvitz-Thompson weight.
+
+    Args:
+        propensity: Probability that each labelled row's label was observed.
+
+    Returns:
+        Positions of as many rows as there are, drawn with replacement with
+        probability proportional to ``1 / propensity`` (seeded).
+
+    Raises:
+        ValueError: If a propensity is outside ``(0, 1]``.
+    """
+    chosen = propensity.to_numpy(float)
+    if not numpy.all((chosen > 0.0) & (chosen <= 1.0)):
+        raise errors.InputError("propensity must be above 0 and at most 1")
+    weight = 1.0 / chosen
+    return numpy.random.default_rng(0).choice(
+        len(chosen), size=len(chosen), p=weight / weight.sum()
+    )
+
+
 class Watcher:
     """Compares production data and outcomes with a bundle's training state.
 
@@ -504,41 +526,45 @@ class Watcher:
         target = outcomes.reset_index(drop=True)[known].reset_index(drop=True)
         features = frame.reset_index(drop=True)[known].reset_index(drop=True)
         if propensity is not None:
-            chosen = propensity.reset_index(drop=True)[known].to_numpy(float)
-            if not numpy.all((chosen > 0.0) & (chosen <= 1.0)):
-                raise errors.InputError(
-                    "propensity must be above 0 and at most 1"
-                )
-            weight = 1.0 / chosen
-            rows_drawn = numpy.random.default_rng(0).choice(
-                labeled, size=labeled, p=weight / weight.sum()
-            )
-            target = target.iloc[rows_drawn].reset_index(drop=True)
-            features = features.iloc[rows_drawn].reset_index(drop=True)
+            drawn = reweigh(propensity.reset_index(drop=True)[known])
+            target = target.iloc[drawn].reset_index(drop=True)
+            features = features.iloc[drawn].reset_index(drop=True)
         scores = metrics.CATALOG.evaluate(
             self.bundle.pipeline, features, target, task
         )
+        change, status = self.grade(scores, reference_metrics)
+        return Performance(
+            rows, labeled, coverage, scores, reference_metrics, change, status
+        )
+
+    def grade(
+        self, scores: dict[str, float], expected: dict[str, float]
+    ) -> tuple[dict[str, float], str]:
+        """Relates metrics to their reference and judges the primary one.
+
+        Args:
+            scores: Metric values on the labelled rows.
+            expected: The same metrics at training time.
+
+        Returns:
+            Per metric with a value and a nonzero reference, the change
+            relative to the reference (positive when it improved); and
+            `degraded` if the primary metric fell by more than
+            `performance_tolerance`, else `ok`.
+        """
         change = {}
         for name, value in scores.items():
-            expected = reference_metrics.get(name)
-            if expected is None or numpy.isnan(value) or expected == 0:
+            reference = expected.get(name)
+            if reference is None or numpy.isnan(value) or reference == 0:
                 continue
             sign = 1 if metrics.CATALOG.metrics[name].greater_is_better else -1
-            change[name] = sign * (value - expected) / abs(expected)
+            change[name] = sign * (value - reference) / abs(reference)
         primary = self.bundle.info.metric
         degraded = (
             primary in change
             and change[primary] < -self.thresholds.performance_tolerance
         )
-        return Performance(
-            rows,
-            labeled,
-            coverage,
-            scores,
-            reference_metrics,
-            change,
-            "degraded" if degraded else "ok",
-        )
+        return change, "degraded" if degraded else "ok"
 
     def assess(
         self, data: pandas.DataFrame, outcomes: pandas.Series | None = None

@@ -135,6 +135,24 @@ def triage(
     return gate.ImageScan(container_digest, bool(verdict["passed"]), digest)
 
 
+def locate(
+    manifest: Mapping[str, Any], base: pathlib.Path, name: str
+) -> pathlib.Path | None:
+    """Resolves an optional evidence file named in a release manifest.
+
+    Args:
+        manifest: The release manifest.
+        base: The manifest's folder.
+        name: Manifest key.
+
+    Returns:
+        The path relative to the manifest's folder, or None if the manifest
+        does not name the key.
+    """
+    value = manifest.get(name)
+    return None if value is None else base / str(value)
+
+
 def gather(manifest_path: str | pathlib.Path) -> gate.Candidate:
     """Reads a manifest and the evidence it names.
 
@@ -159,26 +177,13 @@ def gather(manifest_path: str | pathlib.Path) -> gate.Candidate:
         raise errors.ArtifactError("manifest lacks " + ", ".join(missing))
     base = path.parent
 
-    def file(name: str) -> pathlib.Path | None:
-        """Resolves an optional evidence file named in the manifest.
-
-        Args:
-            name: Manifest key.
-
-        Returns:
-            The path relative to the manifest's folder, or None if the manifest
-            does not name the key.
-        """
-        value = manifest.get(name)
-        return None if value is None else base / str(value)
-
     store = registry.ModelRegistryStore(base / manifest["registry"])
     version = store.resolve(manifest["model"], int(manifest["version"]))
-    approval_path = file("approval")
-    scan_path = file("scan_report")
-    checks_path = file("checks")
-    seen_path = file("observation")
-    staging_path = file("staging_record")
+    approval_path = locate(manifest, base, "approval")
+    scan_path = locate(manifest, base, "scan_report")
+    checks_path = locate(manifest, base, "checks")
+    seen_path = locate(manifest, base, "observation")
+    staging_path = locate(manifest, base, "staging_record")
     container = manifest["container_digest"]
     return gate.Candidate(
         environment=manifest["environment"],
@@ -197,7 +202,9 @@ def gather(manifest_path: str | pathlib.Path) -> gate.Candidate:
         scan=(
             None
             if scan_path is None
-            else triage(scan_path, container, file("scan_policy"))
+            else triage(
+                scan_path, container, locate(manifest, base, "scan_policy")
+            )
         ),
         checks=(
             ()

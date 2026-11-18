@@ -193,11 +193,7 @@ def scaffold(
     # generated build.sh runs, does not find its module already loaded by the
     # package import.
     from scmle.deploy import attest  # noqa: PLC0415 -- lazy, see above
-    from scmle.deploy import base_image  # noqa: PLC0415 -- lazy, see above
-    from scmle.deploy import context  # noqa: PLC0415 -- lazy, see above
-    from scmle.deploy import lockfile  # noqa: PLC0415 -- lazy, see above
     from scmle.deploy import provenance  # noqa: PLC0415 -- lazy, see above
-    from scmle.deploy import vuln_gate  # noqa: PLC0415 -- lazy, see above
     from scmle.governance import sbom  # noqa: PLC0415 -- lazy, see above
 
     root = pathlib.Path(destination)
@@ -208,6 +204,56 @@ def scaffold(
     info = bundle.info
     python_minor = ".".join(info.python.split(".")[:2])
     image = f"python:{python_minor}-slim"
+
+    closure = pin(root, info, scmle_pin)
+    bundle.environment_lock(root / "environment.lock")
+    furnish(root, info, image)
+    digest = provenance.bundle_digest(root / "model")
+    service_sbom = sbom.catalogue(
+        closure,
+        model_name=info.model_name,
+        model_version=info.model_version,
+        bundle_digest=digest,
+        base_image=image,
+        software_version=info.scmle_version,
+    )
+    write_text(
+        root / "sbom.cdx.json", json.dumps(service_sbom, indent=2) + "\n"
+    )
+    attest.stamp(
+        root,
+        digest,
+        builder=f"scmle package {info.scmle_version}",
+        base_image=image,
+        signing_key=signing_key,
+    )
+    write_text(
+        root / "README.md",
+        README.format(
+            name=info.model_name,
+            version=info.model_version,
+            scmle=info.scmle_version,
+            python=info.python,
+            digest=digest,
+        ),
+    )
+    return root
+
+
+def pin(root: pathlib.Path, info: Any, scmle_pin: str | None) -> dict[str, str]:
+    """Writes `requirements.txt` and the locked runtime closure.
+
+    Args:
+        root: The service folder.
+        info: The bundle's build information.
+        scmle_pin: Requirement line for the framework itself, or None for
+            the exact version that built the bundle.
+
+    Returns:
+        The runtime closure, name to exact version.
+    """
+    # Imported lazily for the reason given in `scaffold`.
+    from scmle.deploy import lockfile  # noqa: PLC0415 -- lazy, see scaffold
 
     framework = scmle_pin or f"scmle=={info.scmle_version}"
     pins = [framework]
@@ -246,7 +292,22 @@ def scaffold(
             + "\n"
         )
     write_text(root / "requirements.lock", lock_text)
-    bundle.environment_lock(root / "environment.lock")
+    return closure
+
+
+def furnish(root: pathlib.Path, info: Any, image: str) -> None:
+    """Writes the server script, the container build files and the policy.
+
+    Args:
+        root: The service folder.
+        info: The bundle's build information.
+        image: The base image reference, before its digest is resolved.
+    """
+    # Imported lazily for the reason given in `scaffold`.
+    from scmle.deploy import base_image  # noqa: PLC0415 -- lazy, see scaffold
+    from scmle.deploy import context  # noqa: PLC0415 -- lazy, see scaffold
+    from scmle.deploy import vuln_gate  # noqa: PLC0415 -- lazy, see scaffold
+
     write_text(root / "serve.py", SERVER)
     write_text(
         root / "Dockerfile",
@@ -265,36 +326,6 @@ def scaffold(
         root / "vuln-policy.json",
         json.dumps(vuln_gate.DEFAULT_POLICY, indent=2) + "\n",
     )
-    digest = provenance.bundle_digest(root / "model")
-    service_sbom = sbom.catalogue(
-        closure,
-        model_name=info.model_name,
-        model_version=info.model_version,
-        bundle_digest=digest,
-        base_image=image,
-        software_version=info.scmle_version,
-    )
-    write_text(
-        root / "sbom.cdx.json", json.dumps(service_sbom, indent=2) + "\n"
-    )
-    attest.stamp(
-        root,
-        digest,
-        builder=f"scmle package {info.scmle_version}",
-        base_image=image,
-        signing_key=signing_key,
-    )
-    write_text(
-        root / "README.md",
-        README.format(
-            name=info.model_name,
-            version=info.model_version,
-            scmle=info.scmle_version,
-            python=info.python,
-            digest=digest,
-        ),
-    )
-    return root
 
 
 def write_text(path: pathlib.Path, text: str) -> None:

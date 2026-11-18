@@ -5,7 +5,8 @@ ask whether a complete capability is eligible before it constructs a model,
 loads an optional dependency, or starts training.
 
 `axes` holds what a capability is declared along, `declarations` the
-family, environment and capability records and `registry` the registry.
+family, environment and capability records, `catalog` the registered
+declarations and their resource checks and `registry` the registry.
 """
 
 from scmle.contracts.capabilities.axes import Evaluation

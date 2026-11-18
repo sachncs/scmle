@@ -224,6 +224,76 @@ def temper(
     return g, l_values, w
 
 
+def space(grid: Sequence[float] | None) -> numpy.ndarray:
+    """Returns the thresholds to test, most conservative first.
+
+    Args:
+        grid: The thresholds, or None for `DEFAULT_GRID` points from 1 to 0.
+
+    Returns:
+        The thresholds as floats.
+
+    Raises:
+        ValueError: If the grid is empty or not strictly decreasing.
+    """
+    points = (
+        numpy.linspace(1.0, 0.0, DEFAULT_GRID)
+        if grid is None
+        else numpy.asarray(grid, dtype=float)
+    )
+    if points.size == 0 or numpy.any(numpy.diff(points) >= 0):
+        raise scmle.contracts.errors.InputError(
+            "grid must be strictly decreasing"
+        )
+    return points
+
+
+def probe(
+    tau: float,
+    g: numpy.ndarray,
+    losses: numpy.ndarray,
+    w: numpy.ndarray | None,
+    needed: int,
+    r_star: float,
+    delta: float,
+) -> Step:
+    """Tests one threshold of the fixed sequence.
+
+    Args:
+        tau: The threshold; cases with score at least `tau` are answered.
+        g: Validated scores.
+        losses: Validated losses.
+        w: Validated weights, or None.
+        needed: Smallest answered (effective) size worth testing.
+        r_star: Target selective risk.
+        delta: Level of the test.
+
+    Returns:
+        The step: skipped as not rejected (no errors, p-value 1) when the
+        answered size is below `needed`, otherwise the binomial test of the
+        answered error count against `r_star`.
+    """
+    answered = g >= tau
+    count = int(answered.sum())
+    if w is None:
+        used = count
+    elif count:
+        weight = w[answered]
+        used = math.floor(float(weight.sum()) ** 2 / float((weight**2).sum()))
+    else:
+        used = 0
+    if used < needed:
+        return Step(tau=tau, cases=used, errors=0, p_value=1.0, rejected=False)
+    if w is None:
+        errors = math.ceil(float(losses[answered].sum()) - 1e-12)
+    else:
+        weight = w[answered]
+        rate = float((weight * losses[answered]).sum() / float(weight.sum()))
+        errors = math.ceil(rate * used - 1e-12)
+    p = binomial_p_value(errors, used, r_star)
+    return Step(tau, used, errors, p, p <= delta)
+
+
 def select(
     score: Any,
     loss: Any,
@@ -271,53 +341,16 @@ def select(
             "r_star and delta must be strictly between 0 and 1"
         )
     g, losses, w = temper(score, loss, weights)
-    points = (
-        numpy.linspace(1.0, 0.0, DEFAULT_GRID)
-        if grid is None
-        else numpy.asarray(grid, dtype=float)
-    )
-    if points.size == 0 or numpy.any(numpy.diff(points) >= 0):
-        raise scmle.contracts.errors.InputError(
-            "grid must be strictly decreasing"
-        )
+    points = space(grid)
     steps: list[Step] = []
     chosen = math.inf
     needed = max(minimum, math.ceil(math.log(delta) / math.log1p(-r_star)))
     for tau in points:
-        answered = g >= tau
-        count = int(answered.sum())
-        if w is None:
-            used = count
-        elif count:
-            weight = w[answered]
-            used = math.floor(
-                float(weight.sum()) ** 2 / float((weight**2).sum())
-            )
-        else:
-            used = 0
-        if used < needed:
-            steps.append(
-                Step(
-                    tau=float(tau),
-                    cases=used,
-                    errors=0,
-                    p_value=1.0,
-                    rejected=False,
-                )
-            )
+        step = probe(float(tau), g, losses, w, needed, r_star, delta)
+        steps.append(step)
+        if step.cases < needed:
             continue
-        if w is None:
-            errors = math.ceil(float(losses[answered].sum()) - 1e-12)
-        else:
-            weight = w[answered]
-            rate = float(
-                (weight * losses[answered]).sum() / float(weight.sum())
-            )
-            errors = math.ceil(rate * used - 1e-12)
-        p = binomial_p_value(errors, used, r_star)
-        rejected = p <= delta
-        steps.append(Step(float(tau), used, errors, p, rejected))
-        if not rejected:
+        if not step.rejected:
             break
         chosen = float(tau)
     if math.isinf(chosen):

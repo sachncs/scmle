@@ -222,6 +222,107 @@ def judge(
     )
 
 
+def measure(
+    profile: scmle.data.reference.Baseline, rows: pandas.DataFrame
+) -> tuple[dict[str, float], dict[str, float], dict[str, float]]:
+    """Measures each reference feature of the sampled rows.
+
+    Args:
+        profile: The training reference.
+        rows: The sampled feature rows.
+
+    Returns:
+        Per feature, the increase in missing share over the reference (a
+        feature absent from the rows counts as entirely missing), the
+        noise-adjusted PSI and the unseen-category rate; absent features
+        have only the first.
+    """
+    missing: dict[str, float] = {}
+    drift: dict[str, float] = {}
+    unseen: dict[str, float] = {}
+    for name, reference in profile.features.items():
+        if name not in rows.columns:
+            missing[name] = 1.0 - reference.missing_rate
+            continue
+        column = rows[name]
+        missing[name] = float(column.isna().mean()) - reference.missing_rate
+        drift[name] = reference.adjust(column)
+        unseen[name] = reference.unseen_rate(column)
+    return missing, drift, unseen
+
+
+def quality(
+    profile: scmle.data.reference.Baseline,
+    frames: list[pandas.DataFrame],
+    limits: SignalThresholds,
+    minimum: int,
+) -> list[Signal]:
+    """Judges feature quality and drift against the training reference.
+
+    Args:
+        profile: The training reference.
+        frames: The sampled feature rows in the window.
+        limits: The thresholds.
+        minimum: Fewest sampled rows for a judgement.
+
+    Returns:
+        The signals for the largest missing-share increase, the largest
+        unseen-category rate and the largest noise-adjusted PSI; without
+        values until the sampled rows number at least the minimum.
+    """
+    rows = pandas.concat(frames, ignore_index=True) if frames else None
+    count = 0 if rows is None else len(rows)
+    missing: dict[str, float] = {}
+    drift: dict[str, float] = {}
+    unseen: dict[str, float] = {}
+    if rows is not None and count >= minimum:
+        missing, drift, unseen = measure(profile, rows)
+    worst_missing = max(missing.values()) if missing else None
+    worst_drift = max(drift.values()) if drift else None
+    worst_unseen = max(unseen.values()) if unseen else None
+    ranked = sorted(drift, key=lambda key: drift[key], reverse=True)[:3]
+    return [
+        judge(
+            "feature_missing_increase",
+            Category.DATA_QUALITY,
+            worst_missing,
+            limits.missing_rate_increase,
+            "max",
+            count,
+            minimum,
+            features=sorted(
+                key
+                for key, value in missing.items()
+                if value > limits.missing_rate_increase
+            ),
+        ),
+        judge(
+            "unseen_category_rate",
+            Category.DATA_QUALITY,
+            worst_unseen,
+            limits.drift.unseen_category_rate,
+            "max",
+            count,
+            minimum,
+            features=sorted(
+                key
+                for key, value in unseen.items()
+                if value > limits.drift.unseen_category_rate
+            ),
+        ),
+        judge(
+            "feature_psi_max",
+            Category.DATA_QUALITY,
+            worst_drift,
+            limits.drift.psi_high,
+            "max",
+            count,
+            minimum,
+            worst=[(key, round(drift[key], 4)) for key in ranked],
+        ),
+    ]
+
+
 class SignalMonitor:
     """Collects events and evaluates every signal over a sliding window."""
 
@@ -456,67 +557,7 @@ class SignalMonitor:
         ]
         if self.profile is None:
             return found
-        rows = pandas.concat(frames, ignore_index=True) if frames else None
-        count = 0 if rows is None else len(rows)
-        missing: dict[str, float] = {}
-        drift: dict[str, float] = {}
-        unseen: dict[str, float] = {}
-        if rows is not None and count >= minimum:
-            for name, reference in self.profile.features.items():
-                if name not in rows.columns:
-                    missing[name] = 1.0 - reference.missing_rate
-                    continue
-                column = rows[name]
-                missing[name] = (
-                    float(column.isna().mean()) - reference.missing_rate
-                )
-                drift[name] = reference.adjust(column)
-                unseen[name] = reference.unseen_rate(column)
-        worst_missing = max(missing.values()) if missing else None
-        worst_drift = max(drift.values()) if drift else None
-        worst_unseen = max(unseen.values()) if unseen else None
-        ranked = sorted(drift, key=lambda key: drift[key], reverse=True)[:3]
-        found += [
-            judge(
-                "feature_missing_increase",
-                Category.DATA_QUALITY,
-                worst_missing,
-                limits.missing_rate_increase,
-                "max",
-                count,
-                minimum,
-                features=sorted(
-                    key
-                    for key, value in missing.items()
-                    if value > limits.missing_rate_increase
-                ),
-            ),
-            judge(
-                "unseen_category_rate",
-                Category.DATA_QUALITY,
-                worst_unseen,
-                limits.drift.unseen_category_rate,
-                "max",
-                count,
-                minimum,
-                features=sorted(
-                    key
-                    for key, value in unseen.items()
-                    if value > limits.drift.unseen_category_rate
-                ),
-            ),
-            judge(
-                "feature_psi_max",
-                Category.DATA_QUALITY,
-                worst_drift,
-                limits.drift.psi_high,
-                "max",
-                count,
-                minimum,
-                worst=[(key, round(drift[key], 4)) for key in ranked],
-            ),
-        ]
-        return found
+        return found + quality(self.profile, frames, limits, minimum)
 
     def degradation(self, outcomes: list[numpy.ndarray]) -> list[Signal]:
         """Judges the mean loss of cases whose outcome arrived.

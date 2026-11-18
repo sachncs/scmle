@@ -89,6 +89,33 @@ def moment(line: str) -> datetime.datetime:
     )
 
 
+def fingerprint(frame: pandas.DataFrame) -> str:
+    """Digest of the prepared input rows for the observability sidecar.
+
+    Args:
+        frame: The prepared rows.
+
+    Returns:
+        The SHA-256 of the row hashes; for rows pandas cannot hash, that of
+        their JSON, prefixed ``json:`` so the two schemes never compare.
+    """
+    scheme = ""
+    try:
+        payload = (
+            pandas.util.hash_pandas_object(frame, index=False)
+            .to_numpy(dtype="uint64")
+            .tobytes()
+        )
+    except (TypeError, ValueError):
+        # handled: the fallback scheme is named in the fingerprint, so a
+        # JSON fingerprint is never compared with a row-hash one
+        scheme = "json:"
+        payload = frame.to_json(
+            orient="split", date_format="iso", default_handler=str
+        ).encode("utf-8")
+    return scheme + hashlib.sha256(payload).hexdigest()
+
+
 class PredictionLog:
     """Append-only JSONL log of predictions and outcomes.
 
@@ -183,21 +210,7 @@ class PredictionLog:
                 error_category=type(error).__name__,
             )
             raise
-        scheme = ""
-        try:
-            payload = (
-                pandas.util.hash_pandas_object(frame, index=False)
-                .to_numpy(dtype="uint64")
-                .tobytes()
-            )
-        except (TypeError, ValueError):
-            # handled: the fallback scheme is named in the fingerprint, so a
-            # JSON fingerprint is never compared with a row-hash one
-            scheme = "json:"
-            payload = frame.to_json(
-                orient="split", date_format="iso", default_handler=str
-            ).encode("utf-8")
-        input_fingerprint = scheme + hashlib.sha256(payload).hexdigest()
+        input_fingerprint = fingerprint(frame)
         for event_id in ids:
             self.log_observability(
                 bundle,

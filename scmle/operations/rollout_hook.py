@@ -45,7 +45,146 @@ from scmle.governance import registry
 from scmle.operations import lifecycle
 
 
-class Hook:
+class Sentinel:
+    """The promoted champion's rollback side of `Hook`.
+
+    A mixin: it promotes after a `promote` decision, feeds the new
+    champion's rollback monitor and restores the previous one after a
+    rollback decision, through the hook's manager, plan, ledgers and budget.
+    """
+
+    manager: lifecycle.Maintainer
+    plan: scmle.assurance.charter.decision.Experiment
+    ledger: deployment_ledger.DeploymentLedger
+    budget: scmle.assurance.ledger.budget.DecisionBudget
+    log: rollout.Journal
+    experiment_id: str | None
+    decision: rollout.Decision | None
+    monitor: rollout.Watchdog | None
+    champion_id: str | None
+
+    def promote(
+        self,
+        approval: registry.Sanction,
+        signing_key: str | bytes | None = None,
+    ) -> registry.Release:
+        """Moves the champion alias after a `promote` decision, with approval.
+
+        Without a valid independent approval the registry refuses with an
+        `ArtifactError`, and a guarded registry also needs an attestation.
+        After the move the new champion's rollback monitor is started (a
+        champion that was already monitored raises `ValueError` at that
+        point, after the alias has moved).
+
+        Args:
+            approval: The independent approval of the challenger bundle.
+            signing_key: Key that verifies the approval.
+
+        Returns:
+            The record of the version now champion.
+
+        Raises:
+            ScmleError: If the experiment did not end in `promote`.
+        """
+        if self.decision is None or self.decision.status != rollout.PROMOTE:
+            raise errors.ScmleError(
+                "the experiment has no promote decision; nothing to promote"
+            )
+        record = self.manager.elevate(approval, signing_key)
+        self.champion_id = f"{self.manager.model}:v{record.version}"
+        budget, level = scmle.assurance.ledger.budget.start_rollback_monitor(
+            self.budget, self.champion_id
+        )
+        self.budget = budget
+        self.monitor = rollout.Watchdog(
+            self.plan.tolerance,
+            float(level),
+            self.plan.assignment,
+            self.plan.low,
+            self.plan.high,
+        )
+        self.log.append(
+            "promoted",
+            {"champion": self.champion_id, "rollback_level": str(level)},
+        )
+        return record
+
+    def watch(self, arm: ArrayLike, outcome: ArrayLike) -> str:
+        """Feeds the promoted champion's rollback monitor on fresh traffic.
+
+        Args:
+            arm: The arm of each unit (0 or 1).
+            outcome: The outcome of each unit.
+
+        Returns:
+            The monitor's status, `hold` or `rollback`. Each call that
+            returns `rollback`, including repeated ones after the monitor
+            has rolled back, records a rollback proposal and decision in the
+            ledger and a rollback decision in the decision log.
+
+        Raises:
+            ScmleError: If nothing was promoted through this hook.
+        """
+        if self.monitor is None:
+            raise errors.ScmleError("no promoted champion is monitored")
+        status = self.monitor.observe(arm, outcome)
+        if status == rollout.ROLLBACK:
+            self.ledger.commit(
+                deployment_ledger.ROLLBACK_PROPOSAL,
+                {
+                    "experiment_id": self.experiment_id,
+                    "model": self.manager.model,
+                    "champion": self.champion_id,
+                    "source": "rollback e-process",
+                    "units": self.monitor.done_at,
+                },
+            )
+            self.ledger.commit(
+                deployment_ledger.ROLLOUT_DECISION,
+                {
+                    "experiment_id": self.experiment_id,
+                    "stage": "rollback",
+                    "status": status,
+                    "units": self.monitor.done_at,
+                    "champion": self.champion_id,
+                },
+            )
+            self.log.append(
+                "rollback_decision",
+                {"champion": self.champion_id, "units": self.monitor.done_at},
+            )
+        return status
+
+    def rewind(
+        self,
+        approval: registry.Sanction,
+        signing_key: str | bytes | None = None,
+    ) -> int:
+        """Restores the previous champion after a rollback decision.
+
+        Without a valid independent approval the registry refuses with an
+        `ArtifactError`, and a guarded registry also needs an attestation.
+
+        Args:
+            approval: The independent approval of the restored bundle.
+            signing_key: Key that verifies the approval.
+
+        Returns:
+            The version number restored as champion.
+
+        Raises:
+            ScmleError: If the monitor has not decided a rollback.
+        """
+        if self.monitor is None or self.monitor.status != rollout.ROLLBACK:
+            raise errors.ScmleError(
+                "the monitor has no rollback decision; nothing to restore"
+            )
+        version = self.manager.revert(approval, signing_key)
+        self.log.append("rolled_back", {"restored_version": version})
+        return version
+
+
+class Hook(Sentinel):
     """One model's rollouts under a plan, a budget and a deployment ledger."""
 
     def __init__(
@@ -306,123 +445,3 @@ class Hook:
                 },
             )
         return decision
-
-    def promote(
-        self,
-        approval: registry.Sanction,
-        signing_key: str | bytes | None = None,
-    ) -> registry.Release:
-        """Moves the champion alias after a `promote` decision, with approval.
-
-        Without a valid independent approval the registry refuses with an
-        `ArtifactError`, and a guarded registry also needs an attestation.
-        After the move the new champion's rollback monitor is started (a
-        champion that was already monitored raises `ValueError` at that
-        point, after the alias has moved).
-
-        Args:
-            approval: The independent approval of the challenger bundle.
-            signing_key: Key that verifies the approval.
-
-        Returns:
-            The record of the version now champion.
-
-        Raises:
-            ScmleError: If the experiment did not end in `promote`.
-        """
-        if self.decision is None or self.decision.status != rollout.PROMOTE:
-            raise errors.ScmleError(
-                "the experiment has no promote decision; nothing to promote"
-            )
-        record = self.manager.elevate(approval, signing_key)
-        self.champion_id = f"{self.manager.model}:v{record.version}"
-        budget, level = scmle.assurance.ledger.budget.start_rollback_monitor(
-            self.budget, self.champion_id
-        )
-        self.budget = budget
-        self.monitor = rollout.Watchdog(
-            self.plan.tolerance,
-            float(level),
-            self.plan.assignment,
-            self.plan.low,
-            self.plan.high,
-        )
-        self.log.append(
-            "promoted",
-            {"champion": self.champion_id, "rollback_level": str(level)},
-        )
-        return record
-
-    def watch(self, arm: ArrayLike, outcome: ArrayLike) -> str:
-        """Feeds the promoted champion's rollback monitor on fresh traffic.
-
-        Args:
-            arm: The arm of each unit (0 or 1).
-            outcome: The outcome of each unit.
-
-        Returns:
-            The monitor's status, `hold` or `rollback`. Each call that
-            returns `rollback`, including repeated ones after the monitor
-            has rolled back, records a rollback proposal and decision in the
-            ledger and a rollback decision in the decision log.
-
-        Raises:
-            ScmleError: If nothing was promoted through this hook.
-        """
-        if self.monitor is None:
-            raise errors.ScmleError("no promoted champion is monitored")
-        status = self.monitor.observe(arm, outcome)
-        if status == rollout.ROLLBACK:
-            self.ledger.commit(
-                deployment_ledger.ROLLBACK_PROPOSAL,
-                {
-                    "experiment_id": self.experiment_id,
-                    "model": self.manager.model,
-                    "champion": self.champion_id,
-                    "source": "rollback e-process",
-                    "units": self.monitor.done_at,
-                },
-            )
-            self.ledger.commit(
-                deployment_ledger.ROLLOUT_DECISION,
-                {
-                    "experiment_id": self.experiment_id,
-                    "stage": "rollback",
-                    "status": status,
-                    "units": self.monitor.done_at,
-                    "champion": self.champion_id,
-                },
-            )
-            self.log.append(
-                "rollback_decision",
-                {"champion": self.champion_id, "units": self.monitor.done_at},
-            )
-        return status
-
-    def rewind(
-        self,
-        approval: registry.Sanction,
-        signing_key: str | bytes | None = None,
-    ) -> int:
-        """Restores the previous champion after a rollback decision.
-
-        Without a valid independent approval the registry refuses with an
-        `ArtifactError`, and a guarded registry also needs an attestation.
-
-        Args:
-            approval: The independent approval of the restored bundle.
-            signing_key: Key that verifies the approval.
-
-        Returns:
-            The version number restored as champion.
-
-        Raises:
-            ScmleError: If the monitor has not decided a rollback.
-        """
-        if self.monitor is None or self.monitor.status != rollout.ROLLBACK:
-            raise errors.ScmleError(
-                "the monitor has no rollback decision; nothing to restore"
-            )
-        version = self.manager.revert(approval, signing_key)
-        self.log.append("rolled_back", {"restored_version": version})
-        return version

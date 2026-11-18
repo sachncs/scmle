@@ -10,6 +10,7 @@ import pandas
 
 from scmle import durability
 import scmle.api.project
+from scmle.artifacts import bundle
 from scmle.artifacts import results
 from scmle.contracts import errors
 import scmle.governance.registry
@@ -156,42 +157,12 @@ class Verdict:
     skipped: str | None = None
 
 
-class Maintainer:
-    """Keeps a registered model fresh and safe to serve."""
+class Ledger:
+    """`Maintainer`'s memory of its last attempt, read by the `Cadence`."""
 
-    def __init__(
-        self,
-        registry: scmle.governance.registry.ModelRegistryStore,
-        model: str,
-        work_dir: str,
-        policy: Cadence | None = None,
-    ) -> None:
-        """Initializes the manager.
-
-        Args:
-            registry: Model registry.
-            model: Registered model name.
-            work_dir: Directory for challenger training runs.
-            policy: When a recommended retrain may actually run.
-        """
-        self.registry = registry
-        self.model = model
-        self.work_dir = work_dir
-        self.policy = policy or Cadence()
-        self.rollout_decides = False
-
-    def delegate(self) -> None:
-        """Makes the bootstrap promotion and rollback rules descriptive.
-
-        Once a charter rollout is bound to this manager (`Hook` calls
-        this on construction), the e-processes of `scmle.decision.rollout`
-        are the only deciders. `review` then stages the retrained challenger
-        whatever its bootstrap comparison says, so the e-process can test
-        it, and `revertible` never moves the alias; both audit the
-        bootstrap result as a descriptive diagnostic (`descriptive: true`,
-        `decides: false`). Without a bound rollout nothing changes.
-        """
-        self.rollout_decides = True
+    registry: scmle.governance.registry.ModelRegistryStore
+    model: str
+    policy: Cadence
 
     @property
     def statefile(self) -> pathlib.Path:
@@ -250,6 +221,274 @@ class Maintainer:
             return "cooldown"
         return None
 
+    def tally(self, state: dict[str, Any], fresh: pandas.DataFrame) -> None:
+        """Counts fresh rows toward the cooldown after an attempt.
+
+        Does nothing if there was no attempt or these rows are the ones last
+        acted on.
+
+        Args:
+            state: The saved state, updated in place and written.
+            fresh: The fresh rows seen.
+        """
+        if (
+            state["last_digest"] is None
+            or fingerprint(fresh) == (state["last_digest"])
+        ):
+            return
+        state["rows_since_attempt"] += len(fresh)
+        self.persist(state)
+
+
+class Rollback:
+    """Takes a clearly worse champion back; a mixin of `Maintainer`."""
+
+    registry: scmle.governance.registry.ModelRegistryStore
+    model: str
+    rollout_decides: bool
+
+    def revertible(
+        self,
+        fresh: pandas.DataFrame,
+        target: str,
+        policy: Trigger | None = None,
+        approval: scmle.governance.registry.Sanction | None = None,
+        signing_key: str | bytes | None = None,
+    ) -> Outcome:
+        """Takes the previous champion back if the new one is clearly worse.
+
+        With a charter rollout bound (`delegate`) this is a
+        descriptive diagnostic: it audits the comparison and never moves the
+        alias or asks for approval.
+
+        Both versions score the same fresh labeled rows. The previous version
+        returns only when the whole 95% interval of the new champion's
+        advantage over it lies below minus the policy's tolerance; anything
+        less clear leaves the new champion in place. Once there is a previous
+        version and enough rows, the evidence goes to the audit trail either
+        way.
+
+        With a guarded registry the rollback also needs a human attestation
+        naming this rollback; without one `AttestationRequired` is raised
+        after the evidence is audited and the champion stays. An invalid
+        approval raises `ArtifactError` the same way.
+
+        Args:
+            fresh: Recent served rows including the true target.
+            target: Name of the target column.
+            policy: Evidence required; defaults to `Trigger()`.
+            approval: Independent approval for the rollback promotion.
+            signing_key: HMAC key for the approval signature.
+
+        Returns:
+            The outcome: whether the previous version was restored, the
+            comparison, the restored version and the explanation. It is not
+            restored when there is no previous version, too few rows, the new
+            champion holds up, no approval was given, or a rollout decides.
+        """
+        rule = policy or Trigger()
+        aliases = self.registry.aliases(self.model)
+        previous = aliases.get(scmle.governance.registry.PREVIOUS)
+        if previous is None:
+            return Outcome(
+                rolled_back=False,
+                comparison=None,
+                restored_version=None,
+                reason="no previous version",
+            )
+        if len(fresh) < rule.min_rows:
+            return Outcome(
+                rolled_back=False,
+                comparison=None,
+                restored_version=None,
+                reason=f"fewer than {rule.min_rows} labeled rows",
+            )
+        current = self.registry.load(self.model)
+        old = self.registry.load(self.model, previous)
+        comparison = champion.Referee(old, current).compare(
+            fresh.drop(columns=[target]), fresh[target]
+        )
+        worse = comparison.interval[1] < -rule.tolerance
+        serving = aliases[scmle.governance.registry.CHAMPION]
+        if self.rollout_decides:
+            return self.describe(serving, previous, comparison, worse)
+        return self.settle(
+            serving, previous, comparison, worse, approval, signing_key
+        )
+
+    def describe(
+        self,
+        serving: int,
+        previous: int,
+        comparison: champion.Comparison,
+        worse: bool,
+    ) -> Outcome:
+        """Audits a rollback check that a bound rollout decides instead.
+
+        Args:
+            serving: The champion version.
+            previous: The version a rollback would restore.
+            comparison: New champion (as challenger) against the previous.
+            worse: Whether the interval lies below minus the tolerance.
+
+        Returns:
+            The descriptive outcome; nothing moved.
+        """
+        self.registry.audit(
+            "lifecycle.rollback_check",
+            model=self.model,
+            current=serving,
+            previous=previous,
+            rollback_required=worse,
+            rolled_back=False,
+            descriptive=True,
+            decides=False,
+            **dataclasses.asdict(comparison),
+        )
+        return Outcome(
+            rolled_back=False,
+            comparison=comparison,
+            restored_version=None,
+            reason="descriptive: the bootstrap interval "
+            f"[{comparison.interval[0]:.4f}, {comparison.interval[1]:.4f}]"
+            f" {'is' if worse else 'is not'} below the tolerance; "
+            "nothing moved, the rollback e-process decides",
+        )
+
+    def settle(
+        self,
+        serving: int,
+        previous: int,
+        comparison: champion.Comparison,
+        worse: bool,
+        approval: scmle.governance.registry.Sanction | None,
+        signing_key: str | bytes | None,
+    ) -> Outcome:
+        """Restores the previous version when it is due and approved.
+
+        The check is audited whether or not the restore succeeds.
+
+        Args:
+            serving: The champion version.
+            previous: The version a rollback would restore.
+            comparison: New champion (as challenger) against the previous.
+            worse: Whether the interval lies below minus the tolerance.
+            approval: Independent approval for the rollback promotion.
+            signing_key: HMAC key for the approval signature.
+
+        Returns:
+            The outcome of the check.
+        """
+        restore = worse and approval is not None
+        restored = False
+        try:
+            if restore and approval is not None:
+                self.revert(approval, signing_key, serving, previous)
+                restored = True
+        finally:
+            self.registry.audit(
+                "lifecycle.rollback_check",
+                model=self.model,
+                current=serving,
+                previous=previous,
+                rollback_required=worse,
+                rolled_back=restored,
+                **dataclasses.asdict(comparison),
+            )
+        if not worse:
+            return Outcome(
+                rolled_back=False,
+                comparison=comparison,
+                restored_version=None,
+                reason="the new champion holds up",
+            )
+        if not restore:
+            self.registry.audit(
+                "lifecycle.rollback_pending_approval",
+                model=self.model,
+                version=previous,
+                reason="new champion is clearly worse",
+            )
+            return Outcome(
+                rolled_back=False,
+                comparison=comparison,
+                restored_version=None,
+                reason="rollback requires independent approval",
+            )
+        return Outcome(
+            rolled_back=True,
+            comparison=comparison,
+            restored_version=previous,
+            reason=f"restored v{previous}: the new champion trails it by "
+            f"{-comparison.advantage:.4f} (interval "
+            f"[{comparison.interval[0]:.4f}, {comparison.interval[1]:.4f}])",
+        )
+
+    def revert(
+        self,
+        approval: scmle.governance.registry.Sanction,
+        signing_key: str | bytes | None = None,
+        current: int | None = None,
+        previous: int | None = None,
+    ) -> int:
+        """Points the champion alias back at the previous version.
+
+        The decision to do so (the bootstrap interval of `revertible` or
+        the rollback e-process of `scmle.operations.rollout_hook`) is made by
+        the caller; this is the one place the alias moves, with the same
+        independent approval and the guarded registry's attestation naming
+        this rollback.
+
+        Args:
+            approval: Independent approval for the previous version.
+            signing_key: HMAC key for the approval signature.
+            current: The version being replaced (read when omitted).
+            previous: The version restored (read when omitted).
+
+        Returns:
+            The restored version.
+
+        Raises:
+            ArtifactError: If there is no previous version or the approval
+                is invalid.
+        """
+        aliases = self.registry.aliases(self.model)
+        target = (
+            previous
+            if previous is not None
+            else aliases.get(scmle.governance.registry.PREVIOUS)
+        )
+        if target is None:
+            raise errors.ArtifactError("no previous version to restore")
+        replaced = (
+            current
+            if current is not None
+            else aliases.get(scmle.governance.registry.CHAMPION)
+        )
+        self.registry.promote(
+            self.model,
+            target,
+            approval=approval,
+            signing_key=signing_key,
+            guard_detail={
+                "rollback": {
+                    "model": self.model,
+                    "from_version": replaced,
+                    "to_version": target,
+                }
+            },
+        )
+        return int(target)
+
+
+class Staging:
+    """Registers runs and stages challengers; a mixin of `Maintainer`."""
+
+    registry: scmle.governance.registry.ModelRegistryStore
+    model: str
+    work_dir: str
+    rollout_decides: bool
+
     def enlist(
         self,
         result: results.Run,
@@ -299,6 +538,116 @@ class Maintainer:
                 signing_key=signing_key,
             )
         return record
+
+    def challenge(
+        self,
+        current: bundle.Bundle,
+        fresh: pandas.DataFrame,
+        target: str,
+        notes: list[str],
+        **options: Any,
+    ) -> champion.Comparison:
+        """Trains a challenger, compares it on a holdout and maybe stages it.
+
+        A challenger the bootstrap comparison does not promote is rejected
+        unless a bound rollout decides.
+
+        Args:
+            current: The champion bundle.
+            fresh: Fresh labelled rows, including the target.
+            target: Name of the target column.
+            notes: The review's notes, extended in place.
+            **options: Options for the retraining project.
+
+        Returns:
+            The champion-challenger comparison.
+        """
+        train, holdout = bisect(fresh, current.schema)
+        options.setdefault("task", current.schema.task)
+        options.setdefault("metric", current.info.metric)
+        challenger_run = scmle.api.project.Project(
+            train, target, output_dir=self.work_dir, **options
+        ).run()
+        comparison = champion.Referee(current, challenger_run.bundle).compare(
+            holdout.drop(columns=[target]), holdout[target]
+        )
+        evidence = dataclasses.asdict(comparison)
+        if self.rollout_decides:
+            self.registry.audit(
+                "lifecycle.bootstrap_diagnostic",
+                model=self.model,
+                stage="review",
+                descriptive=True,
+                decides=False,
+                **evidence,
+            )
+        if comparison.decision != "promote" and not self.rollout_decides:
+            self.registry.audit(
+                "lifecycle.challenger_rejected",
+                model=self.model,
+                champion_version=self.registry.resolve(self.model).version,
+                **evidence,
+            )
+            notes.append("challenger was not clearly better; champion kept")
+            return comparison
+        record = self.enlist(challenger_run)
+        self.registry.promote(
+            self.model, record.version, scmle.governance.registry.CHALLENGER
+        )
+        self.registry.audit(
+            "lifecycle.challenger_staged",
+            model=self.model,
+            version=record.version,
+            **evidence,
+        )
+        if self.rollout_decides:
+            notes.append(
+                f"bootstrap comparison says {comparison.decision!r} "
+                "(descriptive only); the rollout e-process decides promotion"
+            )
+        notes.append(
+            f"staged challenger as v{record.version}; independent approval "
+            "required before champion promotion"
+        )
+        return comparison
+
+
+class Maintainer(Ledger, Staging, Rollback):
+    """Keeps a registered model fresh and safe to serve."""
+
+    def __init__(
+        self,
+        registry: scmle.governance.registry.ModelRegistryStore,
+        model: str,
+        work_dir: str,
+        policy: Cadence | None = None,
+    ) -> None:
+        """Initializes the manager.
+
+        Args:
+            registry: Model registry.
+            model: Registered model name.
+            work_dir: Directory for challenger training runs.
+            policy: When a recommended retrain may actually run.
+        """
+        self.registry = registry
+        self.model = model
+        self.work_dir = work_dir
+        self.policy = policy or Cadence()
+        self.rollout_decides = False
+
+    def delegate(self) -> None:
+        """Makes the bootstrap promotion and rollback rules descriptive.
+
+        Once a charter rollout is bound to this manager (`Hook` calls
+        this on construction), the e-processes of `scmle.decision.rollout`
+        are the only deciders. `review` then stages the retrained challenger
+        whatever its bootstrap comparison says, so the e-process can test
+        it, and `revertible` never moves the alias; both audit the
+        bootstrap result as a descriptive diagnostic (`descriptive: true`,
+        `decides: false`). Without a bound rollout nothing changes.
+        """
+        self.rollout_decides = True
 
     def elevate(
         self,
@@ -402,31 +751,24 @@ class Maintainer:
             reasons=notes,
             rows=len(fresh),
         )
-        if report.recommendation.action != "retrain" or not retrain:
+        wanted = report.recommendation.action == "retrain" and retrain
+        skip = self.skip_reason(state, fresh) if wanted else None
+        if not wanted or skip is not None:
+            if skip is not None:
+                self.registry.audit(
+                    "lifecycle.retrain_skipped",
+                    model=self.model,
+                    reason=skip,
+                    rows=len(fresh),
+                )
+                notes.append(f"retraining skipped: {skip}")
             self.tally(state, fresh)
             return Verdict(
-                monitoring=report,
+                report,
                 retrained=False,
                 comparison=None,
                 promoted_version=None,
                 notes=notes or ["healthy"],
-            )
-        skip = self.skip_reason(state, fresh)
-        if skip is not None:
-            self.registry.audit(
-                "lifecycle.retrain_skipped",
-                model=self.model,
-                reason=skip,
-                rows=len(fresh),
-            )
-            self.tally(state, fresh)
-            notes.append(f"retraining skipped: {skip}")
-            return Verdict(
-                monitoring=report,
-                retrained=False,
-                comparison=None,
-                promoted_version=None,
-                notes=notes,
                 skipped=skip,
             )
         digest = fingerprint(fresh)
@@ -438,271 +780,13 @@ class Maintainer:
             reasons=notes,
         )
         self.persist({"last_digest": digest, "rows_since_attempt": 0})
-        train, holdout = bisect(fresh, current.schema)
-        options = dict(configure or {})
-        options.setdefault("task", current.schema.task)
-        options.setdefault("metric", current.info.metric)
-        challenger_run = scmle.api.project.Project(
-            train, target, output_dir=self.work_dir, **options
-        ).run()
-        comparison = champion.Referee(current, challenger_run.bundle).compare(
-            holdout.drop(columns=[target]), holdout[target]
-        )
-        evidence = dataclasses.asdict(comparison)
-        if self.rollout_decides:
-            self.registry.audit(
-                "lifecycle.bootstrap_diagnostic",
-                model=self.model,
-                stage="review",
-                descriptive=True,
-                decides=False,
-                **evidence,
-            )
-        if comparison.decision != "promote" and not self.rollout_decides:
-            self.registry.audit(
-                "lifecycle.challenger_rejected",
-                model=self.model,
-                champion_version=self.registry.resolve(self.model).version,
-                **evidence,
-            )
-            notes.append("challenger was not clearly better; champion kept")
-            return Verdict(
-                monitoring=report,
-                retrained=True,
-                comparison=comparison,
-                promoted_version=None,
-                notes=notes,
-            )
-        record = self.enlist(challenger_run)
-        self.registry.promote(
-            self.model, record.version, scmle.governance.registry.CHALLENGER
-        )
-        self.registry.audit(
-            "lifecycle.challenger_staged",
-            model=self.model,
-            version=record.version,
-            **evidence,
-        )
-        if self.rollout_decides:
-            notes.append(
-                f"bootstrap comparison says {comparison.decision!r} "
-                "(descriptive only); the rollout e-process decides promotion"
-            )
-        notes.append(
-            f"staged challenger as v{record.version}; independent approval "
-            "required before champion promotion"
+        comparison = self.challenge(
+            current, fresh, target, notes, **(configure or {})
         )
         return Verdict(
-            monitoring=report,
+            report,
             retrained=True,
             comparison=comparison,
             promoted_version=None,
             notes=notes,
         )
-
-    def revertible(
-        self,
-        fresh: pandas.DataFrame,
-        target: str,
-        policy: Trigger | None = None,
-        approval: scmle.governance.registry.Sanction | None = None,
-        signing_key: str | bytes | None = None,
-    ) -> Outcome:
-        """Takes the previous champion back if the new one is clearly worse.
-
-        With a charter rollout bound (`delegate`) this is a
-        descriptive diagnostic: it audits the comparison and never moves the
-        alias or asks for approval.
-
-        Both versions score the same fresh labeled rows. The previous version
-        returns only when the whole 95% interval of the new champion's
-        advantage over it lies below minus the policy's tolerance; anything
-        less clear leaves the new champion in place. Once there is a previous
-        version and enough rows, the evidence goes to the audit trail either
-        way.
-
-        With a guarded registry the rollback also needs a human attestation
-        naming this rollback; without one `AttestationRequired` is raised
-        after the evidence is audited and the champion stays. An invalid
-        approval raises `ArtifactError` the same way.
-
-        Args:
-            fresh: Recent served rows including the true target.
-            target: Name of the target column.
-            policy: Evidence required; defaults to `Trigger()`.
-            approval: Independent approval for the rollback promotion.
-            signing_key: HMAC key for the approval signature.
-
-        Returns:
-            The outcome: whether the previous version was restored, the
-            comparison, the restored version and the explanation. It is not
-            restored when there is no previous version, too few rows, the new
-            champion holds up, no approval was given, or a rollout decides.
-        """
-        rule = policy or Trigger()
-        aliases = self.registry.aliases(self.model)
-        previous = aliases.get(scmle.governance.registry.PREVIOUS)
-        if previous is None:
-            return Outcome(
-                rolled_back=False,
-                comparison=None,
-                restored_version=None,
-                reason="no previous version",
-            )
-        if len(fresh) < rule.min_rows:
-            return Outcome(
-                rolled_back=False,
-                comparison=None,
-                restored_version=None,
-                reason=f"fewer than {rule.min_rows} labeled rows",
-            )
-        current = self.registry.load(self.model)
-        old = self.registry.load(self.model, previous)
-        comparison = champion.Referee(old, current).compare(
-            fresh.drop(columns=[target]), fresh[target]
-        )
-        worse = comparison.interval[1] < -rule.tolerance
-        if self.rollout_decides:
-            self.registry.audit(
-                "lifecycle.rollback_check",
-                model=self.model,
-                current=aliases[scmle.governance.registry.CHAMPION],
-                previous=previous,
-                rollback_required=worse,
-                rolled_back=False,
-                descriptive=True,
-                decides=False,
-                **dataclasses.asdict(comparison),
-            )
-            return Outcome(
-                rolled_back=False,
-                comparison=comparison,
-                restored_version=None,
-                reason="descriptive: the bootstrap interval "
-                f"[{comparison.interval[0]:.4f}, {comparison.interval[1]:.4f}]"
-                f" {'is' if worse else 'is not'} below the tolerance; "
-                "nothing moved, the rollback e-process decides",
-            )
-        restore = worse and approval is not None
-        restored = False
-        try:
-            if restore and approval is not None:
-                self.revert(
-                    approval,
-                    signing_key,
-                    aliases[scmle.governance.registry.CHAMPION],
-                    previous,
-                )
-                restored = True
-        finally:
-            self.registry.audit(
-                "lifecycle.rollback_check",
-                model=self.model,
-                current=aliases[scmle.governance.registry.CHAMPION],
-                previous=previous,
-                rollback_required=worse,
-                rolled_back=restored,
-                **dataclasses.asdict(comparison),
-            )
-        if not worse:
-            return Outcome(
-                rolled_back=False,
-                comparison=comparison,
-                restored_version=None,
-                reason="the new champion holds up",
-            )
-        if not restore:
-            self.registry.audit(
-                "lifecycle.rollback_pending_approval",
-                model=self.model,
-                version=previous,
-                reason="new champion is clearly worse",
-            )
-            return Outcome(
-                rolled_back=False,
-                comparison=comparison,
-                restored_version=None,
-                reason="rollback requires independent approval",
-            )
-        return Outcome(
-            rolled_back=True,
-            comparison=comparison,
-            restored_version=previous,
-            reason=f"restored v{previous}: the new champion trails it by "
-            f"{-comparison.advantage:.4f} (interval "
-            f"[{comparison.interval[0]:.4f}, {comparison.interval[1]:.4f}])",
-        )
-
-    def revert(
-        self,
-        approval: scmle.governance.registry.Sanction,
-        signing_key: str | bytes | None = None,
-        current: int | None = None,
-        previous: int | None = None,
-    ) -> int:
-        """Points the champion alias back at the previous version.
-
-        The decision to do so (the bootstrap interval of `revertible` or
-        the rollback e-process of `scmle.operations.rollout_hook`) is made by
-        the caller; this is the one place the alias moves, with the same
-        independent approval and the guarded registry's attestation naming
-        this rollback.
-
-        Args:
-            approval: Independent approval for the previous version.
-            signing_key: HMAC key for the approval signature.
-            current: The version being replaced (read when omitted).
-            previous: The version restored (read when omitted).
-
-        Returns:
-            The restored version.
-
-        Raises:
-            ArtifactError: If there is no previous version or the approval
-                is invalid.
-        """
-        aliases = self.registry.aliases(self.model)
-        target = (
-            previous
-            if previous is not None
-            else aliases.get(scmle.governance.registry.PREVIOUS)
-        )
-        if target is None:
-            raise errors.ArtifactError("no previous version to restore")
-        replaced = (
-            current
-            if current is not None
-            else aliases.get(scmle.governance.registry.CHAMPION)
-        )
-        self.registry.promote(
-            self.model,
-            target,
-            approval=approval,
-            signing_key=signing_key,
-            guard_detail={
-                "rollback": {
-                    "model": self.model,
-                    "from_version": replaced,
-                    "to_version": target,
-                }
-            },
-        )
-        return int(target)
-
-    def tally(self, state: dict[str, Any], fresh: pandas.DataFrame) -> None:
-        """Counts fresh rows toward the cooldown after an attempt.
-
-        Does nothing if there was no attempt or these rows are the ones last
-        acted on.
-
-        Args:
-            state: The saved state, updated in place and written.
-            fresh: The fresh rows seen.
-        """
-        if (
-            state["last_digest"] is None
-            or fingerprint(fresh) == (state["last_digest"])
-        ):
-            return
-        state["rows_since_attempt"] += len(fresh)
-        self.persist(state)

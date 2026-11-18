@@ -1,9 +1,12 @@
 """Champion-challenger comparison with a paired bootstrap."""
 
+from collections.abc import Callable
 import dataclasses
+import functools
 import itertools
 import math
 import operator
+from typing import Any
 
 import numpy
 import pandas
@@ -11,6 +14,7 @@ import pandas
 import scmle.artifacts.bundle
 from scmle.contracts import errors
 from scmle.contracts import tasks
+import scmle.contracts.metrics
 from scmle.evaluation import bootstrap
 from scmle.evaluation import metrics
 
@@ -49,6 +53,35 @@ class Comparison:
     probability_better: float
     decision: str
     dropped: int = 0
+
+
+def rate(
+    metric: scmle.contracts.metrics.Metric,
+    target: pandas.Series,
+    positive: Any,
+    bundle: scmle.artifacts.bundle.Bundle,
+    view: pandas.DataFrame,
+    rows: numpy.ndarray,
+) -> float:
+    """Scores a model on a subset of the rows.
+
+    Args:
+        metric: The metric.
+        target: The outcomes of all rows.
+        positive: The positive label, if the task has one.
+        bundle: The model.
+        view: The model's input frame.
+        rows: Positions of the rows to score.
+
+    Returns:
+        The metric value on those rows.
+    """
+    return metric.score(
+        bundle.pipeline,
+        view.iloc[rows].reset_index(drop=True),
+        target.iloc[rows].reset_index(drop=True),
+        positive,
+    )
 
 
 class Referee:
@@ -115,6 +148,59 @@ class Referee:
         metric = metrics.CATALOG.resolve(
             metric_name or self.champion.info.metric, task
         )
+        frame, target, groups, temporal = self.arrange(data, outcomes)
+        champion_view = self.champion.prepare(frame)
+        challenger_view = self.challenger.prepare(frame)
+        sign = 1.0 if metric.greater_is_better else -1.0
+        score = functools.partial(
+            rate, metric, target, metrics.positive_label(target, task)
+        )
+        everything = numpy.arange(len(target))
+        champion_score = score(self.champion, champion_view, everything)
+        challenger_score = score(self.challenger, challenger_view, everything)
+        samples = self.resample(
+            score,
+            (champion_view, challenger_view),
+            (len(target), groups, temporal),
+            sign,
+        )
+        scant = len(samples) < self.bootstraps * KEPT
+        low, high = (
+            (math.nan, math.nan)
+            if scant
+            else numpy.percentile(samples, [2.5, 97.5])
+        )
+        return Comparison(
+            metric=metric.name,
+            rows=len(target),
+            champion_score=champion_score,
+            challenger_score=challenger_score,
+            advantage=sign * (challenger_score - champion_score),
+            interval=(float(low), float(high)),
+            probability_better=(
+                math.nan if scant else float((samples > 0).mean())
+            ),
+            decision="promote" if not scant and low > 0 else "keep",
+            dropped=self.bootstraps - len(samples),
+        )
+
+    def arrange(
+        self, data: pandas.DataFrame, outcomes: pandas.Series
+    ) -> tuple[pandas.DataFrame, pandas.Series, pandas.Series | None, bool]:
+        """Keeps the labelled rows and orders temporal data by time.
+
+        Args:
+            data: Rows served.
+            outcomes: Observed outcomes aligned to `data`.
+
+        Returns:
+            The labelled rows and their outcomes, the group of each row for
+            clustered data (else None), and whether the rows are a time
+            series (then sorted by the champion's time column).
+
+        Raises:
+            ConfigError: With too few labeled rows to compare.
+        """
         known = outcomes.reset_index(drop=True).notna().to_numpy()
         if known.sum() < MIN_ROWS:
             raise errors.ConfigError(
@@ -141,45 +227,41 @@ class Referee:
             )
             frame = frame.iloc[order].reset_index(drop=True)
             target = target.iloc[order].reset_index(drop=True)
-        champion_view = self.champion.prepare(frame)
-        challenger_view = self.challenger.prepare(frame)
-        positive = metrics.positive_label(target, task)
-        sign = 1.0 if metric.greater_is_better else -1.0
+        return frame, target, groups, temporal
 
-        def score(
-            bundle: scmle.artifacts.bundle.Bundle,
-            view: pandas.DataFrame,
-            rows: numpy.ndarray,
-        ) -> float:
-            """Scores a model on a subset of the rows.
+    def resample(
+        self,
+        score: Callable[
+            [scmle.artifacts.bundle.Bundle, pandas.DataFrame, numpy.ndarray],
+            float,
+        ],
+        views: tuple[pandas.DataFrame, pandas.DataFrame],
+        design: tuple[int, pandas.Series | None, bool],
+        sign: float,
+    ) -> numpy.ndarray:
+        """Bootstraps the challenger's advantage over the champion.
 
-            Args:
-                bundle: The model.
-                view: The model's input frame.
-                rows: Positions of the rows to score.
+        Args:
+            score: Scores a model on its input frame at the given rows.
+            views: The champion's and the challenger's input frames.
+            design: The number of rows, the group of each row for clustered
+                data (else None) and whether to resample contiguous time
+                blocks.
+            sign: 1 if larger scores are better, else -1.
 
-            Returns:
-                The metric value on those rows.
-            """
-            return metric.score(
-                bundle.pipeline,
-                view.iloc[rows].reset_index(drop=True),
-                target.iloc[rows].reset_index(drop=True),
-                positive,
-            )
-
-        everything = numpy.arange(len(target))
-        champion_score = score(self.champion, champion_view, everything)
-        challenger_score = score(self.challenger, challenger_view, everything)
+        Returns:
+            The oriented advantage on each resample that could be scored (a
+            resample missing a class cannot, and is left out).
+        """
+        champion_view, challenger_view = views
+        size, groups, temporal = design
         rng = numpy.random.default_rng(self.seed)
         advantages = []
         draws = list(
             map(
                 operator.call,
                 itertools.repeat(
-                    lambda: bootstrap.redraw(
-                        len(target), groups, temporal, rng
-                    ),
+                    lambda: bootstrap.redraw(size, groups, temporal, rng),
                     self.bootstraps,
                 ),
             )
@@ -194,23 +276,4 @@ class Referee:
             ):  # handled: counted in `dropped`; too many keep the champion
                 continue
             advantages.append(sign * difference)
-        samples = numpy.asarray(advantages)
-        scant = len(samples) < self.bootstraps * KEPT
-        low, high = (
-            (math.nan, math.nan)
-            if scant
-            else numpy.percentile(samples, [2.5, 97.5])
-        )
-        return Comparison(
-            metric=metric.name,
-            rows=len(target),
-            champion_score=champion_score,
-            challenger_score=challenger_score,
-            advantage=sign * (challenger_score - champion_score),
-            interval=(float(low), float(high)),
-            probability_better=(
-                math.nan if scant else float((samples > 0).mean())
-            ),
-            decision="promote" if not scant and low > 0 else "keep",
-            dropped=self.bootstraps - len(samples),
-        )
+        return numpy.asarray(advantages)

@@ -365,30 +365,7 @@ class Baseline:
             ValueError: If the run covers different operations from the
                 baseline.
         """
-        operations = {
-            observation.operation for observation in current.observations
-        }
-        expected = {
-            observation.operation
-            for observation in self.reference_runs[0].observations
-        }
-        if operations != expected:
-            missing = sorted(
-                operation.value for operation in expected - operations
-            )
-            extra = sorted(
-                operation.value for operation in operations - expected
-            )
-            details = []
-            if missing:
-                details.append(f"missing={missing}")
-            if extra:
-                details.append(f"extra={extra}")
-            raise errors.InputError(
-                "performance comparison operations differ: "
-                + ", ".join(details)
-            )
-
+        expected = self.match(current)
         reference_environment = (
             self.reference_runs[0].observations[0].machine,
             self.reference_runs[0].observations[0].software,
@@ -432,6 +409,44 @@ class Baseline:
             relative_regressions=regressions,
             violations=tuple(violations),
         )
+
+    def match(self, current: Run) -> set[Operation]:
+        """Returns the baseline operations, refusing a run that differs.
+
+        Args:
+            current: The run to judge.
+
+        Returns:
+            The operations of the first reference run.
+
+        Raises:
+            ValueError: If the run covers different operations from the
+                baseline; the message names the missing and extra ones.
+        """
+        operations = {
+            observation.operation for observation in current.observations
+        }
+        expected = {
+            observation.operation
+            for observation in self.reference_runs[0].observations
+        }
+        if operations != expected:
+            missing = sorted(
+                operation.value for operation in expected - operations
+            )
+            extra = sorted(
+                operation.value for operation in operations - expected
+            )
+            details = []
+            if missing:
+                details.append(f"missing={missing}")
+            if extra:
+                details.append(f"extra={extra}")
+            raise errors.InputError(
+                "performance comparison operations differ: "
+                + ", ".join(details)
+            )
+        return expected
 
     def tally(self, current: Run, expected: set[Operation]) -> tuple[str, ...]:
         """Lists the operations whose sample count differs from the baseline.
@@ -482,7 +497,6 @@ class Baseline:
             RuntimeError: If an observation that construction guarantees is
                 missing (defensive; not reachable for validated runs).
         """
-        violations: list[str] = []
         current_observation = current.observation(operation)
         if current_observation is None:
             raise RuntimeError(
@@ -505,28 +519,14 @@ class Baseline:
             statistics.median(reference_times),
             current_observation.elapsed,
         )
-        memory_regression: float | None = None
         reference_memory = [
             observation.memory
             for observation in reference_observations
             if observation is not None
         ]
-        if all(value is not None for value in reference_memory):
-            if current_observation.memory is None:
-                violations.append(
-                    f"missing peak memory observation: {operation.value}"
-                )
-            else:
-                memory_regression = rise(
-                    statistics.median(
-                        [
-                            value
-                            for value in reference_memory
-                            if value is not None
-                        ]
-                    ),
-                    current_observation.memory,
-                )
+        memory_regression, violations = weigh(
+            operation, reference_memory, current_observation.memory
+        )
         regression = {
             "elapsed_seconds": time_regression,
             "peak_memory_gb": memory_regression,
@@ -571,6 +571,33 @@ def rise(reference: float, current: float) -> float:
     if reference == 0:
         return 0.0 if current <= 0 else math.inf
     return max((current - reference) / reference, 0.0)
+
+
+def weigh(
+    operation: Operation,
+    reference: list[float | None],
+    current: float | None,
+) -> tuple[float | None, list[str]]:
+    """Returns the peak-memory regression of one operation.
+
+    Memory is compared only when every reference run recorded it.
+
+    Args:
+        operation: The operation compared.
+        reference: Peak memory of each reference run, None where unrecorded.
+        current: Peak memory of the judged run, or None.
+
+    Returns:
+        The relative regression from the reference median, or None when it
+        is not compared, and the violations: a missing current observation
+        where every reference run recorded one.
+    """
+    if not all(value is not None for value in reference):
+        return None, []
+    if current is None:
+        return None, [f"missing peak memory observation: {operation.value}"]
+    recorded = [value for value in reference if value is not None]
+    return rise(statistics.median(recorded), current), []
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

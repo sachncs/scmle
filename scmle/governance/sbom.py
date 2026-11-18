@@ -17,6 +17,36 @@ SBOM_SCHEMA = "https://cyclonedx.org/schema/bom-1.5.schema.json"
 PACKAGE_NAME = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 
 
+def componentize(name: str, version: str) -> dict[str, str]:
+    """Returns the CycloneDX library component of one distribution.
+
+    Args:
+        name: Distribution name as written; it is normalized to lower case
+            with hyphens.
+        version: Pinned version.
+
+    Returns:
+        The component, identified by its PyPI package URL.
+
+    Raises:
+        ValueError: If the name or the version is invalid.
+    """
+    normalized = name.strip().lower().replace("_", "-")
+    if not normalized or PACKAGE_NAME.fullmatch(normalized) is None:
+        raise errors.InputError(f"invalid distribution name: {name!r}")
+    pinned = str(version).strip()
+    if not pinned:
+        raise errors.InputError(f"version for {normalized!r} must not be empty")
+    reference = f"pkg:pypi/{normalized}@{pinned}"
+    return {
+        "type": "library",
+        "bom-ref": reference,
+        "name": normalized,
+        "version": str(version),
+        "purl": reference,
+    }
+
+
 def build(
     distributions: Mapping[str, str],
     *,
@@ -52,27 +82,8 @@ def build(
         raise errors.InputError("software_version must not be empty")
     if not distributions:
         raise errors.InputError("distributions must not be empty")
-    components = []
     ordered = sorted(distributions.items(), key=lambda item: item[0])
-    for name, version in ordered:
-        normalized = name.strip().lower().replace("_", "-")
-        if not normalized or PACKAGE_NAME.fullmatch(normalized) is None:
-            raise errors.InputError(f"invalid distribution name: {name!r}")
-        pinned = str(version).strip()
-        if not pinned:
-            raise errors.InputError(
-                f"version for {normalized!r} must not be empty"
-            )
-        reference = f"pkg:pypi/{normalized}@{pinned}"
-        components.append(
-            {
-                "type": "library",
-                "bom-ref": reference,
-                "name": normalized,
-                "version": str(version),
-                "purl": reference,
-            }
-        )
+    components = [componentize(name, version) for name, version in ordered]
     serial_seed = json.dumps(
         {
             "run_id": run_id,
