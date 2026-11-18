@@ -85,7 +85,7 @@ def test_the_read_log_persists_and_traces_lineage(store, tmp_path):
     ignored, raw = reader.read("raw.csv", CONTRACT)
     ignored, clean = reader.read("clean.csv", CONTRACT, parents=[raw])
     lines = (tmp_path / "reads.jsonl").read_text().splitlines()
-    assert [json.loads(line)["snapshot_id"] for line in lines] == [
+    assert [json.loads(line)["identifier"] for line in lines] == [
         raw.snapshot_id,
         clean.snapshot_id,
     ]

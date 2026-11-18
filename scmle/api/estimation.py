@@ -20,6 +20,7 @@ from scmle.artifacts import bundle
 from scmle.artifacts import results
 from scmle.contracts import errors
 from scmle.contracts import lineage
+from scmle.contracts import records
 from scmle.data.readers import connectors
 from scmle.data.readers import tabular
 from scmle.evaluation import parameter_estimation
@@ -30,7 +31,7 @@ PARAMETER_ESTIMATION_DECLARATION_ARTIFACT = (
     "parameter_estimation_declaration.json"
 )
 PARAMETER_ESTIMATION_DECLARATION_LOCK = "parameter_estimation_declaration.lock"
-PARAMETER_ESTIMATION_DECLARATION_SCHEMA = 1
+PARAMETER_ESTIMATION_DECLARATION_SCHEMA = 2
 
 
 def declare(
@@ -135,9 +136,8 @@ def unwrap(
             "parameter estimation declaration digest mismatch",
             {"run_dir": str(artifact_path)},
         )
-    if (
-        envelope.get("schema_version")
-        != PARAMETER_ESTIMATION_DECLARATION_SCHEMA
+    if envelope.get("schema_version") not in range(
+        records.ORIGIN, PARAMETER_ESTIMATION_DECLARATION_SCHEMA + 1
     ):
         raise errors.ArtifactError(
             "unsupported parameter estimation declaration schema",
@@ -158,10 +158,14 @@ def rebuild(
     """Reconstructs the estimand and policy of an enabled declaration.
 
     The stored policy is plain JSON: the prior, the assumption lists and the
-    variance bounds are restored to the types the configuration takes.
+    variance bounds are restored to the types the configuration takes. A
+    version-2 declaration holds the estimand and the policy in their
+    single-word keys; both are moved back to version 1 through their
+    migrations first, so declarations of either version rebuild.
 
     Args:
-        envelope: The verified declaration, with `estimand` and `policy`.
+        envelope: The verified declaration, with `schema_version`,
+            `estimand` and `policy`.
 
     Returns:
         The estimand and the policy.
@@ -171,7 +175,15 @@ def rebuild(
         TypeError: If a field has the wrong shape.
         ValueError: If the estimand or the policy is invalid.
     """
-    estimand_record = envelope["estimand"]
+    estimand_record = dict(envelope["estimand"])
+    policy_values = dict(envelope["policy"])
+    if envelope.get("schema_version") != records.ORIGIN:
+        estimand_record = records.downgrade(
+            parameter_estimation.Estimand.migrations, estimand_record
+        )
+        policy_values = records.downgrade(
+            parameter_estimation.Config.migrations, policy_values
+        )
     estimand = parameter_estimation.Estimand(
         name=estimand_record["name"],
         outcome=estimand_record["outcome"],
@@ -181,7 +193,6 @@ def rebuild(
         assumptions=tuple(estimand_record["assumptions"]),
         description=estimand_record.get("description", ""),
     )
-    policy_values = dict(envelope["policy"])
     if "prior" in policy_values:
         prior_values = dict(policy_values["prior"])
         policy_values["prior"] = parameter_estimation.BayesianPrior(

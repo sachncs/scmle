@@ -137,7 +137,7 @@ def test_fitted_nodes_are_learned_from_training_rows_only(tmp_path):
     manifest = json.loads(
         (result.run_dir / "validation_manifest.json").read_text()
     )
-    development = frame.iloc[manifest["train_ids"]]
+    development = frame.iloc[manifest["training"]]
     final = result.bundle.pipeline
     while not hasattr(final, "named_steps") and hasattr(final, "estimator_"):
         final = final.estimator_
@@ -270,7 +270,7 @@ def test_search_is_invariant_to_future_target_rewrites_with_a_graph(tmp_path):
     )
     altered = frame.copy()
     rng = numpy.random.default_rng(5)
-    test_rows = frame.index[manifest["test_ids"]]
+    test_rows = frame.index[manifest["test"]]
     altered.loc[test_rows, "y"] = rng.permutation(
         altered.loc[test_rows, "y"].to_numpy()
     )

@@ -553,7 +553,7 @@ def test_reconcile_command(tmp_path, capsys):
     assert cli.main(base) == cli.EXIT_OK
     assert json.loads(capsys.readouterr().out)["consistent"] is True
     document = json.loads(observed.read_text())
-    document["image_digest"] = support_runtime.OTHER
+    document["digests"]["image"] = support_runtime.OTHER
     document["revisions"] = [[document["revision"], support_runtime.OTHER]]
     observed.write_text(json.dumps(document))
     assert cli.main(base) == cli.EXIT_FAILED

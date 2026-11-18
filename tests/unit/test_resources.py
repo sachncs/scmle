@@ -54,9 +54,9 @@ def test_limits_report_each_violation():
 def test_usage_serializes():
     usage = resources.Usage(1.5, 2.5, 30, "m")
     assert usage.to_dict() == {
-        "model_mb": 1.5,
-        "p95_latency_ms": 2.5,
-        "rows_timed": 30,
+        "size": 1.5,
+        "latency": 2.5,
+        "timed": 30,
         "machine": "m",
     }
     assert pytest.approx(usage.model_mb) == 1.5

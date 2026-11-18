@@ -99,4 +99,4 @@ def test_webhook_delivers_json_with_bounded_attempts():
 
     assert delivery.status == "delivered"
     assert delivery.attempts == 1
-    assert received[0]["alert_id"] == make_alert().alert_id
+    assert received[0]["identifier"] == make_alert().alert_id

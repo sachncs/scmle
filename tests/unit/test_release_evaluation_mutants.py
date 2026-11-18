@@ -167,9 +167,9 @@ def test_counts_serialize_and_name_the_bad_field():
         "passed": 3,
         "failed": 2,
         "blocking": 4,
-        "blocking_failures": 1,
+        "blockers": 1,
     }
-    for name in make_counts().to_dict():
+    for name in (field.name for field in dataclasses.fields(make_counts())):
         with pytest.raises(
             TypeError, match=rf"^{name} must be a non-negative integer$"
         ):
@@ -276,20 +276,17 @@ def test_summary_serializes_exactly():
     }
     assert summary.to_dict() == {
         "task": "binary",
-        "policy_schema_version": 3,
+        "policy": 3,
         "status": "blocked",
-        "total_findings": 3,
-        "passed_findings": 1,
-        "failed_findings": 2,
-        "blocking_findings": 2,
-        "blocking_failures": 1,
-        "non_blocking_failures": 1,
-        "counts_by_kind": expected_kinds,
+        "findings": {"total": 3, "passed": 1, "failed": 2, "blocking": 2},
+        "blockers": 1,
+        "warnings": 1,
+        "kinds": expected_kinds,
     }
-    assert list(summary.to_dict()["counts_by_kind"]) == sorted(expected_kinds)
+    assert list(summary.to_dict()["kinds"]) == sorted(expected_kinds)
     text = summary.canonize()
-    assert text.startswith('{"blocking_failures":1,"blocking_findings":2,')
-    assert text.endswith('"task":"binary","total_findings":3}')
+    assert text.startswith('{"blockers":1,"findings":{"blocking":2,')
+    assert text.endswith('"task":"binary","warnings":1}')
     assert ", " not in text
     assert ": " not in text
 
@@ -303,20 +300,20 @@ def test_evaluation_validation_and_exact_serialization():
     assert outcome.blocked is True
     assert outcome.to_dict() == {
         "task": "binary",
-        "policy_schema_version": 3,
+        "policy": 3,
         "passed": False,
         "blocked": True,
-        "blocking_reasons": ["badé"],
+        "blockers": ["badé"],
         "findings": [item.to_dict() for item in outcome.findings],
         "readiness": outcome.tally().to_dict(),
     }
     text = outcome.canonize()
-    assert text.startswith('{"blocked":true,"blocking_reasons":["bad\\u00e9"]')
+    assert text.startswith('{"blocked":true,"blockers":["bad\\u00e9"]')
     assert "\\u00ef" in text
     assert ", " not in text
     assert text.index('"findings"') < text.index('"passed"')
-    assert text.index('"passed"') < text.index('"policy_schema_version"')
-    assert text.index('"policy_schema_version"') < text.index('"readiness"')
+    assert text.index('"passed"') < text.index('"policy"')
+    assert text.index('"policy"') < text.index('"readiness"')
 
     for bad in ("  ", 5, None):
         with pytest.raises(ValueError, match=r"^task must not be empty$"):

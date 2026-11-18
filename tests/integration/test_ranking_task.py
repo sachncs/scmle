@@ -49,8 +49,8 @@ def test_no_query_appears_in_both_development_and_locked_rows(result):
         (result.run_dir / "validation_manifest.json").read_text()
     )
 
-    development = set(frame["query"].iloc[manifest["train_ids"]])
-    locked = set(frame["query"].iloc[manifest["test_ids"]])
+    development = set(frame["query"].iloc[manifest["training"]])
+    locked = set(frame["query"].iloc[manifest["test"]])
 
     assert result.evaluation["split_strategy"] == "group"
     assert locked and not development & locked

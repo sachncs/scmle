@@ -72,8 +72,8 @@ def test_entities_are_on_both_sides_and_the_final_rows_come_last(tmp_path):
     shared = set(explore.entity) & set(confirm.entity)
     assert len(shared) > 0.5 * confirm.entity.nunique()
     validation = read(result, "validation_manifest.json")
-    final = frame.iloc[validation["test_ids"]]
-    development = frame.iloc[validation["train_ids"]]
+    final = frame.iloc[validation["test"]]
+    development = frame.iloc[validation["training"]]
     assert final.t.min() >= development.t.quantile(0.5)
     assert set(final.entity) <= set(development.entity)
     events = (pathlib.Path(result.run_dir) / "events.jsonl").read_text()

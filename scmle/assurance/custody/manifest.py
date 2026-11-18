@@ -344,12 +344,13 @@ def restore(
     version = record.get("manifest_version")
     if version == MANIFEST_VERSION:
         return Manifest.from_dict(record)
-    if version is None and "train_ids" in record:
+    if version is None and ("training" in record or "train_ids" in record):
+        ids = splitters.Manifest.KEYS.downgrade(dict(record))
         v1 = splitters.Manifest(
             strategy=record["strategy"],
             seed=record["seed"],
-            train_ids=tuple(record["train_ids"]),
-            test_ids=tuple(record["test_ids"]),
+            train_ids=tuple(ids["train_ids"]),
+            test_ids=tuple(ids["test_ids"]),
             folds=tuple(
                 (tuple(f["train"]), tuple(f["val"])) for f in record["folds"]
             ),

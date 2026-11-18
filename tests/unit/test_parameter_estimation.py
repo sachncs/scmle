@@ -9,6 +9,7 @@ from typing import Literal
 import numpy
 import pytest
 
+from scmle.contracts import records
 from scmle.evaluation import parameter_estimation
 from scmle.evaluation.envelope import Counts
 from scmle.evaluation.parameter_estimation import BayesianPrior
@@ -17,6 +18,11 @@ from scmle.evaluation.parameter_estimation import Estimand
 from scmle.evaluation.parameter_estimation import estimate_parameters
 from scmle.evaluation.parameter_estimation import Estimation
 from scmle.evaluation.parameter_estimation import ParameterEstimate
+
+
+def fields(policy: Config) -> dict[str, Any]:
+    """The policy's field values, from its written layout."""
+    return records.downgrade(Config.migrations, policy.to_dict())
 
 
 def linear_estimand() -> Estimand:
@@ -701,11 +707,11 @@ def test_continuous_ipw_ate_requires_declared_density_assumptions():
 def test_continuous_policy_round_trip_preserves_explicit_capability():
     """Serialized continuous policy evidence reconstructs without defaults."""
     policy = continuous_treatment_policy()
-    restored = Config(**policy.to_dict())
+    restored = Config(**fields(policy))
 
     assert restored == policy
-    assert restored.to_dict()["continuous_weight_cap"] == 8.0
-    assert restored.to_dict()["continuous_treatment_assumptions"] == (
+    assert restored.to_dict()["cap"] == 8.0
+    assert restored.to_dict()["assumptions"]["continuous"] == (
         "consistency",
         "conditional_exchangeability",
         "continuous_treatment_positivity",
@@ -767,7 +773,7 @@ def test_ipw_ate_clustered_influence_uncertainty_is_deterministic():
     second = estimate_parameters(
         features, outcome, causal_estimand(), policy, clusters=clusters
     )
-    iid_policy_values = policy.to_dict()
+    iid_policy_values = fields(policy)
     iid_policy_values["covariance"] = "iid"
     iid = estimate_parameters(
         features,
@@ -799,7 +805,7 @@ def test_aipw_ate_clustered_influence_uncertainty_is_serializable(tmp_path):
         features, outcome, causal_estimand(), policy, clusters=clusters
     )
 
-    restored_policy = Config(**policy.to_dict())
+    restored_policy = Config(**fields(policy))
     assert restored_policy == policy
     assert result.diagnostics["uncertainty_method"] == (
         "clustered_centered_influence_function"
@@ -898,7 +904,7 @@ def test_aipw_ate_cross_fitting_is_deterministic_and_auditable():
         "not Bayesian" in limitation and "time-varying" in limitation
         for limitation in cross_fitting["limitations"]
     )
-    assert first.to_dict()["policy"]["cross_fitting_folds"] == 5
+    assert first.to_dict()["policy"]["folds"] == 5
     json.dumps(first.to_dict())
 
 
@@ -960,7 +966,7 @@ def test_causal_cluster_bootstrap_resamples_whole_clusters(
     policy = clustered_causal_policy(estimator)
     policy = Config(
         **{
-            **policy.to_dict(),
+            **fields(policy),
             "bootstrap_replicates": 4,
             "seed": 47,
         }
@@ -1338,7 +1344,7 @@ def test_hierarchical_random_slope_policy_is_strictly_declared():
             hierarchical_estimand(),
             Config(
                 **{
-                    **make_hierarchical_random_slope_policy().to_dict(),
+                    **fields(make_hierarchical_random_slope_policy()),
                     "random_slope_position": 1,
                 }
             ),
@@ -1376,7 +1382,7 @@ def test_hierarchical_bootstrap_is_deterministic_and_reference_checked(
     base_policy = make_hierarchical_reml_policy()
     policy = Config(
         **{
-            **base_policy.to_dict(),
+            **fields(base_policy),
             "hierarchical_method": method,
             "bootstrap_replicates": 4,
             "seed": 107,
@@ -1447,7 +1453,7 @@ def test_hierarchical_bootstrap_records_failed_replicates(
     features, outcome, clusters = make_hierarchical_reml_fixture()
     policy = Config(
         **{
-            **make_hierarchical_reml_policy().to_dict(),
+            **fields(make_hierarchical_reml_policy()),
             "bootstrap_replicates": 4,
             "seed": 109,
         }

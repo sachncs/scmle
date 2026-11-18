@@ -65,7 +65,7 @@
     "scmle.data.catalog": {
       "Catalog": {
         "kind": "class",
-        "signature_sha256": "e5fddcac28eb18c5f1a477a8df5062246f6e834e03158552b93893b658e7cfeb"
+        "signature_sha256": "97e538a625751125259a6b808e3fda11ce095f384a4de3aad5f04a2c73644907"
       }
     },
     "scmle.data.store.processing": {

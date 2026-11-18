@@ -87,8 +87,8 @@ def test_quality_evaluation_passes_declared_measures():
 
     assert result.passed is True
     assert result.to_dict()["thresholds"] == {
-        "stability_minimum": 0.8,
-        "fidelity_minimum": 0.9,
+        "stability": 0.8,
+        "fidelity": 0.9,
     }
 
 

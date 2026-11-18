@@ -90,7 +90,7 @@ def test_without_criteria_the_release_evaluation_blocks(folder):
     record = read(folder / "release_evaluation.json")
     assert record["status"] == "policy_not_declared"
     assert record["blocked"] is True and record["passed"] is False
-    assert "not invented from observed metrics" in record["blocking_reasons"][0]
+    assert "not invented from observed metrics" in record["blockers"][0]
 
 
 def test_the_model_folder_is_checksummed_and_unsigned_needs_trust(folder):

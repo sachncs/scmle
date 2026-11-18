@@ -154,7 +154,10 @@ def split_ids(
     manifest = json.loads(
         (result.run_dir / "validation_manifest.json").read_text()
     )
-    return numpy.array(manifest["train_ids"]), numpy.array(manifest["test_ids"])
+    return (
+        numpy.array(manifest.get("training", manifest.get("train_ids"))),
+        numpy.array(manifest.get("test", manifest.get("test_ids"))),
+    )
 
 
 def encode(frame: pandas.DataFrame) -> pandas.DataFrame:

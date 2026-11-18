@@ -77,7 +77,7 @@ def test_every_objective_is_declared_with_a_scope_and_none_loses_data():
 
 def test_a_fault_with_no_scenario_is_not_run_never_passed():
     report = recovery.Runner({"process_kill": passing("process_kill")}).run()
-    by_id = {r["fault_id"]: r for r in report["results"]}
+    by_id = {r["fault"]: r for r in report["results"]}
     assert by_id["process_kill"]["status"] == recovery.PASSED
     assert by_id["bad_release"]["status"] == recovery.NOT_RUN
     assert "no scenario" in by_id["bad_release"]["problems"][0]
@@ -110,7 +110,7 @@ def test_measurements_outside_the_declared_objective_fail_the_fault():
     report = recovery.Runner(
         {"process_kill": slow, "bad_release": lossy, "corrupted_bundle": never}
     ).run()
-    by_id = {r["fault_id"]: r for r in report["results"]}
+    by_id = {r["fault"]: r for r in report["results"]}
     assert by_id["process_kill"]["status"] == recovery.FAILED
     assert "exceeds" in by_id["process_kill"]["problems"][0]
     assert "lost" in by_id["bad_release"]["problems"][0]
@@ -131,7 +131,7 @@ def test_a_failed_check_or_a_crash_is_a_failure_not_a_pass():
     report = recovery.Runner(
         {"process_kill": false_check, "bad_release": crash}
     ).run()
-    by_id = {r["fault_id"]: r for r in report["results"]}
+    by_id = {r["fault"]: r for r in report["results"]}
     assert by_id["process_kill"]["status"] == recovery.FAILED
     assert "check failed: the thing held" in by_id["process_kill"]["problems"]
     assert by_id["bad_release"]["status"] == recovery.FAILED
@@ -144,7 +144,7 @@ def test_a_selected_subset_marks_the_rest_not_selected_and_the_report_is_json():
         "bad_release": passing("bad_release"),
     }
     report = recovery.Runner(scenarios).run(["bad_release"])
-    by_id = {r["fault_id"]: r for r in report["results"]}
+    by_id = {r["fault"]: r for r in report["results"]}
     assert by_id["bad_release"]["status"] == recovery.PASSED
     assert by_id["process_kill"]["problems"] == ["not selected in this run"]
     assert report["all_local_passed"] is True

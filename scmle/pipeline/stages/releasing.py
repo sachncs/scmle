@@ -175,7 +175,7 @@ class Releasing(interface.Stage):
             "status": "policy_not_declared",
             "passed": False,
             "blocked": True,
-            "blocking_reasons": [
+            "blockers": [
                 (
                     "no explicit success criteria were declared; release "
                     "thresholds were not invented from observed metrics"

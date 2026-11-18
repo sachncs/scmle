@@ -1676,28 +1676,38 @@
     },
     "fairness_mitigation": "NoneType",
     "fit_health": {
-     "noise_share": "float",
+     "gains": {
+      "training": "float",
+      "validation": "float"
+     },
+     "noise": "float",
      "note": "str",
      "retained": "float",
-     "train_gain": "float",
-     "validation_gain": "float",
      "verdict": "str"
     },
     "learning_curve": {
-     "last_gain": "float",
+     "gains": {
+      "last": "float",
+      "total": "float"
+     },
      "scores": [
       "float"
      ],
      "sizes": [
       "int"
      ],
-     "total_gain": "float",
      "verdict": "str"
     },
     "metric": "str",
     "metric_greater_is_better": "bool",
     "model_card": {
-     "dataset_id": "str",
+     "artifacts": [
+      "str"
+     ],
+     "dataset": "str",
+     "digests": {
+      "model": "str"
+     },
      "evaluation": {
       "cv_confidence": {
        "available": "bool",
@@ -1725,35 +1735,31 @@
        "roc_auc": "float"
       }
      },
-     "evidence_artifacts": [
+     "excluded": [
       "str"
      ],
-     "feature_names": [
+     "features": [
       "str"
      ],
-     "generated_at": "str",
-     "intended_use": "str",
+     "generated": "str",
      "limitations": [
       "str"
      ],
      "metric": "str",
-     "model_fingerprint": "str",
-     "model_name": "str",
-     "model_version": "str",
-     "out_of_scope": [
-      "str"
-     ],
+     "model": "str",
      "resources": {
+      "latency": "float",
       "machine": "str",
-      "model_mb": "float",
-      "p95_latency_ms": "float",
-      "rows_timed": "int"
+      "size": "float",
+      "timed": "int"
      },
-     "review_status": "str",
+     "review": "str",
      "schema_version": "int",
-     "snapshot_id": "str",
-     "support_status": "str",
-     "task": "str"
+     "snapshot": "str",
+     "support": "str",
+     "task": "str",
+     "use": "str",
+     "version": "str"
     },
     "n_dev": "int",
     "n_test": "int",
@@ -1795,7 +1801,7 @@
     },
     "release_evaluation": {
      "blocked": "bool",
-     "blocking_reasons": [
+     "blockers": [
       "str"
      ],
      "findings": [],
@@ -1857,10 +1863,10 @@
      }
     },
     "resources": {
+     "latency": "float",
      "machine": "str",
-     "model_mb": "float",
-     "p95_latency_ms": "float",
-     "rows_timed": "int"
+     "size": "float",
+     "timed": "int"
     },
     "run_id": "str",
     "sbom": {
@@ -2677,7 +2683,7 @@
        "float"
       ],
       "kind": "str",
-      "missing_rate": "float",
+      "missing": "float",
       "rows": "int"
      },
      "x1": {
@@ -2688,7 +2694,7 @@
        "float"
       ],
       "kind": "str",
-      "missing_rate": "float",
+      "missing": "float",
       "rows": "int"
      },
      "x2": {
@@ -2699,7 +2705,7 @@
        "c": "float"
       },
       "kind": "str",
-      "missing_rate": "float",
+      "missing": "float",
       "rows": "int"
      }
     },
@@ -2720,7 +2726,7 @@
       "float"
      ],
      "kind": "str",
-     "missing_rate": "float",
+     "missing": "float",
      "rows": "int"
     },
     "schema_version": "int"
@@ -2758,7 +2764,13 @@
     "time": "NoneType"
    },
    "model_card.json": {
-    "dataset_id": "str",
+    "artifacts": [
+     "str"
+    ],
+    "dataset": "str",
+    "digests": {
+     "model": "str"
+    },
     "evaluation": {
      "cv_confidence": {
       "available": "bool",
@@ -2786,35 +2798,31 @@
       "roc_auc": "float"
      }
     },
-    "evidence_artifacts": [
+    "excluded": [
      "str"
     ],
-    "feature_names": [
+    "features": [
      "str"
     ],
-    "generated_at": "str",
-    "intended_use": "str",
+    "generated": "str",
     "limitations": [
      "str"
     ],
     "metric": "str",
-    "model_fingerprint": "str",
-    "model_name": "str",
-    "model_version": "str",
-    "out_of_scope": [
-     "str"
-    ],
+    "model": "str",
     "resources": {
+     "latency": "float",
      "machine": "str",
-     "model_mb": "float",
-     "p95_latency_ms": "float",
-     "rows_timed": "int"
+     "size": "float",
+     "timed": "int"
     },
-    "review_status": "str",
+    "review": "str",
     "schema_version": "int",
-    "snapshot_id": "str",
-    "support_status": "str",
-    "task": "str"
+    "snapshot": "str",
+    "support": "str",
+    "task": "str",
+    "use": "str",
+    "version": "str"
    },
    "parameter_estimation_declaration.json": {
     "digest": "str",
@@ -2857,7 +2865,7 @@
    },
    "release_evaluation.json": {
     "blocked": "bool",
-    "blocking_reasons": [
+    "blockers": [
      "str"
     ],
     "findings": [],
@@ -2901,9 +2909,11 @@
      "added": [],
      "changed": [],
      "compatible": "bool",
-     "current_snapshot_id": "str",
-     "previous_snapshot_id": "NoneType",
      "removed": [],
+     "snapshots": {
+      "current": "str",
+      "previous": "NoneType"
+     },
      "status": "str"
     },
     "schema_version": "int",
@@ -3457,10 +3467,10 @@
     "notes": [],
     "seed": "int",
     "strategy": "str",
-    "test_ids": [
+    "test": [
      "int"
     ],
-    "train_ids": [
+    "training": [
      "int"
     ]
    }
@@ -5138,28 +5148,38 @@
     },
     "fairness_mitigation": "NoneType",
     "fit_health": {
-     "noise_share": "float",
+     "gains": {
+      "training": "float",
+      "validation": "float"
+     },
+     "noise": "float",
      "note": "str",
      "retained": "float",
-     "train_gain": "float",
-     "validation_gain": "float",
      "verdict": "str"
     },
     "learning_curve": {
-     "last_gain": "float",
+     "gains": {
+      "last": "float",
+      "total": "float"
+     },
      "scores": [
       "float"
      ],
      "sizes": [
       "int"
      ],
-     "total_gain": "float",
      "verdict": "str"
     },
     "metric": "str",
     "metric_greater_is_better": "bool",
     "model_card": {
-     "dataset_id": "str",
+     "artifacts": [
+      "str"
+     ],
+     "dataset": "str",
+     "digests": {
+      "model": "str"
+     },
      "evaluation": {
       "cv_confidence": {
        "available": "bool",
@@ -5185,35 +5205,31 @@
        "log_loss": "float"
       }
      },
-     "evidence_artifacts": [
+     "excluded": [
       "str"
      ],
-     "feature_names": [
+     "features": [
       "str"
      ],
-     "generated_at": "str",
-     "intended_use": "str",
+     "generated": "str",
      "limitations": [
       "str"
      ],
      "metric": "str",
-     "model_fingerprint": "str",
-     "model_name": "str",
-     "model_version": "str",
-     "out_of_scope": [
-      "str"
-     ],
+     "model": "str",
      "resources": {
+      "latency": "float",
       "machine": "str",
-      "model_mb": "float",
-      "p95_latency_ms": "float",
-      "rows_timed": "int"
+      "size": "float",
+      "timed": "int"
      },
-     "review_status": "str",
+     "review": "str",
      "schema_version": "int",
-     "snapshot_id": "str",
-     "support_status": "str",
-     "task": "str"
+     "snapshot": "str",
+     "support": "str",
+     "task": "str",
+     "use": "str",
+     "version": "str"
     },
     "n_dev": "int",
     "n_test": "int",
@@ -5255,7 +5271,7 @@
     },
     "release_evaluation": {
      "blocked": "bool",
-     "blocking_reasons": [
+     "blockers": [
       "str"
      ],
      "findings": [],
@@ -5317,10 +5333,10 @@
      }
     },
     "resources": {
+     "latency": "float",
      "machine": "str",
-     "model_mb": "float",
-     "p95_latency_ms": "float",
-     "rows_timed": "int"
+     "size": "float",
+     "timed": "int"
     },
     "run_id": "str",
     "sbom": {
@@ -6162,7 +6178,7 @@
        "float"
       ],
       "kind": "str",
-      "missing_rate": "float",
+      "missing": "float",
       "rows": "int"
      },
      "x1": {
@@ -6173,7 +6189,7 @@
        "float"
       ],
       "kind": "str",
-      "missing_rate": "float",
+      "missing": "float",
       "rows": "int"
      },
      "x2": {
@@ -6184,7 +6200,7 @@
        "c": "float"
       },
       "kind": "str",
-      "missing_rate": "float",
+      "missing": "float",
       "rows": "int"
      }
     },
@@ -6203,7 +6219,7 @@
       "mid": "float"
      },
      "kind": "str",
-     "missing_rate": "float",
+     "missing": "float",
      "rows": "int"
     },
     "schema_version": "int"
@@ -6241,7 +6257,13 @@
     "time": "NoneType"
    },
    "model_card.json": {
-    "dataset_id": "str",
+    "artifacts": [
+     "str"
+    ],
+    "dataset": "str",
+    "digests": {
+     "model": "str"
+    },
     "evaluation": {
      "cv_confidence": {
       "available": "bool",
@@ -6267,35 +6289,31 @@
       "log_loss": "float"
      }
     },
-    "evidence_artifacts": [
+    "excluded": [
      "str"
     ],
-    "feature_names": [
+    "features": [
      "str"
     ],
-    "generated_at": "str",
-    "intended_use": "str",
+    "generated": "str",
     "limitations": [
      "str"
     ],
     "metric": "str",
-    "model_fingerprint": "str",
-    "model_name": "str",
-    "model_version": "str",
-    "out_of_scope": [
-     "str"
-    ],
+    "model": "str",
     "resources": {
+     "latency": "float",
      "machine": "str",
-     "model_mb": "float",
-     "p95_latency_ms": "float",
-     "rows_timed": "int"
+     "size": "float",
+     "timed": "int"
     },
-    "review_status": "str",
+    "review": "str",
     "schema_version": "int",
-    "snapshot_id": "str",
-    "support_status": "str",
-    "task": "str"
+    "snapshot": "str",
+    "support": "str",
+    "task": "str",
+    "use": "str",
+    "version": "str"
    },
    "parameter_estimation_declaration.json": {
     "digest": "str",
@@ -6338,7 +6356,7 @@
    },
    "release_evaluation.json": {
     "blocked": "bool",
-    "blocking_reasons": [
+    "blockers": [
      "str"
     ],
     "findings": [],
@@ -6382,9 +6400,11 @@
      "added": [],
      "changed": [],
      "compatible": "bool",
-     "current_snapshot_id": "str",
-     "previous_snapshot_id": "NoneType",
      "removed": [],
+     "snapshots": {
+      "current": "str",
+      "previous": "NoneType"
+     },
      "status": "str"
     },
     "schema_version": "int",
@@ -6938,10 +6958,10 @@
     "notes": [],
     "seed": "int",
     "strategy": "str",
-    "test_ids": [
+    "test": [
      "int"
     ],
-    "train_ids": [
+    "training": [
      "int"
     ]
    }
@@ -8459,28 +8479,38 @@
     },
     "fairness_mitigation": "NoneType",
     "fit_health": {
-     "noise_share": "float",
+     "gains": {
+      "training": "float",
+      "validation": "float"
+     },
+     "noise": "float",
      "note": "str",
      "retained": "float",
-     "train_gain": "float",
-     "validation_gain": "float",
      "verdict": "str"
     },
     "learning_curve": {
-     "last_gain": "float",
+     "gains": {
+      "last": "float",
+      "total": "float"
+     },
      "scores": [
       "float"
      ],
      "sizes": [
       "int"
      ],
-     "total_gain": "float",
      "verdict": "str"
     },
     "metric": "str",
     "metric_greater_is_better": "bool",
     "model_card": {
-     "dataset_id": "str",
+     "artifacts": [
+      "str"
+     ],
+     "dataset": "str",
+     "digests": {
+      "model": "str"
+     },
      "evaluation": {
       "cv_confidence": {
        "available": "bool",
@@ -8505,35 +8535,31 @@
        "rmse": "float"
       }
      },
-     "evidence_artifacts": [
+     "excluded": [
       "str"
      ],
-     "feature_names": [
+     "features": [
       "str"
      ],
-     "generated_at": "str",
-     "intended_use": "str",
+     "generated": "str",
      "limitations": [
       "str"
      ],
      "metric": "str",
-     "model_fingerprint": "str",
-     "model_name": "str",
-     "model_version": "str",
-     "out_of_scope": [
-      "str"
-     ],
+     "model": "str",
      "resources": {
+      "latency": "float",
       "machine": "str",
-      "model_mb": "float",
-      "p95_latency_ms": "float",
-      "rows_timed": "int"
+      "size": "float",
+      "timed": "int"
      },
-     "review_status": "str",
+     "review": "str",
      "schema_version": "int",
-     "snapshot_id": "str",
-     "support_status": "str",
-     "task": "str"
+     "snapshot": "str",
+     "support": "str",
+     "task": "str",
+     "use": "str",
+     "version": "str"
     },
     "n_dev": "int",
     "n_test": "int",
@@ -8582,7 +8608,7 @@
     },
     "release_evaluation": {
      "blocked": "bool",
-     "blocking_reasons": [
+     "blockers": [
       "str"
      ],
      "findings": [],
@@ -8644,10 +8670,10 @@
      }
     },
     "resources": {
+     "latency": "float",
      "machine": "str",
-     "model_mb": "float",
-     "p95_latency_ms": "float",
-     "rows_timed": "int"
+     "size": "float",
+     "timed": "int"
     },
     "run_id": "str",
     "sbom": {
@@ -9311,7 +9337,7 @@
        "float"
       ],
       "kind": "str",
-      "missing_rate": "float",
+      "missing": "float",
       "rows": "int"
      },
      "x1": {
@@ -9322,7 +9348,7 @@
        "float"
       ],
       "kind": "str",
-      "missing_rate": "float",
+      "missing": "float",
       "rows": "int"
      },
      "x2": {
@@ -9333,7 +9359,7 @@
        "c": "float"
       },
       "kind": "str",
-      "missing_rate": "float",
+      "missing": "float",
       "rows": "int"
      }
     },
@@ -9351,7 +9377,7 @@
       "float"
      ],
      "kind": "str",
-     "missing_rate": "float",
+     "missing": "float",
      "rows": "int"
     },
     "schema_version": "int"
@@ -9387,7 +9413,13 @@
     "time": "NoneType"
    },
    "model_card.json": {
-    "dataset_id": "str",
+    "artifacts": [
+     "str"
+    ],
+    "dataset": "str",
+    "digests": {
+     "model": "str"
+    },
     "evaluation": {
      "cv_confidence": {
       "available": "bool",
@@ -9412,35 +9444,31 @@
       "rmse": "float"
      }
     },
-    "evidence_artifacts": [
+    "excluded": [
      "str"
     ],
-    "feature_names": [
+    "features": [
      "str"
     ],
-    "generated_at": "str",
-    "intended_use": "str",
+    "generated": "str",
     "limitations": [
      "str"
     ],
     "metric": "str",
-    "model_fingerprint": "str",
-    "model_name": "str",
-    "model_version": "str",
-    "out_of_scope": [
-     "str"
-    ],
+    "model": "str",
     "resources": {
+     "latency": "float",
      "machine": "str",
-     "model_mb": "float",
-     "p95_latency_ms": "float",
-     "rows_timed": "int"
+     "size": "float",
+     "timed": "int"
     },
-    "review_status": "str",
+    "review": "str",
     "schema_version": "int",
-    "snapshot_id": "str",
-    "support_status": "str",
-    "task": "str"
+    "snapshot": "str",
+    "support": "str",
+    "task": "str",
+    "use": "str",
+    "version": "str"
    },
    "parameter_estimation_declaration.json": {
     "digest": "str",
@@ -9483,7 +9511,7 @@
    },
    "release_evaluation.json": {
     "blocked": "bool",
-    "blocking_reasons": [
+    "blockers": [
      "str"
     ],
     "findings": [],
@@ -9527,9 +9555,11 @@
      "added": [],
      "changed": [],
      "compatible": "bool",
-     "current_snapshot_id": "str",
-     "previous_snapshot_id": "NoneType",
      "removed": [],
+     "snapshots": {
+      "current": "str",
+      "previous": "NoneType"
+     },
      "status": "str"
     },
     "schema_version": "int",
@@ -10124,10 +10154,10 @@
     "notes": [],
     "seed": "int",
     "strategy": "str",
-    "test_ids": [
+    "test": [
      "int"
     ],
-    "train_ids": [
+    "training": [
      "int"
     ]
    }

@@ -121,8 +121,8 @@ def test_groups_never_straddle_the_test_boundary(binary_frame, tmp_path):
     manifest = json.loads(
         (result.run_dir / "validation_manifest.json").read_text()
     )
-    train_groups = set(frame.g.iloc[manifest["train_ids"]])
-    test_groups = set(frame.g.iloc[manifest["test_ids"]])
+    train_groups = set(frame.g.iloc[manifest["training"]])
+    test_groups = set(frame.g.iloc[manifest["test"]])
     assert train_groups.isdisjoint(test_groups)
     assert "g" not in result.bundle.features
 
@@ -158,7 +158,7 @@ def test_search_is_invariant_to_test_labels_and_test_features(
     manifest = json.loads(
         (first.run_dir / "validation_manifest.json").read_text()
     )
-    test_ids = numpy.array(manifest["test_ids"])
+    test_ids = numpy.array(manifest["test"])
 
     altered = imbalanced_frame.copy()
     rng = numpy.random.default_rng(99)
@@ -282,7 +282,7 @@ def test_hard_enforcement_moves_the_test_rows_out_of_reach(
     manifest = json.loads(
         (result.run_dir / "validation_manifest.json").read_text()
     )
-    test_ids = set(manifest["test_ids"])
+    test_ids = set(manifest["test"])
     test_values = {float(frame.loc[i, "sentinel"]) for i in test_ids}
     events = [
         json.loads(line)

@@ -170,7 +170,7 @@ def test_graph_curation_records_structure_and_feature_policy(
 
     assert report.modality == "graph"
     assert report.sample_count == 3
-    assert report.profile["node"]["feature_dimension"] == 2
+    assert report.profile["node"]["dimension"] == 2
     assert report.profile["node"]["label_counts"] == {"unlabeled": 3}
     assert report.quality_findings == ()
     assert report.release_ready

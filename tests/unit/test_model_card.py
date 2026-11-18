@@ -26,7 +26,7 @@ def test_model_card_requires_review_and_preserves_evaluation_context():
 
     record = card.to_dict()
 
-    assert record["review_status"] == "machine_generated_unreviewed"
+    assert record["review"] == "machine_generated_unreviewed"
     assert record["evaluation"]["test_metrics"]["roc_auc"] == 0.91
     assert json.loads(json.dumps(record)) == record
 

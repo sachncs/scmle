@@ -162,7 +162,7 @@ def test_catalog_persists_atomically_and_verifies_read_back(tmp_path):
     restored = catalog.Catalog.read_verified(path)
 
     assert restored == result
-    assert json.loads(path.read_text(encoding="utf-8"))["catalog_digest"] == (
+    assert json.loads(path.read_text(encoding="utf-8"))["digest"] == (
         result.catalog_digest
     )
 

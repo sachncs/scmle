@@ -186,7 +186,7 @@ def test_curation_reports_source_traceability_without_inventing_citations():
     assert report.source_traceability_coverage == 0.5
     assert report.citation_count == len(sourced.citations())
     assert in_memory.citations() == ()
-    assert report.to_dict()["source_traceability_coverage"] == 0.5
+    assert report.to_dict()["traceability"] == 0.5
 
 
 def test_partial_source_identity_is_visible_as_a_quality_finding():
@@ -225,7 +225,7 @@ def test_document_layout_records_ocr_and_table_provenance():
 
     assert sample.layout is layout
     assert layout.table_count == 1
-    assert layout.to_dict()["provider_version"] == "3.2"
+    assert layout.to_dict()["version"] == "3.2"
     assert report.layout_coverage == 1.0
     assert report.layout_providers == ("layout-engine",)
     assert report.layout_element_count == 2

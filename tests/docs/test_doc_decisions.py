@@ -31,6 +31,6 @@ def test_no_success_criteria_blocks_the_release_and_invents_none():
     record = evaluation["release_evaluation"]
     assert record["status"] == "policy_not_declared"
     assert record["blocked"] is True and record["passed"] is False
-    assert "not invented" in record["blocking_reasons"][0]
+    assert "not invented" in record["blockers"][0]
     assert evaluation["release_policy"] is None
     assert list(store.files) == ["release_evaluation.json"]

@@ -41,14 +41,14 @@ def test_a_target_reads_its_kind_from_text_and_records_every_field() -> None:
     assert found.kind is observability.Indicator.LATENCY
     assert found.to_dict() == {
         "name": "prediction-latency",
-        "metric_name": "p95_latency_ms",
+        "metric": "p95_latency_ms",
         "kind": "latency",
         "maximum": 0.0,
-        "window_days": 7,
-        "minimum_samples": 2,
+        "window": 7,
+        "samples": 2,
         "owner": "ml-on-call",
         "runbook": "https://runbooks.example/prediction-latency",
-        "alert_route": "on-call",
+        "route": "on-call",
     }
 
 
@@ -113,8 +113,8 @@ def test_an_assessment_reads_its_status_from_text() -> None:
 
 def test_an_assessment_record_names_its_observed_maximum() -> None:
     record = assessment().to_dict()
-    assert record["observed_maximum"] == 100.0
-    assert record["error_budget_remaining"] == 0.5
+    assert record["maximum"] == 100.0
+    assert record["remaining"] == 0.5
 
 
 @pytest.mark.parametrize(

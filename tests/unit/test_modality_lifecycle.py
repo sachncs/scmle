@@ -439,8 +439,8 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
         modalities.Phase.MODEL_EXPLAINABILITY
     ].evidence["quality"]
     assert model_quality["passed"] is True
-    assert model_quality["fidelity_score"] == pytest.approx(1.0)
-    assert model_quality["stability_score"] >= 0.9
+    assert model_quality["fidelity"] == pytest.approx(1.0)
+    assert model_quality["stability"] >= 0.9
     perturbation = evidence_by_stage[
         modalities.Phase.MODEL_EXPLAINABILITY
     ].evidence["perturbation_stability"]
@@ -485,7 +485,8 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
     assert report.package.signature
     dataset_card = report.documentation["dataset_card"]
     assert (
-        dataset_card["dataset_hash"] == dataset_card["curation"]["dataset_hash"]
+        dataset_card["digests"]["dataset"]
+        == dataset_card["curation"]["digests"]["dataset"]
     )
     assert dataset_card["privacy"]["status"] == "not_assessed"
     assert dataset_card["provenance"]["status"] == (
@@ -1260,7 +1261,7 @@ def test_lifecycle_evaluates_complete_independent_ground_truth_suite(
     ground_truth = evidence["independent_ground_truth"]
     assert ground_truth["status"] == "available"
     assert ground_truth["passed"] is True
-    assert ground_truth["reference_count"] == ground_truth["sample_count"]
+    assert ground_truth["references"] == ground_truth["samples"]
     assert ground_truth["minimum_overlap_score"] == 1.0
 
 

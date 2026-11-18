@@ -12,7 +12,9 @@ lifecycle report): scmle tells their two layouts apart by the keys. The
 write-only records (detector certificates, framing and ingest reports,
 robustness and causal reports, decision reports, capability, modality,
 observability and performance contracts, release policies and explanation
-evidence) were renamed in a second pass and are listed here too.
+evidence, modality curation and data-store reports, evaluation and model
+reports, model cards, deployment, monitoring, operations and workflow
+records) were renamed in a second pass and are listed here too.
 
 **scmle reads old files itself.** Each record kind has a migration, so a
 folder written by an older scmle loads without any change. Hashes and
@@ -58,7 +60,7 @@ hand.
 
 ## The map
 
-559 renamed keys on 160 record kinds.
+889 renamed keys on 248 record kinds.
 
 ### `Confounding` (`data/charter/causal.py`)
 
@@ -1333,6 +1335,757 @@ hand.
 | `max_seconds` | `seconds` |
 | `max_peak_memory_gb` | `memory` |
 
+### `Transcript` (`data/modalities/audio/metadata.py`)
+
+| Old | New |
+|---|---|
+| `provider_version` | `version` |
+
+### `Curation` (`data/modalities/curation.py`)
+
+| Old | New |
+|---|---|
+| `dataset_hash` | `digests.dataset` |
+| `sample_count` | `samples` |
+| `quality_findings` | `findings.quality` |
+| `risk_findings` | `findings.risk` |
+| `release_ready` | `ready` |
+| `unresolved_blocking_findings` | `blockers` |
+
+### `Datasheet` (`data/modalities/curation.py`)
+
+| Old | New |
+|---|---|
+| `dataset_hash` | `digests.dataset` |
+| `sample_count` | `samples` |
+| `intended_use` | `use` |
+
+### `Citation` (`data/modalities/document/elements.py`)
+
+| Old | New |
+|---|---|
+| `document_id` | `document` |
+| `source_uri` | `uri` |
+| `source_digest` | `digests.source` |
+| `page_number` | `page` |
+
+### `Layout` (`data/modalities/document/elements.py`)
+
+| Old | New |
+|---|---|
+| `provider_version` | `version` |
+| `ocr_confidence` | `confidence` |
+| `source_digest` | `digests.source` |
+
+### `Curation` (`data/modalities/document/report.py`)
+
+| Old | New |
+|---|---|
+| `dataset_hash` | `digests.dataset` |
+| `sample_count` | `samples` |
+| `document_count` | `documents` |
+| `duplicate_groups` | `duplicates` |
+| `language_counts` | `counts.languages` |
+| `format_counts` | `counts.formats` |
+| `label_counts` | `counts.labels` |
+| `quality_findings` | `findings.quality` |
+| `risk_findings` | `findings.risk` |
+| `max_characters` | `characters` |
+| `max_tokens` | `tokens` |
+| `layout_coverage` | `layout.coverage` |
+| `layout_providers` | `layout.providers` |
+| `layout_element_count` | `layout.elements` |
+| `table_element_count` | `tables` |
+| `ocr_confidence_min` | `ocr.low` |
+| `ocr_confidence_max` | `ocr.high` |
+| `sensitive_match_counts` | `counts.sensitive` |
+| `source_traceability_coverage` | `traceability` |
+| `citation_count` | `citations` |
+| `release_ready` | `ready` |
+| `unresolved_blocking_findings` | `blockers` |
+
+### `Match` (`data/modalities/geospatial/evidence.py`)
+
+| Old | New |
+|---|---|
+| `left_feature_id` | `left` |
+| `right_feature_id` | `right` |
+
+### `Join` (`data/modalities/geospatial/evidence.py`)
+
+| Old | New |
+|---|---|
+| `left_dataset_hash` | `digests.left` |
+| `right_dataset_hash` | `digests.right` |
+| `predicate_name` | `predicate` |
+| `left_feature_count` | `features.left` |
+| `right_feature_count` | `features.right` |
+| `comparison_count` | `comparisons` |
+| `match_count` | `matched` |
+| `unmatched_left_count` | `unmatched.left` |
+| `unmatched_right_count` | `unmatched.right` |
+| `comparison_limit` | `limits.comparisons` |
+| `match_limit` | `limits.matches` |
+
+### `Provenance` (`data/modalities/geospatial/evidence.py`)
+
+| Old | New |
+|---|---|
+| `source_dataset_hash` | `digests.source` |
+| `target_dataset_hash` | `digests.target` |
+| `source_crs` | `crs.source` |
+| `target_crs` | `crs.target` |
+| `transformer_name` | `transformer` |
+| `feature_count` | `features` |
+
+### `Leakage` (`data/modalities/geospatial/evidence.py`)
+
+| Old | New |
+|---|---|
+| `block_size` | `block` |
+| `feature_count` | `features` |
+| `feature_block_counts` | `blocks` |
+| `crossing_feature_ids` | `crossing` |
+| `truncated_feature_ids` | `truncated` |
+| `max_blocks_per_feature` | `spread` |
+
+### `Profile` (`data/modalities/geospatial/evidence.py`)
+
+| Old | New |
+|---|---|
+| `feature_count` | `features` |
+| `geometry_types` | `geometries` |
+| `content_hash` | `digests.content` |
+
+### `Autocorrelation` (`data/modalities/geospatial/evidence.py`)
+
+| Old | New |
+|---|---|
+| `feature_count` | `features` |
+| `neighbor_count` | `neighbors` |
+| `edge_count` | `edges` |
+| `permutation_count` | `permutations` |
+
+### `Degrees` (`data/modalities/graph/evidence.py`)
+
+| Old | New |
+|---|---|
+| `node_count` | `nodes` |
+| `isolated_node_count` | `isolated` |
+| `labeled_node_count` | `labeled` |
+| `feature_dimension` | `dimension` |
+| `degree_min` | `degree.low` |
+| `degree_max` | `degree.high` |
+| `degree_mean` | `degree.mean` |
+
+### `Connectivity` (`data/modalities/graph/evidence.py`)
+
+| Old | New |
+|---|---|
+| `edge_count` | `edges` |
+| `duplicate_edge_count` | `duplicates` |
+| `self_loop_count` | `loops` |
+| `weight_min` | `weight.low` |
+| `weight_max` | `weight.high` |
+| `weight_mean` | `weight.mean` |
+
+### `Profile` (`data/modalities/graph/evidence.py`)
+
+| Old | New |
+|---|---|
+| `graph_identity` | `digests.graph` |
+| `component_count` | `components` |
+
+### `Profile` (`data/modalities/image/evidence.py`)
+
+| Old | New |
+|---|---|
+| `dataset_count` | `samples` |
+| `profiled_count` | `profiled` |
+| `profiled_bytes` | `size` |
+| `unique_content_count` | `unique` |
+| `duplicate_count` | `duplicates` |
+| `width_min` | `width.low` |
+| `width_max` | `width.high` |
+| `width_mean` | `width.mean` |
+| `height_min` | `height.low` |
+| `height_max` | `height.high` |
+| `height_mean` | `height.mean` |
+| `mean_pixel` | `pixel.mean` |
+| `pixel_std` | `pixel.std` |
+
+### `Augmentation` (`data/modalities/image/sample.py`)
+
+| Old | New |
+|---|---|
+| `parent_source` | `parent` |
+
+### `Sample` (`data/modalities/image/sample.py`)
+
+| Old | New |
+|---|---|
+| `file_hash` | `digests.file` |
+| `content_hash` | `digests.content` |
+| `byte_size` | `size` |
+| `group_id` | `group` |
+| `exif_tags` | `exif` |
+| `sensitive_metadata` | `sensitive` |
+
+### `Finding` (`data/profiling/missingness.py`)
+
+| Old | New |
+|---|---|
+| `missing_rate` | `missing` |
+
+### `Ack` (`data/readers/incremental/evidence.py`)
+
+| Old | New |
+|---|---|
+| `source_identity` | `source` |
+| `accepted_event_ids` | `accepted` |
+| `duplicate_event_ids` | `duplicates` |
+
+### `Consumption` (`data/readers/incremental/evidence.py`)
+
+| Old | New |
+|---|---|
+| `source_identity` | `source` |
+| `consumer_group` | `consumer` |
+| `acknowledged_event_ids` | `acknowledged` |
+
+### `Compatibility` (`data/readers/registry.py`)
+
+| Old | New |
+|---|---|
+| `previous_snapshot_id` | `snapshots.previous` |
+| `current_snapshot_id` | `snapshots.current` |
+
+### `Reference` (`data/reference.py`)
+
+| Old | New |
+|---|---|
+| `missing_rate` | `missing` |
+
+### `Manifest` (`data/splitting/splitters/partitions.py`)
+
+| Old | New |
+|---|---|
+| `train_ids` | `training` |
+| `test_ids` | `test` |
+
+### `Processing` (`data/store/processing.py`)
+
+| Old | New |
+|---|---|
+| `duplicate_objects` | `duplicates` |
+| `duplicate_rows` | `rows.dropped` |
+| `rows_out` | `rows.used` |
+
+### `Finding` (`data/store/quality.py`)
+
+| Old | New |
+|---|---|
+| `row_level` | `granular` |
+
+### `Assessment` (`data/store/quality.py`)
+
+| Old | New |
+|---|---|
+| `snapshot_id` | `snapshot` |
+| `rows_in` | `rows.received` |
+| `rows_out` | `rows.used` |
+
+### `SnapshotRecord` (`data/store/snapshot.py`)
+
+| Old | New |
+|---|---|
+| `snapshot_id` | `identifier` |
+| `schema_digest` | `digests.schema` |
+| `schema_matches` | `conforms` |
+| `read_at` | `read` |
+| `age_seconds` | `age` |
+| `max_age_seconds` | `staleness` |
+
+### `Decomposition` (`evaluation/bias_variance.py`)
+
+| Old | New |
+|---|---|
+| `bias_plus_noise` | `confounded` |
+| `variance_share` | `share` |
+
+### `Criterion` (`evaluation/criteria.py`)
+
+| Old | New |
+|---|---|
+| `higher_is_better` | `direction` |
+
+### `Health` (`evaluation/fit_health.py`)
+
+| Old | New |
+|---|---|
+| `train_gain` | `gains.training` |
+| `validation_gain` | `gains.validation` |
+| `noise_share` | `noise` |
+
+### `Curve` (`evaluation/learning_curve.py`)
+
+| Old | New |
+|---|---|
+| `last_gain` | `gains.last` |
+| `total_gain` | `gains.total` |
+
+### `Estimand` (`evaluation/longitudinal/declaration.py`)
+
+| Old | New |
+|---|---|
+| `subject_identity` | `subject` |
+| `time_column` | `time` |
+| `treatment_column` | `treatment` |
+
+### `Config` (`evaluation/longitudinal/declaration.py`)
+
+| Old | New |
+|---|---|
+| `confidence_level` | `confidence` |
+| `propensity_clip` | `clip` |
+| `max_iterations` | `iterations` |
+| `minimum_rows_per_period` | `minimums.period` |
+| `minimum_rows_per_arm` | `minimums.arm` |
+| `minimum_effective_sample_size` | `minimums.ess` |
+| `reference_tolerance` | `reference` |
+
+### `PeriodATE` (`evaluation/longitudinal/declaration.py`)
+
+| Old | New |
+|---|---|
+| `standard_error` | `se` |
+| `treated_rows` | `treated` |
+| `control_rows` | `control` |
+| `propensity_min` | `propensity.low` |
+| `propensity_max` | `propensity.high` |
+| `fraction_clipped` | `clipped` |
+| `effective_sample_size_treated` | `ess.treated` |
+| `effective_sample_size_control` | `ess.control` |
+
+### `Mitigation` (`evaluation/mitigation.py`)
+
+| Old | New |
+|---|---|
+| `gap_before` | `gap.before` |
+| `gap_after` | `gap.after` |
+| `accuracy_before` | `accuracy.before` |
+| `accuracy_after` | `accuracy.after` |
+
+### `Scores` (`evaluation/nested.py`)
+
+| Old | New |
+|---|---|
+| `outer_scores` | `outer` |
+| `inner_scores` | `inner` |
+
+### `Config` (`evaluation/parameter_estimation/config.py`)
+
+| Old | New |
+|---|---|
+| `confidence_level` | `confidence` |
+| `cluster_name` | `cluster` |
+| `bootstrap_replicates` | `replicates` |
+| `max_iterations` | `iterations` |
+| `reference_tolerance` | `reference` |
+| `treatment_position` | `treatment` |
+| `propensity_clip` | `clip` |
+| `causal_assumptions` | `assumptions.causal` |
+| `continuous_treatment_assumptions` | `assumptions.continuous` |
+| `continuous_weight_cap` | `cap` |
+| `hierarchical_assumptions` | `assumptions.hierarchical` |
+| `cross_fitting_folds` | `folds` |
+| `hierarchical_method` | `hierarchy` |
+| `reml_variance_bounds` | `bounds` |
+| `random_slope_position` | `slope` |
+
+### `Estimand` (`evaluation/parameter_estimation/declaration.py`)
+
+| Old | New |
+|---|---|
+| `feature_names` | `features` |
+
+### `ParameterEstimate` (`evaluation/parameter_estimation/declaration.py`)
+
+| Old | New |
+|---|---|
+| `standard_error` | `se` |
+
+### `Tally` (`evaluation/release/finding.py`)
+
+| Old | New |
+|---|---|
+| `blocking_failures` | `blockers` |
+
+### `Scorecard` (`evaluation/release/verdict.py`)
+
+| Old | New |
+|---|---|
+| `policy_schema_version` | `policy` |
+| `total_findings` | `findings.total` |
+| `passed_findings` | `findings.passed` |
+| `failed_findings` | `findings.failed` |
+| `blocking_findings` | `findings.blocking` |
+| `blocking_failures` | `blockers` |
+| `non_blocking_failures` | `warnings` |
+| `counts_by_kind` | `kinds` |
+
+### `Verdict` (`evaluation/release/verdict.py`)
+
+| Old | New |
+|---|---|
+| `policy_schema_version` | `policy` |
+| `blocking_reasons` | `blockers` |
+
+### `Usage` (`evaluation/resources.py`)
+
+| Old | New |
+|---|---|
+| `model_mb` | `size` |
+| `p95_latency_ms` | `latency` |
+| `rows_timed` | `timed` |
+
+### `Estimand` (`evaluation/sequential/declaration.py`)
+
+| Old | New |
+|---|---|
+| `subject_identity` | `subject` |
+| `time_column` | `time` |
+| `treatment_column` | `treatment` |
+| `baseline_covariates` | `covariates.baseline` |
+| `time_varying_covariates` | `covariates.varying` |
+| `target_treatment` | `regimes.target` |
+| `comparator_treatment` | `regimes.comparator` |
+
+### `Config` (`evaluation/sequential/declaration.py`)
+
+| Old | New |
+|---|---|
+| `confidence_level` | `confidence` |
+| `propensity_clip` | `clip` |
+| `maximum_weight` | `weight` |
+| `max_iterations` | `iterations` |
+| `minimum_subjects` | `minimums.subjects` |
+| `minimum_arm_rows` | `minimums.arm` |
+| `minimum_effective_sample_size` | `minimums.ess` |
+| `reference_tolerance` | `reference` |
+
+### `PeriodDiagnostics` (`evaluation/sequential/report.py`)
+
+| Old | New |
+|---|---|
+| `treated_rows` | `treated` |
+| `control_rows` | `control` |
+| `denominator_propensity_min` | `denominator.low` |
+| `denominator_propensity_max` | `denominator.high` |
+| `numerator_propensity_min` | `numerator.low` |
+| `numerator_propensity_max` | `numerator.high` |
+| `fraction_weight_truncated` | `truncated` |
+| `maximum_untruncated_weight` | `untruncated` |
+| `maximum_weight` | `weight` |
+| `effective_sample_size` | `ess` |
+
+### `RegimeEstimate` (`evaluation/sequential/report.py`)
+
+| Old | New |
+|---|---|
+| `standard_error` | `se` |
+| `weight_sum` | `weights` |
+| `effective_sample_size` | `ess` |
+
+### `Propensity` (`evaluation/uplift.py`)
+
+| Old | New |
+|---|---|
+| `treated_share` | `treated` |
+| `balance_p_value` | `balance` |
+
+### `Thresholds` (`explainability/quality.py`)
+
+| Old | New |
+|---|---|
+| `stability_minimum` | `stability` |
+| `fidelity_minimum` | `fidelity` |
+
+### `Evaluation` (`explainability/quality.py`)
+
+| Old | New |
+|---|---|
+| `sample_count` | `samples` |
+| `stability_score` | `stability` |
+| `fidelity_score` | `fidelity` |
+
+### `Truth` (`explainability/quality.py`)
+
+| Old | New |
+|---|---|
+| `expected_features` | `expected` |
+| `minimum_overlap` | `overlap` |
+
+### `Comparison` (`explainability/quality.py`)
+
+| Old | New |
+|---|---|
+| `sample_id` | `sample` |
+| `expected_features` | `expected` |
+| `observed_features` | `observed` |
+| `overlap_score` | `agreement` |
+| `minimum_overlap` | `overlap` |
+
+### `Suite` (`explainability/quality.py`)
+
+| Old | New |
+|---|---|
+| `sample_count` | `samples` |
+| `reference_count` | `references` |
+
+### `Checkpoint` (`models/deeplearning/contracts.py`)
+
+| Old | New |
+|---|---|
+| `trusted_local_storage` | `trusted` |
+| `atomic_replace` | `atomic` |
+
+### `Contract` (`models/deeplearning/contracts.py`)
+
+| Old | New |
+|---|---|
+| `input_rank` | `rank` |
+| `input_dtype` | `dtype` |
+
+### `Contribution` (`models/deeplearning/contracts.py`)
+
+| Old | New |
+|---|---|
+| `feature_count` | `features` |
+
+### `Boundary` (`models/deeplearning/contracts.py`)
+
+| Old | New |
+|---|---|
+| `model_family` | `family` |
+| `required_extras` | `extras` |
+
+### `Evaluation` (`models/documents/records.py`)
+
+| Old | New |
+|---|---|
+| `sample_count` | `samples` |
+
+### `Explanation` (`models/documents/records.py`)
+
+| Old | New |
+|---|---|
+| `model_digest` | `digests.model` |
+| `input_hash` | `digests.payload` |
+
+### `Drift` (`models/documents/records.py`)
+
+| Old | New |
+|---|---|
+| `reference_hash` | `digests.reference` |
+| `observed_hash` | `digests.observed` |
+| `language_distance` | `language` |
+| `mean_character_delta` | `characters` |
+| `duplicate_rate` | `duplicates` |
+
+### `Config` (`models/images/records.py`)
+
+| Old | New |
+|---|---|
+| `target_size` | `size` |
+
+### `Evaluation` (`models/images/records.py`)
+
+| Old | New |
+|---|---|
+| `sample_count` | `samples` |
+
+### `Explanation` (`models/images/records.py`)
+
+| Old | New |
+|---|---|
+| `model_digest` | `digests.model` |
+| `input_hash` | `digests.payload` |
+
+### `Drift` (`models/images/records.py`)
+
+| Old | New |
+|---|---|
+| `reference_hash` | `digests.reference` |
+| `observed_hash` | `digests.observed` |
+| `mean_pixel_distance` | `pixels` |
+| `duplicate_rate` | `duplicates` |
+
+### `Outcome` (`preparation/pseudo_labeling.py`)
+
+| Old | New |
+|---|---|
+| `pseudo_rows` | `pseudo` |
+
+### `Observation` (`deploy/observation.py`)
+
+| Old | New |
+|---|---|
+| `image_digest` | `digests.image` |
+| `observed_at` | `observed` |
+
+### `Parity` (`deploy/parity.py`)
+
+| Old | New |
+|---|---|
+| `max_probability_error` | `error` |
+
+### `Threshold` (`governance/escalation.py`)
+
+| Old | New |
+|---|---|
+| `r_star` | `target` |
+
+### `Card` (`governance/model_card.py`)
+
+| Old | New |
+|---|---|
+| `model_name` | `model` |
+| `model_version` | `version` |
+| `model_fingerprint` | `digests.model` |
+| `dataset_id` | `dataset` |
+| `snapshot_id` | `snapshot` |
+| `intended_use` | `use` |
+| `out_of_scope` | `excluded` |
+| `feature_names` | `features` |
+| `evidence_artifacts` | `artifacts` |
+| `support_status` | `support` |
+| `review_status` | `review` |
+| `generated_at` | `generated` |
+
+### `Sanction` (`governance/registry.py`)
+
+| Old | New |
+|---|---|
+| `content_id` | `content` |
+| `approved_at` | `approved` |
+
+### `Comparison` (`monitoring/abtest.py`)
+
+| Old | New |
+|---|---|
+| `control_score` | `scores.control` |
+| `treatment_score` | `scores.treatment` |
+| `control_rows` | `rows.control` |
+| `treatment_rows` | `rows.treatment` |
+
+### `Alert` (`monitoring/alerts.py`)
+
+| Old | New |
+|---|---|
+| `alert_id` | `identifier` |
+| `evidence_digest` | `digests.evidence` |
+| `created_at` | `created` |
+
+### `Delivery` (`monitoring/alerts.py`)
+
+| Old | New |
+|---|---|
+| `alert_id` | `alert` |
+| `observed_at` | `observed` |
+
+### `Evaluation` (`monitoring/observability.py`)
+
+| Old | New |
+|---|---|
+| `observed_at` | `observed` |
+| `missing_signals` | `missing` |
+| `expired_metrics` | `expired` |
+| `future_metrics` | `future` |
+| `threshold_breaches` | `breaches` |
+
+### `Slo` (`monitoring/slo.py`)
+
+| Old | New |
+|---|---|
+| `metric_name` | `metric` |
+| `window_days` | `window` |
+| `minimum_samples` | `samples` |
+| `alert_route` | `route` |
+
+### `Assessment` (`monitoring/slo.py`)
+
+| Old | New |
+|---|---|
+| `observed_at` | `observed` |
+| `sample_count` | `samples` |
+| `in_window_count` | `windowed` |
+| `observed_maximum` | `maximum` |
+| `error_budget_remaining` | `remaining` |
+| `incident_required` | `escalate` |
+
+### `RetrainDecision` (`operations/continuous/policies.py`)
+
+| Old | New |
+|---|---|
+| `held_back` | `withheld` |
+| `escalation_id` | `escalation` |
+| `alarm_gates_retrain` | `retrain` |
+
+### `Delivery` (`operations/notify.py`)
+
+| Old | New |
+|---|---|
+| `http_status` | `code` |
+| `idempotency_key` | `idempotency` |
+
+### `Measurement` (`operations/recovery.py`)
+
+| Old | New |
+|---|---|
+| `rto_seconds` | `rto` |
+| `rpo_lost` | `rpo` |
+
+### `Outcome` (`operations/recovery.py`)
+
+| Old | New |
+|---|---|
+| `fault_id` | `fault` |
+
+### `Response` (`operations/respond.py`)
+
+| Old | New |
+|---|---|
+| `incident_id` | `incident` |
+| `telemetry_digest` | `digests.telemetry` |
+| `audit_head` | `head` |
+
+### `Job` (`runners/base/job.py`)
+
+| Old | New |
+|---|---|
+| `run_id` | `identifier` |
+| `timeout_seconds` | `timeout` |
+
+### `Step` (`workflow/definition.py`)
+
+| Old | New |
+|---|---|
+| `depends_on` | `needs` |
+| `timeout_seconds` | `timeout` |
+| `cost_budget` | `budget` |
+| `concurrency_group` | `concurrency` |
+| `expires_seconds` | `expiry` |
+
+### `Workflow` (`workflow/definition.py`)
+
+| Old | New |
+|---|---|
+| `max_concurrent_runs` | `concurrency` |
+| `cost_budget` | `budget` |
+| `group_limits` | `limits` |
+| `max_parallel` | `parallel` |
+
 ### `Uncertainty` (`contracts/evaluation/parts.py`)
 
 | Old | New |
@@ -1418,3 +2171,22 @@ hand.
 | `causal_warning` | `caveat` |
 | `privacy_decision` | `clearance` |
 | `evidence_links` | `links` |
+
+### `Source` (`data/catalog/identity.py`)
+
+| Old | New |
+|---|---|
+| `source_identity` | `identity` |
+
+### `Catalog` (`data/catalog/manifest.py`)
+
+| Old | New |
+|---|---|
+| `catalog_digest` | `digest` |
+
+### `Validation` (`data/modalities/graph/elements.py`)
+
+| Old | New |
+|---|---|
+| `error_codes` | `codes` |
+| `is_valid` | `valid` |

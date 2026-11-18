@@ -94,7 +94,7 @@ def test_folds_keep_every_label_when_the_data_allow(multilabel):
     manifest = json.loads(
         (multilabel.run_dir / "validation_manifest.json").read_text()
     )
-    dev = numpy.array(manifest["train_ids"])
+    dev = numpy.array(manifest["training"])
     for fold in manifest["folds"]:
         for label in LABELS:
             assert frame[label].to_numpy()[dev[fold["val"]]].sum() > 0

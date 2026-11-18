@@ -827,6 +827,502 @@
       "max_seconds": "seconds",
       "max_peak_memory_gb": "memory"
     },
+    "data/modalities/audio/metadata.py Transcript": {
+      "provider_version": "version"
+    },
+    "data/modalities/curation.py Curation": {
+      "dataset_hash": "digests.dataset",
+      "sample_count": "samples",
+      "quality_findings": "findings.quality",
+      "risk_findings": "findings.risk",
+      "release_ready": "ready",
+      "unresolved_blocking_findings": "blockers"
+    },
+    "data/modalities/curation.py Datasheet": {
+      "dataset_hash": "digests.dataset",
+      "sample_count": "samples",
+      "intended_use": "use"
+    },
+    "data/modalities/document/elements.py Citation": {
+      "document_id": "document",
+      "source_uri": "uri",
+      "source_digest": "digests.source",
+      "page_number": "page"
+    },
+    "data/modalities/document/elements.py Layout": {
+      "provider_version": "version",
+      "ocr_confidence": "confidence",
+      "source_digest": "digests.source"
+    },
+    "data/modalities/document/report.py Curation": {
+      "dataset_hash": "digests.dataset",
+      "sample_count": "samples",
+      "document_count": "documents",
+      "duplicate_groups": "duplicates",
+      "language_counts": "counts.languages",
+      "format_counts": "counts.formats",
+      "label_counts": "counts.labels",
+      "quality_findings": "findings.quality",
+      "risk_findings": "findings.risk",
+      "max_characters": "characters",
+      "max_tokens": "tokens",
+      "layout_coverage": "layout.coverage",
+      "layout_providers": "layout.providers",
+      "layout_element_count": "layout.elements",
+      "table_element_count": "tables",
+      "ocr_confidence_min": "ocr.low",
+      "ocr_confidence_max": "ocr.high",
+      "sensitive_match_counts": "counts.sensitive",
+      "source_traceability_coverage": "traceability",
+      "citation_count": "citations",
+      "release_ready": "ready",
+      "unresolved_blocking_findings": "blockers"
+    },
+    "data/modalities/geospatial/evidence.py Match": {
+      "left_feature_id": "left",
+      "right_feature_id": "right"
+    },
+    "data/modalities/geospatial/evidence.py Join": {
+      "left_dataset_hash": "digests.left",
+      "right_dataset_hash": "digests.right",
+      "predicate_name": "predicate",
+      "left_feature_count": "features.left",
+      "right_feature_count": "features.right",
+      "comparison_count": "comparisons",
+      "match_count": "matched",
+      "unmatched_left_count": "unmatched.left",
+      "unmatched_right_count": "unmatched.right",
+      "comparison_limit": "limits.comparisons",
+      "match_limit": "limits.matches"
+    },
+    "data/modalities/geospatial/evidence.py Provenance": {
+      "source_dataset_hash": "digests.source",
+      "target_dataset_hash": "digests.target",
+      "source_crs": "crs.source",
+      "target_crs": "crs.target",
+      "transformer_name": "transformer",
+      "feature_count": "features"
+    },
+    "data/modalities/geospatial/evidence.py Leakage": {
+      "block_size": "block",
+      "feature_count": "features",
+      "feature_block_counts": "blocks",
+      "crossing_feature_ids": "crossing",
+      "truncated_feature_ids": "truncated",
+      "max_blocks_per_feature": "spread"
+    },
+    "data/modalities/geospatial/evidence.py Profile": {
+      "feature_count": "features",
+      "geometry_types": "geometries",
+      "content_hash": "digests.content"
+    },
+    "data/modalities/geospatial/evidence.py Autocorrelation": {
+      "feature_count": "features",
+      "neighbor_count": "neighbors",
+      "edge_count": "edges",
+      "permutation_count": "permutations"
+    },
+    "data/modalities/graph/evidence.py Degrees": {
+      "node_count": "nodes",
+      "isolated_node_count": "isolated",
+      "labeled_node_count": "labeled",
+      "feature_dimension": "dimension",
+      "degree_min": "degree.low",
+      "degree_max": "degree.high",
+      "degree_mean": "degree.mean"
+    },
+    "data/modalities/graph/evidence.py Connectivity": {
+      "edge_count": "edges",
+      "duplicate_edge_count": "duplicates",
+      "self_loop_count": "loops",
+      "weight_min": "weight.low",
+      "weight_max": "weight.high",
+      "weight_mean": "weight.mean"
+    },
+    "data/modalities/graph/evidence.py Profile": {
+      "graph_identity": "digests.graph",
+      "component_count": "components"
+    },
+    "data/modalities/image/evidence.py Profile": {
+      "dataset_count": "samples",
+      "profiled_count": "profiled",
+      "profiled_bytes": "size",
+      "unique_content_count": "unique",
+      "duplicate_count": "duplicates",
+      "width_min": "width.low",
+      "width_max": "width.high",
+      "width_mean": "width.mean",
+      "height_min": "height.low",
+      "height_max": "height.high",
+      "height_mean": "height.mean",
+      "mean_pixel": "pixel.mean",
+      "pixel_std": "pixel.std"
+    },
+    "data/modalities/image/sample.py Augmentation": {
+      "parent_source": "parent"
+    },
+    "data/modalities/image/sample.py Sample": {
+      "file_hash": "digests.file",
+      "content_hash": "digests.content",
+      "byte_size": "size",
+      "group_id": "group",
+      "exif_tags": "exif",
+      "sensitive_metadata": "sensitive"
+    },
+    "data/profiling/missingness.py Finding": {
+      "missing_rate": "missing"
+    },
+    "data/readers/incremental/evidence.py Ack": {
+      "source_identity": "source",
+      "accepted_event_ids": "accepted",
+      "duplicate_event_ids": "duplicates"
+    },
+    "data/readers/incremental/evidence.py Consumption": {
+      "source_identity": "source",
+      "consumer_group": "consumer",
+      "acknowledged_event_ids": "acknowledged"
+    },
+    "data/readers/registry.py Compatibility": {
+      "previous_snapshot_id": "snapshots.previous",
+      "current_snapshot_id": "snapshots.current"
+    },
+    "data/reference.py Reference": {
+      "missing_rate": "missing"
+    },
+    "data/splitting/splitters/partitions.py Manifest": {
+      "train_ids": "training",
+      "test_ids": "test"
+    },
+    "data/store/processing.py Processing": {
+      "duplicate_objects": "duplicates",
+      "duplicate_rows": "rows.dropped",
+      "rows_out": "rows.used"
+    },
+    "data/store/quality.py Finding": {
+      "row_level": "granular"
+    },
+    "data/store/quality.py Assessment": {
+      "snapshot_id": "snapshot",
+      "rows_in": "rows.received",
+      "rows_out": "rows.used"
+    },
+    "data/store/snapshot.py SnapshotRecord": {
+      "snapshot_id": "identifier",
+      "schema_digest": "digests.schema",
+      "schema_matches": "conforms",
+      "read_at": "read",
+      "age_seconds": "age",
+      "max_age_seconds": "staleness"
+    },
+    "evaluation/bias_variance.py Decomposition": {
+      "bias_plus_noise": "confounded",
+      "variance_share": "share"
+    },
+    "evaluation/criteria.py Criterion": {
+      "higher_is_better": "direction"
+    },
+    "evaluation/fit_health.py Health": {
+      "train_gain": "gains.training",
+      "validation_gain": "gains.validation",
+      "noise_share": "noise"
+    },
+    "evaluation/learning_curve.py Curve": {
+      "last_gain": "gains.last",
+      "total_gain": "gains.total"
+    },
+    "evaluation/longitudinal/declaration.py Estimand": {
+      "subject_identity": "subject",
+      "time_column": "time",
+      "treatment_column": "treatment"
+    },
+    "evaluation/longitudinal/declaration.py Config": {
+      "confidence_level": "confidence",
+      "propensity_clip": "clip",
+      "max_iterations": "iterations",
+      "minimum_rows_per_period": "minimums.period",
+      "minimum_rows_per_arm": "minimums.arm",
+      "minimum_effective_sample_size": "minimums.ess",
+      "reference_tolerance": "reference"
+    },
+    "evaluation/longitudinal/declaration.py PeriodATE": {
+      "standard_error": "se",
+      "treated_rows": "treated",
+      "control_rows": "control",
+      "propensity_min": "propensity.low",
+      "propensity_max": "propensity.high",
+      "fraction_clipped": "clipped",
+      "effective_sample_size_treated": "ess.treated",
+      "effective_sample_size_control": "ess.control"
+    },
+    "evaluation/mitigation.py Mitigation": {
+      "gap_before": "gap.before",
+      "gap_after": "gap.after",
+      "accuracy_before": "accuracy.before",
+      "accuracy_after": "accuracy.after"
+    },
+    "evaluation/nested.py Scores": {
+      "outer_scores": "outer",
+      "inner_scores": "inner"
+    },
+    "evaluation/parameter_estimation/config.py Config": {
+      "confidence_level": "confidence",
+      "cluster_name": "cluster",
+      "bootstrap_replicates": "replicates",
+      "max_iterations": "iterations",
+      "reference_tolerance": "reference",
+      "treatment_position": "treatment",
+      "propensity_clip": "clip",
+      "causal_assumptions": "assumptions.causal",
+      "continuous_treatment_assumptions": "assumptions.continuous",
+      "continuous_weight_cap": "cap",
+      "hierarchical_assumptions": "assumptions.hierarchical",
+      "cross_fitting_folds": "folds",
+      "hierarchical_method": "hierarchy",
+      "reml_variance_bounds": "bounds",
+      "random_slope_position": "slope"
+    },
+    "evaluation/parameter_estimation/declaration.py Estimand": {
+      "feature_names": "features"
+    },
+    "evaluation/parameter_estimation/declaration.py ParameterEstimate": {
+      "standard_error": "se"
+    },
+    "evaluation/release/finding.py Tally": {
+      "blocking_failures": "blockers"
+    },
+    "evaluation/release/verdict.py Scorecard": {
+      "policy_schema_version": "policy",
+      "total_findings": "findings.total",
+      "passed_findings": "findings.passed",
+      "failed_findings": "findings.failed",
+      "blocking_findings": "findings.blocking",
+      "blocking_failures": "blockers",
+      "non_blocking_failures": "warnings",
+      "counts_by_kind": "kinds"
+    },
+    "evaluation/release/verdict.py Verdict": {
+      "policy_schema_version": "policy",
+      "blocking_reasons": "blockers"
+    },
+    "evaluation/resources.py Usage": {
+      "model_mb": "size",
+      "p95_latency_ms": "latency",
+      "rows_timed": "timed"
+    },
+    "evaluation/sequential/declaration.py Estimand": {
+      "subject_identity": "subject",
+      "time_column": "time",
+      "treatment_column": "treatment",
+      "baseline_covariates": "covariates.baseline",
+      "time_varying_covariates": "covariates.varying",
+      "target_treatment": "regimes.target",
+      "comparator_treatment": "regimes.comparator"
+    },
+    "evaluation/sequential/declaration.py Config": {
+      "confidence_level": "confidence",
+      "propensity_clip": "clip",
+      "maximum_weight": "weight",
+      "max_iterations": "iterations",
+      "minimum_subjects": "minimums.subjects",
+      "minimum_arm_rows": "minimums.arm",
+      "minimum_effective_sample_size": "minimums.ess",
+      "reference_tolerance": "reference"
+    },
+    "evaluation/sequential/report.py PeriodDiagnostics": {
+      "treated_rows": "treated",
+      "control_rows": "control",
+      "denominator_propensity_min": "denominator.low",
+      "denominator_propensity_max": "denominator.high",
+      "numerator_propensity_min": "numerator.low",
+      "numerator_propensity_max": "numerator.high",
+      "fraction_weight_truncated": "truncated",
+      "maximum_untruncated_weight": "untruncated",
+      "maximum_weight": "weight",
+      "effective_sample_size": "ess"
+    },
+    "evaluation/sequential/report.py RegimeEstimate": {
+      "standard_error": "se",
+      "weight_sum": "weights",
+      "effective_sample_size": "ess"
+    },
+    "evaluation/uplift.py Propensity": {
+      "treated_share": "treated",
+      "balance_p_value": "balance"
+    },
+    "explainability/quality.py Thresholds": {
+      "stability_minimum": "stability",
+      "fidelity_minimum": "fidelity"
+    },
+    "explainability/quality.py Evaluation": {
+      "sample_count": "samples",
+      "stability_score": "stability",
+      "fidelity_score": "fidelity"
+    },
+    "explainability/quality.py Truth": {
+      "expected_features": "expected",
+      "minimum_overlap": "overlap"
+    },
+    "explainability/quality.py Comparison": {
+      "sample_id": "sample",
+      "expected_features": "expected",
+      "observed_features": "observed",
+      "overlap_score": "agreement",
+      "minimum_overlap": "overlap"
+    },
+    "explainability/quality.py Suite": {
+      "sample_count": "samples",
+      "reference_count": "references"
+    },
+    "models/deeplearning/contracts.py Checkpoint": {
+      "trusted_local_storage": "trusted",
+      "atomic_replace": "atomic"
+    },
+    "models/deeplearning/contracts.py Contract": {
+      "input_rank": "rank",
+      "input_dtype": "dtype"
+    },
+    "models/deeplearning/contracts.py Contribution": {
+      "feature_count": "features"
+    },
+    "models/deeplearning/contracts.py Boundary": {
+      "model_family": "family",
+      "required_extras": "extras"
+    },
+    "models/documents/records.py Evaluation": {
+      "sample_count": "samples"
+    },
+    "models/documents/records.py Explanation": {
+      "model_digest": "digests.model",
+      "input_hash": "digests.payload"
+    },
+    "models/documents/records.py Drift": {
+      "reference_hash": "digests.reference",
+      "observed_hash": "digests.observed",
+      "language_distance": "language",
+      "mean_character_delta": "characters",
+      "duplicate_rate": "duplicates"
+    },
+    "models/images/records.py Config": {
+      "target_size": "size"
+    },
+    "models/images/records.py Evaluation": {
+      "sample_count": "samples"
+    },
+    "models/images/records.py Explanation": {
+      "model_digest": "digests.model",
+      "input_hash": "digests.payload"
+    },
+    "models/images/records.py Drift": {
+      "reference_hash": "digests.reference",
+      "observed_hash": "digests.observed",
+      "mean_pixel_distance": "pixels",
+      "duplicate_rate": "duplicates"
+    },
+    "preparation/pseudo_labeling.py Outcome": {
+      "pseudo_rows": "pseudo"
+    },
+    "deploy/observation.py Observation": {
+      "image_digest": "digests.image",
+      "observed_at": "observed"
+    },
+    "deploy/parity.py Parity": {
+      "max_probability_error": "error"
+    },
+    "governance/escalation.py Threshold": {
+      "r_star": "target"
+    },
+    "governance/model_card.py Card": {
+      "model_name": "model",
+      "model_version": "version",
+      "model_fingerprint": "digests.model",
+      "dataset_id": "dataset",
+      "snapshot_id": "snapshot",
+      "intended_use": "use",
+      "out_of_scope": "excluded",
+      "feature_names": "features",
+      "evidence_artifacts": "artifacts",
+      "support_status": "support",
+      "review_status": "review",
+      "generated_at": "generated"
+    },
+    "governance/registry.py Sanction": {
+      "content_id": "content",
+      "approved_at": "approved"
+    },
+    "monitoring/abtest.py Comparison": {
+      "control_score": "scores.control",
+      "treatment_score": "scores.treatment",
+      "control_rows": "rows.control",
+      "treatment_rows": "rows.treatment"
+    },
+    "monitoring/alerts.py Alert": {
+      "alert_id": "identifier",
+      "evidence_digest": "digests.evidence",
+      "created_at": "created"
+    },
+    "monitoring/alerts.py Delivery": {
+      "alert_id": "alert",
+      "observed_at": "observed"
+    },
+    "monitoring/observability.py Evaluation": {
+      "observed_at": "observed",
+      "missing_signals": "missing",
+      "expired_metrics": "expired",
+      "future_metrics": "future",
+      "threshold_breaches": "breaches"
+    },
+    "monitoring/slo.py Slo": {
+      "metric_name": "metric",
+      "window_days": "window",
+      "minimum_samples": "samples",
+      "alert_route": "route"
+    },
+    "monitoring/slo.py Assessment": {
+      "observed_at": "observed",
+      "sample_count": "samples",
+      "in_window_count": "windowed",
+      "observed_maximum": "maximum",
+      "error_budget_remaining": "remaining",
+      "incident_required": "escalate"
+    },
+    "operations/continuous/policies.py RetrainDecision": {
+      "held_back": "withheld",
+      "escalation_id": "escalation",
+      "alarm_gates_retrain": "retrain"
+    },
+    "operations/notify.py Delivery": {
+      "http_status": "code",
+      "idempotency_key": "idempotency"
+    },
+    "operations/recovery.py Measurement": {
+      "rto_seconds": "rto",
+      "rpo_lost": "rpo"
+    },
+    "operations/recovery.py Outcome": {
+      "fault_id": "fault"
+    },
+    "operations/respond.py Response": {
+      "incident_id": "incident",
+      "telemetry_digest": "digests.telemetry",
+      "audit_head": "head"
+    },
+    "runners/base/job.py Job": {
+      "run_id": "identifier",
+      "timeout_seconds": "timeout"
+    },
+    "workflow/definition.py Step": {
+      "depends_on": "needs",
+      "timeout_seconds": "timeout",
+      "cost_budget": "budget",
+      "concurrency_group": "concurrency",
+      "expires_seconds": "expiry"
+    },
+    "workflow/definition.py Workflow": {
+      "max_concurrent_runs": "concurrency",
+      "cost_budget": "budget",
+      "group_limits": "limits",
+      "max_parallel": "parallel"
+    },
     "contracts/evaluation/parts.py Uncertainty": {
       "confidence_level": "confidence",
       "coverage_target": "coverage",
@@ -879,6 +1375,16 @@
       "causal_warning": "caveat",
       "privacy_decision": "clearance",
       "evidence_links": "links"
+    },
+    "data/catalog/identity.py Source": {
+      "source_identity": "identity"
+    },
+    "data/catalog/manifest.py Catalog": {
+      "catalog_digest": "digest"
+    },
+    "data/modalities/graph/elements.py Validation": {
+      "error_codes": "codes",
+      "is_valid": "valid"
     }
   }
 }

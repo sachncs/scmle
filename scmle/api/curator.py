@@ -193,9 +193,10 @@ class Curator:
                 "adapter curate() must return a modality curation report"
             )
         curation_payload = report.to_dict()
-        if curation_payload.get("dataset_hash") != dataset_hash:
+        digest, samples = curation.identify(curation_payload)
+        if digest != dataset_hash:
             raise errors.InputError("curation dataset_hash must match adapter")
-        if curation_payload.get("sample_count") != sample_count:
+        if samples != sample_count:
             raise errors.InputError("curation sample_count must match adapter")
         return curation_payload
 

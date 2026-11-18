@@ -111,10 +111,13 @@ def test_the_signed_fields_are_exactly_the_documented_ones():
     }
     assert "signature" not in approval.to_dict()
     signed = approval.sign(KEY)
-    assert signed.to_dict() == {
+    written = {
         **approval.preimage(),
         "signature": (signed.signature),
     }
+    written["content"] = written.pop("content_id")
+    written["approved"] = written.pop("approved_at")
+    assert signed.to_dict() == written
     assert signed.signature and approval.signature is None
 
 

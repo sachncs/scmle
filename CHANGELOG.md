@@ -62,6 +62,34 @@ marked `Breaking:` and listed first in their group.
   files of either version and anchored digests and signatures still verify;
   scripts of your own that read these files must use the new keys, listed in
   [`docs/RECORD_KEYS.md`](docs/RECORD_KEYS.md).
+* **More write-only record keys renamed.** The second pass covers data,
+  evaluation, model, governance and operations records. Data: modality
+  curation reports and dataset cards (`dataset_hash` -> `digests.dataset`,
+  `quality_findings`/`risk_findings` -> `findings.{quality, risk}`,
+  `release_ready` -> `ready`), document, image, graph, geospatial and audio
+  evidence, the source catalog (`source_identity` -> `identity`,
+  `catalog_digest` -> `digest`), reader compatibility, data-store
+  processing, quality and snapshot records, and the validation split manifest
+  (`train_ids`/`test_ids` -> `training`/`test`). Evaluation and models: fit
+  health, the learning curve (`last_gain`/`total_gain` ->
+  `gains.{last, total}`), mitigation, resources (`model_mb` -> `size`,
+  `p95_latency_ms` -> `latency`), release verdicts (`blocking_reasons` ->
+  `blockers`), longitudinal, sequential and parameter-estimation
+  declarations and reports, explanation quality, and the document and image
+  model explanation and drift records. Governance and operations: the model
+  card, registry approvals (`content_id` -> `content`, `approved_at` ->
+  `approved`; the signature still covers the version-1 fields), escalation
+  thresholds, deployment observations and parity, A/B comparisons, alerts,
+  observability evaluations, SLOs and their assessments, retrain decisions,
+  notifications, recovery, incident responses, jobs and workflows. New
+  `schema_version`s: modality curation report and dataset card 2, document
+  curation report 2, performance `Baseline` 3, catalog 3, `Ack` and
+  `Consumption` 3, parameter-estimation, longitudinal and sequential reports
+  3, the run's `parameter_estimation_declaration.json` 2, image package
+  manifest 2 and the model card 2. scmle reads files of every earlier
+  version; dataset, model, job, workflow and alert digests are anchored at
+  version 1 and do not change. Scripts of your own that read these files must
+  use the new keys, listed in [`docs/RECORD_KEYS.md`](docs/RECORD_KEYS.md).
 * **Modules moved by the package layering (DES-13).** Each package now imports
   only the layers below it; the moves are listed, `old -> new`, under "Module
   moves" in [`docs/RENAMES.md`](docs/RENAMES.md). Names inside a module are

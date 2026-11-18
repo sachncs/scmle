@@ -90,7 +90,7 @@ def test_document_explanations_preserve_source_citations():
     payload = explanation.to_dict()
 
     assert explanation.citations
-    assert payload["citations"][0]["source_digest"] == (
+    assert payload["citations"][0]["digests"]["source"] == (
         training[0].source_digest
     )
 

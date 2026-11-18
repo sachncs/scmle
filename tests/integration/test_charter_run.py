@@ -101,7 +101,7 @@ def test_profiling_sees_exploration_rows_only(binary_frame, tmp_path):
             (
                 pathlib.Path(plain.run_dir) / "validation_manifest.json"
             ).read_text()
-        )["test_ids"]
+        )["test"]
     )
 
 

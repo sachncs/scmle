@@ -486,14 +486,17 @@ class Walk:
             if row.get("action") == "promote" and row.get("alias") == "champion"
         ]
         approval = promoted[-1]["approval_record"]
-        body = {k: v for k, v in approval.items() if k != "signature"}
+        signed = {"content": "content_id", "approved": "approved_at"}
+        body = {
+            signed.get(k, k): v for k, v in approval.items() if k != "signature"
+        }
         self.signed(body, approval["signature"], "reviewer", "the approval")
         self.check(
             approval["decision"] == "approved" and approval["independent"],
             "the approval is an independent approval",
         )
         self.check(
-            approval["content_id"] == content_id,
+            field(approval, "content", "content_id") == content_id,
             "the approval is bound to this bundle",
         )
         self.check(

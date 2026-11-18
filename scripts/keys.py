@@ -31,18 +31,36 @@ DOC = ROOT / "docs" / "RECORD_KEYS.md"
 HEADING = re.compile(r"^### `([^`]+)` `([^`]+)`")
 ROW = re.compile(r"^\| `([^`]+)` \| (keep )?`?([^`|]+?)`? \|")
 FAMILY = re.compile(r"^## (F\d+) ")
-LANDED = frozenset({"F1", "F2", "F3", "F8"})
+LANDED = frozenset({"F1", "F2", "F3", "F4", "F5", "F6", "F8"})
 """Families of the rest vocabulary whose renames are in the code."""
+PENDING = frozenset(
+    {
+        "api/non_tabular.py Scope",
+        "artifacts/bundle/provenance.py Manifest",
+        "artifacts/claims_audit/verdict.py Verification",
+        "inference/evidence.py Link",
+        "pipeline/modality_lifecycle/containers.py Package",
+        "runtime/retry.py Retries",
+    }
+)
+"""Kinds of a landed family whose renames are not in the code yet."""
 PROPERTIES = frozenset(
     {
         "contracts/data/profiles.py Curation",
         "contracts/modalities.py Declaration",
+        "data/catalog/identity.py Source",
+        "data/catalog/manifest.py Catalog",
+        "data/modalities/curation.py Curation",
+        "data/modalities/document/report.py Curation",
+        "data/modalities/graph/elements.py Validation",
+        "monitoring/slo.py Assessment",
     }
 )
 """Kinds of the stored-property family (F10) that a landed family writes."""
 UNWRITTEN = frozenset(
     {
         ("assurance/admissibility/screen/report.py Screen", "unchecked_reason"),
+        ("data/modalities/image/sample.py Sample", "encoded_bytes"),
         ("contracts/data/profiles.py Portrait", "column_statistics"),
         ("contracts/data/profiles.py Portrait", "target_summary"),
         *(
@@ -89,7 +107,9 @@ lifecycle report): scmle tells their two layouts apart by the keys. The
 write-only records (detector certificates, framing and ingest reports,
 robustness and causal reports, decision reports, capability, modality,
 observability and performance contracts, release policies and explanation
-evidence) were renamed in a second pass and are listed here too.
+evidence, modality curation and data-store reports, evaluation and model
+reports, model cards, deployment, monitoring, operations and workflow
+records) were renamed in a second pass and are listed here too.
 
 **scmle reads old files itself.** Each record kind has a migration, so a
 folder written by an older scmle loads without any change. Hashes and
@@ -166,7 +186,8 @@ def landed(text: str) -> dict[str, dict[str, str]]:
 
     Returns:
         `"<module> <Class>"` -> {old stored key: new dotted key} for the
-        families in `LANDED` and the kinds in `PROPERTIES`, without the rows
+        families in `LANDED` (less the kinds in `PENDING`) and the kinds in
+        `PROPERTIES`, without the rows
         in `UNWRITTEN` and with the old keys in `STORED` substituted.
     """
     kinds: dict[str, dict[str, str]] = {}
@@ -181,7 +202,9 @@ def landed(text: str) -> dict[str, dict[str, str]]:
             kind = f"{heading.group(1)} {heading.group(2)}"
             continue
         row = ROW.match(line)
-        wanted = family in LANDED or (family == "F10" and kind in PROPERTIES)
+        wanted = (family in LANDED and kind not in PENDING) or (
+            family == "F10" and kind in PROPERTIES
+        )
         if not row or not kind or row.group(2) or not wanted:
             continue
         old = row.group(1)

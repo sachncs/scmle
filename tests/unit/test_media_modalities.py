@@ -114,7 +114,7 @@ def test_audio_transcript_provenance_is_bounded_and_curated():
 
     assert sample.profile().transcript_present
     assert sample.profile().transcript_segment_count == 2
-    assert transcript.to_dict()["provider_version"] == "2026.10"
+    assert transcript.to_dict()["version"] == "2026.10"
     assert report.profile["transcript_coverage"] == 1.0
     assert report.profile["transcript_sources"] == ["transcriber://run-7"]
     assert report.profile["transcript_segment_count"] == 2
@@ -691,7 +691,7 @@ def test_geospatial_spatial_join_records_bounded_same_crs_evidence():
     assert report.matches == (geospatial.Match("left-a", "right-a"),)
     assert report.left_dataset_hash == left.content_hash
     assert report.right_dataset_hash == right.content_hash
-    assert report.to_dict()["predicate_name"] == "centroid_distance_lt_5/v1"
+    assert report.to_dict()["predicate"] == "centroid_distance_lt_5/v1"
 
 
 def test_geospatial_spatial_join_rejects_crs_mismatch_and_unbounded_work():
@@ -782,7 +782,7 @@ def test_geospatial_reprojection_records_source_and_target_identity():
     assert result.report.source_dataset_hash == dataset.content_hash
     assert result.report.target_dataset_hash == result.dataset.content_hash
     assert result.report.transformer_name == "scale/v1"
-    assert result.to_dict()["report"]["feature_count"] == 1
+    assert result.to_dict()["report"]["features"] == 1
 
 
 def test_geospatial_reprojection_rejects_metadata_changes():
@@ -894,9 +894,9 @@ def test_geospatial_curation_records_deterministic_spatial_autocorrelation():
     assert first.statistic > 0
     assert 0.0 <= first.p_value <= 1.0
     evidence = report.profile["spatial_autocorrelation"]
-    assert evidence["feature_count"] == 5
-    assert evidence["neighbor_count"] == 4
-    assert evidence["permutation_count"] == 99
+    assert evidence["features"] == 5
+    assert evidence["neighbors"] == 4
+    assert evidence["permutations"] == 99
     assert evidence["p_value"] is not None
 
 
@@ -966,7 +966,7 @@ def test_geospatial_boundary_leakage_reports_conservative_envelope_crossings():
     assert evidence.crossing_feature_ids == ("line",)
     assert evidence.truncated_feature_ids == ("line",)
     assert evidence.feature_block_counts == (("point", 1), ("line", 3))
-    assert evidence.to_dict()["max_blocks_per_feature"] == 2
+    assert evidence.to_dict()["spread"] == 2
 
 
 def test_geospatial_temporal_split_normalizes_time_and_curates_coverage():

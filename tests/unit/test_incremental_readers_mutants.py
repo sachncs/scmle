@@ -155,10 +155,10 @@ def test_receipt_to_dict_and_validation():
     point = incremental.Checkpoint("s", 2)
     receipt = incremental.Ack("s", ("a",), ("b",), point)
     assert receipt.to_dict() == {
-        "schema_version": 2,
-        "source_identity": "s",
-        "accepted_event_ids": ["a"],
-        "duplicate_event_ids": ["b"],
+        "schema_version": 3,
+        "source": "s",
+        "accepted": ["a"],
+        "duplicates": ["b"],
         "checkpoint": point.to_dict(),
     }
     with pytest.raises(
@@ -216,11 +216,11 @@ def test_consumption_validation_and_dict():
     receipt = incremental.Ack("s", ("a",), (), point)
     done = incremental.Consumption("s", "g", receipt, ("a",))
     assert done.to_dict() == {
-        "schema_version": 2,
-        "source_identity": "s",
-        "consumer_group": "g",
+        "schema_version": 3,
+        "source": "s",
+        "consumer": "g",
         "receipt": receipt.to_dict(),
-        "acknowledged_event_ids": ["a"],
+        "acknowledged": ["a"],
     }
     with pytest.raises(ValueError, match=r"^result and receipt source"):
         incremental.Consumption("t", "g", receipt, ())

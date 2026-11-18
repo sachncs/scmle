@@ -57,7 +57,10 @@ def reference_score(
         else ensemble.HistGradientBoostingRegressor
     )
     estimator = pipeline.make_pipeline(transformer, model_class(random_state=0))
-    dev, test = manifest["train_ids"], manifest["test_ids"]
+    dev, test = (
+        manifest.get("training", manifest.get("train_ids")),
+        manifest.get("test", manifest.get("test_ids")),
+    )
     estimator.fit(features.iloc[dev], frame[target].iloc[dev])
     metric = metrics.CATALOG.metrics[metric_name]
     positive = metrics.positive_label(frame[target], tasks.Task(task))

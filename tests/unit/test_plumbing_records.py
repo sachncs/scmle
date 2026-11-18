@@ -82,7 +82,7 @@ def test_every_renamed_kind_is_at_version_two_and_injective():
         step = kind.migrations[-1]
         assert len(set(step.renames.values())) == len(step.renames)
         assert (step.change is None) == (step.revert is None)
-    assert catalog.CATALOG_SCHEMA_VERSION == 2
+    assert catalog.CATALOG_SCHEMA_VERSION == 3
     assert (
         records.ORIGIN + len(transaction.Settlement.migrations)
         == transaction.STREAM_STATE_SCHEMA
@@ -95,7 +95,7 @@ def test_a_version_one_catalog_verifies_its_digest_then_migrates(tmp_path):
     path = tmp_path / "catalog.json"
     path.write_text(json.dumps(layout), encoding="utf-8")
     loaded = catalog.Catalog.read_verified(path)
-    assert loaded.schema_version == 2
+    assert loaded.schema_version == 3
     assert loaded.kind == layout["data_kind"]
     assert loaded.samples == layout["sample_count"]
     assert loaded.digests == {"content": layout["content_identity"]}

@@ -11,6 +11,7 @@ import support
 import scmle.api.project
 from scmle.artifacts import bundle
 from scmle.contracts import errors
+from scmle.contracts import records
 import scmle.evaluation.parameter_estimation
 from scmle.evaluation.parameter_estimation import Config
 from scmle.evaluation.parameter_estimation import Estimand
@@ -164,7 +165,7 @@ def test_project_dispatches_and_serializes_bayesian_ate(tmp_path):
         )
     )
     assert declaration["policy"]["estimator"] == "bayesian_ate"
-    assert declaration["policy"]["treatment_position"] == 0
+    assert declaration["policy"]["treatment"] == 0
     assert declaration["policy"]["prior"] == json.loads(
         json.dumps(prior.to_dict())
     )
@@ -262,7 +263,7 @@ def test_project_run_rejects_valid_digest_for_tampered_report(
         envelope["report"]["diagnostics"]["data_identity"]["source_uri"] = (
             "tampered"
         )
-        anchored = Estimation.migration.downgrade(envelope["report"])
+        anchored = records.downgrade(Estimation.migrations, envelope["report"])
         envelope["digest"] = hashlib.sha256(
             json.dumps(anchored, sort_keys=True, separators=(",", ":")).encode(
                 "utf-8"

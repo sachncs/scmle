@@ -89,7 +89,7 @@ def test_an_old_estimation_verifies_and_keeps_its_digest(name, tmp_path):
     result = kind.read(OLD / f"{name}.json")
     assert result.digest() == old["digest"]
     layout = json.loads(json.dumps(result.to_dict()))
-    assert kind.migration.downgrade(layout) == old["report"]
+    assert records.downgrade(kind.migrations, layout) == old["report"]
     path = tmp_path / f"{name}.json"
     assert result.write(path) == old["digest"]
     current = json.loads(path.read_text("utf-8"))
@@ -115,7 +115,7 @@ def test_a_tampered_old_estimation_is_refused(name, tmp_path):
 def test_the_sequential_contrast_and_subjects_are_nested():
     old = stored("sequential")["report"]
     result = sequential.Estimation.from_dict(
-        sequential.Estimation.migration.upgrade(old)
+        records.upgrade(sequential.Estimation.migrations, old, records.ORIGIN)
     )
     assert result.contrast.estimate == old["contrast_estimate"]
     assert result.contrast.se == old["contrast_standard_error"]
@@ -132,14 +132,17 @@ def test_the_sequential_contrast_and_subjects_are_nested():
 @hypothesis.given(dropped=strategies.integers(0, 10_000))
 def test_an_estimation_survives_a_round_trip(name, dropped):
     kind = ESTIMATIONS[name]
-    base = kind.from_dict(kind.migration.upgrade(stored(name)["report"]))
+    base = kind.from_dict(
+        records.upgrade(kind.migrations, stored(name)["report"], records.ORIGIN)
+    )
     rows = envelope.Counts(base.rows.used + dropped, base.rows.used, dropped)
     result = dataclasses.replace(base, rows=rows)
     again = kind.from_dict(json.loads(json.dumps(result.to_dict())))
     assert again == result
     assert again.digest() == result.digest()
     layout = result.to_dict()
-    assert kind.migration.upgrade(kind.migration.downgrade(layout)) == layout
+    older = records.downgrade(kind.migrations, layout)
+    assert records.upgrade(kind.migrations, older, records.ORIGIN) == layout
 
 
 def test_unfold_refuses_unknown_nested_keys():

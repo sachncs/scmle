@@ -23,7 +23,7 @@ def test_project_persists_atomic_report_and_verifies_exact_replay(
     replay = project.verify_replay()
 
     assert project.result == result
-    assert envelope["schema_version"] == 2
+    assert envelope["schema_version"] == 3
     assert envelope["digest"] == result.digest()
     assert replay.level == "exact"
     assert replay.reasons == []

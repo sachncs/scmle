@@ -153,9 +153,10 @@ class Curation:
         ):
             if "modality" in record and record.get("modality") != self.modality:
                 raise errors.InputError(f"{name} does not match modality")
-            if record.get("dataset_hash") != self.digests["dataset"]:
+            digest, samples = curation.identify(record)
+            if digest != self.digests["dataset"]:
                 raise errors.InputError(f"{name} does not match dataset_hash")
-            if record.get("sample_count") != self.samples:
+            if samples != self.samples:
                 raise errors.InputError(f"{name} does not match sample_count")
         object.__setattr__(self, "digests", dict(self.digests))
         object.__setattr__(self, "curation", roundtrip)

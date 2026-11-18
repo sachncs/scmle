@@ -372,7 +372,7 @@ def test_l198_l206_foundational_and_production_contracts(run):
         hasattr(project, "cancel")
         and errors.CancelledError.category == "cancelled"
     )
-    assert {"model_mb", "p95_latency_ms"} <= set(result.evaluation["resources"])
+    assert {"size", "latency"} <= set(result.evaluation["resources"])
     assert (
         project.spec.config_hash() == project.spec.config_hash()
     )  # deterministic hash
@@ -817,11 +817,7 @@ def test_l411_l417_selection_constraints_measured_on_this_machine(
         selection=tasks.Selection(max_model_mb=50, max_p95_latency_ms=1000),
     ).run()
     usage = result.evaluation["resources"]
-    assert (
-        usage["model_mb"] <= 50
-        and usage["p95_latency_ms"] <= 1000
-        and usage["machine"]
-    )
+    assert usage["size"] <= 50 and usage["latency"] <= 1000 and usage["machine"]
     assert "ties -> simpler_model" in result.evaluation["selection_policy"]
 
 
@@ -835,7 +831,7 @@ def test_l421_l437_leakage_invariants(run, frame, tmp_path):
         (result.run_dir / "validation_manifest.json").read_text()
     )
     assert (
-        manifest["train_ids"] and manifest["test_ids"]
+        manifest["training"] and manifest["test"]
     )  # 1 immutable row-id manifest
     from scmle.data.splitting import splitters
 

@@ -27,8 +27,7 @@ def test_a_curve_record_lists_its_points() -> None:
         "sizes": [10, 20],
         "scores": [0.5, 0.6],
         "verdict": "plateau",
-        "last_gain": 0.1,
-        "total_gain": 0.1,
+        "gains": {"last": 0.1, "total": 0.1},
     }
 
 

@@ -41,7 +41,7 @@ def test_evaluation_passes_fresh_metrics_under_threshold():
     )
 
     assert result.passed
-    assert result.to_dict()["threshold_breaches"] == []
+    assert result.to_dict()["breaches"] == []
 
 
 def test_evaluation_fails_closed_for_missing_stale_future_and_breached_metrics():

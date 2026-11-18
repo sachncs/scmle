@@ -119,9 +119,9 @@ next_batch = connector.read_rows(batch.checkpoint, limit=10_000)`}</code></pre>
   <h2>The dataset card</h2>
   <p>Tabular packaged runs write <code>dataset_card.json</code>. Experimental modality lifecycles carry the equivalent card inside their documentation evidence. In both cases it is the human-facing summary of the snapshot: intended use, explicit exclusions, composition, source ownership, lineage, privacy controls, limitations, and findings that still need review. Its default status is <code>machine_generated_unreviewed</code>; that is deliberate. A generated card is context, not approval.</p>
   <pre><code>{`{
-  "intended_use": "Training and evaluation for binary classification...",
-  "out_of_scope": ["It is not a release approval..."],
-  "review_status": "machine_generated_unreviewed",
+  "use": "Training and evaluation for binary classification...",
+  "excluded": ["It is not a release approval..."],
+  "review": "machine_generated_unreviewed",
   "composition": {"source_rows": 12000, "profiled_rows": 12000}
 }`}</code></pre>
 

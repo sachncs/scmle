@@ -455,7 +455,7 @@ def test_a_version_one_baseline_loads():
     profile = reference.Baseline.from_dict(record)
     assert (profile.name, profile.metrics) == ("score", {"roc_auc": 0.8})
     written = profile.to_dict()
-    assert written[records.KEY] == 2
+    assert written[records.KEY] == 3
     assert revert(reference.Baseline.migrations, written) == record
 
 
@@ -510,6 +510,7 @@ def test_every_r5_kind_registers_one_invertible_step():
         ledger.RunManifest,
     )
     for kind in kinds:
-        assert len(kind.migrations) == 1, kind
+        # the baseline gained a second step: each reference writes `missing`
+        assert len(kind.migrations) == 1 + (kind is reference.Baseline), kind
         step = kind.migrations[0]
         assert (step.change is None) == (step.revert is None), kind

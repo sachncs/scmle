@@ -78,8 +78,8 @@ def test_training_targets_never_reach_into_the_locked_period(result):
         (result.run_dir / "validation_manifest.json").read_text()
     )
     usable = frame.iloc[: len(frame) - HORIZON].reset_index(drop=True)
-    last_training = usable["date"].iloc[manifest["train_ids"]].max()
-    first_test = usable["date"].iloc[manifest["test_ids"]].min()
+    last_training = usable["date"].iloc[manifest["training"]].max()
+    first_test = usable["date"].iloc[manifest["test"]].min()
 
     assert result.evaluation["split_strategy"] == "temporal"
     assert last_training + pandas.Timedelta(days=HORIZON) < first_test

@@ -184,7 +184,7 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
 
     assert result.modality == "text"
     assert result.samples == 3
-    assert result.curation["sample_count"] == 3
+    assert result.curation["samples"] == 3
     assert result.card["privacy"]["status"] == "not_assessed"
     assert result.card["manifest"]["task"] == "not_declared"
     assert Path(result.path).is_file()

@@ -35,7 +35,7 @@ def test_a_differing_label_is_named_by_record() -> None:
     assert found.to_dict() == {
         "passed": False,
         "records": 1,
-        "max_probability_error": 0.0,
+        "error": 0.0,
         "tolerance": 0.01,
         "mismatches": ["record 0: label differs"],
     }

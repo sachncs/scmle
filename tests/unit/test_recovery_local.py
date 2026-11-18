@@ -33,13 +33,13 @@ def test_each_local_fault_recovers_within_its_objectives(fault_id):
     result = recovery.Runner({fault_id: faults.SCENARIOS[fault_id]}).run(
         [fault_id]
     )
-    found = next(r for r in result["results"] if r["fault_id"] == fault_id)
+    found = next(r for r in result["results"] if r["fault"] == fault_id)
     assert found["status"] == recovery.PASSED, found["problems"]
     assert found["measurements"], "a recovery without a measurement"
     assert found["detail"]["processes_still_alive_after_close"] == 0
     for measured in found["measurements"]:
-        assert measured["rto_seconds"] is not None
-        assert measured["rpo_lost"] == 0
+        assert measured["rto"] is not None
+        assert measured["rpo"] == 0
         assert measured["method"]
 
 
