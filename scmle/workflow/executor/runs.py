@@ -7,6 +7,7 @@ import time
 from typing import Any
 
 from scmle.contracts import errors
+from scmle.runtime import state
 from scmle.storage import objectstore
 from scmle.workflow import definition
 from scmle.workflow.executor import context
@@ -133,10 +134,7 @@ class Executor(loop.Loop):
         record = self.run_record(run_id)
         if record is None:
             raise errors.ConfigError(f"no run {run_id}")
-        settled = {s.value for s in status.FINISHED} - {
-            status.Progress.FAILED.value
-        }
-        if record["state"] in settled:
+        if not status.TABLE[status.Progress(record["state"])]:
             return record
         return self.drive(run_id, record["trigger_key"], record["requested_by"])
 
@@ -186,10 +184,15 @@ class Executor(loop.Loop):
                 raise errors.ConfigError(
                     "the run was started with a different workflow definition"
                 )
-            record["state"] = status.Progress.RUNNING.value
-            self.write(self.base(run_id) + "run.json", record)
-            record = self.execute(run_id, record)
-            self.write(self.base(run_id) + "run.json", record)
+            machine = state.Machine(
+                status.TABLE, status.Progress(record["state"])
+            )
+            machine.transition(status.Progress.RUNNING)
+            record["state"] = machine.state.value
+            bucket = self.bucket(run_id)
+            bucket.keep("run.json", record)
+            record = self.execute(run_id, record, machine)
+            bucket.keep("run.json", record)
             return record
         finally:
             self.relinquish(run_id)

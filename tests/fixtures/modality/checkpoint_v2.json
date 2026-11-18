@@ -1,0 +1,35 @@
+{
+  "completed": [
+    "ingestion",
+    "validation",
+    "profiling",
+    "curation",
+    "splitting",
+    "feature_preparation"
+  ],
+  "digests": {
+    "dataset": "37805e5737725a459bda60a8a02ebd39e514b470ed0627de32368f092c1c6fa3",
+    "manifest": null,
+    "observed": "37805e5737725a459bda60a8a02ebd39e514b470ed0627de32368f092c1c6fa3",
+    "stages": [
+      "6bc78440b8f0d2ceba3b6b580e49a33934d6a490a91e50ddbeafc1092d63a66d",
+      "763d1230d6ff3359fbf164f4589a49aa44fba1324393283572a308747c48fe58",
+      "e58933c0c3e90e0b10791c93e80e1211adf0079f5dadb57966240635d7cbe600",
+      "823f1b98ad90a803fb153c3e32c737f5e0b50dbce3e1d87fea9bfb5e971d0b21",
+      "2fe510beb66ebaabb5cc997e662778b33826159b4d9d05647f44b8af63e18414",
+      "788a7d26875cf6206e8c842fc5c57aeb18c8869faa86d5219e6f03d5ce619409"
+    ]
+  },
+  "independent": false,
+  "modality": "text",
+  "package": "package",
+  "record_type": "modality_lifecycle_checkpoint",
+  "report": "report.json",
+  "schema_version": 2,
+  "seed": 0,
+  "signature": {
+    "algorithm": "hmac-sha256",
+    "value": "1d001b54d6e9128e39bb217feb8df036c44bd5d0ec59af40ec790516a049e01f"
+  },
+  "status": "running"
+}

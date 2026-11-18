@@ -13,6 +13,7 @@ from scmle.explainability import quality
 from scmle.pipeline.modality_lifecycle import constants
 from scmle.pipeline.modality_lifecycle import containers
 from scmle.pipeline.modality_lifecycle import state
+from scmle.pipeline.modality_lifecycle import steps
 
 if TYPE_CHECKING:
     from sklearn.linear_model import LogisticRegression
@@ -261,10 +262,17 @@ class ModelExplainabilityStage(state.Stage):
     """Explain linear weights and test feature-space stability."""
 
     stage = modalities.Phase.MODEL_EXPLAINABILITY
+    requires = (
+        steps.Splitting,
+        steps.Preparation,
+        steps.Modelling,
+        steps.Composition,
+    )
+    makes = state.Explanation
 
     @staticmethod
     def corroborate(
-        context: state.Context,
+        board: state.Board,
         batch: containers.Batch,
         partitions: containers.Partitions,
         evaluated_sample_count: int,
@@ -273,7 +281,7 @@ class ModelExplainabilityStage(state.Stage):
         """Compares the explanations with caller-authored ground truth.
 
         Args:
-            context: Shared lifecycle state.
+            board: The run's inputs.
             batch: Test feature batch.
             partitions: Train, validation and test partitions.
             evaluated_sample_count: Number of leading rows that were explained.
@@ -288,7 +296,7 @@ class ModelExplainabilityStage(state.Stage):
         """
         references = []
         for sample_index in range(evaluated_sample_count):
-            ground_truth = context.adapter.explanation_ground_truth(
+            ground_truth = board.plan.adapter.explanation_ground_truth(
                 partitions.test[sample_index], batch.feature_names
             )
             if ground_truth is not None:
@@ -310,7 +318,7 @@ class ModelExplainabilityStage(state.Stage):
                 "Raw-modality ground truth remains caller-owned evidence.",
             ],
         }
-        if context.require_independent_ground_truth and (
+        if board.plan.require_independent_ground_truth and (
             ground_truth_evidence["status"] != "available"
             or ground_truth_evidence["passed"] is not True
         ):
@@ -369,26 +377,29 @@ class ModelExplainabilityStage(state.Stage):
             "limitations": list(REPEATED_LIMITATIONS),
         }
 
-    def execute(self, context: state.Context) -> None:
+    def execute(self, board: state.Board) -> state.Explanation:
         """Records signed coefficient contributions with limitations.
 
         Args:
-            context: Shared lifecycle state, updated in place.
+            board: The run's inputs, partitions, features and model.
+
+        Returns:
+            The model explanation.
 
         Raises:
-            RuntimeError: If the model, partitions or test features are missing,
-                or no explanation report could be produced.
+            OrderError: If there are no test features to explain.
         """
-        model = context.model
-        batch = context.feature_batches["test"]
-        partitions = context.partitions
-        if model is None or partitions is None or not len(batch.sample_ids):
+        model = board.get(state.Fit).model
+        batches = board.get(state.Features).batches
+        batch = batches["test"]
+        partitions = board.get(state.Partition).partitions
+        if not len(batch.sample_ids):
             raise errors.OrderError(
                 "model, partitions, and test features are required"
             )
         global_terms = self.prominence(model, batch.feature_names)
         fidelity = replicate(model, batch)
-        train_values = context.feature_batches["train"].values
+        train_values = batches["train"].values
         feature_scales = numpy.maximum(numpy.std(train_values, axis=0), 1.0)
         perturbation_size = feature_scales * 1e-6
         evaluated_sample_count = min(
@@ -398,11 +409,7 @@ class ModelExplainabilityStage(state.Stage):
             model, batch, perturbation_size, evaluated_sample_count
         )
         ground_truth_evidence = self.corroborate(
-            context,
-            batch,
-            partitions,
-            evaluated_sample_count,
-            repeated.reports,
+            board, batch, partitions, evaluated_sample_count, repeated.reports
         )
         repeated_stability = min(repeated.stabilities)
         quality_evaluation = quality.evaluate(
@@ -415,36 +422,37 @@ class ModelExplainabilityStage(state.Stage):
             stability=repeated_stability,
             fidelity=fidelity,
         )
-        context.model_explanation = {
-            "method": "linear_coefficient_and_local_contribution",
-            "model_family": "regularized_linear_classifier",
-            "global_terms": global_terms,
-            "local": {
-                "sample_id": batch.sample_ids[0],
-                "terms": repeated.perturbation_reports[0]["terms"],
-            },
-            "zero_ablation_direction_consistency": (
-                repeated.zero_ablation_consistency
-            ),
-            "perturbation_stability": {
-                "score": repeated.perturbation_stability,
-                "report_count": len(repeated.perturbation_reports),
-                "relative_step": 1e-6,
-                "feature_space_only": True,
-            },
-            "repeated_perturbation": self.repetition(
-                repeated_stability,
-                len(batch.sample_ids),
-                evaluated_sample_count,
-            ),
-            "independent_ground_truth": ground_truth_evidence,
-            "modality_specific": context.adapter.elucidate(
-                partitions.test[0],
-                model,
-                batch.feature_names,
-                repeated.coefficients,
-            ),
-            "quality": quality_evaluation.to_dict(),
-            "limitations": list(LIMITATIONS),
-        }
-        context.record(self.stage, context.model_explanation.copy())
+        return state.Explanation(
+            {
+                "method": "linear_coefficient_and_local_contribution",
+                "model_family": "regularized_linear_classifier",
+                "global_terms": global_terms,
+                "local": {
+                    "sample_id": batch.sample_ids[0],
+                    "terms": repeated.perturbation_reports[0]["terms"],
+                },
+                "zero_ablation_direction_consistency": (
+                    repeated.zero_ablation_consistency
+                ),
+                "perturbation_stability": {
+                    "score": repeated.perturbation_stability,
+                    "report_count": len(repeated.perturbation_reports),
+                    "relative_step": 1e-6,
+                    "feature_space_only": True,
+                },
+                "repeated_perturbation": self.repetition(
+                    repeated_stability,
+                    len(batch.sample_ids),
+                    evaluated_sample_count,
+                ),
+                "independent_ground_truth": ground_truth_evidence,
+                "modality_specific": board.plan.adapter.elucidate(
+                    partitions.test[0],
+                    model,
+                    batch.feature_names,
+                    repeated.coefficients,
+                ),
+                "quality": quality_evaluation.to_dict(),
+                "limitations": list(LIMITATIONS),
+            }
+        )

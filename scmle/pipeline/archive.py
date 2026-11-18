@@ -23,6 +23,7 @@ attempt made, is not run again: its product is applied (`restore`). Any
 other stage runs again and its record is replaced.
 """
 
+import enum
 import hashlib
 import json
 import pathlib
@@ -37,7 +38,6 @@ from scmle.contracts import experiments
 from scmle.contracts import records
 from scmle.contracts import tasks
 from scmle.pipeline import products
-from scmle.runtime import state
 
 SCHEMA_VERSION = 1
 FOLDER = "stages"
@@ -180,7 +180,7 @@ class Directory:
         self,
         index: int,
         name: str,
-        progress: state.Progress,
+        progress: enum.StrEnum,
         seconds: float,
         made: products.Product | None = None,
         needs: dict[str, str | None] | None = None,

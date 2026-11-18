@@ -423,6 +423,8 @@ names in the public API snapshot are also listed in the changelog.
 ## `scmle.core.state`
 
 - `InvalidTransitionError` -> `TransitionError`
+- `Tracker.emit` -> `Tracker.enter` (the entry hook of `Machine`, which
+  `Tracker` now is)
 
 ## `scmle.data.admissibility.asof`
 
@@ -2318,6 +2320,9 @@ names in the public API snapshot are also listed in the changelog.
 - `ensure_not_cancelled` -> `poll`
 - `remove_package` -> `discard`
 - `check_observed_modality` -> `conform`
+- `Context` -> `Board` (frozen; stages return their product instead of
+  setting attributes on it)
+- `clocked` -> `measure` (reads the engine's stage timings)
 - `check_checkpoint_presence` -> `expect`
 - `load_resume_checkpoint` -> `reload`
 - `verified_completed_report` -> `verify`
@@ -2370,6 +2375,15 @@ names in the public API snapshot are also listed in the changelog.
 - `user_adapters` -> `extensions`
 - `add_user_adapter` -> `adopt`
 - `remove_user_adapter` -> `deregister`
+
+Deprecated in favour of the shared plugin registry (`scmle.runtime.plugins`),
+with a `DeprecationWarning` until the next release:
+
+- `extensions()` -> `plugins.REGISTRY.entries(plugins.Kind.ESTIMATORS)`
+- `adopt(adapter)` -> `plugins.REGISTRY.enrol(plugins.Kind.ESTIMATORS,
+  adapter.name, adapter)`
+- `deregister(name)` -> `plugins.REGISTRY.withdraw(plugins.Kind.ESTIMATORS,
+  name)`
 
 ## `scmle.models.sklearn.bagging`
 

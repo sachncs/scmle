@@ -1,0 +1,226 @@
+{
+  "note": "Workflow run and step records written by the executor before phase 4's Machine and Bucket (trace text trimmed). Run 'failed' stopped with evaluate failed; run 'waiting' waits at approve.",
+  "records": {
+    "workflows/scmle-pipeline/runs/scmle-pipeline-2d35836363cb727b/run.json": {
+      "cost": 3.5,
+      "ended_at": 1000002.0,
+      "fence": 1,
+      "requested_by": "alice",
+      "run_id": "scmle-pipeline-2d35836363cb727b",
+      "started_at": 1000000.0,
+      "state": "failed",
+      "steps": {
+        "approve": "skipped",
+        "batch_predict": "skipped",
+        "evaluate": "failed",
+        "ingest": "succeeded",
+        "monitor": "skipped",
+        "train": "succeeded"
+      },
+      "trigger_key": "failed",
+      "workflow": "scmle-pipeline",
+      "workflow_digest": "ee4ff3734eb719e5dee981c2b5863de84b75fda5ab4d1fd8ff3bf0922c424971",
+      "workflow_version": "1"
+    },
+    "workflows/scmle-pipeline/runs/scmle-pipeline-2d35836363cb727b/steps/approve.json": {
+      "fence": 1,
+      "reason": "upstream",
+      "state": "skipped",
+      "step": "approve"
+    },
+    "workflows/scmle-pipeline/runs/scmle-pipeline-2d35836363cb727b/steps/batch_predict.json": {
+      "fence": 1,
+      "reason": "upstream",
+      "state": "skipped",
+      "step": "batch_predict"
+    },
+    "workflows/scmle-pipeline/runs/scmle-pipeline-2d35836363cb727b/steps/evaluate.json": {
+      "attempts": [
+        {
+          "attempt": 1,
+          "error": "DataError: bad metric",
+          "failure": {
+            "causes": [],
+            "kind": "DataError",
+            "message": "bad metric",
+            "trace": "Traceback (trimmed for the fixture)\n"
+          },
+          "state": "failed"
+        }
+      ],
+      "cost": 0.5,
+      "error": "DataError: bad metric",
+      "fence": 1,
+      "idempotency_key": "4e19763d1c7d05c8a04ef009dd91a400daf31d530d875cb44063b68c7ef439d4",
+      "spend": [
+        0.5
+      ],
+      "state": "failed",
+      "step": "evaluate"
+    },
+    "workflows/scmle-pipeline/runs/scmle-pipeline-2d35836363cb727b/steps/ingest.json": {
+      "attempts": [
+        {
+          "attempt": 1,
+          "state": "succeeded"
+        }
+      ],
+      "cost": 0.0,
+      "fence": 1,
+      "idempotency_key": "91d42281b74667e639495206dabc26bf359998c53edff3d9a813760ccfbea1f0",
+      "outputs": {
+        "key": "91d42281",
+        "step": "ingest"
+      },
+      "spend": [
+        0.0
+      ],
+      "state": "succeeded",
+      "step": "ingest"
+    },
+    "workflows/scmle-pipeline/runs/scmle-pipeline-2d35836363cb727b/steps/monitor.json": {
+      "fence": 1,
+      "reason": "upstream",
+      "state": "skipped",
+      "step": "monitor"
+    },
+    "workflows/scmle-pipeline/runs/scmle-pipeline-2d35836363cb727b/steps/train.json": {
+      "attempts": [
+        {
+          "attempt": 1,
+          "error": "PreemptedError: preempted",
+          "failure": {
+            "causes": [],
+            "kind": "PreemptedError",
+            "message": "preempted",
+            "trace": "Traceback (trimmed for the fixture)\n"
+          },
+          "state": "retryable"
+        },
+        {
+          "attempt": 2,
+          "state": "succeeded"
+        }
+      ],
+      "cost": 3.0,
+      "fence": 1,
+      "idempotency_key": "2b0c1689c4d7935000f6a7a74c27e7e5ca5d99d11e29b743adaff1f6df219b77",
+      "outputs": {
+        "ok": true
+      },
+      "spend": [
+        1.5,
+        1.5
+      ],
+      "state": "succeeded",
+      "step": "train"
+    },
+    "workflows/scmle-pipeline/runs/scmle-pipeline-2d9565edcfde18a9/run.json": {
+      "cost": 0.0,
+      "ended_at": 1000002.0,
+      "fence": 1,
+      "requested_by": "alice",
+      "run_id": "scmle-pipeline-2d9565edcfde18a9",
+      "started_at": 1000002.0,
+      "state": "waiting_approval",
+      "steps": {
+        "approve": "waiting",
+        "batch_predict": "pending",
+        "evaluate": "succeeded",
+        "ingest": "succeeded",
+        "monitor": "succeeded",
+        "train": "succeeded"
+      },
+      "trigger_key": "waiting",
+      "workflow": "scmle-pipeline",
+      "workflow_digest": "ee4ff3734eb719e5dee981c2b5863de84b75fda5ab4d1fd8ff3bf0922c424971",
+      "workflow_version": "1"
+    },
+    "workflows/scmle-pipeline/runs/scmle-pipeline-2d9565edcfde18a9/steps/approve.json": {
+      "fence": 1,
+      "state": "waiting",
+      "step": "approve",
+      "waiting_since": 1000002.0
+    },
+    "workflows/scmle-pipeline/runs/scmle-pipeline-2d9565edcfde18a9/steps/evaluate.json": {
+      "attempts": [
+        {
+          "attempt": 1,
+          "state": "succeeded"
+        }
+      ],
+      "cost": 0.0,
+      "fence": 1,
+      "idempotency_key": "3d0cf5a73dff219a9bcb2068a407455a263e9d58ce60ce17b2a4fe4267e88a06",
+      "outputs": {
+        "key": "3d0cf5a7",
+        "step": "evaluate"
+      },
+      "spend": [
+        0.0
+      ],
+      "state": "succeeded",
+      "step": "evaluate"
+    },
+    "workflows/scmle-pipeline/runs/scmle-pipeline-2d9565edcfde18a9/steps/ingest.json": {
+      "attempts": [
+        {
+          "attempt": 1,
+          "state": "succeeded"
+        }
+      ],
+      "cost": 0.0,
+      "fence": 1,
+      "idempotency_key": "e40aee1358f8dfd0f7e149e617fc6a38ddf914c6aff1abc480fe44532547c02a",
+      "outputs": {
+        "key": "e40aee13",
+        "step": "ingest"
+      },
+      "spend": [
+        0.0
+      ],
+      "state": "succeeded",
+      "step": "ingest"
+    },
+    "workflows/scmle-pipeline/runs/scmle-pipeline-2d9565edcfde18a9/steps/monitor.json": {
+      "attempts": [
+        {
+          "attempt": 1,
+          "state": "succeeded"
+        }
+      ],
+      "cost": 0.0,
+      "fence": 1,
+      "idempotency_key": "b7c11ba916edd103f6ae26917712752a6b1c41939e8a8958661a997a272a2ce7",
+      "outputs": {
+        "key": "b7c11ba9",
+        "step": "monitor"
+      },
+      "spend": [
+        0.0
+      ],
+      "state": "succeeded",
+      "step": "monitor"
+    },
+    "workflows/scmle-pipeline/runs/scmle-pipeline-2d9565edcfde18a9/steps/train.json": {
+      "attempts": [
+        {
+          "attempt": 1,
+          "state": "succeeded"
+        }
+      ],
+      "cost": 0.0,
+      "fence": 1,
+      "idempotency_key": "4a2e9b905e772097cf5ae27d299406106b68c86eb853fe23988dd46689feaac7",
+      "outputs": {
+        "key": "4a2e9b90",
+        "step": "train"
+      },
+      "spend": [
+        0.0
+      ],
+      "state": "succeeded",
+      "step": "train"
+    }
+  }
+}

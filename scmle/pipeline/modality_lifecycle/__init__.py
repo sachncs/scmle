@@ -47,7 +47,6 @@ from scmle.pipeline.modality_lifecycle.explanation import perturb
 from scmle.pipeline.modality_lifecycle.explanation import replicate
 from scmle.pipeline.modality_lifecycle.explanation import sensitivities
 from scmle.pipeline.modality_lifecycle.explanation import Stability
-from scmle.pipeline.modality_lifecycle.lifecycle import clocked
 from scmle.pipeline.modality_lifecycle.lifecycle import Lifecycle
 from scmle.pipeline.modality_lifecycle.plans import coherent
 from scmle.pipeline.modality_lifecycle.plans import Plan
@@ -70,7 +69,7 @@ from scmle.pipeline.modality_lifecycle.reporting import rehydrate
 from scmle.pipeline.modality_lifecycle.reporting import require
 from scmle.pipeline.modality_lifecycle.reporting import unpack
 from scmle.pipeline.modality_lifecycle.reporting import unseal
-from scmle.pipeline.modality_lifecycle.state import Context
+from scmle.pipeline.modality_lifecycle.state import Board
 from scmle.pipeline.modality_lifecycle.state import Stage
 from scmle.pipeline.modality_lifecycle.steps import Composition
 from scmle.pipeline.modality_lifecycle.steps import Curating
@@ -113,10 +112,10 @@ __all__ = [
     "SHA256_LENGTH",
     "AudioPreparer",
     "Batch",
+    "Board",
     "Cancellation",
     "Checkpoint",
     "Composition",
-    "Context",
     "Curating",
     "Curation",
     "Curator",
@@ -153,7 +152,6 @@ __all__ = [
     "Validation",
     "ablate",
     "authenticate",
-    "clocked",
     "coherent",
     "file_digest",
     "hashlike",

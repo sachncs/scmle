@@ -1,17 +1,15 @@
-"""The runner that executes the lifecycle stages in order."""
+"""The runner that executes the lifecycle stages on the pipeline engine."""
 
 from __future__ import annotations
 
-import time
 from typing import cast
 from typing import ClassVar
 from typing import TYPE_CHECKING
 
 from scmle.contracts import data
-from scmle.contracts import errors
 from scmle.contracts import modalities
 from scmle.contracts import performance
-from scmle.governance import attestation
+from scmle.pipeline import engine
 from scmle.pipeline.modality_lifecycle import checkpoints
 from scmle.pipeline.modality_lifecycle import constants
 from scmle.pipeline.modality_lifecycle import curators
@@ -20,6 +18,7 @@ from scmle.pipeline.modality_lifecycle import plans
 from scmle.pipeline.modality_lifecycle import reporting
 from scmle.pipeline.modality_lifecycle import state
 from scmle.pipeline.modality_lifecycle import steps
+import scmle.runtime.state
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -27,26 +26,38 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def clocked(context: state.Context, stage: state.Stage) -> None:
-    """Executes one stage and records its duration when it is measured.
+def measure(
+    pipeline: engine.Pipeline[state.Board], board: state.Board
+) -> tuple[performance.Observation, ...]:
+    """The measured operations of a finished run, in operation order.
+
+    The engine timed every stage; a stage with a `performance_operation`
+    reports its time, and inference reports its load and predict times.
 
     Args:
-        context: Shared lifecycle state, updated in place.
-        stage: The stage to execute.
+        pipeline: The engine that ran the stages.
+        board: The run's board after the last stage.
+
+    Returns:
+        One observation per measured operation.
     """
-    started = time.perf_counter()
-    stage.execute(context)
-    operation = stage.performance_operation
-    if operation is not None:
-        if operation is performance.Operation.INGEST:
-            sample_count = len(context.adapter.samples)
-        else:
-            sample_count = len(context.feature_batches["train"].sample_ids)
-        context.clock(
-            operation,
-            time.perf_counter() - started,
-            sample_count,
-        )
+    found = {
+        observation.operation: observation
+        for observation in board.get(state.Reproduction).observations
+    }
+    for stage in pipeline.stages:
+        operation = cast("state.Stage", stage).performance_operation
+        if operation is not None:
+            found[operation] = state.observe(
+                operation,
+                pipeline.timings[pipeline.dependency.title(stage)],
+                cast("state.Stage", stage).samples(board),
+            )
+    return tuple(
+        found[operation]
+        for operation in performance.Operation
+        if operation in found
+    )
 
 
 class Lifecycle:
@@ -73,50 +84,6 @@ class Lifecycle:
         steps.Documentation(),
         steps.Recovery(),
     )
-
-    def run_stages(
-        self,
-        plan: plans.Plan,
-        context: state.Context,
-        resumed: tuple[int, tuple[str, ...]],
-        progress: tuple[list[str], list[str]],
-    ) -> None:
-        """Executes every stage, replaying the ones a checkpoint completed.
-
-        Args:
-            plan: The run's fixed inputs.
-            context: Shared lifecycle state, updated in place.
-            resumed: Number of leading stages that a checkpoint completed,
-                and their evidence digests.
-            progress: Values of the completed stages and their digests; both
-                lists grow as stages finish and are persisted at every
-                boundary.
-
-        Raises:
-            ValueError: If a replayed stage's digest differs from the
-                checkpoint's.
-        """
-        resume_count, resume_digests = resumed
-        completed_stages, stage_digests = progress
-        for stage_index, stage in enumerate(self.stages):
-            plan.poll()
-            context.resume_replay = stage_index < resume_count
-            clocked(context, stage)
-            stage_digest = attestation.checksum(
-                context.stage_records[stage.stage]
-            )
-            if stage_index < resume_count:
-                if stage_digest != resume_digests[stage_index]:
-                    raise errors.InputError(
-                        "lifecycle checkpoint replay diverged at stage "
-                        f"{stage.stage.value}"
-                    )
-            else:
-                completed_stages.append(stage.stage.value)
-                stage_digests.append(stage_digest)
-                plan.persist(completed_stages, stage_digests, "running")
-            context.resume_replay = False
-            plan.poll()
 
     def run(
         self,
@@ -225,14 +192,15 @@ class Lifecycle:
         plan.poll()
         plan.conform()
         plan.audit()
-        stage_names = tuple(stage.stage.value for stage in self.stages)
+        pipeline = engine.Pipeline[state.Board](self.stages)
+        stage_names = tuple(
+            cast("state.Stage", stage).stage.value for stage in pipeline.stages
+        )
         required_stage_names = tuple(
             stage.value for stage in modalities.REQUIRED_LIFECYCLE_STAGES
         )
         if stage_names != required_stage_names:
             raise RuntimeError("modality lifecycle stage order is invalid")
-        resume_count = 0
-        resume_digests: tuple[str, ...] = ()
         checkpoint: checkpoints.Checkpoint | None = None
         if plan.checkpoint_target is not None:
             plan.expect(resume=resume)
@@ -240,36 +208,26 @@ class Lifecycle:
                 checkpoint = plan.reload(stage_names)
                 if checkpoint.status == "completed":
                     return plan.verify()
-                resume_count = len(checkpoint.completed)
-                resume_digests = checkpoint.digests.stages
-        completed_stages = list(
-            checkpoint.completed if checkpoint is not None else ()
+        replay = checkpoints.Replay(plan, checkpoint)
+        replay.start()
+        pipeline.records = replay
+        board = state.Board(
+            plan, () if checkpoint is None else tuple(checkpoint.completed)
         )
-        stage_digests = list(
-            checkpoint.digests.stages if checkpoint is not None else ()
+        machine = scmle.runtime.state.Machine(
+            state.TABLE, scmle.runtime.state.Progress.CREATED
         )
-        plan.persist(completed_stages, stage_digests, "running")
-        context = state.Context(
-            adapter=plan.adapter,
-            package_path=plan.package_target,
-            signing_key=plan.signing_key,
-            seed=plan.seed,
-            observed_adapter=plan.observed,
-            manifest=plan.manifest,
-            require_independent_ground_truth=plan.require_independent_ground_truth,
-        )
-        self.run_stages(
-            plan,
-            context,
-            (resume_count, resume_digests),
-            (completed_stages, stage_digests),
-        )
+        pipeline.advance(board, machine)
         plan.poll()
         report = plans.publish(
-            plan, context, performance_budget, performance_baseline
+            plan,
+            board,
+            measure(pipeline, board),
+            performance_budget,
+            performance_baseline,
         )
-        if plan.checkpoint_target is not None:
-            plan.persist(completed_stages, stage_digests, "completed")
+        replay.finish()
+        machine.transition(scmle.runtime.state.Progress.COMPLETED)
         return report
 
     def declaration(self, report: reporting.Record) -> modalities.Declaration:

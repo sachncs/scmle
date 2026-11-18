@@ -36,6 +36,7 @@ from scmle.pipeline import policies
 from scmle.pipeline import roster
 import scmle.pipeline.context
 import scmle.pipeline.stages
+import scmle.runtime.engine
 from scmle.runtime import limits
 from scmle.runtime import logs
 from scmle.runtime import resource_observation
@@ -96,7 +97,7 @@ class Orchestrator:
             registry.load_plugins()
         self.registry = registry
         self.policy = policy or selection.Averager(spec.selection)
-        self.stages = engine.order(
+        self.stages = scmle.runtime.engine.order(
             stages or scmle.pipeline.stages.default_stages()
         )
         self.pipeline = engine.Pipeline(self.stages)

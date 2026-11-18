@@ -1,13 +1,8 @@
-"""The pipeline engine: orders the stages and runs them under the run state.
+"""The pipeline engine: runs the ordered stages under the run state.
 
-Each stage names what it needs. How a need is met and how ties are broken
-is a `Dependency`: `CLASSES` for the tabular stages (a need is a stage class,
-met by an instance of it or of a subclass; earlier lifecycle states first,
-then the order the stages were given) and `NAMES` for workflow steps (a need
-is a step name; ties by name). `ready` lists the stages whose needs are
-done, which is what a parallel dispatcher starts next. `order` checks that
-every dependency is present, rejects duplicates and cycles, and returns a
-deterministic topological order.
+The order comes from `scmle.runtime.engine` (`order`, with the `CLASSES`
+dependency by default: a need is a stage class, met by an instance of it or
+of a subclass; earlier lifecycle states first).
 `Pipeline` runs that order: before each stage it checks cancellation, it
 moves the state machine only when the stage's state differs from the
 current one, it limits the math-library threads, times the stage, consults
@@ -16,15 +11,22 @@ the run's terminal state. With an archive it writes each stage's product and
 record once the stage and its review are done, and the completion marker
 after the completed state; on a resumed run a stage whose product the
 archive restores is not run again, its product is applied instead
-(`archive.Directory.restore`). `Pipeline.advance(until=...)` runs only the
-stages a given stage needs, which is the side-effect-free plan preview.
+(`Archive.restore`). A stage that returns its product has it applied to the
+board (`Product.apply`), the one path by which a product enters the board
+whether the stage ran or was restored. `Pipeline.advance(until=...)` runs
+only the stages a given stage needs, which is the side-effect-free plan
+preview. The tabular run and the modality lifecycle are two boards and two
+archives on this one engine: the run directory's stage records
+(`archive.Directory`) and the modality run's signed checkpoint
+(`modality_lifecycle.checkpoints.Replay`).
 """
 
 from collections.abc import Callable
 from collections.abc import Hashable
-from collections.abc import Iterable
 from collections.abc import Sequence
+import contextlib
 import dataclasses
+import enum
 import time
 from typing import Any
 from typing import ClassVar
@@ -33,14 +35,102 @@ from typing import Protocol
 from typing import TypeVar
 
 from scmle.contracts import errors
-from scmle.pipeline import archive
+from scmle.contracts import records
 from scmle.pipeline import products
-import scmle.pipeline.context
+from scmle.runtime import engine
 from scmle.runtime import limits
 from scmle.runtime import state
+from scmle.runtime import tracing
 
 ContextT = TypeVar("ContextT", contravariant=True)  # noqa: PLC0105 -- no underscores (naming rule)
-ItemT = TypeVar("ItemT")
+MadeT = TypeVar("MadeT")
+
+
+class Regulator(Protocol):
+    """Limits the math-library threads while a stage runs."""
+
+    def cap(self) -> contextlib.AbstractContextManager[object]:
+        """Returns a context manager that applies the limit while open."""
+        ...
+
+
+class Board(Protocol):
+    """What the engine needs of a run context: cancellation and a thread cap.
+
+    The tabular run's context and the modality lifecycle's board
+    (`modality_lifecycle.state.Board`) are both boards.
+    """
+
+    @property
+    def regulator(self) -> Regulator:
+        """Limits the math-library threads while a stage runs."""
+        ...
+
+    def check_cancelled(self) -> None:
+        """Raises if the run was cancelled."""
+        ...
+
+
+BoardT = TypeVar("BoardT", bound=Board)
+
+
+class Archive(Protocol[MadeT]):
+    """Where a run keeps each finished stage and from which it resumes.
+
+    It is generic over what a stage makes. `archive.Directory` keeps the
+    tabular run's stage records and the modality lifecycle's signed
+    checkpoint is `modality_lifecycle.checkpoints.Replay`, both over
+    products; the workflow executor's object store is
+    `workflow.executor.records.Bucket`, over a step's outputs.
+    """
+
+    def record(
+        self,
+        index: int,
+        name: str,
+        progress: enum.StrEnum,
+        seconds: float,
+        made: MadeT | None = None,
+        needs: dict[str, str | None] | None = None,
+    ) -> records.Layout:
+        """Keeps one finished stage.
+
+        Args:
+            index: The stage's position in the run, from zero.
+            name: The stage's name.
+            progress: The state the stage ran in, or a step ended in.
+            seconds: Seconds the stage took.
+            made: What the stage made, or None.
+            needs: The product digests of the stages it needs, by name.
+
+        Returns:
+            The record kept; its `product` entry is the product's digest.
+        """
+        ...
+
+    def restore(
+        self,
+        index: int,
+        name: str,
+        makes: type[MadeT] | None,
+        needs: dict[str, str | None],
+    ) -> tuple[MadeT, str] | None:
+        """Loads a finished stage's product, if the stage need not run again.
+
+        Args:
+            index: The stage's position in the run, from zero.
+            name: The stage's name.
+            makes: The stage's product type, or None.
+            needs: The product digests this attempt has for its needs.
+
+        Returns:
+            The product and its digest, or None when the stage must run.
+        """
+        ...
+
+    def finish(self) -> None:
+        """Marks the run complete, after everything else."""
+        ...
 
 
 class Node(Protocol[ContextT]):
@@ -66,132 +156,16 @@ class Node(Protocol[ContextT]):
         """
         ...
 
-    def execute(self, context: ContextT) -> None:
-        """Performs the stage, reading and writing the context.
+    def execute(self, context: ContextT) -> products.Product | None:
+        """Performs the stage, reading the context.
 
         Args:
             context: The run context.
+
+        Returns:
+            The stage's product, which the engine applies to the context,
+            or None for a stage that sets the context itself.
         """
-
-
-LIFECYCLE = tuple(state.Progress)
-"""The lifecycle states in order; `order` runs earlier states first."""
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class Dependency(Generic[ItemT]):
-    """How items name their needs, how a need is met and how ties break.
-
-    Attributes:
-        needs: The needs of an item.
-        meets: Whether a done item meets a need.
-        rank: The tie-break key: among ready items, the smallest runs first;
-            equal keys keep the order the items were given.
-        title: The name of an item or of a need, for records and messages.
-    """
-
-    needs: Callable[[ItemT], Iterable[Hashable]]
-    meets: Callable[[ItemT, Hashable], bool]
-    rank: Callable[[ItemT], tuple[int, str]]
-    title: Callable[[Any], str]
-
-
-CLASSES: Dependency[Any] = Dependency(
-    needs=lambda stage: stage.requires,
-    meets=lambda done, need: isinstance(need, type) and isinstance(done, need),
-    rank=lambda stage: (LIFECYCLE.index(stage.state), ""),
-    title=lambda item: (
-        item.__name__ if isinstance(item, type) else type(item).__name__
-    ),
-)
-"""Tabular stages: a need is a stage class, met by an instance of it or of a
-subclass (so a replacement stage satisfies its predecessor's dependents);
-earlier lifecycle states run first, so the state machine only moves forward.
-"""
-
-NAMES: Dependency[Any] = Dependency(
-    needs=lambda step: step.depends_on,
-    meets=lambda done, need: done.name == need,
-    rank=lambda step: (0, step.name),
-    title=lambda item: item if isinstance(item, str) else item.name,
-)
-"""Workflow steps (`name`, `depends_on`): a need is a step name; ties are
-broken by name."""
-
-
-def ready(
-    done: Iterable[ItemT],
-    remaining: Iterable[ItemT],
-    dependency: Dependency[ItemT] = CLASSES,
-) -> tuple[ItemT, ...]:
-    """Lists the remaining items whose every need a done item meets.
-
-    Args:
-        done: The items that finished.
-        remaining: The items not started.
-        dependency: How needs are named and met.
-
-    Returns:
-        The items that may start now, in the order given.
-    """
-    finished = tuple(done)
-    return tuple(
-        item
-        for item in remaining
-        if all(
-            any(dependency.meets(other, need) for other in finished)
-            for need in dependency.needs(item)
-        )
-    )
-
-
-def order(
-    stages: Sequence[ItemT], dependency: Dependency[ItemT] = CLASSES
-) -> tuple[ItemT, ...]:
-    """Orders items so that every item runs after the items it needs.
-
-    Among the items whose needs have run, the one with the smallest
-    `dependency.rank` runs first, and ties keep the order the items were
-    given.
-
-    Args:
-        stages: The stages or steps.
-        dependency: How needs are named and met and how ties break.
-
-    Returns:
-        The items in execution order.
-
-    Raises:
-        ConfigError: If a needed item is missing, an item appears twice, or
-            the dependencies contain a cycle.
-    """
-    titles = [dependency.title(stage) for stage in stages]
-    if len(set(titles)) != len(titles):
-        raise errors.ConfigError("a stage appears more than once")
-    for stage in stages:
-        missing = [
-            dependency.title(need)
-            for need in dependency.needs(stage)
-            if not any(dependency.meets(other, need) for other in stages)
-        ]
-        if missing:
-            raise errors.ConfigError(
-                f"{dependency.title(stage)} requires {missing}, which are not "
-                "in the workflow"
-            )
-    remaining = list(stages)
-    ordered: list[ItemT] = []
-    while remaining:
-        candidates = ready(ordered, remaining, dependency)
-        if not candidates:
-            cycle = [dependency.title(stage) for stage in remaining]
-            raise errors.ConfigError(
-                f"stage dependencies contain a cycle among {cycle}"
-            )
-        first = min(candidates, key=dependency.rank)
-        ordered.append(first)
-        remaining.remove(first)
-    return tuple(ordered)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -207,11 +181,11 @@ class Lap:
     memory: float
 
 
-Review = Callable[[state.Progress, scmle.pipeline.context.Context], None]
+Review = Callable[[state.Progress, BoardT], None]
 """Consults the approval gates of a state once its last stage has run."""
 
 
-class Pipeline:
+class Pipeline(Generic[BoardT]):
     """Runs an ordered stage sequence under one state machine.
 
     Attributes:
@@ -230,9 +204,9 @@ class Pipeline:
 
     def __init__(
         self,
-        stages: Sequence[Node[scmle.pipeline.context.Context]],
-        records: archive.Directory | None = None,
-        dependency: Dependency[Any] = CLASSES,
+        stages: Sequence[Node[BoardT]],
+        records: Archive[products.Product] | None = None,
+        dependency: engine.Dependency[Any] = engine.CLASSES,
     ) -> None:
         """Orders the stages.
 
@@ -241,16 +215,14 @@ class Pipeline:
             records: The run's stage records, or None.
             dependency: How the stages name and meet their needs.
         """
-        self.stages = order(stages, dependency)
+        self.stages = engine.order(stages, dependency)
         self.records = records
         self.dependency = dependency
         self.timings: dict[str, Lap] = {}
         self.digests: dict[str, str | None] = {}
         self.restored: list[str] = []
 
-    def select(
-        self, until: Hashable
-    ) -> tuple[Node[scmle.pipeline.context.Context], ...]:
+    def select(self, until: Hashable) -> tuple[Node[BoardT], ...]:
         """Returns the stages meeting `until` and every stage they need.
 
         Args:
@@ -276,9 +248,7 @@ class Pipeline:
                 needed.append(stage)
         return tuple(stage for stage in self.stages if stage in needed)
 
-    def ancestry(
-        self, stage: Node[scmle.pipeline.context.Context]
-    ) -> dict[str, str | None]:
+    def ancestry(self, stage: Node[BoardT]) -> dict[str, str | None]:
         """The product digests of every stage `stage` needs, directly or not.
 
         Args:
@@ -297,9 +267,9 @@ class Pipeline:
 
     def advance(
         self,
-        context: scmle.pipeline.context.Context,
-        machine: state.Tracker | None = None,
-        review: Review | None = None,
+        context: BoardT,
+        machine: state.Machine[state.Progress] | None = None,
+        review: Review[BoardT] | None = None,
         until: Hashable | None = None,
     ) -> None:
         """Runs the stages, or those `until` needs, without ending the run.
@@ -326,13 +296,21 @@ class Pipeline:
                     reason = f"{reason} (restored from its record)"
                 machine.transition(stage.state, reason)
             lap = Lap(0.0, 0.0)
+            made: products.Product | None = None
             if restored is not None:
                 restored.apply(context)
                 self.restored.append(name)
             else:
                 started = time.perf_counter()
-                with context.regulator.cap():
-                    stage.execute(context)
+                with (
+                    tracing.TRACING.span(
+                        f"stage {name}", {"scmle.stage": name}
+                    ),
+                    context.regulator.cap(),
+                ):
+                    made = stage.execute(context)
+                if made is not None:
+                    made.apply(context)
                 lap = Lap(
                     time.perf_counter() - started, limits.peak_memory_gb()
                 )
@@ -344,11 +322,8 @@ class Pipeline:
                 review(stage.state, context)
             if self.records is not None and restored is None:
                 needs = self.ancestry(stage)
-                made = (
-                    None
-                    if stage.makes is None
-                    else stage.makes.capture(context)
-                )
+                if made is None and stage.makes is not None:
+                    made = stage.makes.capture(context)
                 record = self.records.record(
                     self.stages.index(stage),
                     name,
@@ -359,9 +334,7 @@ class Pipeline:
                 )
                 self.digests[name] = record["product"]
 
-    def restore(
-        self, stage: Node[scmle.pipeline.context.Context]
-    ) -> products.Product | None:
+    def restore(self, stage: Node[BoardT]) -> products.Product | None:
         """The product of a finished stage a resumed run need not run again.
 
         Args:
@@ -384,9 +357,9 @@ class Pipeline:
 
     def run(
         self,
-        context: scmle.pipeline.context.Context,
-        machine: state.Tracker,
-        review: Review,
+        context: BoardT,
+        machine: state.Machine[state.Progress],
+        review: Review[BoardT],
         details: Callable[[], dict[str, str | list[str]]],
         artifacts: tuple[str, ...] = (),
     ) -> None:

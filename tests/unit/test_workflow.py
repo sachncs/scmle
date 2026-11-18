@@ -2,6 +2,7 @@
 
 import dataclasses
 import json
+import pathlib
 import threading
 
 import pytest
@@ -622,6 +623,68 @@ def test_a_step_over_its_own_budget_fails(store):
     assert "StepBudgetError" in saved["error"]
 
 
+def test_a_resume_keeps_the_cost_of_steps_that_failed(store):
+    """STG-12: a resume used to re-read only succeeded steps' cost, so each
+    resume restored the budget a failed attempt had spent."""
+    clock = Clock()
+    recorder = Recorder(clock)
+    flow = definition.Workflow(
+        "spend",
+        "1",
+        (definition.Step("a", definition.StepKind.INGEST, retries=fast()),),
+        cost_budget=10.0,
+    )
+    broken = {"on": True}
+
+    def costly(context):
+        context.spend(6.0)
+        if broken["on"]:
+            raise errors.DataError("bad batch")
+        return {}
+
+    recorder.behaviour["a"] = costly
+    executor = executor_for(store, flow, recorder, clock)
+    record = executor.start("t", "alice")
+    assert record["state"] == "failed"
+    assert record["cost"] == 6.0
+    broken["on"] = False
+    again = executor.resume(record["run_id"])
+    assert again["cost"] >= 12.0
+    assert again["state"] == "budget_stopped"
+    saved = executor.step_record(record["run_id"], "a")
+    assert "StepBudgetError" in saved["error"]
+
+
+def test_parallel_steps_reserve_their_declared_cost(store):
+    """STG-12: steps started together each saw the run's spend as of submit
+    time, so together they could pass the run's budget."""
+    clock = Clock()
+    recorder = Recorder(clock)
+    kind = definition.StepKind.INGEST
+    flow = definition.Workflow(
+        "pair",
+        "1",
+        (
+            definition.Step("a", kind, cost_budget=6.0, retries=fast()),
+            definition.Step("b", kind, cost_budget=6.0, retries=fast()),
+        ),
+        cost_budget=10.0,
+        max_parallel=2,
+    )
+    barrier = threading.Barrier(2, timeout=10)
+
+    def costly(context):
+        barrier.wait()
+        context.spend(6.0)
+        return {}
+
+    recorder.behaviour["a"] = costly
+    recorder.behaviour["b"] = costly
+    record = executor_for(store, flow, recorder, clock).start("t", "alice")
+    assert sorted(record["steps"].values()) == ["failed", "succeeded"]
+    assert record["cost"] == 12.0
+
+
 def test_independent_steps_run_in_parallel_and_a_group_limit_holds(store):
     clock = Clock()
     s = definition.StepKind
@@ -664,6 +727,60 @@ def test_independent_steps_run_in_parallel_and_a_group_limit_holds(store):
     ).start("p", "a")
     assert record["state"] == "succeeded"
     assert peak[0] == 1
+
+
+class Crashing(objectstore.LocalObjectStore):
+    """A store whose process dies before a settled run record is written."""
+
+    def __init__(self, root):
+        super().__init__(root)
+        self.armed = False
+
+    def put(self, key, data, **options):
+        settled = json.loads(data).get("state") != "running"
+        if self.armed and key.endswith("/run.json") and settled:
+            raise SystemExit("killed before run.json")
+        return super().put(key, data, **options)
+
+
+def test_a_crash_before_the_run_record_keeps_every_attempt_spend(tmp_path):
+    """STG-12: a re-run step used to overwrite its failed record, so a drive
+    that died before writing run.json lost the earlier spend on resume."""
+    store = Crashing(tmp_path / "state")
+    clock = Clock()
+    flow = definition.Workflow(
+        "crash",
+        "1",
+        (
+            definition.Step(
+                "a", definition.StepKind.INGEST, retries=retry.Retries(1)
+            ),
+        ),
+        cost_budget=10.0,
+    )
+
+    def costly(context):
+        context.spend(4.0)
+        raise errors.DataError("bad batch")
+
+    def executor():
+        return scmle.workflow.executor.Executor(
+            flow, store, {"a": costly}, clock=clock, sleep=clock.sleep
+        )
+
+    record = executor().start("t", "alice")
+    assert record["cost"] == 4.0
+    store.armed = True
+    with pytest.raises(SystemExit):
+        executor().resume(record["run_id"])
+    store.armed = False
+    saved = executor().step_record(record["run_id"], "a")
+    assert saved["spend"] == [4.0, 4.0]
+    assert saved["cost"] == 8.0
+    assert executor().tally(record["run_id"]) == 8.0
+    final = executor().resume(record["run_id"])
+    assert final["cost"] == 12.0
+    assert final["state"] == "budget_stopped"
 
 
 def test_approval_rules_are_enforced(store):
@@ -947,9 +1064,19 @@ RUN = [
     "workflow_version",
 ]
 CLOSED = sorted([*RUN, "ended_at", "steps"])
-OPENED = ["attempts", "fence", "idempotency_key", "state", "step"]
-KEPT = sorted([*OPENED, "cost", "outputs"])
-FAILED = sorted([*OPENED, "cost", "error"])
+# STG-12: every step record carries `spend`, the append-only list of what
+# each attempt of the run spent, and `cost`, its sum, from the first write.
+OPENED = [
+    "attempts",
+    "cost",
+    "fence",
+    "idempotency_key",
+    "spend",
+    "state",
+    "step",
+]
+KEPT = sorted([*OPENED, "outputs"])
+FAILED = sorted([*OPENED, "error"])
 SKIPPED = ["fence", "reason", "state", "step"]
 WAITING = ["fence", "state", "step", "waiting_since"]
 DECIDED = ["cost", "fence", "idempotency_key", "outputs", "state", "step"]
@@ -1069,3 +1196,40 @@ def transcribe(tmp_path, scenario):
 @pytest.mark.parametrize("scenario", sorted(TRANSCRIPTS))
 def test_the_step_record_transcript_is_unchanged(tmp_path, scenario):
     assert transcribe(tmp_path, scenario) == TRANSCRIPTS[scenario]
+
+
+# ---- records written before the engine's Machine and Bucket ----------------
+
+RECORDS = (
+    pathlib.Path(__file__).parents[1] / "fixtures" / "workflow_records.json"
+)
+
+
+def test_records_written_before_the_engine_load_and_resume(tmp_path):
+    # The fixture holds the run and step records the executor wrote before
+    # phase 4 moved its run states onto `Machine` and its records behind
+    # `Bucket`: one run failed at evaluate after train spent 3.0 and
+    # evaluate 0.5, one waits at its approval. Both load and resume.
+    stored = json.loads(RECORDS.read_text(encoding="utf-8"))["records"]
+    store = objectstore.LocalObjectStore(tmp_path / "state")
+    for key, record in stored.items():
+        store.put(key, json.dumps(record, indent=2, sort_keys=True).encode())
+    clock = Clock()
+    recorder = Recorder(clock)
+    flow = pipeline()
+    executor = executor_for(store, flow, recorder, clock)
+    failed = scmle.workflow.executor.run_id_for(flow, "failed")
+    assert (
+        executor.start("failed", "alice")
+        == stored[f"workflows/{flow.name}/runs/{failed}/run.json"]
+    )
+    healed = executor.resume(failed)
+    assert healed["state"] == "waiting_approval"
+    assert recorder.names() == ["evaluate", "monitor"]
+    assert healed["cost"] == 3.5
+    assert executor.step_record(failed, "evaluate")["spend"] == [0.5, 0.0]
+    waiting = scmle.workflow.executor.run_id_for(flow, "waiting")
+    approve(executor, {"run_id": waiting})
+    done = executor.resume(waiting)
+    assert done["state"] == "succeeded"
+    assert recorder.names()[2:] == ["batch_predict"]

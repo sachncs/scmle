@@ -25,7 +25,7 @@ import hashlib
 import io
 import json
 import pathlib
-import pickle
+import pickle  # nosec B403 -- for PicklingError only
 from typing import Self
 
 import joblib

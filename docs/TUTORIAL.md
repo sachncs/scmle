@@ -305,6 +305,9 @@ file a run writes, and [`CLI.md`](CLI.md) the shell interface.
 
 ## 11. Extending
 
-Subclass `Model` and pass `comply`, or register it through
-the `scmle.models` entry point. See `docs/ARCHITECTURE.md` for every extension
-point.
+Subclass `Model` and pass `comply`, then enrol it with
+`plugins.REGISTRY.enrol(plugins.Kind.ESTIMATORS, name, adapter)` (from
+`scmle.runtime import plugins`) or advertise it through the `scmle.models`
+entry point. Metrics, readers, detectors, stages and transformers are enrolled
+the same way under their own `plugins.Kind` and entry-point group. See
+`docs/ARCHITECTURE.md` for every extension point.

@@ -44,7 +44,13 @@ Modules interact only through the typed contracts in `scmle.contracts`.
 (`CREATED -> VALIDATING -> PROFILING -> PLANNING -> TRAINING -> SELECTING ->
 TESTING -> PACKAGING -> COMPLETED`, with `FAILED`, `CANCELLED`, `BLOCKED` as
 exits). Each transition is an event in `events.jsonl` and a row update in the
-tracking database.
+tracking database. `Tracker` is the tabular table on the one state machine,
+`runtime.state.Machine`, which the modality lifecycle and the workflow
+executor drive with tables of their own. The pipeline engine
+(`pipeline.engine.Pipeline`) orders and runs the stages and hands each
+finished one to an `Archive`: the run directory's stage records, the
+modality lifecycle's signed checkpoint, or the workflow executor's object
+store (`workflow.executor.records.Bucket`).
 
 1. **Ingest** accepts common open tabular formats (CSV/TSV, JSON records,
    newline-delimited JSON, Parquet, Feather/Arrow), pandas/Arrow-compatible
@@ -184,7 +190,8 @@ decision boundary, not merely rename a function call.
 | a feature operation | `Operation` | `feature_graph.OPS` |
 | a synthetic-data generator | `Synthesizer` | `GeneratorOverSampler.generator_class` |
 | a validation protocol | `Partitioner` | `splitting.STRATEGIES` |
-| a model family | `Model` | `Catalog.register` or the `scmle.models` entry point |
+| a model family | `Model` | `plugins.REGISTRY.enrol(plugins.Kind.ESTIMATORS, ...)`, `Catalog.register` or the `scmle.models` entry point |
+| a metric | `Metric` | `plugins.REGISTRY.enrol(plugins.Kind.METRICS, ...)` |
 | a data strategy | `Strategy` | `strategies.STRATEGIES` |
 | a planning policy | `Refiner` | `Planner(rules=...)` |
 | a search algorithm | `Optimizer` | `optimizers.OPTIMIZERS` |
@@ -193,7 +200,19 @@ decision boundary, not merely rename a function call.
 | an executor | `Executor` | `execution.select` |
 | a tracker | `Store` | `Orchestrator(tracker=...)` |
 | a serving surface | `Server` | direct use |
-| a workflow stage | `Stage` | `Orchestrator(stages=...)` |
+| a workflow stage | `Stage` | `Orchestrator(stages=...)` or `plugins.REGISTRY.enrol(plugins.Kind.STAGES, ...)` |
+
+Every kind of extension is enrolled in one registry,
+`scmle.runtime.plugins.REGISTRY`, under a `plugins.Kind`: `ESTIMATORS`,
+`METRICS`, `READERS`, `DETECTORS`, `STAGES` or `TRANSFORMERS`. A package
+advertises items through the kind's entry-point group (`plugins.GROUPS`:
+`scmle.models`, `scmle.metrics`, `scmle.readers`, `scmle.detectors`,
+`scmle.stages`, `scmle.transformers`), and `REGISTRY.discover(kind)` loads,
+vets and reports them, so a broken plugin is logged and skipped rather than
+raised. The model catalog discovers `scmle.models` itself; enrolled metrics
+join the metric catalog and enrolled stages the standard stage sequence. A
+plain string as the kind, and `models.registry.adopt`, `extensions` and
+`deregister`, are deprecated.
 
 An adapter from the `scmle.models` entry point, or an estimator added with
 `register_estimator`, must pass `scmle.models.conformance.comply` or it is
@@ -211,7 +230,8 @@ underscore (`tests/unit/test_conventions.py`).
 The public API can be called from several threads of one process, including
 on the free-threaded build (`tests/unit/test_thread_safety.py`).
 
-* **Registries.** `register_estimator` / `unregister_estimator`
+* **Registries.** `plugins.REGISTRY` holds one lock for every kind.
+  `register_estimator` / `unregister_estimator`
   (`models.registry.USER_ADAPTERS`) and `register_metric`
   (`Repertoire`) check and change under a lock, so a duplicate name has
   exactly one winner. Readers take a snapshot: `Catalog.stock`

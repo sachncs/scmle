@@ -35,6 +35,21 @@ FINISHED = frozenset(
     }
 )
 
+TABLE = {
+    Progress.RUNNING: frozenset(Progress),
+    Progress.WAITING_APPROVAL: frozenset({Progress.RUNNING}),
+    Progress.FAILED: frozenset({Progress.RUNNING}),
+    Progress.SUCCEEDED: frozenset(),
+    Progress.BUDGET_STOPPED: frozenset(),
+    Progress.REJECTED: frozenset(),
+    Progress.EXPIRED: frozenset(),
+}
+"""A run's transition table on the shared `Machine` (`scmle.runtime.state`).
+
+A drive enters `RUNNING` and ends in any state; `RUNNING` again continues a
+run whose executor died. Only a waiting run (after a decision) or a failed
+one (from its failed steps) runs again; the other ends are settled."""
+
 
 class Phase(enum.StrEnum):
     """Where a step is.
@@ -59,3 +74,7 @@ class Phase(enum.StrEnum):
     WAITING = "waiting"
     REJECTED = "rejected"
     EXPIRED = "expired"
+
+
+UNMET = frozenset({Phase.FAILED, Phase.SKIPPED, Phase.REJECTED, Phase.EXPIRED})
+"""Step states that leave a dependent step unable to run: it is skipped."""

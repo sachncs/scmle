@@ -1,4 +1,21 @@
-"""The shared lifecycle state and the stage interface."""
+"""The lifecycle board, the stage products and the stage interface.
+
+The fifteen lifecycle stages are nodes of the one pipeline engine
+(`scmle.pipeline.engine`): the engine orders them by what they need and by
+the run state their phase belongs to (`STATES`), checks cancellation before
+each, caps the math-library threads, times each one and hands each finished
+stage to the run's archive, the signed checkpoint (`checkpoints.Replay`).
+Each stage reads the products of the stages it needs from the `Board` and
+returns its own product, a frozen `Proof`; the engine applies it to the
+board. The board holds the run's fixed inputs and the products made so far,
+and no stage assigns an attribute on it.
+
+Every product carries `evidence`, the JSON-native stage record the report
+holds and the checkpoint digests, unchanged from before the engine. Products
+are derived (`products.Derived`): a resumed run replays every stage against
+the caller's adapter and checks each replayed digest against the checkpoint,
+so no fitted model or adapter state is trusted from disk.
+"""
 
 from __future__ import annotations
 
@@ -8,146 +25,396 @@ import platform
 from typing import Any
 from typing import ClassVar
 from typing import TYPE_CHECKING
+from typing import TypeVar
 
-from scmle.contracts import data
+from scmle.contracts import errors
 from scmle.contracts import events
 from scmle.contracts import modalities
 from scmle.contracts import performance
+from scmle.contracts import tasks
+from scmle.pipeline import products
 from scmle.runtime import limits
+import scmle.runtime.state
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from collections.abc import Mapping
 
     from sklearn.linear_model import LogisticRegression
 
+    from scmle.pipeline import engine
     from scmle.pipeline.modality_lifecycle import containers
-    from scmle.pipeline.modality_lifecycle import curators
+    from scmle.pipeline.modality_lifecycle import plans
+
+ProofT = TypeVar("ProofT", bound="Proof")
+
+STATES = {
+    modalities.Phase.INGESTION: scmle.runtime.state.Progress.VALIDATING,
+    modalities.Phase.VALIDATION: scmle.runtime.state.Progress.VALIDATING,
+    modalities.Phase.PROFILING: scmle.runtime.state.Progress.PROFILING,
+    modalities.Phase.CURATION: scmle.runtime.state.Progress.PROFILING,
+    modalities.Phase.SPLITTING: scmle.runtime.state.Progress.PROFILING,
+    modalities.Phase.FEATURE_PREPARATION: (
+        scmle.runtime.state.Progress.TRAINING
+    ),
+    modalities.Phase.MODELLING: scmle.runtime.state.Progress.TRAINING,
+    modalities.Phase.EVALUATION: scmle.runtime.state.Progress.TESTING,
+    modalities.Phase.DATA_EXPLAINABILITY: scmle.runtime.state.Progress.TESTING,
+    modalities.Phase.MODEL_EXPLAINABILITY: (
+        scmle.runtime.state.Progress.TESTING
+    ),
+    modalities.Phase.PACKAGING: scmle.runtime.state.Progress.PACKAGING,
+    modalities.Phase.INFERENCE: scmle.runtime.state.Progress.PACKAGING,
+    modalities.Phase.MONITORING: scmle.runtime.state.Progress.PACKAGING,
+    modalities.Phase.DOCUMENTATION: scmle.runtime.state.Progress.PACKAGING,
+    modalities.Phase.RECOVERY_AND_RESOURCE_TESTS: (
+        scmle.runtime.state.Progress.PACKAGING
+    ),
+}
+"""The run state each lifecycle phase belongs to, as the tabular stages: the
+engine runs earlier states first, so with each stage's `requires` the order
+is the required lifecycle order."""
+
+TABLE = scmle.runtime.state.chain(
+    (
+        scmle.runtime.state.Progress.CREATED,
+        *dict.fromkeys(STATES.values()),
+        scmle.runtime.state.Progress.COMPLETED,
+    ),
+    scmle.runtime.state.ABORT_STATES,
+)
+"""The lifecycle's transition table on the shared `Machine`: its run states
+forward in order (it has no planning or selecting state), or an abort."""
 
 
-@dataclasses.dataclass
-class Context:
-    """Mutable products shared by the fifteen lifecycle stages.
+@dataclasses.dataclass(frozen=True)
+class Proof(products.Derived):
+    """What one lifecycle stage made: its evidence, and what later stages read.
 
     Attributes:
-        adapter: Modality adapter the lifecycle runs on.
-        package_path: Directory the model package is written to.
-        signing_key: Key that signs the package and report.
-        seed: Random seed of the run.
-        observed_adapter: Adapter over the data used for monitoring.
-        manifest: Modality manifest, if the caller supplied one.
-        require_independent_ground_truth: Whether explanation quality needs
-            independently authored ground truth.
-        resume_replay: Whether the run replays stages already checkpointed.
-        stage_records: Result of each completed stage.
-        curation_report: Curation report produced by the curation stage.
-        partitions: Train, validation and test partitions, once split.
-        feature_batches: Feature batch per partition name.
-        model: Fitted classifier, once trained.
-        evaluation: Held-out evaluation evidence.
-        performance_observations: Measured operations, one per kind.
-        data_explanation: Data explainability evidence.
-        model_explanation: Model explainability evidence.
-        package: Identity of the written package, once packaged.
-        inference: Inference smoke-test evidence.
-        monitoring: Drift-monitoring evidence.
-        documentation: Documentation evidence.
-        recovery: Recovery and resource evidence.
+        phase: The lifecycle stage the product belongs to.
+        evidence: The JSON-native evidence the stage recorded.
     """
 
-    adapter: curators.Preparer
-    package_path: Path
-    signing_key: str | bytes
-    seed: int
-    observed_adapter: curators.Preparer
-    manifest: data.Passport | None = None
-    require_independent_ground_truth: bool = False
-    resume_replay: bool = False
-    stage_records: dict[modalities.Phase, dict[str, object]] = (
-        dataclasses.field(default_factory=dict)
-    )
-    curation_report: Any = None
-    partitions: containers.Partitions | None = None
-    feature_batches: dict[str, containers.Batch] = dataclasses.field(
-        default_factory=dict
-    )
-    model: LogisticRegression | None = None
-    evaluation: dict[str, object] = dataclasses.field(default_factory=dict)
-    performance_observations: dict[
-        performance.Operation,
-        performance.Observation,
-    ] = dataclasses.field(default_factory=dict)
-    data_explanation: dict[str, object] = dataclasses.field(
-        default_factory=dict
-    )
-    model_explanation: dict[str, object] = dataclasses.field(
-        default_factory=dict
-    )
-    package: containers.Package | None = None
-    inference: dict[str, object] = dataclasses.field(default_factory=dict)
-    monitoring: dict[str, object] = dataclasses.field(default_factory=dict)
-    documentation: dict[str, object] = dataclasses.field(default_factory=dict)
-    recovery: dict[str, object] = dataclasses.field(default_factory=dict)
+    phase: ClassVar[modalities.Phase]
+    evidence: dict[str, object]
 
-    def record(
-        self,
-        stage: modalities.Phase,
-        payload: dict[str, object],
-    ) -> None:
-        """Records one stage result for the final evidence index.
+    def summary(self) -> object:
+        """The stage's evidence, which the checkpoint digests."""
+        return self.evidence
+
+    @classmethod
+    def capture(cls, board: object) -> Proof:
+        """Reads the product from the board after its stage ran.
 
         Args:
-            stage: Stage that produced the result.
-            payload: JSON-native result of the stage.
+            board: The lifecycle `Board`.
+
+        Returns:
+            The product.
+
+        Raises:
+            KindError: If `board` is not a lifecycle board.
         """
-        self.stage_records[stage] = payload
+        if not isinstance(board, Board):
+            raise errors.KindError("a lifecycle product is read from a Board")
+        return board.get(cls)
 
-    def clock(
-        self,
-        operation: performance.Operation,
-        elapsed_seconds: float,
-        sample_count: int,
-    ) -> None:
-        """Stores one measured operation with machine and timestamp context.
-
-        The observation also carries the process's peak memory, the platform
-        and Python version, and a UTC timestamp. It replaces any earlier
-        observation of the same operation.
+    def apply(self, board: object) -> None:
+        """Adds the product to the lifecycle board.
 
         Args:
-            operation: Operation that was measured.
-            elapsed_seconds: Wall-clock duration of the operation.
-            sample_count: Number of samples the operation processed.
+            board: The lifecycle `Board`.
+
+        Raises:
+            KindError: If `board` is not a lifecycle board.
         """
-        self.performance_observations[operation] = performance.Observation(
-            operation=operation,
-            elapsed=elapsed_seconds,
-            memory=limits.peak_memory_gb(),
-            samples=sample_count,
-            machine=platform.platform(),
-            observed=events.stamp(),
-            software=(
-                f"{platform.python_implementation()} "
-                f"{platform.python_version()}"
-            ),
-        )
+        if not isinstance(board, Board):
+            raise errors.KindError("a lifecycle product applies to a Board")
+        board.made[self.phase] = self
+
+
+@dataclasses.dataclass(frozen=True)
+class Intake(Proof):
+    """The source identity and sample count."""
+
+    phase = modalities.Phase.INGESTION
+
+
+@dataclasses.dataclass(frozen=True)
+class Census(Proof):
+    """The label and class counts."""
+
+    phase = modalities.Phase.VALIDATION
+
+
+@dataclasses.dataclass(frozen=True)
+class Profile(Proof):
+    """The modality's curation report.
+
+    Attributes:
+        report: The curation report the adapter produced.
+    """
+
+    phase = modalities.Phase.PROFILING
+    report: Any
+
+
+@dataclasses.dataclass(frozen=True)
+class Clearance(Proof):
+    """The finding that no blocking curation finding is unresolved."""
+
+    phase = modalities.Phase.CURATION
+
+
+@dataclasses.dataclass(frozen=True)
+class Partition(Proof):
+    """The train, validation and test partitions.
+
+    Attributes:
+        partitions: The partitions.
+    """
+
+    phase = modalities.Phase.SPLITTING
+    partitions: containers.Partitions
+
+
+@dataclasses.dataclass(frozen=True)
+class Features(Proof):
+    """The feature batch of each partition.
+
+    Attributes:
+        batches: The batch of each partition, by partition name.
+    """
+
+    phase = modalities.Phase.FEATURE_PREPARATION
+    batches: Mapping[str, containers.Batch]
+
+
+@dataclasses.dataclass(frozen=True)
+class Fit(Proof):
+    """The classifier fitted on the training partition.
+
+    Attributes:
+        model: The fitted classifier.
+    """
+
+    phase = modalities.Phase.MODELLING
+    model: LogisticRegression
+
+
+@dataclasses.dataclass(frozen=True)
+class Score(Proof):
+    """The held-out metrics and predictions."""
+
+    phase = modalities.Phase.EVALUATION
+
+
+@dataclasses.dataclass(frozen=True)
+class Lineage(Proof):
+    """The data lineage and feature summaries."""
+
+    phase = modalities.Phase.DATA_EXPLAINABILITY
+
+
+@dataclasses.dataclass(frozen=True)
+class Explanation(Proof):
+    """The model explanation and its quality checks."""
+
+    phase = modalities.Phase.MODEL_EXPLAINABILITY
+
+
+@dataclasses.dataclass(frozen=True)
+class Bundle(Proof):
+    """The written, signed model package.
+
+    Attributes:
+        package: The package's identity.
+    """
+
+    phase = modalities.Phase.PACKAGING
+    package: containers.Package
+
+
+@dataclasses.dataclass(frozen=True)
+class Reproduction(Proof):
+    """The packaged model reproducing the held-out predictions.
+
+    Attributes:
+        observations: The load and inference measurements.
+    """
+
+    phase = modalities.Phase.INFERENCE
+    observations: tuple[performance.Observation, ...]
+
+
+@dataclasses.dataclass(frozen=True)
+class Drift(Proof):
+    """The reference-to-observed drift evidence."""
+
+    phase = modalities.Phase.MONITORING
+
+
+@dataclasses.dataclass(frozen=True)
+class Card(Proof):
+    """The dataset and model card."""
+
+    phase = modalities.Phase.DOCUMENTATION
+
+
+@dataclasses.dataclass(frozen=True)
+class Resilience(Proof):
+    """The tampered-package rejection and the resource bounds."""
+
+    phase = modalities.Phase.RECOVERY_AND_RESOURCE_TESTS
+
+
+def governor() -> limits.Governor:
+    """The thread cap of a lifecycle run: the default resource limits.
+
+    Returns:
+        A governor over the default resources; with no CPU limit its cap
+        leaves the math-library threads as they are.
+    """
+    return limits.Governor(tasks.Resources())
+
+
+@dataclasses.dataclass(frozen=True)
+class Board:
+    """The fixed inputs of a lifecycle run and the products made so far.
+
+    Attributes:
+        plan: The run's fixed inputs.
+        resumed: Values of the stages the resumed checkpoint completed; a
+            stage among them replays onto what the interrupted run wrote.
+        regulator: The thread cap the engine applies around each stage.
+        made: The product of each finished stage, by lifecycle stage; only
+            `Proof.apply` adds one.
+    """
+
+    plan: plans.Plan
+    resumed: tuple[str, ...] = ()
+    regulator: limits.Governor = dataclasses.field(default_factory=governor)
+    made: dict[modalities.Phase, Proof] = dataclasses.field(
+        default_factory=dict
+    )
+
+    def check_cancelled(self) -> None:
+        """Polls the run's cancellation check (`plans.Plan.poll`)."""
+        self.plan.poll()
+
+    def get(self, kind: type[ProofT]) -> ProofT:
+        """The product of a finished stage.
+
+        Args:
+            kind: The product type.
+
+        Returns:
+            The product.
+
+        Raises:
+            OrderError: If the stage that makes it has not run.
+        """
+        found = self.made.get(kind.phase)
+        if not isinstance(found, kind):
+            raise errors.OrderError(f"{kind.__name__} is not made yet")
+        return found
+
+    def replaying(self, phase: modalities.Phase) -> bool:
+        """Whether a stage replays one a checkpoint already completed.
+
+        Args:
+            phase: The stage.
+
+        Returns:
+            True if the run resumes a checkpoint that completed the stage.
+        """
+        return phase.value in self.resumed
+
+
+def observe(
+    operation: performance.Operation, lap: engine.Lap, samples: int
+) -> performance.Observation:
+    """One measured operation with its machine and time.
+
+    Args:
+        operation: What was measured.
+        lap: Its seconds and the process's peak memory after it.
+        samples: How many samples it processed.
+
+    Returns:
+        The observation, stamped now in UTC.
+    """
+    return performance.Observation(
+        operation=operation,
+        elapsed=lap.seconds,
+        memory=lap.memory,
+        samples=samples,
+        machine=platform.platform(),
+        observed=events.stamp(),
+        software=(
+            f"{platform.python_implementation()} {platform.python_version()}"
+        ),
+    )
 
 
 class Stage(abc.ABC):
-    """One polymorphic stage in a modality lifecycle.
+    """One lifecycle stage: a node of the pipeline engine.
 
     Attributes:
         stage: Lifecycle stage this class implements.
-        performance_operation: Operation whose duration is measured for this
-            stage, or None if it is not timed.
+        state: The run state the stage belongs to (`STATES`); with
+            `requires` it orders the stages in the required lifecycle order.
+        requires: The stages whose products this one reads.
+        makes: The product the stage returns, a `Proof` (typed as the
+            engine node's product, which a class variable cannot narrow).
+        performance_operation: Operation the engine's timing of this stage
+            reports, or None if it is not reported.
     """
 
     stage: ClassVar[modalities.Phase]
+    state: ClassVar[scmle.runtime.state.Progress]
+    requires: ClassVar[tuple[type, ...]] = ()
+    makes: ClassVar[type[products.Product] | None]
     performance_operation: ClassVar[performance.Operation | None] = None
 
-    @abc.abstractmethod
-    def execute(self, context: Context) -> None:
-        """Executes the stage and records its evidence.
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Gives a stage the run state of its phase.
 
         Args:
-            context: Shared lifecycle state, updated in place.
+            **kwargs: Passed on to `object.__init_subclass__`.
+        """
+        super().__init_subclass__(**kwargs)
+        cls.state = STATES[cls.stage]
+
+    def describe(self, board: Board | None) -> str:  # noqa: ARG002 -- engine.Node
+        """Returns the reason recorded on entering the stage.
+
+        Args:
+            board: Unused: the reason names only the stage.
+
+        Returns:
+            The reason text.
+        """
+        return f"modality {self.stage.value}"
+
+    def samples(self, board: Board) -> int:
+        """How many samples the reported operation processed.
+
+        Args:
+            board: The run's board after the stage.
+
+        Returns:
+            The training rows.
+        """
+        return len(board.get(Features).batches["train"].sample_ids)
+
+    @abc.abstractmethod
+    def execute(self, board: Board) -> Proof:
+        """Executes the stage.
+
+        Args:
+            board: The run's inputs and the products made so far.
+
+        Returns:
+            The stage's product.
         """

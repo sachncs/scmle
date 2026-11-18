@@ -2,6 +2,8 @@
 
 import contextlib
 import json
+import subprocess
+import sys
 
 import pytest
 
@@ -9,6 +11,7 @@ from scmle.contracts import errors
 from scmle.contracts import events
 from scmle.pipeline import engine
 from scmle.runtime import state
+import scmle.runtime.engine
 
 
 class Regulator:
@@ -164,8 +167,11 @@ def test_a_complete_run_ends_completed_with_its_artifacts(tmp_path):
 
 def test_ready_lists_the_stages_whose_needs_are_done():
     first, second, third = chain()
-    assert engine.ready((), (first, second, third)) == (first,)
-    assert engine.ready((first,), (second, third)) == (second, third)
+    assert scmle.runtime.engine.ready((), (first, second, third)) == (first,)
+    assert scmle.runtime.engine.ready((first,), (second, third)) == (
+        second,
+        third,
+    )
 
 
 class Step:
@@ -178,11 +184,58 @@ class Step:
 
 def test_steps_are_matched_by_name_and_ordered_by_name():
     steps = (Step("c", ("a",)), Step("b"), Step("a"))
-    ordered = engine.order(steps, engine.NAMES)
+    ordered = scmle.runtime.engine.order(steps, scmle.runtime.engine.NAMES)
     assert [step.name for step in ordered] == ["a", "b", "c"]
     done = (steps[2],)
-    assert engine.ready(done, steps[:2], engine.NAMES) == steps[:2]
+    assert (
+        scmle.runtime.engine.ready(done, steps[:2], scmle.runtime.engine.NAMES)
+        == steps[:2]
+    )
     with pytest.raises(errors.ConfigError, match=r"c requires \['z'\]"):
-        engine.order((Step("c", ("z",)),), engine.NAMES)
+        scmle.runtime.engine.order(
+            (Step("c", ("z",)),), scmle.runtime.engine.NAMES
+        )
     with pytest.raises(errors.ConfigError, match="more than once"):
-        engine.order((Step("a"), Step("a")), engine.NAMES)
+        scmle.runtime.engine.order(
+            (Step("a"), Step("a")), scmle.runtime.engine.NAMES
+        )
+
+
+def test_layers_group_steps_into_waves_that_need_only_earlier_waves():
+    steps = (
+        Step("d", ("b", "c")),
+        Step("c", ("a",)),
+        Step("b"),
+        Step("a"),
+    )
+    waves = scmle.runtime.engine.layers(steps, scmle.runtime.engine.NAMES)
+    assert [[step.name for step in wave] for wave in waves] == [
+        ["a", "b"],
+        ["c"],
+        ["d"],
+    ]
+    loop = (Step("x", ("y",)), Step("y", ("x",)))
+    with pytest.raises(errors.ConfigError, match=r"cycle among \['x', 'y'\]"):
+        scmle.runtime.engine.layers(loop, scmle.runtime.engine.NAMES)
+    with pytest.raises(errors.ConfigError, match=r"c requires \['z'\]"):
+        scmle.runtime.engine.layers(
+            (Step("c", ("z",)),), scmle.runtime.engine.NAMES
+        )
+
+
+def test_the_ordering_engine_imports_none_of_the_pipeline():
+    found = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys, scmle.runtime.engine, scmle.workflow.executor; "
+                "print(sorted(m for m in sys.modules if m.startswith("
+                "('scmle.pipeline', 'pandas', 'sklearn'))))"
+            ),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert found.stdout.strip() == "[]"

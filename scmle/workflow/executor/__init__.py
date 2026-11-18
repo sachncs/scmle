@@ -36,11 +36,16 @@ leaves a consistent record and a new one continues from it.
   overwriting the new holder's state (CON-1). The check and the write are
   two store calls, so handlers must still be idempotent.
 
+* **One machine, one archive.** A run's state moves on the shared state
+  machine (`scmle.runtime.state.Machine`) along `status.TABLE`, and its
+  records are kept through `records.Bucket`, the object-store `Archive` of
+  the pipeline engine; neither changes the keys or fields above.
+
 The package splits the executor by concern: `status` (run and step
-states), `failures` (errors), `context` (what a handler sees), `records`
-(run ids and stored records), `leases` (leases and fenced writes), `steps`
-(one step and its retries), `approvals`, `loop` (the run loop) and `runs`
-(`Executor`).
+states and the run's transition table), `failures` (errors), `context`
+(what a handler sees), `records` (run ids and the run's `Bucket`), `leases`
+(leases and fenced writes), `steps` (one step and its retries), `approvals`,
+`loop` (the run loop) and `runs` (`Executor`).
 """
 
 from scmle.workflow.executor.context import Handler

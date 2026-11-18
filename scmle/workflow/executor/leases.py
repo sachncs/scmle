@@ -49,8 +49,7 @@ class Leases(records.Records):
             or key.endswith("/lock")
             or run_id not in self.fences
         ):
-            body = json.dumps(record, indent=2, sort_keys=True).encode()
-            self.store.put(key, body)
+            super().write(key, record)
             return
         fence = self.fences[run_id]
         body = json.dumps(

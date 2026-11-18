@@ -23,10 +23,11 @@ from scmle.models import registry
 from scmle.operations import lifecycle
 from scmle.pipeline import planner
 from scmle.pipeline import profiler
+from scmle.runtime import plugins
 
 
 def test_the_plan_records_included_rejected_and_deferred_techniques():
-    """Enforces docs/ARCHITECTURE.md:57."""
+    """Enforces docs/ARCHITECTURE.md:63."""
     rng = numpy.random.default_rng(0)
     frame = pandas.DataFrame(
         {"x": rng.normal(size=300), "y": rng.integers(0, 2, 300)}
@@ -70,7 +71,7 @@ def recorded(monkeypatch):
 def test_table_statistics_are_aggregate_queries_run_in_the_source(
     monkeypatch,
 ):
-    """Enforces docs/ARCHITECTURE.md:95.
+    """Enforces docs/ARCHITECTURE.md:101.
 
     Counts, distinct counts, keys and inclusion all come back as one row of
     aggregates computed by the database; no query returns the table's rows.
@@ -128,9 +129,9 @@ class Entry:
 
 
 def test_a_plugin_that_fails_conformance_is_not_registered(monkeypatch):
-    """Enforces docs/ARCHITECTURE.md:198 (the entry-point half)."""
+    """Enforces docs/ARCHITECTURE.md:217 (the entry-point half)."""
     monkeypatch.setattr(
-        registry.metadata, "entry_points", lambda group: [Entry()]
+        plugins.metadata, "entry_points", lambda group: [Entry()]
     )
     catalog = registry.Catalog()
     assert catalog.load_plugins() == ["doc_broken_plugin"]
@@ -144,7 +145,7 @@ def score(truth, predicted):
 
 
 def test_readers_keep_their_snapshot_while_registrations_change():
-    """Enforces docs/ARCHITECTURE.md:217."""
+    """Enforces docs/ARCHITECTURE.md:237."""
     custom.register_estimator("doc_snapshot", classifier=naive_bayes.GaussianNB)
     try:
         before = registry.Catalog.stock()
@@ -191,12 +192,12 @@ class Probing(naive_bayes.GaussianNB):
     """A user estimator that checks the registry lock while it fits."""
 
     def fit(self, features, target, sample_weight=None):
-        SEEN.append(lock_is_free(registry.USER_LOCK))
+        SEEN.append(lock_is_free(plugins.REGISTRY.lock))
         return super().fit(features, target, sample_weight)
 
 
 def test_the_registry_lock_is_free_while_a_user_estimator_fits():
-    """Enforces docs/ARCHITECTURE.md:247 (the registry half)."""
+    """Enforces docs/ARCHITECTURE.md:267 (the registry half)."""
     SEEN.clear()
     try:
         custom.register_estimator("doc_probing", classifier=Probing)
@@ -206,7 +207,7 @@ def test_the_registry_lock_is_free_while_a_user_estimator_fits():
 
 
 def test_review_holds_the_state_lock_for_the_whole_retrain(tmp_path):
-    """Enforces docs/ARCHITECTURE.md:247 (the `Maintainer.review` half).
+    """Enforces docs/ARCHITECTURE.md:267 (the `Maintainer.review` half).
 
     The retrain runs inside `locked`; while it runs no other thread can take
     the state file's lock.

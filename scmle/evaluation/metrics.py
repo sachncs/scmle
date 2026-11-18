@@ -23,6 +23,7 @@ from scmle.evaluation import ordinal
 from scmle.evaluation import ranking
 from scmle.evaluation import survival
 from scmle.evaluation import uplift
+from scmle.runtime import plugins
 
 LOGGER = logging.getLogger(__name__)
 
@@ -392,6 +393,9 @@ class Repertoire:
             name: Name of the metric to remove.
         """
         with self.lock:
+            shelf = plugins.REGISTRY.entries(plugins.Kind.METRICS)
+            if shelf.get(name) is self.metrics.get(name):
+                plugins.REGISTRY.withdraw(plugins.Kind.METRICS, name)
             self.report_names = {
                 task: tuple(n for n in names if n != name)
                 for task, names in self.report_names.items()
@@ -502,8 +506,9 @@ def register_metric(
         replace: Allow overriding an existing metric of the same name.
 
     Returns:
-        The registered metric. `Repertoire.register` raises `ConfigError`
-        when the name is taken and `replace` is False.
+        The registered metric, also enrolled in the shared plugin registry
+        (`plugins.REGISTRY`, kind `metrics`). `Repertoire.register` raises
+        `ConfigError` when the name is taken and `replace` is False.
     """
     metric = scmle.contracts.metrics.Formula(
         name,
@@ -513,5 +518,7 @@ def register_metric(
         score_function,
         response_method,
     )
-    CATALOG.register(metric, replace)
+    with CATALOG.lock:
+        CATALOG.register(metric, replace)
+        plugins.REGISTRY.enrol(plugins.Kind.METRICS, name, metric, replace=True)
     return metric

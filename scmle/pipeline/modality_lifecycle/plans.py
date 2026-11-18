@@ -333,7 +333,7 @@ def exported(value: Any) -> dict[str, object] | None:
 
 def benchmark(
     plan: Plan,
-    context: state.Context,
+    observations: tuple[performance.Observation, ...],
     performance_budget: performance.Budget | None,
     performance_baseline: performance.Baseline | None,
 ) -> dict[str, object]:
@@ -341,7 +341,7 @@ def benchmark(
 
     Args:
         plan: The run's fixed inputs.
-        context: Shared lifecycle state with the observations.
+        observations: The measured operations, in operation order.
         performance_budget: Limits the measured operations must meet, if
             any.
         performance_baseline: Earlier run the measurements are compared
@@ -354,11 +354,6 @@ def benchmark(
         ValueError: If the budget or the baseline is violated; the
             package this run created is removed first.
     """
-    observations = tuple(
-        context.performance_observations[operation]
-        for operation in performance.Operation
-        if operation in context.performance_observations
-    )
     performance_run = performance.Run(
         identifier=f"{plan.adapter.digest}:{plan.seed}",
         observations=observations,
@@ -464,7 +459,8 @@ def prepare(
 
 def publish(
     plan: Plan,
-    context: state.Context,
+    board: state.Board,
+    observations: tuple[performance.Observation, ...],
     performance_budget: performance.Budget | None,
     performance_baseline: performance.Baseline | None,
 ) -> reporting.Record:
@@ -472,7 +468,8 @@ def publish(
 
     Args:
         plan: The run's fixed inputs.
-        context: Shared lifecycle state after the last stage.
+        board: The run's board after the last stage.
+        observations: The measured operations, in operation order.
         performance_budget: Limits the measured operations must meet, if
             any.
         performance_baseline: Earlier run the measurements are compared
@@ -483,34 +480,32 @@ def publish(
         run has one.
 
     Raises:
-        RuntimeError: If packaging produced no package.
+        OrderError: If packaging produced no package.
     """
     records = tuple(
         modalities.Proof(
             stage=stage,
             evidence_links=("modality_lifecycle.json",),
-            evidence=context.stage_records[stage],
+            evidence=board.made[stage].evidence,
             notes=(f"completed {stage.value}",),
         )
         for stage in modalities.REQUIRED_LIFECYCLE_STAGES
     )
-    package = context.package
-    if package is None:
-        raise RuntimeError("packaging stage did not produce a package")
+    package = board.get(state.Bundle).package
     performance_evidence = benchmark(
-        plan, context, performance_budget, performance_baseline
+        plan, observations, performance_budget, performance_baseline
     )
     report = reporting.Record(
         modality=modalities.serialise(plan.adapter.modality),
         digests={"dataset": plan.adapter.digest},
         evidence=records,
-        evaluation=context.evaluation,
+        evaluation=board.get(state.Score).evidence,
         performance=performance_evidence,
         package=package,
-        inference=context.inference,
-        monitoring=context.monitoring,
-        documentation=context.documentation,
-        recovery=context.recovery,
+        inference=board.get(state.Reproduction).evidence,
+        monitoring=board.get(state.Drift).evidence,
+        documentation=board.get(state.Card).evidence,
+        recovery=board.get(state.Resilience).evidence,
     ).sign(plan.signing_key)
     if plan.report_target is not None:
         durability.write_atomically(

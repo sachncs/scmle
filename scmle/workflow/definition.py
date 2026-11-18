@@ -25,6 +25,7 @@ from typing import ClassVar
 
 from scmle.contracts import errors
 from scmle.contracts import records
+from scmle.runtime import engine
 from scmle.runtime import retry
 
 NAME_CHARACTERS = frozenset(
@@ -316,41 +317,23 @@ class Workflow:
     def order(self) -> tuple[str, ...]:
         """Computes a deterministic topological order (ties broken by name).
 
+        The engine's waves (`scmle.runtime.engine.layers`), flattened.
+
         Returns:
             The step names, each after all of its dependencies.
-
-        Raises:
-            ConfigError: If the dependencies contain a cycle.
         """
-        remaining = {s.name: set(s.depends_on) for s in self.steps}
-        ordered: list[str] = []
-        while remaining:
-            ready = sorted(n for n, deps in remaining.items() if not deps)
-            if not ready:
-                raise errors.ConfigError(
-                    f"dependency cycle among {sorted(remaining)}"
-                )
-            ordered.extend(ready)
-            for name in ready:
-                del remaining[name]
-            for deps in remaining.values():
-                deps.difference_update(ready)
-        return tuple(ordered)
+        return tuple(name for layer in self.layers() for name in layer)
 
     def layers(self) -> tuple[tuple[str, ...], ...]:
         """Groups steps by depth: each layer depends only on earlier ones.
 
         Returns:
-            The layers in order, each a sorted tuple of step names.
+            The layers in order, each a sorted tuple of step names. The
+            engine raises `ConfigError` if the dependencies contain a cycle.
         """
-        depth: dict[str, int] = {}
-        for name in self.order():
-            parents = self.step(name).depends_on
-            depth[name] = 1 + max((depth[p] for p in parents), default=-1)
-        count = 1 + max(depth.values())
         return tuple(
-            tuple(sorted(n for n, d in depth.items() if d == level))
-            for level in range(count)
+            tuple(step.name for step in layer)
+            for layer in engine.layers(self.steps, engine.NAMES)
         )
 
     def ancestors(self, name: str) -> frozenset[str]:

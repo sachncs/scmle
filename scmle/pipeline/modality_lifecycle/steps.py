@@ -1,4 +1,11 @@
-"""The lifecycle stages other than model explainability."""
+"""The lifecycle stages other than model explainability.
+
+Each stage names the stages whose products it reads (`requires`) and the
+product it returns (`makes`); its run state comes from its phase
+(`state.STATES`), which orders it on the engine. Its evidence is the same
+record as before the engine, so signed checkpoints and reports keep their
+digests.
+"""
 
 from __future__ import annotations
 
@@ -21,36 +28,53 @@ from scmle.contracts import modalities
 from scmle.contracts import performance
 from scmle.contracts import signing
 from scmle.data.modalities import curation
+from scmle.pipeline import engine
 from scmle.pipeline.modality_lifecycle import constants
 from scmle.pipeline.modality_lifecycle import containers
 from scmle.pipeline.modality_lifecycle import predictors
 from scmle.pipeline.modality_lifecycle import state
 from scmle.pipeline.modality_lifecycle import verification
+from scmle.runtime import limits
 
 
 class Ingestion(state.Stage):
     """Confirm source identity and sample cardinality."""
 
     stage = modalities.Phase.INGESTION
+    makes = state.Intake
     performance_operation = performance.Operation.INGEST
 
-    def execute(self, context: state.Context) -> None:
+    def samples(self, board: state.Board) -> int:
+        """How many samples ingestion read.
+
+        Args:
+            board: The run's board.
+
+        Returns:
+            The source samples.
+        """
+        return len(board.plan.adapter.samples)
+
+    def execute(self, board: state.Board) -> state.Intake:
         """Records immutable source identity.
 
         Args:
-            context: Shared lifecycle state, updated in place.
+            board: The run's inputs.
+
+        Returns:
+            The source identity.
 
         Raises:
             ValueError: If the dataset has no samples.
         """
-        if not context.adapter.samples:
+        adapter = board.plan.adapter
+        if not adapter.samples:
             raise errors.InputError("modality dataset must not be empty")
-        context.record(
-            self.stage,
+        return state.Intake(
             {
-                "dataset_hash": context.adapter.digest,
-                "sample_count": len(context.adapter.samples),
-            },
+                "dataset_hash": adapter.digest,
+                "sample_count": len(adapter.samples),
+            }
         )
 
 
@@ -58,18 +82,24 @@ class Validation(state.Stage):
     """Reject missing labels and malformed feature prerequisites."""
 
     stage = modalities.Phase.VALIDATION
+    requires = (Ingestion,)
+    makes = state.Census
 
-    def execute(self, context: state.Context) -> None:
+    def execute(self, board: state.Board) -> state.Census:
         """Validates labels and dataset-level curation state.
 
         Args:
-            context: Shared lifecycle state, updated in place.
+            board: The run's inputs.
+
+        Returns:
+            The label and class counts.
 
         Raises:
             ValueError: If any sample lacks a label or fewer than two classes
                 are present.
         """
-        labels = context.adapter.labels(context.adapter.samples)
+        adapter = board.plan.adapter
+        labels = adapter.labels(adapter.samples)
         if any(label is None for label in labels):
             raise errors.InputError(
                 "complete modality lifecycle requires labels"
@@ -78,9 +108,8 @@ class Validation(state.Stage):
             raise errors.InputError(
                 "classification lifecycle requires two labels"
             )
-        context.record(
-            self.stage,
-            {"label_count": len(labels), "class_count": len(set(labels))},
+        return state.Census(
+            {"label_count": len(labels), "class_count": len(set(labels))}
         )
 
 
@@ -88,35 +117,43 @@ class Profiling(state.Stage):
     """Capture modality-specific profile evidence."""
 
     stage = modalities.Phase.PROFILING
+    requires = (Validation,)
+    makes = state.Profile
 
-    def execute(self, context: state.Context) -> None:
-        """Persists the curation/profile object in lifecycle state.
+    def execute(self, board: state.Board) -> state.Profile:
+        """Profiles and curates the data.
 
         Args:
-            context: Shared lifecycle state, updated in place.
+            board: The run's inputs.
+
+        Returns:
+            The curation report and its record.
         """
-        context.curation_report = context.adapter.curate()
-        context.record(
-            self.stage, {"profile": context.curation_report.to_dict()}
-        )
+        report = board.plan.adapter.curate()
+        return state.Profile({"profile": report.to_dict()}, report)
 
 
 class Curating(state.Stage):
     """Block unresolved data-quality findings before representation."""
 
     stage = modalities.Phase.CURATION
+    requires = (Profiling,)
+    makes = state.Clearance
 
-    def execute(self, context: state.Context) -> None:
+    def execute(self, board: state.Board) -> state.Clearance:
         """Requires a release-ready curation report.
 
         Args:
-            context: Shared lifecycle state, updated in place.
+            board: The run's inputs and its profile.
+
+        Returns:
+            The release-ready verdict.
 
         Raises:
-            ValueError: If there is no curation report or it has unresolved
-                blocking findings.
+            ValueError: If the curation report has unresolved blocking
+                findings.
         """
-        report = context.curation_report
+        report = board.get(state.Profile).report
         if report is None or not report.release_ready:
             findings = (
                 []
@@ -129,25 +166,30 @@ class Curating(state.Stage):
             raise errors.InputError(
                 f"unresolved blocking curation findings: {findings}"
             )
-        context.record(self.stage, {"release_ready": True, "unresolved": []})
+        return state.Clearance({"release_ready": True, "unresolved": []})
 
 
 class Splitting(state.Stage):
     """Create leakage-aware train, validation, and test partitions."""
 
     stage = modalities.Phase.SPLITTING
+    requires = (Curating,)
+    makes = state.Partition
 
-    def execute(self, context: state.Context) -> None:
+    def execute(self, board: state.Board) -> state.Partition:
         """Splits and rejects overlapping sample identities.
 
         Args:
-            context: Shared lifecycle state, updated in place.
+            board: The run's inputs.
+
+        Returns:
+            The partitions.
 
         Raises:
             ValueError: If the train or test partition is empty or two
                 partitions share a group.
         """
-        partitions = context.adapter.split(context.seed)
+        partitions = board.plan.adapter.split(board.plan.seed)
         if not partitions.train or not partitions.test:
             raise errors.InputError(
                 "lifecycle split requires non-empty train and test partitions"
@@ -164,228 +206,233 @@ class Splitting(state.Stage):
             raise errors.InputError(
                 "lifecycle split contains overlapping groups"
             )
-        context.partitions = partitions
-        context.record(
-            self.stage,
-            {
-                "counts": {
-                    "train": len(partitions.train),
-                    "validation": len(partitions.validation),
-                    "test": len(partitions.test),
-                },
-                "groups": partitions.groups,
+        evidence: dict[str, object] = {
+            "counts": {
+                "train": len(partitions.train),
+                "validation": len(partitions.validation),
+                "test": len(partitions.test),
             },
-        )
+            "groups": partitions.groups,
+        }
+        return state.Partition(evidence, partitions)
 
 
 class Preparation(state.Stage):
     """Prepare partition-local finite feature matrices."""
 
     stage = modalities.Phase.FEATURE_PREPARATION
+    requires = (Splitting,)
+    makes = state.Features
 
-    def execute(self, context: state.Context) -> None:
+    def execute(self, board: state.Board) -> state.Features:
         """Prepares and aligns features without fitting on held-out rows.
 
         Args:
-            context: Shared lifecycle state, updated in place.
+            board: The run's inputs and partitions.
+
+        Returns:
+            The feature batch of each partition.
 
         Raises:
-            RuntimeError: If the data has not been split yet.
             ValueError: If the partitions' feature names differ.
         """
-        partitions = context.partitions
-        if partitions is None:
-            raise errors.OrderError(
-                "splitting must precede feature preparation"
-            )
+        adapter = board.plan.adapter
+        partitions = board.get(state.Partition).partitions
         batches = {
-            "train": context.adapter.features(partitions.train),
-            "validation": context.adapter.features(partitions.validation),
-            "test": context.adapter.features(partitions.test),
+            "train": adapter.features(partitions.train),
+            "validation": adapter.features(partitions.validation),
+            "test": adapter.features(partitions.test),
         }
         names = batches["train"].feature_names
         if any(batch.feature_names != names for batch in batches.values()):
             raise errors.InputError("partition feature schemas do not match")
-        context.feature_batches = batches
-        context.record(
-            self.stage,
-            {
-                "feature_names": list(names),
-                "shape": {
-                    name: list(batch.values.shape)
-                    for name, batch in batches.items()
-                },
+        evidence: dict[str, object] = {
+            "feature_names": list(names),
+            "shape": {
+                name: list(batch.values.shape)
+                for name, batch in batches.items()
             },
-        )
+        }
+        return state.Features(evidence, batches)
 
 
 class Modelling(state.Stage):
     """Fit the bounded regularized linear baseline on training features."""
 
     stage = modalities.Phase.MODELLING
+    requires = (Splitting, Preparation)
+    makes = state.Fit
     performance_operation = performance.Operation.FIT
 
-    def execute(self, context: state.Context) -> None:
+    def execute(self, board: state.Board) -> state.Fit:
         """Fits only on the training partition.
 
         Args:
-            context: Shared lifecycle state, updated in place.
+            board: The run's inputs, partitions and features.
+
+        Returns:
+            The fitted classifier.
         """
-        batch = context.feature_batches["train"]
-        labels = context.adapter.labels(
-            context.partitions.train if context.partitions else ()
+        batch = board.get(state.Features).batches["train"]
+        labels = board.plan.adapter.labels(
+            board.get(state.Partition).partitions.train
         )
-        model = LogisticRegression(max_iter=500, random_state=context.seed)
+        model = LogisticRegression(max_iter=500, random_state=board.plan.seed)
         model.fit(batch.values, labels)
-        context.model = model
-        context.record(
-            self.stage,
-            {
-                "model_family": "regularized_linear_classifier",
-                "classes": [str(value) for value in model.classes_],
-            },
-        )
+        evidence: dict[str, object] = {
+            "model_family": "regularized_linear_classifier",
+            "classes": [str(value) for value in model.classes_],
+        }
+        return state.Fit(evidence, model)
 
 
 class Evaluation(state.Stage):
     """Evaluate once on the untouched test partition."""
 
     stage = modalities.Phase.EVALUATION
+    requires = (Splitting, Preparation, Modelling)
+    makes = state.Score
 
-    def execute(self, context: state.Context) -> None:
+    def execute(self, board: state.Board) -> state.Score:
         """Computes deterministic classification metrics and predictions.
 
-        The metrics are computed on the test partition's feature batch and
-        stored as `context.evaluation`, which is also recorded as the stage
-        evidence.
-
         Args:
-            context: Shared lifecycle state, updated in place.
+            board: The run's inputs, partitions, features and model.
 
-        Raises:
-            RuntimeError: If the model or partitions are missing.
+        Returns:
+            The metrics on the test partition's feature batch, with its
+            predictions.
         """
-        model = context.model
-        partitions = context.partitions
-        if model is None or partitions is None:
-            raise errors.OrderError(
-                "modelling and splitting must precede evaluation"
-            )
-        batch = context.feature_batches["test"]
-        actual = context.adapter.labels(partitions.test)
+        model = board.get(state.Fit).model
+        batch = board.get(state.Features).batches["test"]
+        actual = board.plan.adapter.labels(
+            board.get(state.Partition).partitions.test
+        )
         predicted = model.predict(batch.values)
         probabilities = model.predict_proba(batch.values)
-        context.evaluation = {
-            "samples": len(actual),
-            "accuracy": float(accuracy_score(actual, predicted)),
-            "macro_f1": float(f1_score(actual, predicted, average="macro")),
-            "log_loss": float(
-                log_loss(actual, probabilities, labels=list(model.classes_))
-            ),
-            "labels": [str(value) for value in model.classes_],
-            "predictions": [str(value) for value in predicted],
-        }
-        context.record(self.stage, context.evaluation.copy())
+        return state.Score(
+            {
+                "samples": len(actual),
+                "accuracy": float(accuracy_score(actual, predicted)),
+                "macro_f1": float(f1_score(actual, predicted, average="macro")),
+                "log_loss": float(
+                    log_loss(actual, probabilities, labels=list(model.classes_))
+                ),
+                "labels": [str(value) for value in model.classes_],
+                "predictions": [str(value) for value in predicted],
+            }
+        )
+
+
+def statistics(values: numpy.ndarray) -> dict[str, float | int]:
+    """Summarises one feature column.
+
+    Args:
+        values: The column.
+
+    Returns:
+        Its range, moments, quantiles and count of non-finite values.
+    """
+    return {
+        "min": float(numpy.min(values)),
+        "max": float(numpy.max(values)),
+        "mean": float(numpy.mean(values)),
+        "std": float(numpy.std(values)),
+        "q05": float(numpy.quantile(values, 0.05)),
+        "median": float(numpy.median(values)),
+        "q95": float(numpy.quantile(values, 0.95)),
+        "nonfinite_count": int(numpy.count_nonzero(~numpy.isfinite(values))),
+    }
 
 
 class Composition(state.Stage):
     """Explain source composition, split boundaries, and feature ranges."""
 
     stage = modalities.Phase.DATA_EXPLAINABILITY
+    requires = (Splitting, Preparation, Evaluation)
+    makes = state.Lineage
 
-    def execute(self, context: state.Context) -> None:
+    def execute(self, board: state.Board) -> state.Lineage:
         """Records data lineage and non-causal feature summaries.
 
         Args:
-            context: Shared lifecycle state, updated in place.
+            board: The run's inputs, partitions and features.
 
-        Raises:
-            RuntimeError: If the data has not been split yet.
+        Returns:
+            The data explanation.
         """
-        batch = context.feature_batches["train"]
-        partitions = context.partitions
-        if partitions is None:
-            raise errors.OrderError("splitting must precede data explanation")
-        labels = context.adapter.labels(partitions.train)
+        adapter = board.plan.adapter
+        batch = board.get(state.Features).batches["train"]
+        partitions = board.get(state.Partition).partitions
+        labels = adapter.labels(partitions.train)
         label_counts: dict[str, int] = {}
         for label in labels:
             key = str(label)
             label_counts[key] = label_counts.get(key, 0) + 1
-        statistics: dict[str, dict[str, float | int]] = {}
-        for index, name in enumerate(batch.feature_names):
-            values = batch.values[:, index]
-            statistics[name] = {
-                "min": float(numpy.min(values)),
-                "max": float(numpy.max(values)),
-                "mean": float(numpy.mean(values)),
-                "std": float(numpy.std(values)),
-                "q05": float(numpy.quantile(values, 0.05)),
-                "median": float(numpy.median(values)),
-                "q95": float(numpy.quantile(values, 0.95)),
-                "nonfinite_count": int(
-                    numpy.count_nonzero(~numpy.isfinite(values))
-                ),
-            }
         partition_samples = {
             "train": partitions.train,
             "validation": partitions.validation,
             "test": partitions.test,
         }
-        sample_lineage = [
+        return state.Lineage(
             {
-                "sample_id": context.adapter.sample_id(sample),
-                "partition": partition,
+                "dataset_hash": adapter.digest,
+                "sample_ids": list(batch.sample_ids),
+                "sample_lineage": [
+                    {
+                        "sample_id": adapter.sample_id(sample),
+                        "partition": partition,
+                    }
+                    for partition, samples in partition_samples.items()
+                    for sample in samples
+                ],
+                "feature_ranges": {
+                    name: {
+                        "min": float(batch.values[:, index].min()),
+                        "max": float(batch.values[:, index].max()),
+                    }
+                    for index, name in enumerate(batch.feature_names)
+                },
+                "feature_statistics": {
+                    name: statistics(batch.values[:, index])
+                    for index, name in enumerate(batch.feature_names)
+                },
+                "label_distribution": {
+                    "counts": dict(sorted(label_counts.items())),
+                    "sample_count": len(labels),
+                },
+                "partition_counts": {
+                    name: len(samples)
+                    for name, samples in partition_samples.items()
+                },
+                "split_groups": partitions.groups,
+                "limitations": [
+                    (
+                        "Feature summaries describe association and coverage, "
+                        "not causation."
+                    ),
+                    *adapter.remarks(),
+                ],
             }
-            for partition, samples in partition_samples.items()
-            for sample in samples
-        ]
-        context.data_explanation = {
-            "dataset_hash": context.adapter.digest,
-            "sample_ids": list(batch.sample_ids),
-            "sample_lineage": sample_lineage,
-            "feature_ranges": {
-                name: {
-                    "min": float(batch.values[:, index].min()),
-                    "max": float(batch.values[:, index].max()),
-                }
-                for index, name in enumerate(batch.feature_names)
-            },
-            "feature_statistics": statistics,
-            "label_distribution": {
-                "counts": dict(sorted(label_counts.items())),
-                "sample_count": len(labels),
-            },
-            "partition_counts": {
-                "train": len(partitions.train),
-                "validation": len(partitions.validation),
-                "test": len(partitions.test),
-            },
-            "split_groups": partitions.groups,
-            "limitations": [
-                (
-                    "Feature summaries describe association and coverage, not "
-                    "causation."
-                ),
-                *context.adapter.remarks(),
-            ],
-        }
-        context.record(self.stage, context.data_explanation.copy())
+        )
 
 
 class Packaging(state.Stage):
     """Writes and signs a digest-bound model package atomically."""
 
     stage = modalities.Phase.PACKAGING
+    requires = (Preparation, Modelling, Evaluation)
+    makes = state.Bundle
     performance_operation = performance.Operation.PACKAGE
 
     @staticmethod
     def replay(
-        context: state.Context, model: LogisticRegression
+        board: state.Board, model: LogisticRegression
     ) -> containers.Package:
         """Checks the existing package against a replayed run.
 
         Args:
-            context: Shared lifecycle state of the resumed run.
+            board: The resumed run's inputs and features.
             model: The model the replay fitted.
 
         Returns:
@@ -395,16 +442,17 @@ class Packaging(state.Stage):
             ValueError: If the package's dataset identity, feature schema
                 or model differs from the replayed run's.
         """
+        plan = board.plan
         predictor = predictors.Predictor.from_package(
-            context.adapter, context.package_path, context.signing_key
+            plan.adapter, plan.package_target, plan.signing_key
         )
-        expected_features = context.feature_batches["train"].feature_names
-        if predictor.training_dataset_hash != context.adapter.digest:
+        expected = board.get(state.Features).batches["train"].feature_names
+        if predictor.training_dataset_hash != plan.adapter.digest:
             raise errors.InputError(
                 "checkpoint package dataset identity does not match "
                 "the resumed adapter"
             )
-        if predictor.feature_names != expected_features:
+        if predictor.feature_names != expected:
             raise errors.InputError(
                 "checkpoint package feature schema does not match "
                 "the resumed adapter"
@@ -420,31 +468,19 @@ class Packaging(state.Stage):
             )
         return predictor.package
 
-    def execute(self, context: state.Context) -> None:
-        """Persists the estimator and signed manifest.
-
-        When replaying a checkpointed run onto an existing package, the package
-        is verified against the replayed model instead of being rewritten.
+    @staticmethod
+    def write(board: state.Board, model: LogisticRegression) -> Path:
+        """Writes the estimator and its signed manifest to a new folder.
 
         Args:
-            context: Shared lifecycle state, updated in place.
+            board: The run's inputs, features and metrics.
+            model: The fitted model.
 
-        Raises:
-            RuntimeError: If there is no fitted model.
-            ValueError: If an existing package does not match the resumed run.
-            FileExistsError: If the package path already exists and the run is
-                not replaying a checkpoint.
+        Returns:
+            The temporary folder holding the package.
         """
-        model = context.model
-        if model is None:
-            raise errors.OrderError("model is required before packaging")
-        target = context.package_path
-        if context.resume_replay and target.exists():
-            context.package = self.replay(context, model)
-            context.record(self.stage, context.package.to_dict())
-            return
-        if target.exists():
-            raise FileExistsError(target)
+        plan = board.plan
+        target = plan.package_target
         target.parent.mkdir(parents=True, exist_ok=True)
         temporary = Path(
             tempfile.mkdtemp(prefix=f".{target.name}.", dir=target.parent)
@@ -455,24 +491,23 @@ class Packaging(state.Stage):
             durability.sync(model_path)
             unsigned = {
                 "schema_version": 1,
-                "modality": modalities.serialise(context.adapter.modality),
-                "dataset_hash": context.adapter.digest,
+                "modality": modalities.serialise(plan.adapter.modality),
+                "dataset_hash": plan.adapter.digest,
                 "feature_names": list(
-                    context.feature_batches["train"].feature_names
+                    board.get(state.Features).batches["train"].feature_names
                 ),
                 "model_sha256": verification.file_digest(model_path),
                 "evaluation": {
                     key: value
-                    for key, value in context.evaluation.items()
+                    for key, value in board.get(state.Score).evidence.items()
                     if key != "predictions"
                 },
             }
-            signature = signing.mac(unsigned, context.signing_key)
             manifest = {
                 **unsigned,
                 "signature": {
                     "algorithm": signing.SIGNATURE_ALGORITHM,
-                    "value": signature,
+                    "value": signing.mac(unsigned, plan.signing_key),
                 },
             }
             manifest_path = temporary / "manifest.json"
@@ -483,148 +518,195 @@ class Packaging(state.Stage):
             )
             durability.sync(manifest_path)
             durability.sync_directory(temporary)
-            Path(temporary).replace(target)
-            durability.sync_directory(target.parent)
-            context.package = containers.Package(
-                str(target), str(unsigned["model_sha256"]), signature
-            )
-            context.record(self.stage, context.package.to_dict())
         except Exception:
             shutil.rmtree(temporary, ignore_errors=True)
             raise
+        return temporary
+
+    def execute(self, board: state.Board) -> state.Bundle:
+        """Persists the estimator and signed manifest.
+
+        When replaying a checkpointed run onto an existing package, the package
+        is verified against the replayed model instead of being rewritten.
+
+        Args:
+            board: The run's inputs, features, metrics and model.
+
+        Returns:
+            The package's identity.
+
+        Raises:
+            ValueError: If an existing package does not match the resumed run.
+            FileExistsError: If the package path already exists and the run is
+                not replaying a checkpoint.
+        """
+        model = board.get(state.Fit).model
+        target = board.plan.package_target
+        if board.replaying(self.stage) and target.exists():
+            package = self.replay(board, model)
+            return state.Bundle(package.to_dict(), package)
+        if target.exists():
+            raise FileExistsError(target)
+        temporary = self.write(board, model)
+        try:
+            manifest = json.loads(
+                (temporary / "manifest.json").read_text(encoding="utf-8")
+            )
+            temporary.replace(target)
+            durability.sync_directory(target.parent)
+        except Exception:
+            shutil.rmtree(temporary, ignore_errors=True)
+            raise
+        package = containers.Package(
+            str(target),
+            str(manifest["model_sha256"]),
+            str(manifest["signature"]["value"]),
+        )
+        return state.Bundle(package.to_dict(), package)
 
 
 class Inference(state.Stage):
     """Verify the package before loading and reproducing predictions."""
 
     stage = modalities.Phase.INFERENCE
+    requires = (Preparation, Evaluation, Packaging)
+    makes = state.Reproduction
 
-    def execute(self, context: state.Context) -> None:
+    def execute(self, board: state.Board) -> state.Reproduction:
         """Loads trusted bytes and compares predictions with the fitted model.
 
         Args:
-            context: Shared lifecycle state, updated in place.
+            board: The run's inputs, features, metrics and package.
+
+        Returns:
+            The inference check and its load and inference measurements.
 
         Raises:
-            RuntimeError: If the package or partitions are missing.
             ValueError: If the packaged model's predictions differ from the
                 evaluation predictions.
         """
-        if context.package is None or context.partitions is None:
-            raise errors.OrderError(
-                "package and partitions are required before inference"
-            )
+        batch = board.get(state.Features).batches["test"]
+        count = len(batch.sample_ids)
         started = time.perf_counter()
         loaded = verification.load_package(
-            context.package.path, context.signing_key
+            board.get(state.Bundle).package.path, board.plan.signing_key
         )
-        context.clock(
+        load = state.observe(
             performance.Operation.LOAD,
-            time.perf_counter() - started,
-            len(context.feature_batches["test"].sample_ids),
+            engine.Lap(time.perf_counter() - started, limits.peak_memory_gb()),
+            count,
         )
         started = time.perf_counter()
-        predictions = loaded.predict(context.feature_batches["test"].values)
-        context.clock(
+        predictions = loaded.predict(batch.values)
+        inference = state.observe(
             performance.Operation.INFERENCE,
-            time.perf_counter() - started,
-            len(context.feature_batches["test"].sample_ids),
+            engine.Lap(time.perf_counter() - started, limits.peak_memory_gb()),
+            count,
         )
-        expected = context.evaluation["predictions"]
         actual = [str(value) for value in predictions]
-        if actual != expected:
+        if actual != board.get(state.Score).evidence["predictions"]:
             raise ValueError(
                 "packaged inference does not reproduce evaluation predictions"
             )
-        context.inference = {
+        evidence: dict[str, object] = {
             "package_verified": True,
             "prediction_count": len(actual),
             "predictions_match": True,
         }
-        context.record(self.stage, context.inference.copy())
+        return state.Reproduction(evidence, (load, inference))
 
 
 class Monitoring(state.Stage):
     """Emit reference-to-observed data drift evidence."""
 
     stage = modalities.Phase.MONITORING
+    requires = (Ingestion,)
+    makes = state.Drift
 
-    def execute(self, context: state.Context) -> None:
+    def execute(self, board: state.Board) -> state.Drift:
         """Records modality-specific monitoring output.
 
         Args:
-            context: Shared lifecycle state, updated in place.
+            board: The run's inputs.
+
+        Returns:
+            The monitoring output.
         """
-        context.monitoring = context.adapter.monitor(context.observed_adapter)
-        context.record(self.stage, context.monitoring.copy())
+        plan = board.plan
+        return state.Drift(dict(plan.adapter.monitor(plan.observed)))
 
 
 class Documentation(state.Stage):
     """Build a truthful dataset and model card for the baseline."""
 
     stage = modalities.Phase.DOCUMENTATION
+    requires = (Profiling,)
+    makes = state.Card
 
-    def execute(self, context: state.Context) -> None:
+    def execute(self, board: state.Board) -> state.Card:
         """Records support status, intended use, and limitations.
 
         Args:
-            context: Shared lifecycle state, updated in place.
+            board: The run's inputs and profile.
 
-        Raises:
-            RuntimeError: If the data has not been profiled yet.
+        Returns:
+            The documentation.
         """
-        if context.curation_report is None:
-            raise errors.OrderError("profiling must precede documentation")
+        plan = board.plan
+        adapter = plan.adapter
         dataset_card = curation.Datasheet.from_report(
-            modalities.serialise(context.adapter.modality),
-            context.curation_report.to_dict(),
-            context.adapter.remarks(),
-            manifest=context.manifest,
+            modalities.serialise(adapter.modality),
+            board.get(state.Profile).report.to_dict(),
+            adapter.remarks(),
+            manifest=plan.manifest,
         )
-        context.documentation = {
-            "modality": modalities.serialise(context.adapter.modality),
-            "status": (
-                "extension-only"
-                if isinstance(context.adapter.modality, modalities.Bespoke)
-                else "experimental"
-            ),
-            "intended_use": (
-                "bounded lifecycle validation and baseline comparison"
-            ),
-            "dataset_hash": context.adapter.digest,
-            "model_family": "regularized_linear_classifier",
-            "dataset_card": dataset_card.to_dict(),
-            "limitations": list(context.adapter.remarks()),
-            "promotion_requirements": [
-                "independent metric recomputation",
-                "modality-specific explanation validation",
-                "external serving and resource-fault evidence",
-            ],
-        }
-        context.record(self.stage, context.documentation.copy())
+        return state.Card(
+            {
+                "modality": modalities.serialise(adapter.modality),
+                "status": (
+                    "extension-only"
+                    if isinstance(adapter.modality, modalities.Bespoke)
+                    else "experimental"
+                ),
+                "intended_use": (
+                    "bounded lifecycle validation and baseline comparison"
+                ),
+                "dataset_hash": adapter.digest,
+                "model_family": "regularized_linear_classifier",
+                "dataset_card": dataset_card.to_dict(),
+                "limitations": list(adapter.remarks()),
+                "promotion_requirements": [
+                    "independent metric recomputation",
+                    "modality-specific explanation validation",
+                    "external serving and resource-fault evidence",
+                ],
+            }
+        )
 
 
 class Recovery(state.Stage):
     """Prove bounded resource claims and reject a tampered package."""
 
     stage = modalities.Phase.RECOVERY_AND_RESOURCE_TESTS
+    requires = (Preparation, Packaging)
+    makes = state.Resilience
 
-    def execute(self, context: state.Context) -> None:
+    def execute(self, board: state.Board) -> state.Resilience:
         """Tampers with a copy of the package and verifies it is rejected.
 
         Args:
-            context: Shared lifecycle state, updated in place.
+            board: The run's inputs, features and package.
+
+        Returns:
+            The recovery and resource evidence.
 
         Raises:
-            RuntimeError: If there is no package.
             ValueError: If a tampered copy of the package is not rejected.
         """
-        if context.package is None:
-            raise errors.OrderError("package is required before recovery tests")
         temporary = Path(tempfile.mkdtemp(prefix="scmle-lifecycle-recovery-"))
         tampered = temporary / "package"
         try:
-            shutil.copytree(context.package.path, tampered)
+            shutil.copytree(board.get(state.Bundle).package.path, tampered)
             manifest_path = tampered / "manifest.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             manifest["dataset_hash"] = "tampered"
@@ -633,21 +715,19 @@ class Recovery(state.Stage):
             )
             rejected = False
             try:
-                verification.load_package(tampered, context.signing_key)
+                verification.load_package(tampered, board.plan.signing_key)
             except (TypeError, ValueError):  # handled: expected rejection
                 rejected = True
             if not rejected:
                 raise ValueError("tampered package was not rejected")
-            context.recovery = {
-                "tampered_manifest_rejected": True,
-                "feature_rows": int(
-                    context.feature_batches["train"].values.shape[0]
-                ),
-                "feature_columns": int(
-                    context.feature_batches["train"].values.shape[1]
-                ),
-                "bounded": True,
-            }
-            context.record(self.stage, context.recovery.copy())
+            values = board.get(state.Features).batches["train"].values
+            return state.Resilience(
+                {
+                    "tampered_manifest_rejected": True,
+                    "feature_rows": int(values.shape[0]),
+                    "feature_columns": int(values.shape[1]),
+                    "bounded": True,
+                }
+            )
         finally:
             shutil.rmtree(temporary, ignore_errors=True)

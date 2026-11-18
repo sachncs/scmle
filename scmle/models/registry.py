@@ -1,14 +1,14 @@
 """Model registry: third-party adapters register without core edits.
 
-Plugins are discovered lazily through the `scmle.models` entry-point group, and
-heavy imports only happen when an adapter is actually built.
+User adapters live in the shared plugin registry
+(`scmle.runtime.plugins.REGISTRY`, kind `estimators`). Plugins are
+discovered lazily through the `scmle.models` entry-point group, and heavy
+imports only happen when an adapter is actually built.
 """
 
-from importlib import metadata
 import logging
-import threading
-from typing import Any
 from typing import Self
+import warnings
 
 from scmle.contracts import errors
 from scmle.contracts import models
@@ -24,58 +24,71 @@ from scmle.models.sklearn import bagging
 from scmle.models.sklearn import classical
 import scmle.models.survival.adapters
 import scmle.models.uplift.adapters
+from scmle.runtime import plugins
 
 LOGGER = logging.getLogger(__name__)
 
 
-ENTRY_POINT_GROUP = "scmle.models"
-USER_ADAPTERS: dict[str, models.Model] = {}
-"""Adapters added with `register_estimator`, shared by later projects.
-
-Change it only through `adopt` and `deregister`, and read
-it only through `extensions`; all three hold `USER_LOCK`.
+ENTRY_POINT_GROUP = plugins.GROUPS[plugins.Kind.ESTIMATORS]
+USER_ADAPTERS: plugins.Shelf = plugins.REGISTRY.shelves[plugins.Kind.ESTIMATORS]
+"""The shared registry's estimator shelf itself; read it through
+`plugins.REGISTRY.entries` and change it through `plugins.REGISTRY.enrol`
+and `withdraw`, which hold `plugins.REGISTRY.lock`.
 """
-USER_LOCK = threading.RLock()
-"""Serializes check-then-act changes to `USER_ADAPTERS`."""
+
+
+def deprecate(call: str, successor: str) -> None:
+    """Warns that a registry call moved to the shared plugin registry.
+
+    Args:
+        call: The deprecated call.
+        successor: The `plugins.REGISTRY` call that replaces it.
+    """
+    warnings.warn(
+        f"registry.{call} is deprecated; use plugins.REGISTRY.{successor}"
+        "(plugins.Kind.ESTIMATORS, ...) instead",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 def extensions() -> dict[str, models.Model]:
     """Returns a consistent copy of the registered user adapters.
 
+    Deprecated: use `plugins.REGISTRY.entries(plugins.Kind.ESTIMATORS)`.
+
     Returns:
-        A new mapping of model name to adapter; changing it does not change
-        the shared registrations.
+        A new mapping of model name to adapter.
     """
-    with USER_LOCK:
-        return dict(USER_ADAPTERS)
+    deprecate("extensions", "entries")
+    return plugins.REGISTRY.entries(plugins.Kind.ESTIMATORS)
 
 
 def adopt(adapter: models.Model, replace: bool = False) -> None:
     """Registers a user adapter atomically.
 
+    Deprecated: use `plugins.REGISTRY.enrol(plugins.Kind.ESTIMATORS, ...)`.
+
     Args:
         adapter: The adapter to add.
         replace: Allow replacing an earlier registration of the same name.
-
-    Raises:
-        ConfigError: If the name is taken and `replace` is False.
     """
-    with USER_LOCK:
-        if adapter.name in USER_ADAPTERS and not replace:
-            raise errors.ConfigError(
-                f"model '{adapter.name}' is already registered"
-            )
-        USER_ADAPTERS[adapter.name] = adapter
+    deprecate("adopt", "enrol")
+    plugins.REGISTRY.enrol(
+        plugins.Kind.ESTIMATORS, adapter.name, adapter, replace
+    )
 
 
 def deregister(name: str) -> None:
     """Removes a user adapter atomically (no-op if it is not registered).
 
+    Deprecated: use `plugins.REGISTRY.withdraw(plugins.Kind.ESTIMATORS, ...)`.
+
     Args:
         name: Name of the adapter to remove.
     """
-    with USER_LOCK:
-        USER_ADAPTERS.pop(name, None)
+    deprecate("deregister", "withdraw")
+    plugins.REGISTRY.withdraw(plugins.Kind.ESTIMATORS, name)
 
 
 def builtin_names() -> frozenset[str]:
@@ -137,7 +150,8 @@ class Catalog:
         registry.register(ensembles.Stacking(registry))
         registry.register(ensembles.Blending(registry))
         if include_user:
-            for adapter in extensions().values():
+            shelf = plugins.REGISTRY.entries(plugins.Kind.ESTIMATORS)
+            for adapter in shelf.values():
                 registry.register(adapter, overwrite=True)
         return registry
 
@@ -168,30 +182,25 @@ class Catalog:
     def load_plugins(self) -> list[str]:
         """Registers adapters advertised through entry points.
 
-        Every plugin adapter must pass the shared conformance suite before it
-        is registered. Reasons for failures are kept in `plugin_failures`.
+        Discovery goes through the shared registry (`plugins.REGISTRY`), so
+        a discovered adapter is also offered to later catalogs. Every plugin
+        adapter must pass the shared conformance suite before it is
+        registered. Reasons for failures are kept in `plugin_failures`.
 
         Returns:
             Names of plugins that failed to load or conform; a broken plugin
             never breaks the framework.
         """
-        failed = []
-        self.plugin_failures = {}
-        for entry in metadata.entry_points(group=ENTRY_POINT_GROUP):
-            try:
-                loaded = entry.load()
-                found: Any = loaded() if callable(loaded) else loaded
-                items = found if isinstance(found, (list, tuple)) else [found]
-                for adapter in items:
-                    conformance.comply(adapter)
-                    self.register(adapter, overwrite=True)
-            except Exception as error:
-                LOGGER.warning(
-                    "model plugin %s failed to load", entry.name, exc_info=True
-                )
-                failed.append(entry.name)
-                self.plugin_failures[entry.name] = errors.Failure.of(error).text
-        return failed
+        found = plugins.REGISTRY.discover(
+            plugins.Kind.ESTIMATORS, conformance.comply
+        )
+        self.plugin_failures = dict(found.failures)
+        for adapter in found.items:
+            plugins.REGISTRY.enrol(
+                plugins.Kind.ESTIMATORS, adapter.name, adapter, replace=True
+            )
+            self.register(adapter, overwrite=True)
+        return list(found.failures)
 
     def get(self, name: str) -> models.Model:
         """Returns the adapter called `name`.

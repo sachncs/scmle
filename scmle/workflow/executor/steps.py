@@ -3,6 +3,7 @@
 from collections.abc import Mapping
 import functools
 from typing import Any
+from typing import TypeGuard
 
 from scmle.contracts import errors
 from scmle.runtime import retry
@@ -16,6 +17,46 @@ from scmle.workflow.executor import status
 # store writes only, never the handler (ERR-7). Policy: three attempts over
 # about three seconds ride out a throttled or briefly unreachable store.
 WRITES = retry.Retries(3, 1.0, 2.0, 4.0)
+
+
+def ledger(saved: Mapping[str, Any] | None) -> list[float]:
+    """The spend of a step's earlier attempts in this run, one per attempt.
+
+    The record's `spend` list only grows: a re-run step starts from it, so
+    what a failed attempt spent stays in the run's tally even when the
+    drive dies before it writes the run record (STG-12). A record written
+    before the list existed counts as one attempt of its `cost`.
+
+    Args:
+        saved: The step's stored record, or None.
+
+    Returns:
+        A new list of the spend of every earlier attempt.
+    """
+    if saved is None:
+        return []
+    if "spend" in saved:
+        return [float(amount) for amount in saved["spend"]]
+    return [float(saved["cost"])] if "cost" in saved else []
+
+
+def done(
+    saved: Mapping[str, Any] | None, key: str
+) -> TypeGuard[Mapping[str, Any]]:
+    """Whether a step already succeeded under the same idempotency key.
+
+    Args:
+        saved: The step's stored record, or None.
+        key: The idempotency key of this attempt.
+
+    Returns:
+        True when the record is a success under `key`.
+    """
+    return (
+        saved is not None
+        and saved["state"] == status.Phase.SUCCEEDED
+        and saved["idempotency_key"] == key
+    )
 
 
 class Steps(leases.Leases):
@@ -54,18 +95,20 @@ class Steps(leases.Leases):
         state: status.Phase,
         **fields: Any,
     ) -> None:
-        """Writes a step record.
+        """Writes a step record through the run's archive (`Bucket.record`).
 
         Args:
             run_id: The run.
             step: The step.
             state: The step's new state.
-            **fields: Further fields stored in the record.
+            **fields: Further fields stored in the record; `outputs` is the
+                step's product.
         """
+        made = fields.pop("outputs", None)
+        index = self.workflow.steps.index(step)
         with self.guard:
-            self.write(
-                f"{self.base(run_id)}steps/{step.name}.json",
-                {"step": step.name, "state": state.value, **fields},
+            self.bucket(run_id).record(
+                index, step.name, state, 0.0, made, None, **fields
             )
 
     def note(
@@ -150,7 +193,7 @@ class Steps(leases.Leases):
         key: str,
         attempts: list[Mapping[str, Any]],
         result: Mapping[str, Any],
-        total: float,
+        spend: list[float],
     ) -> None:
         """Writes the record of a step that succeeded.
 
@@ -165,7 +208,8 @@ class Steps(leases.Leases):
             key: The step's idempotency key.
             attempts: The step's attempts, the last one succeeded.
             result: The handler's outputs.
-            total: The cost of every attempt.
+            spend: The spend of every attempt in the run, earlier drives'
+                included; the record's cost is their sum.
         """
         save = functools.partial(
             self.stash,
@@ -175,7 +219,8 @@ class Steps(leases.Leases):
             idempotency_key=key,
             attempts=attempts,
             outputs=result,
-            cost=round(total, 6),
+            spend=spend,
+            cost=round(sum(spend), 6),
         )
         retry.call(save, WRITES, sleep=self.sleep)
 
@@ -200,30 +245,28 @@ class Steps(leases.Leases):
 
         Returns:
             The final step state value, the handler's outputs (empty on failure)
-            and the cost incurred.
+            and the cost this call incurred (the record keeps every attempt's
+            spend, `ledger`).
         """
         key = self.idempotency_key(run_id, step, upstream)
         saved = self.step_record(run_id, step.name)
-        if (
-            saved is not None
-            and saved["state"] == status.Phase.SUCCEEDED
-            and saved["idempotency_key"] == key
-        ):
+        if done(saved, key):
             return status.Phase.SUCCEEDED.value, saved["outputs"], 0.0
         handler = self.handlers[step.name]
         attempts: list[Mapping[str, Any]] = []
-        total = 0.0
+        earlier = len(spend := ledger(saved))
         last_error = ""
         for attempt in range(1, step.retries.max_attempts + 1):
-            current = self.begin(
-                run_id, step, attempt, key, upstream, run_spent + total
-            )
+            spent = run_spent + sum(spend[earlier:])
+            current = self.begin(run_id, step, attempt, key, upstream, spent)
             self.stash(
                 run_id,
                 step,
                 status.Phase.RUNNING,
                 idempotency_key=key,
                 attempts=attempts,
+                spend=spend,
+                cost=round(sum(spend), 6),
             )
             try:
                 result = dict(handler(current) or {})
@@ -231,21 +274,25 @@ class Steps(leases.Leases):
             except retry.TransientError as error:
                 # handled: transient error saved in attempts and retried; FAILED
                 # step record
-                total += current.spent
+                spend.append(round(current.spent, 6))
                 last_error = self.note(attempts, attempt, error, "retryable")
                 if attempt < step.retries.max_attempts:
                     self.sleep(step.retries.delay(attempt))
             except Exception as error:  # noqa: BLE001 -- handler boundary
                 # handled: handler exception saved in attempts; step recorded
                 # FAILED with error, its text cut by `note`.
-                total += current.spent
+                spend.append(round(current.spent, 6))
                 last_error = self.note(attempts, attempt, error, "failed")
                 break
             else:
-                total += current.spent
+                spend.append(round(current.spent, 6))
                 attempts.append({"attempt": attempt, "state": "succeeded"})
-                self.keep(run_id, step, key, attempts, result, total)
-                return status.Phase.SUCCEEDED.value, result, total
+                self.keep(run_id, step, key, attempts, result, spend)
+                return (
+                    status.Phase.SUCCEEDED.value,
+                    result,
+                    sum(spend[earlier:]),
+                )
         self.stash(
             run_id,
             step,
@@ -253,6 +300,7 @@ class Steps(leases.Leases):
             idempotency_key=key,
             attempts=attempts,
             error=last_error,
-            cost=round(total, 6),
+            spend=spend,
+            cost=round(sum(spend), 6),
         )
-        return status.Phase.FAILED.value, {}, total
+        return status.Phase.FAILED.value, {}, sum(spend[earlier:])

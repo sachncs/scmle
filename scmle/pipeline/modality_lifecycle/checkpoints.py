@@ -5,6 +5,12 @@ nested the four digests under `digests`. A checkpoint is signed over the
 layout of the version it is stored at, so a version-1 checkpoint still
 verifies after it is loaded: its content is laid out again as version 1
 before the signature is checked, and it is never re-signed.
+
+`Replay` is the signed checkpoint as the engine's archive
+(`engine.Archive`): after each stage the engine hands it the stage's
+product, whose evidence digest it appends and persists, signed; on a resumed
+run every stage runs again and the digest of each one the checkpoint holds
+must be the stored one. No product is loaded from disk.
 """
 
 from __future__ import annotations
@@ -17,13 +23,21 @@ import json
 from pathlib import Path
 from typing import Literal
 from typing import Self
+from typing import TYPE_CHECKING
 
 from scmle.contracts import errors
 from scmle.contracts import modalities
 from scmle.contracts import records
 from scmle.contracts import signing
 from scmle.evaluation import envelope
+from scmle.governance import attestation
+from scmle.pipeline import products
 from scmle.pipeline.modality_lifecycle import reporting
+
+if TYPE_CHECKING:
+    import enum
+
+    from scmle.pipeline.modality_lifecycle import plans
 
 NESTED = {
     "digests": {
@@ -380,3 +394,100 @@ class Checkpoint:
                 "lifecycle checkpoint signature does not verify"
             )
         return checkpoint
+
+
+class Replay:
+    """The signed checkpoint of a lifecycle run as the engine's archive.
+
+    Attributes:
+        plan: The run's fixed inputs; it writes the checkpoint.
+        resumed: The digests of the stages the resumed checkpoint holds.
+        completed: Values of the stages finished so far, in order.
+        digests: The evidence digest of each finished stage, in order.
+    """
+
+    def __init__(
+        self, plan: plans.Plan, checkpoint: Checkpoint | None = None
+    ) -> None:
+        """Starts from the checkpoint a run resumes, if any.
+
+        Args:
+            plan: The run's fixed inputs.
+            checkpoint: The verified checkpoint being resumed, or None.
+        """
+        self.plan = plan
+        self.resumed = () if checkpoint is None else checkpoint.digests.stages
+        self.completed = (
+            [] if checkpoint is None else list(checkpoint.completed)
+        )
+        self.digests = list(self.resumed)
+
+    def record(
+        self,
+        index: int,
+        name: str,
+        progress: enum.StrEnum,  # noqa: ARG002 -- engine.Archive
+        seconds: float,  # noqa: ARG002 -- engine.Archive
+        made: products.Product | None = None,
+        needs: dict[str, str | None] | None = None,  # noqa: ARG002 -- engine.Archive
+    ) -> records.Layout:
+        """Checks or keeps one finished stage's evidence digest.
+
+        Args:
+            index: The stage's position in the lifecycle, from zero.
+            name: The stage's name.
+            progress: Unused: the checkpoint names stages by phase.
+            seconds: Unused: the report carries the measured operations.
+            made: The stage's product.
+            needs: Unused: every stage replays.
+
+        Returns:
+            The stage, its phase and its evidence digest (`product`).
+
+        Raises:
+            OrderError: If the stage made no derived product.
+            ValueError: If a replayed stage's digest differs from the
+                checkpoint's.
+        """
+        evidence = (
+            made.summary() if isinstance(made, products.Derived) else None
+        )
+        if not isinstance(evidence, dict):
+            raise errors.OrderError(f"{name} made no lifecycle evidence")
+        phase = modalities.REQUIRED_LIFECYCLE_STAGES[index].value
+        digest = attestation.checksum(evidence)
+        if index < len(self.resumed):
+            if digest != self.resumed[index]:
+                raise errors.InputError(
+                    f"lifecycle checkpoint replay diverged at stage {phase}"
+                )
+        else:
+            self.completed.append(phase)
+            self.digests.append(digest)
+            self.plan.persist(self.completed, self.digests, "running")
+        return {"stage": name, "phase": phase, "product": digest}
+
+    def restore(
+        self,
+        index: int,  # noqa: ARG002 -- engine.Archive
+        name: str,  # noqa: ARG002 -- engine.Archive
+        makes: type[products.Product] | None,  # noqa: ARG002 -- engine.Archive
+        needs: dict[str, str | None],  # noqa: ARG002 -- engine.Archive
+    ) -> None:
+        """Restores nothing: a lifecycle stage always replays.
+
+        Args:
+            index: Unused.
+            name: Unused.
+            makes: Unused.
+            needs: Unused.
+        """
+        return
+
+    def start(self) -> None:
+        """Persists the boundary the run starts from, signed."""
+        self.plan.persist(self.completed, self.digests, "running")
+
+    def finish(self) -> None:
+        """Persists the completed checkpoint, after the report."""
+        self.plan.persist(self.completed, self.digests, "completed")

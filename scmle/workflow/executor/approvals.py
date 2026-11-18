@@ -160,9 +160,10 @@ class Approvals(steps.Steps):
             )
         if decision["decision"] not in ("approve", "reject"):
             raise failures.ApprovalError("decision must be approve or reject")
-        if self.read(f"{self.base(run_id)}approvals/{name}.json"):
+        bucket = self.bucket(run_id)
+        if bucket.fetch(f"approvals/{name}.json"):
             raise failures.ApprovalError("a decision is already recorded")
-        self.write(f"{self.base(run_id)}approvals/{name}.json", dict(decision))
+        bucket.keep(f"approvals/{name}.json", decision)
 
     def settle(self, run_id: str, step: definition.Step) -> status.Phase:
         """Determines the approval step's state now.
@@ -178,7 +179,7 @@ class Approvals(steps.Steps):
         Returns:
             The step's new state.
         """
-        decision = self.read(f"{self.base(run_id)}approvals/{step.name}.json")
+        decision = self.bucket(run_id).fetch(f"approvals/{step.name}.json")
         if decision is not None:
             if decision["decision"] == "approve":
                 self.stash(
