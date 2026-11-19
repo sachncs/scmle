@@ -46,9 +46,26 @@ DATED_ID = "f4-leakage-dated"
 DATED_DEFECT = "leak_dated"
 
 
-# The ceiling of the dated check: a record of the past holds no value after
-# the moment it is read, so the honest share of values after the cutoff is
-# zero and any larger share is late. Not tuned: it is the limit itself.
+# A column the user declares known only after the outcome (`Dataset.known`),
+# such as a call's duration when the outcome is the call's result: like
+# `DATED`, a reading of the declaration outside the statistical family. It
+# needs no certificate: the declaration, not a test, decides.
+DECLARED = "declared"
+
+
+# The moments a column can become known, relative to the prediction
+# (`Dataset.known`): by the time the prediction is made, or only once the
+# outcome is (`OUTCOME`), which `DECLARED` blocks.
+MOMENTS = ("prediction", "outcome")
+
+
+OUTCOME = "outcome"
+
+
+# The ceiling of the dated and declared checks: a record of the past holds
+# no value after the moment it is read, so the honest share of values after
+# the cutoff (or of a column declared known after the outcome) is zero and
+# any larger share is late. Not tuned: it is the limit itself.
 LATE = 0.0
 
 
@@ -196,7 +213,7 @@ TOLERANCE = 1e-12
 WORDS = {
     SKILL: "cross-fitted skill",
     MISSING: "association of being recorded with the target (Cramer's V)",
-    PURITY: "share of one target class among the recorded values",
+    PURITY: ("share of the other target classes the recorded values hold back"),
     ECHO: "the column read as the target itself (agreement, or R^2 unfitted)",
     ENCODING: (
         "precision of the column as its group's mean of the target, over "
@@ -206,6 +223,7 @@ WORDS = {
         "exact pairs of rows over the most a sample from a population holds"
     ),
     DATED: "share of the column's dates after the declared prediction time",
+    DECLARED: "declared known only after the outcome (data.known)",
 }
 
 

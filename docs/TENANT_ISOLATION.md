@@ -45,7 +45,11 @@ permissions) belongs to wherever you host it and is not claimed here.
    refused, and a backend listing outside the namespace is refused too.
    Tenant names are lowercase DNS labels, so two never share a directory on
    a case-insensitive file system. The job entrypoint confines its store to
-   `SCMLE_TENANT`, `Gateway.confine` gives a verified caller its own
+   the `SCMLE_TENANT` of the job's environment; `python -m
+   scmle.runners.local` confines its store to its own, and its process and
+   container runners set each job's `SCMLE_TENANT` to the runner's tenant
+   (empty for an unconfined store), whatever the job spec sets.
+   `Gateway.confine` gives a verified caller its own
    tenant's namespace only (403 for no tenant or another tenant's), and an
    experiment store keeps each tenant's runs in a database file of its own.
    A local store refuses any path through a symbolic link.

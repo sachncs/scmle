@@ -22,6 +22,7 @@ from scmle.assurance.admissibility.screen.hypotheses import rival
 from scmle.assurance.admissibility.screen.settings import allowance
 from scmle.assurance.admissibility.screen.settings import BINARY_CLASSES
 from scmle.assurance.admissibility.screen.settings import DATED
+from scmle.assurance.admissibility.screen.settings import DECLARED
 from scmle.assurance.admissibility.screen.settings import SKILL
 from scmle.assurance.admissibility.screen.settings import WORDS
 from scmle.assurance.detectors import certificates
@@ -92,6 +93,13 @@ class Finding:
                 "were not known when the prediction is made; declare it "
                 "unavailable at prediction (a date scheduled in advance, such "
                 "as a due date, reads the same: give it as a lead time)"
+            )
+        if self.mechanism == DECLARED:
+            return (
+                f"feature '{self.feature}' is {what}: it cannot be read when "
+                "the prediction is made (certified by the declaration, may "
+                "block); exclude it (unavailable_at_prediction) or correct "
+                "the declaration"
             )
         bound = "n/a" if self.lower_bound is None else f"{self.lower_bound:.3f}"
         status = (
@@ -457,8 +465,6 @@ def conclude(
         early keeps its estimated p-value and an adjusted p-value of 1.
     """
     total, alpha = plan
-    class_codes, totals = classes
-    ceilings = caps(cfg)
     ps = [
         h.p_value if h.p_value is not None else (h.exceed + 1) / (h.drawn + 1)
         for h in pending
@@ -474,16 +480,9 @@ def conclude(
         bound: float | None = None
         suspect = False
         if significant:
-            bound = floor(h, problem, frame, class_codes, totals, cfg, groups)
-            suspect = bound > ceilings[h.mechanism]
-            rest = None
-            if suspect and h.mechanism == SKILL and h.data is not None:
-                rest = rival(h, pending, problem, apart)
-            if rest is not None and h.data is not None:
-                path = f"leakage.screen.margin.{h.feature}"
-                rng = randomness.component_rng(cfg.run_seed, path, 0)
-                mine = reading(h, h.data, frame, problem)
-                suspect = margin(problem, mine, rest, cfg, groups, rng) >= 0
+            bound, suspect = weigh(
+                h, pending, problem, frame, classes, cfg, groups, apart
+            )
         findings.append(
             Finding(
                 h.feature,
@@ -499,3 +498,68 @@ def conclude(
             )
         )
     return findings
+
+
+def weigh(
+    h: Pending,
+    pending: Sequence[Pending],
+    problem: Problem,
+    frame: pandas.DataFrame,
+    classes: tuple[numpy.ndarray, numpy.ndarray],
+    cfg: leakage.Config,
+    groups: numpy.ndarray | None,
+    apart: Sequence[Hashable] = (),
+) -> tuple[float, bool]:
+    """Bounds one hypothesis and says whether it can be a suspect.
+
+    Neither the bound nor a skill hypothesis's margin over the rest of its
+    table reads a permutation, so the answer is the same before and after
+    the permutations; `conclude` asks it of a significant hypothesis.
+
+    Args:
+        h: The hypothesis.
+        pending: The hypotheses of the family.
+        problem: The encoded outcome with its folds.
+        frame: The chosen rows.
+        classes: Class code of the binned outcome per row, and rows per
+            class.
+        cfg: Settings.
+        groups: Group label per row, or None.
+        apart: Columns left out of every other column's rest.
+
+    Returns:
+        The lower bound of its effect, and whether the bound passes its
+        ceiling and, for skill, the column outruns the rest (`margin` at
+        least zero).
+    """
+    class_codes, totals = classes
+    bound = floor(h, problem, frame, class_codes, totals, cfg, groups)
+    suspect = bound > caps(cfg)[h.mechanism]
+    rest = None
+    if suspect and h.mechanism == SKILL and h.data is not None:
+        rest = rival(h, pending, problem, apart)
+    if rest is not None and h.data is not None:
+        path = f"leakage.screen.margin.{h.feature}"
+        rng = randomness.component_rng(cfg.run_seed, path, 0)
+        mine = reading(h, h.data, frame, problem)
+        suspect = margin(problem, mine, rest, cfg, groups, rng) >= 0
+    return bound, suspect
+
+
+def faint(rows: int, cfg: leakage.Config) -> tuple[str, ...]:
+    """States the low power of a scan on fewer rows than `min_rows`.
+
+    Args:
+        rows: Rows the scan saw.
+        cfg: Settings (`min_rows`).
+
+    Returns:
+        One note below `min_rows`, none otherwise.
+    """
+    if rows >= cfg.min_rows:
+        return ()
+    note = (
+        f"low power: {rows} rows, fewer than {cfg.min_rows}; the probe "
+        "states which planted leaks these rows hide"
+    )
+    return (note,)

@@ -110,6 +110,19 @@ def test_rows_with_near_copied_text_are_near_duplicates():
         duplicates.resemble(frame, ["text"], cut=math.inf)
 
 
+def test_missing_text_reads_as_nan_and_still_pairs():
+    review = "this blender is loud but it crushes ice in seconds, recommended"
+    frame = pandas.DataFrame(
+        {
+            "text": [review, review.replace("loud", "lowd"), None],
+            "note": [numpy.nan, numpy.nan, "only one note"],
+        },
+        dtype=object,
+    )
+    flags = duplicates.resemble(frame, ["text", "note"])
+    assert flags.tolist() == [False, True, False]
+
+
 def test_numeric_only_tables_have_no_text_pass():
     frame = pandas.DataFrame({"a": [1.0, 1.0, 2.0]})
     assert not duplicates.resemble(frame, ["a"]).any()

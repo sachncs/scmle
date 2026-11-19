@@ -117,7 +117,7 @@ def test_custom_stage_sequence_is_polymorphic(binary_frame, tmp_path):
 
         def execute(self, context):
             Recording.calls.append(context.selected.model_name)
-            super().execute(context)
+            return super().execute(context)
 
     stages = (*scmle.pipeline.stages.default_stages()[:-1], Recording())
     spec = support.make_project(binary_frame, "y").spec

@@ -294,8 +294,28 @@ marked `Breaking:` and listed first in their group.
   unpickles anything, with an `ArtifactError` that says the format it reads and
   to retrain and save again. There is no converter.
 
+* **Stages return typed products.** `Stage.execute` returns the stage's
+  frozen product (`products.Product`), which the engine applies to the
+  context and keeps with the stage record, or None for a stage that writes
+  the context itself. Every tabular stage now returns one: ingestion
+  `Intake`, reservation `Reserve` (was `Allowance`), labelling `Resolution`,
+  screening `Screen`, surveying `Portrait`, profiling `Partition`, custody
+  `Custody`, claims `Claims`, planning `Blueprint`, training `Search`,
+  selection `Choice`, final evaluation `Exam`, and packaging `Package`. A
+  stage of your own that overrides `execute` and calls the stock one must
+  return what it returns (`return super().execute(context)`), or the
+  stock stage's product is lost. `ProfileStage.impound` and
+  `run_claim_ledger` are gone: the profiling stage applies what
+  `sequester` and `ledger` return.
+
 ### Added
 
+- `Dataset.known` (`Project(known=...)`): per column, `prediction` or
+  `outcome`, when the column becomes known relative to the prediction. The
+  leakage screen blocks a feature declared `outcome`, also when the
+  permutation scan is declined for its cost (`records.declared`). Empty by
+  default and then left out of the stored configuration, so existing
+  configuration hashes do not change.
 - The `thresholdout` failure policy is available: a charter with
   `failure="thresholdout"` asks each survivor's agreement again on the single
   opening of `C` through a journalled Thresholdout reusable holdout (Dwork et
@@ -1325,6 +1345,19 @@ marked `Breaking:` and listed first in their group.
 
 ### Changed
 
+- The leakage screen does not test duplicated records when the screened
+  columns' value space holds no more records than the table has rows (an
+  enumerated design, such as monks); screens a table with fewer than
+  `min_rows` rows with a low-power note instead of leaving it unchecked;
+  and judges record purity against the target's base rate, so an
+  imbalanced table no longer raises false purity suspects (a rare-class
+  record leak on such a table can now be missed, and then warns only).
+- C2 corpus: Tecator's (OpenML 505) `moisture` and `protein`, documented
+  lab measurements made with the target, are removed from the clean table
+  and are two documented real leak cases; bank marketing `V12` and NYC
+  green taxi `total_amount` are screened with their documented
+  availability declared (`known`). The C2 store is stale until measured
+  again.
 * **One rule for every size gate.** A gate that measures a test of nominal
   level `L` (the falsification battery, the placebo-in-space test, the Holm
   subgroup families, the intersection-union test, the two-sample shift
@@ -1623,6 +1656,21 @@ marked `Breaking:` and listed first in their group.
 
 ### Fixed
 
+- MinHash near-duplicates (`duplicates.resemble`) no longer raise
+  `TypeError` on a missing text value under pandas 3, whose `astype(str)`
+  keeps NaN as a float; it reads as `nan`, as under pandas 2. This broke
+  the custody vault bind, vault open and confirmation single-use gates on
+  real data.
+- `opening.evaluate` logs and re-raises a `LeakageError` (a foreign or
+  tampered Thresholdout journal) instead of recording the confirmation as
+  `failed`.
+- The custody vault process no longer leaks when carving the confirmation
+  set, writing its records or an interrupt fails after the set is sealed:
+  `sequester` closes it before re-raising.
+- C1 fault injection: the stand-in context of the admissibility fault uses
+  the run's services and journal, and the reuse-journal fault is injected
+  on a real charter run (bank marketing, OpenML 1461).
+
 - On Linux the memory limit no longer undercounts: a process whose name holds
   non-ASCII bytes failed to decode in `/proc/<pid>/stat` and was skipped from
   the resident-memory sum. Only the numeric fields after the name are read,
@@ -1781,6 +1829,13 @@ marked `Breaking:` and listed first in their group.
   to one tenant, so it verifies only that tenant's tokens. A link swapped in
   between the check and the open is not caught; see
   [`docs/TENANT_ISOLATION.md`](docs/TENANT_ISOLATION.md).
+- Tenant confinement reaches local runner jobs: `python -m
+  scmle.runners.local` confines its store to `SCMLE_TENANT`, `Process` and
+  `Container` accept a `Tenancy` over a local store, and each job's
+  environment sets `SCMLE_TENANT` to the runner's tenant (empty when the
+  store is not confined), overriding the spec's own, so the job opens the
+  namespace its runner was given. The job entrypoint confines by the job's
+  environment, not the process's.
 
 - Breaking: `SCMLE_TRUSTED=1` and `trusted=True` are refused when
   `SCMLE_ENV=production`, in `ModelBundle.load` and in the service, and the

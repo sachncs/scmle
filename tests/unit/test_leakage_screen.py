@@ -167,19 +167,20 @@ def test_purity_bound_is_clopper_pearson():
     recorded = numpy.zeros(100, dtype=bool)
     recorded[:30] = True
     bound = screen.dominance(recorded, classes, FAST, None)
-    assert bound == pytest.approx(0.05 ** (1 / 30), abs=1e-12)
+    low = 0.05 ** (1 / 30)
+    assert bound == pytest.approx(1 - (1 - low) * 0.5 / 0.6, abs=1e-12)
     mixed = numpy.zeros(100, dtype=bool)
     mixed[35:65] = True
-    expected = stats.beta.ppf(0.05, 25, 6)
+    expected = 1 - (1 - stats.beta.ppf(0.05, 25, 6)) * 0.5 / 0.4
     assert screen.dominance(mixed, classes, FAST, None) == pytest.approx(
         expected
     )
 
 
 def test_purity_bound_counts_groups_not_rows_when_grouped():
-    classes = numpy.zeros(40, dtype=int)
-    recorded = numpy.ones(40, dtype=bool)
-    groups = numpy.repeat(numpy.arange(4), 10)
+    classes = numpy.repeat([0, 1], 40)
+    recorded = classes == 0
+    groups = numpy.repeat(numpy.arange(8), 10)
     one_per_group = screen.dominance(recorded, classes, FAST, groups)
     assert one_per_group == pytest.approx(0.05 ** (1 / 4))
     assert one_per_group < screen.dominance(recorded, classes, FAST, None)
@@ -392,9 +393,9 @@ def test_a_value_recorded_only_for_one_class_is_a_suspect():
     assert ("body", screen.PURITY) in suspects(report)
     found = next(f for f in report.suspects if f.mechanism == screen.PURITY)
     assert found.statistic == 1.0
-    assert found.lower_bound == pytest.approx(
-        0.05 ** (1 / int(frame.body.notna().sum()))
-    )
+    low = 0.05 ** (1 / int(frame.body.notna().sum()))
+    base = float((frame.y == 0).mean())
+    assert found.lower_bound == pytest.approx(1 - (1 - low) * 0.5 / (1 - base))
 
 
 def test_missing_only_for_one_class_is_a_missingness_suspect():
@@ -463,9 +464,12 @@ def test_a_null_outcome_inside_groups_is_not_flagged():
     assert report.suspects == ()
 
 
-def test_too_few_rows_or_a_constant_target_say_why_and_flag_nothing():
+def test_few_rows_or_a_constant_target_say_why_and_flag_nothing():
     small = run(world(15, n=40))
-    assert small.suspects == () and "too few rows" in small.notes[0]
+    assert small.suspects == () and small.unchecked == ()
+    assert any("low power" in note for note in small.notes)
+    lone = run(world(15, n=40).assign(y=[0] * 39 + [1]))
+    assert lone.suspects == () and "too few rows" in lone.notes[0]
     constant = world(15).assign(y=1)
     report = run(constant)
     assert report.suspects == () and "screen not run" in report.notes[0]
@@ -561,9 +565,11 @@ def test_a_table_where_every_plant_is_found_gates_every_mechanism():
     assert set(report.gates.values()) == {certificates.Authority.GATING}
 
 
-def test_too_few_rows_say_what_the_screen_would_miss():
+def test_few_rows_are_screened_and_say_what_the_screen_would_miss():
     report = probed(world(20, n=30))
-    assert set(report.probe.values()) == {False}
+    assert report.unchecked == ()
+    assert report.probe["leak_copy"] and False in report.probe.values()
+    assert any("low power" in n for n in report.notes)
     assert any("may remain undetected" in n for n in report.notes)
 
 
@@ -699,13 +705,14 @@ def test_a_wide_multiclass_table_is_declined_quickly_and_says_so():
 # ---- a screen that did not run is never clean (ERR-2) ----------------------
 
 
-def test_too_few_rows_list_every_column_as_unchecked():
-    frame = world(30, n=12)
-    report = run(frame)
-    assert report.findings == ()
-    assert report.unchecked == ("x0", "x1", "x2", "x3")
-    assert "NOT RUN for 4 columns" in report.warning
-    assert "add rows" in report.warning
+def test_few_rows_are_screened_and_a_lone_class_row_is_unchecked():
+    report = run(world(30, n=12))
+    assert report.unchecked == () and report.warning == ""
+    lone = run(world(30, n=12).assign(y=[0] * 11 + [1]))
+    assert lone.findings == ()
+    assert lone.unchecked == ("x0", "x1", "x2", "x3")
+    assert "NOT RUN for 4 columns" in lone.warning
+    assert "add rows" in lone.warning
 
 
 def test_a_degenerate_target_lists_every_column_as_unchecked():

@@ -60,6 +60,38 @@ def cramer(missing: numpy.ndarray, totals: numpy.ndarray) -> Statistic:
     return compute
 
 
+def purge(
+    share: numpy.ndarray, base: numpy.ndarray, classes: int
+) -> numpy.ndarray:
+    """Standardizes a class's share of the recorded rows to equal classes.
+
+    A value recorded only for one outcome holds back every row of the
+    others; a value recorded at random holds back none, and its commonest
+    class keeps the table's base rate, which on an imbalanced table (98
+    percent negatives) is already above any absolute ceiling. The share the
+    recorded values hold back of the other classes' expected rows,
+    `(1 - share) / (1 - base)` left in, is carried to a table of `classes`
+    equal classes (direct standardization): `1 - (1 - share) (1 - 1 / K) /
+    (1 - base)`. On a table of equal classes it is the share itself, so the
+    association ceiling keeps its meaning there; it is 1 when only that
+    class is recorded, whatever the base rate.
+
+    Args:
+        share: The class's share of the recorded rows.
+        base: Its share of all rows.
+        classes: Classes of the outcome, `K`.
+
+    Returns:
+        The standardized share; 0 where the class is every row (no other
+        class can be held back).
+    """
+    rest = 1.0 - base
+    whole = numpy.isclose(rest, 0.0)
+    safe = numpy.where(whole, 1.0, rest)
+    spread = 1.0 - 1.0 / max(classes, 1)
+    return numpy.where(whole, 0.0, 1.0 - (1.0 - share) * spread / safe)
+
+
 def purity_statistic(recorded: numpy.ndarray) -> Statistic:
     """Builds the record-purity statistic.
 
@@ -69,16 +101,20 @@ def purity_statistic(recorded: numpy.ndarray) -> Statistic:
 
     Returns:
         A function mapping an array of shape (B, n) of class-code versions
-        to a length-B array holding, for each, the share of the commonest
-        class among the recorded rows.
+        to a length-B array holding, for each, the largest share of one
+        class among the recorded rows, standardized to equal classes
+        (`purge`).
     """
     flags = recorded.astype("float64")
     count = float(flags.sum())
 
     def compute(labels: numpy.ndarray) -> numpy.ndarray:
         k = int(labels.max()) + 1
-        shares = [(labels == c) @ flags / count for c in range(k)]
-        return numpy.max(shares, axis=0)  # type: ignore[no-any-return, unused-ignore]  # Any on older NumPy stubs; editing code would stale the shipped certificate
+        shares = [
+            purge((labels == c) @ flags / count, (labels == c).mean(axis=-1), k)
+            for c in range(k)
+        ]
+        return numpy.max(shares, axis=0)  # type: ignore[no-any-return, unused-ignore]  # Any on older NumPy stubs
 
     return compute
 
@@ -89,11 +125,14 @@ def dominance(
     cfg: leakage.Config,
     groups: numpy.ndarray | None,
 ) -> float:
-    """One-sided Clopper-Pearson lower bound of the commonest class's share.
+    """One-sided lower bound of the record purity (`purity_statistic`).
 
-    The share is taken among recorded rows. With groups the number of trials
-    is the number of groups holding a recorded row (at most the rows), the
-    conservative count when rows of one group move together.
+    The class is the one whose standardized share is largest; its share
+    among recorded rows is bounded by Clopper-Pearson and standardized to
+    equal classes (`purge`, increasing in the share, so the bound carries
+    over). With groups the number of trials is the number of groups holding
+    a recorded row (at most the rows), the conservative count when rows of
+    one group move together.
 
     Args:
         recorded: Boolean array, True where the value is recorded.
@@ -102,19 +141,24 @@ def dominance(
         groups: Group label per row, or None.
 
     Returns:
-        The lower bound of the share, or 0.0 when the rounded count of
-        successes is zero.
+        The corrected lower bound, or 0.0 when the rounded count of
+        successes is zero or the class is every row.
     """
     labels = classes[recorded]
-    counts = numpy.bincount(labels)
-    share = float(numpy.max(counts)) / len(labels)
+    counts = numpy.bincount(labels, minlength=int(classes.max()) + 1)
+    base = numpy.bincount(classes) / len(classes)
+    shares = counts / len(labels)
+    chosen = int(numpy.argmax(purge(shares, base, len(base))))
     trials = len(labels)
     if groups is not None:
         trials = min(trials, len(pandas.unique(groups[recorded])))
-    wins = round(share * trials)
+    wins = round(float(shares[chosen]) * trials)
     if wins == 0:
         return 0.0
-    return float(stats.beta.ppf(1.0 - cfg.confidence, wins, trials - wins + 1))
+    low = stats.beta.ppf(1.0 - cfg.confidence, wins, trials - wins + 1)
+    return float(
+        purge(numpy.asarray(low), numpy.asarray(base[chosen]), len(base))
+    )
 
 
 def resample(

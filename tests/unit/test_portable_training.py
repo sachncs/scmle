@@ -229,7 +229,7 @@ def test_training_cannot_run_as_serving_or_touch_released_bundles(store):
 
 
 def test_role_tables_are_separate():
-    # Enforces docs/TENANT_ISOLATION.md:52.
+    # Enforces docs/TENANT_ISOLATION.md:56.
     # Enforces website/src/pages/docs/tenant-isolation.astro:34.
     roles.check_separation(roles.TRAINING_ROLE, roles.SERVING_ROLE)
     both = roles.Role("serving", roles.SERVING_ROLE.reads, ("runs/",))

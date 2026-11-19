@@ -13,15 +13,17 @@ analytic p-value and a bound against a ceiling no honest table can pass
   against the table's own natural duplicate rate: a sample from any
   population holds no more exact pairs than its singletons and triples allow.
 
-A third check reads the user's declaration rather than the outcome, and
-stays outside the family: `dated`, a date column holding values after the
+Two checks read the user's declarations rather than the outcome, and stay
+outside the family: `dated`, a date column holding values after the
 declared prediction time (`Dataset.cutoff`), such as a closing date that
-falls later for one outcome. Without the declaration a closing date cannot
-be told from a legitimate trend; with it, a value after the cutoff was not
-known when the prediction is made.
+falls later for one outcome; and `declared`, a column declared known only
+after the outcome (`Dataset.known`), such as a call's duration. Without the
+declaration neither can be told from a legitimate predictor; with it, the
+value was not known when the prediction is made.
 """
 
 from collections.abc import Hashable
+from collections.abc import Mapping
 from collections.abc import Sequence
 import math
 
@@ -34,9 +36,12 @@ from scmle.assurance.admissibility.screen.fitting import Problem
 from scmle.assurance.admissibility.screen.hypotheses import Pending
 from scmle.assurance.admissibility.screen.report import Finding
 from scmle.assurance.admissibility.screen.settings import DATED
+from scmle.assurance.admissibility.screen.settings import DECLARED
 from scmle.assurance.admissibility.screen.settings import DUPLICATION
 from scmle.assurance.admissibility.screen.settings import ENCODING
 from scmle.assurance.admissibility.screen.settings import LATE
+from scmle.assurance.admissibility.screen.settings import MOMENTS
+from scmle.assurance.admissibility.screen.settings import OUTCOME
 from scmle.assurance.admissibility.screen.settings import ROWS
 from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
@@ -353,17 +358,20 @@ def duplication(
         target: Target column.
         cfg: Settings (`confidence`).
 
+    Not tested: a table whose columns' space holds no more records than its
+    rows (`enumerated`). A record there is a cell of the space, so a copy on
+    both sides of a split is what serving looks like, and a model can learn
+    no more from a copied record than from the cell it repeats; the
+    sampling bound does not apply to rows that may be laid out, not drawn.
+
     Returns:
-        The hypothesis, named `ROWS`; None with fewer than three rows.
+        The hypothesis, named `ROWS`; None with fewer than three rows or
+        for a table whose space is no larger than its rows.
     """
     rows = frame[[*names, target]]
-    if len(rows) <= PAIR:
+    if len(rows) <= PAIR or enumerated(frame, names):
         return None
-    try:
-        hashed = pandas.util.hash_pandas_object(rows, index=False)
-    except TypeError:
-        # handled: unhashable cells are counted by their text
-        hashed = pandas.util.hash_pandas_object(rows.astype(str), index=False)
+    hashed = fingerprint(rows)
     counts = numpy.bincount(hashed.value_counts().to_numpy(), minlength=4)
     singles, pairs, triples = (int(counts[k]) for k in (1, 2, 3))
     p, ratio = excess(singles, pairs, triples, len(rows))
@@ -385,6 +393,101 @@ def duplication(
         active=False,
         bound=bound,
     )
+
+
+def fingerprint(rows: pandas.DataFrame) -> pandas.Series:
+    """Hashes each row, so equal rows share a hash.
+
+    Args:
+        rows: The rows.
+
+    Returns:
+        One hash per row; unhashable cells are hashed by their text.
+    """
+    try:
+        return pandas.util.hash_pandas_object(rows, index=False)
+    except TypeError:
+        # handled: unhashable cells are counted by their text
+        return pandas.util.hash_pandas_object(rows.astype(str), index=False)
+
+
+def enumerated(frame: pandas.DataFrame, names: Sequence[Hashable]) -> bool:
+    """Whether the columns' space holds no more records than the table.
+
+    The product of each column's distinct values is the most distinct
+    records the columns can spell. When it is at most the rows, the table
+    can lay out its whole space (a designed experiment, or a benchmark's
+    truth table with a training sample appended), and a record is a cell of
+    that space, not an individual: every input the model will meet is one
+    the rows can hold, and a copied row teaches nothing a repeat of its cell
+    does not. One column always spans its own values, so at least `PAIR`
+    columns must vary; a column of distinct numbers beside another varying
+    column spells more records than rows, so a sampled table never is one.
+
+    Args:
+        frame: Every row to screen.
+        names: Candidate columns.
+
+    Returns:
+        True when at least `PAIR` columns vary and the product of their
+        distinct values (missing counted as a value) is at most the rows.
+    """
+    columns = frame[list(names)]
+    space, varied = 1, 0
+    for name in columns:
+        levels = int(fingerprint(columns[[name]]).nunique())
+        space *= levels
+        varied += levels > 1
+        if space > len(columns):
+            return False
+    return varied >= PAIR
+
+
+def declared(
+    names: Sequence[Hashable], known: Mapping[str, str] | None
+) -> list[Finding]:
+    """Finds the candidate columns declared known only after the outcome.
+
+    The user's declaration of when a column becomes known (`Dataset.known`)
+    decides, as `dated` reads a declared prediction time: a column known
+    only once the outcome is cannot be read when the prediction is made, so
+    its finding is significant, complete and blocking, with no test and no
+    p-value. A column known by the time of the prediction, or not declared,
+    raises nothing.
+
+    Args:
+        names: Candidate columns.
+        known: Column to `prediction` or `outcome` (`MOMENTS`), or None.
+
+    Returns:
+        One finding per candidate column declared `outcome`, in column
+        order.
+
+    Raises:
+        InputError: If a declared moment is not one of `MOMENTS`.
+    """
+    told = dict(known or {})
+    wrong = sorted(k for k, v in told.items() if v not in MOMENTS)
+    if wrong:
+        raise errors.InputError(
+            f"known: columns {wrong} must be declared one of {list(MOMENTS)}"
+        )
+    return [
+        Finding(
+            str(name),
+            DECLARED,
+            1.0,
+            p_value=0.0,
+            adjusted_p=0.0,
+            significant=True,
+            lower_bound=1.0,
+            suspect=True,
+            complete=True,
+            gate=certificates.Authority.GATING,
+        )
+        for name in names
+        if told.get(str(name)) == OUTCOME
+    ]
 
 
 def dated(

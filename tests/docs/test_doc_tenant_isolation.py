@@ -168,7 +168,7 @@ def test_before_it_is_ready_the_probe_gives_no_model_identity():
 
 
 def test_refusals_use_three_fixed_messages(reference):
-    """Enforces docs/TENANT_ISOLATION.md:56 and docs/TENANT_ISOLATION.md:57.
+    """Enforces docs/TENANT_ISOLATION.md:60 and docs/TENANT_ISOLATION.md:61.
 
     A missing scope and a foreign tenant give the same 403 body, so the body
     tells neither which check failed nor whether the other tenant exists.
@@ -213,7 +213,7 @@ def test_refusals_use_three_fixed_messages(reference):
 
 
 def test_audit_rows_carry_the_request_id_and_never_a_body(reference, tmp_path):
-    """Enforces docs/TENANT_ISOLATION.md:60.
+    """Enforces docs/TENANT_ISOLATION.md:64.
 
     Also enforces website/src/pages/docs/tenant-isolation.astro:36.
     """
@@ -252,7 +252,7 @@ def admin_rows(path, count):
 def test_the_chain_catches_edits_gaps_and_reordering_but_not_a_cut_tail(
     tmp_path,
 ):
-    """Enforces docs/TENANT_ISOLATION.md:80.
+    """Enforces docs/TENANT_ISOLATION.md:84.
 
     Also enforces website/src/pages/docs/tenant-isolation.astro:45.
     """
@@ -272,7 +272,7 @@ def test_the_chain_catches_edits_gaps_and_reordering_but_not_a_cut_tail(
 def test_the_revocation_file_named_by_the_environment_is_read_per_request(
     tmp_path,
 ):
-    """Enforces docs/TENANT_ISOLATION.md:111 and docs/TENANT_ISOLATION.md:77.
+    """Enforces docs/TENANT_ISOLATION.md:115 and docs/TENANT_ISOLATION.md:81.
 
     Also enforces website/src/pages/docs/tenant-isolation.astro:10.
     Also enforces website/src/pages/docs/tenant-isolation.astro:44.
@@ -311,7 +311,7 @@ def test_the_revocation_file_named_by_the_environment_is_read_per_request(
 
 
 def test_serving_and_training_roles_keep_to_their_prefixes(tmp_path):
-    """Enforces docs/TENANT_ISOLATION.md:52.
+    """Enforces docs/TENANT_ISOLATION.md:56.
 
     Also enforces website/src/pages/docs/tenant-isolation.astro:34.
     """

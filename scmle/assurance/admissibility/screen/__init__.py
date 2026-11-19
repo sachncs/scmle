@@ -168,11 +168,13 @@ from scmle.assurance.admissibility.screen.planning import load_store
 from scmle.assurance.admissibility.screen.planning import measure
 from scmle.assurance.admissibility.screen.planning import subsample
 from scmle.assurance.admissibility.screen.records import dated
+from scmle.assurance.admissibility.screen.records import declared
 from scmle.assurance.admissibility.screen.records import duplication
 from scmle.assurance.admissibility.screen.records import encodings
 from scmle.assurance.admissibility.screen.report import abstain
 from scmle.assurance.admissibility.screen.report import conclude
 from scmle.assurance.admissibility.screen.report import exceed
+from scmle.assurance.admissibility.screen.report import faint
 from scmle.assurance.admissibility.screen.report import Finding
 from scmle.assurance.admissibility.screen.report import halt
 from scmle.assurance.admissibility.screen.report import Screen
@@ -185,6 +187,7 @@ from scmle.assurance.admissibility.screen.settings import cost
 from scmle.assurance.admissibility.screen.settings import DATED
 from scmle.assurance.admissibility.screen.settings import DATED_DEFECT
 from scmle.assurance.admissibility.screen.settings import DATED_ID
+from scmle.assurance.admissibility.screen.settings import DECLARED
 from scmle.assurance.admissibility.screen.settings import DETECTOR_ID
 from scmle.assurance.admissibility.screen.settings import DETECTORS
 from scmle.assurance.admissibility.screen.settings import DUPLICATION
@@ -229,6 +232,7 @@ __all__ = [
     "DATED",
     "DATED_DEFECT",
     "DATED_ID",
+    "DECLARED",
     "DETECTORS",
     "DETECTOR_ID",
     "DUPLICATION",
@@ -280,6 +284,7 @@ __all__ = [
     "cramer",
     "crossfit",
     "dated",
+    "declared",
     "decline",
     "disclose",
     "dominance",
@@ -289,6 +294,7 @@ __all__ = [
     "encodings",
     "enough",
     "exceed",
+    "faint",
     "family",
     "floor",
     "forecast",
@@ -334,14 +340,17 @@ def screen_table(
     time_column: str | None = None,
     time_budget_seconds: float | None = None,
     cutoff: str | None = None,
+    known: Mapping[str, str] | None = None,
 ) -> Screen:
     """Screens training data with the certified settings.
 
     Groups and a time column structure the rows as `arrange` describes.
     Every suspect may block; `probe` records what a clean result means on
     these rows (see the module docstring). With a declared prediction time,
-    every date column with values after it is late (`records.dated`); that
-    reading needs no budget and runs even when the scan is declined.
+    every date column with values after it is late (`records.dated`), and
+    every column declared known only after the outcome is declared
+    (`records.declared`); those readings need no budget and run even when
+    the scan is declined.
 
     Args:
         frame: Training rows including the target and any structure columns.
@@ -358,6 +367,7 @@ def screen_table(
             and a scan predicted not to fit is declined. None means no cap
             beyond `MAX_PERMUTATIONS`.
         cutoff: The declared prediction time (`Dataset.cutoff`), or None.
+        known: When each column becomes known (`Dataset.known`), or None.
 
     Returns:
         The report, using `CERTIFIED` settings with `seed`. A screen that was
@@ -366,7 +376,8 @@ def screen_table(
         `screen`.
     """
     cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=seed)
-    late = dated(frame, [c for c in features if c in frame.columns], cutoff)
+    present = [c for c in features if c in frame.columns]
+    late = (dated(frame, present, cutoff), declared(present, known))
     rows, grouping, block_size = arrange(frame, group_column, time_column)
     limit = share(time_budget_seconds)
     left = None
@@ -402,38 +413,57 @@ def screen_table(
 
 
 def stamp(
-    report: Screen, late: Sequence[Finding], cutoff: str | None
+    report: Screen,
+    late: tuple[Sequence[Finding], Sequence[Finding]],
+    cutoff: str | None,
 ) -> Screen:
-    """Adds the dated findings of a declared prediction time to a report.
+    """Adds the findings of the user's declarations to a report.
 
     Args:
         report: The screen's report.
-        late: The findings of `records.dated`.
+        late: The findings of `records.dated` and of `records.declared`.
         cutoff: The declared prediction time, or None.
 
     Returns:
-        The report unchanged without a cutoff; otherwise with the late
-        columns' findings, the dated mechanism gating at ceiling `LATE`, and
-        a note on how many date columns were read and the certificate.
+        The report with each declaration's findings, its mechanism gating at
+        ceiling `LATE`, and a note: with a cutoff, how many date columns were
+        read and the certificate; with columns declared known after the
+        outcome, which. Unchanged when neither was declared.
     """
-    if cutoff is None:
+    dates, told = late
+    findings, mechanisms, notes = [*report.findings], [], [*report.notes]
+    if cutoff is not None:
+        store = bundled()
+        state = (
+            "missing"
+            if store is None
+            else store.state(DATED_ID, dated_digest()).value
+        )
+        findings += dates
+        mechanisms.append(DATED)
+        notes.append(
+            f"prediction time {cutoff} declared: {len(dates)} date column(s) "
+            f"hold values after it; published certificate for dated "
+            f"columns: {state}"
+        )
+    if told:
+        findings += told
+        mechanisms.append(DECLARED)
+        notes.append(
+            "declared known only after the outcome: "
+            + ", ".join(f.feature for f in told)
+        )
+    if not mechanisms:
         return report
-    store = bundled()
-    state = (
-        "missing"
-        if store is None
-        else store.state(DATED_ID, dated_digest()).value
-    )
-    note = (
-        f"prediction time {cutoff} declared: {len(late)} date column(s) hold "
-        f"values after it; published certificate for dated columns: {state}"
-    )
     return dataclasses.replace(
         report,
-        findings=(*report.findings, *late),
-        gates={**report.gates, DATED: certificates.Authority.GATING},
-        ceilings={**report.ceilings, DATED: LATE},
-        notes=(*report.notes, note),
+        findings=tuple(findings),
+        gates={
+            **report.gates,
+            **dict.fromkeys(mechanisms, certificates.Authority.GATING),
+        },
+        ceilings={**report.ceilings, **dict.fromkeys(mechanisms, LATE)},
+        notes=tuple(notes),
     )
 
 
@@ -591,9 +621,9 @@ def scan(
     except ValueError as error:
         # handled: returned as failed finding/problem/refusal with error text
         return abstain(cfg, gates, n, f"screen not run: {error}", names)
-    if not enough(problem.y, task, cfg):
+    if not enough(problem.y, task):
         return abstain(
-            cfg, gates, n, "screen not run: too few rows (low power)", names
+            cfg, gates, n, "screen not run: too few rows of a class", names
         )
     alpha = budget.exact(cfg.alpha, "alpha")
     labels = tally(frame[target], task)
@@ -627,6 +657,7 @@ def scan(
     findings = conclude(
         pending, plan, problem, frame, labels, cfg, groups, gates, apart
     )
+    notes = (*notes, *faint(n, cfg))
     return Screen(
         tuple(findings), n, family, total, cfg.alpha, gates, caps(cfg), notes
     )

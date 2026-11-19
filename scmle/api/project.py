@@ -91,6 +91,10 @@ class Definition:
         cutoff: The prediction time, ISO 8601 text such as `2020-01-01`:
             a date column with values after it was not known when the
             prediction is made, and the leakage screen blocks it.
+        known: Column to when it becomes known: `prediction` (by the time
+            the prediction is made, as an unlisted column is taken to be) or
+            `outcome` (only once the outcome is). The leakage screen blocks
+            a feature declared `outcome`.
         time_as_feature: Also let the model use the time column as a feature
             (off by default; models must extrapolate in time).
         excluded_columns: Other columns to ignore.
@@ -219,6 +223,7 @@ class Definition:
     group_column: str | None = None
     time_column: str | None = None
     cutoff: str | None = None
+    known: dict[str, Literal["prediction", "outcome"]] | None = None
     time_as_feature: bool = False
     excluded_columns: list[str] | None = None
     unavailable_at_prediction: list[str] | None = None
@@ -299,6 +304,7 @@ def describe(
         group_column=definition.group_column,
         time_column=definition.time_column,
         cutoff=definition.cutoff,
+        known=definition.known or {},
         time_as_feature=definition.time_as_feature,
         excluded_columns=definition.excluded_columns or [],
         unavailable_at_prediction=definition.unavailable_at_prediction or [],

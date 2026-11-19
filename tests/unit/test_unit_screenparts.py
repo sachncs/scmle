@@ -67,7 +67,11 @@ def test_the_mechanisms_and_detectors_are_named():
         "regression": "f4-leakage-screen-regression",
     }
     assert settings.STORE_PATH.name == "screen_certificates.json"
-    assert set(settings.WORDS) == {*settings.MECHANISM_DEFECTS, settings.DATED}
+    assert set(settings.WORDS) == {
+        *settings.MECHANISM_DEFECTS,
+        settings.DATED,
+        settings.DECLARED,
+    }
 
 
 def test_the_word_pattern_splits_on_underscores_and_punctuation():
@@ -331,20 +335,39 @@ def test_purity_is_the_share_of_the_commonest_recorded_class():
     recorded = numpy.array([True, True, True, False])
     statistic = association.purity_statistic(recorded)
     out = statistic(numpy.array([[0, 0, 1, 1], [2, 2, 2, 0]]))
-    assert out.tolist() == pytest.approx([2 / 3, 1.0])
+    # Three classes are seen: class 0 is 2/3 of the recorded rows and half
+    # of all, standardized to three equal classes; class 2 holds back every
+    # other row.
+    assert out.tolist() == pytest.approx([1 - (1 / 3) * (2 / 3) / 0.5, 1.0])
+    two = statistic(numpy.array([[0, 0, 1, 1]]))
+    assert two.tolist() == pytest.approx([2 / 3])
+
+
+def test_purity_is_corrected_for_the_base_rate():
+    rng = numpy.random.default_rng(0)
+    labels = (rng.random(4000) < 0.02).astype("int64")
+    recorded = rng.random(4000) < 0.5
+    statistic = association.purity_statistic(recorded)
+    raw = float((labels[recorded] == 0).mean())
+    assert raw > 0.95
+    assert statistic(labels[None, :])[0] < 0.75
+    whole = association.purge(numpy.asarray(0.5), numpy.asarray(1.0), 2)
+    assert whole == 0.0
 
 
 def test_dominance_is_a_clopper_pearson_lower_bound():
-    recorded = numpy.array([True] * 10)
-    classes = numpy.array([1] * 10)
+    recorded = numpy.array([True] * 10 + [False] * 10)
+    classes = numpy.array([1] * 10 + [0] * 10)
     cfg = config(confidence=0.95)
+    low = 0.05 ** (1 / 10)
     assert association.dominance(recorded, classes, cfg, None) == pytest.approx(
-        0.05 ** (1 / 10)
+        low
     )
-    groups = numpy.array([0] * 5 + [1] * 5)
+    groups = numpy.array([0] * 5 + [1] * 5 + [2] * 10)
     assert association.dominance(
         recorded, classes, cfg, groups
     ) == pytest.approx(0.05 ** (1 / 2))
+    assert association.dominance(recorded, classes * 0, cfg, None) == 0.0
 
 
 def test_resample_of_a_perfect_split_is_one_and_degenerate_is_minus_infinity():
@@ -852,9 +875,10 @@ def test_copied_rows_are_found_and_natural_repeats_are_not():
 
 def test_the_screen_runs_with_two_rows_of_a_class():
     y = numpy.r_[numpy.zeros(198, "int64"), [1, 1]]
-    assert fitting.enough(y, "classification", config())
-    assert not fitting.enough(y[:-1], "classification", config())
-    assert not fitting.enough(y[:50], "regression", config())
+    assert fitting.enough(y, "classification")
+    assert not fitting.enough(y[:-1], "classification")
+    # Fewer rows than `min_rows` lower power, not size: screened.
+    assert fitting.enough(y[:50], "regression")
 
 
 def test_a_tie_with_the_rest_counts_and_a_weaker_column_does_not():

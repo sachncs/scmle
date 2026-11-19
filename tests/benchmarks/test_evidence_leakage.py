@@ -189,3 +189,66 @@ def test_a_planted_closing_date_is_screened_with_the_users_cutoff() -> None:
             assert case.cutoff == leakage.START.isoformat()
         else:
             assert case.cutoff == ""
+
+
+def test_availability_is_declared_only_where_documented() -> None:
+    declared = {
+        name: case.known
+        for name, case in leakage.catalog().items()
+        if case.known
+    }
+    assert declared == {
+        "leak/bank_duration": ("V12",),
+        "leak/taxi_total": ("total_amount",),
+    }
+    for name, columns in declared.items():
+        assert leakage.catalog()[name].column in columns
+
+
+def test_documented_leak_columns_of_rule_tables_are_removed() -> None:
+    tables = {t.name: t for t in leakage.clean()}
+    assert tables["openml_505"].drop == ("moisture", "protein")
+    assert set(leakage.DOCUMENTED) <= {t.source for t in tables.values()}
+
+
+def test_documented_leak_columns_of_rule_tables_are_leak_cases() -> None:
+    catalog = leakage.catalog()
+    for source, columns in leakage.DOCUMENTED.items():
+        for column in columns:
+            (case,) = [
+                c
+                for c in catalog.values()
+                if c.table.source == source and c.column == column
+            ]
+            assert (case.corpus, case.provenance) == ("leak", leakage.REAL)
+            assert case.table.drop == tuple(
+                other for other in columns if other != column
+            )
+            assert case.known == ()
+    real = [c for c in catalog.values() if c.provenance == leakage.REAL]
+    assert len(real) == 6
+
+
+def test_a_declaration_reaches_the_project(monkeypatch) -> None:
+    seen: dict[str, Any] = {}
+
+    class Stub:
+        profile = None
+
+        def __init__(self, *args: Any, **options: Any) -> None:
+            seen.update(options)
+
+        def plan(self) -> None:
+            return None
+
+    import scmle.api.project
+
+    monkeypatch.setattr(scmle.api.project, "Project", Stub)
+    frame = pandas.DataFrame({"V12": [1.0, 2.0], "Class": ["a", "b"]})
+    monkeypatch.setattr(leakage, "build", lambda case: frame)
+    case = leakage.catalog()["leak/bank_duration"]
+    assert leakage.attempt(case)["known"] == ["V12"]
+    assert seen["known"] == {"V12": "outcome"}
+    seen.clear()
+    leakage.attempt(leakage.catalog()["clean/bank_marketing"])
+    assert "known" not in seen

@@ -323,7 +323,7 @@ def measure(
     except errors.InputError:
         # handled: the scan abstains on the same error before drawing
         return None
-    if not enough(problem.y, task, cfg):
+    if not enough(problem.y, task):
         return None
     classes = leakage.bucket(sample[target], task)
     codes = pandas.factorize(classes, sort=True)[0].astype("int64")

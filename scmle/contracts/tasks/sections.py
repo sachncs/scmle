@@ -103,6 +103,15 @@ class Dataset(Section):
             feature (a numeric stamp stays numeric; a date becomes date
             parts). Off by default because a model that keys on absolute
             time must extrapolate into the future.
+        known: Column to when it becomes known, relative to the prediction:
+            `prediction` (by the time the prediction is made, as every
+            column is taken to be when it is not listed) or `outcome` (only
+            once the outcome is, such as a call's duration when the outcome
+            is the call's result). The leakage screen blocks a feature
+            declared `outcome`: exclude it (`unavailable_at_prediction`) or
+            correct the declaration. Empty (the default) declares nothing
+            and is left out of the stored configuration, so its hash is the
+            one it had before the field existed.
         excluded_columns: Columns never used.
         unavailable_at_prediction: Columns only known after the outcome.
         feature_delays: For columns whose value becomes known only some
@@ -242,6 +251,9 @@ class Dataset(Section):
     group_column: str | None = None
     time_column: str | None = None
     cutoff: str | None = None
+    known: dict[str, Literal["prediction", "outcome"]] = pydantic.Field(
+        default_factory=dict, exclude_if=lambda value: not value
+    )
     time_as_feature: bool = False
     excluded_columns: list[str] = pydantic.Field(default_factory=list)
     unavailable_at_prediction: list[str] = pydantic.Field(default_factory=list)

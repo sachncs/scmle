@@ -12,27 +12,31 @@ OpenML tables in scikit-learn's local cache; `refusal.fetch` loads them
 without the network, at most `refusal.ROWS` rows):
 
 * `clean`: tables as published, with the task a practitioner would declare
-  and the documented leak columns of four tables removed. A block is a
-  false block; any other refusal or a crash also counts against the row,
-  as docs/preregistration/c2.md words it ("does not reach a plan for any
+  and the documented leak columns of five tables removed (`DOCUMENTED` for
+  the one table the rule below adds). A block is a false block; any other
+  refusal or a crash also counts against the row, as
+  docs/preregistration/c2.md words it ("does not reach a plan for any
   reason"): a table the split gate refuses (a class too rare for the test
   rows) is a false block of the row, though not of the screen, and the
   row's `outcomes` count the two apart (`refused`, `blocked`). The first 78
-  tables
-  were chosen by hand. The rest follow a rule fixed before any of them was
-  screened: every real table of the C14 catalog (`refusal.EXTRA`, then
-  `refusal.SUITE`: four published OpenML suites and the tables cached
+  tables were chosen by hand. The rest follow a rule fixed before any of
+  them was screened: every real table of the C14 catalog (`refusal.EXTRA`,
+  then `refusal.SUITE`: four published OpenML suites and the tables cached
   before them) not already here, with the task C14 declares, except a
-  table that is one already here under another source (`SAME`). None of
-  them has a documented leak (C14 excludes copies, and its one documented
-  leak, NYC green taxi `total_amount`, is already here with the column
-  removed). The rule adds 89 tables, so the 86 clean tables the first Holm
-  step needs are reached.
+  table that is one already here under another source (`SAME`). One of
+  them has documented leaks: Tecator (OpenML 505), whose description says
+  its moisture and protein, like fat, the outcome its spectra are to
+  predict, were "determined by analytic chemistry"; they are removed here
+  and are leak cases below. C14's other documented leak, NYC green taxi
+  `total_amount`, is already here with the column removed. The rule adds
+  89 tables, so the 86 clean tables the first Holm step needs are reached.
 * `leak`: two provenances, stated on every case.
   `documented real leak`: the real leaked dataset itself (Titanic `boat`
   and `body`, recorded after the sinking; bank marketing `V12`, the call
   duration the UCI page says is known only after the outcome; NYC green
-  taxi `total_amount`, which includes the tip being predicted).
+  taxi `total_amount`, which includes the tip being predicted; Tecator
+  `moisture` and `protein`, lab measurements made with the fat they
+  predict), each with the table's other leak columns removed.
   `planted on real data`: a real table with one realistic leak added:
   `target_encoding` (an unsmoothed target mean over about five rows per
   level, computed on all rows), `post_outcome` (a field recorded after the
@@ -44,6 +48,19 @@ without the network, at most `refusal.ROWS` rows):
   it: that user scores records as of a known moment, the snapshot the
   closing dates fall after (`START`), and declares it (`cutoff`); without
   that declaration a closing date cannot be told from a legitimate trend.
+  Likewise a documented real leak whose documentation says when the column
+  becomes known is screened with that declared (`known`, `Dataset.known`),
+  as a user who read it would run it, and never from knowing the answer:
+  bank marketing `V12`, of which the UCI page (archive.ics.uci.edu/dataset/
+  222/bank+marketing) says "the duration is not known before a call is
+  performed. Also, after the end of the call y is obviously known"; NYC
+  green taxi `total_amount`, "the total amount charged to passengers" in
+  the TLC data dictionary (data_dictionary_trip_records_green.pdf), which
+  holds `tip_amount` and so is charged only once the tip is (the OpenML
+  page drops it because "otherwise the target could be predicted
+  deterministically"). Titanic's `boat` and `body` and Tecator's
+  `moisture` and `protein` are not declared: their documentation names
+  them without saying when they become known relative to the prediction.
 
 Rows decided (`acceptance.toml`): recall, the one-sided Clopper-Pearson
 lower bound of caught over leak cases, at least `leak_recall_min` (Floor);
@@ -128,6 +145,9 @@ FAMILY = 4
 # C14 tables that are a clean table here under another source: OpenML id to
 # the source used here.
 SAME = {61: "load_iris"}
+# Documented leak columns of the tables the C14 rule adds, removed as the
+# hand-chosen tables' are: OpenML id to columns.
+DOCUMENTED = {505: ("moisture", "protein")}
 NOT_MEASURED = (
     "entity-level leaks",
     "a corpus labelled by people not working on the screen",
@@ -170,6 +190,8 @@ class Case:
         column: The leaking column, empty for duplicates and clean cases.
         cutoff: The prediction time its user declares (`Dataset.cutoff`),
             empty for none.
+        known: Columns its user declares known only after the outcome
+            (`Dataset.known`), from the data's documentation.
     """
 
     name: str
@@ -179,6 +201,7 @@ class Case:
     provenance: str = "clean real data"
     column: str = ""
     cutoff: str = ""
+    known: tuple[str, ...] = ()
 
 
 def clean() -> list[Table]:
@@ -227,7 +250,13 @@ def clean() -> list[Table]:
     ]
     have = {t.source for t in found}
     found += [
-        Table(f"openml_{source}", source, target, task)
+        Table(
+            f"openml_{source}",
+            source,
+            target,
+            task,
+            DOCUMENTED.get(source, ()),
+        )
         for source, (_, _, target, task) in {
             **refusal.EXTRA,
             **refusal.SUITE,
@@ -256,10 +285,24 @@ def catalog() -> dict[str, Case]:
     tables = {t.name: t for t in clean()}
     cases = [Case(f"clean/{t.name}", "clean", t) for t in tables.values()]
     real = (
-        ("titanic_boat", tables["titanic"], ("body",), "boat"),
-        ("titanic_body", tables["titanic"], ("boat",), "body"),
-        ("bank_duration", tables["bank_marketing"], (), "V12"),
-        ("taxi_total", tables["green_taxi"], (), "total_amount"),
+        ("titanic_boat", tables["titanic"], ("body",), "boat", ()),
+        ("titanic_body", tables["titanic"], ("boat",), "body", ()),
+        (
+            "tecator_moisture",
+            tables["openml_505"],
+            ("protein",),
+            "moisture",
+            (),
+        ),
+        ("tecator_protein", tables["openml_505"], ("moisture",), "protein", ()),
+        ("bank_duration", tables["bank_marketing"], (), "V12", ("V12",)),
+        (
+            "taxi_total",
+            tables["green_taxi"],
+            (),
+            "total_amount",
+            ("total_amount",),
+        ),
     )
     cases += [
         Case(
@@ -269,8 +312,9 @@ def catalog() -> dict[str, Case]:
             c,
             REAL,
             c,
+            known=known,
         )
-        for n, t, drop, c in real
+        for n, t, drop, c, known in real
     ]
     for base in BASES:
         for kind in KINDS:
@@ -429,9 +473,10 @@ def attempt(case: Case) -> dict[str, Any]:
         case: The case.
 
     Returns:
-        The case's labels, the outcome (`blocked` by the screen, `passed`,
-        `refused` by another gate, `missing` data or `failed`), the screen's
-        blocking, suspect and unchecked columns, and seconds.
+        The case's labels and declarations, the outcome (`blocked` by the
+        screen, `passed`, `refused` by another gate, `missing` data or
+        `failed`), the screen's blocking, suspect and unchecked columns, and
+        seconds.
     """
     import scmle.api.project
 
@@ -444,6 +489,7 @@ def attempt(case: Case) -> dict[str, Any]:
         "kind": case.kind,
         "provenance": case.provenance,
         "column": case.column,
+        "known": list(case.known),
     }
     try:
         frame = build(case)
@@ -451,6 +497,11 @@ def attempt(case: Case) -> dict[str, Any]:
         record.update(outcome="missing", message=str(error))
         return record
     record.update(rows=len(frame), columns=frame.shape[1] - 1)
+    # A declaration is passed only when made, so a case without one runs
+    # exactly as before the declaration existed.
+    declared: dict[str, Any] = (
+        {"known": dict.fromkeys(case.known, "outcome")} if case.known else {}
+    )
     try:
         with tempfile.TemporaryDirectory() as folder:
             project = scmle.api.project.Project(
@@ -460,6 +511,7 @@ def attempt(case: Case) -> dict[str, Any]:
                 leakage_policy="block",
                 cutoff=case.cutoff or None,
                 output_dir=folder,
+                **declared,
             )
             project.plan()
             profile = project.profile

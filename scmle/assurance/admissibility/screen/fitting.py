@@ -574,26 +574,26 @@ def pairs(
     return list(itertools.combinations(low, 2))
 
 
-def enough(y: numpy.ndarray, task: str, cfg: leakage.Config) -> bool:
+def enough(y: numpy.ndarray, task: str) -> bool:
     """Decides whether the screen's tests can be formed at all.
 
     A cross-fitted skill needs, for every class, one row held out while
     another of its class is in the training folds: two rows a class. Fewer
-    rows per class than folds (a fraud table with a handful of positives)
-    lowers power, not size: each permutation p-value stays exact, and the
-    probe states which plants such rows hide.
+    rows per class than folds (a fraud table with a handful of positives),
+    or fewer rows than `min_rows` (a wide table of a hundred samples),
+    lowers power, not size: each permutation p-value stays exact, a column
+    below its ceiling cannot be a suspect however many rows there are, and
+    the probe states which plants such rows hide. So a small table is
+    screened, and `scan` notes the low power, rather than left unchecked.
 
     Args:
         y: The encoded target.
         task: `classification` or `regression`.
-        cfg: Settings (`min_rows`).
 
     Returns:
-        False with fewer than `min_rows` rows or, for classification, a
-        class with fewer than two rows; True otherwise.
+        False for classification with a class of fewer than two rows; True
+        otherwise.
     """
-    if len(y) < cfg.min_rows:
-        return False
     if task == "classification":
         return min(numpy.bincount(y).tolist()) >= HELD
     return True
