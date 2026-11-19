@@ -73,7 +73,15 @@ def reshape(grown: Any, count: int) -> Any:
     state["values"] = numpy.ascontiguousarray(
         state["values"].transpose(0, 2, 1)
     )
-    nodes = state["nodes"].copy()
+    # A node record has seven padding bytes after `missing_go_to_left`,
+    # which pickling writes out. `copy` (and `zeros_like`) leave them as
+    # whatever the allocator returned, so the bundle bytes would differ
+    # between processes (claim C6). `zeros` clears every byte; the fields
+    # are then copied one by one, leaving the padding zero.
+    source = state["nodes"]
+    nodes = numpy.zeros(source.shape, dtype=source.dtype)
+    for name in source.dtype.names:
+        nodes[name] = source[name]
     nodes["impurity"] *= count
     state["nodes"] = nodes
     shaped = type(grown)(

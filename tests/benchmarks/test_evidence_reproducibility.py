@@ -176,3 +176,13 @@ def test_an_unknown_task_kind_is_refused():
 
 def test_the_stored_measurements_are_for_the_current_code():
     assert reproducibility.problems() == []
+
+
+def test_the_interaction_bundle_is_byte_identical_over_two_processes(
+    tmp_path,
+):
+    # Two fresh processes build the interaction bundle; every member,
+    # pipeline.joblib included, must hash the same (claim C6).
+    found = reproducibility.compare("interaction", tmp_path)
+    assert found["differing"] == []
+    assert found["gap"]["absolute"] == 0.0

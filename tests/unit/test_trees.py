@@ -123,6 +123,21 @@ def test_the_forest_is_pinned_bit_for_bit():
     assert digest(grown.predict_proba(features)) == PINNED
 
 
+@pytest.mark.parametrize("kind", [trees.Tree, trees.Forest, trees.Extra])
+def test_node_padding_is_zero_whatever_the_allocator_held(kind):
+    # The seven padding bytes after `missing_go_to_left` are pickled, so
+    # leftover allocator bytes there made bundles differ between processes.
+    features, labels = problem()
+    poisoned = numpy.full((8, 1 << 16), 0xAB, dtype=numpy.uint8)
+    del poisoned
+    grown = kind(random_state=7, max_depth=4).fit(features, labels)
+    for member in getattr(grown, "estimators_", [grown]):
+        nodes = member.tree_.__getstate__()["nodes"]
+        start = nodes.dtype.fields["missing_go_to_left"][1] + 1
+        raw = nodes.view(numpy.uint8).reshape(len(nodes), nodes.dtype.itemsize)
+        assert not raw[:, start:].any()
+
+
 # Measured on macOS arm64 and on x86-64 (Rosetta), scikit-learn 1.9.1; the
 # stock forest gave 9b03b644... and 68bfd25e... there.
 PINNED = "4e80f90bec57c25664d4b107e75778fee1a9d7d0ba2e9fbd9acb535f35e8314b"
