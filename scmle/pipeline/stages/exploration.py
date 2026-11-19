@@ -15,6 +15,7 @@ from scmle.assurance.robustness import prefilter
 from scmle.causal import claim
 from scmle.contracts import errors
 from scmle.contracts import tasks
+from scmle.pipeline import products
 import scmle.pipeline.context
 from scmle.pipeline.stages import admission
 from scmle.pipeline.stages import scoring
@@ -57,6 +58,44 @@ class Escrow:
     holds_for_coverage: bool = False
 
 
+@dataclasses.dataclass(frozen=True)
+class Claims(products.Derived):
+    """What the claim ledger left for the later stages.
+
+    Derived: it holds the exploration rows, which are never written beside
+    the stage record.
+
+    Attributes:
+        pending: The exploration whose opening of `C` waits until the model
+            (and its calibration) is frozen, or None when the confirmation
+            already ran or the ledger did not run.
+    """
+
+    pending: Escrow | None = None
+
+    def apply(self, board: object) -> None:
+        """Sets the context field the selection and bracketing stages read.
+
+        Args:
+            board: The run context; its `pending_ledger` is set.
+        """
+        setattr(board, "pending_ledger", self.pending)  # noqa: B010 -- the context field keeps its name until context.py goes (1.E)
+
+    def summary(self) -> object:
+        """What the claims were derived from.
+
+        Returns:
+            Whether a confirmation waits, and under which charter.
+        """
+        if self.pending is None:
+            return {"pending": False}
+        return {
+            "pending": True,
+            "charter": self.pending.charter.charter_hash,
+            "coverage": self.pending.holds_for_coverage,
+        }
+
+
 class Exploration(admission.Admission):
     """The claim ledger of a charter run, from exploration to conclusion.
 
@@ -64,9 +103,9 @@ class Exploration(admission.Admission):
     abstract, never run on its own.
     """
 
-    def run_claim_ledger(
+    def ledger(
         self, context: scmle.pipeline.context.Context, task: tasks.Task
-    ) -> None:
+    ) -> Claims:
         """Explores `X` under the ledger and confirms on `C`, now or later.
 
         Runs only for a charter run. Exploration reads the exploration view; the
@@ -76,23 +115,26 @@ class Exploration(admission.Admission):
         recorded as skipped: their findings stay unconfirmed. When the baseline
         claim is about the selected model, or the coverage claim needs the
         calibrated model, the confirmation is deferred until the model is
-        frozen (the pending ledger is kept on the context).
+        frozen (the pending ledger is the product).
 
         Args:
             context: The run context, holding the custody outcome and vault.
             task: The resolved task.
+
+        Returns:
+            The claims, pending only when the confirmation waits.
         """
         outcome = context.custody
         vault = context.custody_vault
         if outcome is None or vault is None:
-            return
+            return Claims()
         if task not in tasks.STANDARD_TASKS:
             context.journal.emit(
                 "ledger.skipped",
                 f"the claim ledger does not cover {task.value} tasks; "
                 "findings stay unconfirmed",
             )
-            return
+            return Claims()
         spec = context.services.spec
         verified = sealing.read_verified(str(spec.charter_path))
         charter = verified.charter
@@ -138,8 +180,9 @@ class Exploration(admission.Admission):
             holds_for_coverage=scoring.coverage_on_confirmation(charter, task),
         )
         if self.defer(context, pending):
-            return
+            return Claims(pending)
         self.conclude(context, pending)
+        return Claims()
 
     def explore(
         self,
@@ -200,7 +243,7 @@ class Exploration(admission.Admission):
         """Keeps the confirmation sealed until the model is frozen, if needed.
 
         Args:
-            context: The run context; receives the pending ledger.
+            context: The run context, supplying the data spec and journal.
             pending: The explored ledger awaiting confirmation.
 
         Returns:
@@ -212,7 +255,6 @@ class Exploration(admission.Admission):
             data.baseline_column and data.baseline_subject == "selected_model"
         )
         if selected or pending.holds_for_coverage:
-            context.pending_ledger = pending
             context.journal.emit(
                 "ledger.deferred",
                 "the confirmation set stays sealed until "

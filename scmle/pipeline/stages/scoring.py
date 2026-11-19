@@ -12,10 +12,10 @@ from scmle.assurance import coverage_confirm
 from scmle.assurance.charter import contracts
 from scmle.assurance.charter import sealing
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.contracts import tasks
 from scmle.decision import netbenefit
 import scmle.decision.threshold
-from scmle.models import thresholds
 import scmle.pipeline.context
 from scmle.pipeline.stages import cost
 from scmle.preparation import strategies
@@ -116,15 +116,8 @@ def freeze(
     charter: contracts.AnalysisCharter,
     seed: int,
     rows: int,
-) -> tuple[Any, dict[str, Any]]:
+) -> tuple[Any, records.Layout]:
     """Wraps a classifier in the chartered cost model's frozen threshold.
-
-    The rule is chosen on out-of-fold development probabilities only and is
-    frozen: the cost model's Bayes cut if the probabilities pass the calibration
-    check, a recalibrated cut if they pass after recalibration, otherwise a
-    cut searched on a grid. A recalibrating rule is expressed as the
-    equivalent cut on the raw probability, so the served classifier needs no
-    extra stage.
 
     Args:
         fitted: The fitted classifier to wrap.
@@ -135,37 +128,12 @@ def freeze(
         rows: Number of validation rows, recorded in the description.
 
     Returns:
-        The thresholded classifier and a description holding the objective,
-        the raw threshold, the number of validation rows, the rule's own
-        record (`f11`) and the cost model's hash.
-
-    Raises:
-        ScmleError: If the charter has no decision layer or cost model, or
-            the chosen rule has no raw threshold.
+        The thresholded classifier and its description
+        (`scmle.decision.threshold.freeze`).
     """
-    layer = charter.decision
-    model = charter.costs
-    if layer is None or model is None:
-        raise errors.ScmleError("the charter has no decision layer")
-    chosen = scmle.decision.threshold.operate(
-        probabilities,
-        actual.astype(float),
-        model,
-        level=layer.model.calibration,
-        replicates=charter.budget.permutations,
-        seed=seed,
+    return scmle.decision.threshold.freeze(
+        fitted, probabilities, actual, charter, seed, rows
     )
-    cut = chosen.rule.uncalibrated
-    if cut is None:
-        raise errors.ScmleError("the chosen rule has no raw threshold")
-    description = {
-        "objective": "chartered_cost",
-        "threshold": cut,
-        "validation_rows": rows,
-        "f11": chosen.to_dict(),
-        "cost_model_hash": model.model_hash,
-    }
-    return thresholds.Classifier.around(fitted, cut), (description)
 
 
 def appraise(
@@ -264,11 +232,12 @@ def pin(selected: Any, decision: Mapping[str, Any] | None) -> str:
 
 def choose_decision_threshold(
     context: scmle.pipeline.context.Context, fitted: Any
-) -> tuple[Any, dict[str, Any] | None]:
+) -> tuple[Any, records.Layout | None]:
     """Optimizes the binary decision threshold on out-of-fold predictions.
 
-    Only development data is used: each validation row is scored by a model
-    that never saw it, so the locked test set stays untouched.
+    Only development data is used (`scmle.decision.threshold.choose`): each
+    validation row is scored by a model that never saw it, so the locked
+    test set stays untouched.
 
     Args:
         context: Run context holding the split and the selected trial.
@@ -307,29 +276,12 @@ def choose_decision_threshold(
         context.profile, "profile"
     ).feature_plan
     seed = context.services.spec.validation.seed
-    probabilities, positions = thresholds.heldout(
+    return scmle.decision.threshold.choose(
+        fitted,
         lambda: strategy.build(plan, adapter, task, seed, selected.params),
-        split.dev_features,
-        split.dev_target,
+        (split.dev_features, split.dev_target),
         split.manifest.folds,
+        decision,
+        chartered,
+        seed,
     )
-    positive = fitted.classes_[1]
-    actual = (split.dev_target.iloc[positions] == positive).to_numpy()
-    if chartered is not None:
-        return freeze(
-            fitted, probabilities, actual, chartered, seed, len(positions)
-        )
-    kind = thresholds.OBJECTIVES[decision.threshold_objective]
-    objective = (
-        kind(decision.false_positive_cost, decision.false_negative_cost)
-        if decision.threshold_objective == "cost"
-        else kind()
-    )
-    threshold, score = thresholds.argmax(probabilities, actual, objective)
-    description = {
-        "objective": decision.threshold_objective,
-        "threshold": threshold,
-        "validation_score": score,
-        "validation_rows": len(positions),
-    }
-    return thresholds.Classifier.around(fitted, threshold), (description)

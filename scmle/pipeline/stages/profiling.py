@@ -14,13 +14,15 @@ from scmle.evaluation import backtest
 from scmle.pipeline import knowledge
 from scmle.pipeline import products
 import scmle.pipeline.context
+from scmle.pipeline.stages import bridge
 from scmle.pipeline.stages import impounding
 from scmle.pipeline.stages import ingestion
+from scmle.pipeline.stages import labelling
 import scmle.runtime.state
 
 
 @dataclasses.dataclass(frozen=True)
-class Partition(products.Derived):
+class Partition(bridge.Bridge):
     """The task, the split and the development profile; made again on resume.
 
     It holds the locked test set, which is never written in clear.
@@ -32,14 +34,23 @@ class Partition(products.Derived):
         curation: The curation report.
         split: The split, with the locked test set.
         frame: The rows the later stages use.
+        propensity: For an uplift task, how well the covariates predict
+            treatment, else None.
+        seasonal: Seasonal-naive forecasts for the locked rows of a
+            forecast with a seasonal period, else None (the context's
+            `seasonal_baseline`).
     """
 
-    task: tasks.Task | None
-    metric: scmle.contracts.metrics.Metric | None
-    profile: scmle.contracts.data.Portrait | None
+    names: ClassVar[dict[str, str]] = {"seasonal": "seasonal_baseline"}
+
+    task: tasks.Task
+    metric: scmle.contracts.metrics.Metric
+    profile: scmle.contracts.data.Portrait
     curation: scmle.contracts.data.Curation | None
-    split: splitters.Split | None
-    frame: pandas.DataFrame | None
+    split: splitters.Split
+    frame: pandas.DataFrame
+    propensity: dict[str, float | bool | str | None] | None = None
+    seasonal: numpy.ndarray | None = None
 
     def summary(self) -> object:
         """The task, metric, split fingerprint and profile.
@@ -49,11 +60,9 @@ class Partition(products.Derived):
         """
         return {
             "task": self.task,
-            "metric": None if self.metric is None else self.metric.name,
-            "split": None
-            if self.split is None
-            else self.split.manifest.fingerprint,
-            "profile": None if self.profile is None else self.profile.to_dict(),
+            "metric": self.metric.name,
+            "split": self.split.manifest.fingerprint,
+            "profile": self.profile.to_dict(),
         }
 
 
@@ -88,7 +97,7 @@ class ProfileStage(impounding.Impounding):
         """
         return "profile dataset"
 
-    def execute(self, context: scmle.pipeline.context.Context) -> None:
+    def execute(self, context: scmle.pipeline.context.Context) -> Partition:
         """Resolves the task, splits the data and profiles the development set.
 
         Writes the profile, curation report and dataset card, enforces the
@@ -96,9 +105,20 @@ class ProfileStage(impounding.Impounding):
         validation helpers for the survival, uplift, multilabel, multioutput,
         forecast and ordinal targets raise their own errors.
 
+        The resolution, the screen and the portrait are applied to the
+        context as soon as they are made, because the claim ledger still
+        reads them there; the claim ledger may amend the portrait, so the
+        partition takes the profile and curation the context holds last.
+        Until the partition is returned the stage owns the split: a failure
+        after it closes the locked rows.
+
         Args:
-            context: The run context; receives the task, metric, profile,
-                curation report and the artifacts written for them.
+            context: The run context; the partition is applied to it, so a
+                caller that runs the stage outside the engine finds it there.
+
+        Returns:
+            The partition: the task, the metric, the split, the profile and
+            curation report, and the rows the later stages use.
 
         Raises:
             BlockedError: If curation leaves unresolved blocking findings, or
@@ -111,17 +131,54 @@ class ProfileStage(impounding.Impounding):
             DataError: If a declared group, time or weight column is missing
                 from the data.
         """
-        spec = context.services.spec
         frame = scmle.pipeline.context.require(context.frame, "frame")
-        frame, task = self.infer(context, frame)
-        self.vet(spec, frame)
-        frame = self.synthesize(context, frame)
-        split = self.divide(context, task, frame)
-        spec = (
-            context.services.spec
-        )  # reweighing may have set the weight column
-        profile, development = self.survey(context, spec, task, frame, split)
-        self.curate(context, frame, development, profile)
+        resolution = self.infer(context, frame)
+        resolution.apply(context)
+        self.vet(context.services.spec, resolution.frame)
+        screen = self.synthesize(context, resolution.frame)
+        screen.apply(context)
+        split, rows, seasonal = self.divide(
+            context, resolution.task, screen.frame
+        )
+        try:
+            made = self.portray(
+                context, resolution, screen.frame, split, rows, seasonal
+            )
+        except BaseException:
+            split.locked_test.close()
+            raise
+        made.apply(context)
+        return made
+
+    def portray(
+        self,
+        context: scmle.pipeline.context.Context,
+        resolution: labelling.Resolution,
+        frame: pandas.DataFrame,
+        split: splitters.Split,
+        rows: pandas.DataFrame,
+        seasonal: numpy.ndarray | None,
+    ) -> Partition:
+        """Profiles and curates the development rows, then screens them.
+
+        Args:
+            context: The run context; receives the portrait.
+            resolution: The resolved task and labelled rows.
+            frame: The whole data, with the synthesised features.
+            split: The split just made.
+            rows: The rows the later stages use.
+            seasonal: The seasonal-naive forecasts of the locked rows, if any.
+
+        Returns:
+            The partition.
+        """
+        spec = context.services.spec  # reweighing may have set the weight
+        task = resolution.task
+        profile, development, propensity = self.survey(
+            context, spec, task, frame, split
+        )
+        portrait = self.curate(context, frame, development, profile)
+        portrait.apply(context)
         context.journal.emit(
             "features.selected",
             "feature set and exclusions fixed from the profile",
@@ -136,14 +193,24 @@ class ProfileStage(impounding.Impounding):
             fingerprint=knowledge.fingerprint(profile, task), task=task.value
         )
         self.enforce_leakage_policy(spec, profile)
-        self.run_claim_ledger(context, task)
+        self.ledger(context, task).apply(context)
+        return Partition(
+            task,
+            resolution.metric,
+            scmle.pipeline.context.require(context.profile, "profile"),
+            context.curation,
+            split,
+            rows,
+            propensity,
+            seasonal,
+        )
 
     def divide(
         self,
         context: scmle.pipeline.context.Context,
         task: tasks.Task,
         frame: pandas.DataFrame,
-    ) -> splitters.Split:
+    ) -> tuple[splitters.Split, pandas.DataFrame, numpy.ndarray | None]:
         """Splits the dataset and records the manifest.
 
         Also computes the seasonal baseline for a forecast with a seasonal
@@ -151,20 +218,24 @@ class ProfileStage(impounding.Impounding):
         reweighing.
 
         Args:
-            context: The run context; receives the split and its manifest.
+            context: The run context; receives the split's manifest.
             task: The resolved task.
             frame: The data to split.
 
         Returns:
-            The split; under a charter, or when resources are hard-enforced, its
-            locked rows are sealed in a separate vault process.
+            The split; under a charter, or when resources are hard-enforced,
+            its locked rows are sealed in a separate vault process. Then the
+            rows the later stages use: the development rows when sealed,
+            else `frame`. Last, the seasonal-naive forecasts of the locked
+            rows, or None.
         """
         split = splitters.Splitter(context.services.spec, task).split(frame)
         data = context.services.spec.data
+        seasonal = None
         if task is tasks.Task.FORECAST and data.seasonal_period:
             # Computed now: under hard isolation the frame held afterwards has
             # no locked rows, but the seasonal baseline needs their history.
-            context.seasonal_baseline = backtest.seasonal_naive(
+            seasonal = backtest.seasonal_naive(
                 frame,
                 numpy.asarray(split.manifest.test_ids),
                 data.value_column or "",
@@ -174,18 +245,19 @@ class ProfileStage(impounding.Impounding):
             )
         chartered = bool(context.services.spec.charter_path)
         if chartered:
-            split = self.impound(context, task, frame, split)
+            custody = self.sequester(context, task, frame, split)
+            custody.apply(context)  # from here `Context.close` closes the vault
+            split = custody.outcome.split
         self.reweigh(context, task, split)
         isolation = "in-process protocol"
         # A charter requests custody regardless of the resource-enforcement
         # mode: sealing the rows must not depend on trial supervision.
         if context.services.governor.hard or chartered:
             split.locked_test = self.seal(split.locked_test)
-            context.frame = split.dev_features.assign(
+            frame = split.dev_features.assign(
                 **{context.services.spec.data.target: split.dev_target}
             )
             isolation = "separate vault process"
-        context.split = split
         context.journal.write_json(
             "validation_manifest.json", split.manifest.to_dict()
         )
@@ -203,4 +275,4 @@ class ProfileStage(impounding.Impounding):
                 "notes": list(split.manifest.notes),
             },
         )
-        return split
+        return split, frame, seasonal

@@ -350,4 +350,5 @@ class Inspection:
             data.time_column,
             time_budget_seconds=self.spec.resources.time_budget_seconds,
             cutoff=data.cutoff,
+            known=data.known,
         )

@@ -1,12 +1,23 @@
-"""Post-selection diagnostics and evidence on the released rows."""
+"""Post-selection diagnostics and evidence on the released rows.
 
+Also the parts of the final evaluation's product (`assessment.Exam`): the
+pseudo-labels, the fairness remedy, the decision and the readings of the
+test rows, each made by one of the final evaluation's mixins and returned
+rather than set on the run context.
+"""
+
+from collections.abc import Mapping
+import dataclasses
 from typing import Any
 from typing import cast
+from typing import ClassVar
+from typing import Self
 
 import numpy
 import pandas
 
 from scmle.contracts import experiments
+from scmle.contracts import records
 from scmle.contracts import tasks
 import scmle.contracts.models
 from scmle.data.readers import streaming
@@ -14,6 +25,7 @@ from scmle.evaluation import fit_health
 from scmle.evaluation import mitigation
 from scmle.evaluation import replay
 from scmle.evaluation import uplift
+from scmle.pipeline import products
 import scmle.pipeline.context
 from scmle.pipeline.stages import interface
 
@@ -21,6 +33,127 @@ DIAGNOSTIC_BUDGET_SHARE = 0.25
 
 
 DIAGNOSTIC_MIN_SECONDS = 30.0
+
+
+@dataclasses.dataclass(frozen=True)
+class Part(products.Derived):
+    """A part of the final evaluation's product; never written.
+
+    Its fields have single-word names; `names` maps each field that the run
+    context still holds to the context attribute, so `apply` keeps filling
+    the context fields that readers not yet converted read.
+
+    Attributes:
+        names: Context attribute of each field the context holds, by field.
+    """
+
+    names: ClassVar[Mapping[str, str]] = {}
+
+    @classmethod
+    def capture(cls, board: object) -> Self:
+        """Reads the part from the run context's attributes.
+
+        Args:
+            board: The run context; it has an attribute per mapped field.
+
+        Returns:
+            The part; fields the context does not hold keep their defaults.
+        """
+        return cls(
+            **{field: getattr(board, name) for field, name in cls.names.items()}
+        )
+
+    def apply(self, board: object) -> None:
+        """Sets the mapped fields on the run context.
+
+        Args:
+            board: The run context.
+        """
+        for field, name in self.names.items():
+            setattr(board, name, getattr(self, field))
+
+    def summary(self) -> object:
+        """Every field, as recorded.
+
+        Returns:
+            The fields by name.
+        """
+        return {
+            field.name: getattr(self, field.name)
+            for field in dataclasses.fields(self)
+        }
+
+
+@dataclasses.dataclass(frozen=True)
+class Pseudolabels(Part):
+    """The self-training judgement of the final fit (`Relabelling`).
+
+    Attributes:
+        record: Unlabeled rows, confidence, the judgement's outcome, whether
+            the pseudo-labels were used and how many; None when the run
+            asked for none or had no unlabeled rows.
+    """
+
+    names: ClassVar[Mapping[str, str]] = {"record": "semi_supervised"}
+
+    record: records.Layout | None = None
+
+
+@dataclasses.dataclass(frozen=True)
+class Remedy(Part):
+    """The group-threshold judgement of the final model (`remedy.Remedy`).
+
+    Attributes:
+        record: The mitigation's evidence, with the gap and accuracy on the
+            released rows once corroborated (`locked_rows`); None without
+            the group-thresholds mitigation or outside binary tasks.
+    """
+
+    names: ClassVar[Mapping[str, str]] = {"record": "fairness_mitigation"}
+
+    record: records.Layout | None = None
+
+
+@dataclasses.dataclass(frozen=True)
+class Readings(Part):
+    """What the final model reads off the released rows (`summary.Summary`).
+
+    Attributes:
+        scores: The model's scores or predicted classes on the released
+            rows (`scoring.reference_scores`), the drift reference the
+            bundle keeps; None before the rows are opened.
+        diagnostics: The post-selection diagnostic reports by name.
+    """
+
+    names: ClassVar[Mapping[str, str]] = {
+        "scores": "reference_scores",
+        "diagnostics": "diagnostics",
+    }
+
+    scores: pandas.Series | None = None
+    diagnostics: dict[str, dict[str, Any]] = dataclasses.field(
+        default_factory=dict
+    )
+
+
+@dataclasses.dataclass(frozen=True)
+class Decision(Part):
+    """The decision rule the test set is opened for, and what it is worth.
+
+    Attributes:
+        threshold: The decision threshold chosen on development data
+            (`scmle.decision.threshold.choose`), or None.
+        benefit: The net benefit of the chartered rule on the released
+            rows, or None.
+        claim: Hash of the coverage claim pledged before the rows opened,
+            or None when the task makes no claim.
+    """
+
+    names: ClassVar[Mapping[str, str]] = {"claim": "coverage_claim_sha256"}
+
+    threshold: records.Layout | None = None
+    benefit: records.Layout | None = None
+    claim: str | None = None
 
 
 class Examination(interface.Stage):
@@ -189,28 +322,32 @@ class Examination(interface.Stage):
 
     def corroborate(
         self,
-        context: scmle.pipeline.context.Context,
+        remedy: Remedy,
         before: Any,
         after: Any,
         features: pandas.DataFrame,
         target: pandas.Series,
-    ) -> None:
+    ) -> Remedy:
         """Adds the gap and accuracy on the released rows to the evidence.
 
         Stores the gap and accuracy before and after the mitigation, and the
-        row count, under `locked_rows` in the mitigation record. Does nothing
-        unless a group-threshold mitigation was applied.
+        row count, under `locked_rows` in the mitigation record, unless no
+        group-threshold mitigation was applied.
 
         Args:
-            context: The run context, holding the mitigation record.
+            remedy: The mitigation judged on development rows.
             before: The model without the group thresholds.
             after: The model with the group thresholds.
             features: The released rows.
             target: The labels of the released rows.
+
+        Returns:
+            The remedy with the released rows' evidence, or `remedy` when
+            nothing was applied.
         """
-        record = context.fairness_mitigation
+        record = remedy.record
         if record is None or not record["applied"]:
-            return
+            return remedy
         column = record["column"]
         assigner = after.assigner
         groups = assigner.assign(features[column]).reset_index(drop=True)
@@ -221,14 +358,21 @@ class Examination(interface.Stage):
             for name, model in (("before", before), ("after", after))
         }
         criterion = record["criterion"]
-        record["locked_rows"] = {
-            "gap_before": mitigation.gap(
-                groups, flags["before"], actual, criterion
-            ),
-            "gap_after": mitigation.gap(
-                groups, flags["after"], actual, criterion
-            ),
-            "accuracy_before": float((flags["before"] == actual).mean()),
-            "accuracy_after": float((flags["after"] == actual).mean()),
-            "rows": len(features),
-        }
+        return Remedy(
+            record
+            | {
+                "locked_rows": {
+                    "gap_before": mitigation.gap(
+                        groups, flags["before"], actual, criterion
+                    ),
+                    "gap_after": mitigation.gap(
+                        groups, flags["after"], actual, criterion
+                    ),
+                    "accuracy_before": float(
+                        (flags["before"] == actual).mean()
+                    ),
+                    "accuracy_after": float((flags["after"] == actual).mean()),
+                    "rows": len(features),
+                }
+            }
+        )

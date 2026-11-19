@@ -23,7 +23,7 @@ class Tracing(bracketing.Bracketing):
     ) -> lineage.Graph:
         """Builds the content-linked graph for one completed package.
 
-        The graph is validated and kept on the context.
+        The graph is validated; the package (`packaging.Package`) keeps it.
 
         Args:
             context: The run context, supplying the manifest, split and trial.
@@ -90,7 +90,6 @@ class Tracing(bracketing.Bracketing):
         if explained:
             graph.connect(lineage.Edge("explanations", "bundle", "includes"))
         graph.validate()
-        context.evidence_graph = graph
         return graph
 
     def originate(

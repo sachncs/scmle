@@ -1,5 +1,6 @@
 """Sealing and impounding the locked test rows."""
 
+import dataclasses
 import hashlib
 from typing import Any
 
@@ -15,8 +16,60 @@ from scmle.contracts import experiments
 from scmle.contracts import tasks
 from scmle.data.splitting import splitters
 from scmle.evaluation import reweighing
+from scmle.pipeline import products
 import scmle.pipeline.context
 from scmle.pipeline.stages import exploration
+
+
+@dataclasses.dataclass(frozen=True)
+class Custody(products.Derived):
+    """The confirmation set of a charter run, carved out and sealed.
+
+    Derived: the vault holds rows that are never written beside the stage
+    record. Whoever holds the custody holds the vault: `Context.close`
+    closes it once the custody is applied, and `Impounding.sequester`
+    closes it on every failure before that.
+
+    Attributes:
+        outcome: The custody outcome: the split restricted to `X`, the
+            exploration view, the manifest and the feasibility verdict.
+        vault: The vault holding the sealed confirmation set.
+        column: The entity column whose rows are not independent, when the
+            charter predicts known entities' future rows, else None.
+    """
+
+    outcome: scmle.assurance.custody.pipeline.Outcome
+    vault: scmle.assurance.custody.sealed.Vault
+    column: str | None = None
+
+    def apply(self, board: object) -> None:
+        """Sets the context fields the later stages read.
+
+        Args:
+            board: The run context; its `custody`, `custody_vault` and, for
+                a known-entity charter, `cluster_column` are set.
+        """
+        setattr(board, "custody", self.outcome)  # noqa: B010 -- the context fields keep their names until context.py goes (1.E)
+        setattr(board, "custody_vault", self.vault)  # noqa: B010 -- as above
+        if self.column is not None:
+            setattr(board, "cluster_column", self.column)  # noqa: B010 -- as above
+
+    def summary(self) -> object:
+        """What the custody was derived from.
+
+        Returns:
+            The manifest's hash and scope, the set sizes and the entity
+            column.
+        """
+        manifest = self.outcome.manifest
+        return {
+            "manifest": manifest.sha256,
+            "scope": manifest.scope,
+            "exploration": len(manifest.sets.exploration),
+            "confirmation": len(manifest.sets.confirmation),
+            "embargo": len(manifest.sets.embargo),
+            "column": self.column,
+        }
 
 
 class Impounding(exploration.Exploration):
@@ -109,34 +162,36 @@ class Impounding(exploration.Exploration):
             f"(weights from {weights.min():.2f} to {weights.max():.2f})",
         )
 
-    def impound(
+    def sequester(
         self,
         context: scmle.pipeline.context.Context,
         task: tasks.Task,
         frame: pandas.DataFrame,
         split: splitters.Split,
-    ) -> splitters.Split:
+    ) -> Custody:
         """Carves and seals the confirmation set under the charter.
 
         The charter is verified (hash, and signature when a key is
         configured) before any row is partitioned, and a charter that fails
-        verification is refused. The returned split holds exploration rows
+        verification is refused. The custody's split holds exploration rows
         only, so the profiler and every trial that follows read nothing from
         the confirmation set. The checks of `check_known_entity` also apply.
+        If the carving or its records fail, or the run is interrupted, the
+        vault is closed before the error leaves: nothing else holds it yet.
 
         Limits: the vault is a separate process on this machine. This process
         drops its own reference to the sealed rows, but the caller's DataFrame
         or the original file still holds every row.
 
         Args:
-            context: The run context; receives the custody outcome and vault
-                and the files that describe them.
+            context: The run context, supplying the specification and the
+                manifest; receives the files that describe the custody.
             task: The resolved task.
             frame: The full data before partitioning.
             split: The split before the confirmation rows are carved out.
 
         Returns:
-            The split reduced to exploration rows.
+            The custody: the outcome, its vault and the entity column.
 
         Raises:
             ConfigError: If the charter's unit of prediction is `new_entity`
@@ -154,13 +209,12 @@ class Impounding(exploration.Exploration):
                 "data.group_column so that entities are split and calibrated "
                 "as units"
             )
-        self.check_known_entity(context, charter, split)
+        column = self.check_known_entity(context, charter, split)
         log = scmle.assurance.custody.sealed.Journal(
             context.services.store.directory / "custody_log.jsonl"
             if context.services.store is not None
             else None
         )
-        vault_set = scmle.assurance.custody.sealed.Vault(log)
         data_hash = (
             context.manifest.digests["data"]
             if context.manifest is not None
@@ -168,19 +222,23 @@ class Impounding(exploration.Exploration):
                 pandas.util.hash_pandas_object(frame).to_numpy().tobytes()
             ).hexdigest()
         )
-        outcome = scmle.assurance.custody.pipeline.sequester(
-            charter=charter,
-            split=split,
-            frame=frame,
-            spec=context.services.spec,
-            task=task,
-            data_hash=data_hash,
-            vault=vault_set,
-        )
-        context.custody = outcome
-        context.custody_vault = vault_set
-        self.chronicle(context, path, verified, outcome)
-        return outcome.split
+        held = scmle.assurance.custody.sealed.Vault(log)
+        try:
+            outcome = scmle.assurance.custody.pipeline.sequester(
+                charter=charter,
+                split=split,
+                frame=frame,
+                spec=context.services.spec,
+                task=task,
+                data_hash=data_hash,
+                vault=held,
+            )
+            self.chronicle(context, path, verified, outcome)
+        except BaseException:
+            # handled: the vault is closed and the error re-raised
+            held.close()
+            raise
+        return Custody(outcome, held, column)
 
     def chronicle(
         self,
@@ -235,14 +293,14 @@ class Impounding(exploration.Exploration):
         context: scmle.pipeline.context.Context,
         charter: contracts.AnalysisCharter,
         split: splitters.Split,
-    ) -> None:
+    ) -> str | None:
         """Requires the data a known-entity-future charter needs.
 
         A later row of an entity seen in training is predicted, so the
         entity column and the time column must be named and validation must
         be time-ordered: an entity-disjoint split would test the wrong unit
-        (that is `new_entity`). The entity column becomes the context's
-        cluster column.
+        (that is `new_entity`). The entity column becomes the run's cluster
+        column (`Custody.column`).
 
         Args:
             context: The run context, supplying the data spec.
@@ -250,12 +308,16 @@ class Impounding(exploration.Exploration):
                 of prediction is `known_entity_future`.
             split: The split, whose strategy must be time-ordered.
 
+        Returns:
+            The entity column, or None unless the charter predicts known
+            entities' future rows.
+
         Raises:
             ConfigError: If a column is missing or the split strategy is not
                 time-ordered.
         """
         if charter.purpose != contracts.KNOWN_ENTITY_FUTURE:
-            return
+            return None
         data = context.services.spec.data
         for role, column in (
             ("group_column", data.group_column),
@@ -276,7 +338,6 @@ class Impounding(exploration.Exploration):
                 f"'{split.manifest.strategy}': an entity-disjoint split tests "
                 "new entities"
             )
-        context.cluster_column = data.group_column
         context.journal.emit(
             "unit.known_entity_future",
             "entities are not split units: their rows sit on both sides, "
@@ -284,3 +345,4 @@ class Impounding(exploration.Exploration):
             "final test rows are the latest period",
             data={"entity_column": data.group_column},
         )
+        return data.group_column

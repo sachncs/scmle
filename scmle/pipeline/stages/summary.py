@@ -13,6 +13,7 @@ from scmle.evaluation import criteria
 from scmle.evaluation import diagnostics
 from scmle.pipeline import suite
 import scmle.pipeline.context
+from scmle.pipeline.stages import examination
 from scmle.pipeline.stages import reporting
 from scmle.pipeline.stages import scoring
 
@@ -36,7 +37,7 @@ class Summary(reporting.Reporting):
         """Scores the final pipeline on the test rows and tracks the scores.
 
         Args:
-            context: The run context; receives the reference scores.
+            context: The run context.
             pipeline: The final pipeline.
             features: The test features.
             target: The test labels.
@@ -57,9 +58,6 @@ class Summary(reporting.Reporting):
             cv_score=selected.score_mean,
             test_metrics=test_metrics,
         )
-        context.reference_scores = scoring.reference_scores(
-            pipeline, features, task
-        )
         return test_metrics
 
     def examine(
@@ -68,23 +66,28 @@ class Summary(reporting.Reporting):
         pipeline: Any,
         features: pandas.DataFrame,
         target: pandas.Series,
-    ) -> None:
+    ) -> examination.Readings:
         """Runs the diagnostic suite on the test rows and writes its reports.
 
         Args:
-            context: The run context; receives the diagnostics.
+            context: The run context.
             pipeline: The final pipeline.
             features: The test features.
             target: The test labels.
+
+        Returns:
+            The model's reference scores on the test rows and the
+            diagnostic reports.
         """
         split = scmle.pipeline.context.require(context.split, "split")
         data = context.services.spec.data
-        context.diagnostics = suite.run_suite(
+        task = scmle.pipeline.context.require(context.task, "task")
+        reports = suite.run_suite(
             diagnostics.DiagnosticInput(
                 pipeline,
                 features,
                 target,
-                scmle.pipeline.context.require(context.task, "task"),
+                task,
                 scmle.pipeline.context.require(context.metric, "metric"),
                 scmle.pipeline.context.require(
                     context.profile, "profile"
@@ -108,7 +111,7 @@ class Summary(reporting.Reporting):
             context.services.governor.until("finish")
             - context.services.governor.reserve.parts.get("package", 0.0),
         )
-        for name, report_body in context.diagnostics.items():
+        for name, report_body in reports.items():
             context.journal.write_json(f"diagnostics/{name}.json", report_body)
             if report_body.get("skipped") is True:
                 context.journal.forgo(
@@ -119,6 +122,9 @@ class Summary(reporting.Reporting):
                     f"diagnostic {name} (cut short)",
                     str(report_body.get("reason", "")),
                 )
+        return examination.Readings(
+            scoring.reference_scores(pipeline, features, task), reports
+        )
 
     def document(
         self,
@@ -126,6 +132,7 @@ class Summary(reporting.Reporting):
         pipeline: Any,
         rows: tuple[pandas.DataFrame, pandas.Series],
         test_metrics: records.Layout,
+        judged: tuple[examination.Pseudolabels, examination.Remedy],
         verdict: records.Layout,
     ) -> records.Layout:
         """Builds the evaluation record, up to the decision it reports.
@@ -135,6 +142,8 @@ class Summary(reporting.Reporting):
             pipeline: The final pipeline.
             rows: The test features and labels.
             test_metrics: The test metrics.
+            judged: The final fit's self-training judgement and the
+                group-threshold remedy.
             verdict: The decision threshold (`decision`) and its net benefit
                 (`net_benefit`).
 
@@ -146,15 +155,7 @@ class Summary(reporting.Reporting):
         task = scmle.pipeline.context.require(context.task, "task")
         metric = scmle.pipeline.context.require(context.metric, "metric")
         features, target = rows
-        baseline = next(
-            (
-                t
-                for t in context.journal.trials
-                if t.model_name == BASELINE
-                and t.status is experiments.Termination.OK
-            ),
-            None,
-        )
+        pseudolabels, remedy = judged
         return {
             "run_id": store.run_id if (store := context.services.store) else "",
             "task": task.value,
@@ -169,13 +170,13 @@ class Summary(reporting.Reporting):
             "selected_cv_std": selected.score_std,
             "fit_health": self.diagnose(context, selected),
             "cv_confidence": self.assure(context),
-            "baseline_cv_score": baseline.score_mean if baseline else None,
+            "baseline_cv_score": self.baseline(context),
             "test_metrics": test_metrics,
             "weighted_test_metrics": self.weigh(
                 context, pipeline, features, target
             ),
-            "semi_supervised": context.semi_supervised,
-            "fairness_mitigation": context.fairness_mitigation,
+            "semi_supervised": pseudolabels.record,
+            "fairness_mitigation": remedy.record,
             "execution_backend": context.services.backend.name,
             "pareto_front": context.pareto_front,
             "evaluation_prevalence": {
@@ -200,6 +201,27 @@ class Summary(reporting.Reporting):
             "split_strategy": split.manifest.strategy,
             **verdict,
         }
+
+    def baseline(self, context: scmle.pipeline.context.Context) -> Any:
+        """The cross-validation score of the `BASELINE` model.
+
+        Args:
+            context: The run context, holding the trials.
+
+        Returns:
+            The mean score of the baseline's successful trial, or None
+            when it has none.
+        """
+        found = next(
+            (
+                t
+                for t in context.journal.trials
+                if t.model_name == BASELINE
+                and t.status is experiments.Termination.OK
+            ),
+            None,
+        )
+        return found.score_mean if found else None
 
     def assure(self, context: scmle.pipeline.context.Context) -> Any:
         """The confidence interval of the selected cross-validation score.

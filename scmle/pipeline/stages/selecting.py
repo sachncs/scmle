@@ -9,6 +9,7 @@ from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.contracts import models
 from scmle.contracts import records
+from scmle.data.splitting import splitters
 from scmle.evaluation import resources
 from scmle.pipeline import products
 import scmle.pipeline.context
@@ -37,9 +38,22 @@ class Choice(products.Kept):
     selected: experiments.Trial | None
     refits: dict[str, models.Estimator]
     pareto_front: list[records.Layout] | None
-    pending_ledger: Any
+    pending_ledger: "exploration.Escrow | None"
     outcomes: list[experiments.Decision]
     skipped: list[dict[str, str]]
+
+
+@dataclasses.dataclass(frozen=True)
+class Pick:
+    """The trial a selection rule chose, before the confirmation opens.
+
+    Attributes:
+        trial: The selected trial.
+        front: The measured Pareto front, when the choice was made on it.
+    """
+
+    trial: experiments.Trial
+    front: list[records.Layout] | None = None
 
 
 class SelectStage(interface.Stage):
@@ -62,13 +76,20 @@ class SelectStage(interface.Stage):
         """
         return context.services.policy.description
 
-    def announce(self, context: scmle.pipeline.context.Context) -> None:
+    def announce(
+        self,
+        context: scmle.pipeline.context.Context,
+        selected: experiments.Trial,
+    ) -> Pick:
         """Emits the `selection.frozen` event for the selected trial.
 
         Args:
-            context: The run context, holding the selected trial.
+            context: The run context whose journal receives the event.
+            selected: The selected trial.
+
+        Returns:
+            The selected trial, as picked without a front.
         """
-        selected = scmle.pipeline.context.require(context.selected, "selected")
         context.journal.emit(
             "selection.frozen",
             f"{selected.model_name}/{selected.strategy}",
@@ -79,6 +100,7 @@ class SelectStage(interface.Stage):
                 "cv_score": selected.score_mean,
             },
         )
+        return Pick(selected)
 
     def limits(
         self, context: scmle.pipeline.context.Context
@@ -103,7 +125,8 @@ class SelectStage(interface.Stage):
         context: scmle.pipeline.context.Context,
         checked: list[experiments.Trial],
         limits: resources.Constraints,
-    ) -> None:
+        refits: dict[str, models.Estimator],
+    ) -> Pick:
         """Measures every checked candidate and picks from the Pareto front.
 
         Among candidates that meet the limits and score within
@@ -111,9 +134,14 @@ class SelectStage(interface.Stage):
         ties). The whole front is reported so the trade-off is visible.
 
         Args:
-            context: The run context; receives the front and the selection.
+            context: The run context, holding the split and the profile.
             checked: The best-ranked trials to measure.
             limits: The serving limits.
+            refits: Receives the chosen candidate's refit, by trial id.
+
+        Returns:
+            The chosen trial and the measured front; without a measured
+            candidate, the affordable one and no front.
 
         Raises:
             BlockedError: If no checked candidate satisfies the limits.
@@ -142,9 +170,7 @@ class SelectStage(interface.Stage):
                 Candidate(trial, candidate, usage, limits.violations(usage))
             )
         if not rows:
-            context.selected = cost.affordable(context, checked)
-            self.announce(context)
-            return
+            return self.announce(context, cost.affordable(context, checked))
         feasible = [r for r in rows if not r.broken]
         if not feasible:
             raise errors.BlockedError(
@@ -162,7 +188,6 @@ class SelectStage(interface.Stage):
             near,
             key=lambda r: (r.usage.p95_latency_ms, r.usage.model_mb),
         )
-        context.pareto_front = frontier(rows, chosen, sign)
         trial = chosen.trial
         context.journal.enter(
             f"{trial.model_name}/{trial.strategy}",
@@ -171,11 +196,11 @@ class SelectStage(interface.Stage):
             f"{context.services.spec.selection.pareto_tolerance} of the "
             f"best score ({chosen.usage.p95_latency_ms:.1f} ms p95)",
         )
-        context.refits[trial.trial_id] = chosen.candidate
-        context.selected = trial
-        self.announce(context)
+        refits[trial.trial_id] = chosen.candidate
+        self.announce(context, trial)
+        return Pick(trial, frontier(rows, chosen, sign))
 
-    def execute(self, context: scmle.pipeline.context.Context) -> None:
+    def execute(self, context: scmle.pipeline.context.Context) -> Choice:
         """Chooses the model, then opens a deferred confirmation.
 
         If the confirmation was deferred, it is completed here once the model
@@ -185,78 +210,43 @@ class SelectStage(interface.Stage):
 
         Args:
             context: The run context, holding any pending ledger.
-        """
-        self.choose(context)
-        pending = context.pending_ledger
-        if pending is None:
-            return
-        selected = scmle.pipeline.context.require(context.selected, "selected")
-        split = scmle.pipeline.context.require(context.split, "split")
-        data = context.services.spec.data
-        subject = None
-        if data.baseline_column and data.baseline_subject == "selected_model":
-            subject = self.codify(context, pending, selected, split)
-        if pending.holds_for_coverage:
-            context.pending_ledger = dataclasses.replace(
-                pending, subject=subject
-            )
-            return
-        context.pending_ledger = None
-        profiling.ProfileStage().conclude(context, pending, subject)
-
-    def codify(
-        self,
-        context: scmle.pipeline.context.Context,
-        pending: "exploration.Escrow",
-        selected: experiments.Trial,
-        split: Any,
-    ) -> scmle.assurance.framing.claim.Selection:
-        """Returns the selected model as the rule the baseline claim is about.
-
-        Args:
-            context: The run context; the refit pipeline is cached in it.
-            pending: The deferred ledger, supplying the view and charter.
-            selected: The selected trial.
-            split: The split whose development rows the model is refit on if
-                no refit exists.
 
         Returns:
-            The selected model with its positive class (the last class in
-            sorted order), the cost model's threshold and a description of how
-            it was fitted.
+            The selected trial, the refits made on the way, the front and
+            the ledger still pending.
         """
-        pipeline = context.refits.get(selected.trial_id)
-        if pipeline is None:
-            pipeline = strategies.lookup(selected.strategy).build(
-                scmle.pipeline.context.require(
-                    context.profile, "profile"
-                ).feature_plan,
-                context.services.registry.get(selected.model_name),
-                scmle.pipeline.context.require(context.task, "task"),
-                context.services.spec.validation.seed,
-                selected.params,
+        refits = dict(context.refits)
+        pick = self.choose(context, refits)
+        pending = context.pending_ledger
+        if pending is not None:
+            split = scmle.pipeline.context.require(context.split, "split")
+            data = context.services.spec.data
+            subject = None
+            if (
+                data.baseline_column
+                and data.baseline_subject == "selected_model"
+            ):
+                subject = codify(context, pending, pick.trial, split, refits)
+            if pending.holds_for_coverage:
+                pending = dataclasses.replace(pending, subject=subject)
+            else:
+                profiling.ProfileStage().conclude(context, pending, subject)
+                pending = None
+        with context.journal.lock:
+            return Choice(
+                pick.trial,
+                refits,
+                pick.front,
+                pending,
+                list(context.journal.outcomes),
+                list(context.journal.skipped),
             )
-            pipeline.fit(split.dev_features, split.dev_target)
-            context.refits[selected.trial_id] = pipeline
-        model = scmle.pipeline.context.require(
-            pending.charter.costs, "cost_model"
-        )
-        classes = sorted(pending.view.target.dropna().unique(), key=str)
-        return scmle.assurance.framing.claim.Selection(
-            pipeline,
-            classes[-1],
-            float(model.threshold),
-            {
-                "model": selected.model_name,
-                "strategy": selected.strategy,
-                "params": selected.params,
-                "trial_id": selected.trial_id,
-                "split": split.manifest.fingerprint,
-                "seed": context.services.spec.validation.seed,
-            },
-        )
 
-    def choose(self, context: scmle.pipeline.context.Context) -> None:
+    def choose(
+        self,
+        context: scmle.pipeline.context.Context,
+        refits: dict[str, models.Estimator],
+    ) -> Pick:
         """Chooses the best trial that satisfies the serving constraints.
 
         Without serving limits and without the Pareto option the top-ranked
@@ -269,7 +259,11 @@ class SelectStage(interface.Stage):
         machine, and the first one within every limit wins.
 
         Args:
-            context: The run context; receives the selected trial.
+            context: The run context, holding the trials, split and profile.
+            refits: Receives the refit of a measured choice, by trial id.
+
+        Returns:
+            The selected trial, with the front when it was chosen on one.
 
         Raises:
             BlockedError: If no checked candidate satisfies the constraints.
@@ -282,9 +276,7 @@ class SelectStage(interface.Stage):
         limits = self.limits(context)
         spec = context.services.spec.selection
         if not limits.active and not spec.pareto:
-            context.selected = cost.affordable(context, ranked)
-            self.announce(context)
-            return
+            return self.announce(context, cost.affordable(context, ranked))
         split = scmle.pipeline.context.require(context.split, "split")
         task = scmle.pipeline.context.require(context.task, "task")
         plan = scmle.pipeline.context.require(
@@ -294,8 +286,7 @@ class SelectStage(interface.Stage):
             : context.services.spec.selection.max_candidates_checked
         ]
         if spec.pareto:
-            self.select_on_front(context, checked, limits)
-            return
+            return self.select_on_front(context, checked, limits, refits)
         measured = 0
         for trial in checked:
             if cost.late(context, trial):
@@ -323,14 +314,10 @@ class SelectStage(interface.Stage):
                 f"within serving limits ({usage.model_mb:.2f} MB, p95 "
                 f"{usage.p95_latency_ms:.1f} ms on {usage.machine})",
             )
-            context.refits[trial.trial_id] = candidate
-            context.selected = trial
-            self.announce(context)
-            return
+            refits[trial.trial_id] = candidate
+            return self.announce(context, trial)
         if not measured:
-            context.selected = cost.affordable(context, checked)
-            self.announce(context)
-            return
+            return self.announce(context, cost.affordable(context, checked))
         raise errors.BlockedError(
             f"none of the top {len(checked)} candidates satisfies the "
             "serving constraints; relax the limits or allow more candidates"
@@ -352,6 +339,58 @@ class Candidate:
     candidate: Any
     usage: resources.Usage
     broken: list[str]
+
+
+def codify(
+    context: scmle.pipeline.context.Context,
+    pending: "exploration.Escrow",
+    selected: experiments.Trial,
+    split: splitters.Split,
+    refits: dict[str, models.Estimator],
+) -> scmle.assurance.framing.claim.Selection:
+    """Returns the selected model as the rule the baseline claim is about.
+
+    Args:
+        context: The run context, holding the profile and services.
+        pending: The deferred ledger, supplying the view and charter.
+        selected: The selected trial.
+        split: The split whose development rows the model is refit on if
+            no refit exists.
+        refits: The refits so far, by trial id; receives this one.
+
+    Returns:
+        The selected model with its positive class (the last class in
+        sorted order), the cost model's threshold and a description of how
+        it was fitted.
+    """
+    pipeline = refits.get(selected.trial_id)
+    if pipeline is None:
+        pipeline = strategies.lookup(selected.strategy).build(
+            scmle.pipeline.context.require(
+                context.profile, "profile"
+            ).feature_plan,
+            context.services.registry.get(selected.model_name),
+            scmle.pipeline.context.require(context.task, "task"),
+            context.services.spec.validation.seed,
+            selected.params,
+        )
+        pipeline.fit(split.dev_features, split.dev_target)
+        refits[selected.trial_id] = pipeline
+    model = scmle.pipeline.context.require(pending.charter.costs, "cost_model")
+    classes = sorted(pending.view.target.dropna().unique(), key=str)
+    return scmle.assurance.framing.claim.Selection(
+        pipeline,
+        classes[-1],
+        float(model.threshold),
+        {
+            "model": selected.model_name,
+            "strategy": selected.strategy,
+            "params": selected.params,
+            "trial_id": selected.trial_id,
+            "split": split.manifest.fingerprint,
+            "seed": context.services.spec.validation.seed,
+        },
+    )
 
 
 def frontier(

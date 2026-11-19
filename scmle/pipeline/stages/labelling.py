@@ -1,12 +1,62 @@
 """Task resolution, the first part of the profile stage."""
 
+import dataclasses
+from typing import ClassVar
+
 import pandas
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
+import scmle.contracts.metrics
 import scmle.data.validation.target
 import scmle.pipeline.context
+from scmle.pipeline.stages import bridge
 from scmle.pipeline.stages import interface
+
+
+@dataclasses.dataclass(frozen=True)
+class Resolution(bridge.Bridge):
+    """The resolved task and the labelled rows it is learned from.
+
+    Attributes:
+        task: The resolved task.
+        metric: The primary metric.
+        frame: The labelled rows (an ordinal target encoded as ranks).
+        unlabeled: Rows without a target set aside by the `unlabeled`
+            policy, or None when every row has one.
+        labels: For an ordinal task, the labels from lowest to highest,
+            else None (the context's `ordinal_labels`).
+        notes: The intake's repairs, and the rows set aside (the context's
+            `cleaning_notes`).
+    """
+
+    names: ClassVar[dict[str, str]] = {
+        "labels": "ordinal_labels",
+        "notes": "cleaning_notes",
+    }
+
+    task: tasks.Task
+    metric: scmle.contracts.metrics.Metric
+    frame: pandas.DataFrame
+    unlabeled: pandas.DataFrame | None
+    labels: tuple[str | int, ...] | None
+    notes: list[str]
+
+    def summary(self) -> object:
+        """The task, the metric and the rows set aside.
+
+        Returns:
+            The identity of the resolution.
+        """
+        return {
+            "task": self.task,
+            "metric": self.metric.name,
+            "unlabeled": None
+            if self.unlabeled is None
+            else len(self.unlabeled),
+            "ordinal": self.labels,
+            "notes": list(self.notes),
+        }
 
 
 class Labelling(interface.Stage):
@@ -18,17 +68,16 @@ class Labelling(interface.Stage):
 
     def set_aside_unlabeled(
         self, context: scmle.pipeline.context.Context, frame: pandas.DataFrame
-    ) -> pandas.DataFrame:
+    ) -> tuple[pandas.DataFrame, pandas.DataFrame]:
         """Applies the `unlabeled` policy to rows with a missing target.
 
         Args:
-            context: The run context; receives the unlabeled rows and the
-                labeled frame.
+            context: The run context, holding the data specification.
             frame: The data, some of whose target values are missing.
 
         Returns:
-            The labeled rows. The others wait in `context.unlabeled` (their
-            weight, if the data has one, defaults to 1).
+            The labeled rows, and the others without the target column
+            (their weight, if the data has one, defaults to 1).
 
         Raises:
             BlockedError: Under the default `block` policy.
@@ -44,29 +93,21 @@ class Labelling(interface.Stage):
         rows = frame[missing].drop(columns=[data.target]).reset_index(drop=True)
         if data.weight_column and data.weight_column in rows:
             rows[data.weight_column] = rows[data.weight_column].fillna(1.0)
-        context.unlabeled = rows
-        context.cleaning_notes.append(
-            f"{len(rows)} row(s) without a target were set aside "
-            f"(policy '{data.unlabeled}')"
-        )
-        context.frame = frame[~missing].reset_index(drop=True)
-        return context.frame
+        return frame[~missing].reset_index(drop=True), rows
 
     def infer(
         self, context: scmle.pipeline.context.Context, frame: pandas.DataFrame
-    ) -> tuple[pandas.DataFrame, tasks.Task]:
+    ) -> Resolution:
         """Resolves the task and validates the target columns it needs.
 
-        Sets the context's task and metric (and, for an ordinal task, the
-        encoded frame and the labels).
-
         Args:
-            context: The run context.
+            context: The run context, holding the intake's repairs.
             frame: The loaded data.
 
         Returns:
-            The frame (with rows lacking a target set aside, or an ordinal
-            target encoded) and the resolved task.
+            The resolution: the task, the metric, the frame (with rows
+            lacking a target set aside, or an ordinal target encoded), the
+            rows set aside and the ordinal labels.
 
         Raises:
             ConfigError: If `pseudo_label` is used for a non-classification
@@ -75,13 +116,19 @@ class Labelling(interface.Stage):
                 reported.
         """
         spec = context.services.spec
-        target = frame[spec.data.target]
-        if target.isna().any():
-            frame = self.set_aside_unlabeled(context, frame)
-            target = frame[spec.data.target]
-        task = scmle.data.validation.target.TaskResolver(spec).resolve(target)
+        notes = list(context.cleaning_notes)
+        unlabeled = None
+        if frame[spec.data.target].isna().any():
+            frame, unlabeled = self.set_aside_unlabeled(context, frame)
+            notes.append(
+                f"{len(unlabeled)} row(s) without a target were set aside "
+                f"(policy '{spec.data.unlabeled}')"
+            )
+        task = scmle.data.validation.target.TaskResolver(spec).resolve(
+            frame[spec.data.target]
+        )
         if (
-            context.unlabeled is not None
+            unlabeled is not None
             and spec.data.unlabeled == "pseudo_label"
             and not task.is_classification
         ):
@@ -95,21 +142,15 @@ class Labelling(interface.Stage):
                 f"resolves to {task.value}"
             )
         self.confirm(spec, frame, task)
+        labels = None
         if task is tasks.Task.ORDINAL:
-            ranks = {
-                label: rank
-                for rank, label in enumerate(spec.data.ordinal_order)
-            }
+            labels = tuple(spec.data.ordinal_order)
+            ranks = {label: rank for rank, label in enumerate(labels)}
             frame = frame.copy()
             frame[spec.data.target] = (
                 frame[spec.data.target].map(ranks).astype(int)
             )
-            context.frame = frame
-            context.ordinal_labels = tuple(spec.data.ordinal_order)
-        context.task = task
-        context.metric = context.services.catalog.resolve(
-            spec.primary_metric, task
-        )
+        metric = context.services.catalog.resolve(spec.primary_metric, task)
         unknown = sorted(
             set(spec.problem.success_criteria)
             - set(context.services.catalog.report_names[task])
@@ -120,7 +161,7 @@ class Labelling(interface.Stage):
                 "available: "
                 f"{sorted(context.services.catalog.report_names[task])}"
             )
-        return frame, task
+        return Resolution(task, metric, frame, unlabeled, labels, notes)
 
     def confirm(
         self, spec: tasks.Config, frame: pandas.DataFrame, task: tasks.Task

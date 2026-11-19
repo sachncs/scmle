@@ -17,6 +17,7 @@ from scmle.contracts import tasks
 import scmle.contracts.data
 import scmle.pipeline.context
 from scmle.pipeline.stages import identification
+from scmle.pipeline.stages import surveying
 
 
 class Admission(identification.Identification):
@@ -331,7 +332,7 @@ def amend(
     """Rewrites the profile, curation report and dataset card for a plan.
 
     Args:
-        context: The run context; its profile and curation are replaced.
+        context: The run context; the amended portrait is applied to it.
         plan: The feature plan without the quarantined fields.
 
     Returns:
@@ -339,27 +340,27 @@ def amend(
     """
     profile = scmle.pipeline.context.require(context.profile, "profile")
     profile = dataclasses.replace(profile, feature_plan=plan)
-    context.profile = profile
     context.journal.write_json("dataset_profile.json", profile.to_dict())
     curation = context.curation
-    if curation is not None:
-        amended = dataclasses.replace(
-            curation,
-            feature_columns={
-                "numeric": plan.numeric,
-                "categorical": plan.categorical,
-                "text": plan.text,
-            },
-            dropped_columns=plan.dropped,
-        )
-        context.curation = amended
-        context.journal.write_json("curation_report.json", amended.to_dict())
-        context.journal.write_json(
-            "dataset_card.json",
-            scmle.contracts.data.Datasheet.distill(amended).to_dict(),
-        )
-        return ["curation_report.json", "dataset_card.json"]
-    return []
+    if curation is None:
+        surveying.Portrait(profile, None).apply(context)
+        return []
+    amended = dataclasses.replace(
+        curation,
+        feature_columns={
+            "numeric": plan.numeric,
+            "categorical": plan.categorical,
+            "text": plan.text,
+        },
+        dropped_columns=plan.dropped,
+    )
+    surveying.Portrait(profile, amended).apply(context)
+    context.journal.write_json("curation_report.json", amended.to_dict())
+    context.journal.write_json(
+        "dataset_card.json",
+        scmle.contracts.data.Datasheet.distill(amended).to_dict(),
+    )
+    return ["curation_report.json", "dataset_card.json"]
 
 
 def announce(

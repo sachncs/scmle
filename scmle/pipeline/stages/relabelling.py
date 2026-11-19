@@ -3,9 +3,11 @@
 from typing import Any
 
 from scmle.contracts import experiments
+from scmle.contracts import records
 import scmle.evaluation.metrics
 import scmle.pipeline.context
 from scmle.pipeline.stages import cost
+from scmle.pipeline.stages import examination
 from scmle.pipeline.stages import remedy
 from scmle.preparation import pseudo_labeling
 from scmle.preparation import strategies
@@ -23,13 +25,12 @@ class Relabelling(remedy.Remedy):
         context: scmle.pipeline.context.Context,
         selected: experiments.Trial,
         pipeline: Any,
-    ) -> Any:
+    ) -> tuple[Any, examination.Pseudolabels]:
         """Adds confident pseudo-labels to the final fit when they help.
 
         The judgement uses only development folds. The unlabeled rows never
         touch the locked test rows. Does nothing unless the data specification
-        asks for pseudo-labeling and unlabeled rows exist; the outcome is
-        recorded on the context.
+        asks for pseudo-labeling and unlabeled rows exist.
 
         Args:
             context: The run context, holding the unlabeled rows and split.
@@ -40,12 +41,13 @@ class Relabelling(remedy.Remedy):
             The pipeline to carry forward: the self-trained refit when
             cross-validation accepted it, otherwise `pipeline` unchanged
             (including when the judgement was abandoned for lack of time or
-            confident rows).
+            confident rows); and the judgement's record
+            (`examination.Pseudolabels`), empty when none was made.
         """
         data = context.services.spec.data
         unlabeled = context.unlabeled
         if data.unlabeled != "pseudo_label" or unlabeled is None:
-            return pipeline
+            return pipeline, examination.Pseudolabels()
         split = scmle.pipeline.context.require(context.split, "split")
         task = scmle.pipeline.context.require(context.task, "task")
         metric = scmle.pipeline.context.require(context.metric, "metric")
@@ -75,15 +77,14 @@ class Relabelling(remedy.Remedy):
                 )
             ),
         )
-        record: dict[str, Any] = {
+        record: records.Layout = {
             "unlabeled_rows": len(unlabeled),
             "confidence": data.pseudo_label_confidence,
             "outcome": None if outcome is None else outcome.to_dict(),
             "used": False,
         }
-        context.semi_supervised = record
         if outcome is None or not outcome.accepted:
-            return pipeline
+            return pipeline, examination.Pseudolabels(record)
         augmented, count = pseudo_labeling.selftrain(
             pipeline,
             split.dev_features,
@@ -91,6 +92,6 @@ class Relabelling(remedy.Remedy):
             unlabeled,
             data.pseudo_label_confidence,
         )
-        record["used"] = count > 0
-        record["pseudo_rows"] = count
-        return augmented
+        return augmented, examination.Pseudolabels(
+            record | {"used": count > 0, "pseudo_rows": count}
+        )

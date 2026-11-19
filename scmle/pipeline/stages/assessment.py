@@ -3,18 +3,21 @@
 import dataclasses
 from typing import Any
 from typing import ClassVar
+from typing import Self
 
 import numpy
 import pandas
 
 from scmle.assurance.custody import journal
 from scmle.contracts import experiments
+from scmle.contracts import models
 from scmle.contracts import records
 from scmle.contracts import tasks
 from scmle.models import thresholds
 from scmle.pipeline import products
 import scmle.pipeline.context
 from scmle.pipeline.stages import cost
+from scmle.pipeline.stages import examination
 from scmle.pipeline.stages import scoring
 from scmle.pipeline.stages import selecting
 from scmle.pipeline.stages import summary
@@ -36,12 +39,64 @@ class Exam(products.Derived):
         shipped: The model the bundle serves: the same choice refit on
             every row, or `final_pipeline` when it was not refit.
         test_rows: The opened test rows and labels.
+        pseudolabels: The self-training judgement of the final fit.
+        remedy: The group-threshold judgement of the final model.
+        decision: The decision threshold, its net benefit and the coverage
+            claim's hash.
+        readings: The reference scores and diagnostics of the test rows.
     """
 
     evaluation: records.Layout | None
-    final_pipeline: Any
-    shipped: Any
+    final_pipeline: models.Estimator | None
+    shipped: models.Estimator | None
     test_rows: tuple[pandas.DataFrame, pandas.Series] | None
+    pseudolabels: examination.Pseudolabels = dataclasses.field(
+        default_factory=examination.Pseudolabels
+    )
+    remedy: examination.Remedy = dataclasses.field(
+        default_factory=examination.Remedy
+    )
+    decision: examination.Decision = dataclasses.field(
+        default_factory=examination.Decision
+    )
+    readings: examination.Readings = dataclasses.field(
+        default_factory=examination.Readings
+    )
+
+    @classmethod
+    def capture(cls, board: object) -> Self:
+        """Reads the exam from the run context; each part reads its own.
+
+        Args:
+            board: The run context.
+
+        Returns:
+            The exam.
+        """
+        plain = {
+            name: getattr(board, name)
+            for name in ("evaluation", "final_pipeline", "shipped", "test_rows")
+        }
+        return cls(
+            **plain,
+            pseudolabels=examination.Pseudolabels.capture(board),
+            remedy=examination.Remedy.capture(board),
+            decision=examination.Decision.capture(board),
+            readings=examination.Readings.capture(board),
+        )
+
+    def apply(self, board: object) -> None:
+        """Sets the exam's fields on the run context; each part sets its own.
+
+        Args:
+            board: The run context.
+        """
+        for field in dataclasses.fields(self):
+            value = getattr(self, field.name)
+            if isinstance(value, products.Product):
+                value.apply(board)
+            else:
+                setattr(board, field.name, value)
 
     def summary(self) -> object:
         """The evaluation record and whether the test rows were opened.
@@ -73,21 +128,23 @@ class FinalEvaluationStage(summary.Summary):
         selected = scmle.pipeline.context.require(context.selected, "selected")
         return f"final one-time test evaluation of {selected.model_name}"
 
-    def execute(self, context: scmle.pipeline.context.Context) -> None:
+    def execute(self, context: scmle.pipeline.context.Context) -> Exam:
         """Refits on all development data and evaluates on the test set.
 
         Reuses the refit made during selection if there is one. Applies
         pseudo-labeling, streamed training, the decision threshold and the
         fairness mitigation, registers the coverage claim, then opens the
-        locked rows once, after the selection is frozen. Records the test
-        metrics, diagnostics and the evaluation document in the context; the
-        bundle's model is the choice refit on every row (`ship`).
-        The locked rows are first wrapped so that opening them is recorded in
-        the run's custody journal (`journal.Custodian`).
+        locked rows once, after the selection is frozen. The bundle's model
+        is the choice refit on every row (`ship`). The locked rows are first
+        wrapped so that opening them is recorded in the run's custody
+        journal (`journal.Custodian`).
 
         Args:
-            context: The run context; receives the final model, the test rows
-                and the evaluation.
+            context: The run context; its journal records events and files.
+
+        Returns:
+            The final model, the test rows and the evaluation, with the
+            pseudo-labels, the remedy, the decision and the readings.
         """
         context.services.check()
         split = scmle.pipeline.context.require(context.split, "split")
@@ -99,60 +156,54 @@ class FinalEvaluationStage(summary.Summary):
         selected = scmle.pipeline.context.require(context.selected, "selected")
         task = scmle.pipeline.context.require(context.task, "task")
         pipeline = self.refit(context, selected, task)
-        pipeline = self.pseudolabel(context, selected, pipeline)
+        pipeline, pseudolabels = self.pseudolabel(context, selected, pipeline)
         pipeline = self.relearn(context, pipeline)
-        pipeline, decision = scoring.choose_decision_threshold(
+        pipeline, threshold = scoring.choose_decision_threshold(
             context, pipeline
         )
         unmitigated = pipeline
-        pipeline = self.mitigate(context, selected, pipeline, decision)
-        self.pledge(context)
+        pipeline, remedy = self.mitigate(context, selected, pipeline, threshold)
+        claim = self.pledge(context)
         locked = split.locked_test
-        test_features, test_target = self.unlock(context, decision)
-        context.test_rows = (test_features, test_target)
-        self.corroborate(
-            context, unmitigated, pipeline, test_features, test_target
-        )
-        context.journal.emit(
-            "test.opened",
-            "locked test set released once, after selection was frozen",
-            data={
-                "rows": len(test_features),
-                "fingerprint": split.manifest.fingerprint,
-            },
-        )
-        context.final_pipeline = pipeline
+        rows = self.unlock(context, threshold)
+        remedy = self.corroborate(remedy, unmitigated, pipeline, *rows)
         usage = cost.meter(context, pipeline, split.dev_features)
-        test_metrics = self.measure(
-            context, pipeline, test_features, test_target
-        )
-        context.shipped, shipped = self.ship(context, pipeline)
-        self.examine(context, pipeline, test_features, test_target)
-        net_benefit = scoring.appraise(
-            context, pipeline, test_features, test_target, decision
-        )
-        self.decide(
-            context, pipeline, test_features, test_target, decision, net_benefit
-        )
-        context.evaluation = self.document(
+        test_metrics = self.measure(context, pipeline, *rows)
+        shipped, refit = self.ship(context, pipeline, rows, pseudolabels)
+        readings = self.examine(context, pipeline, *rows)
+        benefit = scoring.appraise(context, pipeline, *rows, threshold)
+        decision = examination.Decision(threshold, benefit, claim)
+        self.decide(context, pipeline, *rows, decision)
+        evaluation = self.document(
             context,
             pipeline,
-            (test_features, test_target),
+            rows,
             test_metrics,
-            {"decision": decision, "net_benefit": net_benefit},
+            (pseudolabels, remedy),
+            {"decision": threshold, "net_benefit": benefit},
         ) | {
             "resources": usage.to_dict(),
             "resource_limits": context.services.governor.report(),
             "skipped_for_time": context.journal.skipped,
             "test_set_opened": locked.opened,
-            "shipped": shipped,
-            "diagnostics": sorted(context.diagnostics),
+            "shipped": refit,
+            "diagnostics": sorted(readings.diagnostics),
             "elapsed_seconds": context.services.elapsed(),
             "reproducibility": (
                 "same seed/data/environment replays; threaded backends may "
                 "differ"
             ),
         }
+        return Exam(
+            evaluation,
+            pipeline,
+            shipped,
+            rows,
+            pseudolabels,
+            remedy,
+            decision,
+            readings,
+        )
 
     def refit(
         self,
@@ -189,6 +240,8 @@ class FinalEvaluationStage(summary.Summary):
         self,
         context: scmle.pipeline.context.Context,
         evaluated: Any,
+        rows: tuple[pandas.DataFrame, pandas.Series],
+        pseudolabels: examination.Pseudolabels,
     ) -> tuple[Any, records.Layout]:
         """The frozen choice refit on development and test rows, to serve.
 
@@ -205,9 +258,11 @@ class FinalEvaluationStage(summary.Summary):
         or when it would not end before the packaging reserve.
 
         Args:
-            context: The run context, holding the split, the selection and
-                the opened test rows.
+            context: The run context, holding the split and the selection.
             evaluated: The evaluated model, wrapped as it was scored.
+            rows: The opened test rows and labels.
+            pseudolabels: The final fit's self-training judgement; the
+                refit self-trains again when the pseudo-labels were used.
 
         Returns:
             The model to serve and the record of the refit (`refit`, the
@@ -215,7 +270,6 @@ class FinalEvaluationStage(summary.Summary):
         """
         split = scmle.pipeline.context.require(context.split, "split")
         selected = scmle.pipeline.context.require(context.selected, "selected")
-        rows = scmle.pipeline.context.require(context.test_rows, "test_rows")
         reason = self.hold(context, len(rows[0]))
         if reason:
             context.journal.forgo("refit on every row", reason)
@@ -237,9 +291,7 @@ class FinalEvaluationStage(summary.Summary):
         )
         fitted.fit(features, target)
         unlabeled = context.unlabeled
-        if (context.semi_supervised or {}).get(
-            "used"
-        ) and unlabeled is not None:
+        if (pseudolabels.record or {}).get("used") and unlabeled is not None:
             fitted = pseudo_labeling.selftrain(
                 fitted,
                 features,
@@ -296,6 +348,9 @@ class FinalEvaluationStage(summary.Summary):
     ) -> tuple[pandas.DataFrame, pandas.Series]:
         """Opens the locked rows once, bound to the frozen selection.
 
+        Emits `test.opened` with the rows released and the split's
+        fingerprint.
+
         Args:
             context: The run context, holding the split and the selection.
             decision: The decision threshold the selection is frozen with.
@@ -316,6 +371,14 @@ class FinalEvaluationStage(summary.Summary):
             # Reweighing weights development rows only; locked rows carry a
             # neutral weight so the pipeline finds the column it expects.
             features = features.assign(**{tasks.FAIRNESS_WEIGHT: 1.0})
+        context.journal.emit(
+            "test.opened",
+            "locked test set released once, after selection was frozen",
+            data={
+                "rows": len(features),
+                "fingerprint": split.manifest.fingerprint,
+            },
+        )
         return features, target
 
 

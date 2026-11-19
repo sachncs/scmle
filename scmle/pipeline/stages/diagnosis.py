@@ -1,5 +1,6 @@
 """Post-selection diagnostics run while packaging."""
 
+import dataclasses
 from typing import Any
 from typing import cast
 
@@ -7,6 +8,7 @@ import numpy
 from sklearn import base
 
 from scmle.contracts import experiments
+from scmle.contracts import records
 from scmle.contracts import tasks
 import scmle.contracts.models
 from scmle.evaluation import backtest
@@ -21,12 +23,66 @@ from scmle.pipeline.stages import cost
 from scmle.preparation import strategies
 
 
+@dataclasses.dataclass(frozen=True)
+class Diagnostics:
+    """The post-selection diagnostics of the selected model.
+
+    Each report is None when it was not computed (budget spent, too few
+    rows, or the task does not allow it).
+
+    Attributes:
+        curve: The learning curve on the first fold.
+        nested: The nested cross-validation estimate.
+        variance: The bias-variance decomposition.
+        sensitivity: The hyperparameter sensitivity.
+    """
+
+    curve: records.Layout | None
+    nested: records.Layout | None
+    variance: records.Layout | None
+    sensitivity: records.Layout | None
+
+    def entries(self) -> records.Layout:
+        """The evaluation record's diagnostic entries, in record order.
+
+        Returns:
+            The learning curve, nested CV, bias-variance and sensitivity.
+        """
+        return {
+            "learning_curve": self.curve,
+            "nested_cv": self.nested,
+            "bias_variance": self.variance,
+            "sensitivity": self.sensitivity,
+        }
+
+
 class Diagnosis(calibration.Calibration):
     """Post-selection diagnostics of the selected model.
 
     Part of `PackageStage`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
+
+    def probe(
+        self,
+        context: scmle.pipeline.context.Context,
+        selected: experiments.Trial,
+    ) -> Diagnostics:
+        """Computes the diagnostics, in the order their fits are budgeted.
+
+        Args:
+            context: The run context, holding the split, metric and budget.
+            selected: The selected trial.
+
+        Returns:
+            The learning curve, nested CV, bias-variance and sensitivity.
+        """
+        return Diagnostics(
+            self.learning_curve(context, selected),
+            self.nested_validation(context, selected),
+            self.bias_variance(context, selected),
+            self.sensitivity(context, selected),
+        )
 
     def learning_curve(
         self,

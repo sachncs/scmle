@@ -1,5 +1,6 @@
 """Release evaluation against explicit success criteria."""
 
+import dataclasses
 import logging
 from typing import Any
 
@@ -15,6 +16,34 @@ import scmle.pipeline.context
 from scmle.pipeline.stages import interface
 
 LOGGER = logging.getLogger(__name__)
+
+
+@dataclasses.dataclass(frozen=True)
+class Verdict:
+    """The release verdict: the policy, its outcome and the evidence.
+
+    Attributes:
+        policy: The derived evaluation policy, or None when no success
+            criteria were declared.
+        outcome: The release evaluation record.
+        evidence: The evidence index record.
+    """
+
+    policy: records.Layout | None
+    outcome: records.Layout
+    evidence: records.Layout
+
+    def entries(self) -> records.Layout:
+        """The evaluation record's release entries, in record order.
+
+        Returns:
+            The release policy, evaluation and evidence entries.
+        """
+        return {
+            "release_policy": self.policy,
+            "release_evaluation": self.outcome,
+            "release_evidence": self.evidence,
+        }
 
 
 class Releasing(interface.Stage):
@@ -94,18 +123,9 @@ class Releasing(interface.Stage):
         self,
         context: scmle.pipeline.context.Context,
         store: Any,
-        evaluation: dict[str, Any],
+        evaluation: records.Layout,
     ) -> None:
-        """Evaluates explicit success criteria against release evidence.
-
-        Writes the release policy, evidence and evaluation files into the run
-        store and records the results in `evaluation`. When no success criteria
-        were declared, the evaluation is blocked with status
-        `policy_not_declared` and only `release_evaluation.json` is written;
-        thresholds are never invented from observed metrics. Otherwise the
-        outcome is also gated by the reliability plan, the release attestation
-        and the evidence index, which is signed when a signing key is
-        configured.
+        """Records the release verdict (`judge`) in the evaluation document.
 
         Args:
             context: The run context, holding the task, metric and diagnostics.
@@ -113,6 +133,33 @@ class Releasing(interface.Stage):
             evaluation: The evaluation document, which must already hold the
                 test metrics; the release policy, evaluation and evidence
                 entries are added to it.
+        """
+        evaluation.update(self.judge(context, store, evaluation).entries())
+
+    def judge(
+        self,
+        context: scmle.pipeline.context.Context,
+        store: Any,
+        evaluation: records.Layout,
+    ) -> Verdict:
+        """Evaluates explicit success criteria against release evidence.
+
+        Writes the release policy, evidence and evaluation files into the run
+        store. When no success criteria were declared, the verdict is blocked
+        with status `policy_not_declared` and only `release_evaluation.json`
+        is written; thresholds are never invented from observed metrics.
+        Otherwise the outcome is also gated by the reliability plan, the
+        release attestation and the evidence index, which is signed when a
+        signing key is configured.
+
+        Args:
+            context: The run context, holding the task, metric and diagnostics.
+            store: The run store receiving the files.
+            evaluation: The evaluation document, read only; it must already
+                hold the test metrics.
+
+        Returns:
+            The verdict.
         """
         task = scmle.pipeline.context.require(context.task, "task")
         metric = scmle.pipeline.context.require(context.metric, "metric")
@@ -123,8 +170,7 @@ class Releasing(interface.Stage):
             context.services.spec.problem.success_criteria,
         )
         if policy is None:
-            self.abstain(store, evaluation)
-            return
+            return self.abstain(store)
 
         evidence_index = self.evidence_index(context, store, policy)
         signing_key = signing.keying(None)
@@ -154,21 +200,26 @@ class Releasing(interface.Stage):
         outcome = release.countersign(
             outcome, evidence_index, evidence_verified
         )
-        evaluation["release_policy"] = policy.model_dump(mode="json")
-        evaluation["release_evaluation"] = outcome.to_dict()
-        evaluation["release_evidence"] = evidence_index.to_dict()
+        verdict = Verdict(
+            policy.model_dump(mode="json"),
+            outcome.to_dict(),
+            evidence_index.to_dict(),
+        )
         store.write_json(
             "evaluation_policy.json", policy.model_dump(mode="json")
         )
         store.write_json("release_evidence.json", evidence_index.to_dict())
         store.write_json("release_evaluation.json", outcome.to_dict())
+        return verdict
 
-    def abstain(self, store: Any, evaluation: records.Layout) -> None:
-        """Records a release blocked because no success criteria were declared.
+    def abstain(self, store: Any) -> Verdict:
+        """A release blocked because no success criteria were declared.
 
         Args:
             store: The run store receiving `release_evaluation.json`.
-            evaluation: The evaluation document; gains empty release entries.
+
+        Returns:
+            The blocked verdict, with no policy and no evidence.
         """
         record = {
             "status": "policy_not_declared",
@@ -182,10 +233,8 @@ class Releasing(interface.Stage):
             ],
             "findings": [],
         }
-        evaluation["release_policy"] = None
-        evaluation["release_evaluation"] = record
-        evaluation["release_evidence"] = {"records": [], "ready": False}
         store.write_json("release_evaluation.json", record)
+        return Verdict(None, record, {"records": [], "ready": False})
 
     def vouch(self, evaluation: records.Layout) -> bool:
         """Verifies the release attestation against the provenance and SBOM.

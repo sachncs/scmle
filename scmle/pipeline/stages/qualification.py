@@ -16,8 +16,46 @@ import scmle.assurance.robustness.report
 import scmle.assurance.robustness.stability
 from scmle.contracts import tasks
 from scmle.data.readers import tabular
+from scmle.pipeline import products
 import scmle.pipeline.context
 from scmle.pipeline.stages import screening
+
+
+@dataclasses.dataclass(frozen=True)
+class Robustness(products.Derived):
+    """The verdicts of the stability and shift assessment of a charter run.
+
+    Its reports are in the run directory; no context field holds it.
+
+    Attributes:
+        stability: The stability report's status.
+        shift: The shift report's status.
+        gate: The stability gate's level.
+        forward: The forward (time-ordered) check's status.
+        fragile: The survivors judged fragile.
+    """
+
+    stability: str
+    shift: str
+    gate: str
+    forward: str
+    fragile: tuple[str, ...] = ()
+
+    def apply(self, board: object) -> None:
+        """Sets nothing: no context field holds the assessment.
+
+        Args:
+            board: The run context; unchanged.
+        """
+        del board
+
+    def summary(self) -> object:
+        """What the assessment concluded.
+
+        Returns:
+            The fields, as JSON-ready data.
+        """
+        return dataclasses.asdict(self)
 
 
 class Qualification(screening.Screening):
@@ -141,7 +179,7 @@ class Qualification(screening.Screening):
         self,
         context: scmle.pipeline.context.Context,
         stage: prefilter.Prefilter,
-    ) -> None:
+    ) -> Robustness:
         """Writes the stability and shift reports and the EDA page.
 
         The files are `stability_report.json`, `shift_report.json` and
@@ -157,6 +195,9 @@ class Qualification(screening.Screening):
         Args:
             context: The run context that stores the reports.
             stage: The stability stage, holding the assessment it ran.
+
+        Returns:
+            The verdicts the reports state.
         """
         found = stage.found
         assert found is not None  # noqa: S101 -- scout always runs the stage (tests/unit/test_unreachable_gates.py) # nosec B101
@@ -186,4 +227,11 @@ class Qualification(screening.Screening):
                 "shift_reason": shift_document["reason"],
                 "forward": found.forward.status,
             },
+        )
+        return Robustness(
+            stability_document["status"],
+            shift_document["status"],
+            found.stability_gate.value,
+            found.forward.status,
+            tuple(found.fragile),
         )

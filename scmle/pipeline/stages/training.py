@@ -2,6 +2,7 @@
 
 import dataclasses
 from typing import ClassVar
+from typing import Self
 
 from scmle.contracts import errors
 from scmle.contracts import experiments
@@ -12,6 +13,7 @@ from scmle.pipeline import strategy_search
 from scmle.pipeline import trials
 from scmle.pipeline import tuning
 import scmle.pipeline.context
+import scmle.pipeline.journal
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import interface
 from scmle.pipeline.stages import planning
@@ -34,6 +36,24 @@ class Search(products.Kept):
     outcomes: list[experiments.Decision]
     trial_counter: int
     skipped: list[dict[str, str]]
+
+    @classmethod
+    def copy(cls, journal: scmle.pipeline.journal.Journal) -> Self:
+        """Copies the search out of the run's journal, under its lock.
+
+        Args:
+            journal: The journal the trials were transcribed to.
+
+        Returns:
+            The search; later stages' entries do not change it.
+        """
+        with journal.lock:
+            return cls(
+                list(journal.trials),
+                list(journal.outcomes),
+                journal.trial_counter,
+                list(journal.skipped),
+            )
 
 
 class TrainStage(interface.Stage):
@@ -60,7 +80,7 @@ class TrainStage(interface.Stage):
         plan = scmle.pipeline.context.require(context.plan, "plan")
         return f"{len(plan.candidates)} candidates"
 
-    def execute(self, context: scmle.pipeline.context.Context) -> None:
+    def execute(self, context: scmle.pipeline.context.Context) -> Search:
         """Runs every candidate, then searches strategies, tunes and ensembles.
 
         Candidates run in chunks of `backend.workers`. The trial window and
@@ -69,8 +89,11 @@ class TrainStage(interface.Stage):
         candidate order regardless of the backend.
 
         Args:
-            context: The run context, holding the execution plan; receives the
-                trials.
+            context: The run context, holding the execution plan; its journal
+                transcribes the trials as they end.
+
+        Returns:
+            The search: a copy of what the journal holds once it is done.
 
         Raises:
             BlockedError: If preparation left no trial window for the first
@@ -116,3 +139,4 @@ class TrainStage(interface.Stage):
         ensemble_search.Stacker(context, runner).search(
             list(context.journal.trials)
         )
+        return Search.copy(context.journal)

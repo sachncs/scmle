@@ -1,5 +1,6 @@
 """Causal identification of a charter run's primary claim."""
 
+import dataclasses
 from typing import Any
 
 from scmle.assurance.admissibility import qualify
@@ -9,8 +10,43 @@ from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import governed
 from scmle.causal import claim
 import scmle.causal.identification.run
+from scmle.pipeline import products
 import scmle.pipeline.context
 from scmle.pipeline.stages import qualification
+
+
+@dataclasses.dataclass(frozen=True)
+class Estimand(products.Derived):
+    """The identified causal claim of a charter run.
+
+    Its documents are in the run directory; no context field holds it.
+
+    Attributes:
+        status: The claim's status (`causal_claims.json`).
+        tier: The claim's evidence tier.
+        estimated: Whether it was estimated on the single opening of `C`
+            (otherwise only the design was diagnosed on `X`).
+    """
+
+    status: str
+    tier: str
+    estimated: bool
+
+    def apply(self, board: object) -> None:
+        """Sets nothing: no context field holds the claim.
+
+        Args:
+            board: The run context; unchanged.
+        """
+        del board
+
+    def summary(self) -> object:
+        """What the identification concluded.
+
+        Returns:
+            The fields, as JSON-ready data.
+        """
+        return dataclasses.asdict(self)
 
 
 class Identification(qualification.Qualification):
@@ -102,7 +138,7 @@ class Identification(qualification.Qualification):
         run: governed.Governance,
         graph: Any,
         found: qualify.Qualification,
-    ) -> None:
+    ) -> Estimand | None:
         """Reports the identification of a causal charter.
 
         Runs only when the charter's estimand carries a causal block. When the
@@ -121,10 +157,13 @@ class Identification(qualification.Qualification):
             run: The governed run, holding the confirmation's documents.
             graph: The declared DAG, or None.
             found: The exploration qualification, whose DAG checks are used.
+
+        Returns:
+            The identified claim, or None for a predictive charter.
         """
         block = charter.estimand.causal
         if block is None:
-            return
+            return None
         documents = run.confirmation.documents
         if claim.CLAIM_FILE in documents:
             claims = documents[claim.CLAIM_FILE]
@@ -139,7 +178,7 @@ class Identification(qualification.Qualification):
                     "estimated_on_c": True,
                 },
             )
-            return
+            return Estimand(claims["status"], claims["tier"], estimated=True)
         frame = view.features.copy()
         frame[context.services.spec.data.target] = view.target
         outcome = scmle.causal.identification.run.design_only(
@@ -163,3 +202,4 @@ class Identification(qualification.Qualification):
                 "estimated_on_c": False,
             },
         )
+        return Estimand(claims["status"], claims["tier"], estimated=False)

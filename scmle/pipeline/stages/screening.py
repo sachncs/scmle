@@ -1,5 +1,6 @@
 """Leakage screening and feature synthesis of the profile stage."""
 
+import dataclasses
 import logging
 from typing import Any
 
@@ -10,10 +11,36 @@ from scmle.assurance.charter import sealing
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.pipeline import ingest_stage
+from scmle.pipeline import products
 import scmle.pipeline.context
 from scmle.pipeline.stages import surveying
 
 LOGGER = logging.getLogger(__name__)
+
+
+@dataclasses.dataclass(frozen=True)
+class Screen(products.Derived):
+    """The rows with the features synthesised through the as-of views.
+
+    Attributes:
+        frame: The rows, with the synthesised columns when a plan ran.
+        ingest: The declared-source ingestion, or None when the project
+            declared none.
+    """
+
+    frame: pandas.DataFrame
+    ingest: ingest_stage.Output | None
+
+    def summary(self) -> object:
+        """The columns and the ingestion's summary.
+
+        Returns:
+            The identity of the screened rows.
+        """
+        return {
+            "columns": [str(column) for column in self.frame.columns],
+            "ingest": None if self.ingest is None else self.ingest.summary,
+        }
 
 
 class Screening(surveying.Surveying):
@@ -74,7 +101,7 @@ class Screening(surveying.Surveying):
 
     def synthesize(
         self, context: scmle.pipeline.context.Context, frame: pandas.DataFrame
-    ) -> pandas.DataFrame:
+    ) -> Screen:
         """Adds the synthesized features before the data are split.
 
         Does nothing unless the data spec names an `ingest_plan`, which needs
@@ -89,8 +116,9 @@ class Screening(surveying.Surveying):
             frame: The loaded data.
 
         Returns:
-            The frame with the synthesized columns appended, or `frame` itself
-            when no ingest plan and no charter ingest block are set.
+            The screen: the frame with the synthesized columns appended, or
+            `frame` itself and no ingestion when no ingest plan and no
+            charter ingest block are set.
 
         Raises:
             ConfigError: If only one of the ingest plan and the charter block
@@ -107,7 +135,7 @@ class Screening(surveying.Surveying):
                     "the charter has an ingest block but data.ingest_plan is "
                     "not set"
                 )
-            return frame
+            return Screen(frame, None)
         if block is None:
             raise errors.ConfigError(
                 "data.ingest_plan needs a charter with an ingest block"
@@ -130,8 +158,6 @@ class Screening(surveying.Surveying):
         )
         if block.entity is not None:
             merged = self.regroup(context, block.entity, merged)
-        context.frame = merged
-        context.ingest = result
         for name, document in result.documents.items():
             context.journal.write_json(name, document)
         context.journal.emit(
@@ -140,7 +166,7 @@ class Screening(surveying.Surveying):
             (ingest_stage.MANIFEST, ingest_stage.PROVENANCE),
             result.summary,
         )
-        return merged
+        return Screen(merged, result)
 
     def regroup(
         self,

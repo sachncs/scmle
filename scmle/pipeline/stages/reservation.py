@@ -14,14 +14,16 @@ import scmle.runtime.state
 
 
 @dataclasses.dataclass(frozen=True)
-class Allowance(products.Derived):
+class Reserve(products.Derived):
     """The time held back for the final steps; held again on resume.
 
     Attributes:
-        governor: The run's governor, whose reserve the stage provisioned.
+        governor: The run's governor, whose reserve (`budget.Reserve`) the
+            stage provisioned; applying the product sets it on the run's
+            services.
     """
 
-    governor: limits.Governor | None
+    governor: limits.Governor
 
     def summary(self) -> object:
         """The table shape and the seconds held back by part.
@@ -29,8 +31,6 @@ class Allowance(products.Derived):
         Returns:
             The reserve, which depends only on the shape and the budget.
         """
-        if self.governor is None:
-            return None
         reserve = self.governor.reserve
         return {"shape": reserve.shape, "parts": reserve.parts}
 
@@ -45,7 +45,7 @@ class Reservation(interface.Stage):
     """
 
     requires: ClassVar[tuple[type, ...]] = (ingestion.IngestStage,)
-    makes: ClassVar[type[products.Product] | None] = Allowance
+    makes: ClassVar[type[products.Product] | None] = Reserve
     state: ClassVar[scmle.runtime.state.Progress] = (
         scmle.runtime.state.Progress.VALIDATING
     )
@@ -64,11 +64,14 @@ class Reservation(interface.Stage):
         """
         return "reserve time for the final steps"
 
-    def execute(self, context: scmle.pipeline.context.Context) -> None:
+    def execute(self, context: scmle.pipeline.context.Context) -> Reserve:
         """Provisions the reserve, records it and admits the run.
 
         Args:
             context: The run context, holding the ingested frame.
+
+        Returns:
+            The reserve held for the final refit, diagnostics and packaging.
 
         Raises:
             BlockedError: If preparation, one cheapest trial and the reserve
@@ -84,3 +87,4 @@ class Reservation(interface.Stage):
             data={"reserve_seconds": parts},
         )
         reserve.admit()
+        return Reserve(context.services.governor)

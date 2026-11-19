@@ -17,9 +17,12 @@ rate of the check is measured by the certificates. Nothing here reads the
 final evaluation set.
 """
 
+from collections.abc import Callable
+from collections.abc import Sequence
 import dataclasses
 from typing import Any
 from typing import ClassVar
+from typing import TYPE_CHECKING
 
 import numpy
 from numpy.typing import ArrayLike
@@ -27,13 +30,19 @@ from numpy.typing import NDArray
 from scipy import optimize
 from scipy import stats
 
+from scmle.assurance.charter import contracts
 from scmle.assurance.framing import costs
 from scmle.contracts import errors
+from scmle.contracts import models
 from scmle.contracts import qualification
 from scmle.contracts import records
+from scmle.contracts import tasks
 from scmle.decision import netbenefit
 from scmle.models import thresholds
 from scmle.runtime import randomness
+
+if TYPE_CHECKING:
+    import pandas
 
 BINS = 10
 FOLDS = 5
@@ -507,3 +516,121 @@ def operate(
         ),
         stable_range=span(risk, labels, rule, model),
     )
+
+
+def freeze(
+    fitted: Any,
+    probabilities: NDArray[numpy.float64],
+    actual: NDArray[numpy.bool_],
+    charter: contracts.AnalysisCharter,
+    seed: int,
+    rows: int,
+) -> tuple[Any, records.Layout]:
+    """Wraps a classifier in the chartered cost model's frozen threshold.
+
+    The rule is chosen on out-of-fold development probabilities only and is
+    frozen (`operate`): the cost model's Bayes cut if the probabilities pass
+    the calibration check, a recalibrated cut if they pass after
+    recalibration, otherwise a cut searched on a grid. A recalibrating rule
+    is expressed as the equivalent cut on the raw probability, so the served
+    classifier needs no extra stage.
+
+    Args:
+        fitted: The fitted scikit-learn classifier to wrap.
+        probabilities: Out-of-fold development probabilities.
+        actual: Whether each of those rows is of the positive class.
+        charter: The analysis charter with its decision layer and cost model.
+        seed: Seed for the calibration check and its replicates.
+        rows: Number of validation rows, recorded in the description.
+
+    Returns:
+        The thresholded classifier and a description holding the objective,
+        the raw threshold, the number of validation rows, the rule's own
+        record (`f11`) and the cost model's hash.
+
+    Raises:
+        ScmleError: If the charter has no decision layer or cost model, or
+            the chosen rule has no raw threshold.
+    """
+    layer = charter.decision
+    model = charter.costs
+    if layer is None or model is None:
+        raise errors.ScmleError("the charter has no decision layer")
+    chosen = operate(
+        probabilities,
+        actual.astype(float),
+        model,
+        level=layer.model.calibration,
+        replicates=charter.budget.permutations,
+        seed=seed,
+    )
+    cut = chosen.rule.uncalibrated
+    if cut is None:
+        raise errors.ScmleError("the chosen rule has no raw threshold")
+    description = {
+        "objective": "chartered_cost",
+        "threshold": cut,
+        "validation_rows": rows,
+        "f11": chosen.to_dict(),
+        "cost_model_hash": model.model_hash,
+    }
+    return thresholds.Classifier.around(fitted, cut), description
+
+
+def choose(
+    fitted: Any,
+    build: Callable[[], models.Estimator],
+    rows: "tuple[pandas.DataFrame, pandas.Series]",
+    folds: Sequence[tuple[Sequence[int], Sequence[int]]],
+    settings: tasks.Threshold,
+    charter: contracts.AnalysisCharter | None,
+    seed: int,
+) -> tuple[Any, records.Layout]:
+    """Chooses the binary decision threshold on development data only.
+
+    Each validation row is scored by a model built afresh (`build`) and
+    fitted without it, so the final test rows are never read. A charter's
+    cost model takes precedence over the settings' objective (`freeze`);
+    otherwise the threshold maximises the settings' objective on the
+    out-of-fold probabilities.
+
+    Args:
+        fitted: The selected classifier refit on the development rows (a
+            scikit-learn classifier: its second class, `classes_[1]`, is the
+            positive one).
+        build: Factory of the unfitted selected classifier.
+        rows: The development features and labels.
+        folds: `(fit positions, validation positions)` pairs.
+        settings: The objective and the misclassification costs.
+        charter: The charter with a decision layer and cost model, or None.
+        seed: Seed of the chartered rule's calibration check.
+
+    Returns:
+        The classifier wrapped with the threshold, and a description of the
+        decision: objective, threshold and validation rows, plus the
+        validation score (objective) or the rule's record (charter).
+    """
+    features, target = rows
+    probabilities, positions = thresholds.heldout(
+        build, features, target, folds
+    )
+    positive = fitted.classes_[1]
+    actual = (target.iloc[positions] == positive).to_numpy()
+    if charter is not None:
+        return freeze(
+            fitted, probabilities, actual, charter, seed, len(positions)
+        )
+    kind = thresholds.OBJECTIVES[settings.threshold_objective]
+    objective = (
+        kind(settings.false_positive_cost, settings.false_negative_cost)
+        if settings.threshold_objective == "cost"
+        else kind()
+    )
+    cut, score = thresholds.argmax(probabilities, actual, objective)
+    description = {
+        "objective": settings.threshold_objective,
+        "threshold": cut,
+        "validation_score": score,
+        "validation_rows": len(positions),
+    }
+    return thresholds.Classifier.around(fitted, cut), description

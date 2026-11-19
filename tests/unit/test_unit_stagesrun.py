@@ -115,7 +115,7 @@ def test_packaging_inherits_the_diagnostics_and_release_in_order():
 
 
 def test_each_stage_names_what_it_needs_and_makes():
-    assert reservation.Reservation.makes is reservation.Allowance
+    assert reservation.Reservation.makes is reservation.Reserve
     assert selecting.SelectStage.makes is selecting.Choice
     assert planning.Planning.makes is planning.Blueprint
     assert profiling.ProfileStage.makes is profiling.Partition

@@ -2,7 +2,6 @@
 
 import dataclasses
 import logging
-from typing import Any
 from typing import ClassVar
 
 from scmle.contracts import capabilities
@@ -190,21 +189,21 @@ def requisition(
     return key
 
 
-def advise(context: scmle.pipeline.context.Context) -> tuple[Any, ...]:
-    """Derives and stores the recommendations for the user.
+def advise(
+    context: scmle.pipeline.context.Context,
+) -> tuple[recommendations.Recommendation, ...]:
+    """Derives the recommendations for the user.
 
     Args:
         context: A context whose profile is populated.
 
     Returns:
-        The recommendations, also kept on the context.
+        The recommendations (kept on the context by `Blueprint.apply`).
     """
-    advice = recommendations.recommend(
+    return recommendations.recommend(
         scmle.pipeline.context.require(context.profile, "profile"),
         context.services.spec,
     )
-    context.recommendations = advice
-    return advice
 
 
 @dataclasses.dataclass(frozen=True)
@@ -246,7 +245,18 @@ class Planning(interface.Stage):
         """
         return "build execution plan"
 
-    def execute(self, context: scmle.pipeline.context.Context) -> None:
+    def execute(self, context: scmle.pipeline.context.Context) -> Blueprint:
+        """Builds the blueprint, which the engine applies to the context.
+
+        Args:
+            context: The run context, holding the profile, task and manifest.
+
+        Returns:
+            The execution plan and the recommendations.
+        """
+        return self.draft(context)
+
+    def draft(self, context: scmle.pipeline.context.Context) -> Blueprint:
         """Builds the execution plan and the recommendations.
 
         First records the runtime resources the capability gate plans
@@ -257,15 +267,17 @@ class Planning(interface.Stage):
         `UnsupportedError`).
 
         Args:
-            context: The run context; receives the execution plan.
+            context: The run context, holding the profile, task and manifest.
+
+        Returns:
+            The blueprint: the plan, the advice and the capabilities.
         """
         observe(context)
         plan = devise(context)
-        context.plan = plan
+        registry = context.services.capability_registry
         context.journal.write_json("execution_plan.json", plan.to_dict())
         context.journal.write_json(
-            "capability_registry.json",
-            context.services.capability_registry.to_dict(),
+            "capability_registry.json", registry.to_dict()
         )
         context.journal.write_json(
             "diagnostics/decision_log.json",
@@ -281,3 +293,4 @@ class Planning(interface.Stage):
             f"{len(advice)} recommendation(s) for the user",
             ("diagnostics/recommendations.json",),
         )
+        return Blueprint(plan, advice, registry)

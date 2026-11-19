@@ -33,8 +33,8 @@ class Intake(products.Derived):
         stream: The chunked source and its totals, when streamed.
     """
 
-    frame: pandas.DataFrame | None
-    manifest: provenance.DatasetManifest | None
+    frame: pandas.DataFrame
+    manifest: provenance.DatasetManifest
     cleaning_notes: list[str]
     read_seconds: float
     stream: tuple[streaming.Feed, streaming.Totals] | None
@@ -45,9 +45,8 @@ class Intake(products.Derived):
         Returns:
             The identity of the ingested data.
         """
-        digests = None if self.manifest is None else dict(self.manifest.digests)
         return {
-            "digests": digests,
+            "digests": dict(self.manifest.digests),
             "notes": list(self.cleaning_notes),
             "streamed": self.stream is not None,
         }
@@ -94,12 +93,11 @@ class IngestStage(interface.Stage):
 
     def read_stream(
         self, context: scmle.pipeline.context.Context, data: tasks.Dataset
-    ) -> pandas.DataFrame:
+    ) -> tuple[pandas.DataFrame, tuple[streaming.Feed, streaming.Totals]]:
         """Reads the file in one pass, keeping a sample of both sides.
 
         A hash of each row's position assigns it to the locked or the
-        development side, and a capped sample of each side is kept. The
-        streaming source and the pass totals are stored in `context.stream`.
+        development side, and a capped sample of each side is kept.
 
         Args:
             context: The run context, supplying the validation settings.
@@ -107,7 +105,8 @@ class IngestStage(interface.Stage):
 
         Returns:
             The kept development and locked rows together, with a
-            `split_side` column marking the side of each row.
+            `split_side` column marking the side of each row, and the
+            streaming source with the pass totals.
         """
         source = streaming.locate(data.uri)
         columns = source.shape()[1]
@@ -123,10 +122,9 @@ class IngestStage(interface.Stage):
             context.services.spec.validation.test_fraction,
             context.services.spec.validation.seed,
         )
-        context.stream = (source, totals)
-        return frame
+        return frame, (source, totals)
 
-    def execute(self, context: scmle.pipeline.context.Context) -> None:
+    def execute(self, context: scmle.pipeline.context.Context) -> Intake:
         """Loads the data, records its manifest and applies the feature graph.
 
         An in-memory input frame is copied; otherwise the file is read whole,
@@ -134,12 +132,14 @@ class IngestStage(interface.Stage):
         values are treated as missing and noted. The source snapshot and the
         dataset manifest are written. A schema change that is incompatible
         with the stored snapshot, or checkpoints computed on different data,
-        raise `ConfigError` (through `enrol` and
-        `forbid`).
+        raise `ConfigError` (through `enrol` and `forbid`).
 
         Args:
-            context: The run context; receives the frame, manifest and cleaning
-                notes.
+            context: The run context; the intake is applied to it, so a
+                caller that runs the stage outside the engine finds it there.
+
+        Returns:
+            The intake: the rows, their manifest and the read's repairs.
 
         Raises:
             UnsupportedError: If the data is not tabular and no
@@ -159,56 +159,79 @@ class IngestStage(interface.Stage):
                 },
             )
         started = context.services.clock.monotonic()
+        stream = None
         if context.services.input_frame is not None:
             frame = context.services.input_frame.copy(deep=False)
         elif self.overflows(data):
-            frame = self.read_stream(context, data)
+            frame, stream = self.read_stream(context, data)
         else:
             frame = tabular.read_table(data.uri)
         if data.horizon:
             frame = forecasting.augment(frame, data)
-        context.read_seconds = context.services.clock.monotonic() - started
-        context.manifest = tabular.manifested(
+        seconds = context.services.clock.monotonic() - started
+        manifest = tabular.manifested(
             frame, data.target, data.uri, data.modality
         )
-        self.enrol(context, frame)
+        self.enrol(context, manifest, frame)
         frame, infinite = tabular.sanitize(frame)
-        context.cleaning_notes = [
+        notes = [
             f"column '{name}': {count} infinite value(s) treated as missing"
             for name, count in infinite.items()
         ]
-        if context.stream is not None:
-            totals = context.stream[1]
-            context.cleaning_notes.append(
+        if stream is not None:
+            totals = stream[1]
+            notes.append(
                 f"streamed {totals.rows} rows; {totals.development_sample} "
                 f"development rows kept in memory, {totals.locked} rows locked"
             )
-        graph = context.services.spec.feature_graph
-        if graph.nodes:
-            feature_graph.validate_graph(graph, set(frame.columns), data)
-            ordered = feature_graph.segregate(graph)[0]
-            frame = feature_graph.Temporal(
-                ordered, data.group_column, data.time_column
-            ).apply(frame)
-            context.journal.emit(
-                "features.graph",
-                f"feature graph v{graph.version} {graph.fingerprint()}",
-                data={
-                    "fingerprint": graph.fingerprint(),
-                    "nodes": [n.model_dump(mode="json") for n in graph.nodes],
-                },
-            )
-        context.frame = frame
-        self.forbid(context)
-        manifest = context.manifest.to_dict()
-        context.journal.write_json("dataset_manifest.json", manifest)
+        frame = self.graph(context, frame)
+        self.forbid(context, manifest)
+        context.journal.write_json("dataset_manifest.json", manifest.to_dict())
         context.journal.track(
-            dataset_id=context.manifest.identifier,
-            data_hash=context.manifest.digests["data"],
+            dataset_id=manifest.identifier, data_hash=manifest.digests["data"]
         )
+        made = Intake(frame, manifest, notes, seconds, stream)
+        made.apply(context)
+        return made
+
+    @staticmethod
+    def graph(
+        context: scmle.pipeline.context.Context, frame: pandas.DataFrame
+    ) -> pandas.DataFrame:
+        """Applies the ordered nodes of the specification's feature graph.
+
+        Args:
+            context: The run context, holding the specification.
+            frame: The sanitised rows.
+
+        Returns:
+            The rows with the ordered graph columns, or `frame` itself when
+            the graph has no nodes.
+        """
+        data = context.services.spec.data
+        graph = context.services.spec.feature_graph
+        if not graph.nodes:
+            return frame
+        feature_graph.validate_graph(graph, set(frame.columns), data)
+        ordered = feature_graph.segregate(graph)[0]
+        frame = feature_graph.Temporal(
+            ordered, data.group_column, data.time_column
+        ).apply(frame)
+        context.journal.emit(
+            "features.graph",
+            f"feature graph v{graph.version} {graph.fingerprint()}",
+            data={
+                "fingerprint": graph.fingerprint(),
+                "nodes": [n.model_dump(mode="json") for n in graph.nodes],
+            },
+        )
+        return frame
 
     def enrol(
-        self, context: scmle.pipeline.context.Context, frame: pandas.DataFrame
+        self,
+        context: scmle.pipeline.context.Context,
+        manifest: provenance.DatasetManifest,
+        frame: pandas.DataFrame,
     ) -> None:
         """Records the source identity and refuses incompatible schema changes.
 
@@ -216,14 +239,14 @@ class IngestStage(interface.Stage):
         `source.snapshot` event.
 
         Args:
-            context: The run context, holding the manifest and the run store.
+            context: The run context, holding the run store.
+            manifest: The dataset's identity.
             frame: The loaded data, whose column names and dtypes are recorded.
 
         Raises:
             ConfigError: If the stored source registry holds an earlier snapshot
                 of the source whose schema is incompatible with the new one.
         """
-        manifest = scmle.pipeline.context.require(context.manifest, "manifest")
         snapshot = scmle.data.readers.registry.Observation.restore(
             manifest,
             {
@@ -264,11 +287,16 @@ class IngestStage(interface.Stage):
             },
         )
 
-    def forbid(self, context: scmle.pipeline.context.Context) -> None:
+    def forbid(
+        self,
+        context: scmle.pipeline.context.Context,
+        manifest: provenance.DatasetManifest,
+    ) -> None:
         """Rejects resuming trials computed on different data.
 
         Args:
-            context: The run context, holding the checkpoints and manifest.
+            context: The run context, holding the checkpoints.
+            manifest: The identity of the data just read.
 
         Raises:
             ConfigError: If the run has checkpoints and the data hash differs
@@ -282,9 +310,7 @@ class IngestStage(interface.Stage):
         previous = provenance.DatasetManifest.from_dict(
             json.loads(saved.read_text(encoding="utf-8"))
         ).digests["data"]
-        current = scmle.pipeline.context.require(
-            context.manifest, "manifest"
-        ).digests["data"]
+        current = manifest.digests["data"]
         if previous != current:
             raise errors.ConfigError(
                 "cannot resume: the data changed since the checkpointed "

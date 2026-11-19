@@ -13,6 +13,7 @@ from scmle.contracts import tasks
 from scmle.decision import reports
 from scmle.evaluation import coverage
 import scmle.pipeline.context
+from scmle.pipeline.stages import examination
 from scmle.pipeline.stages import relabelling
 from scmle.pipeline.stages import scoring
 
@@ -24,7 +25,7 @@ class Reporting(relabelling.Relabelling):
     abstract, never run on its own.
     """
 
-    def pledge(self, context: scmle.pipeline.context.Context) -> None:
+    def pledge(self, context: scmle.pipeline.context.Context) -> str | None:
         """Fixes and hashes the coverage claim before the final rows open.
 
         Written to `coverage_claim.json`, announced by a `coverage.registered`
@@ -32,7 +33,11 @@ class Reporting(relabelling.Relabelling):
         stores no interval or set has no claim, and nothing is written.
 
         Args:
-            context: The run context that stores the claim and its hash.
+            context: The run context whose journal stores the claim.
+
+        Returns:
+            The claim's hash (`examination.Decision.claim`), or None when the
+            task makes no claim.
         """
         split = scmle.pipeline.context.require(context.split, "split")
         charter_hash = None
@@ -49,10 +54,9 @@ class Reporting(relabelling.Relabelling):
             slice_columns=scoring.slicers(context),
         )
         if claim is None:
-            return
+            return None
         sha = scmle.assurance.ledger.ledger.digest(claim)
         context.journal.write_json(coverage_run.CLAIM_FILE, claim)
-        context.coverage_claim_sha256 = sha
         vault = context.custody_vault
         if vault is not None:
             vault.log.append(
@@ -67,6 +71,7 @@ class Reporting(relabelling.Relabelling):
             (coverage_run.CLAIM_FILE,),
             {"sha256": sha},
         )
+        return sha
 
     def notarize(self, context: scmle.pipeline.context.Context) -> None:
         """Appends the hashes of the four decision files to the custody log.
@@ -93,8 +98,7 @@ class Reporting(relabelling.Relabelling):
         pipeline: Any,
         features: pandas.DataFrame,
         target: pandas.Series,
-        decision: records.Layout | None,
-        net_benefit: records.Layout | None,
+        decision: examination.Decision,
     ) -> None:
         """Writes the policy value, fairness satisfaction and rollout design.
 
@@ -110,8 +114,7 @@ class Reporting(relabelling.Relabelling):
             pipeline: The fitted final model.
             features: The released rows.
             target: The labels of the released rows.
-            decision: The chartered threshold description, or None.
-            net_benefit: The net-benefit report, or None.
+            decision: The chartered threshold and its net-benefit report.
         """
         charter = scoring.decisional(context)
         if charter is None or charter.decision is None:
@@ -145,13 +148,15 @@ class Reporting(relabelling.Relabelling):
         )
         report = reports.decision_report(
             charter,
-            decision,
-            net_benefit,
+            decision.threshold,
+            decision.benefit,
             value,
             satisfaction,
             None if built is None else built[0],
         )
-        written = self.deposit(context, value, decision, net_benefit, built)
+        written = self.deposit(
+            context, value, decision.threshold, decision.benefit, built
+        )
         context.journal.write_json("decision_report.json", report)
         self.notarize(context)
         context.journal.emit(

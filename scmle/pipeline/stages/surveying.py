@@ -12,9 +12,36 @@ from scmle.data.profiling import label_noise
 from scmle.data.profiling import representativeness
 from scmle.data.readers import tabular
 from scmle.evaluation import uplift
+from scmle.pipeline import products
 from scmle.pipeline import profiler
 import scmle.pipeline.context
 from scmle.pipeline.stages import labelling
+
+
+@dataclasses.dataclass(frozen=True)
+class Portrait(products.Derived):
+    """The development rows' profile and the curation report built on it.
+
+    Attributes:
+        profile: The development-set profile (`contracts.data.Portrait`).
+        curation: The curation report, or None when none was written.
+    """
+
+    profile: scmle.contracts.data.Portrait
+    curation: scmle.contracts.data.Curation | None
+
+    def summary(self) -> object:
+        """The profile and the curation report.
+
+        Returns:
+            The identity of the portrait.
+        """
+        return {
+            "profile": self.profile.to_dict(),
+            "curation": None
+            if self.curation is None
+            else self.curation.to_dict(),
+        }
 
 
 class Surveying(labelling.Labelling):
@@ -31,7 +58,11 @@ class Surveying(labelling.Labelling):
         task: tasks.Task,
         frame: pandas.DataFrame,
         split: Any,
-    ) -> tuple[Any, pandas.DataFrame]:
+    ) -> tuple[
+        scmle.contracts.data.Portrait,
+        pandas.DataFrame,
+        dict[str, float | bool | str | None] | None,
+    ]:
         """Profiles the development rows of a split.
 
         Args:
@@ -43,8 +74,9 @@ class Surveying(labelling.Labelling):
 
         Returns:
             The profile, with the feature graph, cleaning notes, quality notes
-            and (for an uplift task) the propensity finding attached, and the
-            development frame.
+            and (for an uplift task) the propensity finding attached, the
+            development frame, and for an uplift task how well the covariates
+            predict treatment (else None).
         """
         development = split.dev_features.assign(
             **{spec.data.target: split.dev_target}
@@ -64,29 +96,29 @@ class Surveying(labelling.Labelling):
                 + tuple(context.cleaning_notes),
             )
         profile = self.annotate(spec, task, development, profile)
-        if task is tasks.Task.UPLIFT:
-            propensity = uplift.randomised(
-                split.dev_features.drop(
-                    columns=[spec.data.treatment_column], errors="ignore"
-                ),
-                split.dev_features[spec.data.treatment_column].to_numpy(),
-                spec.validation.seed,
-            )
-            context.propensity = propensity.to_dict()
-            finding = f"treatment assignment: {propensity.note}"
-            profile = dataclasses.replace(
-                profile,
-                quality_findings=(*profile.quality_findings, finding),
-            )
-        return profile, development
+        if task is not tasks.Task.UPLIFT:
+            return profile, development, None
+        propensity = uplift.randomised(
+            split.dev_features.drop(
+                columns=[spec.data.treatment_column], errors="ignore"
+            ),
+            split.dev_features[spec.data.treatment_column].to_numpy(),
+            spec.validation.seed,
+        )
+        finding = f"treatment assignment: {propensity.note}"
+        profile = dataclasses.replace(
+            profile,
+            quality_findings=(*profile.quality_findings, finding),
+        )
+        return profile, development, propensity.to_dict()
 
     def curate(
         self,
         context: scmle.pipeline.context.Context,
         frame: pandas.DataFrame,
         development: pandas.DataFrame,
-        profile: Any,
-    ) -> None:
+        profile: scmle.contracts.data.Portrait,
+    ) -> Portrait:
         """Writes the curation report and dataset card.
 
         Curation findings are advisory observations for a person to review;
@@ -95,11 +127,14 @@ class Surveying(labelling.Labelling):
         because every observation is recorded as non-blocking (GATE-1).
 
         Args:
-            context: The run context; receives the profile, the curation
-                report and the artifacts written for them.
+            context: The run context, holding the intake; receives the
+                artifacts written.
             frame: The whole loaded data.
             development: The development rows that were profiled.
             profile: The dataset profile.
+
+        Returns:
+            The portrait: the profile and its curation report.
         """
         source_rows = (
             context.stream[1].rows if context.stream is not None else len(frame)
@@ -129,8 +164,6 @@ class Surveying(labelling.Labelling):
             dropped_columns=profile.feature_plan.dropped,
         )
         card = scmle.contracts.data.Datasheet.distill(curation)
-        context.profile = profile
-        context.curation = curation
         context.journal.write_json("dataset_profile.json", profile.to_dict())
         context.journal.write_json("curation_report.json", curation.to_dict())
         context.journal.write_json("dataset_card.json", card.to_dict())
@@ -149,6 +182,7 @@ class Surveying(labelling.Labelling):
                 "risk_findings": len(profile.risk_findings),
             },
         )
+        return Portrait(profile, curation)
 
     @staticmethod
     def annotate(

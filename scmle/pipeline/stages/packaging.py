@@ -28,15 +28,19 @@ PARITY_ROWS = 200
 class Package(products.Derived):
     """The signed bundle and the run's result; the run is then complete.
 
+    Its fields are named as the run-context fields `apply` sets.
+
     Attributes:
         bundle: The packaged model.
         result: The run's result.
         evidence_graph: The graph of the run's evidence.
+        evaluation: The evaluation record at its current layout.
     """
 
     bundle: scmle.artifacts.bundle.Bundle | None
     result: results.Run | None
     evidence_graph: lineage.Graph
+    evaluation: records.Layout | None
 
     def summary(self) -> object:
         """The digest of the evidence graph, which names every artifact.
@@ -70,7 +74,7 @@ class PackageStage(tracing.Tracing):
         """
         return "write bundle and reports"
 
-    def execute(self, context: scmle.pipeline.context.Context) -> None:
+    def execute(self, context: scmle.pipeline.context.Context) -> Package:
         """Packages artifacts and assembles the `RunResult`.
 
         Builds the model bundle with its conformal, quantile and coverage
@@ -81,8 +85,10 @@ class PackageStage(tracing.Tracing):
         the result carries that layout.
 
         Args:
-            context: The run context; receives the bundle, the result and the
-                evaluation record at its current layout.
+            context: The run context; read only (`Package.apply` sets it).
+
+        Returns:
+            The bundle, result, evidence graph and evaluation record.
         """
         store = context.services.workspace
         split = scmle.pipeline.context.require(context.split, "split")
@@ -92,10 +98,7 @@ class PackageStage(tracing.Tracing):
         )
         profile = scmle.pipeline.context.require(context.profile, "profile")
         bundle = self.assemble(context)
-        evaluation["learning_curve"] = self.learning_curve(context, selected)
-        evaluation["nested_cv"] = self.nested_validation(context, selected)
-        evaluation["bias_variance"] = self.bias_variance(context, selected)
-        evaluation["sensitivity"] = self.sensitivity(context, selected)
+        evaluation.update(self.probe(context, selected).entries())
         bundle.conformal = self.conformalise(context, selected, bundle)
         bundle.quantile = self.bracket(context)
         self.settle(context, bundle)
@@ -110,7 +113,9 @@ class PackageStage(tracing.Tracing):
                 "diagnostics/forecast_backtest.json",
                 evaluation["forecast_backtest"],
             )
-        self.gauge(context, bundle, evaluation)
+        uncertainty = self.gauge(context, bundle)
+        uncertainty.equip(bundle)
+        evaluation.update(uncertainty.entries())
         bundle.novelty = novelty.Strangeness.fit(
             split.dev_features,
             bundle.schema.numeric,
@@ -121,7 +126,6 @@ class PackageStage(tracing.Tracing):
         self.certify(context, bundle, evaluation)
         self.release_evaluation(context, store, evaluation)
         evaluation = results.evaluation(evaluation)
-        context.evaluation = evaluation
         store.write_json("evaluation.json", evaluation)
         evidence_graph = self.trace(context, store)
         graph_record = evidence_graph.to_dict()
@@ -146,7 +150,7 @@ class PackageStage(tracing.Tracing):
             "report.html",
             report.Renderer().render(result, board),
         )
-        context.bundle, context.result = bundle, result
+        return Package(bundle, result, evidence_graph, evaluation)
 
     def assemble(
         self, context: scmle.pipeline.context.Context

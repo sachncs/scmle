@@ -5,6 +5,7 @@ from typing import Any
 import numpy
 
 from scmle.contracts import experiments
+from scmle.contracts import records
 from scmle.contracts import tasks
 from scmle.data.readers import streaming
 from scmle.evaluation import mitigation
@@ -26,8 +27,8 @@ class Remedy(examination.Examination):
         context: scmle.pipeline.context.Context,
         selected: experiments.Trial,
         pipeline: Any,
-        decision: dict[str, Any] | None,
-    ) -> Any:
+        decision: records.Layout | None,
+    ) -> tuple[Any, examination.Remedy]:
         """Gives each group its own threshold when that is judged worthwhile.
 
         The judgement uses out-of-fold development predictions only. Under
@@ -35,8 +36,7 @@ class Remedy(examination.Examination):
         written to the decision log; with any other mitigation nothing is done.
 
         Args:
-            context: The run context; receives the decision-log entry and the
-                mitigation record.
+            context: The run context; receives the decision-log entry.
             selected: The selected trial, used to rebuild the model for the
                 out-of-fold predictions.
             pipeline: The fitted final model.
@@ -44,12 +44,13 @@ class Remedy(examination.Examination):
                 its threshold is the base cut of the groups (0.5 if None).
 
         Returns:
-            A group-threshold classifier when applied, else `pipeline`.
+            A group-threshold classifier when applied, else `pipeline`; and
+            the judgement (`examination.Remedy`), empty when none was made.
         """
         fairness = context.services.spec.fairness
         task = scmle.pipeline.context.require(context.task, "task")
         if fairness.mitigation != "group_thresholds":
-            return pipeline
+            return pipeline, examination.Remedy()
         column = (
             fairness.column or context.services.spec.data.sensitive_columns[0]
         )
@@ -60,7 +61,7 @@ class Remedy(examination.Examination):
                 experiments.Edict.REJECT,
                 "group thresholds apply to binary classification only",
             )
-            return pipeline
+            return pipeline, examination.Remedy()
         split = scmle.pipeline.context.require(context.split, "split")
         probabilities, positions = self.outfold(context, selected)
         actual = (
@@ -89,12 +90,12 @@ class Remedy(examination.Examination):
             else experiments.Edict.REJECT,
             result.reason,
         )
-        context.fairness_mitigation = result.to_dict()
+        remedy = examination.Remedy(result.to_dict())
         if not result.applied:
-            return pipeline
+            return pipeline, remedy
         return thresholds.Segmenter(
             pipeline, column, assigner, result.thresholds, base_cut
-        )
+        ), remedy
 
     def outfold(
         self,

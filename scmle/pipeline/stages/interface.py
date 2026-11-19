@@ -38,10 +38,17 @@ class Stage(abc.ABC):
         """
 
     @abc.abstractmethod
-    def execute(self, context: scmle.pipeline.context.Context) -> None:
-        """Performs the stage, reading and writing the context.
+    def execute(
+        self, context: scmle.pipeline.context.Context
+    ) -> products.Product | None:
+        """Performs the stage, reading the context.
 
         Args:
-            context: The run context; earlier stages' products are read from it
-                and this stage's products are written to it.
+            context: The run context; earlier stages' products are read from
+                it.
+
+        Returns:
+            What the stage made, which the engine applies to the context and
+            keeps with the stage record; None for a stage that writes the
+            context itself.
         """

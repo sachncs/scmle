@@ -1,5 +1,6 @@
 """Quantile brackets and interval coverage of the package."""
 
+import dataclasses
 from typing import Any
 
 import numpy
@@ -8,6 +9,7 @@ import scmle.artifacts.bundle
 from scmle.assurance import coverage_confirm
 from scmle.assurance import coverage_run
 from scmle.assurance import coverage_slices
+from scmle.contracts import records
 from scmle.contracts import tasks
 from scmle.evaluation import conformal
 from scmle.evaluation import quantile
@@ -17,6 +19,43 @@ from scmle.pipeline.stages import diagnosis
 from scmle.pipeline.stages import profiling
 from scmle.pipeline.stages import scoring
 from scmle.preparation import preprocessing
+
+
+@dataclasses.dataclass(frozen=True)
+class Uncertainty:
+    """The bundle's uncertainty evidence and its coverage on the test rows.
+
+    Attributes:
+        conformal: The conformal calibration, or None.
+        quantile: The calibrated quantile models, or None.
+        curve: The quantile band's coverage at each nominal level, or None
+            when not measured.
+        report: The measured coverage report, or None when not measured.
+    """
+
+    conformal: conformal.ConformalCalibrator | None
+    quantile: quantile.QuantileIntervals | None
+    curve: list[dict[str, float]] | None = None
+    report: records.Layout | None = None
+
+    def equip(self, bundle: scmle.artifacts.bundle.Bundle) -> None:
+        """Stores a measured coverage report on the bundle.
+
+        Args:
+            bundle: The model bundle, not yet saved.
+        """
+        if self.report is not None:
+            bundle.coverage_report = self.report
+
+    def entries(self) -> records.Layout:
+        """The evaluation record's coverage entry, when one was measured.
+
+        Returns:
+            `quantile_coverage`, or nothing.
+        """
+        if self.curve is None:
+            return {}
+        return {"quantile_coverage": self.curve}
 
 
 class Bracketing(diagnosis.Diagnosis):
@@ -38,7 +77,8 @@ class Bracketing(diagnosis.Diagnosis):
         others and tests everything in the one opening. If the coverage claim
         cannot be built (no registered claim hash or no conformal calibration
         on the bundle), its document is written as not evaluated. Does nothing
-        when no ledger is pending.
+        when no ledger is pending. The context's field is left as it is: no
+        stage after packaging reads it, and the context is not reused.
 
         Args:
             context: The run context, holding the pending ledger.
@@ -48,7 +88,6 @@ class Bracketing(diagnosis.Diagnosis):
         pending = context.pending_ledger
         if pending is None:
             return
-        context.pending_ledger = None
         task = scmle.pipeline.context.require(context.task, "task")
         runner = None
         if context.coverage_claim_sha256 is not None:
@@ -140,55 +179,60 @@ class Bracketing(diagnosis.Diagnosis):
         self,
         context: scmle.pipeline.context.Context,
         bundle: scmle.artifacts.bundle.Bundle,
-        evaluation: dict[str, Any],
-    ) -> None:
+    ) -> Uncertainty:
         """Measures the coverage of the bundle's intervals on the test rows.
 
-        Does nothing without held-out test rows. Adds `quantile_coverage` to
-        the evaluation when the bundle has quantile models, and stores and
-        writes the coverage report when one is measured.
+        Measures nothing without held-out test rows. The quantile coverage
+        curve is measured when the bundle has quantile models; the coverage
+        report, when one is measured, is written with its event.
 
         Args:
             context: The run context, holding the test rows and the claim.
-            bundle: The model bundle; receives the coverage report.
-            evaluation: The evaluation document; receives the quantile
-                coverage curve.
+            bundle: The model bundle, holding its conformal and quantile
+                evidence; read only.
+
+        Returns:
+            The bundle's uncertainty evidence with what was measured.
         """
-        if bundle.quantile is not None and context.test_rows is not None:
-            evaluation["quantile_coverage"] = bundle.quantile.covering(
+        if context.test_rows is None:
+            return Uncertainty(bundle.conformal, bundle.quantile)
+        curve = (
+            bundle.quantile.covering(
                 *context.test_rows, scoring.COVERAGE_LEVELS
             )
-        if context.test_rows is not None:
-            # Each declared slice column becomes a label series aligned with
-            # the test rows: a numeric column with many values is banded at
-            # quantiles of the development rows, any other keeps its values as
-            # text, and a column the rows lack maps to None.
-            split = scmle.pipeline.context.require(context.split, "split")
-            test_features = context.test_rows[0]
-            slices = {
-                column: (
-                    coverage_slices.bucket(
-                        test_features[column], split.dev_features.get(column)
-                    )
-                    if column in test_features.columns
-                    else None
+            if bundle.quantile is not None
+            else None
+        )
+        # Each declared slice column becomes a label series aligned with
+        # the test rows: a numeric column with many values is banded at
+        # quantiles of the development rows, any other keeps its values as
+        # text, and a column the rows lack maps to None.
+        split = scmle.pipeline.context.require(context.split, "split")
+        test_features = context.test_rows[0]
+        slices = {
+            column: (
+                coverage_slices.bucket(
+                    test_features[column], split.dev_features.get(column)
                 )
-                for column in scoring.slicers(context)
-            }
-            measured = coverage_run.run_report(
-                bundle,
-                *context.test_rows,
-                scoring.COVERAGE_LEVELS,
-                claim_sha256=context.coverage_claim_sha256,
-                slices=slices,
+                if column in test_features.columns
+                else None
             )
-            if measured is not None:
-                bundle.coverage_report = measured
-                context.journal.write_json("coverage_report.json", measured)
-                context.journal.emit(
-                    "coverage.reported",
-                    "coverage of the stored intervals or sets was measured "
-                    "on the final test rows",
-                    ("coverage_report.json",),
-                    {"methods": sorted(measured["methods"])},
-                )
+            for column in scoring.slicers(context)
+        }
+        measured = coverage_run.run_report(
+            bundle,
+            *context.test_rows,
+            scoring.COVERAGE_LEVELS,
+            claim_sha256=context.coverage_claim_sha256,
+            slices=slices,
+        )
+        if measured is not None:
+            context.journal.write_json("coverage_report.json", measured)
+            context.journal.emit(
+                "coverage.reported",
+                "coverage of the stored intervals or sets was measured "
+                "on the final test rows",
+                ("coverage_report.json",),
+                {"methods": sorted(measured["methods"])},
+            )
+        return Uncertainty(bundle.conformal, bundle.quantile, curve, measured)

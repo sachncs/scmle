@@ -266,7 +266,7 @@ def test_a_product_governor_replaces_the_frozen_services():
     context = board()
     before = context.services
     governor = limits.Governor(context.services.spec.resources, 5.0)
-    reservation.Allowance(governor).apply(context)
+    reservation.Reserve(governor).apply(context)
     assert context.services.governor is governor
     assert context.services is not before
     assert context.services.registry is before.registry
