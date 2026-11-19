@@ -77,18 +77,6 @@ REST_BASE = 1.0
 REST_ROW = 3e-5
 REST_CELL = 1.5e-6
 REST_MARGIN = 1.5
-# The label-noise check as it actually runs: a five-fold boosted model of
-# `label_noise.ESTIMATOR_MAX_ITER` rounds, one tree per class above two, on
-# the rows its allowance admits (`label_noise.affordable`). On the same runs
-# it took NOISE_BASE + NOISE_CELL x rows x columns x C' seconds or less (C'
-# the classes above two, else 1): least squares gives 0.015 s and 3.24e-6
-# s per cell; 3.6e-6 bounds every measured check (largest measured to
-# predicted ratio 0.99; gina 8.8 s on 2,522 x 970 cells), so no further
-# margin is added. `label_noise.cost` (1.5e-7 per cell, fitted on narrow
-# tables where the fixed cost dominates) predicts 1.1 s for gina and so
-# admits every row; this model prices what that admits.
-NOISE_BASE = 0.15
-NOISE_CELL = 3.6e-6
 
 
 def rest(rows: int, columns: int = 0) -> float:
@@ -112,7 +100,8 @@ def noise(rows: int, columns: int, classes: int, budget: float) -> float:
 
     The check samples the rows its allowance (`label_noise.SHARE` of the
     budget) admits by `label_noise.cost` and skips below
-    `label_noise.MIN_ROWS`; those rows are priced by the measured model.
+    `label_noise.MIN_ROWS`; those rows are priced by that same cost model,
+    the single one the admission and this estimate share.
 
     Args:
         rows: Development rows.
@@ -121,8 +110,8 @@ def noise(rows: int, columns: int, classes: int, budget: float) -> float:
         budget: The run's time budget in seconds.
 
     Returns:
-        `NOISE_BASE + NOISE_CELL x checked rows x columns x C'`, or 0.0
-        when the check will be skipped.
+        `label_noise.cost` of the rows checked, or 0.0 when the check will
+        be skipped.
     """
     admitted = label_noise.affordable(
         columns, classes, budget * label_noise.SHARE
@@ -130,8 +119,7 @@ def noise(rows: int, columns: int, classes: int, budget: float) -> float:
     if admitted < label_noise.MIN_ROWS:
         return 0.0
     checked = min(rows, label_noise.MAX_ROWS, admitted)
-    ways = classes if classes > label_noise.BINARY_CLASSES else 1
-    return NOISE_BASE + NOISE_CELL * checked * columns * ways
+    return label_noise.cost(checked, columns, classes)
 
 
 def estimate(rows: int, columns: int, classes: int, budget: float) -> float:
@@ -181,13 +169,17 @@ class Profiler(inspection.Inspection):
     portrait, its feature plan and the monotonic constraints are here.
     """
 
-    def __init__(self, spec: tasks.Config) -> None:
+    def __init__(self, spec: tasks.Config, texts: tuple[str, ...] = ()) -> None:
         """Initializes the profiler.
 
         Args:
             spec: Project specification describing column roles.
+            texts: Columns a data kind declares free text: they are
+                profiled as text however few rows there are, so a short
+                corpus keeps its text instead of dropping it as an id.
         """
         self.spec = spec
+        self.texts = texts
 
     def monotonic_features(self, numeric: list[str]) -> dict[str, int]:
         """Validates the monotonic constraints against the numeric features.

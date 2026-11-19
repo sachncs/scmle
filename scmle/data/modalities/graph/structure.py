@@ -131,7 +131,7 @@ class Structure:
         event_time = edge.event_time.isoformat() if edge.event_time else ""
         return (endpoints[0], endpoints[1], edge.relation, event_time)
 
-    def connected_components(self) -> tuple[frozenset[str], ...]:
+    def components(self) -> tuple[frozenset[str], ...]:
         """Returns deterministic weakly connected components.
 
         Edges are treated as undirected and edges to undeclared nodes are

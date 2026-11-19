@@ -4,6 +4,7 @@ from collections.abc import Mapping
 import functools
 from http import server
 import logging
+import socket
 import threading
 import time
 from typing import Any
@@ -20,6 +21,7 @@ from scmle.security import access
 from scmle.security import audit
 from scmle.serving.server import contract
 from scmle.serving.server import handler
+from scmle.serving.server import workers
 
 LOGGER = logging.getLogger("scmle.serving")
 
@@ -197,9 +199,10 @@ class HttpServing(contract.Server, Watch):
         self.max_request_bytes = max_request_bytes
         self.max_records = max_records
         self.request_timeout_seconds = request_timeout_seconds
-        self.admission = guard.Admission(
-            max_concurrent, scoring_timeout_seconds
+        self.capacity = workers.enlist(
+            max_concurrent, scoring_timeout_seconds, self.serial
         )
+        self.admission = self.capacity.admission
         self.httpd: Listener | None = None
         self.thread: threading.Thread | None = None
         self.loading: threading.Thread | None = None
@@ -213,10 +216,10 @@ class HttpServing(contract.Server, Watch):
         """Readiness, which a timed-out call or draining takes away.
 
         Returns:
-            See `guard.assess`; while `stop` drains, `ready` is false and
-            the reason is `draining`.
+            See `workers.Capacity.assess`; while `stop` drains, `ready` is
+            false and the reason is `draining`.
         """
-        found = guard.assess(self.readiness, self.admission)
+        found = self.capacity.assess(self.readiness)
         if self.draining:
             return {**found, "ready": False, "reason": "draining"}
         return found
@@ -460,6 +463,10 @@ class Listener(server.ThreadingHTTPServer):
 
     daemon_threads = True
     allow_reuse_address = True
+    # The standard library listens with a backlog of 5: more callers
+    # connecting in the same instant than that were refused or reset under
+    # load. The kernel's own maximum bounds the queue instead.
+    request_queue_size = socket.SOMAXCONN
 
     def __init__(self, address: tuple[str, int], handler: Any) -> None:
         """Binds the socket and starts with nothing in flight.
@@ -516,6 +523,7 @@ class Listener(server.ThreadingHTTPServer):
                 to their daemon threads and logged.
         """
         self.shutdown()
+        self.sweep()
         self.server_close()
         if not self.drain(grace):
             LOGGER.warning(
@@ -523,6 +531,33 @@ class Listener(server.ThreadingHTTPServer):
                 self.flight,
                 grace,
             )
+
+    def sweep(self) -> int:
+        """Answers the connections already waiting in the listen backlog.
+
+        The kernel completes a connection before the server accepts it;
+        closing the socket with such connections queued resets them, and
+        their callers see a reset instead of an answer. Each is handed to
+        a thread like any accepted connection, so `drain` waits for it.
+
+        At most `request_queue_size` connections are taken, the most the
+        backlog holds at once, so callers that keep connecting cannot hold
+        the sweep open forever.
+
+        Returns:
+            The number of connections taken from the backlog.
+        """
+        self.socket.settimeout(0.0)  # accept without waiting
+        taken = 0
+        while taken < self.request_queue_size:
+            try:
+                request, address = self.get_request()
+            except OSError:
+                # handled: an empty backlog (or a closed socket) ends the sweep
+                break
+            self.process_request(request, address)
+            taken += 1
+        return taken
 
     def drain(self, seconds: float) -> bool:
         """Waits until no connection is in flight.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import functools
 from typing import Any
 from typing import TYPE_CHECKING
 
@@ -13,6 +14,7 @@ from scmle.contracts import errors
 from scmle.contracts import modalities
 from scmle.data.modalities import curation
 from scmle.data.modalities import geospatial
+from scmle.data.modalities.geospatial import blocks
 from scmle.pipeline.modality_lifecycle import containers
 from scmle.pipeline.modality_lifecycle import curators
 from scmle.pipeline.modality_lifecycle import scoring
@@ -22,6 +24,10 @@ if TYPE_CHECKING:
 
     from sklearn.linear_model import LogisticRegression
 
+
+MINIMUM = 3
+"""Fewest blocks a derived side leaves: one each for training, validation
+and test (`geospatial.Dataset.tile`)."""
 
 REMARKS = (
     ("The baseline uses geometry envelopes and centroids in the declared CRS."),
@@ -58,21 +64,46 @@ class GeospatialPreparer(curators.Preparer):
     modality = modalities.Modality.GEOSPATIAL
 
     def __init__(
-        self, dataset: geospatial.Dataset, block_size: float = 1.0
+        self, dataset: geospatial.Dataset, block_size: float | None = None
     ) -> None:
-        """Binds a geospatial dataset and an explicit CRS-unit block size.
+        """Binds a geospatial dataset and its CRS-unit block size.
 
         Args:
             dataset: Vector features the lifecycle runs on.
-            block_size: Side of the spatial split blocks, in CRS units.
+            block_size: Side of the spatial split blocks, in CRS units; None
+                derives it from the labels' autocorrelation range
+                (`blocks.design`, MM-11) with at least `MINIMUM` blocks.
 
         Raises:
             ValueError: If `block_size` is not positive.
         """
-        if block_size <= 0:
+        if block_size is not None and block_size <= 0:
             raise errors.InputError("block_size must be positive")
         self.dataset = dataset
-        self.block_size = block_size
+        self.declared = block_size
+
+    @functools.cached_property
+    def side(self) -> float:
+        """The block side: the declared one, else derived when first used.
+
+        Returns:
+            The side in CRS units.
+
+        Raises:
+            BlockedError: If it is derived and the features stand at fewer
+                than `MINIMUM` distinct places.
+        """
+        if self.declared is not None:
+            return self.declared
+        points = numpy.asarray(
+            [item.centroid for item in self.dataset.features],
+            dtype=numpy.float64,
+        )
+        labels = [item.label for item in self.dataset.features]
+        gram = blocks.variogram(
+            points, blocks.encode(labels, categorical=False), 0
+        )
+        return float(blocks.design(points, gram, MINIMUM)[0])
 
     @property
     def digest(self) -> str:
@@ -97,10 +128,10 @@ class GeospatialPreparer(curators.Preparer):
         if not self.dataset.crs.strip():
             profile["spatial_boundary_leakage"] = {
                 "status": "blocked_missing_crs",
-                "block_size": self.block_size,
+                "block_size": self.side,
             }
         else:
-            leakage = self.dataset.straddle(self.block_size)
+            leakage = self.dataset.straddle(self.side)
             profile["spatial_boundary_leakage"] = leakage.to_dict()
             if leakage.crossing_feature_ids:
                 quality_findings.append(
@@ -109,7 +140,7 @@ class GeospatialPreparer(curators.Preparer):
                         data.FindingSeverity.WARNING,
                         {
                             "dataset": self.digest,
-                            "block_size": self.block_size,
+                            "block_size": self.side,
                         },
                         leakage.to_dict(),
                         "Review geometries crossing spatial block envelopes "
@@ -133,7 +164,7 @@ class GeospatialPreparer(curators.Preparer):
             Train, validation and test partitions, with the block IDs of each
             under `groups`.
         """
-        result = self.dataset.tile(self.block_size, seed=seed)
+        result = self.dataset.tile(self.side, seed=seed)
         return containers.Partitions(
             result.train,
             result.validation,

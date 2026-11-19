@@ -36,8 +36,8 @@ class Splits(Survey):
 
         Returns:
             A mapping from feature ID to (min x block, min y block, max x
-            block, max y block) indexes, counted from the dataset's minimum
-            x and y.
+            block, max y block) indexes, counted from the CRS origin so that
+            adding a feature moves no other feature's block (MM-11).
 
         Raises:
             GeometryError: If the dataset has no CRS.
@@ -52,8 +52,7 @@ class Splits(Survey):
             raise errors.InputError(
                 "block_size must be a positive finite number"
             )
-        dataset_bounds = self.profile().bounds
-        origin_x, origin_y = dataset_bounds[:2]
+        origin_x = origin_y = 0.0  # the CRS origin, fixed (MM-11)
         envelopes: dict[str, tuple[int, int, int, int]] = {}
         for feature in self.features:
             minimum_x, minimum_y, maximum_x, maximum_y = feature.bounds
@@ -160,9 +159,7 @@ class Splits(Survey):
                 "block_size must be a positive finite number"
             )
         proportions(validation_fraction, test_fraction)
-        dataset_bounds = self.profile().bounds
-        origin_x = dataset_bounds[0]
-        origin_y = dataset_bounds[1]
+        origin_x = origin_y = 0.0  # the CRS origin, fixed (MM-11)
 
         def locate(feature: Placemark) -> str:
             minimum_x, minimum_y, maximum_x, maximum_y = feature.bounds

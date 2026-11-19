@@ -215,7 +215,7 @@ class Survey(Structure):
         return Profile(
             graph_identity=self.identity,
             directed=self.directed,
-            component_count=len(self.connected_components()),
+            component_count=len(self.components()),
             node=self.census(),
             edge=self.profile_edges(),
         )

@@ -137,8 +137,8 @@ SEEDED = {
 
 @pytest.mark.parametrize("name", sorted(SEEDED))
 def test_each_seeded_live_failure_fails_its_check_only(name):
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:806.
-    # Enforces website/src/learn/when-things-go-wrong.html:319.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:811.
+    # Enforces website/src/learn/when-things-go-wrong.html:363.
     document, failing = SEEDED[name]
     results = named(support_release.run_live(document))
     assert not results[failing].passed
@@ -311,9 +311,9 @@ SCAN_FAILURES = {
 @pytest.mark.parametrize("name", sorted(SCAN_FAILURES))
 def test_missing_or_failed_pre_deploy_evidence_is_refused(name):
     # Enforces docs/DECISIONS.md:201.
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:789.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:794.
     # Enforces website/src/learn/decisions.html:73.
-    # Enforces website/src/learn/when-things-go-wrong.html:312-313.
+    # Enforces website/src/learn/when-things-go-wrong.html:356-357.
     changes, expected = SCAN_FAILURES[name]
     base = support_release.candidate("staging")
     refused(dataclasses.replace(base, **changes), expected)
@@ -471,7 +471,7 @@ def test_every_reason_is_reported_not_only_the_first():
     # Enforces docs/CLI.md:241.
     # Enforces docs/GLOSSARY.md:700.
     # Enforces website/src/learn/glossary.html:351.
-    # Enforces website/src/pages/docs/cli.astro:96.
+    # Enforces website/src/pages/docs/cli.astro:141.
     decision = gate.admit(
         support_release.candidate(
             "staging",

@@ -87,3 +87,61 @@ jobs:
             benchmarks/evidence/reproducibility.json
             benchmarks/evidence/platforms.json
           if-no-files-found: warn
+
+  # Claim C6, "rebuild on a clean runner": one runner trains each task with
+  # the command line and uploads the run folders; a second, fresh runner
+  # rebuilds each bundle's environment from its manifest alone and retrains.
+  # To store the result: gh run download RUN -n traceability-rebuilt -D .
+  # then python -m benchmarks.evidence.traceability --merge rebuilt.json
+  bundle:
+    name: train the bundles to rebuild
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      UV_PYTHON: "3.14"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - run: sudo apt-get update && sudo apt-get install -y libgomp1
+      - run: uv sync --python 3.14
+      - name: Train every task with the command line
+        run: uv run python -m benchmarks.evidence.traceability --build "${{ runner.temp }}/bundles"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: traceability-bundles
+          path: ${{ runner.temp }}/bundles
+          if-no-files-found: error
+
+  rebuild:
+    name: rebuild from the manifest on a fresh runner
+    needs: bundle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      UV_PYTHON: "3.14"
+    steps:
+      # The rebuild checks out the bundle's commit from this clone, so it
+      # needs the history, not only the tip.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - run: sudo apt-get update && sudo apt-get install -y libgomp1
+      # This environment only drives the rebuild; each bundle is retrained
+      # in its own new environment built from its manifest's pins.
+      - run: uv sync --python 3.14
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: traceability-bundles
+          path: ${{ runner.temp }}/bundles
+      - name: Rebuild each bundle and compare it
+        run: >-
+          uv run python -m benchmarks.evidence.traceability
+          --rebuild "${{ runner.temp }}/bundles"
+          --record rebuilt.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: traceability-rebuilt
+          path: rebuilt.json
+          if-no-files-found: warn

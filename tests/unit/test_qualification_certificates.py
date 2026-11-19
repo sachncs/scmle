@@ -237,7 +237,7 @@ def test_a_detector_without_a_certificate_cannot_be_marked_gating():
     # Enforces docs/GLOSSARY.md:425.
     # Enforces website/src/learn/glossary.html:207.
     # Enforces website/src/pages/docs/qualification.astro:42.
-    # Enforces website/src/pages/index.astro:449.
+    # Enforces website/src/pages/index.astro:462.
     store = certificates.Store()
     assert store.state("d1", HASH_A) is certificates.Freshness.MISSING
     with pytest.raises(certificates.CertificateError, match="no certificate"):
@@ -275,7 +275,7 @@ def test_descriptive_status_demotes_blocking_decisions():
     # Enforces website/src/pages/docs/causal-decision.astro:41.
     # Enforces website/src/pages/docs/qualification.astro:106.
     # Enforces website/src/pages/docs/qualification.astro:42.
-    # Enforces website/src/pages/index.astro:449.
+    # Enforces website/src/pages/index.astro:462.
     descriptive = certificates.Authority.DESCRIPTIVE
     gating = certificates.Authority.GATING
     decision = qualification.Decision

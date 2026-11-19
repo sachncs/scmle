@@ -1,5 +1,6 @@
 """The resource governor's messages and report, and the process tables."""
 
+import mmap
 import multiprocessing
 import os
 import pathlib
@@ -86,6 +87,18 @@ def test_the_footprint_follows_children_only(monkeypatch) -> None:
     assert limits.footprint(1) == {1: 10, 2: 20, 3: 30}
 
 
+def test_the_process_table_lists_this_process() -> None:
+    # `pids` reads the platform's own table: /proc, `ps` or psutil.
+    table = limits.pids()
+    assert table[os.getpid()][0] == os.getppid()
+    assert table[os.getpid()][1] > 0
+
+
+@pytest.mark.skipif(
+    limits.WINDOWS,
+    reason="Windows has no native `ps` (a `ps` on PATH is MSYS's and lists "
+    "MSYS pids); `pids` reads psutil there, tested above",
+)
 def test_the_ps_table_lists_this_process() -> None:
     table = limits.ps_table()
     assert table[os.getpid()][0] == os.getppid()
@@ -118,7 +131,7 @@ def test_the_proc_table_reads_parent_and_resident_pages(
         return tmp_path / "proc" if text == "/proc" else real(text)
 
     monkeypatch.setattr(limits, "pathlib", types.SimpleNamespace(Path=path))
-    page = limits.resource.getpagesize()
+    page = mmap.PAGESIZE
     assert limits.tabulate() == {42: (7, 25 * page)}
 
 
@@ -164,7 +177,7 @@ def test_the_proc_table_reads_the_lowercase_statm(
     monkeypatch.setattr(
         limits, "pathlib", types.SimpleNamespace(Path=lambda text: root)
     )
-    page = limits.resource.getpagesize()
+    page = mmap.PAGESIZE
     assert limits.tabulate() == {42: (7, 25 * page)}
 
 
@@ -190,7 +203,7 @@ def test_a_process_with_a_non_ascii_name_is_still_counted(
         ),
     )
     table = limits.tabulate()
-    assert table[4242] == (1, 3 * limits.resource.getpagesize())
+    assert table[4242] == (1, 3 * mmap.PAGESIZE)
 
 
 def test_a_statm_that_is_not_ascii_skips_the_process(

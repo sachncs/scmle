@@ -12,6 +12,7 @@ from scmle.data.modalities.curation import Curation
 from scmle.data.modalities.curation import flaw
 from scmle.data.modalities.curation import label_counts
 from scmle.data.modalities.geospatial.evidence import Profile
+from scmle.data.modalities.geospatial.geometry import GeometryError
 from scmle.data.modalities.geospatial.geometry import MIN_OBSERVATIONS
 from scmle.data.modalities.geospatial.geometry import Placemark
 from scmle.data.modalities.geospatial.topology import Topology
@@ -162,9 +163,10 @@ class Survey(Topology):
 
         The profile includes label counts, temporal completeness, and global
         Moran's I when a CRS is declared, at least three features exist, and
-        every label is numeric. Findings cover a missing CRS, mixed geometry
-        types, mixed temporal state, and a mix of labeled and unlabeled
-        features.
+        every label is numeric; labels that do not vary report status
+        ``"not_estimable"`` with the reason. Findings cover a missing CRS,
+        mixed geometry types, mixed temporal state, and a mix of labeled and
+        unlabeled features.
 
         Returns:
             A curation report for the geospatial modality.
@@ -193,9 +195,18 @@ class Survey(Topology):
                 "reason": "numeric values are required for every feature",
             }
         else:
-            profile_data["spatial_autocorrelation"] = (
-                self.spatial_autocorrelation().to_dict()
-            )
+            try:
+                profile_data["spatial_autocorrelation"] = (
+                    self.spatial_autocorrelation().to_dict()
+                )
+            except GeometryError as error:
+                # MM-9: labels without variation have no statistic.
+                if error.details.get("code") != "statistic_not_estimable":
+                    raise
+                profile_data["spatial_autocorrelation"] = {
+                    "status": "not_estimable",
+                    "reason": str(error),
+                }
         quality_findings, risk_findings = findings(self, profile_data)
         return Curation(
             modality="geospatial",

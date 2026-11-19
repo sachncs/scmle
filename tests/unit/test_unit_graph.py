@@ -227,7 +227,7 @@ def test_connected_components_are_weak_and_ordered():
         [edge("c", "d"), edge("b", "a"), edge("a", "z")],
         nodes=["a", "b", "c", "d", "e"],
     )
-    assert graph.connected_components() == (
+    assert graph.components() == (
         frozenset({"a", "b"}),
         frozenset({"c", "d"}),
         frozenset({"e"}),

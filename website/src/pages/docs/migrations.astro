@@ -12,7 +12,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   <h2>The migration checklist</h2>
   <ol>
     <li>Pin the source commit, lockfile, Python version, and current artifact digests.</li>
-    <li>Read the capability matrix for status changes, renamed fields, newly blocking findings, and changed resource limits.</li>
+    <li>Read the capability matrix for status changes and changed resource limits, and the breaking changes in <code>CHANGELOG.md</code> (with <code>docs/RENAMES.md</code>) for renamed fields and newly blocking findings.</li>
     <li>Regenerate the dataset card, model card, explanation evidence, and evidence graph from the new run.</li>
     <li>Run the focused migration tests, full reliability gate, artifact verification, and site smoke suite.</li>
     <li>Recompute one critical metric, one fairness result, and one explanation independently.</li>

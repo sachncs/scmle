@@ -1,6 +1,9 @@
 """Post-selection diagnostics run while packaging."""
 
+from collections.abc import Callable
+from collections.abc import Mapping
 import dataclasses
+import functools
 from typing import Any
 from typing import cast
 
@@ -21,8 +24,34 @@ from scmle.pipeline import engine
 from scmle.pipeline.stages import assessment
 from scmle.pipeline.stages import calibration
 from scmle.pipeline.stages import cost
+from scmle.pipeline.stages import ingestion
 from scmle.pipeline.stages import profiling
 from scmle.preparation import strategies
+
+
+def recipe(
+    board: engine.Board, selected: experiments.Trial
+) -> Callable[[Mapping[str, Any] | None], Any]:
+    """Builds the selected candidate from given parameters.
+
+    The candidate is featurised by the data's kind (`kinds.Kind.featurise`).
+
+    Args:
+        board: The run's board, holding the partition and the intake.
+        selected: The selected trial.
+
+    Returns:
+        The builder of the unfitted candidate from its parameters.
+    """
+    partition = board.get(profiling.Partition)
+    return functools.partial(
+        strategies.lookup(selected.strategy).build,
+        partition.profile.feature_plan,
+        board.services.registry.get(selected.model_name),
+        partition.task,
+        board.services.spec.validation.seed,
+        featurise=board.get(ingestion.Intake).kind.featurise,
+    )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -105,13 +134,7 @@ class Diagnosis(calibration.Calibration):
             return None
         partition = board.get(profiling.Partition)
         split = partition.split
-        template = strategies.lookup(selected.strategy).build(
-            partition.profile.feature_plan,
-            board.services.registry.get(selected.model_name),
-            partition.task,
-            board.services.spec.validation.seed,
-            selected.params,
-        )
+        template = recipe(board, selected)(selected.params)
         metric = partition.metric
         fit_positions, evaluate_positions = split.manifest.folds[0]
         curve = learning_curve.compute(
@@ -159,17 +182,14 @@ class Diagnosis(calibration.Calibration):
         ):
             return {"skipped": f"not defined for {task.value}"}
         split = partition.split
-        adapter = board.services.registry.get(selected.model_name)
-        strategy = strategies.lookup(selected.strategy)
-        plan = partition.profile.feature_plan
-        seed = board.services.spec.validation.seed
+        build = recipe(board, selected)
         found = bias_variance.decompose(
-            lambda: strategy.build(plan, adapter, task, seed, selected.params),
+            lambda: build(selected.params),
             split.dev_features,
             split.dev_target,
             task.is_classification,
             replicates,
-            seed,
+            board.services.spec.validation.seed,
             lambda: bool(cost.halt(board, selected, "bias-variance estimate")),
         )
         if found is None:
@@ -212,21 +232,18 @@ class Diagnosis(calibration.Calibration):
         split = partition.split
         if len(split.dev_target) < sensitivity.MIN_ROWS:
             return {"skipped": "too few rows"}
-        adapter = board.services.registry.get(selected.model_name)
-        strategy = strategies.lookup(selected.strategy)
-        plan = partition.profile.feature_plan
-        seed = board.services.spec.validation.seed
+        build = recipe(board, selected)
         metric = partition.metric
         scorer = metric.scorer(
             scmle.evaluation.metrics.positive_label(split.dev_target, task)
         )
         report = sensitivity.analyze(
-            lambda: strategy.build(plan, adapter, task, seed, selected.params),
+            lambda: build(selected.params),
             split.dev_features,
             split.dev_target,
             scorer,
             repeats,
-            seed,
+            board.services.spec.validation.seed,
         )
         return {**report.to_dict(), "dominant": report.dominant()}
 
@@ -261,22 +278,20 @@ class Diagnosis(calibration.Calibration):
             return {"skipped": "time budget spent"}
         task = partition.task
         adapter = board.services.registry.get(selected.model_name)
-        strategy = strategies.lookup(selected.strategy)
-        plan = partition.profile.feature_plan
-        seed = board.services.spec.validation.seed
+        build = recipe(board, selected)
         metric = partition.metric
         positive = scmle.evaluation.metrics.positive_label(
             split.dev_target, task
         )
         result = nested.nest(
-            lambda params: strategy.build(plan, adapter, task, seed, params),
+            build,
             adapter.search_space,
             split.dev_features,
             split.dev_target,
             [(f[0], f[1]) for f in split.manifest.folds],
             metric.scorer(positive),
             task.is_classification,
-            seed,
+            board.services.spec.validation.seed,
             should_stop=lambda: bool(
                 cost.halt(board, selected, "nested validation")
             ),
@@ -314,13 +329,7 @@ class Diagnosis(calibration.Calibration):
         partition = board.get(profiling.Partition)
         split = partition.split
         data = board.services.spec.data
-        template = strategies.lookup(selected.strategy).build(
-            partition.profile.feature_plan,
-            board.services.registry.get(selected.model_name),
-            partition.task,
-            board.services.spec.validation.seed,
-            selected.params,
-        )
+        template = recipe(board, selected)(selected.params)
         fitted = []
         for fit_positions, evaluate_positions in split.manifest.folds:
             if cost.halt(board, selected, "forecast backtest"):

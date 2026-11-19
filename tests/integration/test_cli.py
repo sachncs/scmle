@@ -71,7 +71,7 @@ def test_blocked_run_returns_exit_code_two(binary_frame, tmp_path, caplog):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:22.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:83.
     # Enforces website/src/learn/when-things-go-wrong.html:11.
-    # Enforces website/src/learn/when-things-go-wrong.html:39.
+    # Enforces website/src/learn/when-things-go-wrong.html:50.
     broken = binary_frame.assign(y=range(len(binary_frame)))
     broken["y"] = broken["y"] % 5
     path = tmp_path / "d.csv"

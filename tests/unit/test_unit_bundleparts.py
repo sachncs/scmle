@@ -8,6 +8,7 @@ recourse goals.
 
 import hashlib
 import hmac
+import io
 import json
 import pathlib
 
@@ -489,18 +490,54 @@ def test_admit_refuses_a_bundle_without_a_schema_checksum(binary, tmp_path):
 def test_authenticate_detects_a_modified_model_or_schema(binary, tmp_path):
     root, document = manifest(binary, tmp_path)
     info, legacy = archive.admit(document, True, False)
-    archive.authenticate(root, info, legacy, True, None)
-    schema = root / layout.SCHEMA_FILE
-    schema.write_text(schema.read_text("utf-8") + " ", encoding="utf-8")
+    snapshot = archive.unpack(root)
+    archive.authenticate(root, snapshot, info, legacy, True, None)
+    shape = root / layout.SCHEMA_FILE
+    shape.write_text(shape.read_text("utf-8") + " ", encoding="utf-8")
+    changed = archive.unpack(root)
     with pytest.raises(errors.ArtifactError, match="schema file was modified"):
-        archive.authenticate(root, info, False, True, None)
-    archive.authenticate(root, info, True, True, None)
+        archive.authenticate(root, changed, info, False, True, None)
+    archive.authenticate(root, changed, info, True, True, None)
     (root / layout.MODEL_FILE).write_bytes(b"0")
     with pytest.raises(errors.ArtifactError, match="model file was modified"):
-        archive.authenticate(root, info, legacy, True, None)
+        archive.authenticate(root, snapshot, info, legacy, True, None)
     (root / layout.MODEL_FILE).unlink()
     with pytest.raises(errors.ArtifactError, match=r"missing pipeline\.joblib"):
-        archive.authenticate(root, info, legacy, True, None)
+        archive.authenticate(root, snapshot, info, legacy, True, None)
+
+
+def test_the_schema_checksum_covers_the_bytes_that_were_parsed(
+    binary, tmp_path
+):
+    root, document = manifest(binary, tmp_path)
+    info, legacy = archive.admit(document, True, False)
+    snapshot = archive.unpack(root)
+    forged = archive.Snapshot(
+        snapshot.manifest, snapshot.schema, snapshot.text, b"{}"
+    )
+    with pytest.raises(errors.ArtifactError, match="schema file was modified"):
+        archive.authenticate(root, forged, info, legacy, True, None)
+
+
+def test_the_signature_covers_the_manifest_bytes_that_were_parsed(
+    binary, tmp_path
+):
+    root = binary[0].save(tmp_path / "b", signing_key=KEY)
+    snapshot = archive.unpack(root)
+    assert seal.verify_signature(root, KEY, snapshot.text) is True
+    with pytest.raises(errors.ArtifactError, match="signature is invalid"):
+        seal.verify_signature(root, KEY, snapshot.text + b" ")
+
+
+def test_unpack_reads_the_manifest_and_schema_bytes_once(binary, tmp_path):
+    root, document = manifest(binary, tmp_path)
+    snapshot = archive.unpack(root)
+    assert snapshot.manifest == document
+    assert snapshot.text == (root / layout.MANIFEST_FILE).read_bytes()
+    assert snapshot.layout == (root / layout.SCHEMA_FILE).read_bytes()
+    (root / layout.MANIFEST_FILE).write_text("[]", encoding="utf-8")
+    with pytest.raises(errors.ArtifactError, match="invalid model bundle"):
+        archive.unpack(root)
 
 
 def test_resolve_returns_listed_members_and_refuses_changed_ones(
@@ -511,28 +548,27 @@ def test_resolve_returns_listed_members_and_refuses_changed_ones(
     assert archive.resolve(root, info, layout.NOVELTY_FILE, "x") is None
     assert (
         archive.resolve(root, info, layout.MODEL_FILE, "x")
-        == root / layout.MODEL_FILE
+        == (root / layout.MODEL_FILE).read_bytes()
     )
     (root / layout.MODEL_FILE).write_bytes(b"0")
     with pytest.raises(errors.ArtifactError, match="checksum mismatch: gone"):
         archive.resolve(root, info, layout.MODEL_FILE, "gone")
+    (root / layout.MODEL_FILE).unlink()
+    with pytest.raises(errors.ArtifactError, match="checksum mismatch: gone"):
+        archive.resolve(root, info, layout.MODEL_FILE, "gone")
 
 
-def test_unpickle_explains_a_member_from_another_build(tmp_path):
-    path = tmp_path / "m.joblib"
-    joblib.dump({"a": 1}, path)
-    assert archive.unpickle(path) == {"a": 1}
+def test_unpickle_explains_a_member_from_another_build(monkeypatch):
+    buffer = io.BytesIO()
+    joblib.dump({"a": 1}, buffer)
+    assert archive.unpickle(buffer.getvalue(), "m.joblib") == {"a": 1}
 
-    def missing(path):
+    def missing(source):
         raise ModuleNotFoundError("No module named 'gone'")
 
-    original = archive.joblib.load
-    archive.joblib.load = missing
-    try:
-        with pytest.raises(errors.ArtifactError, match=r"m\.joblib names"):
-            archive.unpickle(path)
-    finally:
-        archive.joblib.load = original
+    monkeypatch.setattr(archive.joblib, "load", missing)
+    with pytest.raises(errors.ArtifactError, match=r"m\.joblib names"):
+        archive.unpickle(buffer.getvalue(), "m.joblib")
 
 
 def test_every_optional_member_round_trips(regressor, tmp_path):

@@ -1,0 +1,37 @@
+{
+ "artifacts": [
+  "complete.json",
+  "coverage_report.json",
+  "dataset_manifest.json",
+  "dataset_profile.json",
+  "evaluation.json",
+  "explanations",
+  "model",
+  "validation_manifest.json"
+ ],
+ "strategy": "group",
+ "evaluation": [
+  "baseline",
+  "confidence",
+  "metrics",
+  "opened",
+  "task"
+ ],
+ "interval": [
+  "available",
+  "candidates",
+  "corrected_standard_error",
+  "folds",
+  "interval",
+  "level",
+  "mean",
+  "naive_standard_error",
+  "note",
+  "selection_optimism"
+ ],
+ "coverage": "once, by the final evaluation",
+ "custody": [
+  "started",
+  "opened"
+ ]
+}

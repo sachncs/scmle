@@ -42,7 +42,7 @@ def options(parser):
 def test_deploy_commands_take_keys_only_as_files():
     """Enforces docs/CLI.md:243.
 
-    Also enforces website/src/pages/docs/cli.astro:96.
+    Also enforces website/src/pages/docs/cli.astro:141.
     """
     deploy = next(
         action.choices["deploy"]
@@ -65,7 +65,7 @@ def test_serve_needs_authentication_beyond_loopback(
 ):
     """Enforces docs/CLI.md:276.
 
-    Also enforces website/src/pages/docs/cli.astro:100.
+    Also enforces website/src/pages/docs/cli.astro:145.
     """
     for name in list(os.environ):
         if name.startswith("SCMLE_AUTH_"):
@@ -166,7 +166,7 @@ def gapped():
 def test_a_declaration_the_data_cannot_support_is_refused_on_record(
     tmp_path, table, options
 ):
-    """Enforces docs/CLI.md:272-276.
+    """Enforces docs/CLI.md:391-395.
 
     Also enforces docs/ARTIFACTS.md:160.
     """
@@ -203,9 +203,9 @@ def blobs(rows=240):
 
 
 def test_cluster_searches_each_method_and_count_and_writes_a_bundle(tmp_path):
-    """Enforces docs/CLI.md:298-302.
+    """Enforces docs/CLI.md:417-422.
 
-    Also enforces docs/CLI.md:303-304.
+    Also enforces docs/CLI.md:422-424.
     """
     data = tmp_path / "rows.csv"
     blobs().to_csv(data, index=False)
@@ -241,7 +241,7 @@ def test_cluster_searches_each_method_and_count_and_writes_a_bundle(tmp_path):
 def test_retire_refuses_a_bundle_and_retires_a_registered_version(
     tmp_path, monkeypatch
 ):
-    """Enforces docs/CLI.md:332-335.
+    """Enforces docs/CLI.md:461-464.
 
     Also enforces docs/ARTIFACTS.md:181.
     """
@@ -292,7 +292,7 @@ def test_retire_refuses_a_bundle_and_retires_a_registered_version(
 def test_run_estimation_is_kept_beside_selection_and_never_read_by_it(
     tmp_path, monkeypatch
 ):
-    """Enforces docs/CLI.md:276-277."""
+    """Enforces docs/CLI.md:395-396."""
     seen = []
     run = orchestrator.Orchestrator.run
 
@@ -329,3 +329,27 @@ def test_run_estimation_is_kept_beside_selection_and_never_read_by_it(
     assert declared == ["enabled", "estimand", "policy", "schema_version"]
     assert written == []
     assert (next(out.glob("run_*")) / "parameter_estimation.json").is_file()
+
+
+def test_a_completed_run_is_refused_by_resume_with_exit_one(
+    tmp_path, binary_frame, caplog
+):
+    """Enforces docs/CLI.md:260-261.
+
+    Also enforces docs/TUTORIAL.md:195-196,
+    website/src/pages/docs/cli.astro:80,
+    website/src/pages/docs/operations.astro:40 and
+    website/src/pages/docs/workflows.astro:68.
+    """
+    data = tmp_path / "data.csv"
+    binary_frame.to_csv(data, index=False)
+    out = tmp_path / "runs"
+    command = ["run", str(data), "--target", "y", "--output-dir", str(out)]
+    assert cli.main([*command, "--budget", "30"]) == cli.EXIT_OK
+    (run,) = out.glob("run_*")
+    caplog.clear()
+    with caplog.at_level(logging.INFO, logger=cli.__name__):
+        code = cli.main(["resume", str(run)])
+    assert code == cli.EXIT_FAILED == 1
+    expected = "config error: run already completed; nothing to resume"
+    assert expected in caplog.text

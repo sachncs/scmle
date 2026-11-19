@@ -40,7 +40,7 @@ def test_a_trial_within_limits_returns_its_value():
 
 def test_a_runaway_trial_is_killed_at_the_ceiling():
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:222.
-    # Enforces website/src/learn/when-things-go-wrong.html:97.
+    # Enforces website/src/learn/when-things-go-wrong.html:112.
     started = time.monotonic()
     supervisor = limits.Supervisor(1.0, None)
     with pytest.raises(limits.TrialError, match="hard time ceiling"):

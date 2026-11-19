@@ -490,8 +490,13 @@ if __name__ == "__main__":
 
 ONNX where the model allows it (forests, linear, SVM, LightGBM, XGBoost;
 HistGradientBoosting is not expressible and goes through the service). It
-needs the `onnx` extra, and the export is verified on at least 299 rows held
-out from training:
+needs the `onnx` extra:
+
+```bash
+pip install "scmle[onnx] @ git+https://github.com/sachncs/scmle"
+```
+
+The export is verified on at least 299 rows held out from training:
 
 ```python
 import pandas

@@ -9,12 +9,12 @@ from scmle.contracts import experiments
 from scmle.pipeline import engine
 from scmle.pipeline import ensemble_search
 from scmle.pipeline import products
-from scmle.pipeline import profiler
 from scmle.pipeline import strategy_search
 from scmle.pipeline import trials
 from scmle.pipeline import tuning
 import scmle.pipeline.journal
 from scmle.pipeline.stages import cost
+from scmle.pipeline.stages import ingestion
 from scmle.pipeline.stages import interface
 from scmle.pipeline.stages import planning
 from scmle.pipeline.stages import profiling
@@ -125,9 +125,11 @@ class TrainStage(interface.Stage):
                 *cost.dimensions(
                     board.services.spec, partition.frame, partition.task
                 ),
-                profiler.estimate,
+                board.get(ingestion.Intake).kind.cost,
             )
-        runner = trials.Runner(board, partition)
+        runner = trials.Runner(
+            board, partition, board.get(ingestion.Intake).kind.featurise
+        )
         plan = products.require(board.get(planning.Blueprint).plan, "plan")
         names = plan.candidates
         for start in range(0, len(names), runner.workers):

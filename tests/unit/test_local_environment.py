@@ -96,7 +96,7 @@ def test_compose_validates_with_the_docker_cli_when_present():
 
 def test_the_local_dockerfile_refuses_the_placeholder_and_runs_non_root():
     # Enforces docs/LOCAL.md:70.
-    # Enforces website/src/pages/docs/local.astro:45.
+    # Enforces website/src/pages/docs/local.astro:50.
     text = (ROOT / "deploy" / "Dockerfile").read_text(encoding="utf-8")
     assert f"@sha256:{PLACEHOLDER}" in text
     assert "--require-hashes" in text and "--no-deps" in text

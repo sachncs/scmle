@@ -148,6 +148,12 @@
         "signature_sha256": "97e538a625751125259a6b808e3fda11ce095f384a4de3aad5f04a2c73644907"
       }
     },
+    "scmle.data.modalities.audio.wav": {
+      "pcm": {
+        "kind": "callable",
+        "signature_sha256": "c488893b3b946d797459363f2035d624114a5cd6680eda56ead815b3e14e572e"
+      }
+    },
     "scmle.data.store.processing": {
       "Checkpoint": {
         "kind": "class",
@@ -610,6 +616,72 @@
       "pick": {
         "kind": "callable",
         "signature_sha256": "8300fcdffbf1edab41836f8841a283b7bd2e3d2746bad556a4df8b479df0154c"
+      }
+    },
+    "scmle.pipeline.kinds.audio": {
+      "Audio": {
+        "kind": "class",
+        "signature_sha256": "9ec044f0a984a38ab0c4eda6249dd69a133b03645e371b9455e31c37e42a50d2"
+      }
+    },
+    "scmle.pipeline.kinds.document": {
+      "Document": {
+        "kind": "class",
+        "signature_sha256": "04609cce366eea8c1f6fedda9086b2675e774e96f9ea6240bfbec23ec8c2b190"
+      }
+    },
+    "scmle.pipeline.kinds.geospatial": {
+      "Geospatial": {
+        "kind": "class",
+        "signature_sha256": "9ec044f0a984a38ab0c4eda6249dd69a133b03645e371b9455e31c37e42a50d2"
+      }
+    },
+    "scmle.pipeline.kinds.graph": {
+      "Graph": {
+        "kind": "class",
+        "signature_sha256": "9ec044f0a984a38ab0c4eda6249dd69a133b03645e371b9455e31c37e42a50d2"
+      }
+    },
+    "scmle.pipeline.kinds.image": {
+      "Image": {
+        "kind": "class",
+        "signature_sha256": "9ec044f0a984a38ab0c4eda6249dd69a133b03645e371b9455e31c37e42a50d2"
+      }
+    },
+    "scmle.pipeline.kinds.media": {
+      "Description": {
+        "kind": "class",
+        "signature_sha256": "b5623493f5daa72bb10bacbb23f0e1c75732fcc96462c91a07373f044788a7fd"
+      },
+      "Media": {
+        "kind": "class",
+        "signature_sha256": "9ec044f0a984a38ab0c4eda6249dd69a133b03645e371b9455e31c37e42a50d2"
+      }
+    },
+    "scmle.pipeline.kinds.raster": {
+      "Raster": {
+        "kind": "class",
+        "signature_sha256": "9ec044f0a984a38ab0c4eda6249dd69a133b03645e371b9455e31c37e42a50d2"
+      }
+    },
+    "scmle.pipeline.kinds.rows": {
+      "Cohorts": {
+        "kind": "class",
+        "signature_sha256": "0c13b844243dc7e1c5bcf8f9faa35358d8048d717fda0e15a820c6354d58bc78"
+      },
+      "Rows": {
+        "kind": "class",
+        "signature_sha256": "9ec044f0a984a38ab0c4eda6249dd69a133b03645e371b9455e31c37e42a50d2"
+      },
+      "unite": {
+        "kind": "callable",
+        "signature_sha256": "55095f10abc5f8094303a635b424f503239347a601fbb14b95d872f7f19b0d45"
+      }
+    },
+    "scmle.pipeline.kinds.video": {
+      "Video": {
+        "kind": "class",
+        "signature_sha256": "9ec044f0a984a38ab0c4eda6249dd69a133b03645e371b9455e31c37e42a50d2"
       }
     },
     "scmle.pipeline.modality_lifecycle": {

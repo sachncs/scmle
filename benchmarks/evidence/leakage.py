@@ -45,16 +45,17 @@ without the network, at most `refusal.ROWS` rows):
   `moisture` and `protein`, lab measurements made with the fat they
   predict), each with the table's other leak columns removed.
   `planted on real data`: a real table with one realistic leak added:
-  `target_encoding` (an unsmoothed target mean over about five rows per
-  level, computed on all rows), `post_outcome` (a field recorded after the
-  outcome: the label with a tenth of entries garbled, or the target plus
-  noise), `duplicates` (three in ten rows copied, so copies straddle the
-  split) or `future_timestamp` (a closing date that falls later for the
-  positive class or a larger target). A leak is caught only when the
-  screen blocks the run. A closing date is screened as its user would run
-  it: that user scores records as of a known moment, the snapshot the
-  closing dates fall after (`START`), and declares it (`cutoff`); without
-  that declaration a closing date cannot be told from a legitimate trend.
+  `target_encoding` (an unsmoothed target mean over quantile bins of the
+  values of the numeric column with the most values, about five rows per bin
+  and tied values in one bin, computed on all rows), `post_outcome` (a field
+  recorded after the outcome: the label with a tenth of entries garbled, or
+  the target plus noise), `duplicates` (three in ten rows copied, so copies
+  straddle the split) or `future_timestamp` (a closing date that falls later
+  for the positive class or a larger target). A leak is caught only when the
+  screen blocks the run. A closing date is screened as its user would run it:
+  that user scores records as of a known moment, the snapshot the closing
+  dates fall after (`START`), and declares it (`cutoff`); without that
+  declaration a closing date cannot be told from a legitimate trend.
   Likewise a documented real leak whose documentation says when the column
   becomes known is screened with that declared (`known`, `Dataset.known`),
   as a user who read it would run it, and never from knowing the answer:
@@ -65,9 +66,15 @@ without the network, at most `refusal.ROWS` rows):
   the TLC data dictionary (data_dictionary_trip_records_green.pdf), which
   holds `tip_amount` and so is charged only once the tip is (the OpenML
   page drops it because "otherwise the target could be predicted
-  deterministically"). Titanic's `boat` and `body` and Tecator's
-  `moisture` and `protein` are not declared: their documentation names
-  them without saying when they become known relative to the prediction.
+  deterministically"); Tecator `moisture` and `protein`, which the
+  source's description (OpenML 505, from StatLib) lists as outputs, not
+  inputs ("real_in=122", the spectrum and its principal components;
+  "real_out=3", the three contents "determined by analytic chemistry";
+  "predict the fat content ... on the basis of its near infrared
+  absorbance spectrum"), so they are known with the outcome, from the same
+  analysis. Titanic's `boat` and `body` are not declared: their
+  documentation names them without saying when they become known
+  relative to the prediction.
 
 Rows decided (`acceptance.toml`): recall, the one-sided Clopper-Pearson
 lower bound of caught over leak cases, at least `leak_recall_min` (Floor);
@@ -307,9 +314,15 @@ def catalog() -> dict[str, Case]:
             tables["openml_505"],
             ("protein",),
             "moisture",
-            (),
+            ("moisture",),
         ),
-        ("tecator_protein", tables["openml_505"], ("moisture",), "protein", ()),
+        (
+            "tecator_protein",
+            tables["openml_505"],
+            ("moisture",),
+            "protein",
+            ("protein",),
+        ),
         ("bank_duration", tables["bank_marketing"], (), "V12", ("V12",)),
         (
             "taxi_total",
@@ -431,9 +444,13 @@ def plant(
         features = frame.drop(columns=[table.target])
         numeric = features.select_dtypes("number")
         source = numeric.nunique().idxmax()
+        # Quantile bins of the values, not of row ranks: tied values share
+        # a level, so the encoding is a function of the column, as a
+        # fitted target encoding is (a bin of ranks cut a value by row
+        # position, which no column holds).
         bins = max(2, len(frame) // LEVEL)
         levels = pandas.qcut(
-            numeric[source].rank(method="first"), bins, labels=False
+            numeric[source], bins, labels=False, duplicates="drop"
         )
         means = (
             pandas.Series(values).groupby(levels.to_numpy()).transform("mean")

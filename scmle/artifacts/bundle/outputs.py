@@ -112,9 +112,10 @@ class Outputs(core.Core):
 
         Verification is the default: the graph and the pipeline score
         `check`, rows held out from training, and the export is blocked
-        when they diverge (`onnx_export.verify`). A blocked graph is
-        removed. `<path>.manifest.json` records the graph's digest and the
-        check's result, or that the check was skipped.
+        when they diverge (`onnx_export.verify`). Too few held-out rows
+        are refused before the converter is imported or run. A blocked
+        graph is removed. `<path>.manifest.json` records the graph's
+        digest and the check's result, or that the check was skipped.
 
         Args:
             path: Destination file.
@@ -142,6 +143,8 @@ class Outputs(core.Core):
             raise errors.ConfigError(
                 "pass held-out rows to check, or unverified, not both"
             )
+        if not unverified:
+            onnx_export.enough(check)
         written = onnx_export.export(self, path)
         report = None
         if not unverified:

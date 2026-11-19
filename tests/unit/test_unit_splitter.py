@@ -7,6 +7,7 @@ import pytest
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.splitting.splitters import partitions
+from scmle.data.splitting.splitters import spatial
 from scmle.data.splitting.splitters import splits
 from scmle.data.splitting.splitters import splitter
 from scmle.data.splitting.splitters import temporal
@@ -42,6 +43,8 @@ def test_the_registry_names_every_strategy():
         "group": splits.Group,
         "temporal": temporal.Chronology,
         "rolling": temporal.Rolling,
+        "grouped_temporal": temporal.Succession,
+        "spatial_block": spatial.Tiling,
     } == splitter.STRATEGIES
     assert splitter.TASK_STRATEGIES == {
         tasks.Task.SURVIVAL: "stratified_events",

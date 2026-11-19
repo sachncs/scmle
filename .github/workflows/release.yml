@@ -70,9 +70,16 @@ jobs:
   verify:
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - name: Release tags are protected from deletion and from being moved
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          uv run --python 3.14 python -m benchmarks.evidence.supply
+          --protected "${GITHUB_REPOSITORY}" --tag "${GITHUB_REF_NAME}"
       - name: Tag matches the package version and the changelog
         run: |
           version=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
@@ -128,8 +135,10 @@ jobs:
     timeout-minutes: 120
     environment: pypi
     permissions:
-      id-token: write   # PyPI trusted publishing; no API token is stored.
+      id-token: write   # PyPI trusted publishing and Sigstore signing; no key is stored.
       contents: write   # Create the GitHub release.
+    outputs:
+      hashes: ${{ steps.subjects.outputs.hashes }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
@@ -154,7 +163,27 @@ jobs:
           uv pip install --python /tmp/release-sdist-env/bin/python dist/*.tar.gz
           /tmp/release-sdist-env/bin/scmle --help
           /tmp/release-sdist-env/bin/python -c "import scmle; print(scmle.__version__)"
+      - name: No known high vulnerability in the locked dependencies
+        # pip-audit exits 1 on any finding; the gate reads its report and
+        # decides, failing closed on a finding with no severity and on an
+        # unreadable report (scmle.deploy.vuln_gate).
+        run: |
+          uv export --frozen --all-extras --no-emit-project --output-file audit-requirements.txt
+          status=0
+          uv run pip-audit --requirement audit-requirements.txt --no-deps --disable-pip --format json --output audit.json || status=$?
+          echo "pip-audit exited ${status}; the gate decides"
+          uv run python -m scmle.deploy.vuln_gate audit.json --policy deploy/vuln-policy.json
+      - name: Provenance subjects (SHA-256 of every distribution)
+        id: subjects
+        run: |
+          cd dist
+          echo "hashes=$(sha256sum -- *.whl *.tar.gz | base64 -w0)" >> "$GITHUB_OUTPUT"
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+      - name: Sign every distribution with Sigstore (keyless, this workflow's identity)
+        uses: sigstore/gh-action-sigstore-python@790bc6befb9d733738f18d8f895854b453640ec9 # v3.5.0
+        with:
+          inputs: ./dist/*.whl ./dist/*.tar.gz
+          upload-signing-artifacts: true
       - name: GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -172,3 +201,21 @@ jobs:
           --pypi-project scmle
           --attempts 6
           --retry-delay 10
+
+  # SLSA level 3 provenance for every distribution, signed through Sigstore
+  # and attached to the GitHub release. The generator is a reusable workflow
+  # that verifies its own ref, which must be a full release tag
+  # (refs/tags/vX.Y.Z): its builder-fetch.sh exits on a commit SHA, so it is
+  # the one reference here pinned by tag. v2.1.0 is commit
+  # f7dd8c54c2067bafc12ca7a55595d5ee9b75204a; benchmarks/evidence/supply.py
+  # checks that the tag still names that commit.
+  provenance:
+    needs: [publish]
+    permissions:
+      actions: read     # Read the workflow run the provenance describes.
+      id-token: write   # Sign the provenance with Sigstore.
+      contents: write   # Attach the provenance to the release.
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0 # f7dd8c54c2067bafc12ca7a55595d5ee9b75204a
+    with:
+      base64-subjects: "${{ needs.publish.outputs.hashes }}"
+      upload-assets: true

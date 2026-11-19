@@ -28,6 +28,7 @@ import contextlib
 import dataclasses
 import importlib
 import logging
+import mmap
 import multiprocessing
 from multiprocessing import connection
 import multiprocessing.process
@@ -159,7 +160,7 @@ def tabulate() -> dict[int, tuple[int, int]]:
         vanish or cannot be read while scanning are omitted.
     """
     table: dict[int, tuple[int, int]] = {}
-    page = resource.getpagesize()
+    page = mmap.PAGESIZE  # the kernel page size, on every platform
     for entry in pathlib.Path("/proc").iterdir():
         name = entry.name
         if not name.isdigit():

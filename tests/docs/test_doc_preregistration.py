@@ -47,8 +47,10 @@ def test_availability_is_declared_only_from_the_sources_documentation():
     assert declared == {
         "leak/bank_duration": ("V12",),
         "leak/taxi_total": ("total_amount",),
+        "leak/tecator_moisture": ("moisture",),
+        "leak/tecator_protein": ("protein",),
     }
-    for name in ("titanic_boat", "titanic_body", "tecator_moisture"):
+    for name in ("titanic_boat", "titanic_body"):
         assert leakage.catalog()[f"leak/{name}"].known == ()
 
 

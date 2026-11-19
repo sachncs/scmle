@@ -84,7 +84,7 @@ def test_the_decision_log_holds_included_rejected_and_deferred_choices(folder):
     """Enforces docs/ARTIFACTS.md:23.
 
     Also enforces website/src/pages/docs/artifacts.astro:9.
-    Also enforces website/src/pages/index.astro:200.
+    Also enforces website/src/pages/index.astro:213.
     Also enforces website/src/pages/docs/architecture.astro:32.
     """
     plan = read(folder / "diagnostics" / "decision_log.json")["plan"]

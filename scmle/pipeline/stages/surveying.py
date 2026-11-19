@@ -14,7 +14,6 @@ from scmle.data.readers import tabular
 from scmle.evaluation import uplift
 from scmle.pipeline import engine
 from scmle.pipeline import products
-from scmle.pipeline import profiler
 from scmle.pipeline.stages import ingestion
 from scmle.pipeline.stages import labelling
 
@@ -64,7 +63,10 @@ class Surveying(labelling.Labelling):
         pandas.DataFrame,
         dict[str, float | bool | str | None] | None,
     ]:
-        """Profiles the development rows of a split.
+        """Profiles the development rows of a split through their kind.
+
+        The kind decides how its rows are profiled (`kinds.Kind.survey`):
+        a document's text stays text however short the corpus is.
 
         Args:
             board: The run's board, holding the intake and the resolution.
@@ -84,12 +86,13 @@ class Surveying(labelling.Labelling):
         )
         intake = board.get(ingestion.Intake)
         notes = board.get(labelling.Resolution).notes
-        profile = profiler.Profiler(spec).profile(
+        profile = intake.kind.survey(
+            spec,
             development,
             intake.manifest,
             task,
             intake.read_seconds,
-            total_rows=len(frame),
+            len(frame),
         )
         profile = graft(spec, profile)
         if notes:

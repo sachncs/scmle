@@ -73,9 +73,25 @@ class DependencyError(errors.DataError):
         super().__init__(message, context)
 
 
+LOCAL = 64
+"""Longest local part of an address (RFC 5321, 4.5.3.1.1)."""
+
+DOMAIN = 253
+"""Longest domain name before its last label: 255 octets (RFC 5321,
+4.5.3.1.2) less the dot and two-letter shortest top-level label."""
+
+LABEL = 63
+"""Longest label of a domain name (RFC 1035, 2.3.4)."""
+
 SENSITIVE_PATTERNS: dict[str, re.Pattern[str]] = {
+    # Each quantifier is bounded by the standard's length limit, so a start
+    # position costs at most LOCAL + DOMAIN x LABEL steps and the scan is
+    # linear in the text (MM-1): an unbounded `+` re-scanned a long dotted
+    # run without `@` from every position (80 KB took 18 s).
     "email": re.compile(
-        r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE
+        rf"\b[A-Z0-9._%+-]{{1,{LOCAL}}}@[A-Z0-9.-]{{1,{DOMAIN}}}"
+        rf"\.[A-Z]{{2,{LABEL}}}\b",
+        re.IGNORECASE,
     ),
     "phone": re.compile(
         r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})"

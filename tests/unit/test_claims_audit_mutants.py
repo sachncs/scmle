@@ -54,7 +54,7 @@ def finding(name, status, detail):
 
 def test_verification_serializes_every_field():
     # Enforces docs/READING_RESULTS.md:363.
-    # Enforces website/src/learn/reading-results.html:163-164.
+    # Enforces website/src/learn/reading-results.html:191-192.
     items = (
         finding("a", claims_audit.PASS, "x"),
         finding("b", claims_audit.SKIPPED, "y"),
@@ -721,7 +721,7 @@ def write_custody(folder, events, key=KEY):
 
 def test_custody_findings_are_exact_for_hand_made_logs(tmp_path):
     # Enforces docs/CLI.md:177.
-    # Enforces website/src/pages/docs/cli.astro:87.
+    # Enforces website/src/pages/docs/cli.astro:131.
     document = {"outcome": confirm.CONFIRMED, "digests": {"survivors": "s"}}
     assert claims_audit.custodial(tmp_path, document, KEY) == finding(
         CUSTODY, "skipped", "custody_log.jsonl is not in the run"

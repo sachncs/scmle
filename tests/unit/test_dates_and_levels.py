@@ -203,7 +203,9 @@ def test_the_overflow_encoding_is_cross_fitted():
     rows = 2000
     codes = pandas.DataFrame({"code": [f"c{i}" for i in range(rows)]})
     target = pandas.Series(numpy.random.default_rng(0).integers(0, 2, rows))
-    encoded = preprocessing.Overflow(seed=0).fit_transform(codes, target)
+    name, encoder, chooser = preprocessing.overflow(("code",))
+    assert (name, chooser(codes)) == ("overflow", ["code"])
+    encoded = encoder.fit_transform(codes, target)
     assert abs(numpy.corrcoef(encoded[:, 0], target)[0, 1]) < 0.1
 
 

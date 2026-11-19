@@ -242,9 +242,9 @@ def test_trusted_is_refused_in_production_everywhere(
     # Enforces docs/GLOSSARY.md:612.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:463.
     # Enforces website/src/learn/glossary.html:306.
-    # Enforces website/src/learn/when-things-go-wrong.html:183.
-    # Enforces website/src/pages/docs/cli.astro:99.
-    # Enforces website/src/pages/docs/quickstart.astro:118.
+    # Enforces website/src/learn/when-things-go-wrong.html:198.
+    # Enforces website/src/pages/docs/cli.astro:144.
+    # Enforces website/src/pages/docs/quickstart.astro:122.
     # Enforces website/src/pages/docs/threat-model.astro:15.
     with pytest.raises(
         errors.ArtifactError, match="SCMLE_TRUSTED=1 is refused"

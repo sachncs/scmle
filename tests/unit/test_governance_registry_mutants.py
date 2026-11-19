@@ -140,7 +140,7 @@ def test_a_signature_verifies_only_with_the_same_key_and_content(monkeypatch):
 
 
 def test_each_signed_field_is_covered_by_the_signature():
-    # Enforces website/src/pages/docs/operations.astro:154.
+    # Enforces website/src/pages/docs/operations.astro:236.
     signed = review().sign(KEY)
     for change in (
         {"model": "n"},
@@ -158,9 +158,9 @@ def test_each_signed_field_is_covered_by_the_signature():
 
 def test_validate_target_checks_identity_decision_independence_and_signature():
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:544.
-    # Enforces website/src/learn/when-things-go-wrong.html:214.
-    # Enforces website/src/pages/docs/operations.astro:141.
-    # Enforces website/src/pages/docs/operations.astro:154.
+    # Enforces website/src/learn/when-things-go-wrong.html:229.
+    # Enforces website/src/pages/docs/operations.astro:207.
+    # Enforces website/src/pages/docs/operations.astro:236.
     good = review().sign(KEY)
     good.validate("m", 1, "c" * 64, KEY)
     for args in (("x", 1, "c" * 64), ("m", 2, "c" * 64), ("m", 1, "d" * 64)):
@@ -363,10 +363,10 @@ def test_a_staging_alias_moves_without_approval_and_leaves_no_previous(
 def test_the_champion_needs_an_approval_that_names_the_exact_bundle(tmp_path):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:542.
     # Enforces docs/START_HERE.md:749.
-    # Enforces website/src/learn/start-here.html:377.
-    # Enforces website/src/learn/when-things-go-wrong.html:214.
-    # Enforces website/src/pages/docs/operations.astro:141.
-    # Enforces website/src/pages/docs/operations.astro:154.
+    # Enforces website/src/learn/start-here.html:380.
+    # Enforces website/src/learn/when-things-go-wrong.html:229.
+    # Enforces website/src/pages/docs/operations.astro:207.
+    # Enforces website/src/pages/docs/operations.astro:236.
     store = make_registry(tmp_path / "reg")
     with pytest.raises(
         errors.ArtifactError,

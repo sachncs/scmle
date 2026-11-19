@@ -228,6 +228,7 @@ print(sample.layout)`}</code></pre>
 
   <h2>Experimental image baseline</h2>
   <p>The image path needs the <code>multimodal</code> extra (Pillow) and follows the same evidence-first boundary. Labelled <code>Dataset</code> samples are curated for exact and near-duplicate content, mixed label state, augmentation lineage, and sensitive metadata, resized into a bounded pixel matrix, evaluated with held-out data, and explained with global/local pixel contributions plus a deterministic black-baseline occlusion report.</p>
+  <pre><code class="language-bash">pip install "scmle[multimodal] @ git+https://github.com/sachncs/scmle"</code></pre>
   <pre><code class="language-python">{`from PIL import Image
 
 from scmle.data.modalities.image import Dataset, Sample

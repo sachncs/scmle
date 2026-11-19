@@ -46,8 +46,8 @@ def test_the_lifecycle_refuses_a_manifest_that_does_not_match_the_adapter(
 ):
     """A mismatched manifest stops the run before any package is written.
 
-    Also enforces website/src/pages/docs/data.astro:129.
-    Also enforces website/src/pages/docs/extensions.astro:91.
+    Also enforces website/src/pages/docs/data.astro:199.
+    Also enforces website/src/pages/docs/extensions.astro:151.
     """
     adapter = document_adapter()
     target = tmp_path / "package"
@@ -64,9 +64,9 @@ def test_the_lifecycle_refuses_a_manifest_that_does_not_match_the_adapter(
 def test_image_evidence_says_it_is_not_saliency_or_localization(tmp_path):
     """The image baseline states that it is neither saliency nor location.
 
-    Also enforces website/src/pages/docs/data.astro:213.
-    Also enforces website/src/pages/docs/modalities.astro:120.
-    Also enforces website/src/pages/docs/modalities.astro:105.
+    Also enforces website/src/pages/docs/data.astro:342.
+    Also enforces website/src/pages/docs/modalities.astro:138.
+    Also enforces website/src/pages/docs/modalities.astro:123.
     """
     report = modality_lifecycle.Lifecycle().run(
         image_adapter(),

@@ -41,12 +41,16 @@ BINARY_CLASSES = 2
 # (OMP_NUM_THREADS=1, CPU seconds, at most 4,000 rows) the seconds above
 # the fixed cost were 1.3e-6 to 3.14e-6 per cell and class way on wilt,
 # qsar-biodeg, APSFailure, Bioresponse, christine, mfeat-factors and
-# semeion (3.2e-6 by least squares on the profiler's runs, which bound at
-# 3.6e-6: `scmle.pipeline.profiler.NOISE_CELL`), so CELL is 3.6e-6. The
-# largest measured to predicted ratio is then 1.06 (the 1,600-row,
-# 30-column binary table, 0.36 s against 0.34 s), so MARGIN = 1.25 keeps
-# the prediction an upper bound on every measured table. A larger thread
-# cap only finishes sooner.
+# semeion (3.24e-6 by least squares on the profiler's runs, which bound at
+# 3.6e-6), so CELL is 3.6e-6. The largest measured to predicted ratio is
+# then 1.06 (the 1,600-row, 30-column binary table, 0.36 s against
+# 0.34 s), so MARGIN = 1.25 keeps the prediction an upper bound on every
+# measured table; checked again 2026-11-19 on the sampled checks of gina
+# (2.91 s on 638 rows, predicted 3.00 s) and Bioresponse (2.21 s on 348
+# rows of 1,776 columns, predicted 2.99 s). A larger thread cap only
+# finishes sooner. This is the only cost model of the check: `affordable`
+# admits rows by it and `scmle.pipeline.profiler.noise` charges the
+# preparation estimate by it, so admission and estimate cannot disagree.
 BASE_SECONDS = 0.05
 CLASS_SECONDS = 0.12
 CELL_SECONDS = 3.6e-6

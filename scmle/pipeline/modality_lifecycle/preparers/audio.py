@@ -53,6 +53,10 @@ NOISE_LIMITATIONS = (
         "before interpreting low-SNR results."
     ),
 )
+PROBED = 100_000
+"""Frames the noise probe decodes: the features it scores read the first
+100,000 frames (`audio.Dataset.prepare_features`), so later frames cannot
+move its score, and decoding them only cost memory (register row MM-18)."""
 SILENCE_LIMITATIONS = (
     ("The model consumes bounded aggregate signal features after masking."),
     (
@@ -260,8 +264,8 @@ class AudioPreparer(curators.Preparer):
         Returns:
             Mapping with one scenario per requested ratio holding the observed
             ratio, the score, its change from `original_score` and the share
-            of clipped values; or status "not_available" if the sample is not
-            WAV or is silent.
+            of clipped values over the `PROBED` frames scored; or status
+            "not_available" if the sample is not WAV or is silent there.
 
         Raises:
             ValueError: If `snr_db` is empty, has more than eight values, or
@@ -285,7 +289,7 @@ class AudioPreparer(curators.Preparer):
             raise errors.InputError(
                 "snr_db values must be finite and in [0, 120]"
             )
-        parameters, values = audio.pcm(sample.encoded_bytes)
+        parameters, values = audio.pcm(sample.encoded_bytes, PROBED)
         signal_rms = float(numpy.sqrt(numpy.mean(numpy.square(values))))
         if signal_rms <= 0.0:
             return curators.unavailable(

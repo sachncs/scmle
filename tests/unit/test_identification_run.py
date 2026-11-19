@@ -147,7 +147,7 @@ def test_the_held_out_estimate_alone_is_not_confirmed():
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:126.
     # Enforces website/src/learn/glossary.html:199.
     # Enforces website/src/learn/what-scmle-cannot-do.html:27-28.
-    # Enforces website/src/learn/when-things-go-wrong.html:153.
+    # Enforces website/src/learn/when-things-go-wrong.html:168.
     # Enforces website/src/pages/docs/causal-decision.astro:64.
     spec = block(controls=(), strata=(), sensitivity=None)
     x, c = (

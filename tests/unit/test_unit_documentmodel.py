@@ -316,6 +316,26 @@ def test_an_ablation_reports_score_drops_per_removed_term(fitted):
         fitted.ablate(sample, max_terms=0)
 
 
+def test_an_ablation_that_flips_the_class_is_scored_on_the_original_class(
+    fitted,
+):
+    """MM-13: removing `orchard` flips the prediction to water."""
+    sample = Sample("q", "orchard ocean")
+    matrix = fitted.transform((sample,))
+    assert fitted.estimator.predict(matrix)[0] == "fruit"
+    removed = fitted.vectorizer.transform(["ocean"])
+    assert fitted.estimator.predict(removed)[0] == "water"
+    index = list(fitted.estimator.classes_).index("fruit")
+    base = fitted.confidence(matrix)
+
+    found = dict(fitted.ablate(sample, top_k=2).terms)
+
+    assert found["orchard"] == pytest.approx(
+        base - fitted.confidence(removed, index)
+    )
+    assert found["orchard"] > base > 0
+
+
 def test_a_multiclass_model_uses_the_class_row():
     model = classifier.Classifier(config()).fit(THREE)
     sample = Sample("q", "green meadow")

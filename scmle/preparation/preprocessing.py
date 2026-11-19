@@ -5,6 +5,7 @@ and refits the whole thing per fold (fold-local fitting) and inference reuses
 the identical fitted graph.
 """
 
+from collections.abc import Callable
 from collections.abc import Mapping
 import dataclasses
 from typing import Any
@@ -31,6 +32,10 @@ import scmle.preparation.multitarget
 import scmle.preparation.ranking
 import scmle.preparation.survival
 import scmle.preparation.uplift
+
+Featuriser = Callable[[data.Blueprint, data.Preprocessing], Any]
+"""Builds the unfitted featuriser of a feature plan under its switches:
+`build_preprocessor` for a table, a data kind's `featurise` in a run."""
 
 SPARSE_THRESHOLD = 0.3
 # HistGradientBoosting bins a native categorical into at most `max_bins`
@@ -305,18 +310,20 @@ def isolate(
 def frontend(
     plan: data.Blueprint,
     options: data.Preprocessing,
+    featurise: Featuriser | None = None,
 ) -> Any:
     """Builds the preprocessing front end, with the feature graph if any.
 
     Args:
         plan: Feature columns by kind (and row-wise graph nodes).
         options: Preprocessing switches.
+        featurise: Builds the featuriser; `build_preprocessor` by default.
 
     Returns:
         The column transformer, or a pipeline of graph transformer followed
         by the column transformer when features are derived.
     """
-    preprocessor = build_preprocessor(plan, options)
+    preprocessor = (featurise or build_preprocessor)(plan, options)
     if not plan.derived:
         return preprocessor
     return pipeline.Pipeline(
@@ -383,6 +390,7 @@ def preprocess(
     options: data.Preprocessing,
     task: tasks.Task,
     seed: int,
+    featurise: Featuriser | None = None,
 ) -> list[tuple[str, Any]]:
     """Lists the steps that come before the estimator.
 
@@ -391,6 +399,7 @@ def preprocess(
         options: Preprocessing switches.
         task: Resolved task type.
         seed: Random seed forwarded to the selector.
+        featurise: Builds the featuriser; `build_preprocessor` by default.
 
     Returns:
         The graph, construction, preprocessing and selection steps that the
@@ -401,7 +410,7 @@ def preprocess(
         steps.append(("graph", feature_graph.Transformer(plan.derived)))
     if options.construct:
         steps.append(("construct", selection.Constructor(tuple(plan.numeric))))
-    steps.append(("prep", build_preprocessor(plan, options)))
+    steps.append(("prep", (featurise or build_preprocessor)(plan, options)))
     if options.select:
         steps.append(
             (
@@ -458,6 +467,7 @@ def instantiate(
     seed: int,
     params: Mapping[str, Any] | None = None,
     options: data.Preprocessing | None = None,
+    featurise: Featuriser | None = None,
 ) -> Any:
     """Builds a complete, independently evaluable candidate pipeline.
 
@@ -468,6 +478,8 @@ def instantiate(
         seed: Random seed forwarded to the estimator.
         params: Hyperparameter overrides for the estimator.
         options: Preprocessing switches; by default `default_options`.
+        featurise: Builds the featuriser of the plan, the data kind's
+            (`kinds.Kind.featurise`); `build_preprocessor` by default.
 
     Returns:
         An unfitted pipeline of preprocessing followed by the estimator.
@@ -497,7 +509,7 @@ def instantiate(
     special = isolate(plan, options)
     if options.high_cardinality == "ordinal" and special:
         params |= adapter.nominals(list(range(len(special))))
-    steps = preprocess(plan, options, task, seed)
+    steps = preprocess(plan, options, task, seed, featurise)
     estimator = adapter.build(task, seed, params)
     problem = misalignment(plan, options.select, options.missing)
     if problem:

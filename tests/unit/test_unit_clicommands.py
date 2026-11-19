@@ -275,7 +275,7 @@ def test_catalog_prints_and_writes_the_evidence(tmp_path, capsys):
     assert intake.Cataloging().execute(args) == command.EXIT_OK
     printed = json.loads(capsys.readouterr().out)
     assert printed == json.loads((tmp_path / "cat.json").read_text("utf-8"))
-    assert str(tmp_path / "t.csv") in json.dumps(printed)
+    assert printed["source"]["uri"] == (tmp_path / "t.csv").resolve().as_uri()
 
 
 def test_ingest_options_have_zero_tolerances_by_default():

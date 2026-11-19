@@ -13,6 +13,7 @@ from scmle.models.deeplearning import networks
 import scmle.models.registry
 from scmle.models.sklearn import classical
 from scmle.pipeline import engine
+from scmle.pipeline import kinds
 from scmle.pipeline import orchestrator
 from scmle.pipeline import roster
 from scmle.pipeline import stages
@@ -65,9 +66,16 @@ def test_tabular_beta_plan_has_an_explicit_library_capability_path():
     assert set(plan.candidates) == {"dummy", "logistic_regression"}
     declarations = board.services.capability_registry.catalogue()
     assert declarations
-    assert {declaration.key.modality for declaration in declarations} == {
-        capabilities.Modality.TABULAR
-    }
+    assert {
+        declaration.key.modality
+        for declaration in declarations
+        if declaration.status is capabilities.Status.SUPPORTED
+    } == {capabilities.Modality.TABULAR}
+    assert {
+        declaration.status
+        for declaration in declarations
+        if declaration.key.modality is not capabilities.Modality.TABULAR
+    } == {capabilities.Status.EXPERIMENTAL}
     assert {declaration.key.inference for declaration in declarations} == {
         capabilities.Inference.LIBRARY
     }
@@ -131,7 +139,7 @@ def test_ft_transformer_uses_an_experimental_tabular_boundary():
 def test_experimental_transformer_requires_explicit_model_opt_in():
     """An experimental FT-Transformer can be selected only by declaration.
 
-    Also enforces website/src/pages/docs/modeling.astro:78.
+    Also enforces website/src/pages/docs/modeling.astro:101.
     """
     adapter = networks.FT_TRANSFORMER
     registry = scmle.models.registry.Catalog((classical.Dummy(), adapter))
@@ -186,7 +194,7 @@ def test_extension_only_foundation_adapter_cannot_break_auto_planning(
 def test_unimplemented_contract_dimensions_are_not_promoted():
     """Missing modality, uncertainty, and explanation paths fail closed.
 
-    Also enforces website/src/pages/docs/capabilities.astro:82.
+    Also enforces website/src/pages/docs/capabilities.astro:133.
     Also enforces website/src/pages/docs/evidence.astro:32.
     """
     registry = roster.enrol()
@@ -232,7 +240,7 @@ def test_empty_override_fails_before_model_fitting():
 def test_declared_non_tabular_modality_fails_closed_before_model_fitting():
     """A modality declaration cannot silently inherit tabular support.
 
-    Also enforces website/src/pages/docs/api.astro:33.
+    Also enforces website/src/pages/docs/api.astro:45.
     Also enforces website/src/pages/docs/data.astro:25.
     """
     spec = tasks.Config(
@@ -260,10 +268,10 @@ def test_file_backed_non_tabular_modality_fails_before_tabular_reader(
 
     Also enforces website/src/pages/docs/data.astro:25.
     """
-    source = tmp_path / "image-list.txt"
-    source.write_text("image-a.jpg\n")
+    source = tmp_path / "notes.txt"
+    source.write_text("a note\n")
     spec = tasks.Config(
-        data=tasks.Dataset(uri=str(source), target="label", modality="image"),
+        data=tasks.Dataset(uri=str(source), target="label", modality="text"),
         search=tasks.Search(top_models=0),
         strategies=tasks.Strategies(top_models=0),
         ensemble=tasks.Stacking(size=0),
@@ -279,9 +287,9 @@ def test_file_backed_non_tabular_modality_fails_before_tabular_reader(
     assert failure.value.details == {
         "status": "unsupported",
         "reason": "file-backed modality has no ingestion adapter",
-        "modality": "image",
+        "modality": "text",
         "uri": str(source),
-        "supported_modalities": ["tabular"],
+        "supported_modalities": sorted(kinds.KINDS),
     }
 
 

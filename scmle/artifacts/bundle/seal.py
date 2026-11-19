@@ -29,16 +29,21 @@ def sign(manifest_bytes: bytes, key: bytes) -> str:
 
 
 def verify_signature(
-    root: pathlib.Path, signing_key: str | bytes | None
+    root: pathlib.Path,
+    signing_key: str | bytes | None,
+    text: bytes | None = None,
 ) -> bool:
     """Checks the manifest signature.
 
     A missing manifest surfaces as the `OSError` of reading it, not as an
-    `ArtifactError`.
+    `ArtifactError`. A caller that goes on to trust the manifest passes the
+    bytes it parsed as `text`, so the signature covers exactly those bytes
+    and not a file that may have been replaced since.
 
     Args:
         root: Bundle directory.
         signing_key: HMAC key (defaults to the environment).
+        text: The manifest bytes to check; None reads the manifest file.
 
     Returns:
         True when a signature exists and verifies; False when the bundle is
@@ -69,7 +74,9 @@ def verify_signature(
         raise errors.ArtifactError(
             f"unsupported bundle signature algorithm {algorithm!r}"
         )
-    expected = sign((root / layout.MANIFEST_FILE).read_bytes(), key)
+    if text is None:
+        text = (root / layout.MANIFEST_FILE).read_bytes()
+    expected = sign(text, key)
     if not hmac.compare_digest(recorded, expected):
         raise errors.ArtifactError(
             "bundle signature is invalid: the bundle was modified or "

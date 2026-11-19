@@ -11,6 +11,7 @@ from scmle.contracts import tasks
 from scmle.data.splitting import splitters
 from scmle.data.splitting.splitters import lockbox
 from scmle.data.splitting.splitters import partitions
+from scmle.data.splitting.splitters import spatial
 from scmle.data.splitting.splitters import splits
 from scmle.data.splitting.splitters import temporal
 
@@ -89,7 +90,7 @@ def test_temporal_split_respects_order(frame):
 def test_temporal_with_unparseable_time_blocks(frame):
     # Enforces README.md:151.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:168.
-    # Enforces website/src/learn/when-things-go-wrong.html:69.
+    # Enforces website/src/learn/when-things-go-wrong.html:84.
     broken = frame.assign(t=frame.t.astype(str))
     broken.loc[3, "t"] = "not a date"
     with pytest.raises(errors.BlockedError, match="ambiguous"):
@@ -201,6 +202,8 @@ def test_strategy_registry_is_polymorphic():
         "group",
         "temporal",
         "rolling",
+        "grouped_temporal",
+        "spatial_block",
     }
     assert issubclass(splits.Stratified, splits.Random)
     assert issubclass(splits.Events, splits.Random)
@@ -217,11 +220,15 @@ def test_strategies_are_one_family_of_single_noun_classes():
         "group": splits.Group,
         "temporal": temporal.Chronology,
         "rolling": temporal.Rolling,
+        "grouped_temporal": temporal.Succession,
+        "spatial_block": spatial.Tiling,
     }
     assert family == splitters.STRATEGIES
-    timed = {temporal.Chronology, temporal.Rolling}
+    timed = {temporal.Chronology, temporal.Rolling, temporal.Succession}
+    placed = {spatial.Tiling: spatial}
     assert all(
-        kind.__module__ == (temporal if kind in timed else splits).__name__
+        kind.__module__
+        == placed.get(kind, temporal if kind in timed else splits).__name__
         for kind in family.values()
     )
 

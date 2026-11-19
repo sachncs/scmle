@@ -1,10 +1,12 @@
 """Serving lifecycle: drain on stop, reload without downtime, signals."""
 
+import functools
 import json
 import os
 import pathlib
 import re
 import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -23,6 +25,7 @@ from scmle.inference import guard
 from scmle.operations import signals
 from scmle.serving import runtime
 from scmle.serving import server
+from scmle.serving.server import handler
 from tests import support_ops
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -104,14 +107,78 @@ def test_stop_lets_a_request_in_flight_finish_then_refuses_connections(
     assert stopper.is_alive() and adapter.draining
     health = adapter.health()
     assert health["ready"] is False and health["reason"] == "draining"
-    # Refused, or reset if it reached the backlog before the socket closed.
-    with pytest.raises(OSError):
-        urllib.request.urlopen(f"{url}/livez", timeout=2)
+    listener = adapter.httpd
+    deadline = time.monotonic() + 10
+    while listener.socket.fileno() != -1 and time.monotonic() < deadline:
+        time.sleep(0.02)
+    # Once the socket is closed a new connection is refused, never reset.
+    with pytest.raises(ConnectionRefusedError):
+        socket.create_connection(listener.server_address, timeout=2)
     release.set()
     worker.join(20)
     stopper.join(20)
     assert not stopper.is_alive()
     assert results[0][0] == 200 and len(results[0][1]["predictions"]) == 1
+
+
+def test_a_connection_waiting_in_the_backlog_is_answered_not_reset(bundle):
+    # C7: closing the listening socket reset every connection the kernel
+    # had completed but the server had not yet accepted.
+    adapter = server.HttpServing(bundle)
+    adapter.warm()
+    listener = server.Listener(
+        ("127.0.0.1", 0),
+        functools.partial(handler.Responder, adapter=adapter),
+    )
+    try:
+        waiting = [
+            socket.create_connection(listener.server_address, timeout=10)
+            for ignored in range(3)
+        ]
+        for connection in waiting:
+            connection.sendall(b"GET /livez HTTP/1.0\r\n\r\n")
+        assert listener.sweep() == 3
+        assert listener.sweep() == 0
+        listener.server_close()
+        assert listener.drain(10)
+        for connection in waiting:
+            answer = connection.makefile("rb").read()
+            assert answer.startswith(b"HTTP/1.0 200 ")
+            connection.close()
+    finally:
+        listener.server_close()
+        adapter.admission.close()
+
+
+def test_the_backlog_holds_a_burst_of_connections(bundle):
+    # C7: with the standard backlog of 5, a burst of callers connecting at
+    # once was refused or reset before the server could accept them.
+    adapter = server.HttpServing(bundle)
+    listener = server.Listener(
+        ("127.0.0.1", 0),
+        functools.partial(handler.Responder, adapter=adapter),
+    )
+    burst = 4 * server.MAX_CONCURRENT_REQUESTS
+    try:
+        assert listener.request_queue_size == socket.SOMAXCONN
+        waiting = [
+            socket.create_connection(listener.server_address, timeout=10)
+            for ignored in range(burst)
+        ]
+        for connection in waiting:
+            connection.sendall(b"GET /livez HTTP/1.0\r\n\r\n")
+        assert listener.sweep() == burst
+        assert listener.drain(10)
+        for connection in waiting:
+            assert (
+                connection.makefile("rb")
+                .readline()
+                .startswith(b"HTTP/1.0 200 ")
+            )
+            connection.close()
+    finally:
+        listener.server_close()
+        adapter.admission.close()
 
 
 def test_stop_gives_up_on_a_request_after_the_grace(
@@ -256,6 +323,71 @@ def test_hold_reloads_on_sighup_and_drains_on_sigterm(
     lines = written.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1 and "signals" in json.loads(lines[0])
     assert signal.getsignal(signal.SIGTERM) is before
+
+
+@POSIX
+def test_hold_keeps_serving_out_of_rotation_for_the_linger(golden, bundle):
+    # C7: SIGTERM closed the socket at once, while the platform still
+    # routed callers here; each connection it then completed was reset.
+    adapter = server.HttpServing(bundle)
+    seen = {}
+
+    def drive():
+        deadline = time.monotonic() + 20
+        while adapter.httpd is None and time.monotonic() < deadline:
+            time.sleep(0.02)
+        url = adapter.address
+        os.kill(os.getpid(), signal.SIGTERM)
+        time.sleep(0.3)
+        seen["readyz"] = call(f"{url}/readyz")
+        seen["predict"] = call(
+            f"{url}/predict", {"records": golden.records[:1]}
+        )
+        seen["serving"] = adapter.httpd is not None
+
+    driver = threading.Thread(target=drive)
+    driver.start()
+    started = time.monotonic()
+    runtime.hold(adapter, signals.SignalMonitor(), None, 60.0, linger=1.5)
+    elapsed = time.monotonic() - started
+    driver.join(20)
+    status, body = seen["readyz"]
+    assert status == 503 and body["reason"] == "draining"
+    assert seen["predict"][0] == 200
+    assert seen["serving"] is True
+    assert 1.5 <= elapsed < 10
+    assert adapter.httpd is None
+
+
+@POSIX
+def test_a_second_stop_signal_ends_the_linger(bundle):
+    adapter = server.HttpServing(bundle)
+
+    def drive():
+        deadline = time.monotonic() + 20
+        while adapter.httpd is None and time.monotonic() < deadline:
+            time.sleep(0.02)
+        os.kill(os.getpid(), signal.SIGTERM)
+        time.sleep(0.3)
+        os.kill(os.getpid(), signal.SIGINT)
+
+    driver = threading.Thread(target=drive)
+    driver.start()
+    started = time.monotonic()
+    runtime.hold(adapter, signals.SignalMonitor(), None, 60.0, linger=30.0)
+    driver.join(20)
+    assert time.monotonic() - started < 10
+    assert adapter.httpd is None
+
+
+def test_the_linger_comes_from_the_environment(monkeypatch):
+    monkeypatch.delenv(runtime.LINGER, raising=False)
+    assert runtime.lingering(os.environ) == 0.0
+    monkeypatch.setenv(runtime.LINGER, "4.5")
+    assert runtime.lingering(os.environ) == 4.5
+    monkeypatch.setenv(runtime.LINGER, "-1")
+    with pytest.raises(errors.ConfigError, match="linger"):
+        runtime.lingering(os.environ)
 
 
 def test_hold_refuses_a_bad_interval_and_a_worker_thread(bundle):

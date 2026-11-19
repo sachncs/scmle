@@ -1,8 +1,10 @@
 """Uplift model adapters."""
 
 from collections.abc import Mapping
+import inspect
 from typing import Any
 
+from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import tasks
 from scmle.models.uplift import estimators
@@ -11,7 +13,7 @@ UPLIFT = frozenset({tasks.Task.UPLIFT})
 
 
 class Uplift(models.Model):
-    """A meta-learner built from boosted outcome models.
+    """A meta-learner built from outcome models of one family.
 
     Configure it with keyword arguments, or subclass it and declare the same
     names as class attributes. An argument left out keeps the class-level
@@ -19,9 +21,12 @@ class Uplift(models.Model):
 
     Attributes:
         learner: The estimator class.
+        kind: Outcome-model family the learner fits, a key of
+            `estimators.KINDS`.
     """
 
     learner: type = estimators.TLearner
+    kind = "boosting"
     family = "causal"
 
     def __init__(
@@ -31,6 +36,7 @@ class Uplift(models.Model):
         family: str | None = None,
         capabilities: models.Capabilities | None = None,
         learner: type | None = None,
+        kind: str | None = None,
     ) -> None:
         """Sets the declared data on this instance.
 
@@ -39,12 +45,14 @@ class Uplift(models.Model):
             family: Coarse family used for reporting.
             capabilities: Declared capabilities.
             learner: Estimator class the adapter builds.
+            kind: Outcome-model family, a key of `estimators.KINDS`.
         """
         given: dict[str, Any] = {
             "name": name,
             "family": family,
             "capabilities": capabilities,
             "learner": learner,
+            "kind": kind,
         }
         for attribute, value in given.items():
             if value is not None:
@@ -65,12 +73,25 @@ class Uplift(models.Model):
                 outcome); other entries are ignored.
 
         Returns:
-            An unfitted uplift learner of the adapter's `learner` class.
+            An unfitted uplift learner of the adapter's `learner` class,
+            given the adapter's `kind` when its constructor takes one.
+
+        Raises:
+            ConfigError: If the adapter names a non-default `kind` for a
+                learner class that cannot take it.
         """
         settings = dict(params or {})
-        learner: models.Estimator = self.learner(
-            classify=settings.pop("classify", True), random_state=seed
-        )
+        options: dict[str, bool | int | str] = {
+            "classify": settings.pop("classify", True),
+            "random_state": seed,
+        }
+        if "kind" in inspect.signature(self.learner).parameters:
+            options["kind"] = self.kind
+        elif self.kind != Uplift.kind:
+            raise errors.ConfigError(
+                f"{self.name}: {self.learner.__name__} takes no outcome kind"
+            )
+        learner: models.Estimator = self.learner(**options)
         return learner
 
 
@@ -98,8 +119,18 @@ X_LEARNER = Uplift(
     learner=estimators.CrossLearner,
 )
 
+LINEAR = Uplift(
+    name="uplift_linear_t_learner",
+    family="linear",
+    capabilities=models.Capabilities(UPLIFT, needs_scaling=True, cost=1),
+    learner=estimators.TLearner,
+    kind="linear",
+)
+"""T-learner on logistic or ridge outcome models: the linear family."""
+
 UPLIFT_ADAPTERS: tuple[models.Model, ...] = (
     T_LEARNER,
     S_LEARNER,
     X_LEARNER,
+    LINEAR,
 )

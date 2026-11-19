@@ -295,17 +295,28 @@ def allocate(
     validation_fraction: float,
     test_fraction: float,
     seed: int,
+    strata: Mapping[str, str] | None = None,
 ) -> tuple[set[str], set[str]]:
     """Shuffles group ids and assigns whole groups to validation and test.
 
     With at least three groups a non-zero fraction gets at least one group;
     at least one group is always left for training when any exists.
 
+    With `strata` (MM-8) the holdouts are drawn stratum by stratum in turn:
+    the groups of each stratum are shuffled, the j-th group of a stratum of
+    s groups is ranked at j / s, and the holdouts take groups in rank order
+    (test first, then validation). Every stratum is therefore represented in
+    a holdout as soon as it holds at least as many groups as there are
+    strata, and in proportion to its size after that; a group is skipped
+    when taking it would leave its stratum without a training group.
+
     Args:
         cohorts: The unique group ids; sorted before the shuffle.
         validation_fraction: Share of groups for validation, in [0, 1).
         test_fraction: Share of groups for testing, in [0, 1).
         seed: Seed of the shuffle.
+        strata: The stratum (a label bucket) of each group, or None to
+            draw without stratification.
 
     Returns:
         The validation group ids and the test group ids.
@@ -330,10 +341,51 @@ def allocate(
             test_count -= 1
         else:
             break
-    return (
-        set(groups[test_count : test_count + validation_count]),
-        set(groups[:test_count]),
-    )
+    if strata is None:
+        return (
+            set(groups[test_count : test_count + validation_count]),
+            set(groups[:test_count]),
+        )
+    return stratify(groups, strata, (validation_count, test_count), randomizer)
+
+
+def stratify(
+    groups: list[str],
+    strata: Mapping[str, str],
+    counts: tuple[int, int],
+    randomizer: random.Random,
+) -> tuple[set[str], set[str]]:
+    """Draws the holdouts stratum by stratum in turn (see `allocate`).
+
+    Args:
+        groups: The shuffled group ids.
+        strata: The stratum of each group.
+        counts: The validation and test group counts.
+        randomizer: The shuffle's generator; breaks ties of rank.
+
+    Returns:
+        The validation group ids and the test group ids.
+    """
+    layers: dict[str, list[str]] = {}
+    for name in groups:
+        layers.setdefault(strata[name], []).append(name)
+    ranks = {
+        name: (position / len(members), randomizer.random())
+        for members in layers.values()
+        for position, name in enumerate(members)
+    }
+    remaining = {stratum: len(members) for stratum, members in layers.items()}
+    validation: set[str] = set()
+    test: set[str] = set()
+    sides = [(test, counts[1]), (validation, counts[0])]
+    for name in sorted(groups, key=ranks.__getitem__):
+        open_sides = [side for side, count in sides if len(side) < count]
+        if not open_sides:
+            break
+        if remaining[strata[name]] > 1:
+            open_sides[0].add(name)
+            remaining[strata[name]] -= 1
+    return validation, test
 
 
 def disclose(
@@ -680,6 +732,7 @@ def flaw(
 __all__ = [
     "Curation",
     "Datasheet",
+    "allocate",
     "conflicting_label_groups",
     "dataset_hash",
     "findings",

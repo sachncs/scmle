@@ -18,6 +18,7 @@ import scmle.decision.threshold
 from scmle.pipeline import engine
 from scmle.pipeline import products
 from scmle.pipeline.stages import cost
+from scmle.pipeline.stages import ingestion
 from scmle.pipeline.stages import profiling
 from scmle.pipeline.stages import selecting
 from scmle.preparation import strategies
@@ -233,7 +234,14 @@ def choose_decision_threshold(
     seed = board.services.spec.validation.seed
     return scmle.decision.threshold.choose(
         fitted,
-        lambda: strategy.build(plan, adapter, task, seed, selected.params),
+        lambda: strategy.build(
+            plan,
+            adapter,
+            task,
+            seed,
+            selected.params,
+            featurise=board.get(ingestion.Intake).kind.featurise,
+        ),
         (split.dev_features, split.dev_target),
         split.manifest.folds,
         decision,

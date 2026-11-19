@@ -274,7 +274,7 @@ def test_the_command_line_runs_a_spec_in_a_process(
     path = tmp_path / "job.json"
     path.write_text(json.dumps(spec.to_dict()))
     data = tmp_path / "train.csv"
-    data.write_text("a,y\n1,0\n")
+    data.write_bytes(b"a,y\n1,0\n")
     arguments = [
         "--store",
         str(tmp_path / "store"),
@@ -335,7 +335,7 @@ def test_the_command_line_confines_the_store_to_its_tenant(
     path = tmp_path / "job.json"
     path.write_text(json.dumps(spec.to_dict()))
     data = tmp_path / "train.csv"
-    data.write_text("a,y\n1,0\n")
+    data.write_bytes(b"a,y\n1,0\n")
     arguments = [
         "--store",
         str(tmp_path / "store"),

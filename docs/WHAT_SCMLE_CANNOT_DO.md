@@ -250,18 +250,18 @@ with the number of numeric columns. These are the only measurements.
 * Tabular data is the home ground. [`API_STABILITY.md`](API_STABILITY.md) says
   which parts of the interface are stable, and the package is in beta: the
   interface may change between `0.x` releases.
-* The non-tabular modalities (text, document, image, audio, video, graph and
-  geospatial) are experimental, and each built-in modality's declaration
-  says why in its limitations: it runs the bounded lifecycle (one split, one
-  regularized linear classifier), not the shared pipeline engine, so it has
-  no candidate search, cross-validation, baseline comparison, prediction
-  intervals, locked test set and vault, or analysis charter. Beyond that,
-  text and document do no OCR or semantic reading; image has no decoding,
-  perturbation, explanation or drift benchmark; audio and video make no
-  transcript, speaker or event claim and have no noise-robustness or drift
-  benchmark; geospatial does not gate on spatially separated folds; graph's
-  baseline ignores topology. None has been deployed
-  ([`BREADTH.md`](BREADTH.md)).
+* Non-tabular kinds (document, graph, image, video, audio, raster,
+  geospatial) run the shared stages (`--modality`) but are experimental: a
+  run needs the opt-in `models.experimental_models`, and deployment,
+  monitoring and recovery are not proven. A served model takes described
+  rows, not raw files; descriptors are hand-built, not learned. Geospatial
+  vector's test interval resamples rows, not spatial blocks, so it can be
+  too narrow. Documents get no OCR or semantic reading; image has no
+  decoding, perturbation, explanation or drift benchmark; audio and video
+  make no transcript, speaker or event claim and have no noise-robustness or
+  drift benchmark; a graph's structure enters only as per-node counts. The
+  older modality lifecycles (one split, one regularized linear classifier)
+  stay experimental. None has been deployed ([`BREADTH.md`](BREADTH.md)).
 * TabPFN needs its own licence and token. PyTorch and Keras families need an
   extra install. No language-model client ships; recorded drafts can be
   replayed, and a replayed draft with no calibrated threshold is refused.

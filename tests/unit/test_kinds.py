@@ -17,6 +17,7 @@ from scmle.pipeline import engine
 from scmle.pipeline import kinds
 from scmle.pipeline import products
 from scmle.pipeline import profiler
+from scmle.pipeline import roster
 import scmle.pipeline.services
 from scmle.pipeline.stages import ingestion
 from scmle.runtime import limits
@@ -42,11 +43,33 @@ def test_the_tabular_kind_is_a_kind_and_is_registered():
     assert isinstance(kind, kinds.Tabular)
     assert isinstance(kind, kinds.Kind)
     assert kind.name == "tabular"
-    assert set(kinds.KINDS) == {"tabular"}
+    assert set(kinds.KINDS) == {
+        "tabular",
+        "document",
+        "graph",
+        "image",
+        "video",
+        "audio",
+        "raster",
+        "geospatial",
+    }
+
+
+def test_every_registered_kind_is_a_kind_named_as_registered():
+    for name, kind in kinds.KINDS.items():
+        assert isinstance(kind, kinds.Kind)
+        assert kind.name == name
+
+
+def test_the_roster_enrols_exactly_what_every_kind_declares():
+    declared = {
+        record.key for kind in kinds.KINDS.values() for record in kind.declare()
+    }
+    assert {record.key for record in roster.enrol().catalogue()} == declared
 
 
 def test_an_unregistered_file_modality_is_refused_with_its_details():
-    data = config("images.txt", modality="image").data
+    data = config("notes.txt", modality="text").data
     with pytest.raises(
         capabilities.UnsupportedError,
         match="file-backed modality has no registered ingestion adapter",
@@ -55,9 +78,9 @@ def test_an_unregistered_file_modality_is_refused_with_its_details():
     assert failure.value.details == {
         "status": "unsupported",
         "reason": "file-backed modality has no ingestion adapter",
-        "modality": "image",
-        "uri": "images.txt",
-        "supported_modalities": ["tabular"],
+        "modality": "text",
+        "uri": "notes.txt",
+        "supported_modalities": sorted(kinds.KINDS),
     }
 
 

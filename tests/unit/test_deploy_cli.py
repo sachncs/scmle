@@ -93,11 +93,11 @@ def test_a_complete_release_is_certified_and_the_record_verifies(
     # Enforces docs/CLI.md:241.
     # Enforces docs/GLOSSARY.md:698.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:21.
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:823.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:828.
     # Enforces website/src/learn/glossary.html:349.
     # Enforces website/src/learn/when-things-go-wrong.html:10.
-    # Enforces website/src/learn/when-things-go-wrong.html:323.
-    # Enforces website/src/pages/docs/cli.astro:96.
+    # Enforces website/src/learn/when-things-go-wrong.html:367.
+    # Enforces website/src/pages/docs/cli.astro:141.
     root, ignored, digest = release
     assert gate(root, "admit") == cli.EXIT_OK
     capsys.readouterr()
@@ -138,9 +138,9 @@ def test_evidence_that_is_not_supplied_blocks_the_release(
     release, capsys, drop
 ):
     # Enforces docs/CLI.md:241.
-    # Enforces docs/GLOSSARY.md:698-698.
+    # Enforces docs/GLOSSARY.md:698-700.
     # Enforces website/src/learn/glossary.html:349.
-    # Enforces website/src/pages/docs/cli.astro:96.
+    # Enforces website/src/pages/docs/cli.astro:141.
     root, manifest, ignored = release
     del manifest[drop]
     write_manifest(root, manifest)
@@ -240,8 +240,8 @@ def test_production_with_the_staging_record_is_certified(release, capsys):
 def test_live_writes_results_and_fails_when_a_check_fails(
     release, monkeypatch, capsys
 ):
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:806.
-    # Enforces website/src/learn/when-things-go-wrong.html:319.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:811.
+    # Enforces website/src/learn/when-things-go-wrong.html:363.
     root, ignored, digest = release
     (root / "token").write_text("good-token\n", encoding="utf-8")
     document = support_release.recorded(digest)

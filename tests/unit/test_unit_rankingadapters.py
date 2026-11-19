@@ -52,8 +52,10 @@ def test_a_ranker_declares_its_name_library_and_requirements():
         adapters.Pointwise,
         adapters.Ranker,
         adapters.Ranker,
+        adapters.Linear,
     ]
     assert adapters.RANKING_ADAPTERS[1:] == (
         adapters.LIGHTGBM_RANKER,
         adapters.XGBOOST_RANKER,
+        adapters.PAIRWISE,
     )

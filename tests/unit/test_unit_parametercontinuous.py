@@ -39,7 +39,7 @@ def world(rows=400, seed=4):
 
 
 def test_the_capability_texts_are_fixed():
-    # Enforces website/src/pages/docs/modeling.astro:313.
+    # Enforces website/src/pages/docs/modeling.astro:431.
     assert continuous.EVIDENCE == (
         "generalized_propensity_density_diagnostics",
         "weight_effective_sample_size",
@@ -106,7 +106,7 @@ def test_weights_need_four_levels_and_variance():
 
 
 def test_a_cap_limits_weights_and_records_them():
-    # Enforces website/src/pages/docs/modeling.astro:313.
+    # Enforces website/src/pages/docs/modeling.astro:431.
     raw = numpy.array([0.5, 1.0, 10.0, 2.0])
     weights, record = continuous.cap(raw, policy(cap=4.0))
     assert weights.tolist() == [0.5, 1.0, 4.0, 2.0]

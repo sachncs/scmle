@@ -131,7 +131,7 @@ def test_unknown_combination_fails_before_training_with_structured_diagnostic():
 
 
 def test_duplicate_keys_and_incomplete_declarations_are_rejected():
-    # Enforces website/src/pages/docs/capabilities.astro:82.
+    # Enforces website/src/pages/docs/capabilities.astro:133.
     record = make_capability()
     registry = capabilities.Registry((record,))
 
@@ -172,9 +172,9 @@ def test_registry_serialization_is_canonical_across_registration_order():
 def test_transformer_and_jepa_family_statuses_are_explicit():
     """Family metadata records implemented boundaries without promotion.
 
-    Also enforces website/src/pages/docs/modeling.astro:111.
+    Also enforces website/src/pages/docs/modeling.astro:144.
     Also enforces website/src/pages/docs/modeling.astro:13.
-    Also enforces website/src/pages/docs/modeling.astro:78.
+    Also enforces website/src/pages/docs/modeling.astro:101.
     """
     registry = capabilities.Registry.seed()
 

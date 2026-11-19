@@ -216,15 +216,17 @@ def extract(
 
 def pcm(
     encoded_bytes: bytes,
+    limit: int | None = None,
 ) -> tuple[tuple[int, int, int, int, str, str], numpy.ndarray]:
     """Decodes WAV PCM values and retain the writer parameters.
 
-    Values are normalized to ``[-1, 1]`` and shaped as frames by channels.
-    This is a bounded dependency-light primitive for caller-owned perturbation
-    probes; it is not a general-purpose audio decoder.
+    Values are normalized to ``[-1, 1]`` and shaped as frames by channels;
+    a dependency-light primitive for perturbation probes, not a decoder.
 
     Args:
         encoded_bytes: A complete WAV file.
+        limit: Frames decoded from the first (all when None), so a probe
+            scoring a prefix holds only the prefix.
 
     Returns:
         A pair. The first item is the writer parameters as channels, sample
@@ -247,7 +249,7 @@ def pcm(
                 opened.getcomptype(),
                 opened.getcompname(),
             )
-            raw = opened.readframes(opened.getnframes())
+            raw = opened.readframes(limit or opened.getnframes())
     except (EOFError, wave.Error) as error:
         raise ValidationError(
             "audio payload is not a readable WAV file",

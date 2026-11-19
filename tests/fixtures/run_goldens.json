@@ -2002,6 +2002,10 @@
       "available": "bool",
       "source": "str"
      },
+     "documents": {
+      "available": "bool",
+      "source": "str"
+     },
      "embeddings": {
       "available": "bool",
       "source": "str"
@@ -5494,6 +5498,10 @@
       "available": "bool",
       "source": "str"
      },
+     "documents": {
+      "available": "bool",
+      "source": "str"
+     },
      "embeddings": {
       "available": "bool",
       "source": "str"
@@ -8851,6 +8859,10 @@
       "source": "str"
      },
      "distributed": {
+      "available": "bool",
+      "source": "str"
+     },
+     "documents": {
       "available": "bool",
       "source": "str"
      },

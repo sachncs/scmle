@@ -1,9 +1,10 @@
 """A payload swapped after it is hashed never loads (SEC-13).
 
 Each package loader reads the payload once, checks the digest of those bytes
-and unpickles the same bytes. The test replaces the file on disk right after
-its first open (the hash step), so a loader that opened it again to unpickle
-would run the swapped pickle.
+and unpickles the same bytes. The test replaces the file on disk as soon as
+its first open (the hash step) is closed, so a loader that opened it again
+to unpickle would run the swapped pickle. The swap waits for the close
+because Windows refuses to replace a file that is open.
 """
 
 import builtins
@@ -46,7 +47,7 @@ def dumped(value: object) -> bytes:
 
 @pytest.fixture
 def swap(monkeypatch):
-    """Swaps the payload for `Swapped` right after its first open."""
+    """Swaps the payload for `Swapped` when its first open is closed."""
     TRIPPED.clear()
     real = builtins.open
     opened: list[pathlib.Path] = []
@@ -60,9 +61,17 @@ def swap(monkeypatch):
                 and not opened
             ):
                 opened.append(model)
-                staged = model.with_suffix(".swap")
-                staged.write_bytes(dumped(Swapped()))
-                staged.replace(model)
+                close = stream.close
+
+                def closed() -> None:
+                    if stream.closed:
+                        return
+                    close()
+                    staged = model.with_suffix(".swap")
+                    staged.write_bytes(dumped(Swapped()))
+                    staged.replace(model)
+
+                stream.close = closed
             return stream
 
         monkeypatch.setattr(builtins, "open", wrapper)
@@ -70,6 +79,7 @@ def swap(monkeypatch):
 
     yield arm
     assert opened, "the payload was never opened"
+    assert opened[0].read_bytes() == dumped(Swapped()), "never swapped"
 
 
 @pytest.mark.parametrize("module", [documents, images])

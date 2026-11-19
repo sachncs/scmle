@@ -39,7 +39,7 @@ def test_every_entry_point_defaults_to_the_warn_policy():
     What `warn` does with a flagged column (it trains and labels the score)
     is enforced by tests/leakage/test_leakage.py, which runs it end to end.
 
-    Also enforces website/src/learn/leakage.html:66-67.
+    Also enforces website/src/learn/leakage.html:68-69.
     """
     signature = inspect.signature(project.Project)
     parser = cli.build_parser()
@@ -58,7 +58,7 @@ def test_the_probe_screens_plants_with_the_real_screens_settings(
 ):
     """Enforces docs/LEAKAGE.md:238.
 
-    Also enforces website/src/learn/leakage.html:67-68.
+    Also enforces website/src/learn/leakage.html:69-70.
     """
     calls = []
     original = screen.screen
@@ -104,10 +104,10 @@ def test_the_probe_screens_plants_with_the_real_screens_settings(
 
 
 def test_an_attestation_that_expires_before_its_date_is_refused(tmp_path):
-    """Enforces docs/LEAKAGE.md:347.
+    """Enforces docs/LEAKAGE.md:351.
 
-    Also enforces website/src/learn/leakage.html:97.
-    Also enforces website/src/learn/when-things-go-wrong.html:135.
+    Also enforces website/src/learn/leakage.html:128.
+    Also enforces website/src/learn/when-things-go-wrong.html:150.
     """
     record = {
         "column": "worst area",
@@ -142,9 +142,9 @@ def test_an_attestation_that_expires_before_its_date_is_refused(tmp_path):
 
 @pytest.mark.parametrize("kind", screen_certify.KINDS)
 def test_no_null_world_of_the_certification_was_flagged(kind):
-    """Enforces docs/LEAKAGE.md:431 (0 of 1000 null worlds flagged).
+    """Enforces docs/LEAKAGE.md:435 (0 of 1000 null worlds flagged).
 
-    Also enforces website/src/learn/leakage.html:118.
+    Also enforces website/src/learn/leakage.html:174.
     """
     document = json.loads(
         screen_certify.MEASUREMENTS_PATH.read_text(encoding="utf-8")

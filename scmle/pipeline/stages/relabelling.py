@@ -8,6 +8,7 @@ import scmle.evaluation.metrics
 from scmle.pipeline import engine
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import examination
+from scmle.pipeline.stages import ingestion
 from scmle.pipeline.stages import labelling
 from scmle.pipeline.stages import profiling
 from scmle.pipeline.stages import remedy
@@ -60,6 +61,7 @@ class Relabelling(remedy.Remedy):
             task,
             board.services.spec.validation.seed,
             selected.params,
+            featurise=board.get(ingestion.Intake).kind.featurise,
         )
         outcome = pseudo_labeling.judge(
             template,

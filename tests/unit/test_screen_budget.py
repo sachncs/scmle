@@ -215,7 +215,7 @@ def test_block_refuses_an_unchecked_screen_and_warn_proceeds(tmp_path):
     # Enforces docs/ARCHITECTURE.md:165.
     # Enforces docs/LEAKAGE.md:194.
     # Enforces website/src/learn/leakage.html:58.
-    # Enforces website/src/pages/index.astro:136.
+    # Enforces website/src/pages/index.astro:149.
     with pytest.raises(errors.BlockedError, match="NOT RUN") as raised:
         support.make_project(
             wide(columns=WIDE, leaky=True),

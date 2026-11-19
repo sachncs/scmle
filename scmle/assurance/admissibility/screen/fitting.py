@@ -595,7 +595,7 @@ def enough(y: numpy.ndarray, task: str) -> bool:
         otherwise.
     """
     if task == "classification":
-        return min(numpy.bincount(y).tolist()) >= HELD
+        return int(numpy.min(numpy.bincount(y))) >= HELD
     return True
 
 

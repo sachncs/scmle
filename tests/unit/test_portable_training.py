@@ -213,7 +213,7 @@ def test_a_crashed_supervisor_continues_the_numbering(store):
 
 def test_training_cannot_run_as_serving_or_touch_released_bundles(store):
     # Enforces docs/PORTABLE_TRAINING.md:44 and docs/PORTABLE_TRAINING.md:45.
-    # Enforces website/src/pages/docs/portable-training.astro:27.
+    # Enforces website/src/pages/docs/portable-training.astro:29.
     clock = support_runners.FakeClock()
     runner = local_runner(store, clock)
     with pytest.raises(errors.ConfigError, match="serving identity"):
@@ -293,7 +293,7 @@ def test_checkpoints_skip_a_damaged_newest_one(store):
 
 def test_the_entrypoint_checks_the_spec_digest_and_the_store_scheme(tmp_path):
     # Enforces docs/PORTABLE_TRAINING.md:64.
-    # Enforces website/src/pages/docs/portable-training.astro:31.
+    # Enforces website/src/pages/docs/portable-training.astro:33.
     store = make_store(tmp_path)
     clock = support_runners.FakeClock()
     runner = local_runner(store, clock)

@@ -94,7 +94,7 @@ def make_policy() -> Config:
 def test_sequential_ipw_is_deterministic_and_auditable() -> None:
     """Sequential weights produce stable regime and period evidence.
 
-    Also enforces website/src/pages/docs/modeling.astro:327.
+    Also enforces website/src/pages/docs/modeling.astro:445.
     Also enforces website/src/pages/docs/modeling.astro:55.
     """
     estimator = Estimator(make_estimand(), make_policy())

@@ -19,6 +19,7 @@ from scmle.pipeline.stages import assessment
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import diagnosis
 from scmle.pipeline.stages import examination
+from scmle.pipeline.stages import ingestion
 from scmle.pipeline.stages import profiling
 from scmle.pipeline.stages import scoring
 from scmle.pipeline.stages import selecting
@@ -144,6 +145,7 @@ class Bracketing(diagnosis.Diagnosis):
                 task,
                 seed,
                 {"loss": "quantile", "quantile": level},
+                featurise=board.get(ingestion.Intake).kind.featurise,
             )
 
         observed: list[float] = []

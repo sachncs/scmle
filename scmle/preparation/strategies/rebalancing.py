@@ -92,6 +92,7 @@ class Weighting(Rebalancing):
         task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
+        featurise: preprocessing.Featuriser | None = None,
     ) -> models.Estimator:
         """Builds the standard pipeline with `class_weight='balanced'`.
 
@@ -101,13 +102,15 @@ class Weighting(Rebalancing):
             task: Resolved task type.
             seed: Random seed.
             params: Hyperparameter overrides.
+            featurise: Builds the featuriser of the plan: the data kind's
+                (`kinds.Kind.featurise`).
 
         Returns:
             The unfitted candidate estimator, preprocessing included.
         """
         weighted = {**(params or {}), "class_weight": "balanced"}
         pipeline: models.Estimator = preprocessing.instantiate(
-            plan, adapter, task, seed, weighted
+            plan, adapter, task, seed, weighted, featurise=featurise
         )
         return pipeline
 
@@ -128,6 +131,7 @@ class Resampling(Rebalancing):
         task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
+        featurise: preprocessing.Featuriser | None = None,
     ) -> models.Estimator:
         """Wraps the standard pipeline so it trains on rebalanced data.
 
@@ -137,11 +141,15 @@ class Resampling(Rebalancing):
             task: Resolved task type.
             seed: Random seed.
             params: Hyperparameter overrides.
+            featurise: Builds the featuriser of the plan: the data kind's
+                (`kinds.Kind.featurise`).
 
         Returns:
             The unfitted candidate estimator, preprocessing included.
         """
-        inner = preprocessing.instantiate(plan, adapter, task, seed, params)
+        inner = preprocessing.instantiate(
+            plan, adapter, task, seed, params, featurise=featurise
+        )
         return resampling.ResamplingClassifier(
             inner, self.resampler_class(), seed
         )
@@ -203,6 +211,7 @@ class Recalibration(Strategy):
         task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
+        featurise: preprocessing.Featuriser | None = None,
     ) -> models.Estimator:
         """Wraps the standard pipeline in a cross-fitted calibrator.
 
@@ -212,11 +221,15 @@ class Recalibration(Strategy):
             task: Resolved task type.
             seed: Random seed.
             params: Hyperparameter overrides.
+            featurise: Builds the featuriser of the plan: the data kind's
+                (`kinds.Kind.featurise`).
 
         Returns:
             The unfitted candidate estimator, preprocessing included.
         """
-        inner = preprocessing.instantiate(plan, adapter, task, seed, params)
+        inner = preprocessing.instantiate(
+            plan, adapter, task, seed, params, featurise=featurise
+        )
         calibrated: models.Estimator = inner_cv.Calibrated(
             inner,
             method="sigmoid",
@@ -295,6 +308,7 @@ class Smote(Rebalancing):
         task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
+        featurise: preprocessing.Featuriser | None = None,
     ) -> models.Estimator:
         """Builds preprocess -> resample -> model with the SMOTE variant.
 
@@ -304,6 +318,8 @@ class Smote(Rebalancing):
             task: Resolved task type.
             seed: Random seed.
             params: Hyperparameter overrides.
+            featurise: Builds the featuriser of the plan: the data kind's
+                (`kinds.Kind.featurise`).
 
         Returns:
             The unfitted candidate estimator, preprocessing included.
@@ -312,7 +328,7 @@ class Smote(Rebalancing):
         sampler = getattr(over_sampling, self.sampler_name)(random_state=seed)
         options = data.Preprocessing(scale=adapter.capabilities.needs_scaling)
         return resampling.PreprocessedResamplingClassifier(
-            preprocessing.frontend(plan, options),
+            preprocessing.frontend(plan, options, featurise),
             sampler,
             cast("base.BaseEstimator", adapter.build(task, seed, params)),
         )

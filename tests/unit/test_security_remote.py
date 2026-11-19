@@ -160,7 +160,7 @@ def test_rotation_is_picked_up_for_an_unknown_kid_but_not_every_call():
 
 
 def test_a_key_set_that_cannot_be_fetched_fails_closed_after_max_stale(caplog):
-    # Enforces website/src/pages/docs/security.astro:48.
+    # Enforces website/src/pages/docs/security.astro:88.
     # Enforces website/src/pages/docs/tenant-isolation.astro:51.
     clock = support_identity.Clock()
     documents = Documents()
@@ -238,7 +238,7 @@ def test_two_replicas_see_a_revocation_within_the_ttl():
 
 
 def test_a_revocation_source_that_stays_down_stops_accepting_tokens():
-    # Enforces website/src/pages/docs/security.astro:48.
+    # Enforces website/src/pages/docs/security.astro:88.
     # Enforces website/src/pages/docs/tenant-isolation.astro:51.
     clock = support_identity.Clock()
     documents = Documents()

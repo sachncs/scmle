@@ -52,6 +52,23 @@ def test_the_suite_catches_a_backend_without_compare_and_swap(tmp_path):
     assert failed == {"if_version", "if_version_race"}
 
 
+@pytest.mark.parametrize(
+    ("returned", "path", "expected"),
+    [
+        ("\\\\?\\C:\\root\\race", "C:\\root\\race", True),
+        ("\\\\?\\UNC\\host\\share\\race", "\\\\host\\share\\race", True),
+        ("\\\\?\\C:\\elsewhere\\race", "C:\\root\\race", False),
+    ],
+)
+def test_a_kept_extended_prefix_is_the_same_path(
+    monkeypatch, returned, path, expected
+):
+    # Under racing writers Windows' realpath can keep the `\\?\` prefix it
+    # normally strips; that was read as a link and refused the key.
+    monkeypatch.setattr(objectstore.os.path, "realpath", lambda p: returned)
+    assert objectstore.direct(path) is expected
+
+
 def test_the_uri_names_the_backend_and_prefix(tmp_path):
     assert make_local(tmp_path).uri("a/b").startswith("file://")
 

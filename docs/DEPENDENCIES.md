@@ -21,7 +21,7 @@
 | `tabpfn` | TabPFN | needs an accepted Prior Labs license and `TABPFN_TOKEN`; extension-only, not in `all` |
 | `embeddings` | sentence-transformers | downloads a model on first use; not in `all` |
 | `onnx` | skl2onnx, onnxruntime, onnxmltools | for `scmle export-onnx` |
-| `tracking` | MLflow | `MlflowExperimentStore` |
+| `documents` | pypdf | PDF input for the `document` kind; text and Markdown need no extra |
 | `multimodal` | Pillow | image modality |
 | `benchmarks` | huggingface_hub | Hugging Face benchmark suite |
 

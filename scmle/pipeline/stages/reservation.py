@@ -6,7 +6,6 @@ from typing import ClassVar
 from scmle.contracts import errors
 from scmle.pipeline import engine
 from scmle.pipeline import products
-from scmle.pipeline import profiler
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import ingestion
 from scmle.pipeline.stages import interface
@@ -95,10 +94,10 @@ class Reservation(interface.Stage):
                 cannot fit in the time budget (`budget.Reserve.admit`).
         """
         reserve = board.services.governor.reserve
-        frame = board.get(ingestion.Intake).frame
+        intake = board.get(ingestion.Intake)
         parts = reserve.provision(
-            *cost.dimensions(board.services.spec, frame, None),
-            profiler.estimate,
+            *cost.dimensions(board.services.spec, intake.frame, None),
+            intake.kind.cost,
         )
         board.journal.emit(
             "budget.reserved",

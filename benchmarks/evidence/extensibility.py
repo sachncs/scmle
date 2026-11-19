@@ -685,7 +685,7 @@ class Lines(kinds.Tabular):
                 evidence_links=("probe.py",),
                 limitations=("labelled lines only",),
             )
-            for task, families in roster.TABULAR_BETA_TASK_FAMILIES[:2]
+            for task, families in kinds.TABULAR_BETA_TASK_FAMILIES[:2]
             for family in families
             for fairness in (
                 capabilities.Fairness.NONE,
@@ -859,41 +859,19 @@ KINDEDITS = (
 def pick(data: tasks.Dataset) -> Kind:''',
     ),
     Edit(
-        KINDS,
-        """        return profiler.estimate(rows, columns, classes, budget)
-""",
-        '''        return profiler.estimate(rows, columns, classes, budget)
-
-    def declare(self) -> tuple[capabilities.Capability, ...]:
-        """None: the roster declares the tabular capabilities.
-
-        Returns:
-            An empty tuple.
-        """
-        return ()
-''',
-    ),
-    Edit(
         ROSTER,
-        "from scmle.contracts import tasks\n",
-        "from scmle.contracts import tasks\nfrom scmle.pipeline import kinds\n",
-    ),
-    Edit(
-        ROSTER,
-        "    return capabilities.Registry.seed(records)\n",
-        "    records.extend(\n"
-        "        item for kind in kinds.known().values() "
-        "for item in kind.declare()\n"
-        "    )\n"
-        "    return capabilities.Registry.seed(records)\n",
+        "        record for kind in kinds.KINDS.values() for record in "
+        "kind.declare()\n",
+        "        record for kind in kinds.known().values() for record in "
+        "kind.declare()\n",
     ),
 )
 KINDREASONS = {
     PLUGINS: "the registry has no kind (entry-point group) for data kinds",
     KINDS: "`pick` reads only the built-in `KINDS` mapping",
     ROSTER: (
-        "the capability registry is built from the tabular roster alone; a "
-        "kind cannot declare what its modality supports"
+        "the capability registry enrols the built-in `KINDS` alone, not the "
+        "kinds plugins advertise"
     ),
 }
 
@@ -1069,13 +1047,14 @@ EXERCISES = (
                 "        names = self.report_names.get(task, ())\n",
             ),
             Edit(
-                ROSTER,
-                '    (tasks.Task.UPLIFT, ("baseline", "causal")),\n)\n',
-                '    (tasks.Task.UPLIFT, ("baseline", "causal")),\n'
+                KINDS,
+                '    (tasks.Task.UPLIFT, ("baseline", "linear", "causal")),'
+                "\n)\n",
+                '    (tasks.Task.UPLIFT, ("baseline", "linear", "causal")),\n'
                 '    (tasks.Task.COUNT, ("linear",)),\n)\n',
             ),
             Edit(
-                ROSTER,
+                KINDS,
                 "    tasks.Task.UPLIFT: capabilities.Evaluation.UPLIFT,\n}",
                 "    tasks.Task.UPLIFT: capabilities.Evaluation.UPLIFT,\n"
                 "    tasks.Task.COUNT: capabilities.Evaluation.STANDARD,\n}",
@@ -1103,9 +1082,9 @@ EXERCISES = (
                 "the default and reported metrics are tables keyed by every "
                 "task, and plugin metrics are never discovered"
             ),
-            ROSTER: (
-                "the capability families and evaluation of a task are tables "
-                "keyed by every task"
+            KINDS: (
+                "the tabular kind's capability families and evaluation of a "
+                "task are tables keyed by every task"
             ),
             CALIBRATION: (
                 "conformal calibration treats every task outside a fixed "

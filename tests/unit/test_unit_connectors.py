@@ -322,7 +322,9 @@ def test_filesystem_accepts_file_uris_and_rejects_others(tmp_path):
     path = tmp_path / "t.csv"
     connector = filesystem.Filesystem(path.as_uri())
     assert connector.path == path.resolve()
-    local = filesystem.Filesystem(f"file://localhost{path}")
+    local = filesystem.Filesystem(
+        path.as_uri().replace("file://", "file://localhost", 1)
+    )
     assert local.path == path.resolve()
     with pytest.raises(failure.SchemeError) as raised:
         filesystem.Filesystem("s3://b/k")

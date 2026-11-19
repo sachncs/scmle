@@ -128,9 +128,43 @@ XGBOOST_RANKER = Ranker(
 )
 """XGBoost NDCG ranker."""
 
+
+class Linear(models.Model):
+    """A linear ranker learnt from preference pairs within each query."""
+
+    name = "pairwise_linear_ranker"
+    family = "linear"
+    capabilities = models.Capabilities(RANKING, needs_scaling=True, cost=2)
+    search_space = search.Space(
+        (search.Real("penalty", 1e-3, 100.0, log=True),)
+    )
+
+    def build(
+        self,
+        task: tasks.Task,  # noqa: ARG002 -- required by Model.build
+        seed: int,
+        params: Mapping[str, Any] | None = None,
+    ) -> models.Estimator:
+        """Returns an unfitted pairwise linear ranker.
+
+        Args:
+            task: Resolved task type.
+            seed: Seed of the pair sampling.
+            params: Search-space overrides passed to the ranker.
+
+        Returns:
+            An unfitted pairwise ranker.
+        """
+        return estimators.Pairwise(random_state=seed, **dict(params or {}))
+
+
+PAIRWISE = Linear()
+"""Pairwise logistic (RankSVM-style) linear ranker: the linear family."""
+
 RANKING_ADAPTERS: tuple[models.Model, ...] = (
     Pointwise(),
     LIGHTGBM_RANKER,
     XGBOOST_RANKER,
+    PAIRWISE,
 )
 """Ranking adapter instances, in registration order."""

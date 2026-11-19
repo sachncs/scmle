@@ -4,9 +4,12 @@ from collections import defaultdict
 import dataclasses
 import hashlib
 
+import pandas
+
 from scmle.contracts import errors
-from scmle.data.modalities.curation import allocate
-from scmle.data.modalities.curation import proportions
+from scmle.data.modalities import cohorts
+from scmle.data.modalities import curation
+from scmle.data.modalities.document import likeness
 from scmle.data.modalities.document.elements import DocumentError
 from scmle.data.modalities.document.elements import Profile
 from scmle.data.modalities.document.report import Curation
@@ -138,7 +141,6 @@ class Dataset(Review):
             profiles, duplicate_groups, layouts, max_characters, max_tokens
         )
         risk_findings = self.assess(
-            duplicate_groups,
             label_counts,
             sensitive_counts,
             sensitive_document_ids,
@@ -177,48 +179,49 @@ class Dataset(Review):
         validation_fraction: float = 0.2,
         test_fraction: float = 0.2,
         seed: int = 0,
+        kin: likeness.Resemblance | None = None,
     ) -> Split:
-        """Splits samples without placing one document ID in two partitions.
+        """Splits samples without placing one document in two partitions.
 
-        Samples are shuffled at the document-ID group level, then emitted in
-        their original order within each partition. This supports chunked
-        documents and prevents content from one document leaking into a test
-        partition through another chunk.
+        Samples are grouped by document id, so the chunks of one document
+        stay together, and emitted in their original order within each
+        partition (`curation.divide`). With `kin`, each group also joins the
+        near-duplicate cluster of its content, so exact and near-duplicate
+        content never straddles partitions (MM-10), and groups are allocated
+        stratified by their most frequent label (MM-8). Without it the
+        split is the one the modality lifecycle signed its checkpoints with.
 
         Args:
-            validation_fraction: Share of document ids for validation, in
-                [0, 1).
-            test_fraction: Share of document ids for testing, in [0, 1).
-            seed: Seed of the shuffle of the sorted document ids.
+            validation_fraction: Share of groups for validation, in [0, 1).
+            test_fraction: Share of groups for testing, in [0, 1).
+            seed: Seed of the allocation.
+            kin: The near-duplicate clustering, or None to group by document
+                id alone.
 
         Returns:
-            The split. With at least three document ids a non-zero fraction
-            gets at least one id; the remaining samples form the training
+            The split. With at least three groups a non-zero fraction gets
+            at least one group; the remaining samples form the training
             set.
 
         Raises:
-            ValueError: If a fraction is outside [0, 1) or the fractions sum
-                to 1 or more.
+            InputError: If a fraction is outside [0, 1) or the fractions
+                sum to 1 or more.
         """
-        proportions(validation_fraction, test_fraction)
-
-        grouped: defaultdict[str, list[Sample]] = defaultdict(list)
-        for sample in self.samples:
-            grouped[sample.document_id].append(sample)
-        validation_ids, test_ids = allocate(
-            grouped, validation_fraction, test_fraction, seed
-        )
-        train = tuple(
-            sample
-            for sample in self.samples
-            if sample.document_id not in test_ids | validation_ids
-        )
-        validation = tuple(
-            sample
-            for sample in self.samples
-            if sample.document_id in validation_ids
-        )
-        test = tuple(
-            sample for sample in self.samples if sample.document_id in test_ids
+        curation.proportions(validation_fraction, test_fraction)
+        keys = [sample.document_id for sample in self.samples]
+        labels = None
+        if kin is not None:
+            clusters = kin.cluster([sample.content for sample in self.samples])
+            keys = likeness.merge(
+                pandas.Series(keys), pandas.Series(clusters)
+            ).tolist()
+            labels = [sample.label for sample in self.samples]
+        train, validation, test = cohorts.divide(
+            self.samples,
+            keys,
+            labels,
+            validation_fraction,
+            test_fraction,
+            seed,
         )
         return Split(train=train, validation=validation, test=test)

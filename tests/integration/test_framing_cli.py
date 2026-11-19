@@ -108,7 +108,7 @@ def test_frame_replay_without_tau_is_refused(tmp_path):
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:266.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:356.
     # Enforces website/src/learn/what-scmle-cannot-do.html:70-71.
-    # Enforces website/src/learn/when-things-go-wrong.html:147.
+    # Enforces website/src/learn/when-things-go-wrong.html:162.
     # Enforces website/src/pages/docs/artifacts.astro:119.
     # Enforces website/src/pages/docs/causal-decision.astro:46.
     inputs(tmp_path)

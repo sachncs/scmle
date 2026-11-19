@@ -72,7 +72,7 @@ def test_editing_a_field_without_resigning_fails(tmp_path):
 
 def test_an_amendment_may_only_tighten_the_budget():
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:409.
-    # Enforces website/src/learn/when-things-go-wrong.html:168-169.
+    # Enforces website/src/learn/when-things-go-wrong.html:183-184.
     base = make_charter()
     tighter = make_charter(quota=5)
     looser = make_charter(quota=20)

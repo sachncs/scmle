@@ -1,8 +1,9 @@
 """Leakage-aware splitting: strategies, immutable manifest, sealed test set.
 
 Row identifiers are positional indices into the ingested frame. Each
-strategy in `splits` (`splits.Random`, `splits.Group` ...) and `temporal`
-(`temporal.Chronology`, `temporal.Rolling`) owns one validation protocol;
+strategy in `splits` (`splits.Random`, `splits.Group` ...), `temporal`
+(`temporal.Chronology`, `temporal.Rolling`, `temporal.Succession`) and
+`spatial` (`spatial.Tiling`) owns one validation protocol;
 `Splitter` selects and applies it. The test partition lives behind a
 `lockbox.Lockbox`, which opens exactly once, with the token the
 orchestrator issues after selection.

@@ -154,7 +154,7 @@ def test_components_and_profiles_are_deterministic(
     """Components and node/edge profiles summarize valid graph evidence."""
     profile = shifted_graph.profile()
 
-    assert shifted_graph.connected_components() == (frozenset({"a", "b", "c"}),)
+    assert shifted_graph.components() == (frozenset({"a", "b", "c"}),)
     assert profile.component_count == 1
     assert profile.node.node_count == 3
     assert profile.node.feature_dimension == 2

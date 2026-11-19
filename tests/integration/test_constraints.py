@@ -50,7 +50,7 @@ def test_latency_limit_is_enforced_and_reported(binary_frame, tmp_path):
 
 def test_impossible_constraints_block_the_run(binary_frame, tmp_path):
     # Enforces README.md:151.
-    # Enforces website/src/pages/index.astro:313.
+    # Enforces website/src/pages/index.astro:326.
     limit = tasks.Selection(max_model_mb=1e-6, max_candidates_checked=3)
     with pytest.raises(errors.BlockedError, match="satisfies") as caught:
         run(binary_frame, tmp_path, limit)

@@ -177,12 +177,42 @@ def test_estimate_rejects_an_impossible_shape():
         profiler.estimate(-1, 3, 2, 60)
 
 
-def test_the_label_noise_check_is_priced_as_it_runs():
-    # gina: 2,522 development rows of 970 columns took 8.8 s, which the
-    # narrow-table `label_noise.cost` put at 1.1 s.
-    assert label_noise.cost(2522, 970, 2) < 1.5
-    assert 8.8 <= profiler.noise(2522, 970, 2, 30) < 8.8 * 1.1
-    assert profiler.noise(2522, 970, 10, 30) == 0.0  # skipped: no rows fit
+@pytest.mark.parametrize(
+    ("rows", "columns", "classes", "budget"),
+    [
+        (2522, 970, 2, 30),
+        (2522, 970, 2, 60),
+        (3000, 1776, 2, 60),
+        (1274, 256, 10, 60),
+        (1600, 30, 2, 60),
+        (100, 2, 2, 60),
+    ],
+)
+def test_the_label_noise_check_is_priced_by_its_own_cost_model(
+    rows, columns, classes, budget
+):
+    # One model decides both how many rows the check admits and what the
+    # preparation estimate charges for it, so the two cannot disagree.
+    allowance = budget * label_noise.SHARE
+    admitted = label_noise.affordable(columns, classes, allowance)
+    checked = min(rows, label_noise.MAX_ROWS, admitted)
+    priced = profiler.noise(rows, columns, classes, budget)
+    assert priced == pytest.approx(label_noise.cost(checked, columns, classes))
+    assert priced <= allowance * (1 + 1e-9)
+
+
+def test_the_label_noise_cost_bounds_the_measured_checks():
+    # Measured 2026-11-19 (OMP_NUM_THREADS=1, 60 s budget): gina's check
+    # took 2.91 s on 638 of 970-column rows, Bioresponse's 2.21 s on 348 of
+    # 1,776; gina took 8.8 s on all 2,522 rows.
+    assert label_noise.cost(638, 970, 2) >= 2.91
+    assert label_noise.cost(348, 1776, 2) >= 2.21
+    assert label_noise.cost(2522, 970, 2) >= 8.8
+    assert profiler.noise(2522, 970, 2, 60) >= 2.91
+
+
+def test_a_skipped_label_noise_check_is_free():
+    assert profiler.noise(2522, 970, 10, 30) == 0.0  # no MIN_ROWS rows fit
     assert profiler.noise(1274, 256, 10, 60) > profiler.noise(1274, 256, 2, 60)
 
 
@@ -190,8 +220,14 @@ def test_the_rest_grows_with_the_columns():
     assert profiler.rest(2522, 970) > 2 * profiler.rest(2522, 0)
 
 
-def test_gina_preparation_is_estimated_within_its_measured_seconds():
-    # Measured 2026-11-19: 20.7 s to the first trial at a 30 s budget and
-    # 22.8 s at 60 s (OMP_NUM_THREADS=1).
-    assert profiler.estimate(2522, 970, 2, 30) >= 20.7
-    assert profiler.estimate(2522, 970, 2, 60) >= 22.8
+@pytest.mark.parametrize(
+    ("rows", "columns", "measured"),
+    [(2522, 970, 13.7), (3000, 1776, 7.4), (2623, 1558, 12.9)],
+)
+def test_wide_preparation_is_estimated_within_its_measured_seconds(
+    rows, columns, measured
+):
+    # Seconds to the first trial at a 60 s budget, measured 2026-11-19
+    # (OMP_NUM_THREADS=1, beside a mutation run) with the label-noise check
+    # sampled to its allowance: gina, Bioresponse, Internet-Advertisements.
+    assert profiler.estimate(rows, columns, 2, 60) >= measured

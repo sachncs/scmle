@@ -87,6 +87,15 @@ class Server(abc.ABC):
             raise guard.UnreadyError("the model is not loaded")
         return self.loaded
 
+    def serial(self) -> bool:
+        """Whether scoring is serialized: the model has series features.
+
+        Returns:
+            True when a loaded bundle has series features, whose remembered
+            history makes score and remember one step.
+        """
+        return bool(self.loaded and self.loaded.schema.series)
+
     @property
     def artifact_digest(self) -> str:
         """Digest of the manifest of the bundle being served."""

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 from typing import TYPE_CHECKING
 from typing import TypedDict
@@ -214,14 +215,15 @@ class Imagery(curators.Preparer):
         """Builds raster shape, CRS, transform, and label evidence.
 
         Returns:
-            The curation report, with decoded pixel statistics if a decoder is
-            set (otherwise a metadata-only marker) and warnings for mixed
-            shapes, CRS or data types and for unknown nodata handling.
+            The curation report for modality `raster` (register row MM-4),
+            with decoded pixel statistics if a decoder is set (otherwise a
+            metadata-only marker) and warnings for mixed shapes, CRS or data
+            types and for unknown nodata handling.
         """
         profile = survey(self)
         quality_findings = flaws(self, profile)
         return curation.Curation(
-            modality="geospatial-raster",
+            modality=modalities.serialise(self.modality),
             dataset_hash=self.digest,
             sample_count=len(self.dataset),
             profile=profile,
@@ -539,6 +541,9 @@ def survey(preparer: Imagery) -> Survey:
 def decoding(preparer: Imagery) -> Pixels:
     """Profiles decoded pixel values, or marks the rasters metadata-only.
 
+    Each raster is decoded once and dropped before the next, so the
+    profile holds one decoded array at a time (register row MM-6).
+
     Args:
         preparer: Preparer whose rasters and decoder are profiled.
 
@@ -553,26 +558,26 @@ def decoding(preparer: Imagery) -> Pixels:
             "decoder": None,
             "max_pixels": preparer.max_pixels,
         }
-    decoded = [
-        sample.decode(decoder, max_pixels=preparer.max_pixels)
-        for sample in preparer.dataset
-    ]
-    measured = (
-        sample.measured_nodata_fraction(decoder, max_pixels=preparer.max_pixels)
-        for sample in preparer.dataset
-        if sample.nodata_value is not None
-    )
-    shapes = sorted({tuple(values.shape) for values in decoded})
+    shapes: set[tuple[int, ...]] = set()
+    low, high = math.inf, -math.inf
+    measured = []
+    for sample in preparer.dataset:
+        values = sample.decode(decoder, max_pixels=preparer.max_pixels)
+        shapes.add(tuple(values.shape))
+        low = min(low, float(values.min()))
+        high = max(high, float(values.max()))
+        if sample.nodata_value is not None:
+            measured.append(
+                float(numpy.equal(values, sample.nodata_value).mean())
+            )
     return {
         "status": "decoded",
         "decoder": preparer.decoder_name,
         "max_pixels": preparer.max_pixels,
-        "shapes": [list(shape) for shape in shapes],
-        "minimum": min(float(values.min()) for values in decoded),
-        "maximum": max(float(values.max()) for values in decoded),
-        "measured_nodata_fraction": sorted(
-            value for value in measured if value is not None
-        ),
+        "shapes": [list(shape) for shape in sorted(shapes)],
+        "minimum": low,
+        "maximum": high,
+        "measured_nodata_fraction": sorted(measured),
     }
 
 

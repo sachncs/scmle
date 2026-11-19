@@ -203,7 +203,7 @@ def test_incremental_state_rejects_cross_source_reads_and_commits(tmp_path):
 def test_idempotent_sink_commit_filters_duplicates_and_persists_receipt(
     tmp_path,
 ):
-    # Enforces website/src/pages/docs/data.astro:90.
+    # Enforces website/src/pages/docs/data.astro:152.
     source = incremental.SequenceEventSource(
         "memory://events", [event("a", 1, 0), event("b", 2, 1)]
     )

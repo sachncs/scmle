@@ -789,8 +789,9 @@ def hygiene(
         record["refused"] = f"{type(error).__name__}: {error}"[:300]
         return record
     record["strategy"] = manifest.strategy
-    copies = duplicates.duplicate_groups(rows, splitter.feature_columns(rows))
-    copies = numpy.where(copies == duplicates.NOT_DUPLICATED, None, copies)
+    groups = duplicates.duplicate_groups(rows, splitter.feature_columns(rows))
+    copies = groups.astype(object)
+    copies[groups == duplicates.NOT_DUPLICATED] = None
     columns = {
         "entity": data.group_column,
         "time": data.time_column,

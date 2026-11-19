@@ -200,6 +200,8 @@ def test_availability_is_declared_only_where_documented() -> None:
     assert declared == {
         "leak/bank_duration": ("V12",),
         "leak/taxi_total": ("total_amount",),
+        "leak/tecator_moisture": ("moisture",),
+        "leak/tecator_protein": ("protein",),
     }
     for name, columns in declared.items():
         assert leakage.catalog()[name].column in columns
@@ -224,7 +226,8 @@ def test_documented_leak_columns_of_rule_tables_are_leak_cases() -> None:
             assert case.table.drop == tuple(
                 other for other in columns if other != column
             )
-            assert case.known == ()
+            # The source lists them as outputs ("real_out=3").
+            assert case.known == (column,)
     real = [c for c in catalog.values() if c.provenance == leakage.REAL]
     assert len(real) == 6
 

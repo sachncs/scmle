@@ -1148,8 +1148,8 @@ def test_geospatial_lifecycle_emits_crs_bound_explanation(tmp_path: Path):
 def test_geospatial_curation_records_boundary_leakage_warning():
     """The adapter carries envelope-crossing evidence into curation.
 
-    Also enforces website/src/pages/docs/api.astro:259.
-    Also enforces website/src/pages/docs/data.astro:173.
+    Also enforces website/src/pages/docs/api.astro:408.
+    Also enforces website/src/pages/docs/data.astro:278.
     """
     adapter = modality_lifecycle.GeospatialPreparer(
         geospatial.Dataset(
@@ -1439,14 +1439,14 @@ def test_lifecycle_compares_against_a_repeated_performance_baseline(
 
 
 def test_blocking_geospatial_curation_stops_before_packaging(tmp_path: Path):
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:177-160.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:177-181.
     """Missing CRS evidence blocks before a model or package is created.
 
-    Also enforces website/src/learn/when-things-go-wrong.html:78.
+    Also enforces website/src/learn/when-things-go-wrong.html:93.
     Also enforces website/src/pages/docs/cards.astro:32.
-    Also enforces website/src/pages/docs/data.astro:118.
-    Also enforces website/src/pages/docs/modalities.astro:105.
-    Also enforces website/src/pages/docs/operations.astro:113.
+    Also enforces website/src/pages/docs/data.astro:188.
+    Also enforces website/src/pages/docs/modalities.astro:123.
+    Also enforces website/src/pages/docs/operations.astro:179.
     Also enforces website/src/pages/docs/modeling.astro:19.
     Also enforces website/src/pages/docs/operating-loop.astro:18.
     """

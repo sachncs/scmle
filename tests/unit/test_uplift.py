@@ -128,6 +128,7 @@ def test_configured_instances_and_class_style_subclasses_build_learners():
         ("uplift_t_learner", estimators.TLearner),
         ("uplift_s_learner", estimators.SingleModelLearner),
         ("uplift_x_learner", estimators.CrossLearner),
+        ("uplift_linear_t_learner", estimators.TLearner),
     ]
     legacy = ClassStyleUplift()
     assert (legacy.name, legacy.family) == ("class_style_uplift", "causal")

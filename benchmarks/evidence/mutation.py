@@ -112,6 +112,15 @@ BUDGET = 45 * 60
 # A frame of mutmut's own code in a traceback, and of its worker pool.
 TOOL = re.compile(r'File "[^"]*[/\\]mutmut[/\\]')
 POOL = re.compile(r'File "[^"]*[/\\]mutmut[/\\]workers[/\\]')
+# mutmut's runners, the first the default. The fork runner reaps any child
+# of its process and dies with `KeyError: <pid>` on one it did not start (a
+# helper a kill-set test left unreaped, such as the sealed test set's
+# governance process); the fork-server runner forks the tests from a
+# separate process and ignores such children, so a module whose attempt
+# died that way is retried under it.
+ISOLATION = ("fork", "forkserver")
+# The last line of a crash on a child the fork runner did not start.
+STRAY = re.compile(r"^KeyError: \d+$")
 # The last line of a traceback: an exception class and its message (not a
 # line mutmut prints before a deliberate exit, such as "FAILED: ...").
 RAISED = re.compile(r"^(\w+\.)*\w*(Error|Exception|Interrupt|Exit)(: .*)?$")
@@ -479,13 +488,16 @@ def snapshot(target: Path) -> None:
             shutil.copy2(entry, target / entry.name)
 
 
-def configure(work: Path, path: str, tests: list[str]) -> None:
+def configure(
+    work: Path, path: str, tests: list[str], isolation: str = ISOLATION[0]
+) -> None:
     """Writes the mutmut configuration for one module.
 
     Args:
         work: The work tree.
         path: Module to mutate.
         tests: Its kill set; empty means no test runs.
+        isolation: mutmut's runner, one of `ISOLATION`.
     """
     shutil.rmtree(work / "mutants", ignore_errors=True)
     copied = sorted(
@@ -501,6 +513,7 @@ def configure(work: Path, path: str, tests: list[str]) -> None:
         f"timeout_multiplier = {MULTIPLIER}",
         f"timeout_constant = {CONSTANT}",
         "use_git_change_detection = false",
+        f"process_isolation = {isolation}",
         "pytest_add_cli_args =\n    -p\n    no:cacheprovider\n    -k\n    "
         + STALENESS,
     ]
@@ -528,11 +541,15 @@ def environment() -> dict[str, str]:
     """The environment of every mutmut process.
 
     Returns:
-        The current environment with one thread per numeric library.
+        The current environment with one thread per numeric library, and
+        with macOS's check that aborts (exit -6) a forked child initialising
+        an Objective-C class another thread was initialising at the fork
+        turned off, as the fork-server runner forks after threads start.
     """
     found = dict(os.environ)
     for name in THREADS:
         found[name] = "1"
+    found["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] = "YES"
     return found
 
 
@@ -651,12 +668,27 @@ def pooled(output: str) -> bool:
     return POOL.search(output) is not None
 
 
+def stray(output: str) -> bool:
+    """Whether the fork runner died on a child it did not start.
+
+    Args:
+        output: The tail of mutmut's output.
+
+    Returns:
+        True when the traceback passes through the worker pool and ends in
+        `KeyError: <pid>`.
+    """
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    return pooled(output) and bool(lines) and bool(STRAY.match(lines[-1]))
+
+
 def trial(
     work: Path,
     path: str,
     position: int,
     workers: int,
     limit: float,
+    isolation: str = ISOLATION[0],
 ) -> tuple[list[str], dict[str, int | None], str | None, int, str]:
     """One attempt: generates, draws and runs one module's mutants.
 
@@ -666,6 +698,7 @@ def trial(
         position: Its place in the sorted sample.
         workers: mutmut's `--max-children`.
         limit: Wall seconds for the attempt.
+        isolation: mutmut's runner, one of `ISOLATION`.
 
     Returns:
         The drawn names, their exit codes (None when not run), a note on
@@ -674,7 +707,7 @@ def trial(
     """
     started = time.monotonic()
     tests = suite(path, work)
-    configure(work, path, tests)
+    configure(work, path, tests, isolation)
     status, output = call(work, ["-c", GENERATE], limit)
     names = pick(list(codes(work, path)), position, design()[1])
     if status != 0:
@@ -711,30 +744,36 @@ def examine(
 
     Returns:
         The module's kill set, drawn mutants, counts per status, the
-        mutants not run, every crashed attempt, whether it is undecided, a
-        note on anything that went wrong, its file fingerprint and the
-        seconds taken.
+        mutants not run, every crashed attempt, whether it is undecided, the
+        runner of the last attempt, a note on anything that went wrong, its
+        file fingerprint and the seconds taken.
     """
     started = time.monotonic()
     tests = suite(path, work)
     retries: list[dict[str, Any]] = []
     workers = WORKERS
+    isolation = ISOLATION[0]
     while True:
         left = limit - (time.monotonic() - started)
         names, outcome, note, status, output = trial(
-            work, path, position, workers, left
+            work, path, position, workers, left, isolation
         )
         error = None if idle(output) else fault(status, output)
         if error is None:
             break
-        retries.append({"workers": workers, "exception": error})
+        retries.append(
+            {"workers": workers, "isolation": isolation, "exception": error}
+        )
+        if stray(output):
+            isolation = ISOLATION[1]
         if pooled(output):
             workers = 1
         spent = time.monotonic() - started >= limit
         if len(retries) >= attempts() or spent:
             break
     crashes = "; ".join(
-        f"attempt {i} ({r['workers']} workers) crashed in mutmut: "
+        f"attempt {i} ({r['workers']} workers, {r['isolation']}) crashed "
+        "in mutmut: "
         f"{r['exception']}"
         for i, r in enumerate(retries, 1)
     )
@@ -760,6 +799,7 @@ def examine(
         "survivors": sorted(n for n, c in outcome.items() if c == 0),
         "retries": retries,
         "undecided": error is not None,
+        "isolation": isolation,
         "note": note,
         "files": fingerprint([path, *tests], work),
         "seconds": round(time.monotonic() - started, 1),
@@ -899,8 +939,11 @@ def measure() -> dict[str, Any]:
             "attempts": attempts(),
             "retry": "a mutmut process that dies with an exception in "
             "mutmut's own code is discarded and the module run again from "
-            "scratch, single-worker after a worker-pool crash; a module "
-            "crashing on every attempt is undecided",
+            "scratch, single-worker after a worker-pool crash and under the "
+            "fork-server runner after a crash on a child mutmut did not "
+            "start; a module crashing on every attempt is undecided",
+            "isolation": f"mutmut process_isolation {ISOLATION[0]}, "
+            f"{ISOLATION[1]} on retry after a stray-child crash",
             "timeout": f"2 * {MULTIPLIER} * (baseline + {CONSTANT}) CPU s",
             "cap_seconds": CAP,
             "budget_seconds": BUDGET,

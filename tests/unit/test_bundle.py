@@ -86,7 +86,7 @@ def test_unknown_categories_and_missing_values_are_reported(trained):
 
 def test_tampering_is_detected(trained, tmp_path):
     # Enforces README.md:154.
-    # Enforces website/src/pages/index.astro:433.
+    # Enforces website/src/pages/index.astro:446.
     bundle = trained[0]
     directory = bundle.save(tmp_path / "m")
     with (directory / scmle.artifacts.bundle.MODEL_FILE).open("ab") as handle:
@@ -107,7 +107,7 @@ def test_schema_tampering_is_detected(trained, tmp_path):
 def test_version_mismatch_blocks_unless_allowed(trained, tmp_path):
     # Enforces docs/SECURITY.md:27.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:473.
-    # Enforces website/src/learn/when-things-go-wrong.html:187.
+    # Enforces website/src/learn/when-things-go-wrong.html:202.
     # Enforces website/src/pages/docs/threat-model.astro:8.
     bundle, features = trained
     directory = bundle.save(tmp_path / "m")
@@ -178,7 +178,7 @@ def test_a_member_naming_a_missing_module_is_refused(tmp_path, trained):
 def test_legacy_bundle_requires_opt_in_and_can_be_migrated(tmp_path, trained):
     # Enforces docs/API_STABILITY.md:279.
     # Enforces website/src/pages/docs/api-stability.astro:83.
-    # Enforces website/src/pages/docs/api.astro:283.
+    # Enforces website/src/pages/docs/api.astro:489.
     directory = trained[0].save(tmp_path / "legacy")
     manifest_path = directory / scmle.artifacts.bundle.MANIFEST_FILE
     manifest = json.loads(manifest_path.read_text())
@@ -301,17 +301,17 @@ def test_unsigned_bundles_are_refused_unless_trusted(
     # Enforces docs/BEGINNER_FINDINGS.md:37.
     # Enforces website/src/learn/beginner-findings.html:22.
     # Enforces website/src/learn/glossary.html:302.
-    # Enforces website/src/learn/start-here.html:218.
+    # Enforces website/src/learn/start-here.html:221.
     # Enforces website/src/pages/docs/artifacts.astro:130.
-    # Enforces website/src/pages/docs/quickstart.astro:118.
-    # Enforces website/src/pages/docs/quickstart.astro:92.
+    # Enforces website/src/pages/docs/quickstart.astro:122.
     # Enforces website/src/pages/docs/quickstart.astro:94.
+    # Enforces website/src/pages/docs/quickstart.astro:96.
     # Enforces website/src/pages/docs/threat-model.astro:6.
     # Enforces website/src/pages/docs/threat-model.astro:67.
-    # Enforces website/src/pages/index.astro:223.
-    # Enforces website/src/pages/index.astro:237.
-    # Enforces website/src/pages/index.astro:433.
-    # Enforces website/src/pages/docs/cli.astro:99.
+    # Enforces website/src/pages/index.astro:236.
+    # Enforces website/src/pages/index.astro:250.
+    # Enforces website/src/pages/index.astro:446.
+    # Enforces website/src/pages/docs/cli.astro:144.
     monkeypatch.delenv(scmle.contracts.signing.SIGNING_KEY_ENV, raising=False)
     bundle, features = trained
     directory = bundle.save(tmp_path / "m")
@@ -331,14 +331,14 @@ def test_signed_bundles_load_without_trust_and_detect_tampering(
     # Enforces docs/BENCHMARKS.md:18.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:458.
     # Enforces README.md:154.
-    # Enforces website/src/learn/when-things-go-wrong.html:181.
+    # Enforces website/src/learn/when-things-go-wrong.html:196.
     # Enforces website/src/pages/docs/benchmarks.astro:719-721.
     # Enforces website/src/pages/docs/artifacts.astro:130.
-    # Enforces website/src/pages/docs/quickstart.astro:94.
+    # Enforces website/src/pages/docs/quickstart.astro:96.
     # Enforces website/src/pages/docs/threat-model.astro:6.
-    # Enforces website/src/pages/index.astro:223.
-    # Enforces website/src/pages/index.astro:413.
-    # Enforces website/src/pages/index.astro:433.
+    # Enforces website/src/pages/index.astro:236.
+    # Enforces website/src/pages/index.astro:426.
+    # Enforces website/src/pages/index.astro:446.
     monkeypatch.delenv(scmle.contracts.signing.SIGNING_KEY_ENV, raising=False)
     bundle, features = trained
     directory = bundle.save(tmp_path / "m", signing_key="s3cret")
@@ -359,8 +359,8 @@ def test_a_swapped_model_file_cannot_ride_a_valid_signature(
     # Enforces docs/BENCHMARKS.md:18.
     # Enforces README.md:154.
     # Enforces website/src/pages/docs/benchmarks.astro:719-721.
-    # Enforces website/src/pages/index.astro:223.
-    # Enforces website/src/pages/index.astro:413.
+    # Enforces website/src/pages/index.astro:236.
+    # Enforces website/src/pages/index.astro:426.
     monkeypatch.delenv(scmle.contracts.signing.SIGNING_KEY_ENV, raising=False)
     bundle = trained[0]
     good = bundle.save(tmp_path / "good", signing_key="k")
@@ -379,7 +379,7 @@ def test_a_swapped_model_file_cannot_ride_a_valid_signature(
 def test_a_signed_bundle_with_no_key_is_refused_even_when_trusted(
     trained, tmp_path, monkeypatch
 ):
-    # Enforces website/src/pages/docs/quickstart.astro:113.
+    # Enforces website/src/pages/docs/quickstart.astro:116.
     # Enforces website/src/pages/docs/threat-model.astro:6.
     monkeypatch.delenv(scmle.contracts.signing.SIGNING_KEY_ENV, raising=False)
     monkeypatch.delenv(
@@ -438,8 +438,8 @@ def test_default_policy_requires_exact_column_names(trained):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:482.
     # Enforces docs/START_HERE.md:541.
     # Enforces website/src/learn/glossary.html:294.
-    # Enforces website/src/learn/start-here.html:276.
-    # Enforces website/src/learn/when-things-go-wrong.html:189.
+    # Enforces website/src/learn/start-here.html:279.
+    # Enforces website/src/learn/when-things-go-wrong.html:204.
     bundle, features = trained
     renamed = features.rename(columns={"num": "NUM"})
     with pytest.raises(errors.SchemaError, match="missing"):
@@ -448,7 +448,7 @@ def test_default_policy_requires_exact_column_names(trained):
 
 def test_explicit_renames_map_incoming_names(trained):
     # Enforces docs/START_HERE.md:541.
-    # Enforces website/src/learn/start-here.html:276.
+    # Enforces website/src/learn/start-here.html:279.
     bundle, features = trained
     renamed = features.rename(columns={"num": "customer_age", "cat": "segment"})
     mapping = scmle.inference.mapping.Mapper(
@@ -463,7 +463,7 @@ def test_explicit_renames_map_incoming_names(trained):
 
 def test_case_and_whitespace_insensitive_matching_is_opt_in(trained):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:482.
-    # Enforces website/src/learn/when-things-go-wrong.html:189.
+    # Enforces website/src/learn/when-things-go-wrong.html:204.
     bundle, features = trained
     messy = features.rename(columns={"num": "  NUM ", "cat": "Cat"})
     with pytest.raises(errors.SchemaError):

@@ -29,6 +29,7 @@ from scmle.contracts import tasks
 import scmle.contracts.metrics
 from scmle.evaluation import metrics
 from scmle.pipeline import engine
+from scmle.preparation import preprocessing
 from scmle.preparation import strategies
 from scmle.runtime import limits
 
@@ -76,6 +77,8 @@ class Payload:
         ceiling_seconds: Hard time ceiling for the trial (None = none).
         memory_gb: Hard memory cap for the trial (None = none).
         weighted: Score folds with the feature plan's weight column.
+        featurise: Builds the featuriser of the plan: the data kind's
+            (`kinds.Kind.featurise`).
     """
 
     job: Job
@@ -93,6 +96,7 @@ class Payload:
     ceiling_seconds: float | None = None
     memory_gb: float | None = None
     weighted: bool = False
+    featurise: preprocessing.Featuriser | None = None
 
 
 TRAIN_SCORE_ROWS = 2000
@@ -239,6 +243,7 @@ def evaluate_payload(payload: Payload) -> experiments.Trial:
             payload.task,
             payload.seed,
             job.params,
+            featurise=payload.featurise,
         )
         raw_scores, raw_train_scores = crossfit(payload, pipeline, result)
         scores = [metric.naturalise(float(s)) for s in raw_scores]
@@ -326,18 +331,25 @@ class Runner:
         profile: The development-set profile.
         feature_plan: Feature columns by kind.
         folds: Cross-validation folds as lists of positions.
+        featurise: Builds the featuriser of the plan: the data kind's.
     """
 
     def __init__(
-        self, board: engine.Board, partition: "profiling.Partition"
+        self,
+        board: engine.Board,
+        partition: "profiling.Partition",
+        featurise: preprocessing.Featuriser | None = None,
     ) -> None:
         """Initializes the runner from the run's partition.
 
         Args:
             board: Run board, holding the services and the journal.
             partition: The partition: the split, profile, task and metric.
+            featurise: Builds the featuriser of the plan
+                (`kinds.Kind.featurise`); the table's by default.
         """
         self.board = board
+        self.featurise = featurise
         self.split = partition.split
         self.task = partition.task
         self.metric = partition.metric
@@ -386,6 +398,7 @@ class Runner:
                 and self.feature_plan.weight_column
                 and self.metric.weightable()
             ),
+            featurise=self.featurise,
         )
 
     def run(

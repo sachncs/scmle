@@ -77,6 +77,7 @@ class Strategy(abc.ABC):
         task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
+        featurise: preprocessing.Featuriser | None = None,
     ) -> models.Estimator:
         """Builds the complete, unfitted candidate.
 
@@ -86,6 +87,8 @@ class Strategy(abc.ABC):
             task: Resolved task type.
             seed: Random seed.
             params: Hyperparameter overrides.
+            featurise: Builds the featuriser of the plan: the data kind's
+                (`kinds.Kind.featurise`).
 
         Returns:
             The candidate estimator (preprocessing included).
@@ -123,6 +126,7 @@ class Default(Strategy):
         task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
+        featurise: preprocessing.Featuriser | None = None,
     ) -> models.Estimator:
         """Builds the standard pipeline.
 
@@ -132,11 +136,13 @@ class Default(Strategy):
             task: Resolved task type.
             seed: Random seed.
             params: Hyperparameter overrides.
+            featurise: Builds the featuriser of the plan: the data kind's
+                (`kinds.Kind.featurise`).
 
         Returns:
             The unfitted candidate estimator, preprocessing included.
         """
         pipeline: models.Estimator = preprocessing.instantiate(
-            plan, adapter, task, seed, params
+            plan, adapter, task, seed, params, featurise=featurise
         )
         return pipeline

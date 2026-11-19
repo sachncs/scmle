@@ -216,6 +216,7 @@ class FinalEvaluationStage(summary.Summary):
                 task,
                 board.services.spec.validation.seed,
                 selected.params,
+                featurise=board.get(ingestion.Intake).kind.featurise,
             )
             pipeline.fit(split.dev_features, split.dev_target)
         return pipeline
@@ -273,6 +274,7 @@ class FinalEvaluationStage(summary.Summary):
             task,
             board.services.spec.validation.seed,
             selected.params,
+            featurise=board.get(ingestion.Intake).kind.featurise,
         )
         fitted.fit(features, target)
         unlabeled = board.get(labelling.Resolution).unlabeled

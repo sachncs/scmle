@@ -205,7 +205,7 @@ def test_a_charter_run_writes_the_admissibility_artifacts(
     binary_frame, tmp_path
 ):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:269.
-    # Enforces website/src/learn/when-things-go-wrong.html:110.
+    # Enforces website/src/learn/when-things-go-wrong.html:125.
     result = run(binary_frame, tmp_path, inscribe(tmp_path))
     folder = pathlib.Path(result.run_dir)
 
@@ -282,7 +282,7 @@ def test_a_valid_attestation_keeps_a_certified_suspect_and_is_ledgered(
     binary_frame, tmp_path
 ):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:318.
-    # Enforces website/src/learn/when-things-go-wrong.html:135.
+    # Enforces website/src/learn/when-things-go-wrong.html:150.
     attestation = {
         "column": "echo",
         "lead_seconds": 60.0,
@@ -531,7 +531,7 @@ def test_a_charter_without_rules_is_reported_as_not_chartered(
 
 def test_a_specification_that_contradicts_the_chartered_rule_is_refused():
     # Enforces docs/CLI.md:146.
-    # Enforces website/src/pages/docs/cli.astro:68.
+    # Enforces website/src/pages/docs/cli.astro:110.
     from scmle.pipeline import stages
 
     assert stages.governing("x", "by", None, "by") == "by"

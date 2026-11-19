@@ -130,11 +130,14 @@ def test_unpack_handles_collections_and_rejects_bad_types():
 
 
 def test_autocorrelate_computes_morans_i():
-    assert geometry.autocorrelate(numpy.array([1.0, 1.0, 3.0]), [(0, 1)]) == 0.5
-    assert (
-        geometry.autocorrelate(numpy.array([1.0, 2.0, 3.0]), [(0, 1), (1, 2)])
-        == 0.0
+    # Exact in real arithmetic; the platform's dot product may round the
+    # last bit (0.5000000000000001 on Windows).
+    clustered = geometry.autocorrelate(numpy.array([1.0, 1.0, 3.0]), [(0, 1)])
+    assert clustered == pytest.approx(0.5)
+    line = geometry.autocorrelate(
+        numpy.array([1.0, 2.0, 3.0]), [(0, 1), (1, 2)]
     )
+    assert line == pytest.approx(0.0, abs=1e-12)
     negative = geometry.autocorrelate(numpy.array([1.0, 3.0, 1.0]), [(0, 1)])
     assert negative == pytest.approx(-1.0)
 
@@ -305,7 +308,7 @@ def test_pairs_enforces_the_match_limit():
 
 
 def test_transform_guards_feature_metadata():
-    # Enforces website/src/pages/docs/api.astro:278.
+    # Enforces website/src/pages/docs/api.astro:484.
     features = [mark("a", 1, 2, properties={"k": 1})]
 
     def shift(feature, source, target):
@@ -335,7 +338,7 @@ def test_transform_guards_feature_metadata():
 
 
 def test_a_dataset_hash_binds_crs_and_ignores_order():
-    # Enforces website/src/pages/docs/api.astro:279.
+    # Enforces website/src/pages/docs/api.astro:485.
     first, second = mark("a", 0, 0), mark("b", 1, 1)
     forward = dataset.Dataset((first, second), crs=" EPSG:4326 ")
     assert forward.crs == "EPSG:4326"
@@ -568,7 +571,7 @@ def test_prepare_features_lists_bounds_and_centroids():
 
 
 def test_envelop_and_straddle_count_blocks():
-    # Enforces website/src/pages/docs/api.astro:259.
+    # Enforces website/src/pages/docs/api.astro:408.
     line = geometry.Placemark(
         "l", {"type": "LineString", "coordinates": [[0, 0], [2.5, 0.5]]}
     )
@@ -592,8 +595,8 @@ def test_envelop_and_straddle_count_blocks():
 
 
 def test_tile_keeps_each_block_in_one_partition():
-    # Enforces website/src/pages/docs/api.astro:259.
-    # Enforces website/src/pages/docs/data.astro:220.
+    # Enforces website/src/pages/docs/api.astro:408.
+    # Enforces website/src/pages/docs/data.astro:349.
     features = tuple(mark(str(i), float(i), 0.0) for i in range(10))
     data = dataset.Dataset(features, crs="X")
     partition = data.tile(2.0, 0.2, 0.2, seed=0)
@@ -640,7 +643,7 @@ def payload_tile(**kwargs):
 
 
 def test_a_tile_validates_its_metadata():
-    # Enforces website/src/pages/docs/data.astro:220.
+    # Enforces website/src/pages/docs/data.astro:349.
     tile = payload_tile(nodata_value=0)
     assert tile.byte_size == 6
     assert tile.nodata_value == 0.0

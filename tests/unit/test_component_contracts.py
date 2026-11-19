@@ -78,7 +78,7 @@ def concrete_subclasses(base, *modules):
 def test_every_concrete_component_implements_its_abstract_interface(
     base, modules
 ):
-    # Enforces website/src/pages/docs/extensions.astro:76.
+    # Enforces website/src/pages/docs/extensions.astro:134.
     implementations = concrete_subclasses(base, *modules)
     assert implementations, f"no implementations of {base.__name__} found"
     concrete = [cls for cls in implementations if not inspect.isabstract(cls)]

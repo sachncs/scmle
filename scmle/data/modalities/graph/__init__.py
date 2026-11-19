@@ -25,6 +25,8 @@ from scmle.data.modalities.graph.evidence import Profile
 from scmle.data.modalities.graph.files import edgelist
 from scmle.data.modalities.graph.files import link
 from scmle.data.modalities.graph.identity import graph_identity
+from scmle.data.modalities.graph.preparation import chronicle
+from scmle.data.modalities.graph.preparation import debut
 from scmle.data.modalities.graph.preparation import featurize
 from scmle.data.modalities.graph.preparation import induct
 from scmle.data.modalities.graph.preparation import prepare_features
@@ -46,6 +48,8 @@ __all__ = [
     "TemporalError",
     "Validation",
     "ValidationError",
+    "chronicle",
+    "debut",
     "edgelist",
     "featurize",
     "graph_identity",

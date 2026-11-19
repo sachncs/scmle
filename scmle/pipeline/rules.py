@@ -7,6 +7,7 @@ and the `Planner` that applies it.
 """
 
 import abc
+from collections.abc import Callable
 import dataclasses
 
 from scmle.contracts import data
@@ -39,6 +40,9 @@ class Situation:
         task: Resolved task type.
         approved_models: Models a human approved, or None for no restriction.
         history: Past runs available for meta-learning.
+        cost: The preparation cost model of the data's kind
+            (`kinds.Kind.cost`): seconds from rows, columns, classes and
+            budget.
     """
 
     spec: tasks.Config
@@ -46,6 +50,7 @@ class Situation:
     task: tasks.Task
     approved_models: tuple[str, ...] | None = None
     history: tuple[experiments.Precedent, ...] = ()
+    cost: Callable[[int, int, int, float], float] = profiler.estimate
 
 
 def shape(context: Situation) -> tuple[int, int, int]:
@@ -77,7 +82,7 @@ def window(context: Situation) -> float:
     rows, columns, classes = shape(context)
     seconds = context.spec.resources.time_budget_seconds
     held = sum(budget.reservation(rows, columns, classes, seconds).values())
-    prepared = profiler.estimate(rows, columns, classes, seconds)
+    prepared = context.cost(rows, columns, classes, seconds)
     return max(seconds - prepared - held, 0.0)
 
 

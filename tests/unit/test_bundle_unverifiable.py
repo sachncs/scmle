@@ -55,9 +55,9 @@ def test_trusted_load_refuses_a_signature_it_cannot_check(rehashed):
     # Enforces docs/CLI.md:272.
     # Enforces docs/GLOSSARY.md:613.
     # Enforces website/src/learn/glossary.html:306.
-    # Enforces website/src/pages/docs/quickstart.astro:118.
+    # Enforces website/src/pages/docs/quickstart.astro:122.
     # Enforces website/src/pages/docs/threat-model.astro:67.
-    # Enforces website/src/pages/docs/cli.astro:99.
+    # Enforces website/src/pages/docs/cli.astro:144.
     with pytest.raises(errors.ArtifactError, match="no signing key set"):
         scmle.artifacts.bundle.Bundle.load(rehashed, trusted=True)
 

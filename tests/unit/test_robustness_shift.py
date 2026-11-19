@@ -264,9 +264,9 @@ def test_a_column_with_one_level_and_an_empty_column_have_p_one():
 
 def test_no_reference_is_unverifiable_never_pass():
     # Enforces docs/READING_RESULTS.md:396.
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:253-234.
-    # Enforces website/src/learn/reading-results.html:178-179.
-    # Enforces website/src/learn/when-things-go-wrong.html:106.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:253-255.
+    # Enforces website/src/learn/reading-results.html:206-207.
+    # Enforces website/src/learn/when-things-go-wrong.html:121.
     # Enforces website/src/pages/docs/artifacts.astro:27.
     left = frames()[0]
     result = shift.assess(left, None, 0)
@@ -276,8 +276,8 @@ def test_no_reference_is_unverifiable_never_pass():
 
 
 def test_a_reference_without_shared_columns_or_rows_is_unverifiable():
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:253-234.
-    # Enforces website/src/learn/when-things-go-wrong.html:106.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:253-255.
+    # Enforces website/src/learn/when-things-go-wrong.html:121.
     left, right = frames()
     other = right.rename(columns=lambda name: "z" + name)
     assert shift.assess(left, other, 0).status is shift.Status.UNVERIFIABLE

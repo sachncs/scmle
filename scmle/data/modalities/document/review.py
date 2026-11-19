@@ -281,26 +281,30 @@ class Review:
 
     def assess(
         self,
-        duplicate_groups: tuple[tuple[str, ...], ...],
         label_counts: Mapping[str, int],
         sensitive_counts: Mapping[str, int],
         sensitive_document_ids: list[str],
     ) -> list[data.Finding]:
         """Builds the risk findings of the corpus.
 
+        Identical content is grouped by its hash over the samples themselves,
+        so two samples that repeat one document id are still compared
+        (MM-16).
+
         Args:
-            duplicate_groups: Groups of document ids with identical content.
             label_counts: Samples per label bucket.
             sensitive_counts: Match count of each sensitive-value name.
             sensitive_document_ids: Ids of the documents with a match.
 
         Returns:
-            The findings for sensitive content, conflicting labels inside a
-            duplicate group and a mix of labelled and unlabelled samples, in
-            that order.
+            The findings for sensitive content, conflicting labels among
+            samples of identical content and a mix of labelled and
+            unlabelled samples, in that order.
         """
         findings: list[data.Finding] = []
-        sample_by_id = {sample.document_id: sample for sample in self.samples}
+        copies: dict[str, list[Sample]] = {}
+        for sample in self.samples:
+            copies.setdefault(sample.content_hash, []).append(sample)
         if sensitive_counts:
             findings.append(
                 flaw(
@@ -313,11 +317,15 @@ class Review:
                     blocking=True,
                 )
             )
-        for group in duplicate_groups:
-            labels = {
-                bucketize(sample_by_id[document_id].label)
-                for document_id in group
-            }
+        conflicts = sorted(
+            (
+                tuple(sorted(sample.document_id for sample in members)),
+                {bucketize(sample.label) for sample in members},
+            )
+            for members in copies.values()
+            if len(members) > 1
+        )
+        for group, labels in conflicts:
             if len(labels) > 1:
                 findings.append(
                     flaw(

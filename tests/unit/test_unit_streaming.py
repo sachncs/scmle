@@ -450,7 +450,7 @@ def test_finalize_refuses_mismatches(tmp_path):
 
 
 def test_commit_transaction_records_and_replays_evidence(tmp_path):
-    # Enforces website/src/pages/docs/data.astro:76.
+    # Enforces website/src/pages/docs/data.astro:118.
     source = csv(tmp_path, 3)
     ledger = book(tmp_path, source)
     batch = ledger.read_batch(rows=2)
@@ -551,7 +551,7 @@ def test_a_failed_acknowledgement_is_retried_later(tmp_path):
 
 def test_a_consumer_refuses_another_groups_acknowledgement(tmp_path):
     # Enforces website/src/pages/docs/data.astro:17.
-    # Enforces website/src/pages/docs/data.astro:75.
+    # Enforces website/src/pages/docs/data.astro:117.
     ledger = book(tmp_path, csv(tmp_path, 3))
     batch = ledger.read_batch(rows=1)
     ledger.earmark(ack(batch, "other"))

@@ -1,6 +1,7 @@
 """The causal estimate registered as a ledger claim."""
 
 import json
+import re
 
 import pandas
 import pytest
@@ -67,7 +68,9 @@ def test_an_unseal_of_a_bad_file_is_a_config_error(tmp_path):
         claim.unseal(str(missing))
     broken = tmp_path / "broken.json"
     broken.write_text("{", encoding="utf-8")
-    with pytest.raises(errors.ConfigError, match=f"declared DAG {broken}: "):
+    with pytest.raises(
+        errors.ConfigError, match=re.escape(f"declared DAG {broken}: ")
+    ):
         claim.unseal(str(broken))
     tampered = tmp_path / "tampered.json"
     document = graph().artifact()

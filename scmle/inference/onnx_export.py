@@ -398,6 +398,31 @@ def feed(bundle: Any, frame: pandas.DataFrame) -> dict[str, numpy.ndarray]:
     return inputs
 
 
+def enough(frame: pandas.DataFrame | None) -> pandas.DataFrame:
+    """Blocks a held-out set too small for the divergence gate.
+
+    It runs before conversion too, so a bad held-out set is refused
+    before the converter is imported or run.
+
+    Args:
+        frame: Held-out rows; None means none were given.
+
+    Returns:
+        The rows, at least `ROWS` of them.
+
+    Raises:
+        BlockedError: With no rows or fewer than `ROWS`.
+    """
+    rows = 0 if frame is None else len(frame)
+    if frame is None or rows < ROWS:
+        raise errors.BlockedError(
+            f"the ONNX divergence gate needs at least {ROWS} rows held out "
+            f"from training to rule out a {RATE:.0%} divergence rate at "
+            f"{CONFIDENCE:.0%} confidence; got {rows}"
+        )
+    return frame
+
+
 def verify(
     bundle: Any,
     path: str | pathlib.Path,
@@ -430,17 +455,12 @@ def verify(
             exceeds `tolerance` or is NaN, or when a label differs on a row
             whose margin exceeds twice `tolerance`.
     """
-    rows = 0 if frame is None else len(frame)
-    if frame is None or rows < ROWS:
-        raise errors.BlockedError(
-            f"the ONNX divergence gate needs at least {ROWS} rows held out "
-            f"from training to rule out a {RATE:.0%} divergence rate at "
-            f"{CONFIDENCE:.0%} confidence; got {rows}"
-        )
+    held = enough(frame)
+    rows = len(held)
     runtime = load_converter()[1]
     session = runtime.InferenceSession(str(path))
-    outputs = session.run(None, feed(bundle, frame))
-    prepared = bundle.prepare(frame)
+    outputs = session.run(None, feed(bundle, held))
+    prepared = bundle.prepare(held)
     agreement, disagreements = 1.0, 0
     if bundle.classes is not None:
         expected = numpy.asarray(bundle.pipeline.predict_proba(prepared))

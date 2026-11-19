@@ -134,4 +134,23 @@ def test_a_function_the_graph_cannot_express_is_refused_by_name(tmp_path):
     )
 
     with pytest.raises(errors.ArtifactError, match="log1p"):
-        bundle.export_onnx(tmp_path / "m.onnx")
+        bundle.export_onnx(tmp_path / "m.onnx", check=held_out())
+
+
+def test_too_few_held_out_rows_are_refused_before_the_converter_loads(
+    monkeypatch, tmp_path
+):
+    bundle = test_onnx_export.make_bundle(
+        "logistic_regression", tasks.Task.BINARY
+    )[0]
+    loads = []
+    monkeypatch.setattr(
+        onnx_export, "load_converter", lambda: loads.append(1) or ()
+    )
+
+    for rows in (None, held_out(onnx_export.ROWS - 1)):
+        with pytest.raises(errors.BlockedError, match="at least"):
+            bundle.export_onnx(tmp_path / "m.onnx", check=rows)
+
+    assert loads == []
+    assert not (tmp_path / "m.onnx").exists()

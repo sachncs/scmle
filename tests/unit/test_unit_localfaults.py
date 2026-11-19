@@ -59,7 +59,7 @@ def test_write_json_writes_compact_sorted_json(tmp_path):
 
 
 def test_halt_terminates_a_sleeping_child(tmp_path):
-    # Enforces website/src/pages/docs/operations.astro:128.
+    # Enforces website/src/pages/docs/operations.astro:194.
     terminated, code = workspace.Workspace(tmp_path).halt()
     assert terminated is True
     assert code != 0
@@ -115,7 +115,7 @@ def test_worker_loss_writes_one_event(runner):
 
 
 def test_a_timeout_is_cancelled_and_publishes_nothing(runner):
-    # Enforces website/src/pages/docs/operations.astro:128.
+    # Enforces website/src/pages/docs/operations.astro:194.
     found = facts(runner.run_timeout())
     assert found["timeout_injection"] == {"terminated": True}
     assert found["cancellation_record"] == {"state": "cancelled"}
@@ -125,7 +125,7 @@ def test_a_timeout_is_cancelled_and_publishes_nothing(runner):
 
 
 def test_retries_are_exhausted_after_three_attempts(runner):
-    # Enforces website/src/pages/docs/operations.astro:128.
+    # Enforces website/src/pages/docs/operations.astro:194.
     found = facts(runner.run_retry_exhaustion())
     assert found == {
         "retry_history": {"attempts": 3},
@@ -213,7 +213,7 @@ def test_a_dependency_mismatch_blocks_the_run(runner):
 
 
 def test_a_tampered_signature_is_quarantined(runner):
-    # Enforces website/src/pages/docs/operations.astro:128.
+    # Enforces website/src/pages/docs/operations.astro:194.
     # Enforces website/src/pages/docs/recovery.astro:11.
     found = facts(runner.run_invalid_signature())
     assert found == {
@@ -226,7 +226,7 @@ def test_a_tampered_signature_is_quarantined(runner):
 
 
 def test_a_duplicate_event_is_committed_once(runner):
-    # Enforces website/src/pages/docs/operations.astro:113.
+    # Enforces website/src/pages/docs/operations.astro:179.
     found = facts(runner.run_duplicate_event())
     assert found["duplicate_event"]["first"] == ["event-1"]
     assert found["duplicate_event"]["second"] == ["event-1"]
@@ -235,7 +235,7 @@ def test_a_duplicate_event_is_committed_once(runner):
 
 
 def test_an_incomplete_lineage_blocks_release(runner):
-    # Enforces website/src/pages/docs/operations.astro:128.
+    # Enforces website/src/pages/docs/operations.astro:194.
     found = facts(runner.run_incomplete_lineage())
     assert found == {
         "lineage_gap": {"rejected": True},
@@ -245,7 +245,7 @@ def test_an_incomplete_lineage_blocks_release(runner):
 
 
 def test_a_rejected_approval_blocks_release(runner):
-    # Enforces website/src/pages/docs/operations.astro:128.
+    # Enforces website/src/pages/docs/operations.astro:194.
     found = facts(runner.run_rejected_approval())
     assert found == {
         "approval_rejection": {"rejected": True},
@@ -255,7 +255,7 @@ def test_a_rejected_approval_blocks_release(runner):
 
 
 def test_a_changed_snapshot_is_rejected(runner):
-    # Enforces website/src/pages/docs/operations.astro:113.
+    # Enforces website/src/pages/docs/operations.astro:179.
     # Enforces website/src/pages/docs/recovery.astro:11.
     # Enforces website/src/pages/docs/recovery.astro:29.
     found = facts(runner.run_changed_snapshot())

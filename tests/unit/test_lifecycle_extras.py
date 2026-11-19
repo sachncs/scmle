@@ -162,7 +162,7 @@ def registry_with(tmp_path, first, second):
 
 def test_a_clearly_worse_new_champion_is_rolled_back(good, tmp_path):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:575.
-    # Enforces website/src/learn/when-things-go-wrong.html:224-225.
+    # Enforces website/src/learn/when-things-go-wrong.html:239-240.
     broken = bundle_of("logistic_regression", traffic(seed=0, flip=True))
     store, manager = registry_with(tmp_path, good, broken)
     fresh = traffic(1200, seed=20)
@@ -200,7 +200,7 @@ def test_a_clearly_worse_new_champion_waits_for_approval(good, tmp_path):
 
 def test_a_new_champion_that_holds_up_stays(good, tmp_path):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:575.
-    # Enforces website/src/learn/when-things-go-wrong.html:224-225.
+    # Enforces website/src/learn/when-things-go-wrong.html:239-240.
     same = bundle_of("logistic_regression", traffic(seed=1))
     store, manager = registry_with(tmp_path, good, same)
 

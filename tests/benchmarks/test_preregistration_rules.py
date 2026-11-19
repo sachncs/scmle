@@ -88,8 +88,8 @@ def test_registrations_are_not_kept_under_plan():
 
 def test_the_index_rows_match_the_scorecard_and_the_files():
     # Enforces docs/preregistration/README.md:21.
-    # Enforces docs/preregistration/README.md:29.
-    # Enforces docs/preregistration/README.md:38.
+    # Enforces docs/preregistration/README.md:27.
+    # Enforces docs/preregistration/README.md:33.
     rows = INDEX.findall(registered("README"))
     found = claims()
     assert len(rows) == len(found) == 14
@@ -115,7 +115,7 @@ def test_the_index_rows_match_the_scorecard_and_the_files():
 
 
 def test_no_validation_or_acceptance_stream_is_drawn():
-    # Enforces docs/preregistration/README.md:55.
+    # Enforces docs/preregistration/README.md:44.
     # Enforces docs/preregistration/c3.md:34.
     drawn = [
         f"{path.relative_to(ROOT)}: {match.group()}"
@@ -137,7 +137,7 @@ def test_no_validation_or_acceptance_stream_is_drawn():
 
 
 def test_holm_sizes_the_four_stage_d_rows():
-    # Enforces docs/preregistration/README.md:81.
+    # Enforces docs/preregistration/README.md:62.
     # Enforces docs/preregistration/c2.md:49.
     variables = acceptance.load()
     alpha = variables["alpha"].value

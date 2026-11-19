@@ -134,7 +134,7 @@ def test_a_finding_converts_raw_enum_values_and_round_trips():
     ],
 )
 def test_a_finding_refuses_blank_or_impossible_fields(changes, message):
-    # Enforces website/src/pages/docs/extensions.astro:146.
+    # Enforces website/src/pages/docs/extensions.astro:211.
     with pytest.raises(errors.InputError, match=message):
         finding(**changes)
 
@@ -254,9 +254,9 @@ def test_a_portrait_normalises_evidence_and_dumps_single_words():
 
 
 def test_blocking_findings_without_a_safe_disposition_hold_release():
-    # Enforces website/src/pages/docs/api.astro:200.
-    # Enforces website/src/pages/docs/data.astro:118.
-    # Enforces website/src/pages/docs/extensions.astro:146.
+    # Enforces website/src/pages/docs/api.astro:298.
+    # Enforces website/src/pages/docs/data.astro:188.
+    # Enforces website/src/pages/docs/extensions.astro:211.
     # Enforces website/src/pages/docs/modalities.astro:41.
     report = curation()
     assert [f.identifier for f in report.unresolved_blocking_findings] == [

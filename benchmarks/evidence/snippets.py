@@ -26,11 +26,16 @@ A block that declares no language, or one not listed, fails: nothing may
 leave the population by being unlabelled.
 
 How a page runs: as a reader would follow it, top to bottom, in a fresh
-empty folder that is also `HOME`, with the repository's environment first on
-`PATH` and no `SCMLE_*` variable set. The pages install the package from its
-GitHub URL (`ORIGIN`); that URL reaches a snapshot of the working tree
-(`snapshot`, through the `HOME` folder's git configuration), so a run
-measures the code the stored result names, not the last published commit.
+empty folder that is also `HOME`, with no `SCMLE_*` variable set. What the
+page finds does not depend on the machine or on how the measurement was
+started (`Bench`): first on `PATH` is a fresh environment of its own holding
+a snapshot of the working tree (`snapshot`) installed, not editable, with its
+locked dependencies and no extra (`install`), so a page that needs an extra
+must install it as a reader would; then the tools of `TOOLS`; then only
+`os.defpath`. The pages install the package from its GitHub URL (`ORIGIN`);
+that URL reaches the same snapshot (through the `HOME` folder's git
+configuration), so a run measures the code the stored result names, not the
+last published commit nor whatever another checkout or environment holds.
 Each snippet is a fresh process; what a reader's terminal keeps between
 commands (the working directory and the exported variables) carries from one
 shell snippet to the next. A Python, JSON or TOML block whose lead-in
@@ -116,6 +121,17 @@ SETTLE = 10.0
 TAIL = 600
 # The repository's published URL, as the pages clone and install it.
 ORIGIN = "https://github.com/sachncs/scmle"
+# The tools a page finds besides its own environment and `os.defpath`: the
+# pages clone with git and develop with uv. Anything else a page runs (a
+# container engine, PowerShell) must be on `os.defpath` of every machine
+# alike, or its block fails or is skipped the same everywhere.
+TOOLS = ("uv", "git")
+# Variables that only point the tools at caches the machine already holds:
+# they change how fast a page runs, never what it finds.
+CACHES = {
+    "UV_CACHE_DIR": ("cache", "dir"),
+    "UV_PYTHON_INSTALL_DIR": ("python", "dir"),
+}
 FENCE = re.compile(r"^(\s*)(```+|~~~+)\s*([^\n`]*)$")
 BLOCK = re.compile(
     r"<pre\b[^>]*>\s*<code\b([^>]*)>(.*?)</code>\s*</pre>",
@@ -370,6 +386,101 @@ def deliberate(text: str, line: int) -> bool:
     return False
 
 
+@dataclasses.dataclass(frozen=True)
+class Bench:
+    """What every page is given, the same on every machine.
+
+    Attributes:
+        source: The working-tree snapshot (`snapshot`) each page installs
+            and `ORIGIN` reaches.
+        tools: A folder of links to the tools of `TOOLS`.
+        variables: The cache locations of `CACHES`.
+    """
+
+    source: Path
+    tools: Path
+    variables: tuple[tuple[str, str], ...] = ()
+
+
+def furnish(source: Path, base: Path) -> Bench:
+    """Gathers the tools and caches every page is given.
+
+    Args:
+        source: The working-tree snapshot.
+        base: A scratch directory.
+
+    Returns:
+        The bench.
+
+    Raises:
+        InputError: If a tool of `TOOLS` is not installed.
+    """
+    tools = base / "tools"
+    tools.mkdir()
+    for name in TOOLS:
+        found = shutil.which(name)
+        if found is None:
+            message = f"snippets: the pages need {name}, which is not installed"
+            raise errors.InputError(message)
+        (tools / name).symlink_to(found)
+    variables = []
+    for variable, arguments in CACHES.items():
+        done = subprocess.run(
+            [str(tools / "uv"), *arguments],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if done.returncode == 0 and done.stdout.strip():
+            variables.append((variable, done.stdout.strip()))
+    return Bench(source, tools, tuple(variables))
+
+
+def install(bench: Bench, target: Path) -> Path:
+    """A fresh environment holding the snapshot and its locked dependencies.
+
+    `uv venv --seed`, then `uv sync --frozen --no-dev --no-editable`: like a
+    reader's virtual environment it has `pip`; the lock file decides every
+    other version, the snapshot is installed as a wheel (so nothing reads
+    another checkout), and no extra or development tool is in it.
+
+    Args:
+        bench: The bench.
+        target: The environment's folder (created).
+
+    Returns:
+        Its folder of programs, to put first on `PATH`.
+
+    Raises:
+        InputError: If the snapshot cannot be installed.
+    """
+    variables = {
+        "HOME": str(target.parent),
+        "PATH": os.pathsep.join([str(bench.tools), os.defpath]),
+        "UV_PROJECT_ENVIRONMENT": str(target),
+        **dict(bench.variables),
+    }
+    uv = str(bench.tools / "uv")
+    for command in (
+        [uv, "venv", "--seed", "--allow-existing", str(target)],
+        [uv, "sync", "--frozen", "--no-dev", "--no-editable", "--inexact"],
+    ):
+        done = subprocess.run(
+            [*command, "--quiet", "--project", str(bench.source)],
+            cwd=bench.source,
+            env=variables,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if done.returncode != 0:
+            message = (
+                f"snippets: cannot install the snapshot: {done.stderr[-TAIL:]}"
+            )
+            raise errors.InputError(message)
+    return target / ("Scripts" if os.name == "nt" else "bin")
+
+
 class Terminal:
     """A reader's terminal: one page, followed top to bottom.
 
@@ -386,7 +497,11 @@ class Terminal:
     """
 
     def __init__(
-        self, base: Path, limit: float, source: Path | None = None
+        self,
+        base: Path,
+        limit: float,
+        source: Path | None = None,
+        bench: Bench | None = None,
     ) -> None:
         """Opens a terminal in a fresh folder under `base`.
 
@@ -395,7 +510,12 @@ class Terminal:
             limit: The time cap in seconds.
             source: A git repository that `ORIGIN` reaches from this
                 terminal (`snapshot`), or None to leave `ORIGIN` alone.
+            bench: What the page is given (its own environment and the
+                tools); None gives the measuring interpreter's folder
+                instead, for a test of the terminal itself.
         """
+        if bench is not None:
+            source = bench.source
         self.home = Path(tempfile.mkdtemp(dir=base, prefix="page-"))
         if source is not None:
             redirect = "".join(
@@ -405,10 +525,17 @@ class Terminal:
             (self.home / ".gitconfig").write_text(redirect, encoding="utf-8")
         self.state = Path(tempfile.mkdtemp(dir=base, prefix="state-"))
         self.cwd = self.home
-        environment = Path(sys.executable).parent
+        if bench is None:
+            found = [str(Path(sys.executable).parent)]
+            variables: dict[str, str] = {}
+        else:
+            target = Path(tempfile.mkdtemp(dir=base, prefix="environment-"))
+            found = [str(install(bench, target)), str(bench.tools)]
+            variables = dict(bench.variables)
         self.env = {
+            **variables,
             "HOME": str(self.home),
-            "PATH": os.pathsep.join([str(environment), os.defpath]),
+            "PATH": os.pathsep.join([*found, os.defpath]),
             "LANG": "C.UTF-8",
             "TMPDIR": str(self.state),
             "SNIPPET_STATE": str(self.state),
@@ -690,6 +817,7 @@ def follow(
     base: Path,
     limit: float,
     source: Path | None = None,
+    bench: Bench | None = None,
 ) -> list[dict[str, Any]]:
     """Runs one page's snippets in order in a fresh terminal.
 
@@ -698,12 +826,13 @@ def follow(
         base: A scratch directory.
         limit: The time cap in seconds.
         source: The working-tree snapshot `ORIGIN` reaches, or None.
+        bench: What the page is given (`Terminal`).
 
     Returns:
         One record per snippet. A saved Python file that no later shell
         snippet ran is run directly at the end of the page.
     """
-    terminal = Terminal(base, limit, source)
+    terminal = Terminal(base, limit, source, bench)
     records: list[dict[str, Any]] = []
     try:
         records.extend(terminal.run(snippet) for snippet in snippets)
@@ -827,7 +956,15 @@ def measure(
     """
     started = time.monotonic()
     code = certificates.code_hash(
-        fences, blocks, deliberate, cap, follow, snapshot, tally
+        fences,
+        blocks,
+        deliberate,
+        cap,
+        follow,
+        snapshot,
+        furnish,
+        install,
+        tally,
     )
     content = fingerprint(root)
     snippets = gather(root)
@@ -839,8 +976,9 @@ def measure(
     records: list[dict[str, Any]] = []
     with tempfile.TemporaryDirectory(prefix="snippets-") as base:
         source = snapshot(root, Path(base))
+        bench = furnish(source, Path(base))
         for page in pages.values():
-            done = follow(page, Path(base), limit, source)
+            done = follow(page, Path(base), limit, bench=bench)
             records += done
             if echo is not None:
                 echo(done)
@@ -853,6 +991,13 @@ def measure(
             "kinds": KINDS,
             "cap_seconds": limit,
             "platform": sys.platform,
+            "environment": (
+                "per page: uv venv --seed, uv sync --frozen --no-dev "
+                "--no-editable of the working-tree snapshot; then "
+                + ", ".join(TOOLS)
+                + "; then "
+                "os.defpath"
+            ),
         },
         "counts": tally(records),
         "snippets": records,

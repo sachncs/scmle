@@ -15,6 +15,7 @@ from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.models.sklearn import classical
 from scmle.pipeline import journal
+from scmle.pipeline import profiler
 from scmle.pipeline import rules
 from scmle.pipeline import strategy_search
 from scmle.pipeline.stages import profiling
@@ -103,7 +104,9 @@ def situation(rows, columns, seconds):
         ),
         target_summary={"n_classes": 2},
     )
-    return types.SimpleNamespace(spec=spec, profile=profile)
+    return types.SimpleNamespace(
+        spec=spec, profile=profile, cost=profiler.estimate
+    )
 
 
 CANDIDATES = [

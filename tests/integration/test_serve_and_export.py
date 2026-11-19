@@ -382,6 +382,8 @@ def test_export_onnx_command_fails_cleanly_for_an_unsupported_model(
             "--trusted",
             "--output",
             str(tmp_path / "m.onnx"),
+            "--check",
+            str(root / "rows.csv"),
         ]
     )
 

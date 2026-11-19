@@ -63,8 +63,8 @@ def test_without_an_attestation_the_certified_suspect_is_blocked():
 def test_a_valid_attestation_keeps_the_column_flagged_and_attested():
     # Enforces docs/LEAKAGE.md:249.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:318.
-    # Enforces website/src/learn/leakage.html:68-69.
-    # Enforces website/src/learn/when-things-go-wrong.html:135.
+    # Enforces website/src/learn/leakage.html:70-71.
+    # Enforces website/src/learn/when-things-go-wrong.html:150.
     found = run_with([attest()])
 
     assert found.quarantined == {}
@@ -78,7 +78,7 @@ def test_a_valid_attestation_keeps_the_column_flagged_and_attested():
 
 def test_the_override_is_a_ledger_row_with_the_attester_and_the_p_value():
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:318.
-    # Enforces website/src/learn/when-things-go-wrong.html:135.
+    # Enforces website/src/learn/when-things-go-wrong.html:150.
     found = run_with([attest()])
 
     rows = [c for s, c in found.checks if s == qualify.ATTESTATION_SOURCE]
@@ -99,10 +99,10 @@ def test_an_expired_attestation_does_not_count():
 
 
 def test_an_attestation_for_another_charter_does_not_count():
-    # Enforces docs/LEAKAGE.md:325.
+    # Enforces docs/LEAKAGE.md:329.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:314.
-    # Enforces website/src/learn/leakage.html:80.
-    # Enforces website/src/learn/when-things-go-wrong.html:135.
+    # Enforces website/src/learn/leakage.html:111.
+    # Enforces website/src/learn/when-things-go-wrong.html:150.
     found = run_with([attest(scope="other-charter")])
 
     assert set(found.quarantined) == {"copy"}

@@ -2,6 +2,9 @@
 
 import contextlib
 import dataclasses
+import hashlib
+import hmac
+import io
 import json
 import os
 import pathlib
@@ -26,26 +29,45 @@ import scmle.data.reference
 import scmle.evaluation.conformal
 
 
-def unpack(
-    root: pathlib.Path,
-) -> tuple[dict[str, Any], artifacts.Interface]:
-    """Reads the manifest and the schema of a bundle directory.
+@dataclasses.dataclass(frozen=True)
+class Snapshot:
+    """A bundle's manifest and schema, each read from disk once.
+
+    The signature is checked over `text` and the schema checksum over
+    `layout`, the same bytes `manifest` and `schema` were parsed from, so a
+    file replaced between the check and the parse is never trusted.
+
+    Attributes:
+        manifest: The manifest as a dict.
+        schema: The parsed schema.
+        text: The manifest bytes.
+        layout: The schema bytes.
+    """
+
+    manifest: dict[str, Any]
+    schema: artifacts.Interface
+    text: bytes
+    layout: bytes
+
+
+def unpack(root: pathlib.Path) -> Snapshot:
+    """Reads the manifest and the schema of a bundle directory, once each.
 
     Args:
         root: The bundle directory.
 
     Returns:
-        The manifest as a dict and the parsed schema.
+        The parsed manifest and schema with the bytes they were parsed from.
 
     Raises:
         ArtifactError: If a file is missing or the metadata is invalid.
     """
     try:
-        manifest = json.loads(
-            (root / layout.MANIFEST_FILE).read_text(encoding="utf-8")
-        )
+        text = (root / layout.MANIFEST_FILE).read_bytes()
+        shape = (root / layout.SCHEMA_FILE).read_bytes()
+        manifest = json.loads(text.decode("utf-8"))
         schema = artifacts.Interface.from_dict(
-            json.loads((root / layout.SCHEMA_FILE).read_text(encoding="utf-8"))
+            json.loads(shape.decode("utf-8"))
         )
     except FileNotFoundError as error:
         raise errors.ArtifactError(
@@ -60,7 +82,9 @@ def unpack(
         ValueError,
     ) as error:
         raise errors.ArtifactError("invalid model bundle metadata") from error
-    return manifest, schema
+    if not isinstance(manifest, dict):
+        raise errors.ArtifactError("invalid model bundle metadata")
+    return Snapshot(manifest, schema, text, shape)
 
 
 def admit(
@@ -103,6 +127,7 @@ def admit(
 
 def authenticate(
     root: pathlib.Path,
+    snapshot: Snapshot,
     info: provenance.Manifest,
     legacy: bool,
     trusted: bool,
@@ -112,10 +137,13 @@ def authenticate(
 
     Nothing is unpickled here. `trusted` vouches for a missing signature
     only: a signature that cannot be checked, because no key is set, may be
-    an invalid one, so it is refused like one.
+    an invalid one, so it is refused like one. The signature is checked
+    over the manifest bytes `info` was parsed from, and the schema checksum
+    over the schema bytes the schema was parsed from.
 
     Args:
         root: The bundle directory.
+        snapshot: The manifest and schema bytes, as read once.
         info: The bundle's manifest.
         legacy: Whether the bundle is format 1, which has no schema checksum.
         trusted: Whether the caller vouches for an unsigned bundle.
@@ -125,7 +153,7 @@ def authenticate(
         ArtifactError: If the bundle is unauthenticated, signed but no key is
             set to check it, lacks its model file, or a checksum differs.
     """
-    authentic = seal.verify_signature(root, signing_key)
+    authentic = seal.verify_signature(root, signing_key, snapshot.text)
     if not authentic and not trusted:
         raise errors.ArtifactError(
             "refusing to load an unauthenticated bundle: it is pickle-"
@@ -147,9 +175,9 @@ def authenticate(
         raise errors.ArtifactError(
             "checksum mismatch: model file was modified or corrupted"
         )
-    schema_path = root / layout.SCHEMA_FILE
-    if not legacy and layout.shasum(schema_path) != info.files.get(
-        layout.SCHEMA_FILE
+    if not legacy and not hmac.compare_digest(
+        hashlib.sha256(snapshot.layout).hexdigest(),
+        str(info.files.get(layout.SCHEMA_FILE)),
     ):
         raise errors.ArtifactError(
             "checksum mismatch: schema file was modified or corrupted"
@@ -158,34 +186,39 @@ def authenticate(
 
 def resolve(
     root: pathlib.Path, info: provenance.Manifest, name: str, modified: str
-) -> pathlib.Path | None:
-    """Returns the path of a listed bundle member whose checksum matches.
+) -> bytes | None:
+    """Reads a listed bundle member once and checks it against the manifest.
+
+    The returned bytes are the bytes whose checksum matched; callers parse
+    or unpickle them, never the file, so a member replaced after the check
+    is never loaded (SEC-13).
 
     Args:
         root: The bundle directory.
-        info: The bundle's manifest.
+        info: The bundle's manifest, already authenticated.
         name: File name of the member.
         modified: Words that finish "checksum mismatch: " in the error.
 
     Returns:
-        The member's path, or None if the manifest does not list it.
+        The member's bytes, or None if the manifest does not list it.
 
     Raises:
         ArtifactError: If the member is missing or its checksum differs.
     """
     if name not in info.files:
         return None
-    path = root / name
-    if not path.exists() or layout.shasum(path) != info.files[name]:
-        raise errors.ArtifactError(f"checksum mismatch: {modified}")
-    return path
+    try:
+        return envelope.fetch(root / name, info.files[name])
+    except (OSError, errors.InputError) as error:
+        raise errors.ArtifactError(f"checksum mismatch: {modified}") from error
 
 
-def unpickle(path: pathlib.Path) -> Any:
-    """Loads one verified, pickled member of a bundle.
+def unpickle(data: bytes, name: str) -> Any:
+    """Loads one verified, pickled member of a bundle from its bytes.
 
     Args:
-        path: The member file, already checksummed.
+        data: The member's bytes, as `resolve` returned them.
+        name: The member's file name, for messages.
 
     Returns:
         The stored object.
@@ -195,13 +228,35 @@ def unpickle(path: pathlib.Path) -> Any:
             does not have, as one written by another build does.
     """
     try:
-        return joblib.load(path)
+        return joblib.load(io.BytesIO(data))
     except (ModuleNotFoundError, AttributeError) as error:
         raise errors.ArtifactError(
-            f"{path.name} names a module or class this build does not have "
+            f"{name} names a module or class this build does not have "
             f"({error}); the bundle was written by another build, so retrain "
             "and save it again"
         ) from error
+
+
+def pipeline(root: pathlib.Path, info: provenance.Manifest) -> Any:
+    """Loads the verified model member, read once.
+
+    Args:
+        root: The bundle directory.
+        info: The bundle's manifest, already authenticated.
+
+    Returns:
+        The fitted pipeline.
+
+    Raises:
+        ArtifactError: If the model file is not listed, is missing, or its
+            checksum differs.
+    """
+    data = resolve(
+        root, info, layout.MODEL_FILE, "model file was modified or corrupted"
+    )
+    if data is None:
+        raise errors.ArtifactError(f"missing {layout.MODEL_FILE}")
+    return unpickle(data, layout.MODEL_FILE)
 
 
 def hydrate(
@@ -221,39 +276,37 @@ def hydrate(
         ArtifactError: If a listed member is missing or its checksum differs.
     """
     reference = None
-    path = resolve(
+    data = resolve(
         root, info, layout.REFERENCE_FILE, "reference profile was modified"
     )
-    if path is not None:
-        reference = scmle.data.reference.Baseline.from_dict(
-            json.loads(path.read_text(encoding="utf-8"))
-        )
+    if data is not None:
+        reference = scmle.data.reference.Baseline.from_dict(json.loads(data))
     history = None
-    path = resolve(
+    data = resolve(
         root, info, layout.HISTORY_FILE, "series history was modified"
     )
-    if path is not None:
-        history = pandas.read_parquet(path)
+    if data is not None:
+        history = pandas.read_parquet(io.BytesIO(data))
     calibrator = None
-    path = resolve(
+    data = resolve(
         root, info, layout.CALIBRATOR_FILE, "calibrator was modified"
     )
-    if path is not None:
-        calibrator = unpickle(path)
+    if data is not None:
+        calibrator = unpickle(data, layout.CALIBRATOR_FILE)
     calibrated = None
-    path = resolve(
+    data = resolve(
         root, info, layout.CONFORMAL_FILE, "conformal scores were modified"
     )
-    if path is not None:
+    if data is not None:
         calibrated = scmle.evaluation.conformal.ConformalCalibrator.from_dict(
-            json.loads(path.read_text(encoding="utf-8"))
+            json.loads(data)
         )
     detector = None
-    path = resolve(
+    data = resolve(
         root, info, layout.NOVELTY_FILE, "novelty detector was modified"
     )
-    if path is not None:
-        detector = unpickle(path)
+    if data is not None:
+        detector = unpickle(data, layout.NOVELTY_FILE)
     return reference, history, calibrator, calibrated, detector
 
 
@@ -274,29 +327,29 @@ def restore(
         ArtifactError: If a listed member is missing or its checksum differs.
     """
     intervals = None
-    path = resolve(
+    data = resolve(
         root, info, layout.QUANTILE_FILE, "quantile models were modified"
     )
-    if path is not None:
-        intervals = unpickle(path)
+    if data is not None:
+        intervals = unpickle(data, layout.QUANTILE_FILE)
     cv_plus_models = None
-    path = resolve(
+    data = resolve(
         root, info, layout.CV_PLUS_FILE, "CV+ fold models were modified"
     )
-    if path is not None:
-        cv_plus_models = unpickle(path)
+    if data is not None:
+        cv_plus_models = unpickle(data, layout.CV_PLUS_FILE)
     stored_coverage = None
-    path = resolve(
+    data = resolve(
         root, info, layout.COVERAGE_FILE, "coverage report was modified"
     )
-    if path is not None:
-        stored_coverage = json.loads(path.read_text(encoding="utf-8"))
+    if data is not None:
+        stored_coverage = json.loads(data)
     stored_weights = None
-    path = resolve(
+    data = resolve(
         root, info, layout.SHIFT_WEIGHTS_FILE, "shift weights were modified"
     )
-    if path is not None:
-        stored_weights = unpickle(path)
+    if data is not None:
+        stored_weights = unpickle(data, layout.SHIFT_WEIGHTS_FILE)
     return intervals, cv_plus_models, stored_coverage, stored_weights
 
 
@@ -477,12 +530,12 @@ class Archive(core.Core):
             )
         manifest_path = root / layout.MANIFEST_FILE
         try:
-            manifest_text = manifest_path.read_text(encoding="utf-8")
-        except (OSError, UnicodeError) as error:
+            manifest_text = manifest_path.read_bytes()
+        except OSError as error:
             raise errors.ArtifactError(
                 "cannot rotate an incomplete model bundle"
             ) from error
-        if not seal.verify_signature(root, old):
+        if not seal.verify_signature(root, old, manifest_text):
             raise errors.ArtifactError(
                 "cannot rotate an unauthenticated model bundle"
             )
@@ -495,9 +548,7 @@ class Archive(core.Core):
                 json.dump(
                     {
                         "algorithm": seal.SIGNATURE_ALGORITHM,
-                        "signature": seal.sign(
-                            manifest_text.encode(), replacement
-                        ),
+                        "signature": seal.sign(manifest_text, replacement),
                     },
                     handle,
                 )
@@ -553,9 +604,9 @@ class Archive(core.Core):
         envelope.vouch(trusted)
         root = pathlib.Path(directory)
         tombstone.enforce(root)
-        manifest, schema = unpack(root)
-        info, legacy = admit(manifest, trusted, allow_legacy_format)
-        authenticate(root, info, legacy, trusted, signing_key)
+        snapshot = unpack(root)
+        info, legacy = admit(snapshot.manifest, trusted, allow_legacy_format)
+        authenticate(root, snapshot, info, legacy, trusted, signing_key)
         problems = info.incompatibilities()
         if problems and not allow_version_mismatch:
             raise errors.ArtifactError(
@@ -573,8 +624,8 @@ class Archive(core.Core):
             root, info
         )
         loaded = cls(
-            unpickle(root / layout.MODEL_FILE),
-            schema,
+            pipeline(root, info),
+            snapshot.schema,
             info,
             reference,
             history,

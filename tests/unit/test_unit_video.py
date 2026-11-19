@@ -189,7 +189,7 @@ def test_a_dataset_hash_binds_time_and_order():
 
 
 def test_numerize_lists_metadata_features():
-    # Enforces website/src/pages/docs/data.astro:226.
+    # Enforces website/src/pages/docs/data.astro:355.
     data = dataset.Dataset((clip("mem://a", b"x" * 20),))
     features = data.numerize()
     assert features.values == (
@@ -209,7 +209,7 @@ def test_numerize_lists_metadata_features():
     [(10, 4, (0, 3, 6, 9)), (3, 8, (0, 1, 2)), (5, 1, (0,)), (1, 2, (0,))],
 )
 def test_stride_spaces_frame_indices_evenly(count, limit, expected):
-    # Enforces website/src/pages/docs/api.astro:233.
+    # Enforces website/src/pages/docs/api.astro:354.
     built = clip("mem://a", metadata=meta(frame_count=count))
     assert frames.Frames.stride(built, limit) == expected
 
@@ -220,7 +220,7 @@ def test_stride_needs_a_positive_limit():
 
 
 def test_summarize_records_frame_statistics_and_indices():
-    # Enforces website/src/pages/docs/api.astro:233.
+    # Enforces website/src/pages/docs/api.astro:354.
     data = dataset.Dataset((clip("mem://a", metadata=meta(frame_count=3)),))
     calls = []
 
@@ -270,7 +270,7 @@ def test_summarize_validates_its_arguments():
     ],
 )
 def test_measure_rejects_bad_frames(frame, code):
-    # Enforces website/src/pages/docs/api.astro:233.
+    # Enforces website/src/pages/docs/api.astro:354.
     with pytest.raises(sample.VideoError) as raised:
         frames.measure(clip("mem://a"), lambda raw, index: frame, 7, 8)
     assert raised.value.details["code"] == code
@@ -390,8 +390,8 @@ def test_drift_flags_encoding_and_dimensions():
 
 
 def test_timeline_reports_temporal_completeness():
-    # Enforces website/src/pages/docs/api.astro:235.
-    # Enforces website/src/pages/docs/data.astro:227.
+    # Enforces website/src/pages/docs/api.astro:356.
+    # Enforces website/src/pages/docs/data.astro:356.
     first = clip("mem://a", observation_time=at(2))
     second = clip("mem://b", observation_time=at(1))
     assert survey.timeline([first, second]) == {

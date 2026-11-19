@@ -7,7 +7,7 @@ from scmle.rehearsal import demo
 
 def test_the_native_demo_passes_every_step(tmp_path, capsys):
     # Enforces docs/LOCAL.md:33.
-    # Enforces website/src/pages/docs/local.astro:32.
+    # Enforces website/src/pages/docs/local.astro:37.
     transcript = demo.run(tmp_path / "demo")
     capsys.readouterr()
     names = [step.name for step in transcript.steps]

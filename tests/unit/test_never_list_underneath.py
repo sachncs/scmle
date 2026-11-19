@@ -9,7 +9,7 @@ from scmle.governance import registry
 
 
 def test_the_champion_alias_does_not_move_without_a_signed_approval(tmp_path):
-    # Enforces website/src/pages/docs/operations.astro:141.
+    # Enforces website/src/pages/docs/operations.astro:207.
     store = registry.ModelRegistryStore(tmp_path / "registry")
     with pytest.raises(errors.ArtifactError):
         store.promote("model", 1)

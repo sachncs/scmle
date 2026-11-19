@@ -25,7 +25,7 @@ def records() -> tuple[dict[str, object], dict[str, object]]:
 
 
 def test_attestation_binds_model_provenance_and_sbom_digests():
-    # Enforces website/src/pages/docs/operations.astro:34.
+    # Enforces website/src/pages/docs/operations.astro:60.
     provenance, sbom = records()
 
     record = attestation.Attestation.from_records(provenance, sbom)
@@ -70,7 +70,7 @@ def test_attestation_signature_binds_all_release_subjects():
 
 
 def test_attestation_signature_rejects_tampered_persisted_record():
-    # Enforces website/src/pages/docs/operations.astro:34.
+    # Enforces website/src/pages/docs/operations.astro:60.
     provenance, sbom = records()
     record = attestation.Attestation.from_records(
         provenance, sbom, signing_key="release-key"

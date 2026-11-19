@@ -43,7 +43,7 @@ def evaluation(result):
 
 
 def test_the_charter_cost_model_sets_the_threshold(binary_frame, tmp_path):
-    # Enforces docs/API_STABILITY.md:187.
+    # Enforces docs/API_STABILITY.md:190.
     # Enforces docs/API_STABILITY.md:190.
     # Enforces docs/ARTIFACTS.md:45.
     # Enforces website/src/pages/docs/api-stability.astro:75.

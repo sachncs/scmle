@@ -348,7 +348,7 @@ def test_release_is_blocked_when_fault_plan_is_unexecuted():
     """Statistical success does not override an unverified fault plan.
 
     Also enforces website/src/pages/docs/evidence.astro:82.
-    Also enforces website/src/pages/docs/operations.astro:34.
+    Also enforces website/src/pages/docs/operations.astro:60.
     """
     outcome = release.assess(
         make_policy(),
@@ -516,7 +516,7 @@ def test_attestation_gate_requires_a_signed_release_record():
     """A release record without an HMAC signature fails closed.
 
     Also enforces website/src/pages/docs/evidence.astro:77.
-    Also enforces website/src/pages/docs/operations.astro:34.
+    Also enforces website/src/pages/docs/operations.astro:60.
     """
     outcome = release.Verdict(
         task="classification",
@@ -552,7 +552,7 @@ def test_attestation_gate_requires_a_signed_release_record():
 def test_attestation_gate_rejects_a_tampered_signature():
     """A present signature is insufficient when verification fails.
 
-    Also enforces website/src/pages/docs/operations.astro:34.
+    Also enforces website/src/pages/docs/operations.astro:60.
     """
     outcome = release.Verdict(
         task="classification",

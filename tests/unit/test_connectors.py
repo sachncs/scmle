@@ -114,7 +114,7 @@ def test_object_store_connector_reads_bounded_tabular_objects_and_resumes(
 def test_object_store_checkpoint_rejects_changed_raw_snapshot(frame):
     """A resumed object read cannot silently mix two raw snapshots.
 
-    Also enforces website/src/pages/docs/data.astro:115.
+    Also enforces website/src/pages/docs/data.astro:185.
     """
     payloads = [
         frame.to_csv(index=False).encode("utf-8"),
@@ -214,7 +214,7 @@ def test_object_store_connector_reports_decoder_contract_failures():
 def test_object_store_connector_rejects_large_payloads_and_bad_formats():
     """Bounded object support fails closed instead of hiding memory risk.
 
-    Also enforces website/src/pages/docs/data.astro:115.
+    Also enforces website/src/pages/docs/data.astro:185.
     """
     with pytest.raises(connectors.ConnectorError, match="max_bytes"):
         connectors.Bucket(
@@ -298,7 +298,7 @@ def test_streaming_object_connector_rejects_oversized_records():
 def test_checkpoint_cannot_cross_source_boundaries(tmp_path):
     """A checkpoint from one source cannot silently read another source.
 
-    Also enforces website/src/pages/docs/data.astro:75.
+    Also enforces website/src/pages/docs/data.astro:117.
     """
     first_path = tmp_path / "first.csv"
     second_path = tmp_path / "second.csv"
@@ -390,7 +390,7 @@ def test_warehouse_connector_reads_bounded_batches_through_injected_engine(
 def test_warehouse_connector_retries_and_rejects_invalid_callback_rows(frame):
     """Engine failures retry, while unsafe callback results fail closed.
 
-    Also enforces website/src/pages/docs/api.astro:98.
+    Also enforces website/src/pages/docs/api.astro:129.
     """
     attempts = []
 

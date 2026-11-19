@@ -5,6 +5,7 @@ from numbers import Real
 from typing import Any
 
 import numpy
+from scipy import spatial
 
 from scmle.contracts import errors
 from scmle.data.modalities.geospatial.evidence import Autocorrelation
@@ -99,25 +100,46 @@ class Topology:
             [feature.centroid for feature in self.features],
             dtype=numpy.float64,
         )
-        edges: set[tuple[int, int]] = set()
-        for first in range(len(centroids)):
-            distances = [
-                (
-                    float(
-                        numpy.sum((centroids[first] - centroids[second]) ** 2)
-                    ),
-                    second,
-                )
-                for second in range(len(centroids))
-                if second != first
-            ]
-            nearest = sorted(distances)[:neighbor_count]
-            for distance_and_index in nearest:
-                second = distance_and_index[1]
-                edges.add(
-                    (first, second) if first < second else (second, first)
-                )
-        return tuple(sorted(edges))
+        tree = spatial.cKDTree(centroids)
+        count = len(centroids)
+        distances, indexes = tree.query(
+            centroids, k=min(neighbor_count + 2, count)
+        )
+        rows = numpy.arange(count)[:, None]
+        others = indexes != rows
+        rank = numpy.cumsum(others, axis=1)
+        chosen = others & (rank <= neighbor_count)
+        last = numpy.where(others & (rank == neighbor_count), distances, 0).max(
+            1
+        )
+        beyond = numpy.where(
+            others & (rank == neighbor_count + 1), distances, numpy.inf
+        ).min(1)
+        tied = beyond <= last
+        chosen &= ~tied[:, None]
+        pairs = [
+            numpy.column_stack(
+                [
+                    numpy.broadcast_to(rows, indexes.shape)[chosen],
+                    indexes[chosen],
+                ]
+            )
+        ]
+        for row in numpy.flatnonzero(tied):
+            # A distance tie at the k-th neighbour: rank every candidate at
+            # that distance by feature index, as documented.
+            near = numpy.asarray(
+                tree.query_ball_point(centroids[row], last[row]), dtype=int
+            )
+            near = near[near != row]
+            gaps = numpy.sum((centroids[near] - centroids[row]) ** 2, axis=1)
+            near = near[numpy.lexsort((near, gaps))][:neighbor_count]
+            pairs.append(numpy.column_stack([numpy.full(len(near), row), near]))
+        edges = numpy.sort(numpy.vstack(pairs), axis=1)
+        return tuple(
+            (int(first), int(second))
+            for first, second in numpy.unique(edges, axis=0)
+        )
 
     def collect(self, values: Sequence[Real] | None) -> numpy.ndarray:
         """Collects and checks the values that Moran's I is computed on.

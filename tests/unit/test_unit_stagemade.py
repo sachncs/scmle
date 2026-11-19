@@ -123,7 +123,7 @@ def test_the_intake_digest_is_that_of_its_old_summary():
 
 
 def test_a_file_backed_modality_without_an_adapter_is_refused():
-    board = start(spec=config(modality="image"))
+    board = start(spec=config(modality="text"))
     board = dataclasses.replace(
         board,
         services=dataclasses.replace(board.services, input_frame=None),
@@ -252,12 +252,15 @@ def test_a_failure_after_the_split_closes_the_locked_rows(monkeypatch):
     ingestion.IngestStage().execute(board)
     stage = profiling.ProfileStage()
     divide = stage.divide
+    originals = []
 
     def shut(box):
         closed.append(box)
+        originals[0](box)
 
     def spy(*arguments):
         made = divide(*arguments)
+        originals.append(type(made[0].locked_test).close)
         monkeypatch.setattr(type(made[0].locked_test), "close", shut)
         return made
 
@@ -277,9 +280,11 @@ def test_closing_the_board_closes_the_partitions_locked_rows(monkeypatch):
     board = start()
     ingestion.IngestStage().execute(board)
     made = profiling.ProfileStage().execute(board)
+    original = type(made.split.locked_test).close
 
     def shut(box):
         closed.append(box)
+        original(box)
 
     monkeypatch.setattr(type(made.split.locked_test), "close", shut)
     board.close()

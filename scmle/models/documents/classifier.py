@@ -137,11 +137,11 @@ class Classifier(Archive):
         Candidate terms are the terms present in the document, ranked by
         absolute local linear contribution and cut to `max_terms`. Each is
         removed from the original text on its own (every whole-word,
-        case-insensitive match). The score reported for a term is the original
-        predicted-class score minus the ablated score; positive values mean
-        that the term supported the predicted class relative to its absence.
-        The `top_k` terms with the largest absolute score change are returned,
-        ties broken alphabetically.
+        case-insensitive match). A term's score change is the predicted
+        class's score minus the ablated text's score for that same class,
+        even when the removal flips the prediction; positive values mean
+        the term supported the predicted class relative to its absence. The
+        `top_k` largest absolute changes are returned, ties alphabetically.
 
         Args:
             sample: Document to explain.
@@ -182,13 +182,13 @@ class Classifier(Archive):
             ),
             key=lambda item: (-abs(item[1]), item[0]),
         )[:max_terms]
-        original_score = self.confidence(matrix)
+        original_score = self.confidence(matrix, class_index)
         ablations: list[tuple[str, float]] = []
         for term in (candidate[0] for candidate in candidates):
             pattern = rf"(?iu)\b{re.escape(term)}\b"
-            ablated_content = re.sub(pattern, " ", sample.content)
-            ablated_matrix = vectorizer.transform([ablated_content or " "])
-            delta = original_score - self.confidence(ablated_matrix)
+            text = re.sub(pattern, " ", sample.content)
+            ablated = vectorizer.transform([text or " "])
+            delta = original_score - self.confidence(ablated, class_index)
             ablations.append((term, float(delta)))
         selected = sorted(
             ablations,
@@ -207,15 +207,17 @@ class Classifier(Archive):
             citations=sample.citations(),
         )
 
-    def confidence(self, matrix: Any) -> float:
-        """Computes the decision score of the predicted class.
+    def confidence(self, matrix: Any, index: int | None = None) -> float:
+        """Computes the decision score of the predicted or a given class.
 
         Args:
             matrix: Feature matrix whose first row is scored.
+            index: Position in `classes_` of the class to score; None
+                scores the class predicted for the first row.
 
         Returns:
-            The decision-function value for the class predicted for the
-            first row; larger means more support for that class.
+            The decision-function value for that class on the first row;
+            larger means more support for it.
 
         Raises:
             RuntimeError: If the classifier has not been fitted.
@@ -224,10 +226,11 @@ class Classifier(Archive):
         estimator = self.estimator
         if estimator is None:
             raise errors.OrderError("classifier is not fitted")
-        predicted = estimator.predict(matrix)[0]
-        class_index = int(numpy.flatnonzero(estimator.classes_ == predicted)[0])
+        if index is None:
+            predicted = estimator.predict(matrix)[0]
+            index = int(numpy.flatnonzero(estimator.classes_ == predicted)[0])
         decision = numpy.asarray(estimator.decision_function(matrix))
         if decision.ndim == 1:
             raw_score = float(decision[0])
-            return raw_score if class_index == 1 else -raw_score
-        return float(decision[0, class_index])
+            return raw_score if index == 1 else -raw_score
+        return float(decision[0, index])

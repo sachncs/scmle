@@ -118,7 +118,7 @@ def test_production_refuses_the_published_demo_key_unless_allowed(tmp_path):
     """Enforces docs/SERVICE_SLO.md:128.
 
     Also enforces website/src/pages/docs/service.astro:84.
-    Also enforces website/src/pages/docs/security.astro:35.
+    Also enforces website/src/pages/docs/security.astro:56.
     """
     demo = next(iter(verify.PUBLISHED_KEYS))
     production = {"SCMLE_ENV": "production", "SCMLE_SIGNING_KEY": demo}

@@ -22,6 +22,7 @@ import scmle.decision.threshold
 from scmle.models import thresholds
 from scmle.pipeline import ensemble_search
 from scmle.pipeline import journal
+from scmle.pipeline import kinds
 from scmle.pipeline import products
 from scmle.pipeline import strategy_search
 from scmle.pipeline import trials
@@ -29,6 +30,7 @@ from scmle.pipeline import tuning
 from scmle.pipeline.stages import assessment
 from scmle.pipeline.stages import examination
 from scmle.pipeline.stages import exploration
+from scmle.pipeline.stages import ingestion
 from scmle.pipeline.stages import labelling
 from scmle.pipeline.stages import planning
 from scmle.pipeline.stages import profiling
@@ -123,9 +125,10 @@ class Runner:
 
     workers = 2
 
-    def __init__(self, board, partition):
+    def __init__(self, board, partition, featurise=None):
         self.board = board
         self.partition = partition
+        self.featurise = featurise
 
     def run_many(self, jobs, first):
         return [
@@ -158,7 +161,11 @@ def searched(monkeypatch):
     )
     held = board(
         fake(),
-        {planning.Blueprint: blueprint, profiling.Partition: partition()},
+        {
+            planning.Blueprint: blueprint,
+            profiling.Partition: partition(),
+            ingestion.Intake: types.SimpleNamespace(kind=kinds.TABULAR),
+        },
     )
     return held, training.TrainStage().execute(held)
 

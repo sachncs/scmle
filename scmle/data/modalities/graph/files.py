@@ -89,7 +89,12 @@ def edgelist(
     suffix = input_path.name.lower()
     if suffix.endswith(".csv"):
         try:
-            frame = pandas.read_csv(input_path)
+            # Endpoints are read as written: `007` stays `007` and `NA` or
+            # `null` stay node ids, so CSV and JSONL give one graph (MM-7).
+            frame = pandas.read_csv(
+                input_path,
+                converters={source_column: str, target_column: str},
+            )
         except (
             OSError,
             pandas.errors.ParserError,
@@ -159,7 +164,10 @@ def link(
             )
         source = record[source_column]
         target = record[target_column]
-        if pandas.isna(source) or pandas.isna(target):
+        if any(
+            pandas.isna(value) or not str(value).strip()
+            for value in (source, target)
+        ):
             raise ParseError(f"edge record {index} has a missing endpoint")
         weight_value = record.get(weight_column, 1.0)
         if pandas.isna(weight_value):

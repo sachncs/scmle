@@ -45,6 +45,16 @@ LOGGER = logging.getLogger(__name__)
 T = TypeVar("T")
 MAX_KEY_LENGTH = 1024
 KEY_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._=+@ -]*")
+EXTENDED = "\\\\?\\"
+"""Windows' extended-length path prefix, which `os.path.realpath` can keep.
+
+On Windows `realpath` strips this prefix only if a second lookup of the
+file fails the same way the first did; a concurrent writer that creates,
+locks or deletes the file between the two lookups leaves it on, so the
+same path comes back with the prefix in front.
+"""
+UNC = "\\\\?\\UNC\\"
+"""The extended-length prefix of a network path, in place of its `//`."""
 
 
 class StoreError(errors.DataError):
@@ -411,8 +421,12 @@ def direct(path: pathlib.Path) -> bool:
         junction, compared without regard to case where the file system
         ignores it.
     """
-    real = os.path.normcase(os.path.realpath(path))
-    return real == os.path.normcase(str(path))
+    real = os.path.realpath(path)
+    if real.startswith(UNC):
+        real = "\\\\" + real.removeprefix(UNC)
+    elif real.startswith(EXTENDED):
+        real = real.removeprefix(EXTENDED)
+    return os.path.normcase(real) == os.path.normcase(str(path))
 
 
 class LocalObjectStore(Depot):

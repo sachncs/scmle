@@ -8,6 +8,7 @@ features. The fixtures are small, labelled and deterministic.
 import hashlib
 import io
 import json
+import pathlib
 import wave
 
 import numpy
@@ -287,7 +288,9 @@ def test_image_explanations_occlude_sixteen_regions():
 def test_the_image_sample_id_joins_source_and_hash():
     preparer = images()
     sample = preparer.samples[0]
-    assert preparer.sample_id(sample) == f"image-0.png:{sample.content_hash}"
+    # A bare file name is a local path, so its source is its file URI.
+    source = pathlib.Path("image-0.png").resolve().as_uri()
+    assert preparer.sample_id(sample) == f"{source}:{sample.content_hash}"
 
 
 def test_the_raster_headers_name_four_statistics_per_band():
@@ -371,7 +374,7 @@ def test_video_occlusion_zeroes_five_statistics_per_frame():
 
 
 def test_video_frames_need_a_decoder():
-    # Enforces website/src/pages/docs/data.astro:172.
+    # Enforces website/src/pages/docs/data.astro:277.
     preparer = clips()
     with pytest.raises(errors.OrderError, match="explicit frame decoder"):
         video.frames(preparer, preparer.samples[0], None, [0], 0.0)

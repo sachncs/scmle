@@ -126,7 +126,7 @@ def test_constant_column_has_a_single_basis_column():
 
 def test_permutations_stay_inside_their_strata():
     # Enforces docs/LEAKAGE.md:236.
-    # Enforces website/src/learn/leakage.html:67-68.
+    # Enforces website/src/learn/leakage.html:69-70.
     strata = numpy.repeat([0, 1, 2], [5, 7, 3])
     rng = numpy.random.default_rng(0)
     index = screen.permute(strata, 50, rng)
@@ -523,7 +523,7 @@ def test_subsample_keeps_groups_whole_and_time_order():
 def test_the_global_null_is_flagged_no_more_often_than_alpha():
     # Enforces docs/ARCHITECTURE.md:155.
     # Enforces docs/LEAKAGE.md:236.
-    # Enforces website/src/learn/leakage.html:67-68.
+    # Enforces website/src/learn/leakage.html:69-70.
     significant = 0
     worlds = 60
     for seed in range(worlds):
@@ -558,7 +558,7 @@ def test_the_shipped_certificates_are_current_for_every_kind():
 
 def test_a_table_where_every_plant_is_found_gates_every_mechanism():
     # Enforces docs/LEAKAGE.md:238.
-    # Enforces website/src/learn/leakage.html:67-68.
+    # Enforces website/src/learn/leakage.html:69-70.
     report = probed(world(20))
     assert report.probe == dict.fromkeys(plants.KINDS, True)
     assert set(report.gates) == set(screen.MECHANISM_DEFECTS)
@@ -574,7 +574,7 @@ def test_few_rows_are_screened_and_say_what_the_screen_would_miss():
 
 
 def test_a_missed_plant_is_reported_and_a_suspect_still_blocks(monkeypatch):
-    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:156.
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:158.
     # Enforces website/src/learn/what-scmle-cannot-do.html:36-37.
     found = {**dict.fromkeys(plants.KINDS, True), "leak_threshold": False}
     monkeypatch.setattr(screen, "probe", lambda *a, **k: found)
@@ -585,7 +585,7 @@ def test_a_missed_plant_is_reported_and_a_suspect_still_blocks(monkeypatch):
 
 def test_a_stale_certificate_is_reported_and_does_not_decide(monkeypatch):
     # Enforces docs/LEAKAGE.md:236.
-    # Enforces website/src/learn/leakage.html:67-68.
+    # Enforces website/src/learn/leakage.html:69-70.
     monkeypatch.setattr(screen, "code_digest", lambda: "0" * 64)
     report = probed(world(20))
     assert "published certificate for binary targets: stale" in report.notes
@@ -606,7 +606,7 @@ def test_a_column_named_like_a_plant_is_screened_beside_the_plants():
 def test_without_gates_a_suspect_warns_and_cannot_block():
     # Enforces docs/ARCHITECTURE.md:172.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:140.
-    # Enforces website/src/learn/when-things-go-wrong.html:51.
+    # Enforces website/src/learn/when-things-go-wrong.html:66.
     frame = world(19).assign(leak=lambda f: f.y + 0.0)
     report = run(frame)
     found = report.suspects[0]
@@ -619,7 +619,7 @@ def test_without_gates_a_suspect_warns_and_cannot_block():
 
 def test_with_probed_gates_a_suspect_blocks():
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:140.
-    # Enforces website/src/learn/when-things-go-wrong.html:51.
+    # Enforces website/src/learn/when-things-go-wrong.html:66.
     frame = world(20).assign(leak=lambda f: f.y + 0.0)
     report = probed(frame)
     assert {f.feature for f in report.blocking} == {"leak"}

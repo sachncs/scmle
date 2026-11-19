@@ -48,6 +48,7 @@ class Features(Strategy):
         task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
+        featurise: preprocessing.Featuriser | None = None,
     ) -> models.Estimator:
         """Builds the pipeline with the strategy's numeric steps.
 
@@ -57,6 +58,8 @@ class Features(Strategy):
             task: Resolved task type.
             seed: Random seed.
             params: Hyperparameter overrides.
+            featurise: Builds the featuriser of the plan: the data kind's
+                (`kinds.Kind.featurise`).
 
         Returns:
             The unfitted candidate estimator, preprocessing included.
@@ -72,7 +75,7 @@ class Features(Strategy):
         if self.select:
             options = dataclasses.replace(options, scale=True)
         pipeline: models.Estimator = preprocessing.instantiate(
-            plan, adapter, task, seed, params, options
+            plan, adapter, task, seed, params, options, featurise=featurise
         )
         return pipeline
 
@@ -173,6 +176,7 @@ class Rarity(Strategy):
         task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
+        featurise: preprocessing.Featuriser | None = None,
     ) -> models.Estimator:
         """Wraps the standard pipeline in the density-weighted regressor.
 
@@ -182,11 +186,15 @@ class Rarity(Strategy):
             task: Resolved task type.
             seed: Random seed.
             params: Hyperparameter overrides.
+            featurise: Builds the featuriser of the plan: the data kind's
+                (`kinds.Kind.featurise`).
 
         Returns:
             The unfitted candidate estimator, preprocessing included.
         """
-        inner = preprocessing.instantiate(plan, adapter, task, seed, params)
+        inner = preprocessing.instantiate(
+            plan, adapter, task, seed, params, featurise=featurise
+        )
         return resampling.DensityWeightedRegressor(inner)
 
 
@@ -231,6 +239,7 @@ class Encoding(Strategy):
         task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
+        featurise: preprocessing.Featuriser | None = None,
     ) -> models.Estimator:
         """Builds the pipeline with target-encoded high-cardinality columns.
 
@@ -240,6 +249,8 @@ class Encoding(Strategy):
             task: Resolved task type.
             seed: Random seed.
             params: Hyperparameter overrides.
+            featurise: Builds the featuriser of the plan: the data kind's
+                (`kinds.Kind.featurise`).
 
         Returns:
             The unfitted candidate estimator, preprocessing included.
@@ -250,7 +261,7 @@ class Encoding(Strategy):
             sparse=False,
         )
         pipeline: models.Estimator = preprocessing.instantiate(
-            plan, adapter, task, seed, params, options
+            plan, adapter, task, seed, params, options, featurise=featurise
         )
         return pipeline
 
@@ -513,6 +524,7 @@ class Transformation(Strategy):
         task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
+        featurise: preprocessing.Featuriser | None = None,
     ) -> models.Estimator:
         """Wraps the standard pipeline so the target is transformed.
 
@@ -522,13 +534,15 @@ class Transformation(Strategy):
             task: Resolved task type.
             seed: Random seed.
             params: Hyperparameter overrides.
+            featurise: Builds the featuriser of the plan: the data kind's
+                (`kinds.Kind.featurise`).
 
         Returns:
             The unfitted candidate estimator, preprocessing included.
         """
         transformed: models.Estimator = compose.TransformedTargetRegressor(
             regressor=preprocessing.instantiate(
-                plan, adapter, task, seed, params
+                plan, adapter, task, seed, params, featurise=featurise
             ),
             transformer=transformers.AsinhTarget(),
         )

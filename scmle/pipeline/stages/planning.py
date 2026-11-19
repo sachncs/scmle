@@ -9,6 +9,7 @@ from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.contracts import tasks
 from scmle.pipeline import engine
+from scmle.pipeline import kinds
 from scmle.pipeline import products
 from scmle.pipeline import recommendations
 from scmle.pipeline import roster
@@ -79,6 +80,7 @@ def devise(
             partition.task,
             approved.candidates if approved is not None else None,
             board.services.history,
+            board.get(ingestion.Intake).kind.cost,
         )
     )
     task = partition.task
@@ -173,7 +175,7 @@ def requisition(
         modality=modality,
         task=task,
         model_family=model_family,
-        evaluation=roster.TABULAR_BETA_EVALUATIONS[task],
+        evaluation=kinds.TABULAR_BETA_EVALUATIONS[task],
         uncertainty=capabilities.Uncertainty.NONE,
         fairness=fairness,
         explainability=capabilities.Explainability.NONE,

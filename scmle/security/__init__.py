@@ -5,4 +5,9 @@ set; `access` turns a verified token into an authorization decision (scopes,
 tenant, rate limit) with errors that are safe to show a caller; `audit`
 appends activation, access and administration rows to the hash-chained
 deployment ledger.
+
+Two checks serve claim C9: `deserialisation` finds every call in a package
+that deserialises and judges whether its bytes are authenticated, and
+`leaks` searches what a run wrote for its input rows, rare categories and
+secrets.
 """

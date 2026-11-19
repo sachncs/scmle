@@ -75,7 +75,7 @@ def test_sample_has_file_and_content_identity():
 
 @PILLOW_SKIP
 def test_empty_and_corrupt_payloads_are_structured():
-    # Enforces website/src/pages/docs/extensions.astro:134.
+    # Enforces website/src/pages/docs/extensions.astro:199.
     for payload, code in [
         (b"", "empty_payload"),
         (b"not an image", "corrupt_payload"),
@@ -88,7 +88,7 @@ def test_empty_and_corrupt_payloads_are_structured():
 
 @PILLOW_SKIP
 def test_oversized_payload_and_pixel_limits_are_rejected():
-    # Enforces website/src/pages/docs/extensions.astro:134.
+    # Enforces website/src/pages/docs/extensions.astro:199.
     payload = png_bytes((1, 2, 3), size=(10, 10))
     with pytest.raises(image.ImageValidationError, match="bytes") as by_bytes:
         image.Sample.from_bytes(payload, max_bytes=len(payload) - 1)
@@ -250,7 +250,7 @@ def test_curation_reports_mixed_label_state():
 def test_curation_blocks_conflicting_duplicate_labels():
     """Duplicate pixels cannot silently carry incompatible labels.
 
-    Also enforces website/src/pages/docs/api.astro:112.
+    Also enforces website/src/pages/docs/api.astro:157.
     """
     payload = png_bytes((10, 20, 30))
     report = image.Dataset(
@@ -271,10 +271,10 @@ def test_curation_blocks_conflicting_duplicate_labels():
 def test_curation_blocks_sensitive_exif_metadata():
     """GPS and author metadata require an explicit privacy disposition.
 
-    Also enforces website/src/pages/docs/api.astro:112.
-    Also enforces website/src/pages/docs/api.astro:200.
-    Also enforces website/src/pages/docs/data.astro:169.
-    Also enforces website/src/pages/docs/data.astro:229.
+    Also enforces website/src/pages/docs/api.astro:157.
+    Also enforces website/src/pages/docs/api.astro:298.
+    Also enforces website/src/pages/docs/data.astro:274.
+    Also enforces website/src/pages/docs/data.astro:358.
     """
     canvas = Image.new("RGB", (4, 3), (10, 20, 30))
     exif = Image.Exif()

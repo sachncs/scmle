@@ -13,6 +13,7 @@ from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.evaluation import parameter_estimation
 from scmle.optimization import optimizers
+from scmle.pipeline import kinds
 from scmle.runtime import config
 
 LOGGER = logging.getLogger(__name__)
@@ -206,8 +207,21 @@ class ProjectCommand(command.Command):
         Args:
             parser: The argument parser of this command.
         """
-        parser.add_argument("data", help="CSV or Parquet file")
+        parser.add_argument(
+            "data",
+            help="CSV or Parquet file, or the source of the declared "
+            "modality (a manifest, a directory of label folders, a graph "
+            "directory or a vector file)",
+        )
         parser.add_argument("--target", required=True, nargs="+")
+        parser.add_argument(
+            "--modality",
+            choices=sorted(kinds.KINDS),
+            default="tabular",
+            help="the kind of data the source holds; every kind but "
+            "tabular is experimental and needs `models.experimental_models` "
+            "in the --config file",
+        )
         parser.add_argument("--task", default="auto")
         parser.add_argument("--metric")
         command.option(
@@ -300,6 +314,7 @@ class ProjectCommand(command.Command):
         return project.Project(
             args.data,
             args.target[0] if len(args.target) == 1 else args.target,
+            modality=args.modality,
             task=args.task,
             metric=args.metric,
             time_budget=args.budget,

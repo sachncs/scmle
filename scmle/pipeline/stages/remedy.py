@@ -122,7 +122,14 @@ class Remedy(examination.Examination):
         plan = partition.profile.feature_plan
         seed = board.services.spec.validation.seed
         return thresholds.heldout(
-            lambda: strategy.build(plan, adapter, task, seed, selected.params),
+            lambda: strategy.build(
+                plan,
+                adapter,
+                task,
+                seed,
+                selected.params,
+                featurise=board.get(ingestion.Intake).kind.featurise,
+            ),
             split.dev_features,
             split.dev_target,
             split.manifest.folds,

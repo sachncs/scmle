@@ -13,6 +13,7 @@ from typing import Any
 import scmle
 from scmle.assurance.detectors import minhash
 from scmle.assurance.ledger.confirm import thresholdout
+from scmle.data.modalities.audio import wav
 from scmle.data.store import processing
 from scmle.data.store import quality
 from scmle.data.store import snapshot
@@ -30,6 +31,15 @@ from scmle.operations import recovery
 from scmle.operations import signals
 from scmle.operations import spool
 from scmle.pipeline import kinds
+from scmle.pipeline.kinds import audio
+from scmle.pipeline.kinds import document
+from scmle.pipeline.kinds import geospatial
+from scmle.pipeline.kinds import graph
+from scmle.pipeline.kinds import image
+from scmle.pipeline.kinds import media
+from scmle.pipeline.kinds import raster
+from scmle.pipeline.kinds import rows
+from scmle.pipeline.kinds import video
 from scmle.runners import base
 from scmle.runners import checkpoint
 from scmle.runners import local
@@ -224,6 +234,16 @@ EXTENSION_SURFACES = {
     ),
     "scmle.workflow.schedule": (schedule, ("Scheduler", "Tick")),
     "scmle.pipeline.kinds": (kinds, ("Kind", "Tabular", "pick")),
+    "scmle.pipeline.kinds.rows": (rows, ("Cohorts", "Rows", "unite")),
+    "scmle.pipeline.kinds.media": (media, ("Description", "Media")),
+    "scmle.pipeline.kinds.audio": (audio, ("Audio",)),
+    "scmle.pipeline.kinds.document": (document, ("Document",)),
+    "scmle.pipeline.kinds.geospatial": (geospatial, ("Geospatial",)),
+    "scmle.pipeline.kinds.graph": (graph, ("Graph",)),
+    "scmle.pipeline.kinds.image": (image, ("Image",)),
+    "scmle.pipeline.kinds.raster": (raster, ("Raster",)),
+    "scmle.pipeline.kinds.video": (video, ("Video",)),
+    "scmle.data.modalities.audio.wav": (wav, ("pcm",)),
     "scmle.data.store.processing": (
         processing,
         ("Checkpoint", "IncrementalProcessor", "Processing"),

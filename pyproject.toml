@@ -65,6 +65,8 @@ benchmarks = ["huggingface_hub>=0.25"]
 sota = ["openml>=0.15"]
 distributed = ["ray>=2.40"]
 multimodal = ["pillow>=13.0"]
+# PDF input for the `document` kind; text and Markdown need no extra.
+documents = ["pypdf>=5"]
 # OpenTelemetry spans for requests, scoring and pipeline stages, exported
 # over OTLP/HTTP when `scmle --trace` or SCMLE_TRACING asks for them.
 tracing = [
@@ -72,7 +74,7 @@ tracing = [
     "opentelemetry-exporter-otlp-proto-http>=1.27",
 ]
 all = [
-    "scmle[boosting,catboost,deeplearning,optimization,sampling,polars,spreadsheets,tracking,distributed,benchmarks,multimodal,tracing]",
+    "scmle[boosting,catboost,deeplearning,optimization,sampling,polars,spreadsheets,tracking,distributed,benchmarks,multimodal,documents,tracing]",
 ]
 
 [project.urls]
@@ -125,15 +127,28 @@ reportMissingTypeStubs = "none"
 reportUnnecessaryIsInstance = "none"
 
 [tool.deptry]
+# scripts/rename.py imports its sibling scripts/structure.py by path.
+known_first_party = ["structure"]
+
 [tool.deptry.package_module_name_map]
 pillow = "PIL"
 imbalanced-learn = "imblearn"
 scikit-learn = "sklearn"
+# Both tracing distributions install into the `opentelemetry` namespace; the
+# map is needed where the extra is not installed (deptry cannot read it).
+opentelemetry-sdk = "opentelemetry"
+opentelemetry-exporter-otlp-proto-http = "opentelemetry"
 
 [tool.deptry.per_rule_ignores]
 # benchmarks/qualification/make_f5_oracles.py is an offline generator that needs
-# cleanlab, which is not a dependency of the package.
-DEP001 = ["cleanlab"]
+# cleanlab, which is not a dependency of the package; fuzz/serving.py needs
+# atheris, pinned in fuzz/requirements.txt for the fuzz workflow (Linux only).
+DEP001 = ["cleanlab", "atheris"]
+# Developer tools that use dev dependencies outside tests:
+# benchmarks/evidence/mutation.py drives mutmut, and scripts/rename.py reads
+# types with mypy and rewrites code with libcst, which mutmut brings.
+DEP003 = ["libcst"]
+DEP004 = ["mutmut", "mypy"]
 # Optional extras are imported lazily and guarded, so deptry cannot see them.
 DEP002 = [
     "catboost",
@@ -154,6 +169,7 @@ DEP002 = [
     "openml",
     "ray",
     "pillow",
+    "pypdf",
     "scmle",
 ]
 

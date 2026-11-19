@@ -79,9 +79,11 @@ class Inspection:
 
     Attributes:
         spec: Project specification describing column roles.
+        texts: Columns profiled as free text whatever their values.
     """
 
     spec: tasks.Config
+    texts: tuple[str, ...] = ()
 
     def exclude(self, frame: pandas.DataFrame) -> dict[str, str]:
         """Maps configured non-feature columns to why they are excluded.
@@ -176,7 +178,11 @@ class Inspection:
             if name == self.spec.data.target:
                 continue
             series = frame[name]
-            kind = columns.categorize(series)
+            kind = (
+                columns.TextKind()
+                if name in self.texts
+                else columns.categorize(series)
+            )
             stats = kind.statistics(series)
             statistics[name] = stats
             if name in dropped:

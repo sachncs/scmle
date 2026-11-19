@@ -16,6 +16,7 @@ from scmle.pipeline import products
 from scmle.pipeline import strategy_search
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import exploration
+from scmle.pipeline.stages import ingestion
 from scmle.pipeline.stages import interface
 from scmle.pipeline.stages import profiling
 from scmle.pipeline.stages import training
@@ -177,6 +178,7 @@ class SelectStage(interface.Stage):
                 task,
                 board.services.spec.validation.seed,
                 trial.params,
+                featurise=board.get(ingestion.Intake).kind.featurise,
             )
             candidate.fit(split.dev_features, split.dev_target)
             usage = resources.measure(candidate, split.dev_features)
@@ -339,6 +341,7 @@ class SelectStage(interface.Stage):
             task,
             board.services.spec.validation.seed,
             trial.params,
+            featurise=board.get(ingestion.Intake).kind.featurise,
         )
         candidate.fit(split.dev_features, split.dev_target)
         usage = resources.measure(candidate, split.dev_features)
@@ -456,6 +459,7 @@ def codify(
             partition.task,
             board.services.spec.validation.seed,
             selected.params,
+            featurise=board.get(ingestion.Intake).kind.featurise,
         )
         pipeline.fit(split.dev_features, split.dev_target)
         refits[selected.trial_id] = pipeline

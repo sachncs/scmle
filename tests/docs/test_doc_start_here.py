@@ -50,8 +50,8 @@ def test_predict_refuses_a_wrong_key_and_missing_columns_with_exit_one(
 ):
     """Enforces docs/START_HERE.md:521.
 
-    Also enforces website/src/learn/start-here.html:265.
-    Also enforces website/src/pages/docs/quickstart.astro:113.
+    Also enforces website/src/learn/start-here.html:268.
+    Also enforces website/src/pages/docs/quickstart.astro:116.
     """
     directory, rows = signed
     caplog.set_level(logging.INFO)

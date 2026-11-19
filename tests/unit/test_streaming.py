@@ -219,7 +219,7 @@ def test_stream_checkpoint_binds_snapshot_offset_and_watermark(tmp_path):
 def test_transactional_sink_binds_receipt_ack_and_checkpoint_durably(
     tmp_path,
 ):
-    # Enforces website/src/pages/docs/data.astro:76.
+    # Enforces website/src/pages/docs/data.astro:118.
     path = tmp_path / "events.csv"
     write_stream_csv(path)
     source = streaming.Csv(path)
@@ -384,7 +384,7 @@ def test_stream_ledger_commits_idempotently_and_persists_checkpoint(tmp_path):
 def test_stream_consumer_retries_ack_after_restart_without_replaying_writer(
     tmp_path,
 ):
-    # Enforces website/src/pages/docs/data.astro:90.
+    # Enforces website/src/pages/docs/data.astro:152.
     path = tmp_path / "events.csv"
     write_stream_csv(path)
     source = streaming.Csv(path)
@@ -431,7 +431,7 @@ def test_stream_consumer_retries_ack_after_restart_without_replaying_writer(
 
 
 def test_stream_ledger_refuses_a_changed_source_snapshot(tmp_path):
-    # Enforces website/src/pages/docs/data.astro:75.
+    # Enforces website/src/pages/docs/data.astro:117.
     path = tmp_path / "events.csv"
     write_stream_csv(path)
     source = streaming.Csv(path)

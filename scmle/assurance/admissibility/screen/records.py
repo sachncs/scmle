@@ -29,6 +29,7 @@ import math
 
 import numpy
 import pandas
+from scipy import special
 from scipy import stats
 
 from scmle.assurance.admissibility import leakage
@@ -390,11 +391,11 @@ def excess(
     """Tests the pairs against the most a sample from a population holds.
 
     The counts are taken as Poisson with means `l1, l2, l3`, constrained
-    by `l2^2 <= c l1 l3` (`c` from `SCHWARZ` and `rows`). On the boundary
-    the likelihood is largest at `l1 = f1 + d`, `l2 = f2 - 2 d`,
-    `l3 = f3 + d`, `d` the smaller root of
-    `(4 - c) d^2 - (4 f2 + c (f1 + f3)) d + f2^2 - c f1 f3 = 0`; the
-    likelihood ratio is chi-bar-squared, half a `chi^2_1` (one inequality).
+    by `l2^2 <= c l1 l3` (`c` from `SCHWARZ` and `rows`). The p-value is
+    the exact conditional one (`exact`). The effect is the pairs over their
+    mean where the likelihood is largest on the boundary: `l1 = f1 + d`,
+    `l2 = f2 - 2 d`, `l3 = f3 + d`, `d` the smaller root of
+    `(4 - c) d^2 - (4 f2 + c (f1 + f3)) d + f2^2 - c f1 f3 = 0`.
 
     Args:
         singles: Records seen once, `f1`.
@@ -414,13 +415,41 @@ def excess(
     shift = (
         b - math.sqrt(b * b - 4 * a * (pairs**2 - c * singles * triples))
     ) / (2 * a)
-    means = (singles + shift, pairs - 2 * shift, triples + shift)
-    counts = (singles, pairs, triples)
-    deviance = 2.0 * sum(
-        f * math.log(f / m) for f, m in zip(counts, means, strict=True) if f > 0
+    return exact(singles, pairs, triples, c), pairs / (pairs - 2 * shift)
+
+
+def exact(singles: int, pairs: int, triples: int, c: float) -> float:
+    """The exact p-value of the pairs given the singles and the triples.
+
+    The constraint `l2^2 <= c l1 l3` is linear in the Poisson natural
+    parameters (`2 log l2 - log l1 - log l3 <= log c`), so conditioning on
+    `2 f1 + f2` and `2 f3 + f2` removes the nuisance means and leaves the
+    pairs a law with monotone likelihood ratio in that contrast: the tail
+    on the boundary is the uniformly most powerful unbiased test, of exact
+    size at every count. The half `chi^2_1` of the likelihood ratio it
+    replaces rejected 1.9 percent of boundary counts at 0.01 when about
+    four triples were expected (`tests/unit/test_duplication_exact.py`).
+
+    Args:
+        singles: Records seen once, `f1`.
+        pairs: Records seen exactly twice, `f2`.
+        triples: Records seen three times, `f3`.
+        c: The boundary constant (`SCHWARZ` with the rows' correction).
+
+    Returns:
+        The probability of at least `pairs` pairs on the boundary, given
+        both sums.
+    """
+    upper, lower = 2 * singles + pairs, 2 * triples + pairs
+    j = numpy.arange(pairs % 2, min(upper, lower) + 1, 2)
+    weights = (
+        0.5 * j * math.log(c)
+        - special.gammaln((upper - j) / 2 + 1)
+        - special.gammaln(j + 1)
+        - special.gammaln((lower - j) / 2 + 1)
     )
-    p = 0.5 * float(stats.chi2.sf(max(deviance, 0.0), 1))
-    return p, pairs / means[1]
+    tail = special.logsumexp(weights[j >= pairs])
+    return math.exp(tail - special.logsumexp(weights))
 
 
 def duplication(

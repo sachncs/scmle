@@ -321,6 +321,70 @@ marked `Breaking:` and listed first in their group.
 
 ### Added
 
+- Every data kind on the shared stages, experimental except `tabular`. Each
+  kind is registered in `scmle.pipeline.kinds.KINDS` and declares its own
+  capability records (`Kind.declare()`); `roster.enrol` enrols them by
+  iterating `KINDS`. Every kind runs ingestion (`kind.read`), profiling
+  (`kind.survey`), the split (`kind.constrain`), time-budget admission
+  (`kind.cost`), training (`kind.featurise`) and packaging (`kind.decode`) as
+  a table does: candidate search over the shared model families,
+  cross-validation, the locked test set, explanation and the signed bundle.
+  One shared splitter (`rows.Cohorts`) keeps copies, near-copies, declared
+  groups and spatial blocks on one side of every split and fold; with a
+  time-ordered protocol it purges development rows that share a cohort with
+  a test row, an exchangeable protocol becomes the group split with a note,
+  a declared group with missing values is refused, and when no cohort holds
+  two rows the declared protocol applies. A served model of a non-tabular
+  kind takes described rows (descriptor or feature rows), not raw files.
+  - `document`: class folders or a listing table of text, Markdown or PDF
+    (PDF needs `pypdf`), the text column declared as text (so a corpus
+    under 30 documents keeps it), TF-IDF fitted inside the folds, chunks and
+    near-duplicates kept together. MM-13 and MM-17 are fixed on this path
+    only, not in the older document lifecycle.
+  - `graph`: a node table and an edge file, node ids read as text; a node's
+    structural features count only edges known when it is first seen, and a
+    timed graph holds out the latest-seen nodes. With `document` this closes
+    MM-1, MM-7, MM-8, MM-10, MM-11, MM-16 (documents) and MM-22.
+  - `image` (Pillow, `multimodal` extra): one row of numeric descriptors per
+    file. Closes MM-10, MM-12, MM-13 (occlusion keeps the original class) and
+    MM-17 (standard signed bundle; a manifest naming an outside file is
+    refused).
+  - `video` (`ffmpeg` and `ffprobe` on the PATH): evenly spaced frames
+    decoded through an FFmpeg pipe into descriptor rows. Closes MM-3 (a
+    time-ordered split finishes with folds), MM-6, MM-10 and MM-12.
+  - `audio` (FLAC needs `soundfile`) and `raster` (GeoTIFF needs
+    `rasterio`): clips read in bounded chunks and tiles in bounded strips;
+    raster keeps spatial blocks anchored at the CRS origin together. Close
+    MM-4, MM-6, MM-10, MM-11, MM-12, MM-13, MM-16 and MM-18.
+  - `geospatial` (vector): GeoJSON and line-by-line
+    GeoJSON (other formats need `geopandas`) read as one row per feature
+    with geometry measures, split by spatial blocks sized from the label's
+    spatial range. Closes MM-2, MM-9 and MM-11. Besides the shared reason
+    below, a served model takes the geometry columns, not raw GeoJSON, and
+    the held-out test interval resamples rows, not spatial blocks, so it can
+    be too narrow.
+
+  Every non-tabular kind is declared `experimental`, not `supported`, for
+  binary, multiclass and regression: supported means the whole lifecycle is
+  proven, and deployment, monitoring and recovery are not proven for these
+  kinds (`rows.LIFECYCLE` in each record's limitations). A run needs the
+  opt-in `models.experimental_models` in the `--config` file; without it the
+  run is refused with an `UnsupportedError`. No breadth slice is qualified
+  (`docs/BREADTH.md`). A9 split-leakage property tests cover each kind.
+- `scmle run DATA --target Y --modality KIND` picks the data kind (`tabular`,
+  `document`, `graph`, `image`, `video`, `audio`, `raster`, `geospatial`).
+  Any kind but `tabular` needs `--config` with
+  `{"models": {"experimental_models": [...]}}` naming model families the
+  task accepts.
+- The `documents` extra (`pypdf`), for PDF input to the `document` kind.
+- Citation guard `tests/docs/test_doc_citations.py`: fails when a test's
+  citation of a doc line is stale or cites a line with no statement.
+- C2 duplicate test: `records.exact`, an exact conditional test on the counts
+  of singles, pairs and triples. It has exact size where the old p-value was
+  too generous when triples are rare (in simulation 1.9% rejected at 0.01
+  and 12% at 0.05), and is weaker on some tables (OpenML 1464: 0.011 to
+  0.018; 1067: 0.018 to 0.024).
+
 - ONNX divergence gate (`export.onnx.divergence`, claim C1):
   `onnx_export.verify` blocks a graph whose probabilities (scaled values for
   regression) differ from the pipeline's by more than gamma_1024 for float32
@@ -1376,6 +1440,30 @@ marked `Breaking:` and listed first in their group.
 
 ### Changed
 
+- `scripts/recite.py` follows line moves in every scanned doc (including
+  `website/src`, `docs/preregistration` and `#L` citations), moves both ends
+  of a range, and follows a line reworded in place (similarity threshold
+  `KIN = 0.59`, the 99th percentile for unrelated doc lines). `--history`
+  repairs citations already committed stale; `--base REF --docs` handles a
+  second round of edits before a commit.
+- C12 snippet check: each page's code blocks run in their own fresh
+  environment built from the working-tree snapshot, not in whichever
+  environment and `PATH` started the check.
+- C1 faults: a path whose extra is missing from the running interpreter runs
+  in an isolated interpreter with that extra (as the CI onnx job does), and
+  the record names the interpreter used.
+- C10 mutation: a module whose run crashes under mutmut's default runner is
+  retried under mutmut's fork-server runner; a module still undecided counts
+  as undecided.
+- Time-budget admission prices each kind with its own `kind.cost`, so a
+  media kind needs a larger budget than before for the same row count.
+- Label noise has a single cost model: the profiler's noise check is priced
+  by `label_noise.cost`, the model that sets how many rows it gets.
+- C2 corpus: tecator (OpenML 505) declares `moisture` and `protein` as
+  outcomes; its description lists them as outputs determined by analytic
+  chemistry. `docs/preregistration/c2.md` records that this was changed after
+  `protein` was seen missed.
+
 - Selection is evidence-based: a variant (a data strategy, tuned
   hyperparameters or an ensemble) competes only when a paired test on the
   shared folds gives it at least a 0.95 probability of beating its default
@@ -1698,6 +1786,9 @@ marked `Breaking:` and listed first in their group.
   budget.
 
 ### Fixed
+
+- C2 target-encoding plant bins by value, so tied values share a level
+  (OpenML 1464 now blocks).
 
 - A charter run's leakage screen reads the declared `data.cutoff` and
   `data.known` (admission passes them to `qualify.run`), so a column known

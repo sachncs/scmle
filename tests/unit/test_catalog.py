@@ -115,7 +115,7 @@ def test_opaque_data_requires_explicit_content_identity():
 def test_source_metadata_removes_governance_blockers_for_clean_data():
     """Declared source context is retained instead of inferred from bytes.
 
-    Also enforces website/src/pages/docs/data.astro:57.
+    Also enforces website/src/pages/docs/data.astro:74.
     """
     source = catalog.Source(
         uri="memory://customer-sample",

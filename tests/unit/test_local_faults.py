@@ -14,7 +14,7 @@ from scmle.rehearsal import local_faults
 def test_local_executor_passes_every_declared_scenario(tmp_path):
     """Every local scenario must satisfy its complete evidence contract.
 
-    Also enforces website/src/pages/docs/operations.astro:128.
+    Also enforces website/src/pages/docs/operations.astro:194.
     """
     root = tmp_path / "local-faults"
     executor = local_faults.Executor(root)

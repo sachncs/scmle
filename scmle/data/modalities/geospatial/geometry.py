@@ -240,8 +240,9 @@ def autocorrelate(
     weight_total = 2 * len(edges)
     if weight_total == 0:
         raise errors.InputError("edges must contain at least one neighbor pair")
-    numerator = sum(
-        centered[first] * centered[second] * 2 for first, second in edges
+    pairs = numpy.asarray(edges, dtype=numpy.int64).reshape(-1, 2)
+    numerator = 2 * float(
+        numpy.dot(centered[pairs[:, 0]], centered[pairs[:, 1]])
     )
     return float(len(numeric) * numerator / (weight_total * denominator))
 

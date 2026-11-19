@@ -25,7 +25,10 @@ files) with fast settings (no tuning,
 ensembles or deep learning), or `site` level, a direct call of the gate's
 function (or the command or stage function that contains it). Each gate's
 pass path is run too (`control`) where a clean input is cheap to build; it
-decides nothing.
+decides nothing. A path whose gate sits behind an optional extra this
+interpreter cannot import (`EXTRAS`: the ONNX divergence gate has no
+onnxruntime wheel on free-threaded 3.14t) runs under `INTERPRETER` with the
+extra installed, and its record names that interpreter.
 
 Two parts are measured and kept apart:
 
@@ -76,6 +79,7 @@ import logging
 import os
 from pathlib import Path
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import time
@@ -93,6 +97,7 @@ from scmle.contracts import errors
 from scmle.contracts import tasks
 
 PATH = Path(__file__).with_suffix(".json")
+ROOT = Path(__file__).resolve().parents[2]
 VARIABLE = "gate_fault_block_min"
 # Policy: seconds of budget per run. Preparation of a real charter run took
 # 82 to 130 s on a loaded laptop, which a 60 s budget refuses through
@@ -116,6 +121,16 @@ NOT_MEASURED = (
         "house sales split into zip codes and sales)"
     ),
 )
+# Optional extras a gate's paths need, by extra: the modules that must
+# import for a path to reach its gate rather than fail on the import.
+EXTRAS = {"onnx": ("skl2onnx", "onnxruntime")}
+# The interpreter that runs a path whose extra this one cannot import: the
+# newest CPython every extra has wheels for (onnxruntime has none for the
+# free-threaded 3.14t), the one the CI `onnx` job runs on.
+INTERPRETER = "3.13"
+# Seconds to build that interpreter's isolated environment, on top of the
+# path's own `BUDGET`: 42 s measured cold on 2026-11-19, about three times.
+SETUP = 120
 FAST = {
     "search": tasks.Search(top_models=0),
     "strategies": tasks.Strategies(top_models=0),
@@ -793,6 +808,8 @@ def admissibility(attest: bool) -> str | None:
     from scmle.assurance.admissibility import provenance
     from scmle.assurance.admissibility import qualify
     from scmle.pipeline import stages
+    from scmle.pipeline.stages import screening
+    from scmle.pipeline.stages import surveying
 
     scope = "c" * 64
     rng = numpy.random.default_rng(SEED)
@@ -827,13 +844,18 @@ def admissibility(attest: bool) -> str | None:
                 group_column=None, time_column=None, cutoff=None, known={}
             ),
         )
+        made: dict[type, Any] = {
+            screening.Screen: types.SimpleNamespace(ingest=None),
+            surveying.Portrait: types.SimpleNamespace(
+                profile=types.SimpleNamespace(
+                    feature_plan=data.Blueprint(("copy",), ())
+                )
+            ),
+        }
         context: Any = types.SimpleNamespace(
             services=types.SimpleNamespace(spec=spec),
             journal=types.SimpleNamespace(write_json=ignore, emit=ignore),
-            ingest=None,
-            profile=types.SimpleNamespace(
-                feature_plan=data.Blueprint(("copy",), ())
-            ),
+            get=made.__getitem__,
         )
         charter: Any = types.SimpleNamespace(
             estimand=types.SimpleNamespace(kind="predictive", causal=None),
@@ -1023,11 +1045,11 @@ def planter(fault: str, other: Task) -> type:
             del context
             return f"plugin stage (journal {fault})"
 
-        def execute(self, context: Any) -> None:
+        def execute(self, board: Any) -> None:
             """Writes one answered session on `other` as the run's journal.
 
             Args:
-                context: The run context holding the run's store.
+                board: The run's board holding the run's store.
             """
             if fault != "foreign":
                 return
@@ -1035,7 +1057,7 @@ def planter(fault: str, other: Task) -> type:
             labels = pandas.Series(frame[target] == "2", name=target)
             rows = (frame.drop(columns=[target]), labels)
             terms = thresholdout.Terms(len(frame), queries=1, budget=1)
-            folder = Path(context.services.store.directory)
+            folder = Path(board.services.store.directory)
             thresholdout.Thresholdout(
                 rows, rows, terms, journal=folder / governed.JOURNAL
             ).query(lambda *scored: numpy.zeros(len(scored[1])))
@@ -1258,18 +1280,18 @@ def overrun(spent: bool, part: str = "simulated") -> Any:
     class Late(stages.TrainStage):
         """Training that first spends the whole budget when `spent`."""
 
-        def execute(self, context: Any) -> Any:
+        def execute(self, board: Any) -> Any:
             """Moves the run's start back, then trains.
 
             Args:
-                context: The run context.
+                board: The run's board.
 
             Returns:
                 What the training stage returns.
             """
             if spent:
-                context.regulator.started_at -= BUDGET
-            return super().execute(context)
+                board.regulator.started_at -= BUDGET
+            return super().execute(board)
 
     frame, target, options = clean("binary", part)
     project = scmle.api.project.Project(
@@ -1743,6 +1765,7 @@ def plugin(fault: str) -> type:
         The `Stage` subclass.
     """
     from scmle.pipeline import stages
+    from scmle.pipeline.stages import profiling
     from scmle.pipeline.stages import selecting
     import scmle.runtime.state
 
@@ -1764,13 +1787,13 @@ def plugin(fault: str) -> type:
             del context
             return f"plugin stage ({fault})"
 
-        def execute(self, context: Any) -> None:
+        def execute(self, board: Any) -> None:
             """Binds or opens the locked test rows.
 
             Args:
-                context: The run context holding the split.
+                board: The run's board holding the partition and its split.
             """
-            locked = context.split.locked_test
+            locked = board.get(profiling.Partition).split.locked_test
             if fault == "bind":
                 locked.bind("plugin")
             if fault == "open":
@@ -2108,6 +2131,8 @@ class Injection:
         control: Runs the pass path, or None when it is not built.
         override: Plants the fault under the documented override, or None.
         reason: Why a path is not injected, or ''.
+        extra: The optional extra (a key of `EXTRAS`) its paths need, or
+            ''; without it they run under `INTERPRETER` (`delegate`).
     """
 
     level: str
@@ -2116,6 +2141,7 @@ class Injection:
     control: Callable[[], Any] | None = None
     override: Callable[[], Any] | None = None
     reason: str = ""
+    extra: str = ""
 
 
 # Rows held out from the model for the ONNX divergence gate: at least the
@@ -2248,6 +2274,7 @@ INJECTIONS: dict[str, Injection] = {
         bind(exported, "unchecked"),
         bind(exported, "checked"),
         override=bind(exported, "unverified"),
+        extra="onnx",
     ),
     "ingest.cli.unit_verdict": Injection(
         "site",
@@ -2584,6 +2611,7 @@ REAL: dict[str, Injection] = {
         bind(exported, "unchecked", part="real"),
         bind(exported, "checked", part="real"),
         override=bind(exported, "unverified", part="real"),
+        extra="onnx",
     ),
     "ingest.cli.unit_verdict": Injection(
         "run",
@@ -3030,8 +3058,110 @@ def jobs(gates: dict[str, registry.Gate]) -> list[tuple[str, str, str]]:
     return found
 
 
+def installed(extra: str) -> bool:
+    """Whether every module of an optional extra imports here.
+
+    Args:
+        extra: A key of `EXTRAS`.
+
+    Returns:
+        True when each of its modules imports.
+    """
+    for name in EXTRAS[extra]:
+        try:
+            importlib.import_module(name)
+        except ImportError:
+            # handled: the extra is reported absent and the path delegated
+            return False
+    return True
+
+
+def delegate(name: str, path: str, part: str, extra: str) -> dict[str, Any]:
+    """Runs one path under `INTERPRETER` with its extra installed.
+
+    The path runs in an isolated environment of this project with the
+    extra (`uv run --isolated`), through this module's `--attempt` mode,
+    and its record comes back as the last line printed.
+
+    Args:
+        name: The gate.
+        path: The path.
+        part: The part.
+        extra: The extra the path needs.
+
+    Returns:
+        The path's record with the interpreter and extra it ran under, or
+        `failed` with the reason when that environment could not run it.
+    """
+    command = [
+        "uv",
+        "run",
+        "--isolated",
+        "--python",
+        INTERPRETER,
+        "--extra",
+        extra,
+        "python",
+        "-m",
+        "benchmarks.evidence.faults",
+        "--attempt",
+        name,
+        path,
+        part,
+    ]
+    environment = {
+        k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"
+    } | {"OMP_NUM_THREADS": "1"}
+    record: dict[str, Any] = {
+        "gate": name,
+        "path": path,
+        "part": part,
+        "level": injections(part)[name].level,
+        "cause": injections(part)[name].cause,
+    }
+    started = time.monotonic()
+    try:
+        done = subprocess.run(
+            command,
+            cwd=ROOT,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=BUDGET + SETUP,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        record.update(
+            outcome="failed",
+            error=type(error).__name__,
+            message=f"{INTERPRETER} with the {extra} extra: {error}"[:300],
+            seconds=round(time.monotonic() - started, 2),
+        )
+        return record
+    lines = done.stdout.strip().splitlines()
+    try:
+        returned = json.loads(lines[-1]) if done.returncode == 0 else None
+    except (IndexError, json.JSONDecodeError):
+        returned = None
+    if not isinstance(returned, dict):
+        tail = (done.stderr or done.stdout).strip()[-300:]
+        record.update(
+            outcome="failed",
+            error="DelegationError",
+            message=f"{INTERPRETER} with the {extra} extra exited "
+            f"{done.returncode}: {tail}"[:300],
+            seconds=round(time.monotonic() - started, 2),
+        )
+        return record
+    return returned | {"interpreter": INTERPRETER, "extra": extra}
+
+
 def run(name: str, path: str, part: str = "simulated") -> dict[str, Any]:
-    """`attempt`, with a gate missing from the part's table recorded.
+    """`attempt`, with a missing gate recorded and missing extras delegated.
+
+    A path whose injection needs an optional extra this interpreter cannot
+    import runs under `INTERPRETER` with the extra (`delegate`), so it
+    reaches its gate instead of failing on the import.
 
     Args:
         name: The gate.
@@ -3041,7 +3171,8 @@ def run(name: str, path: str, part: str = "simulated") -> dict[str, Any]:
     Returns:
         The record.
     """
-    if name not in injections(part):
+    injection = injections(part).get(name)
+    if injection is None:
         return {
             "gate": name,
             "path": path,
@@ -3050,6 +3181,8 @@ def run(name: str, path: str, part: str = "simulated") -> dict[str, Any]:
             "outcome": "not injected",
             "reason": "no injection built for this gate",
         }
+    if injection.extra and not installed(injection.extra):
+        return delegate(name, path, part, injection.extra)
     return attempt(name, path, part)
 
 
@@ -3349,18 +3482,26 @@ def summary(document: dict[str, Any] | None = None) -> tuple[str, str]:
 def main(arguments: list[str] | None = None) -> int:
     """Writes (`--write`) or checks (`--check`) the stored measurement.
 
+    `--attempt GATE PATH PART` runs one path here and prints its record as
+    the last line (what `delegate` reads).
+
     Args:
         arguments: Command-line arguments; None reads `sys.argv`.
 
     Returns:
-        0 after `--write`; for `--check`, 0 when `problems` is empty and 1
-        otherwise.
+        0 after `--write` or `--attempt`; for `--check`, 0 when `problems`
+        is empty and 1 otherwise.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--write", action="store_true")
     mode.add_argument("--check", action="store_true")
+    mode.add_argument("--attempt", nargs=3, metavar=("GATE", "PATH", "PART"))
     options = parser.parse_args(arguments)
+    if options.attempt:
+        prepare()
+        print(json.dumps(attempt(*options.attempt), sort_keys=True))
+        return 0
     if options.write:
         document = measure()
         PATH.write_text(

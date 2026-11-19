@@ -7,7 +7,7 @@ import pytest
 from scmle.contracts import capabilities
 from scmle.contracts import tasks
 from scmle.evaluation import reweighing
-from scmle.pipeline import roster
+from scmle.pipeline import kinds
 
 
 def test_the_bin_count_follows_sturges_and_is_capped():
@@ -63,10 +63,8 @@ def test_binned_weights_make_group_and_outcome_level_independent():
 
 
 def test_regression_is_registered_with_mitigation():
-    assert roster.fairnesses(tasks.Task.REGRESSION) == (
+    assert kinds.fairnesses(tasks.Task.REGRESSION) == (
         capabilities.Fairness.NONE,
         capabilities.Fairness.MITIGATION,
     )
-    assert roster.fairnesses(tasks.Task.ORDINAL) == (
-        capabilities.Fairness.NONE,
-    )
+    assert kinds.fairnesses(tasks.Task.ORDINAL) == (capabilities.Fairness.NONE,)

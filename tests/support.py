@@ -10,6 +10,7 @@ import scmle.api.project
 from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import tasks
+import scmle.models.registry
 
 NO_TUNING = tasks.Search(top_models=0)
 NO_STRATEGIES = tasks.Strategies(top_models=0)
@@ -17,6 +18,34 @@ NO_ENSEMBLE = tasks.Stacking(size=0)
 FAST_MODELS = tasks.Candidates(
     exclude_families=["bagging", "deep_learning", "foundation"]
 )
+
+
+def optin(task, rows=1_000, **models):
+    """Opts a task's automatic candidates in, as an experimental kind needs.
+
+    Every kind but tabular is declared experimental, so a run of one lists
+    the models it accepts in `models.experimental_models`; a listed model
+    must serve the task.
+
+    Args:
+        task: The task the run resolves to.
+        rows: Rows of the data, for the models' row limits.
+        **models: Further `tasks.Candidates` fields.
+
+    Returns:
+        The candidates section.
+    """
+    adapters = scmle.models.registry.Catalog.stock().adapters
+    return tasks.Candidates(
+        experimental_models=sorted(
+            name
+            for name, adapter in adapters.items()
+            if adapter.auto_candidate
+            and adapter.capabilities.standalone
+            and adapter.objection(task, rows) is None
+        ),
+        **models,
+    )
 
 
 def interrupt(project):

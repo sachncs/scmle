@@ -107,11 +107,11 @@ def test_the_exported_classifier_agrees_in_class_order(tmp_path):
 
 
 def test_models_the_converter_cannot_express_are_refused_by_name(tmp_path):
-    bundle = make_bundle("random_forest", tasks.Task.BINARY)[0]
+    bundle, features = make_bundle("random_forest", tasks.Task.BINARY)
     bundle.pipeline = tasks  # Not an estimator at all.
 
     with pytest.raises(errors.ArtifactError, match="not supported"):
-        bundle.export_onnx(tmp_path / "m.onnx")
+        bundle.export_onnx(tmp_path / "m.onnx", check=features)
 
 
 def test_an_attached_calibrator_blocks_the_export(tmp_path):
@@ -119,15 +119,15 @@ def test_an_attached_calibrator_blocks_the_export(tmp_path):
     bundle.calibrate(features, bundle.predict(features), method="sigmoid")
 
     with pytest.raises(errors.ArtifactError, match="calibrator"):
-        bundle.export_onnx(tmp_path / "m.onnx")
+        bundle.export_onnx(tmp_path / "m.onnx", check=features)
 
 
 def test_survival_models_are_refused(tmp_path):
-    bundle = make_bundle("random_forest", tasks.Task.BINARY)[0]
+    bundle, features = make_bundle("random_forest", tasks.Task.BINARY)
     bundle.schema = dataclasses.replace(bundle.schema, task="survival")
 
     with pytest.raises(errors.ArtifactError, match="survival"):
-        bundle.export_onnx(tmp_path / "m.onnx")
+        bundle.export_onnx(tmp_path / "m.onnx", check=features)
 
 
 def test_a_failed_parity_check_names_the_difference(tmp_path):
@@ -211,11 +211,11 @@ def test_boosted_regressors_export(name, tmp_path):
 
 
 def test_a_refusal_points_to_the_service_package(tmp_path):
-    bundle = make_bundle("random_forest", tasks.Task.BINARY)[0]
+    bundle, features = make_bundle("random_forest", tasks.Task.BINARY)
     bundle.pipeline = object()
 
     with pytest.raises(errors.ArtifactError, match="scaffold"):
-        bundle.export_onnx(tmp_path / "m.onnx")
+        bundle.export_onnx(tmp_path / "m.onnx", check=features)
 
 
 def test_nan_outputs_do_not_pass_the_parity_check(monkeypatch, tmp_path):

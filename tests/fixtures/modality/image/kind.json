@@ -1,0 +1,41 @@
+{
+ "custody": [
+  "split.created",
+  "selection.frozen",
+  "test.opened",
+  "model.shipped"
+ ],
+ "interval": {
+  "available": "bool",
+  "candidates": "int",
+  "corrected_standard_error": "float",
+  "folds": "int",
+  "interval": [
+   "float"
+  ],
+  "level": "float",
+  "mean": "float",
+  "naive_standard_error": "float",
+  "note": "str",
+  "selection_optimism": "float"
+ },
+ "model": [
+  "conformal.json",
+  "coverage_report.json",
+  "model_manifest.json",
+  "novelty.joblib",
+  "pipeline.joblib",
+  "reference.json",
+  "schema.json"
+ ],
+ "stages": [
+  "00-ingeststage",
+  "01-reservation",
+  "02-profilestage",
+  "03-planning",
+  "04-trainstage",
+  "05-selectstage",
+  "06-finalevaluationstage",
+  "07-packagestage"
+ ]
+}
