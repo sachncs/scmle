@@ -11,6 +11,16 @@ below it is a ratchet the next `--write` records.
     uv run python scripts/structure.py            # check against the budget
     uv run python scripts/structure.py --write    # record current counts
     uv run python scripts/structure.py --simulate scripts/layers.toml
+    uv run python scripts/structure.py --external # list external collisions
+
+Three counts serve the naming phase (register phase 6). `external_names`
+counts the multi-word names the package defines that a library it imports
+also offers (a module name or a class attribute), so `pandas.read_json`
+and an scmle `read_json` read alike; `--external` lists them.
+`import_aliases` counts `import ... as` bindings, which the naming rule
+forbids. `compound_attributes` counts multi-word attribute names per class,
+in the class body and on `self`. `EXEMPT` lists the names no count
+includes, with the reason each keeps its spelling.
 
 `--simulate` applies a layer map (`scripts/layers.toml`: the layer order and
 the module moves) to the package's import graph, including function-level
@@ -23,6 +33,8 @@ ended with its map applied and deleted; import-linter's layers contract in
 
 import argparse
 import ast
+import importlib
+import inspect
 import json
 import pathlib
 import re
@@ -36,6 +48,35 @@ LOOSE = re.compile(r"dict\[str, *(Any|object)\]")
 CAPITALS = re.compile(r"[A-Z][a-z0-9]*")
 BARE = frozenset({"ValueError", "TypeError", "RuntimeError"})
 LAYERS = pathlib.Path(__file__).with_name("layers.toml")
+# Multi-word names no count includes, each with the reason it must keep its
+# spelling: another library calls the first seventeen by name, and a
+# certificate hashes the source of the last.
+SERVER = "http.server: BaseHTTPRequestHandler calls it by name"
+SOCKET = "socketserver: BaseServer calls it by name for each request"
+ESTIMATOR = "scikit-learn: the estimator API calls it by name"
+EXEMPT = {
+    "do_GET": SERVER + " (do_<method> per request)",
+    "do_HEAD": SERVER + " (do_<method> per request)",
+    "do_POST": SERVER + " (do_<method> per request)",
+    "log_message": SERVER,
+    "version_string": SERVER,
+    "process_request": SOCKET,
+    "process_request_thread": SOCKET + " (ThreadingMixIn per request)",
+    "http_request": "urllib.request: OpenerDirector calls <scheme>_request",
+    "redirect_request": "urllib.request: HTTPRedirectHandler calls it",
+    "get_params": ESTIMATOR + " (clone, search)",
+    "set_params": ESTIMATOR + " (clone, search)",
+    "get_feature_names_out": ESTIMATOR + " (pipelines, set_output)",
+    "get_n_splits": "scikit-learn: cross-validation asks a splitter for it",
+    "inverse_transform": ESTIMATOR + " (pipelines, target transforms)",
+    "predict_proba": ESTIMATOR + " (scorers, calibration, pipelines)",
+    "state_dict": "torch: nn.Module checkpoints call it by name",
+    "load_state_dict": "torch: nn.Module checkpoints call it by name",
+    "shrunk_covariance": (
+        "the uncertainty certificate hashes reconcile.shrunk_covariance;"
+        " renaming it invalidates the certificate"
+    ),
+}
 
 
 def limits() -> dict[str, int]:
@@ -91,11 +132,98 @@ def catches(node: ast.AST) -> bool:
     return any(ast.unparse(kind) == "ValueError" for kind in kinds)
 
 
+def counted(name: str) -> bool:
+    """Whether a name is multi-word and not exempt."""
+    return compound(name) and name not in EXEMPT
+
+
+def attributes(node: ast.ClassDef) -> set[str]:
+    """Attribute names a class defines: in its body and on `self`."""
+    found = set()
+    for item in node.body:
+        if isinstance(item, ast.AnnAssign | ast.AugAssign):
+            found.add(getattr(item.target, "id", ""))
+        elif isinstance(item, ast.Assign):
+            found.update(getattr(target, "id", "") for target in item.targets)
+        elif isinstance(item, ast.FunctionDef | ast.AsyncFunctionDef):
+            own = item.args.args[0].arg if item.args.args else ""
+            found.update(
+                inner.attr
+                for inner in ast.walk(item)
+                if isinstance(inner, ast.Attribute)
+                and isinstance(inner.ctx, ast.Store)
+                and isinstance(inner.value, ast.Name)
+                and inner.value.id == own
+            )
+    return found - {""}
+
+
+def aliases(tree: ast.AST) -> int:
+    """Counts the import bindings renamed with `as`.
+
+    Code strings a module runs in a child process are read too.
+    """
+    count = 0
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import | ast.ImportFrom):
+            count += sum(alias.asname is not None for alias in node.names)
+        elif (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and "import " in node.value
+        ):
+            try:
+                inner = ast.parse(node.value)
+            except SyntaxError:
+                continue
+            count += aliases(inner)
+    return count
+
+
+def external(imported: set[str], defined: set[str]) -> dict[str, str]:
+    """Defined names that a library the package imports also offers.
+
+    A library's public names are its module's names and the attributes of
+    the classes it exposes. Only libraries installed here are read, so the
+    count depends on the environment (`torch` adds `state_dict`).
+
+    Args:
+        imported: Modules the package imports.
+        defined: Multi-word names the package defines.
+
+    Returns:
+        Each colliding name and the first module that also offers it.
+    """
+    found: dict[str, str] = {}
+    for module in sorted(imported):
+        try:
+            loaded = importlib.import_module(module)
+        except Exception:  # noqa: BLE001 - an optional library is absent
+            continue
+        offered = set(dir(loaded))
+        for value in vars(loaded).values():
+            if inspect.isclass(value):
+                offered.update(dir(value))
+        for name in sorted(defined & offered):
+            found.setdefault(name, module)
+    return found
+
+
 def measure() -> dict[str, int]:
     """Counts every budgeted quantity over the package.
 
     Returns:
         Quantity name to its count.
+    """
+    return scan()[0]
+
+
+def scan() -> tuple[dict[str, int], dict[str, str]]:
+    """Counts every budgeted quantity, and names the external collisions.
+
+    Returns:
+        Quantity name to its count, and each multi-word name the package
+        defines that an imported library also offers, with that library.
     """
     bound = limits()
     found = dict.fromkeys(
@@ -105,37 +233,66 @@ def measure() -> dict[str, int]:
             "functions_over",
             "compound_functions",
             "compound_classes",
+            "compound_attributes",
             "private_names",
             "loose_dicts",
             "largest_module",
             "bare_raises",
             "value_catches",
+            "import_aliases",
+            "external_names",
         ),
         0,
     )
     if LAYERS.exists():
         found["layer_breaks"] = len(simulate(load(LAYERS))[0])
+    imported: set[str] = set()
+    defined: set[str] = set()
+    root = PACKAGE.name
     for path in sorted(PACKAGE.rglob("*.py")):
         text = path.read_text(encoding="utf-8")
         lines = text.count("\n")
         found["modules_over"] += lines > bound["module"]
         found["largest_module"] = max(found["largest_module"], lines)
         found["loose_dicts"] += len(LOOSE.findall(text))
-        for node in ast.walk(ast.parse(text)):
+        tree = ast.parse(text)
+        found["import_aliases"] += aliases(tree)
+        for node in ast.walk(tree):
             found["bare_raises"] += bare(node)
             found["value_catches"] += catches(node)
+            if isinstance(node, ast.Import | ast.ImportFrom):
+                names = [alias.name for alias in node.names]
+                if isinstance(node, ast.ImportFrom):
+                    # `from http import server` imports the module
+                    # `http.server`; a name that is not a module fails to
+                    # import and is skipped.
+                    module = node.module if not node.level else None
+                    names = [module] if module else []
+                    names += [f"{module}.{alias.name}" for alias in node.names]
+                    names = names if module else []
+                imported.update(
+                    name for name in names if name.split(".")[0] != root
+                )
+                continue
             if isinstance(node, ast.ClassDef):
                 found["classes_over"] += span(node) > bound["class"]
-                found["compound_classes"] += compound(node.name)
+                found["compound_classes"] += counted(node.name)
+                found["compound_attributes"] += sum(
+                    map(counted, attributes(node))
+                )
             elif isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
                 found["functions_over"] += span(node) > bound["function"]
-                found["compound_functions"] += compound(node.name)
+                found["compound_functions"] += counted(node.name)
             else:
                 continue
+            if counted(node.name):
+                defined.add(node.name)
             found["private_names"] += node.name.startswith("_") and not (
                 node.name.endswith("__")
             )
-    return found
+    collisions = external(imported, defined)
+    found["external_names"] = len(collisions)
+    return found, collisions
 
 
 def load(path: pathlib.Path) -> tuple[list[list[str]], dict[str, str]]:
@@ -331,7 +488,12 @@ def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--simulate", type=pathlib.Path)
+    parser.add_argument("--external", action="store_true")
     options = parser.parse_args(arguments)
+    if options.external:
+        for name, module in sorted(scan()[1].items()):
+            print(f"{name}  {module}")
+        return 0
     if options.simulate:
         breaks, largest = simulate(load(options.simulate))
         print(*breaks, sep="\n")
