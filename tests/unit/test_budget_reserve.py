@@ -18,8 +18,8 @@ def frame(rows=200, seed=0):
 
 def test_a_skip_is_recorded_in_the_events_and_the_report_list():
     context = scmle.api.project.Project(frame(), "y").orchestrator.new_context()
-    context.forgo("threshold", "needs 9.0 s but 1.0 s remain")
-    assert context.skipped == [
+    context.journal.forgo("threshold", "needs 9.0 s but 1.0 s remain")
+    assert context.journal.skipped == [
         {"work": "threshold", "reason": "needs 9.0 s but 1.0 s remain"}
     ]
 
@@ -40,14 +40,20 @@ def timed(budget, folds=5):
 
     recorded = []
     context = SimpleNamespace(
-        regulator=limits.Governor(tasks.Resources(time_budget_seconds=budget)),
+        services=SimpleNamespace(
+            governor=limits.Governor(
+                tasks.Resources(time_budget_seconds=budget)
+            ),
+            spec=SimpleNamespace(
+                resources=tasks.Resources(time_budget_seconds=budget)
+            ),
+        ),
         split=SimpleNamespace(
             manifest=SimpleNamespace(folds=[([0], [1])] * folds)
         ),
-        spec=SimpleNamespace(
-            resources=tasks.Resources(time_budget_seconds=budget)
+        journal=SimpleNamespace(
+            forgo=lambda work, reason: recorded.append((work, reason))
         ),
-        forgo=lambda work, reason: recorded.append((work, reason)),
     )
     return context, recorded
 
@@ -86,10 +92,10 @@ def test_diagnostics_get_at_most_what_is_left_before_packaging():
     from scmle.pipeline import stages
 
     context = timed(20)[0]
-    context.regulator.reserve.parts = {"package": 5.0}
+    context.services.governor.reserve.parts = {"package": 5.0}
     assert stages.FinalEvaluationStage.ration(context) <= 15.0
     late = timed(1)[0]
-    late.regulator.started_at -= 10
+    late.services.governor.started_at -= 10
     assert stages.FinalEvaluationStage.ration(late) == 0.0
 
 

@@ -133,7 +133,7 @@ Use `result.save(directory, signing_key=...)` to export one for deployment.
 | File | Contents |
 | --- | --- |
 | `model/` | The checksummed bundle, signed when a key is configured. |
-| `Dockerfile`, `.dockerignore`, `build.sh` | Base image pinned by a digest placeholder that the build refuses until `build.sh` resolves it; non-root user; locked install; credential files excluded; the script that scans the context, resolves the base, builds, scans and attests. |
+| `Dockerfile`, `.dockerignore`, `build.sh` | Base image pinned by digest: the default is the digest scmle recorded for that base (`scmle.deploy.base_image.PINNED`), `build.sh` resolves it again, and a base with no recorded pin gets the placeholder digest, which the build refuses; non-root user; locked install; credential files excluded; the script that scans the context, resolves the base, builds, scans and attests. |
 | `requirements.txt`, `requirements.lock`, `environment.lock` | Direct pins; the runtime closure installed with `--no-deps`; every package of the build environment. |
 | `sbom.cdx.json` | CycloneDX SBOM: runtime libraries, the bundle (by manifest digest) and the base image. |
 | `provenance.json` | Signed statement: subject is the bundle digest; materials are the files above. Verified by the service at start. |

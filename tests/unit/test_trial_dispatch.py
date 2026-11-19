@@ -53,10 +53,12 @@ def runner(monkeypatch, budget, reserve):
     governor.reserve.parts = {"refit": reserve}
     backend = Backend(clock)
     context = SimpleNamespace(
-        regulator=governor,
-        backend=backend,
-        checkpoints={},
-        check_cancelled=lambda: None,
+        services=SimpleNamespace(
+            governor=governor,
+            backend=backend,
+            checkpoints={},
+            check=lambda: None,
+        )
     )
     built = trials.Runner.__new__(trials.Runner)
     built.context = context
@@ -95,15 +97,19 @@ def test_a_strategy_search_the_window_cannot_hold_is_skipped_on_record():
     )
     recorded = []
     context = SimpleNamespace(
-        spec=SimpleNamespace(
-            effective=lambda: SimpleNamespace(names=["smote"], top_models=1)
+        services=SimpleNamespace(
+            spec=SimpleNamespace(
+                effective=lambda: SimpleNamespace(names=["smote"], top_models=1)
+            ),
+            registry=SimpleNamespace(adapters={}),
+            governor=governor,
         ),
-        registry=SimpleNamespace(adapters={}),
-        regulator=governor,
         metric=SimpleNamespace(greater_is_better=True),
         task=tasks.Task.BINARY,
         profile=object(),
-        forgo=lambda work, reason: recorded.append((work, reason)),
+        journal=SimpleNamespace(
+            forgo=lambda work, reason: recorded.append((work, reason))
+        ),
     )
     leader = experiments.Trial(
         "t1", "knn", experiments.Termination.OK, "accuracy", 0.9, 0.0, [0.9]

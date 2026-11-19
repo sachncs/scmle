@@ -62,7 +62,7 @@ def test_tabular_beta_plan_has_an_explicit_library_capability_path():
     plan = stages.devise(context)
 
     assert set(plan.candidates) == {"dummy", "logistic_regression"}
-    declarations = context.capability_registry.catalogue()
+    declarations = context.services.capability_registry.catalogue()
     assert declarations
     assert {declaration.key.modality for declaration in declarations} == {
         capabilities.Modality.TABULAR
@@ -70,7 +70,7 @@ def test_tabular_beta_plan_has_an_explicit_library_capability_path():
     assert {declaration.key.inference for declaration in declarations} == {
         capabilities.Inference.LIBRARY
     }
-    family = context.capability_registry.find(
+    family = context.services.capability_registry.find(
         capabilities.ModelFamily.JEPA.value
     )
     assert family is not None

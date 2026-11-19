@@ -38,6 +38,7 @@ from scmle.cli.intake import IngestCommand
 from scmle.cli.maintenance import Records
 from scmle.cli.rollout import Deployment
 from scmle.cli.rollout import Operation
+from scmle.cli.storage import Storage
 from scmle.cli.training import Estimation
 from scmle.cli.training import Plan
 from scmle.cli.training import ProjectCommand
@@ -80,6 +81,7 @@ __all__ = [
     "Retirement",
     "Run",
     "Serve",
+    "Storage",
     "Trail",
     "build_parser",
     "main",
@@ -114,6 +116,7 @@ COMMANDS: tuple[Command, ...] = (
     Forgetting(),
     Retirement(),
     Deletion(),
+    Storage(),
 )
 
 

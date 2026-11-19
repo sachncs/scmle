@@ -11,6 +11,7 @@ from types import ModuleType
 from scmle.assurance.detectors import certificates
 from scmle.assurance.detectors import duplicates
 from scmle.assurance.detectors import labels
+from scmle.assurance.detectors import minhash
 from scmle.assurance.detectors import missingness
 from scmle.assurance.detectors import outliers
 from scmle.assurance.detectors import sentinels
@@ -47,7 +48,7 @@ SPECS: dict[str, Identity] = {
         Identity("f5-sentinel", (sentinels,), ("sentinel",)),
         Identity(
             "f5-duplicates",
-            (duplicates, scmle.data.splitting.duplicates),
+            (duplicates, minhash, scmle.data.splitting.duplicates),
             ("duplicate_exact", "duplicate_near"),
         ),
         Identity(

@@ -159,11 +159,13 @@ from scmle.assurance.admissibility.screen.hypotheses import tested
 from scmle.assurance.admissibility.screen.permutation import draw_permutations
 from scmle.assurance.admissibility.screen.permutation import resamples
 from scmle.assurance.admissibility.screen.planning import arrange
+from scmle.assurance.admissibility.screen.planning import bound
 from scmle.assurance.admissibility.screen.planning import bundled
 from scmle.assurance.admissibility.screen.planning import decline
 from scmle.assurance.admissibility.screen.planning import Demand
 from scmle.assurance.admissibility.screen.planning import disclose
 from scmle.assurance.admissibility.screen.planning import load_store
+from scmle.assurance.admissibility.screen.planning import measure
 from scmle.assurance.admissibility.screen.planning import subsample
 from scmle.assurance.admissibility.screen.records import dated
 from scmle.assurance.admissibility.screen.records import duplication
@@ -196,6 +198,7 @@ from scmle.assurance.admissibility.screen.settings import HYPOTHESES
 from scmle.assurance.admissibility.screen.settings import KNOTS
 from scmle.assurance.admissibility.screen.settings import LATE
 from scmle.assurance.admissibility.screen.settings import MAX_CERTIFIED_CLASSES
+from scmle.assurance.admissibility.screen.settings import MAX_PERMUTATIONS
 from scmle.assurance.admissibility.screen.settings import MAX_ROWS
 from scmle.assurance.admissibility.screen.settings import MECHANISM_DEFECTS
 from scmle.assurance.admissibility.screen.settings import MIN_CLASSES
@@ -238,6 +241,7 @@ __all__ = [
     "KNOTS",
     "LATE",
     "MAX_CERTIFIED_CLASSES",
+    "MAX_PERMUTATIONS",
     "MAX_ROWS",
     "MECHANISM_DEFECTS",
     "MIN_CLASSES",
@@ -266,6 +270,7 @@ __all__ = [
     "arrange",
     "aucs",
     "basis",
+    "bound",
     "bundled",
     "caps",
     "chisquare",
@@ -293,6 +298,7 @@ __all__ = [
     "hypothesize",
     "load_store",
     "margin",
+    "measure",
     "oof_fit",
     "pair",
     "pairs",
@@ -316,113 +322,6 @@ __all__ = [
     "throttle",
     "words",
 ]
-
-
-MAX_PERMUTATIONS = 100_000
-
-
-def bound(rows: int, columns: int, classes: int) -> float:
-    """Bounds the seconds of the real scan and the probe before any data.
-
-    Every column is assumed to raise the most hypotheses a column can, so
-    the bound is not below what the scans ask for; in a run `share` caps it.
-
-    Args:
-        rows: Rows to be screened (before `subsample`).
-        columns: Candidate columns.
-        classes: Classes of the target; below two means regression.
-
-    Returns:
-        The predicted seconds of both scans, with no cap applied.
-    """
-    task = "classification" if classes >= MIN_CLASSES else "regression"
-    seen = min(rows, MAX_ROWS)
-    ways = classes if classes > BINARY_CLASSES else 1
-    alpha = budget.exact(leakage.CERTIFIED.alpha, "alpha")
-    total = 0.0
-    for width in (columns, columns + len(plants.DEFECTS)):
-        draws = max(
-            leakage.CERTIFIED.permutations,
-            resamples(HYPOTHESES * width + 1, alpha),
-        )
-        work = min(draws, MAX_PERMUTATIONS) * width * ways
-        total += cost(task, seen, work)
-    return total
-
-
-def measure(
-    frame: pandas.DataFrame,
-    target: str,
-    task: str,
-    cfg: leakage.Config,
-    names: Sequence[Hashable],
-    groups: pandas.Series | None,
-    block_size: int | None,
-) -> Demand | None:
-    """Counts the work of `screen` on these rows without drawing any.
-
-    It chooses the rows as `screen` does and forms the same hypotheses
-    (without their statistics), so the count equals the scan's.
-
-    Args:
-        frame: Rows to screen, with the target.
-        target: Target column.
-        task: `classification` or `regression`.
-        cfg: Settings.
-        names: Candidate columns.
-        groups: Group label per row, or None.
-        block_size: Rows per time block, or None.
-
-    Returns:
-        The demand; None when the scan will stop before drawing (invalid
-        outcome, too few rows, nothing to test, or the permutation limit),
-        which costs no more than `SCAN_SECONDS`.
-    """
-    values = None if groups is None else groups.to_numpy()
-    rows, blocks = subsample(len(frame), values, block_size, cfg.run_seed)
-    sample = frame.iloc[rows].reset_index(drop=True)
-    grouping = None if values is None else values[rows]
-    # The scan abstains where `encode` fails: no folds (one group, or fewer
-    # rows than folds) or an invalid outcome (InputError).
-    single = grouping is not None and len(pandas.unique(grouping)) <= 1
-    if single or (grouping is None and len(sample) < cfg.folds):
-        return None
-    try:
-        problem = encode(sample[target], task, cfg, grouping, blocks)
-    except errors.InputError:
-        # handled: the scan abstains on the same error before drawing
-        return None
-    if not enough(problem.y, task, cfg):
-        return None
-    classes = leakage.bucket(sample[target], task)
-    codes = pandas.factorize(classes, sort=True)[0].astype("int64")
-    totals = numpy.bincount(codes).astype("float64")
-    structured = grouping is not None or blocks is not None
-    pending = propose(
-        sample,
-        target,
-        names,
-        problem,
-        cfg,
-        codes,
-        totals,
-        structured=structured,
-    )[0]
-    pending += encodings(sample, names, problem, cfg)
-    copied = duplication(frame, names, target, cfg) if pending else None
-    pending += [] if copied is None else [copied]
-    live = sift(pending, cfg)
-    skill = sum(1 for h in pending if h.mechanism == SKILL and h.active)
-    family = len(pending)
-    columns = tested(pending, names)
-    alpha = budget.exact(cfg.alpha, "alpha")
-    total = max(cfg.permutations, resamples(family, alpha))
-    if family == 0 or (live and total > MAX_PERMUTATIONS):
-        return None
-    ways = problem.classes if problem.classes > BINARY_CLASSES else 1
-    work = total * skill * ways
-    seconds = cost(task, len(sample), work)
-    return Demand(len(sample), family, total, skill, work, columns, seconds)
 
 
 def screen_table(
@@ -470,29 +369,20 @@ def screen_table(
     late = dated(frame, [c for c in features if c in frame.columns], cutoff)
     rows, grouping, block_size = arrange(frame, group_column, time_column)
     limit = share(time_budget_seconds)
-    demand = None
-    if limit is not None:
-        unknown = [c for c in features if c not in rows.columns or c == target]
-        if not unknown and target in rows.columns:
-            demand = measure(
-                rows, target, task, cfg, features, grouping, block_size
-            )
-    if (
-        demand is not None
-        and limit is not None
-        and time_budget_seconds is not None
-        and demand.seconds > limit
-    ):
-        report = decline(cfg, demand, limit, time_budget_seconds)
-        report = dataclasses.replace(
-            report,
-            notes=(
-                *report.notes,
+    left = None
+    if limit is not None and time_budget_seconds is not None:
+        demand = measure(
+            rows, target, task, cfg, features, grouping, block_size
+        )
+        if demand is not None and demand.seconds > limit:
+            report = decline(cfg, demand, limit, time_budget_seconds)
+            notes = (
                 evidence(task, int(frame[target].nunique())),
                 "probe not run: the screen itself did not run",
-            ),
-        )
-        return stamp(report, late, cutoff)
+            )
+            report = dataclasses.replace(report, notes=(*report.notes, *notes))
+            return stamp(report, late, cutoff)
+        left = limit - (SCAN_SECONDS if demand is None else demand.seconds)
     report = screen(
         rows,
         target,
@@ -504,9 +394,6 @@ def screen_table(
         dict.fromkeys(MECHANISM_DEFECTS, certificates.Authority.GATING),
     )
     classes = int(frame[target].nunique()) if len(frame) else 0
-    left = None
-    if limit is not None:
-        left = limit - (SCAN_SECONDS if demand is None else demand.seconds)
     found = probe(
         rows, target, task, list(features), cfg, grouping, block_size, left
     )

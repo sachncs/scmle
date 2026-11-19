@@ -1,9 +1,9 @@
 {
   "claim": "C6",
-  "code": "0541e70bed12ea3237d52290af1f70f0e3737cbd79b6feaf11603f15ccb2efef",
+  "code": "b92fa652c19bd94dbeff5c406e7d105214d3fe6989d84f74603868e66f530a18",
   "merged": {
     "claim": "C6",
-    "code": "0541e70bed12ea3237d52290af1f70f0e3737cbd79b6feaf11603f15ccb2efef",
+    "code": "b92fa652c19bd94dbeff5c406e7d105214d3fe6989d84f74603868e66f530a18",
     "not_measured": [
       "platforms other than those recorded here",
       "a clean-runner rebuild from the lock file",
@@ -11,13 +11,13 @@
       "runs whose wall-clock time budget cuts the search short"
     ],
     "platforms": {
-      "macOS-26.7.3-arm64-arm-64bit-Mach-O": {
+      "Linux-7.0.0-1016-aws-x86_64-with-glibc2.43": {
         "budget": 3600,
         "machine": {
           "hashseed": null,
-          "machine": "arm64",
-          "platform": "macOS-26.7.3-arm64-arm-64bit-Mach-O",
-          "python": "3.14.7",
+          "machine": "x86_64",
+          "platform": "Linux-7.0.0-1016-aws-x86_64-with-glibc2.43",
+          "python": "3.14.4",
           "versions": {
             "joblib": "1.6.0",
             "numpy": "2.5.4",
@@ -30,7 +30,7 @@
           }
         },
         "rows": 600,
-        "seconds": 40.0,
+        "seconds": 72.7,
         "seed": 7,
         "tasks": {
           "binary": {
@@ -40,14 +40,14 @@
               "relative": 0.0
             },
             "hashes": {
-              "conformal.json": "0acdda4b2b8c5dbe0edd17b67714f67870510c27b6aa4b098e905a1ef2cbf5b4",
-              "coverage_report.json": "f9bed89f1d321a3592f3d0dd6c7bf7098cbf8b4760552fd66b676194033b1e3b",
-              "model_manifest.json": "86db41c2adba922b1c38fb90819c3fadbd042d43b57b1a95b999e72a018392bd",
-              "novelty.joblib": "9064537f33db4f61ea6aec6caa8949613d712c7d86338820fc2c81e15f5d9ffc",
-              "pipeline.joblib": "25c6a38f56b6b844980d4c4249a0f3087cccfba417bcb956411d1c8e9f02f8a8",
-              "reference.json": "f3a2b0a07b368a3db9d76bc84632627fa2e06ccfc5159d5d4cc54cd521e91b61",
+              "conformal.json": "85d1ef7567a14ee6e088931c0ff7aeb6c8792d52406abdee5fb939c8d9ab2cca",
+              "coverage_report.json": "3d00dec91cee9256e8f6f5b8cc6e59d4a3b026551381ada22cb50477e3857468",
+              "model_manifest.json": "761019a8370d5c88df799ea2de9031c4d5f604a348d78cc458cf79b2d9f595af",
+              "novelty.joblib": "9826d7f62b291b1f792165624b9214860fd5265f01e2811681f55cab6348f3bd",
+              "pipeline.joblib": "c0bf74dc89f5f02f74ccd54424b6a260a92912e1ae834698811333188a911fb5",
+              "reference.json": "ad09616c6c4a5715359d58577bd4847ab5ca5d567f57d4fe0cbf50c96bedd8db",
               "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
-              "signature.json": "f02626e025477e8674603190823f74f0edf1698fe79d68c73f917c57d16f97f8"
+              "signature.json": "66ac4019b0d92d3e8eef868c1418f9a1fc66715fc7ab91368409ee136a6bd9e3"
             },
             "members": 8,
             "metrics": {
@@ -59,8 +59,8 @@
               "roc_auc": 0.9598997493734336
             },
             "seconds": [
-              2.8,
-              2.6
+              5.7,
+              5.7
             ],
             "selected": [
               "logistic_regression",
@@ -68,14 +68,29 @@
             ],
             "threads": [
               {
+                "internal_api": "openblas",
+                "num_threads": 4,
+                "version": "0.3.31.dev"
+              },
+              {
                 "internal_api": "openmp",
-                "num_threads": 1,
+                "num_threads": 4,
+                "version": null
+              },
+              {
+                "internal_api": "openblas",
+                "num_threads": 4,
+                "version": "0.3.34.106.0"
+              },
+              {
+                "internal_api": "openmp",
+                "num_threads": 4,
                 "version": null
               }
             ],
             "trials": [
-              9,
-              9
+              11,
+              11
             ],
             "untraced": []
           },
@@ -86,27 +101,527 @@
               "relative": 0.0
             },
             "hashes": {
-              "conformal.json": "c53e56dc776e7d91b89229f5d1e56fff73a83958ac28e8749622fca806b1682f",
-              "coverage_report.json": "55c021183fefafdc785e94307e24357426835fdde481bf6afa0d8d2cf80bf626",
-              "model_manifest.json": "613a03450526808d7655fb60398eccf444cf7dbae300508f4b97f757cd4871cd",
-              "novelty.joblib": "72bb57854c0eb134a0a5841141e9a9fba807580b0e004a6e011ddb93387fd8c5",
-              "pipeline.joblib": "cd71db618141ea12d9303539a7690952599fa87864c4d1a7f78a4951b1eeb175",
-              "reference.json": "f29412558b3106cc485aec7a6205161133b031f43ccc0c4171a66969946a88d3",
+              "conformal.json": "8a97100747644726b7041f736619e5ae937d884cea87d442274ee2495cd4cd08",
+              "coverage_report.json": "13a0f0f3353dbd304fdf0e50783cc081d98a768b9a1328f2bdc62652afe4f581",
+              "model_manifest.json": "4e2b65beb9d09fa3a8da9af6ce5e5344e930580c0b3677df1b05a3050e9e53de",
+              "novelty.joblib": "321b033fec4339a81fdd4d8bb71611775bf07fc9543ccf147db865ceeb17a774",
+              "pipeline.joblib": "c9a2182d905433bbdbbdbf9ae545eed413d7d71041c237b5ae125bc771a5738e",
+              "reference.json": "5458eb7ca147bf273db1ca9b297ead6ecd27167c25a6915d8d47a8bda2d79ff0",
               "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
-              "signature.json": "a533330025055eeead19f63375e20ae4cd11dfe2335879f132bd67163dce5332"
+              "signature.json": "d755a3c896f5a1a7e1a7dc4a5ab5f06dcb1ec68289a794f57d9f08a4b30048ff"
             },
             "members": 8,
             "metrics": {
               "accuracy": 0.85,
               "balanced_accuracy": 0.8492769744160178,
               "f1": 0.8571428571428571,
-              "log_loss": 0.43491640012493477,
-              "pr_auc": 0.8252559564356262,
-              "roc_auc": 0.8672135706340378
+              "log_loss": 0.4343082532185374,
+              "pr_auc": 0.8182773493133442,
+              "roc_auc": 0.8670745272525028
             },
             "seconds": [
-              3.2,
-              3.2
+              7.0,
+              6.9
+            ],
+            "selected": [
+              "random_forest",
+              "random_forest"
+            ],
+            "threads": [
+              {
+                "internal_api": "openblas",
+                "num_threads": 4,
+                "version": "0.3.34.106.0"
+              },
+              {
+                "internal_api": "openmp",
+                "num_threads": 4,
+                "version": null
+              },
+              {
+                "internal_api": "openblas",
+                "num_threads": 4,
+                "version": "0.3.31.dev"
+              },
+              {
+                "internal_api": "openmp",
+                "num_threads": 4,
+                "version": null
+              }
+            ],
+            "trials": [
+              11,
+              11
+            ],
+            "untraced": []
+          },
+          "multiclass": {
+            "differing": [],
+            "gap": {
+              "absolute": 0.0,
+              "relative": 0.0
+            },
+            "hashes": {
+              "conformal.json": "5fa21828ead70a789f98f75098ac14655e838f9524ce7de343196dfccb2df478",
+              "coverage_report.json": "a4f8d9b5a4e56973ceda08ed92afcaeea61f56c481eb5b8bb8f1ee94de7052aa",
+              "model_manifest.json": "147f4ade2a7cbff12888171b2b74ad8055214a204d9b82e9d375e7996645241a",
+              "novelty.joblib": "74344b8323e913459cc1064e40aad9ab3d3c3def6c5e07979bbb0dcbaf451b73",
+              "pipeline.joblib": "a7df5b1fd28863b450d1f43459343ed08fa081257d296beed689e4d1f63435ea",
+              "reference.json": "09bb8ca652ed2976ce402c34ee1e2f2654b787e23e762cf06680eb54569a354e",
+              "schema.json": "9328b9e7e7899e6e6b1d43ca3a12e7f80488bcaa10e8c94828b369f9bf5b8af0",
+              "signature.json": "7378df25915b52b24ecf494479193899a2166f5b851d0fb025bd80da7742047f"
+            },
+            "members": 8,
+            "metrics": {
+              "accuracy": 0.7416666666666667,
+              "balanced_accuracy": 0.7384259259259259,
+              "f1_macro": 0.7441074110255131,
+              "log_loss": 0.6388598548604971
+            },
+            "seconds": [
+              11.6,
+              11.9
+            ],
+            "selected": [
+              "logistic_regression",
+              "logistic_regression"
+            ],
+            "threads": [
+              {
+                "internal_api": "openblas",
+                "num_threads": 4,
+                "version": "0.3.34.106.0"
+              },
+              {
+                "internal_api": "openblas",
+                "num_threads": 4,
+                "version": "0.3.31.dev"
+              },
+              {
+                "internal_api": "openmp",
+                "num_threads": 4,
+                "version": null
+              },
+              {
+                "internal_api": "openmp",
+                "num_threads": 4,
+                "version": null
+              }
+            ],
+            "trials": [
+              11,
+              11
+            ],
+            "untraced": []
+          },
+          "regression": {
+            "differing": [],
+            "gap": {
+              "absolute": 0.0,
+              "relative": 0.0
+            },
+            "hashes": {
+              "conformal.json": "e98a5b1b0ba943c8f5cbc5f1e1ede57e9a3dc566a43625750f350dc7bc151385",
+              "coverage_report.json": "c858934ca1b0999c7eb3f5af1c9e45956810343ac3661a6b2023ade4c4d81c76",
+              "cv_plus.joblib": "d14f772599774343bae28ce534994e9f79947499e6f3318dfa14190a3acab142",
+              "model_manifest.json": "e18196022d8b722906defc2001c70706bd284f9006444383e1ef6f5bc3a5fefb",
+              "novelty.joblib": "7cc2b3cf3132ccb2627c0480077648e2524354c14fc4d6fd4789183ae28e5933",
+              "pipeline.joblib": "7b7eef329e6979251216706895cbc7635d22784ced51d6ca44c1bb5f724ddce2",
+              "quantile.joblib": "b79bf3b213981226eb894b5815a67681a386f05c85ca7352c53ead8f65034d16",
+              "reference.json": "e2223226de43fdbbaeb8c7d5974c1c89280bc6680faaefa50cf773cc8d728c01",
+              "schema.json": "26fb7bc1a1560ce271d432aedc31d2dfcb678bbb14221244681825785972337f",
+              "signature.json": "ff4894315146bf9743703948b8dcaddd2043478cb8c930cf9398e429c55863ea"
+            },
+            "members": 10,
+            "metrics": {
+              "mae": 0.7315561729885645,
+              "r2": 0.9260151759343608,
+              "rmse": 0.9295354827958172
+            },
+            "seconds": [
+              5.2,
+              5.2
+            ],
+            "selected": [
+              "ridge",
+              "ridge"
+            ],
+            "threads": [
+              {
+                "internal_api": "openmp",
+                "num_threads": 4,
+                "version": null
+              },
+              {
+                "internal_api": "openblas",
+                "num_threads": 4,
+                "version": "0.3.31.dev"
+              },
+              {
+                "internal_api": "openmp",
+                "num_threads": 4,
+                "version": null
+              },
+              {
+                "internal_api": "openblas",
+                "num_threads": 4,
+                "version": "0.3.34.106.0"
+              }
+            ],
+            "trials": [
+              12,
+              12
+            ],
+            "untraced": []
+          }
+        }
+      },
+      "Windows-2025Server-10.0.26100-SP0": {
+        "budget": 3600,
+        "machine": {
+          "hashseed": null,
+          "machine": "AMD64",
+          "platform": "Windows-2025Server-10.0.26100-SP0",
+          "python": "3.14.10",
+          "versions": {
+            "joblib": "1.6.0",
+            "numpy": "2.5.4",
+            "pandas": "3.0.6",
+            "pyarrow": "25.0.1",
+            "scikit-learn": "1.9.1",
+            "scipy": "1.18.1",
+            "scmle": "0.1.0b1",
+            "threadpoolctl": "3.7.0"
+          }
+        },
+        "rows": 600,
+        "seconds": 155.2,
+        "seed": 7,
+        "tasks": {
+          "binary": {
+            "differing": [],
+            "gap": {
+              "absolute": 0.0,
+              "relative": 0.0
+            },
+            "hashes": {
+              "conformal.json": "1441d7399f726e085a3a95d2ea283308296a678e68d9d37e979ce841a1341416",
+              "coverage_report.json": "3d00dec91cee9256e8f6f5b8cc6e59d4a3b026551381ada22cb50477e3857468",
+              "model_manifest.json": "76355228b9d7176de375c97df8af9a8f54dd8fe32dda629c9e3ea8e3a2179ff3",
+              "novelty.joblib": "80eee0350d638beeaa97f18c7138dbd77389df2fc527e3df13b9fa82e7bd2af1",
+              "pipeline.joblib": "c2b5d853fd81aa62ca83089003e1ecd4cbea8f8b5d790d2a10c5021e2dfae9f7",
+              "reference.json": "ad09616c6c4a5715359d58577bd4847ab5ca5d567f57d4fe0cbf50c96bedd8db",
+              "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
+              "signature.json": "05b2fb95daab8c583a92208ca0bd0cf0e95c8c97932c737b020e8fc193a70fdc"
+            },
+            "members": 8,
+            "metrics": {
+              "accuracy": 0.8666666666666667,
+              "balanced_accuracy": 0.8663324979114453,
+              "f1": 0.873015873015873,
+              "log_loss": 0.2612590297431367,
+              "pr_auc": 0.9681912628544989,
+              "roc_auc": 0.9598997493734336
+            },
+            "seconds": [
+              13.0,
+              12.4
+            ],
+            "selected": [
+              "logistic_regression",
+              "logistic_regression"
+            ],
+            "threads": [
+              {
+                "internal_api": "openblas",
+                "num_threads": 4,
+                "version": "0.3.34.106.0"
+              },
+              {
+                "internal_api": "openblas",
+                "num_threads": 4,
+                "version": "0.3.31.dev"
+              },
+              {
+                "internal_api": "openmp",
+                "num_threads": 4,
+                "version": null
+              }
+            ],
+            "trials": [
+              11,
+              11
+            ],
+            "untraced": []
+          },
+          "interaction": {
+            "differing": [],
+            "gap": {
+              "absolute": 0.0,
+              "relative": 0.0
+            },
+            "hashes": {
+              "conformal.json": "8a97100747644726b7041f736619e5ae937d884cea87d442274ee2495cd4cd08",
+              "coverage_report.json": "13a0f0f3353dbd304fdf0e50783cc081d98a768b9a1328f2bdc62652afe4f581",
+              "model_manifest.json": "f0f05a2926d64aacdc66f1b43d6a4fab7b00940ed8b8e9bab8d5a366987c06e3",
+              "novelty.joblib": "9bb5215471e3b61c9434a9453500328ef2b64a9e38ce84b21366d0dfadaefed2",
+              "pipeline.joblib": "78f00440f2cd16693bc853f7765b0124198f62e6843d8504e7e2ef55546967d6",
+              "reference.json": "5458eb7ca147bf273db1ca9b297ead6ecd27167c25a6915d8d47a8bda2d79ff0",
+              "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
+              "signature.json": "852e7bc04adb695ad645ce2de527e8547ea259e1bb642237e7e5fbf640935cde"
+            },
+            "members": 8,
+            "metrics": {
+              "accuracy": 0.85,
+              "balanced_accuracy": 0.8492769744160178,
+              "f1": 0.8571428571428571,
+              "log_loss": 0.4343082532185374,
+              "pr_auc": 0.8182773493133442,
+              "roc_auc": 0.8670745272525028
+            },
+            "seconds": [
+              14.6,
+              14.6
+            ],
+            "selected": [
+              "random_forest",
+              "random_forest"
+            ],
+            "threads": [
+              {
+                "internal_api": "openblas",
+                "num_threads": 4,
+                "version": "0.3.34.106.0"
+              },
+              {
+                "internal_api": "openblas",
+                "num_threads": 4,
+                "version": "0.3.31.dev"
+              },
+              {
+                "internal_api": "openmp",
+                "num_threads": 4,
+                "version": null
+              }
+            ],
+            "trials": [
+              11,
+              11
+            ],
+            "untraced": []
+          },
+          "multiclass": {
+            "differing": [],
+            "gap": {
+              "absolute": 0.0,
+              "relative": 0.0
+            },
+            "hashes": {
+              "conformal.json": "ae16d841e19cd483e4f4ef64f7bef2c8eacbcf4d3f0811eb35c52b3a8b2ecfae",
+              "coverage_report.json": "f0c49a4586da226b9f921740923678c40653354e66c39e3e4b02109411a9033f",
+              "model_manifest.json": "1b16370c2faf540e630d0928e9f1727238a1670d732185fb7a7d430c374d09f6",
+              "novelty.joblib": "71655cf2ae19d5df4d163d4c6bd1432404bc2ac2abeae47a130e0055bee0150d",
+              "pipeline.joblib": "d49cd8368ba11892e53d8989137d4b5a0bf97a11d8dee6b2e98c4b2c17970a30",
+              "reference.json": "09bb8ca652ed2976ce402c34ee1e2f2654b787e23e762cf06680eb54569a354e",
+              "schema.json": "9328b9e7e7899e6e6b1d43ca3a12e7f80488bcaa10e8c94828b369f9bf5b8af0",
+              "signature.json": "3bb08d5a2a9222b9811c4b954bca37d84d08b1575b9a7f4912ba70a6709ebe54"
+            },
+            "members": 8,
+            "metrics": {
+              "accuracy": 0.7416666666666667,
+              "balanced_accuracy": 0.7384259259259259,
+              "f1_macro": 0.7441074110255131,
+              "log_loss": 0.6388598548604971
+            },
+            "seconds": [
+              27.8,
+              22.6
+            ],
+            "selected": [
+              "logistic_regression",
+              "logistic_regression"
+            ],
+            "threads": [
+              {
+                "internal_api": "openblas",
+                "num_threads": 4,
+                "version": "0.3.34.106.0"
+              },
+              {
+                "internal_api": "openblas",
+                "num_threads": 4,
+                "version": "0.3.31.dev"
+              },
+              {
+                "internal_api": "openmp",
+                "num_threads": 4,
+                "version": null
+              }
+            ],
+            "trials": [
+              11,
+              11
+            ],
+            "untraced": []
+          },
+          "regression": {
+            "differing": [],
+            "gap": {
+              "absolute": 0.0,
+              "relative": 0.0
+            },
+            "hashes": {
+              "conformal.json": "85c1d784a9a69ef4335f4dd4026e822bd668802a4492d8c7f102feceeedb19fd",
+              "coverage_report.json": "0829b8ad97326079b8c147c756a838905b0c523155c4a0cd23044866dc95a750",
+              "cv_plus.joblib": "d25733f1ef9e74e3a9b3250dd2ec244eb16af712daeec8626141009b69628525",
+              "model_manifest.json": "dba2e6b05b3736a9832a53e1a903d9653ce20551f6738173effd995887a066ce",
+              "novelty.joblib": "28813470464fe6bd71439685158a8c4612d740d13cc1f0fa575f2ce3aae4f6ba",
+              "pipeline.joblib": "37b3773830eac3d0d7fa2b365c34055e14f10331f105077d6db44b39ef90b82f",
+              "quantile.joblib": "b79bf3b213981226eb894b5815a67681a386f05c85ca7352c53ead8f65034d16",
+              "reference.json": "e7c669032c7039f61e60bfcc3c3b4cc93d29bd58497a6efd8ce6477d5f8651ec",
+              "schema.json": "26fb7bc1a1560ce271d432aedc31d2dfcb678bbb14221244681825785972337f",
+              "signature.json": "d7fb49095648758d74e5a767c187d23fe8d572fe31fcd45b502269721867218c"
+            },
+            "members": 10,
+            "metrics": {
+              "mae": 0.7315561729885643,
+              "r2": 0.9260151759343608,
+              "rmse": 0.9295354827958169
+            },
+            "seconds": [
+              11.4,
+              12.8
+            ],
+            "selected": [
+              "ridge",
+              "ridge"
+            ],
+            "threads": [
+              {
+                "internal_api": "openblas",
+                "num_threads": 4,
+                "version": "0.3.34.106.0"
+              },
+              {
+                "internal_api": "openblas",
+                "num_threads": 4,
+                "version": "0.3.31.dev"
+              },
+              {
+                "internal_api": "openmp",
+                "num_threads": 4,
+                "version": null
+              }
+            ],
+            "trials": [
+              12,
+              12
+            ],
+            "untraced": []
+          }
+        }
+      },
+      "macOS-26.7.2-arm64-arm-64bit-Mach-O": {
+        "budget": 3600,
+        "machine": {
+          "hashseed": null,
+          "machine": "arm64",
+          "platform": "macOS-26.7.2-arm64-arm-64bit-Mach-O",
+          "python": "3.14.10",
+          "versions": {
+            "joblib": "1.6.0",
+            "numpy": "2.5.4",
+            "pandas": "3.0.6",
+            "pyarrow": "25.0.1",
+            "scikit-learn": "1.9.1",
+            "scipy": "1.18.1",
+            "scmle": "0.1.0b1",
+            "threadpoolctl": "3.7.0"
+          }
+        },
+        "rows": 600,
+        "seconds": 163.4,
+        "seed": 7,
+        "tasks": {
+          "binary": {
+            "differing": [],
+            "gap": {
+              "absolute": 0.0,
+              "relative": 0.0
+            },
+            "hashes": {
+              "conformal.json": "0acdda4b2b8c5dbe0edd17b67714f67870510c27b6aa4b098e905a1ef2cbf5b4",
+              "coverage_report.json": "e2282ae6f28ad23f8ff48bc314bb0475a6c0a9b34c454600dce0de57184d71db",
+              "model_manifest.json": "f776439b204324461f1919584ca01a5e3ccaa764aa157c6c4c62997429ac413d",
+              "novelty.joblib": "9064537f33db4f61ea6aec6caa8949613d712c7d86338820fc2c81e15f5d9ffc",
+              "pipeline.joblib": "43571619fecd289e0cffc115b5646b33aa7eaee0d739ee4a07a06cb9e33ea7df",
+              "reference.json": "f3a2b0a07b368a3db9d76bc84632627fa2e06ccfc5159d5d4cc54cd521e91b61",
+              "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
+              "signature.json": "b6f659bbeecb2b00bc4a677eeb5df2ee8daae6f56c7e22e534519eadaaba3a0f"
+            },
+            "members": 8,
+            "metrics": {
+              "accuracy": 0.8666666666666667,
+              "balanced_accuracy": 0.8663324979114453,
+              "f1": 0.873015873015873,
+              "log_loss": 0.2612590297431367,
+              "pr_auc": 0.9681912628544989,
+              "roc_auc": 0.9598997493734336
+            },
+            "seconds": [
+              8.7,
+              8.0
+            ],
+            "selected": [
+              "logistic_regression",
+              "logistic_regression"
+            ],
+            "threads": [
+              {
+                "internal_api": "openmp",
+                "num_threads": 3,
+                "version": null
+              },
+              {
+                "internal_api": "openmp",
+                "num_threads": 3,
+                "version": null
+              }
+            ],
+            "trials": [
+              11,
+              11
+            ],
+            "untraced": []
+          },
+          "interaction": {
+            "differing": [],
+            "gap": {
+              "absolute": 0.0,
+              "relative": 0.0
+            },
+            "hashes": {
+              "conformal.json": "8a97100747644726b7041f736619e5ae937d884cea87d442274ee2495cd4cd08",
+              "coverage_report.json": "a1f799a5a19dbc3b374b7dc650e7207e8cae6f897de2f5816896f46698a523a7",
+              "model_manifest.json": "98d9bf10c2f3962300d23877ce7bc877e555439e4e7c1a9249ef63446c89319d",
+              "novelty.joblib": "72bb57854c0eb134a0a5841141e9a9fba807580b0e004a6e011ddb93387fd8c5",
+              "pipeline.joblib": "c9a2182d905433bbdbbdbf9ae545eed413d7d71041c237b5ae125bc771a5738e",
+              "reference.json": "5458eb7ca147bf273db1ca9b297ead6ecd27167c25a6915d8d47a8bda2d79ff0",
+              "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
+              "signature.json": "45e1572943d3ae46725d3732f856e37048217b10110ce288c0be6bcb53a2a0ba"
+            },
+            "members": 8,
+            "metrics": {
+              "accuracy": 0.85,
+              "balanced_accuracy": 0.8492769744160178,
+              "f1": 0.8571428571428571,
+              "log_loss": 0.4343082532185374,
+              "pr_auc": 0.8182773493133442,
+              "roc_auc": 0.8670745272525028
+            },
+            "seconds": [
+              12.4,
+              10.2
             ],
             "selected": [
               "random_forest",
@@ -115,13 +630,18 @@
             "threads": [
               {
                 "internal_api": "openmp",
-                "num_threads": 1,
+                "num_threads": 3,
+                "version": null
+              },
+              {
+                "internal_api": "openmp",
+                "num_threads": 3,
                 "version": null
               }
             ],
             "trials": [
-              9,
-              9
+              11,
+              11
             ],
             "untraced": []
           },
@@ -133,13 +653,13 @@
             },
             "hashes": {
               "conformal.json": "fd926007ec8e2278e82be3604bf8682a74f60ddef350ff31a9e20e3377a6f383",
-              "coverage_report.json": "b962ed592bbe565cdd5f0f077845291d96ee79798a9ae931849d5300a6eecdfe",
-              "model_manifest.json": "1d8a6f84f85aa2702216916a2e1dbebce86a1616fb406f77877577afb3f82d9e",
+              "coverage_report.json": "bdb4439e624675bf0a25e9c96075efcad2f537198b39438234eb0e84c797f10d",
+              "model_manifest.json": "04df09d6b391dbb96efbb411b12200b6f953cb83d902cb3d126b1120cb205309",
               "novelty.joblib": "54146f7d822f6789680d2c004377f2e6997f4ee654b926cd59694542afbf9ad5",
-              "pipeline.joblib": "546d3b2c6b395a50e948d8721059e4debf844f63c3b43ed8bf74c7e780603d9b",
+              "pipeline.joblib": "8e3533d5eadb54f1f30c5945345f30b54a8b068d492fa90232bea39b6d2f99ac",
               "reference.json": "09bb8ca652ed2976ce402c34ee1e2f2654b787e23e762cf06680eb54569a354e",
               "schema.json": "9328b9e7e7899e6e6b1d43ca3a12e7f80488bcaa10e8c94828b369f9bf5b8af0",
-              "signature.json": "c843b1612767de377cd4373e1136fae2d9a0118ddda212aa44a25225859a5ce5"
+              "signature.json": "561cc0f4e74a1dbed0ddad35446559e4b7da9f78c6fa43911a2b3b52730864cf"
             },
             "members": 8,
             "metrics": {
@@ -149,8 +669,8 @@
               "log_loss": 0.6388598548604971
             },
             "seconds": [
-              6.4,
-              6.5
+              23.9,
+              19.5
             ],
             "selected": [
               "logistic_regression",
@@ -159,13 +679,18 @@
             "threads": [
               {
                 "internal_api": "openmp",
-                "num_threads": 1,
+                "num_threads": 3,
+                "version": null
+              },
+              {
+                "internal_api": "openmp",
+                "num_threads": 3,
                 "version": null
               }
             ],
             "trials": [
-              9,
-              9
+              11,
+              11
             ],
             "untraced": []
           },
@@ -177,15 +702,15 @@
             },
             "hashes": {
               "conformal.json": "8fb2722c2938e9ae4ae988f90d1cc883e82fb68af215402e43a6379b757a6e65",
-              "coverage_report.json": "5746ebe9f1977517097a44780d1848a2aa38848533b6cefc4a846549344e9d5b",
+              "coverage_report.json": "986873f464b51707234a6f5db5134e2d04846051e5563b5b37ecb8d2a5c4fdde",
               "cv_plus.joblib": "5af87ecc7e65ebd6628eb6cb433fed95d124ab70977d640e464ef13d9aec755f",
-              "model_manifest.json": "39f5abfdd132d495c96e7518850ad2b49f60c1fda9fc9425ae6b1f7fe465aed5",
+              "model_manifest.json": "f4ee24d3c085db5cc6420f1258d918582599ec840c004189363d36ae73ee53ff",
               "novelty.joblib": "73b4418b09c0fe119f7d1511ba86a24231b4a831d15cd245bafbb61a40214616",
-              "pipeline.joblib": "317b000b380bc7a615582d023de6d24ce9412569eb1d779cd48d37c253e96174",
-              "quantile.joblib": "b089c6326f85845b73bfb3cc867fdb699f9fbbeee4cdc17ed380ab8c04071dbe",
+              "pipeline.joblib": "72e5f4c2c290747ff09e39d8da192416d09a529f06ccdf0d6e1f89125ec92ef3",
+              "quantile.joblib": "b46d1cafa93f7afb81028dee86fb579d206ee519444a9051dafcb4ef53a4f3ad",
               "reference.json": "df3913ce339ff0d93403e28f4a9a3080dd5083de297d1ee92ee039ad2647df93",
               "schema.json": "26fb7bc1a1560ce271d432aedc31d2dfcb678bbb14221244681825785972337f",
-              "signature.json": "9bd9960afbb790354509a87b59c69e2d4e75a02cafc70bbc4732d1d213775933"
+              "signature.json": "b2452eafcdde71a4a356ff728ea6eb9544080fd1d415c13d3ab5c1794d72bc62"
             },
             "members": 10,
             "metrics": {
@@ -194,8 +719,8 @@
               "rmse": 0.929535482795817
             },
             "seconds": [
-              2.4,
-              2.4
+              19.7,
+              15.2
             ],
             "selected": [
               "ridge",
@@ -204,13 +729,18 @@
             "threads": [
               {
                 "internal_api": "openmp",
-                "num_threads": 1,
+                "num_threads": 3,
+                "version": null
+              },
+              {
+                "internal_api": "openmp",
+                "num_threads": 3,
                 "version": null
               }
             ],
             "trials": [
-              10,
-              10
+              12,
+              12
             ],
             "untraced": []
           }
@@ -228,11 +758,98 @@
     "platforms whose runner job did not upload a record",
     "Python versions other than each runner's"
   ],
-  "pairs": [],
-  "sources": [
-    "/Users/sachin/Documents/Codex/github-repos/scmle/benchmarks/evidence/reproducibility.json"
+  "pairs": [
+    {
+      "absolute": 0.0,
+      "left": "Linux-7.0.0-1016-aws-x86_64-with-glibc2.43",
+      "relative": 0.0,
+      "right": "Windows-2025Server-10.0.26100-SP0",
+      "task": "binary"
+    },
+    {
+      "absolute": 0.0,
+      "left": "Linux-7.0.0-1016-aws-x86_64-with-glibc2.43",
+      "relative": 0.0,
+      "right": "Windows-2025Server-10.0.26100-SP0",
+      "task": "interaction"
+    },
+    {
+      "absolute": 0.0,
+      "left": "Linux-7.0.0-1016-aws-x86_64-with-glibc2.43",
+      "relative": 0.0,
+      "right": "Windows-2025Server-10.0.26100-SP0",
+      "task": "multiclass"
+    },
+    {
+      "absolute": 3.3306690738754696e-16,
+      "left": "Linux-7.0.0-1016-aws-x86_64-with-glibc2.43",
+      "relative": 3.5831543125794675e-16,
+      "right": "Windows-2025Server-10.0.26100-SP0",
+      "task": "regression"
+    },
+    {
+      "absolute": 0.0,
+      "left": "Linux-7.0.0-1016-aws-x86_64-with-glibc2.43",
+      "relative": 0.0,
+      "right": "macOS-26.7.2-arm64-arm-64bit-Mach-O",
+      "task": "binary"
+    },
+    {
+      "absolute": 0.0,
+      "left": "Linux-7.0.0-1016-aws-x86_64-with-glibc2.43",
+      "relative": 0.0,
+      "right": "macOS-26.7.2-arm64-arm-64bit-Mach-O",
+      "task": "interaction"
+    },
+    {
+      "absolute": 0.0,
+      "left": "Linux-7.0.0-1016-aws-x86_64-with-glibc2.43",
+      "relative": 0.0,
+      "right": "macOS-26.7.2-arm64-arm-64bit-Mach-O",
+      "task": "multiclass"
+    },
+    {
+      "absolute": 2.220446049250313e-16,
+      "left": "Linux-7.0.0-1016-aws-x86_64-with-glibc2.43",
+      "relative": 2.3887695417196446e-16,
+      "right": "macOS-26.7.2-arm64-arm-64bit-Mach-O",
+      "task": "regression"
+    },
+    {
+      "absolute": 0.0,
+      "left": "Windows-2025Server-10.0.26100-SP0",
+      "relative": 0.0,
+      "right": "macOS-26.7.2-arm64-arm-64bit-Mach-O",
+      "task": "binary"
+    },
+    {
+      "absolute": 0.0,
+      "left": "Windows-2025Server-10.0.26100-SP0",
+      "relative": 0.0,
+      "right": "macOS-26.7.2-arm64-arm-64bit-Mach-O",
+      "task": "interaction"
+    },
+    {
+      "absolute": 0.0,
+      "left": "Windows-2025Server-10.0.26100-SP0",
+      "relative": 0.0,
+      "right": "macOS-26.7.2-arm64-arm-64bit-Mach-O",
+      "task": "multiclass"
+    },
+    {
+      "absolute": 1.1102230246251565e-16,
+      "left": "Windows-2025Server-10.0.26100-SP0",
+      "relative": 1.1943847708598228e-16,
+      "right": "macOS-26.7.2-arm64-arm-64bit-Mach-O",
+      "task": "regression"
+    }
   ],
-  "spread": 0.0,
+  "sources": [
+    "/private/tmp/claude-501/-Users-sachin-Documents-Codex-github-repos-scmle/d296d912-b17c-4964-9bb4-cbd7880b7542/scratchpad/c6records2/reproducibility-macos-latest/reproducibility.json",
+    "/private/tmp/claude-501/-Users-sachin-Documents-Codex-github-repos-scmle/d296d912-b17c-4964-9bb4-cbd7880b7542/scratchpad/c6records2/reproducibility-ubuntu-latest/reproducibility.json",
+    "/private/tmp/claude-501/-Users-sachin-Documents-Codex-github-repos-scmle/d296d912-b17c-4964-9bb4-cbd7880b7542/scratchpad/c6records2/reproducibility-windows-latest/reproducibility.json"
+  ],
+  "spread": 3.5831543125794675e-16,
   "tolerance": {
     "name": "cross_platform_tol",
     "value": 1e-06

@@ -93,10 +93,11 @@ def test_round_trip_and_wrong_kind_errors():
 
 
 class RecordingContext:
-    """Collects the events a stage emits."""
+    """Collects the events a stage emits; it is its own journal."""
 
     def __init__(self):
         self.events = []
+        self.journal = self
 
     def emit(self, kind, reason="", artifacts=(), data=None):
         self.events.append((kind, reason, data))
@@ -134,9 +135,13 @@ def test_sensitivity_below_the_minimum_rows_is_skipped_not_raised():
     from scmle.pipeline import stages
 
     context = SimpleNamespace(
-        spec=SimpleNamespace(selection=SimpleNamespace(sensitivity_repeats=3)),
+        services=SimpleNamespace(
+            spec=SimpleNamespace(
+                selection=SimpleNamespace(sensitivity_repeats=3)
+            ),
+            governor=SimpleNamespace(overdue=lambda seconds, keep=0.0: None),
+        ),
         task=tasks.Task.REGRESSION,
-        regulator=SimpleNamespace(overdue=lambda seconds, keep=0.0: None),
         split=SimpleNamespace(dev_target=numpy.arange(10.0)),
     )
     selected = SimpleNamespace(fit_seconds=0.0, fold_scores=[])

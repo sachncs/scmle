@@ -4,13 +4,15 @@ import DocTable from "../../components/DocTable.astro";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const adapters = [
   ["<code>Runner</code>", "the workload, in this process", "the training role of <code>RoleStore</code>", "injected, or <code>PreemptedError</code>"],
+  ["<code>Process</code>", "the runner entrypoint, a child process", "the training role, in the child", "SIGTERM, then SIGKILL after the grace period"],
+  ["<code>Container</code>", "the same entrypoint in an image, through the Docker CLI", "the training role, as uid 10001 on a read-only root", "<code>docker stop</code>: SIGTERM, then SIGKILL"],
 ];
 ---
 
 <DocsLayout title="Portable training" description="One scmle job spec, a runner interface: durable run ids, checkpoints, retries, cost budgets, separated training and serving roles, and what has not been run." current="portable-training">
   <p class="eyebrow"><span></span> Serve and operate</p>
   <h1>One job spec,<br /><em>any place to run it.</em></h1>
-  <p class="lead">A <code>Job</code> and a <code>Runner</code> interface. The package ships the local runner, which runs and is tested; a runner for any other place is written by the user against the same interface.</p>
+  <p class="lead">A <code>Job</code> and a <code>Runner</code> interface. The package ships three runners on this machine (inline, child process and container); a runner for any other place is written by the user against the same interface.</p>
 
   <h2>The spec and the run</h2>
   <p>A <code>Job</code> names a durable <code>run_id</code> (the idempotency key), the project specification (opaque JSON), the training identity, resources, a timeout, a <code>Retries</code>, an optional <code>CostBudget</code> and a non-secret environment. A GPU needs a stated <code>gpu_reason</code>: specialised compute only behind a declared need. <code>Runner.run(spec)</code> behaves the same on every runner:</p>
@@ -28,11 +30,11 @@ const adapters = [
 
   <h2>Runners</h2>
   <DocTable label="Runners" head={["Runner", "Runs the attempt as", "Identity", "Interruption"]} rows={adapters} />
-  <p>A runner for a container platform starts the runner entrypoint in the image. It opens the <code>file://</code> store named by <code>SCMLE_STORE_URI</code>, loads the stored spec, refuses it if its digest is not the one the runner started, and runs the workload named by <code>SCMLE_WORKLOAD</code>. The default workload runs an unchanged <code>Project</code>: it copies the data from the store, mirrors the run directory to <code>runs/&lt;id&gt;/workdir/</code> every 30 seconds and at the end, and after a restart on an empty disk restores it and calls <code>Project.resume</code>. A hard kill loses at most the trials since the last mirror.</p>
+  <p>A runner for a container platform starts the runner entrypoint in the image. It opens the <code>file://</code> store named by <code>SCMLE_STORE_URI</code> (confined to the tenant's namespace when <code>SCMLE_TENANT</code> is set), loads the stored spec, refuses it if its digest is not the one the runner started, and runs the workload named by <code>SCMLE_WORKLOAD</code>. The default workload runs an unchanged <code>Project</code>: it copies the data from the store, mirrors the run directory to <code>runs/&lt;id&gt;/workdir/</code> every 30 seconds and at the end, and after a restart on an empty disk restores it and calls <code>Project.resume</code>. A hard kill loses at most the trials since the last mirror.</p>
   <p>A reproducibility report compares each metric of a result against tolerances declared before the runs; a miss is published, not hidden.</p>
 
   <h2>What was not done</h2>
-  <p>Only the local runner ships and is tested. No container image was built, no job was interrupted on a remote platform, and no cost was measured against a bill. The reproducibility-tolerance report against a second place does not exist.</p>
+  <p>The process runner is tested on every platform. The container tests need a built image and run in the release workflow's image job, which builds the image from the wheel on a pinned base and runs a tiny job through the container runner; on a macOS developer machine Docker Desktop could not bind-mount the test's temporary directory, so they have not passed there. No job was interrupted on a remote platform, and no cost was measured against a bill. The reproducibility-tolerance report against a second place does not exist.</p>
 
   <p class="meta">Training runners of the 0.1 beta line</p>
 </DocsLayout>

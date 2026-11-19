@@ -296,6 +296,45 @@ marked `Breaking:` and listed first in their group.
 
 ### Added
 
+- The `thresholdout` failure policy is available: a charter with
+  `failure="thresholdout"` asks each survivor's agreement again on the single
+  opening of `C` through a journalled Thresholdout reusable holdout (Dwork et
+  al. 2015, `scmle.assurance.ledger.confirm.thresholdout`), within its derived
+  tolerance and budget. The journal at `<run_dir>/thresholdout_journal.json`
+  lets an interrupted run resume with its budget spent. `Procedure.failure`
+  accepts `thresholdout`. The policy without a reuse session is refused with
+  a `ConfigError` before exploration starts.
+- Near-duplicate detection by MinHash (`scmle.assurance.detectors.minhash`)
+  is part of the f5-duplicates detector, whose certificate is stale until it
+  is measured again.
+
+- Two more runners on this machine: `scmle.runners.local.Process` runs each
+  attempt as `python -m scmle.runners.entrypoint` in a child process, and
+  `local.Container` runs the same entrypoint in an image through the Docker
+  CLI (bind-mounted store, read-only root, every capability dropped, the
+  job's resources as limits). Both read the attempt's end from the
+  entrypoint's exit status (`scmle.runners.base.Exit`: 0, 1, 75 transient,
+  143 interrupted, 137 killed), stop a job with SIGTERM and then SIGKILL
+  after a grace period, and keep its output at `runs/<id>/logs/<n>.txt`.
+  `python -m scmle.runners.local --runner process|container` runs a spec
+  from the command line, and `Job.read` rebuilds a stored spec. See
+  [`docs/PORTABLE_TRAINING.md`](docs/PORTABLE_TRAINING.md).
+- A training image: `Dockerfile` at the repository root installs the wheel
+  on `deploy/requirements.lock` with `--require-hashes`, on a base pinned by
+  digest, as uid 10001. `python -m scmle.deploy.packaging image --wheel
+  dist/<wheel>` builds it and smoke-tests `scmle --help` as non-root. The
+  release workflow's `image` job builds it, runs a tiny job through the
+  container runner and the runner tests against it, and `publish` now waits
+  for it.
+- Base images are pinned: `scmle.deploy.base_image.PINNED` records the
+  index digest of each Python slim base scmle builds on, so a generated
+  service Dockerfile defaults to a real digest instead of the placeholder,
+  which stays refused for a base with no pin.
+- `scmle store adopt --root R --tenant T` moves every object a store holds
+  outside the tenant namespaces into `tenants/<T>/` (`Tenancy.adopt`), the
+  migration of a store written before namespacing; re-running it finishes
+  an interrupted move.
+
 - Clustering has a user path: `scmle cluster DATA --output DIR` and
   `scmle.api.clustering.cluster`. It searches k-means, Gaussian mixture and
   agglomerative clustering over `--counts` (default 2 to 8) with
@@ -1730,6 +1769,18 @@ marked `Breaking:` and listed first in their group.
   the original run and the rerun; it used to report `exact`.
 
 ### Security
+
+- Tenant isolation at the storage layer: `scmle.storage.tenancy.Tenancy`
+  confines every operation to `tenants/<tenant>/`, refuses crafted keys and
+  keys naming the namespace root, and refuses a backend listing outside the
+  namespace; tenant names are lowercase DNS labels. The job entrypoint
+  confines its store to `SCMLE_TENANT`, `Gateway.confine` gives a verified
+  caller only its own tenant's namespace, an experiment store keeps each
+  tenant's runs in a database of its own, and a local store refuses any path
+  through a symbolic link (`EscapeError`). A JWK `tenant` field binds a key
+  to one tenant, so it verifies only that tenant's tokens. A link swapped in
+  between the check and the open is not caught; see
+  [`docs/TENANT_ISOLATION.md`](docs/TENANT_ISOLATION.md).
 
 - Breaking: `SCMLE_TRUSTED=1` and `trusted=True` are refused when
   `SCMLE_ENV=production`, in `ModelBundle.load` and in the service, and the

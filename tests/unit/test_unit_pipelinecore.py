@@ -1,5 +1,6 @@
 """The run context, its journal, the planning rules and the search steps."""
 
+import dataclasses
 import json
 import types
 
@@ -18,6 +19,7 @@ from scmle.pipeline import hyperband
 from scmle.pipeline import journal
 from scmle.pipeline import rules
 import scmle.pipeline.context
+from scmle.pipeline.stages import planning
 
 
 def config(budget=1800, **data):
@@ -52,26 +54,20 @@ class Board(journal.Journal):
     """A journal with a real store, event log and a recording tracker."""
 
     def __init__(self, root=None):
-        self.spec = config()
-        self.trials = []
-        self.outcomes = []
-        self.trial_counter = 0
-        self.skipped = []
         self.tracked = []
         self.revised = []
-        self.tracker = types.SimpleNamespace(
+        tracker = types.SimpleNamespace(
             transcribe=lambda run, outcome: self.tracked.append(
                 (run, outcome.trial_id)
             ),
             revise=lambda run, **fields: self.revised.append((run, fields)),
         )
-        if root is None:
-            self.store = None
-            self.log = None
-        else:
+        store = log = None
+        if root is not None:
             root.mkdir()
-            self.store = scmle.artifacts.store.Workspace("r1", root)
-            self.log = events.Log(root / "events.jsonl")
+            store = scmle.artifacts.store.Workspace("r1", root)
+            log = events.Log(root / "events.jsonl")
+        super().__init__(config(), store, log, tracker)
 
 
 def kinds(root):
@@ -165,32 +161,34 @@ def context():
 
 
 def test_a_preview_context_has_no_store_and_a_budget_deadline(context):
-    assert context.directory == ""
-    assert context.deadline == context.started_at + 1800
+    assert context.services.directory == ""
+    assert (
+        context.services.deadline == context.services.governor.started_at + 1800
+    )
     with pytest.raises(errors.ScmleError, match="'store' is unavailable"):
-        assert context.workspace is None
-    assert context.regulator is context.regulator
+        assert context.services.workspace is None
+    assert context.regulator is context.services.governor
 
 
 def test_cancellation_raises_with_the_run_directory(context):
-    context.check_cancelled()
-    context.cancel_event.set()
+    context.services.check()
+    context.services.cancel_event.set()
     try:
         with pytest.raises(errors.CancelledError) as caught:
-            context.check_cancelled()
+            context.services.check()
         assert caught.value.details == {"run_dir": ""}
     finally:
-        context.cancel_event.clear()
+        context.services.cancel_event.clear()
 
 
 def test_observe_needs_the_capability_observation(context):
-    saved = context.capability_observation
-    context.capability_observation = None
+    saved = context.services
+    context.services = dataclasses.replace(saved, capability_observation=None)
     try:
         with pytest.raises(errors.ScmleError, match="capability_observation"):
-            context.observe()
+            planning.observe(context)
     finally:
-        context.capability_observation = saved
+        context.services = saved
 
 
 def situation(spec=None, rows=10, width=2, wide=()):
@@ -447,11 +445,15 @@ class Tuner(hyperband.Hyperband):
         self.metric = types.SimpleNamespace(greater_is_better=True)
         self.recorded = []
         self.context = types.SimpleNamespace(
-            allocate=self.allocate,
-            transcribe=self.recorded.append,
-            regulator=types.SimpleNamespace(skip_reason=lambda first: skip),
-            forgo=lambda work, reason: self.recorded.append((work, reason)),
-            check_cancelled=lambda: None,
+            services=types.SimpleNamespace(
+                governor=types.SimpleNamespace(skip_reason=lambda first: skip),
+                check=lambda: None,
+            ),
+            journal=types.SimpleNamespace(
+                allocate=self.allocate,
+                transcribe=self.recorded.append,
+                forgo=lambda work, reason: self.recorded.append((work, reason)),
+            ),
         )
         self.counter = 0
 
@@ -542,23 +544,27 @@ class Stacking(ensemble_search.Stacker):
         self.objected = []
         self.context = types.SimpleNamespace(
             task="the task",
-            registry=types.SimpleNamespace(
-                get=lambda name: types.SimpleNamespace(
-                    family=families.get(name, "x"),
-                    objection=lambda task: (
-                        self.objected.append((name, task))
-                        or objections.get(name)
-                    ),
-                )
+            services=types.SimpleNamespace(
+                registry=types.SimpleNamespace(
+                    get=lambda name: types.SimpleNamespace(
+                        family=families.get(name, "x"),
+                        objection=lambda task: (
+                            self.objected.append((name, task))
+                            or objections.get(name)
+                        ),
+                    )
+                ),
+                spec=types.SimpleNamespace(
+                    ensemble=types.SimpleNamespace(size=size)
+                ),
+                governor=types.SimpleNamespace(skip_reason=lambda first: skip),
+                check=lambda: None,
             ),
-            spec=types.SimpleNamespace(
-                ensemble=types.SimpleNamespace(size=size)
+            journal=types.SimpleNamespace(
+                enter=lambda *args: self.entered.append(args),
+                allocate=lambda count: ["e1"],
+                transcribe=self.recorded.append,
             ),
-            regulator=types.SimpleNamespace(skip_reason=lambda first: skip),
-            enter=lambda *args: self.entered.append(args),
-            allocate=lambda count: ["e1"],
-            transcribe=self.recorded.append,
-            check_cancelled=lambda: None,
         )
         self.metric = types.SimpleNamespace(
             greater_is_better=greater, name="accuracy"

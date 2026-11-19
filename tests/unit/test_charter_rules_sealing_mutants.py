@@ -28,7 +28,7 @@ def test_rule_choices_are_named_in_full():
         f"confirmation must be one of {allowed}"
     )
     assert message(partial(rules.Procedure, failure="retry")) == (
-        "failure must be 'unconfirmed': no other policy is implemented"
+        "failure must be one of ('unconfirmed', 'thresholdout')"
     )
     assert message(partial(rules.Procedure, stability=1)) == (
         "stability must be a boolean"

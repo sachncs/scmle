@@ -8,6 +8,7 @@ import pytest
 from scmle.assurance.charter import contracts
 from scmle.assurance.charter import sealing
 import scmle.assurance.charter.rules
+from scmle.assurance.ledger import confirm
 from scmle.contracts import errors
 from tests.unit.test_charter_contracts import make_charter
 
@@ -110,7 +111,7 @@ def test_rules_in_an_older_format_are_refused(tmp_path):
     [
         {"ledger": "alpha-investing"},
         {"confirmation": "fisher"},
-        {"failure": "thresholdout"},
+        {"failure": "retry"},
         {"stability": "yes"},
         {"agreement": 0.0},
         {"exclusion": 1.5},
@@ -121,6 +122,14 @@ def test_rules_in_an_older_format_are_refused(tmp_path):
 def test_invalid_rules_are_rejected(changes):
     with pytest.raises(ValueError):
         scmle.assurance.charter.rules.Procedure(**changes)
+
+
+def test_the_thresholdout_failure_policy_is_accepted_and_round_trips():
+    rules = scmle.assurance.charter.rules.Procedure(failure="thresholdout")
+    assert rules.failure == confirm.THRESHOLDOUT
+    again = scmle.assurance.charter.rules.Procedure.from_dict(rules.to_dict())
+    assert again == rules
+    assert again != scmle.assurance.charter.rules.Procedure()
 
 
 def test_rules_reject_unknown_and_missing_fields():

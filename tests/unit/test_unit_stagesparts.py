@@ -18,6 +18,7 @@ from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.contracts import tasks
 from scmle.evaluation import resources
+from scmle.pipeline import services
 from scmle.pipeline.stages import admission
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import examination
@@ -64,15 +65,20 @@ def context(seconds=100.0, folds=5, package=0.0, budget=60):
     recorded = []
     entered = []
     return types.SimpleNamespace(
-        regulator=Governor(seconds, package),
+        services=types.SimpleNamespace(
+            governor=Governor(seconds, package),
+            spec=types.SimpleNamespace(
+                resources=types.SimpleNamespace(time_budget_seconds=budget)
+            ),
+            clock=services.Clock(),
+        ),
         split=types.SimpleNamespace(
             manifest=types.SimpleNamespace(folds=[([0], [1])] * folds)
         ),
-        spec=types.SimpleNamespace(
-            resources=types.SimpleNamespace(time_budget_seconds=budget)
+        journal=types.SimpleNamespace(
+            forgo=lambda work, reason: recorded.append((work, reason)),
+            enter=lambda *args: entered.append(args),
         ),
-        forgo=lambda work, reason: recorded.append((work, reason)),
-        enter=lambda *args: entered.append(args),
         recorded=recorded,
         entered=entered,
     )
@@ -170,7 +176,7 @@ def test_meter_times_fewer_rows_when_time_is_short(monkeypatch):
     board = context(seconds=10.0, package=4.0)
     measured = []
     ticks = iter([0.0, 1.0])
-    monkeypatch.setattr(cost.time, "monotonic", lambda: next(ticks))
+    board.services.clock = types.SimpleNamespace(monotonic=lambda: next(ticks))
     monkeypatch.setattr(
         cost.resources,
         "measure",
@@ -193,7 +199,7 @@ def test_meter_times_at_least_one_row(monkeypatch):
     board = context(seconds=0.0)
     measured = []
     ticks = iter([0.0, 1.0])
-    monkeypatch.setattr(cost.time, "monotonic", lambda: next(ticks))
+    board.services.clock = types.SimpleNamespace(monotonic=lambda: next(ticks))
     monkeypatch.setattr(
         cost.resources,
         "measure",
@@ -210,8 +216,10 @@ def test_dimensions_count_labelled_rows_features_and_classes():
     )
     board = types.SimpleNamespace(
         frame=frame,
-        spec=types.SimpleNamespace(
-            data=types.SimpleNamespace(target="y", targets=["z"])
+        services=types.SimpleNamespace(
+            spec=types.SimpleNamespace(
+                data=types.SimpleNamespace(target="y", targets=["z"])
+            )
         ),
         task=tasks.Task.MULTICLASS,
     )
@@ -303,10 +311,14 @@ def test_coverage_on_confirmation_needs_a_confirmatory_block():
 
 
 def test_without_a_charter_there_are_no_slices_or_decision_layer():
-    board = types.SimpleNamespace(spec=types.SimpleNamespace(charter_path=None))
+    board = types.SimpleNamespace(
+        services=types.SimpleNamespace(
+            spec=types.SimpleNamespace(charter_path=None)
+        )
+    )
     assert scoring.slicers(board) == ()
     assert scoring.decisional(board) is None
-    board.spec.charter_path = ""
+    board.services.spec.charter_path = ""
     assert scoring.slicers(board) == ()
 
 
@@ -318,22 +330,24 @@ def test_freeze_needs_a_decision_layer():
 
 def test_no_threshold_is_chosen_outside_binary_tasks():
     board = types.SimpleNamespace(
-        spec=types.SimpleNamespace(
-            decision=types.SimpleNamespace(threshold_objective="f1"),
-            charter_path=None,
+        services=types.SimpleNamespace(
+            spec=types.SimpleNamespace(
+                decision=types.SimpleNamespace(threshold_objective="f1"),
+                charter_path=None,
+            )
         ),
         task=tasks.Task.REGRESSION,
     )
     fitted = object()
     assert scoring.choose_decision_threshold(board, fitted) == (fitted, None)
     board.task = tasks.Task.BINARY
-    board.spec.decision.threshold_objective = "none"
+    board.services.spec.decision.threshold_objective = "none"
     assert scoring.choose_decision_threshold(board, fitted) == (fitted, None)
 
 
 def test_the_threshold_search_is_skipped_on_record_when_late():
     board = context(seconds=1.0, package=0.5)
-    board.spec = types.SimpleNamespace(
+    board.services.spec = types.SimpleNamespace(
         decision=types.SimpleNamespace(threshold_objective="f1"),
         charter_path=None,
     )
@@ -345,8 +359,67 @@ def test_the_threshold_search_is_skipped_on_record_when_late():
 
 
 def test_appraise_needs_a_chartered_rule():
-    board = types.SimpleNamespace(spec=types.SimpleNamespace(charter_path=None))
+    board = types.SimpleNamespace(
+        services=types.SimpleNamespace(
+            spec=types.SimpleNamespace(charter_path=None)
+        )
+    )
     assert scoring.appraise(board, None, None, None, {"f11": {}}) is None
+
+
+class ConcludedError(Exception):
+    """Stops `conclude` at the confirmation, carrying what it was given."""
+
+
+@pytest.mark.parametrize(
+    ("failure", "reused"), [("thresholdout", True), ("unconfirmed", False)]
+)
+def test_a_charter_run_hands_its_reuse_session_to_the_confirmation(
+    monkeypatch, failure, reused
+):
+    built = []
+
+    def replication(explored, features, target):
+        built.append((explored, features, target))
+        return "session"
+
+    def finalise(explored, **given):
+        raise ConcludedError(given)
+
+    monkeypatch.setattr(exploration.governed, "replication", replication)
+    monkeypatch.setattr(exploration.governed, "finalise", finalise)
+    view = types.SimpleNamespace(features="X", target="y")
+    pending = types.SimpleNamespace(
+        charter=types.SimpleNamespace(
+            rules=types.SimpleNamespace(
+                failure=failure, confirmation="by", ledger="e-lond"
+            )
+        ),
+        view=view,
+        baseline=None,
+        causal=None,
+        explored="explored",
+    )
+    context = types.SimpleNamespace(
+        services=types.SimpleNamespace(
+            spec=types.SimpleNamespace(
+                confirmation_rule="by",
+                confirmation_failure_policy="unconfirmed",
+            ),
+            store=None,
+        ),
+        custody_vault=types.SimpleNamespace(sets={"C": "C"}),
+    )
+    # The stage is abstract; `conclude` reads nothing of its own before the
+    # confirmation when no subject is given.
+    with pytest.raises(ConcludedError) as caught:
+        exploration.Exploration.conclude(
+            types.SimpleNamespace(), context, pending
+        )
+    given = caught.value.args[0]
+    assert given["policy"] == failure
+    assert given["reuse"] == ("session" if reused else None)
+    assert built == ([("explored", "X", "y")] if reused else [])
 
 
 def test_governing_prefers_the_charter_and_refuses_a_contradiction():
@@ -390,7 +463,9 @@ def test_prune_removes_quarantined_fields_and_records_why():
 def test_register_writes_only_what_the_qualification_holds():
     written = {}
     board = types.SimpleNamespace(
-        write_json=lambda path, body: written.update({path: body})
+        journal=types.SimpleNamespace(
+            write_json=lambda path, body: written.update({path: body})
+        )
     )
     table = types.SimpleNamespace(to_dict=lambda: {"t": 1})
     store = types.SimpleNamespace(to_dict=lambda: {"s": 1})
@@ -457,7 +532,9 @@ def test_amend_replaces_the_profile_without_a_curation():
     board = types.SimpleNamespace(
         profile=Profile(None),
         curation=None,
-        write_json=lambda path, body: written.update({path: body}),
+        journal=types.SimpleNamespace(
+            write_json=lambda path, body: written.update({path: body})
+        ),
     )
     assert admission.amend(board, plan()) == []
     assert board.profile == Profile(plan())

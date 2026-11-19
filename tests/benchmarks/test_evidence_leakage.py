@@ -152,13 +152,10 @@ def test_a_planted_classification_leak_needs_a_binary_target() -> None:
 
 def test_the_stored_measurement_is_current() -> None:
     stored = json.loads(leakage.PATH.read_text(encoding="utf-8"))
-    # At the first Holm step a ceiling of 0.05 needs 86 clean tables; the
-    # corpus has fewer (docs/preregistration/c2.md, "Where the current
-    # module differs"), which is the only problem allowed.
-    issues = leakage.problems(stored)
-    assert all("none can pass" in p for p in issues), issues
-    expected = ("not measured",) if issues else ("pass", "fail")
-    assert leakage.summary(stored)[1] in expected
+    # The clean corpus reaches the 86 tables of the first Holm step, so the
+    # stored measurement decides both rows.
+    assert leakage.problems(stored) == []
+    assert leakage.summary(stored)[1] in ("pass", "fail")
 
 
 def test_the_clean_corpus_reaches_the_first_holm_step_minimum() -> None:

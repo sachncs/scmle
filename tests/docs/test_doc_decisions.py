@@ -24,8 +24,10 @@ def test_no_success_criteria_blocks_the_release_and_invents_none():
     context = types.SimpleNamespace(
         task=tasks.Task.BINARY,
         metric=types.SimpleNamespace(name="roc_auc", greater_is_better=True),
-        spec=types.SimpleNamespace(
-            problem=types.SimpleNamespace(success_criteria={})
+        services=types.SimpleNamespace(
+            spec=types.SimpleNamespace(
+                problem=types.SimpleNamespace(success_criteria={})
+            )
         ),
     )
     store = Store()

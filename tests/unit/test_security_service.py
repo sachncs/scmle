@@ -118,7 +118,7 @@ def test_predict_works_with_the_scope_and_not_without(service, reference):
 
 
 def test_error_bodies_never_say_why(service, reference):
-    # Enforces docs/TENANT_ISOLATION.md:46.
+    # Enforces docs/TENANT_ISOLATION.md:57.
     # Enforces docs/SERVICE_SLO.md:29.
     # Enforces website/src/pages/docs/service.astro:50.
     # Enforces website/src/pages/docs/tenant-isolation.astro:35.
@@ -218,7 +218,7 @@ def test_the_request_size_limit_still_applies_behind_the_gateway(
 def test_audit_records_activation_access_and_admin_in_a_valid_chain(
     reference, tmp_path
 ):
-    # Enforces docs/TENANT_ISOLATION.md:49.
+    # Enforces docs/TENANT_ISOLATION.md:60.
     # Enforces website/src/pages/docs/tenant-isolation.astro:36.
     clock = support_identity.Clock()
     path = tmp_path / "audit.jsonl"
@@ -265,7 +265,7 @@ def test_audit_records_activation_access_and_admin_in_a_valid_chain(
 
 
 def test_an_edited_audit_row_breaks_the_chain(tmp_path):
-    # Enforces docs/TENANT_ISOLATION.md:69.
+    # Enforces docs/TENANT_ISOLATION.md:80.
     # Enforces website/src/pages/docs/tenant-isolation.astro:45.
     log = audit.Log.open(tmp_path / "a.jsonl")
     log.admin("ops", "one")
@@ -295,7 +295,7 @@ def test_a_failed_activation_is_audited(tmp_path):
 
 
 def test_no_unauthenticated_server_can_listen_beyond_loopback(reference):
-    # Enforces docs/TENANT_ISOLATION.md:87.
+    # Enforces docs/TENANT_ISOLATION.md:114.
     # Enforces docs/API_STABILITY.md:212.
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:184.
     # Enforces README.md:266.
@@ -317,7 +317,7 @@ def test_no_unauthenticated_server_can_listen_beyond_loopback(reference):
 
 
 def test_the_runtime_default_host_needs_authentication():
-    # Enforces docs/TENANT_ISOLATION.md:87.
+    # Enforces docs/TENANT_ISOLATION.md:114.
     # Enforces website/src/pages/docs/tenant-isolation.astro:55.
     plain = runtime.settings({})
     assert plain["host"] == "0.0.0.0" and plain["gateway"] is None  # nosec B104
@@ -344,7 +344,7 @@ def test_authentication_settings_need_an_issuer_and_audience():
 
 
 def test_the_shipped_compose_file_publishes_no_port_and_secures_the_apis():
-    # Enforces docs/TENANT_ISOLATION.md:87.
+    # Enforces docs/TENANT_ISOLATION.md:114.
     # Enforces website/src/pages/docs/tenant-isolation.astro:42.
     # Enforces website/src/pages/docs/threat-model.astro:19.
     text = (ROOT / "compose.yaml").read_text(encoding="utf-8")
@@ -361,7 +361,7 @@ def test_the_shipped_compose_file_publishes_no_port_and_secures_the_apis():
 def test_the_generated_image_does_not_turn_authentication_off(
     reference, tmp_path
 ):
-    # Enforces docs/TENANT_ISOLATION.md:87.
+    # Enforces docs/TENANT_ISOLATION.md:114.
     # Enforces website/src/pages/docs/tenant-isolation.astro:55.
     folder = tmp_path / "svc"
     packaging.scaffold(reference, folder, signing_key=KEY)

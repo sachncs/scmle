@@ -112,15 +112,12 @@ def restore(value: str) -> ModalityIdentity:
     candidate: object = value  # callers may pass a non-string
     if not isinstance(candidate, str) or not candidate.strip():
         raise errors.InputError("modality value must be a non-empty string")
-    try:
+    if value in {member.value for member in Modality}:
         return Modality(value)
-    except ValueError:
-        prefix = "extension:"
-        if not value.startswith(prefix):
-            raise errors.InputError(
-                f"unknown modality value: {value}"
-            ) from None
-        return Bespoke(value.removeprefix(prefix))
+    prefix = "extension:"
+    if not value.startswith(prefix):
+        raise errors.InputError(f"unknown modality value: {value}")
+    return Bespoke(value.removeprefix(prefix))
 
 
 class Phase(enum.StrEnum):

@@ -174,7 +174,7 @@ def test_revoked_tokens_subjects_and_keys_are_refused():
 
 
 def test_the_revocation_file_is_read_on_every_check_and_fails_closed(tmp_path):
-    # Enforces docs/TENANT_ISOLATION.md:66 and docs/TENANT_ISOLATION.md:84.
+    # Enforces docs/TENANT_ISOLATION.md:77 and docs/TENANT_ISOLATION.md:111.
     # Enforces website/src/pages/docs/tenant-isolation.astro:10.
     # Enforces website/src/pages/docs/tenant-isolation.astro:44.
     clock = support_identity.Clock()

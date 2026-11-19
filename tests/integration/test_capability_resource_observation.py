@@ -139,7 +139,7 @@ def test_bound_observation_is_used_by_the_capability_gate(monkeypatch):
     )
     registry = capabilities.Registry((record,))
     monkeypatch.setattr(
-        orchestrator.resource_observation,
+        resource_observation,
         "observe_runtime_resources",
         lambda path=None: observation(
             cpu_cores=2,
@@ -175,7 +175,7 @@ def test_unknown_declared_facts_fail_closed_and_are_persisted(
     )
     registry = capabilities.Registry((record,))
     monkeypatch.setattr(
-        orchestrator.resource_observation,
+        resource_observation,
         "observe_runtime_resources",
         lambda path=None: observation(
             cpu_cores=None,

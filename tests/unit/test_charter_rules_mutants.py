@@ -13,7 +13,8 @@ def test_each_rule_error_names_the_offending_field():
     ):
         rules.Procedure(confirmation="nope")
     with pytest.raises(
-        ValueError, match="failure must be 'unconfirmed': no other"
+        ValueError,
+        match=r"failure must be one of \('unconfirmed', 'thresholdout'\)",
     ):
         rules.Procedure(failure="retry")
     with pytest.raises(ValueError, match=r"^stability must be a boolean$"):

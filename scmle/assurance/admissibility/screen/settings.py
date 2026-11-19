@@ -155,6 +155,13 @@ MAX_CERTIFIED_CLASSES = 10
 SCREEN_SHARE = 0.15
 
 
+# The most permutations a scan draws. Resolving the smallest rank-1
+# threshold `alpha / (m * H_m)` needs `B + 1 >= m * H_m / alpha`; at the
+# certified `alpha` that covers a family of several thousand hypotheses,
+# and a larger family is declined loudly instead of drawn for minutes.
+MAX_PERMUTATIONS = 100_000
+
+
 FITS_PER_SECOND = 25_000
 
 

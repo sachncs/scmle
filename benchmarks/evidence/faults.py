@@ -918,6 +918,59 @@ def reconcile(drop: int) -> None:
     declared.require(declared.reconcile({"orders": frame}, expected, 0.0))
 
 
+def reuse(asked: int) -> None:
+    """Asks a reusable holdout `asked` queries; its terms allow three.
+
+    Args:
+        asked: Queries asked; 3 passes, 4 asks one past the session's
+            answers.
+    """
+    from scmle.assurance.ledger.confirm import thresholdout
+
+    allowed = 3
+    size = thresholdout.minimum(queries=allowed, budget=2)
+    rng = numpy.random.default_rng(5)
+    rows = pandas.DataFrame({"x": rng.normal(size=size)})
+    labels = pandas.Series(rng.integers(0, 2, size), name="y")
+    terms = thresholdout.Terms(size, queries=allowed, budget=2)
+    guard = thresholdout.Thresholdout((rows, labels), (rows, labels), terms)
+    for _ in range(asked):
+        guard.query(
+            lambda frame, target: ((frame["x"] > 0) == (target > 0)).astype(
+                float
+            )
+        )
+
+
+def rejournal(foreign: bool) -> None:
+    """Resumes a reusable holdout from a journal of other rows, or its own.
+
+    Args:
+        foreign: True plants a journal written for other holdout rows;
+            False resumes from the session's own journal.
+    """
+    from scmle.assurance.ledger.confirm import thresholdout
+
+    size = thresholdout.minimum()
+    rng = numpy.random.default_rng(6)
+    rows = pandas.DataFrame({"x": rng.normal(size=size)})
+    labels = pandas.Series(rng.integers(0, 2, size), name="y")
+    other = pandas.Series(1 - labels, name="y")
+    with tempfile.TemporaryDirectory() as folder:
+        journal = Path(folder) / "journal.json"
+        writer = (rows, other) if foreign else (rows, labels)
+        thresholdout.Thresholdout(
+            (rows, labels), writer, journal=journal
+        ).query(
+            lambda frame, target: ((frame["x"] > 0) == (target > 0)).astype(
+                float
+            )
+        )
+        thresholdout.Thresholdout((rows, labels), (rows, labels)).resume(
+            journal
+        )
+
+
 def confirmation(times: int) -> None:
     """Runs the single confirmation on a real ledger `times` times.
 
@@ -2016,6 +2069,18 @@ INJECTIONS: dict[str, Injection] = {
         bind(confirmation, 2),
         bind(confirmation, 1),
     ),
+    "confirm.reuse_exhausted": Injection(
+        "site",
+        "a reusable holdout asked one query past its answers",
+        bind(reuse, 4),
+        bind(reuse, 3),
+    ),
+    "confirm.reuse_journal": Injection(
+        "site",
+        "a reusable holdout resumed from a journal of other holdout rows",
+        bind(rejournal, foreign=True),
+        bind(rejournal, foreign=False),
+    ),
     "profile.monotonic_columns": Injection(
         "run",
         "monotonic constraint on a categorical column",
@@ -2333,6 +2398,17 @@ REAL: dict[str, Injection] = {
         f"the same signed charter run twice on {CREDIT}",
         bind(rerun, again=True),
         bind(rerun, again=False),
+    ),
+    "confirm.reuse_exhausted": absent(
+        "a charter run's reusable holdout asked past its answers",
+        "a run asks one query per survivor and stops at the session's "
+        "terms, so no run on real data reaches the limit; the gate is "
+        "planted only by a direct call",
+    ),
+    "confirm.reuse_journal": absent(
+        "a charter run resumed with a reuse journal of other rows",
+        "planting it needs a run interrupted between two answers and its "
+        "journal replaced, which no real-data run here does",
     ),
     "profile.monotonic_columns": Injection(
         "run",

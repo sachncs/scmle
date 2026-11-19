@@ -51,6 +51,14 @@
     },
     {
       "category": "environment",
+      "pattern": "^SIGTERM is POSIX only$"
+    },
+    {
+      "category": "environment",
+      "pattern": "^SCMLE_IMAGE names no built image$"
+    },
+    {
+      "category": "environment",
       "pattern": "^POSIX load average and slot directories$"
     },
     {

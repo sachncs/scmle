@@ -96,6 +96,24 @@ blocks = "ledger.confirmation is not None, so the confirmation was already perfo
 override = "none"
 variables = []
 
+[confirm.reuse_exhausted]
+site = "scmle.assurance.ledger.confirm.thresholdout:Thresholdout.query"
+error = "LeakageError"
+claim = "C3"
+passes = "The reusable holdout has given fewer than Terms.queries answers and fewer than Terms.budget holdout (overfitting) answers, so each answer stays within the derived tolerance of its population mean."
+blocks = "The session already gave Terms.queries answers, or spent its Terms.budget holdout answers; a further answer would leave the description-length bound the tolerance is derived from."
+override = "none"
+variables = ["QUERIES", "BUDGET", "TOLERANCE", "CONFIDENCE", "STEP"]
+
+[confirm.reuse_journal]
+site = "scmle.assurance.ledger.confirm.thresholdout:Thresholdout.resume"
+error = "LeakageError"
+claim = "C3"
+passes = "The journal of an interrupted session reads and is sealed for the same holdout rows and terms, so the session resumes with its budget spent."
+blocks = "The journal is unreadable or belongs to other rows or terms; the budget is never reset by starting over."
+override = "none"
+variables = []
+
 [profile.monotonic_columns]
 site = "scmle.pipeline.profiler:Profiler.monotonic_features"
 error = "BlockedError"

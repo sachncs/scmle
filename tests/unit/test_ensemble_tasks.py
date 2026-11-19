@@ -37,13 +37,19 @@ class Search(ensemble_search.Stacker):
         self.ran = []
         self.context = types.SimpleNamespace(
             task=task,
-            registry=registry.Catalog.stock(include_user=False),
-            spec=types.SimpleNamespace(ensemble=types.SimpleNamespace(size=3)),
-            regulator=types.SimpleNamespace(skip_reason=lambda first: None),
-            enter=lambda *args: self.entered.append(args),
-            allocate=lambda count: ["e1"],
-            transcribe=lambda outcome: None,
-            check_cancelled=lambda: None,
+            services=types.SimpleNamespace(
+                registry=registry.Catalog.stock(include_user=False),
+                spec=types.SimpleNamespace(
+                    ensemble=types.SimpleNamespace(size=3)
+                ),
+                governor=types.SimpleNamespace(skip_reason=lambda first: None),
+                check=lambda: None,
+            ),
+            journal=types.SimpleNamespace(
+                enter=lambda *args: self.entered.append(args),
+                allocate=lambda count: ["e1"],
+                transcribe=lambda outcome: None,
+            ),
         )
         self.metric = types.SimpleNamespace(greater_is_better=True, name="m")
         self.runner = types.SimpleNamespace(run=self.run)

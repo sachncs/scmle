@@ -115,6 +115,7 @@ def test_commands_are_polymorphic():
         "forget",
         "retire",
         "delete",
+        "store",
     ]
     assert all(isinstance(c, cli.Command) for c in cli.COMMANDS)
 

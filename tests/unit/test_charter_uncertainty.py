@@ -87,7 +87,9 @@ def test_unknown_fields_are_refused():
 def stage_context(path):
     from types import SimpleNamespace
 
-    return SimpleNamespace(spec=SimpleNamespace(charter_path=path))
+    return SimpleNamespace(
+        services=SimpleNamespace(spec=SimpleNamespace(charter_path=path))
+    )
 
 
 def test_the_stage_reads_the_cap_from_the_charter(tmp_path):

@@ -66,6 +66,45 @@ def test_a_planted_long_function_is_counted(monkeypatch, tmp_path):
     assert found["compound_classes"] == 0
 
 
+def test_planted_naming_regressions_are_counted(monkeypatch, tmp_path):
+    module = load()
+    package = tmp_path / "scmle"
+    package.mkdir()
+    (package / "planted.py").write_text(
+        "import json as codec\n"
+        "import pandas\n"
+        'CHILD = """\nfrom scmle import tasks as t\n"""\n\n\n'
+        "class Frame:\n"
+        "    row_count: int = 0\n\n"
+        "    def __init__(self):\n"
+        "        self.column_names = []\n"
+        "        self.size = 0\n\n"
+        "    def to_numpy(self):\n"
+        "        return pandas, codec\n\n"
+        "    def get_params(self):\n"
+        "        return {}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(module, "PACKAGE", package)
+    found, collisions = module.scan()
+    assert found["import_aliases"] == 2
+    assert found["compound_attributes"] == 2
+    assert found["compound_functions"] == 1
+    assert found["external_names"] == 1
+    assert collisions == {"to_numpy": "pandas"}
+
+
+def test_every_exempt_name_is_multi_word_and_has_a_reason():
+    module = load()
+    assert len(module.EXEMPT) == 18
+    assert {"process_request", "process_request_thread"} <= set(module.EXEMPT)
+    assert "shrunk_covariance" in module.EXEMPT
+    for name, reason in module.EXEMPT.items():
+        assert module.compound(name)
+        assert not module.counted(name)
+        assert reason
+
+
 def plant(root, files):
     """Writes a synthetic package tree under `root/scmle`."""
     package = root / "scmle"

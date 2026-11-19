@@ -146,8 +146,13 @@ def test_a_strong_legitimate_predictor_is_not_a_leakage_risk():
     )
     result = profile(frame)[1]
     assert not any("leakage" in r for r in result.risk_findings)
-    (finding,) = result.leakage["findings"]
-    assert finding["significant"] and not finding["suspect"]
+    screen = result.leakage
+    # The column was tested (it is in the family, none is unchecked), but its
+    # skill is below the ceiling, so `sift` spends no permutations on it and
+    # it is neither significant nor suspect, and no finding is written.
+    assert screen["family"] >= 1 and screen["unchecked"] == []
+    assert screen["suspects"] == [] and screen["blocking"] == []
+    assert screen["findings"] == []
 
 
 def test_the_screen_uses_groups_and_the_time_order(classification_frame):

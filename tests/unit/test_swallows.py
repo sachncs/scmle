@@ -207,8 +207,10 @@ def test_a_failed_attestation_check_keeps_its_reason(monkeypatch, caplog):
     context = types.SimpleNamespace(
         task=tasks.Task.REGRESSION,
         metric=types.SimpleNamespace(name="rmse", greater_is_better=False),
-        spec=types.SimpleNamespace(
-            problem=types.SimpleNamespace(success_criteria={"rmse": 1.0})
+        services=types.SimpleNamespace(
+            spec=types.SimpleNamespace(
+                problem=types.SimpleNamespace(success_criteria={"rmse": 1.0})
+            )
         ),
         diagnostics={},
     )

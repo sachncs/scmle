@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any
 
 import scmle
+from scmle.assurance.detectors import minhash
+from scmle.assurance.ledger.confirm import thresholdout
 from scmle.data.store import processing
 from scmle.data.store import quality
 from scmle.data.store import snapshot
@@ -37,6 +39,7 @@ from scmle.security import access
 from scmle.security import audit
 from scmle.security import tokens
 from scmle.storage import objectstore
+from scmle.storage import tenancy
 import scmle.trail.builder
 import scmle.trail.chain
 import scmle.trail.show
@@ -150,7 +153,20 @@ EXTENSION_SURFACES = {
             "Depot",
             "RetryingStore",
             "StoreError",
+            "EscapeError",
         ),
+    ),
+    "scmle.storage.tenancy": (
+        tenancy,
+        ("Tenancy", "TenantError", "confine", "directory", "qualify"),
+    ),
+    "scmle.assurance.ledger.confirm.thresholdout": (
+        thresholdout,
+        ("Answer", "Session", "Terms", "Thresholdout", "minimum"),
+    ),
+    "scmle.assurance.detectors.minhash": (
+        minhash,
+        ("Bands", "flags", "pairs", "similarity"),
     ),
     "scmle.data.store.snapshot": (
         snapshot,
@@ -177,9 +193,10 @@ EXTENSION_SURFACES = {
             "RunManifest",
             "Progress",
             "Runner",
+            "Exit",
         ),
     ),
-    "scmle.runners.local": (local, ("Runner",)),
+    "scmle.runners.local": (local, ("Runner", "Process", "Container")),
     "scmle.runners.roles": (
         roles,
         ("Role", "RoleStore", "check_distinct", "check_separation"),

@@ -31,7 +31,7 @@ server; the generated service writes JSON when `SCMLE_LOG_JSON` is set).
 | `scmle claims list\|show\|verify RUN_DIR` | List the claims of a charter run, show one with its hypothesis and checks, or verify the run's ledger and claims (see below). `verify` exits 1 when any step fails. |
 | `scmle frame REQUEST --source S --data X --output DIR` | Draft an unsigned charter, a cost-model record and the questions only a person can answer, from a plain request. Exit 2 when refused. See [ARTIFACTS](ARTIFACTS.md). |
 | `scmle trail build\|verify\|show` | Join the charter, framing, cost model, claim ledger, registry, release state and deployment ledger of one model into a hash-chained, signed trail; verify a trail folder against its own records; print it. `build` and `verify` exit 1 on any finding. See [TRAIL](TRAIL.md). |
-| `scmle records upgrade FOLDER [--dry-run]` | Rewrite the stored records of a folder at the current schema version, keeping a `.bak` of each file; exit 1, with every file restored, if a seal, signature or chain fails to verify (see below). `estimate`, `cluster`, `forget`, `retire` and `delete` are described at the end of this page. |
+| `scmle records upgrade FOLDER [--dry-run]` | Rewrite the stored records of a folder at the current schema version, keeping a `.bak` of each file; exit 1, with every file restored, if a seal, signature or chain fails to verify (see below). `estimate`, `cluster`, `forget`, `retire`, `delete` and `store` are described at the end of this page. |
 
 `plan` and `run` take the same options; `scmle run --help` lists them all.
 The common ones:
@@ -343,3 +343,19 @@ interruption resumes from the journal. The key is read from `--key-file` or
 `SCMLE_SIGNING_KEY`; without one nothing is changed. `forget verify` exits 1
 when a receipt's signature does not verify. See
 [`ARTIFACTS.md`](ARTIFACTS.md) for the files.
+
+## Adopting a store into a tenant
+
+```bash
+scmle store adopt --root store/ --tenant acme
+```
+
+Moves every object of a local store that lies outside the tenant
+namespaces into `tenants/<tenant>/`: the migration of a store written
+before tenants were namespaced (see
+[`TENANT_ISOLATION.md`](TENANT_ISOLATION.md)). Each object is copied with
+`if_absent` and its original removed only if unchanged, so running the
+command again after an interruption finishes the move; it prints each key
+it moved, and nothing once the store is adopted. It exits 1 when a
+different object already sits at a destination or the tenant name is
+invalid.

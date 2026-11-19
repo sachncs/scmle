@@ -170,17 +170,17 @@ JOB_CHILD = """
 import json, os, sys, time
 from scmle.runtime import limits
 from scmle.storage import objectstore
-from scmle.workflow import definition as wd
-from scmle.workflow import executor as ex
+from scmle.workflow import definition
+from scmle.workflow import executor
 
 root, marker, kill = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
-flow = wd.Workflow(
+flow = definition.Workflow(
     "recovery-job",
     "1",
     (
-        wd.Step("ingest", wd.StepKind.INGEST),
-        wd.Step("train", wd.StepKind.TRAIN, ("ingest",)),
-        wd.Step("evaluate", wd.StepKind.EVALUATE, ("train",)),
+        definition.Step("ingest", definition.StepKind.INGEST),
+        definition.Step("train", definition.StepKind.TRAIN, ("ingest",)),
+        definition.Step("evaluate", definition.StepKind.EVALUATE, ("train",)),
     ),
 )
 
@@ -197,7 +197,7 @@ def handler(name):
     return run
 
 store = objectstore.LocalObjectStore(root)
-runner = ex.Executor(
+runner = executor.Executor(
     flow,
     store,
     {n: handler(n) for n in ("ingest", "train", "evaluate")},

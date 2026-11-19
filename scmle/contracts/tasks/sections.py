@@ -286,15 +286,11 @@ class Dataset(Section):
             The value unchanged.
 
         Raises:
-            ValueError: If it is not ISO 8601 text.
+            ValueError: If it is not ISO 8601 text (`fromisoformat` names
+                the text); pydantic reports it against `cutoff`.
         """
         if value is not None:
-            try:
-                datetime.datetime.fromisoformat(value)
-            except ValueError as error:
-                raise ValueError(
-                    f"cutoff {value!r} is not an ISO 8601 date or time"
-                ) from error
+            datetime.datetime.fromisoformat(value)
         return value
 
 

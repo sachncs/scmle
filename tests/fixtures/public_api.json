@@ -102,6 +102,46 @@
         "signature_sha256": "248512be50363b50d4dbcff740ecb3167e95cd013c74dcfaf3a5b3465c4bb300"
       }
     },
+    "scmle.assurance.detectors.minhash": {
+      "Bands": {
+        "kind": "class",
+        "signature_sha256": "c88c5fe2aef07c5e36c9a25d5518e8f432b80eb44d5c5292837ad65e1564cc2b"
+      },
+      "flags": {
+        "kind": "callable",
+        "signature_sha256": "7027b5904d4605b85ffe3738820580328d1aa54df5e0277b69dfa203ea1cc98d"
+      },
+      "pairs": {
+        "kind": "callable",
+        "signature_sha256": "05fc276300d508bf44c1051f9243e3768a1f81db49e3aabe0ed338dc291d8e4b"
+      },
+      "similarity": {
+        "kind": "callable",
+        "signature_sha256": "95105ac8d9b01aaebc045f8cd8f7f3c99f76bf0fb6729b477f1911ed037b7fc0"
+      }
+    },
+    "scmle.assurance.ledger.confirm.thresholdout": {
+      "Answer": {
+        "kind": "class",
+        "signature_sha256": "a09ecdcdf035ac825aa182dfd264d8ce3d48456c8199ca044e09570856a79997"
+      },
+      "Session": {
+        "kind": "class",
+        "signature_sha256": "21d2a91463a6e0942402043bc4442c73e208814cf4d298060e0132bb218de8fc"
+      },
+      "Terms": {
+        "kind": "class",
+        "signature_sha256": "29ddd887feacd793ac5ecade4af53615d8ab5080124bf98f03e50fc2a0522012"
+      },
+      "Thresholdout": {
+        "kind": "class",
+        "signature_sha256": "1df15bdda85bdfcc38720ed8f58552dbf55773e6aa760ba6f717f817a1db0643"
+      },
+      "minimum": {
+        "kind": "callable",
+        "signature_sha256": "5a5215b70aa6e57c1c45354aee6a4e6ad9c656e6e98e04765d21ac465d08a508"
+      }
+    },
     "scmle.data.catalog": {
       "Catalog": {
         "kind": "class",
@@ -597,6 +637,10 @@
         "kind": "class",
         "signature_sha256": "aea2b30a1b9070b7e6df46c850f319a859ed08d00553c1cc7493c947abed0072"
       },
+      "Exit": {
+        "kind": "class",
+        "signature_sha256": "b49ea7dc8c50cc39c8ff445f08aa03d41bf9fb4f5902efde1e39e8228a3a141d"
+      },
       "Job": {
         "kind": "class",
         "signature_sha256": "c6fae65d4a5eb8748e317a529194f876db77d33e858603c1ee4f3d583eb4503a"
@@ -625,6 +669,14 @@
       }
     },
     "scmle.runners.local": {
+      "Container": {
+        "kind": "class",
+        "signature_sha256": "650c2b9854fa9b3bc0591ddddd0fb5d0d9773ff8b4d531255899de7eb23ace6c"
+      },
+      "Process": {
+        "kind": "class",
+        "signature_sha256": "7c743f9b0a5fb8fb801bfdf3c7d3f2fa72dd5c379e336bd32caca28903c5dc65"
+      },
       "Runner": {
         "kind": "class",
         "signature_sha256": "800c34497b26210ec4b9529c57b56b234722115347929e3c8ddcc28354722ded"
@@ -707,7 +759,7 @@
     "scmle.security.tokens": {
       "Key": {
         "kind": "class",
-        "signature_sha256": "7fbecf12f06ba1307ba0688f1fc68a13831f1d13458bb00d00c93fd6c0aed943"
+        "signature_sha256": "50ac25e8341b6faf414103477a417d42ccb7108c2c6d5f6dee3690ce5b279e87"
       },
       "Keystore": {
         "kind": "class",
@@ -749,6 +801,10 @@
         "kind": "class",
         "signature_sha256": "5bd8bcbedd1160de89a0a507583d6e95e8b000cb0b9ea49dface5f1761bae1ea"
       },
+      "EscapeError": {
+        "kind": "class",
+        "signature_sha256": "ac48ce8e419a9558b2d5a642ab88618a1e3c2e24d2e203a5aabe0c868a664234"
+      },
       "LocalObjectStore": {
         "kind": "class",
         "signature_sha256": "c75bccf3cd28e6237ca1713ba812b199bf64f30b23149c0710b80f6584494c36"
@@ -764,6 +820,28 @@
       "StoreError": {
         "kind": "class",
         "signature_sha256": "ac48ce8e419a9558b2d5a642ab88618a1e3c2e24d2e203a5aabe0c868a664234"
+      }
+    },
+    "scmle.storage.tenancy": {
+      "Tenancy": {
+        "kind": "class",
+        "signature_sha256": "bfc5537f92e1b9c86603cbe6a229dcc1eb866cc5f2e4ca875f5100843a009f1b"
+      },
+      "TenantError": {
+        "kind": "class",
+        "signature_sha256": "ac48ce8e419a9558b2d5a642ab88618a1e3c2e24d2e203a5aabe0c868a664234"
+      },
+      "confine": {
+        "kind": "callable",
+        "signature_sha256": "58d621dfe187a53be2dcd759669e82db83a83a4ccc218fa734a69c7a32e0a384"
+      },
+      "directory": {
+        "kind": "callable",
+        "signature_sha256": "115ea5a549feb6d7edfc7ff7a3483adc534d74c34271a9213e2b2c69e44982b0"
+      },
+      "qualify": {
+        "kind": "callable",
+        "signature_sha256": "da5e96069ff678140a2459b9f9ff03be24f9e62293ca3b2606132a717b74485a"
       }
     },
     "scmle.trail.builder": {
