@@ -8,6 +8,7 @@ from scmle.contracts import tasks
 from scmle.data.readers import streaming
 from scmle.data.splitting import duplicates
 from scmle.data.splitting.splitters import lockbox
+from scmle.data.splitting.splitters import spatial
 from scmle.data.splitting.splitters import splits
 from scmle.data.splitting.splitters import temporal
 from scmle.data.splitting.splitters.partitions import DUPLICATE_AWARE
@@ -31,8 +32,23 @@ STRATEGIES: dict[str, type[Partitioner]] = {
         splits.Group,
         temporal.Chronology,
         temporal.Rolling,
+        temporal.Succession,
+        spatial.Tiling,
     )
 }
+
+# Strategies whose manifest records the declared `validation.entities`.
+ENTITY_AWARE = frozenset({temporal.Chronology.name, temporal.Rolling.name})
+
+# Strategies that order rows in time: every training row precedes the rows
+# it is checked against.
+TIMED = frozenset(
+    {
+        temporal.Chronology.name,
+        temporal.Rolling.name,
+        temporal.Succession.name,
+    }
+)
 
 
 TASK_STRATEGIES = {
@@ -272,9 +288,7 @@ class Splitter:
             folds=tuple((tuplify(a), tuplify(b)) for a, b in part.folds),
             notes=tuple(part.notes),
             entities=(
-                self.spec.validation.entities
-                if isinstance(strategy, temporal.Chronology)
-                else None
+                self.spec.validation.entities if name in ENTITY_AWARE else None
             ),
         )
         target_name = self.spec.data.target

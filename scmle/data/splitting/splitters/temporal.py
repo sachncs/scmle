@@ -3,7 +3,11 @@
 `Chronology` holds out the latest rows and folds the development rows in
 expanding windows; `Rolling` slides fixed windows forward. Both keep tied
 timestamps, and entities declared unseen, on one side of every split.
+`Succession` splits whole groups in the order they occur, each group on one
+side of the test split and of every fold.
 """
+
+from collections.abc import Hashable
 
 import numpy
 import pandas
@@ -377,3 +381,226 @@ class Rolling(Chronology):
             *self.remark(),
         ]
         return Partition(dev_ids, test_ids, windows, notes)
+
+
+class Succession(Chronology):
+    """Grouped temporal split: whole groups, taken in the order they occur.
+
+    A group (a batch, a session, a store's week) is ordered by its first
+    timestamp, then its last, then its name, and sits wholly on one side of
+    the test split and of every fold. The latest groups are the test set;
+    the development groups are cut into `folds + 1` runs in that order and
+    fold `k` validates on run `k` after training on the runs before it, as
+    scikit-learn's `TimeSeriesSplit` does with rows. A training row is kept
+    only when it is earlier than every row it is checked against, and the
+    embargo then drops the latest training rows, so time order holds even
+    where groups overlap in time.
+    """
+
+    name = "grouped_temporal"
+
+    def labels(self, frame: pandas.DataFrame) -> numpy.ndarray:
+        """The group of each row.
+
+        Args:
+            frame: The full dataset.
+
+        Returns:
+            The `group_column` values.
+
+        Raises:
+            BlockedError: If the group or time column is not declared, or
+                the group column has missing values.
+        """
+        column = self.data.group_column
+        if not column or not self.data.time_column:
+            raise errors.BlockedError(
+                "grouped_temporal validation needs data.group_column and "
+                "data.time_column"
+            )
+        values = frame[column].to_numpy()
+        if pandas.isna(values).any():
+            raise errors.BlockedError(
+                f"group column '{column}' has missing values"
+            )
+        return values
+
+    def spans(
+        self, times: numpy.ndarray, labels: numpy.ndarray
+    ) -> pandas.DataFrame:
+        """Each group's first and last timestamp.
+
+        Args:
+            times: Timestamp of each row.
+            labels: Group of each row.
+
+        Returns:
+            One row per group, indexed by group, with columns `min` and
+            `max`.
+        """
+        rows = pandas.DataFrame({"group": labels, "time": times})
+        return rows.groupby("group", sort=False)["time"].agg(["min", "max"])
+
+    def sequence(
+        self, times: numpy.ndarray, labels: numpy.ndarray
+    ) -> list[Hashable]:
+        """The groups in the order they occur.
+
+        Args:
+            times: Timestamp of each row.
+            labels: Group of each row.
+
+        Returns:
+            The group names by first timestamp, then last, then name.
+        """
+        bounds = self.spans(times, labels)
+        bounds["name"] = [str(name) for name in bounds.index]
+        ordered = bounds.sort_values(["min", "max", "name"], kind="stable")
+        return list(ordered.index)
+
+    def concurrency(self, frame: pandas.DataFrame) -> int:
+        """The most groups running at one time.
+
+        Two groups run at once when their spans from first to last
+        timestamp meet. The count is greatest at some group's first
+        timestamp: the groups started by then less those already ended.
+
+        Args:
+            frame: The full dataset.
+
+        Returns:
+            The largest number of groups whose spans hold one timestamp.
+
+        Raises:
+            BlockedError: If the group or time column is missing or
+                unusable.
+        """
+        bounds = self.spans(self.times(frame), self.labels(frame))
+        starts = numpy.sort(bounds["min"].to_numpy())
+        ends = numpy.sort(bounds["max"].to_numpy())
+        started = numpy.searchsorted(starts, starts, "right")
+        ended = numpy.searchsorted(ends, starts, "left")
+        return int(numpy.max(started - ended))
+
+    def embargo(self, frame: pandas.DataFrame) -> int:
+        """Rows dropped before the test window and each validation window.
+
+        A forecast row's target looks `horizon` steps ahead. Groups that
+        follow one another are one series cut into pieces, so `horizon`
+        time steps cover `horizon` rows of each group running at that time,
+        not of every group.
+
+        Args:
+            frame: The full dataset.
+
+        Returns:
+            The configured embargo rows when no horizon is set; otherwise
+            the larger of that and the horizon times `concurrency`.
+
+        Raises:
+            BlockedError: If the group or time column is missing or
+                unusable.
+        """
+        configured = self.validation.embargo_rows
+        horizon = self.data.horizon
+        if horizon is None:
+            return configured
+        return max(configured, horizon * self.concurrency(frame))
+
+    def window(
+        self,
+        clock: numpy.ndarray,
+        fit: numpy.ndarray,
+        held: numpy.ndarray,
+        embargo: int,
+    ) -> numpy.ndarray:
+        """Training positions strictly before the checked ones, less embargo.
+
+        Args:
+            clock: Timestamp of each position, ascending.
+            fit: Candidate training positions, ascending.
+            held: Positions checked against.
+            embargo: Latest training rows to drop.
+
+        Returns:
+            The candidates earlier than every checked position, without the
+            latest `embargo` of them.
+        """
+        earlier: numpy.ndarray = fit[clock[fit] < clock[held].min()]
+        return earlier[: max(len(earlier) - embargo, 0)]
+
+    def partition(self, frame: pandas.DataFrame) -> Partition:
+        """Group holdout at the end of time and expanding group-run folds.
+
+        Args:
+            frame: The full dataset.
+
+        Returns:
+            The development positions (oldest first), the test positions,
+            the folds latest window first, and notes.
+
+        Raises:
+            BlockedError: If the columns are missing or unparseable, there
+                are fewer than `round(groups * test_fraction) + folds + 1`
+                groups, or fewer than `MIN_FOLDS` folds keep a training row.
+        """
+        labels = self.labels(frame)
+        times = self.times(frame)
+        names = self.sequence(times, labels)
+        folds = self.validation.folds
+        count = max(1, round(len(names) * self.validation.test_fraction))
+        least = count + folds + 1
+        if len(names) < least:
+            raise errors.BlockedError(
+                f"grouped_temporal validation needs at least {least} groups "
+                f"({count} to test, one run per fold and one to train first); "
+                f"'{self.data.group_column}' has {len(names)}"
+            )
+        kept = names[:-count]
+        tested = pandas.Series(labels).isin(names[-count:]).to_numpy()
+        test_ids = numpy.flatnonzero(tested)
+        test_ids = test_ids[numpy.argsort(times[test_ids], kind="stable")]
+        rest = numpy.flatnonzero(~tested)
+        rest = rest[numpy.argsort(times[rest], kind="stable")]
+        embargo = self.embargo(frame)
+        dev_ids = self.window(times, rest, test_ids, embargo)
+        clock, local = times[dev_ids], pandas.Series(labels[dev_ids])
+        everything = numpy.arange(len(dev_ids))
+        runs = numpy.array_split(numpy.arange(len(kept)), folds + 1)
+        windows = []
+        for index in range(1, folds + 1):
+            before = [kept[i] for run in runs[:index] for i in run]
+            held = everything[local.isin([kept[i] for i in runs[index]])]
+            if not len(held):
+                continue
+            fit = self.window(
+                clock, everything[local.isin(before)], held, embargo
+            )
+            if len(fit):
+                windows.append((fit, held))
+        if len(windows) < MIN_FOLDS:
+            raise errors.BlockedError(
+                f"only {len(windows)} grouped temporal fold(s) keep a training "
+                "row earlier than their validation groups; the groups overlap "
+                "in time (use temporal with validation.entities 'unseen' for "
+                "series that run side by side) or add groups"
+            )
+        summary = (
+            f"grouped temporal: {len(names)} groups of "
+            f"'{self.data.group_column}' in order of first timestamp; the "
+            f"latest {count} are the test set and {len(windows)} folds "
+            "validate later runs of groups than they train on"
+        )
+        notes = [summary, "folds are listed latest window first"]
+        overlap = int((times[rest] >= times[test_ids].min()).sum())
+        if overlap:
+            notes.append(
+                f"{overlap} row(s) of development groups fall at or after the "
+                "test window's first timestamp and are left out"
+            )
+        if embargo:
+            notes.append(
+                f"embargo of {embargo} rows before the test window and before "
+                "each validation window"
+            )
+        return Partition(dev_ids, test_ids, windows[::-1], notes)
