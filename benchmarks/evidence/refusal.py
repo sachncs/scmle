@@ -39,18 +39,34 @@ default target, except a dataset that
 
 1. is already in the catalog (by data id);
 2. is a copy of a table already used by an evidence set (refusal, leakage
-   or quality) under another id, or another feature view of the same
-   objects: `COPIES` names each with the table it repeats;
+   or quality) under another id, or another feature view or labelling of
+   the same objects: `COPIES` names each with the table it repeats;
 3. has more than `CELLS` cells (rows times features), the memory bound
    below;
-4. states no licence on OpenML (`colleges`, 42727, says "NA").
+4. states no licence on OpenML (`colleges`, 42727, says "NA");
+5. is a copy of a table of the sealed TabArena-v0.1 hold-out
+   (`benchmarks/sota/split.json`), which no development or evidence run may
+   read: `SEALED` names each with the hold-out table it repeats (credit-g,
+   diabetes, diamonds, Amazon_employee_access, Diabetes130US,
+   KDDCup09_appetency, physiochemical_protein and QSAR-TID-11 were in the
+   catalog until this rule removed them);
+6. is deactivated on OpenML.
+
+Third round (`FURTHER`). With rule 5 applied, custody
+(`benchmarks.evidence.custody`) gave validation and acceptance fewer than
+the rate's minimum of real tasks, and the four suites hold no further
+admissible table. The datasets of OpenML100 (study 14) are then taken in
+the study's order, declared `classification` with OpenML's default target,
+under rules 1 to 6, until custody gives each of validation and acceptance
+the minimum. These tables are not screened by the leakage set (C2), so
+custody places them by this set's needs.
 
 The suites hold binary, multiclass and regression tables and the awkward
 cases with them: wide (Bioresponse, Internet-Advertisements, arcene),
-imbalanced (APSFailure, shuttle, KDDCup09_appetency), many categories
-(Amazon_employee_access, black_friday, Click_prediction_small), missing
-values (sick, okcupid-stem, house_prices_nominal) and dates turned into
-numbers (nyc-taxi-green-dec-2016, kick). None of them stores a date as a
+imbalanced (APSFailure, shuttle), many categories (black_friday,
+Click_prediction_small), missing values (sick, okcupid-stem,
+house_prices_nominal, soybean) and dates turned into numbers
+(nyc-taxi-green-dec-2016, kick). None of them stores a date as a
 calendar value, so a date column is not covered by real tables.
 * `simulated`: clean generated tasks of every kind, several sizes and shapes
   (plain, mixed types with missing values, wide with noise columns):
@@ -734,7 +750,6 @@ SUITE: dict[int, tuple[str, str, str, str]] = {
         "verification.time",
         "regression",
     ),
-    44963: ("physiochemical_protein", "regression", "RMSD", "regression"),
     44964: ("superconductivity", "regression", "critical_temp", "regression"),
     44965: (
         "geographical_origin_of_music",
@@ -774,7 +789,6 @@ SUITE: dict[int, tuple[str, str, str, str]] = {
         "class_protein_localization",
         "classification",
     ),
-    1111: ("kddcup09_appetency", "binary", "APPETENCY", "classification"),
     1457: ("amazon_commerce_reviews", "multiclass", "Class", "classification"),
     41138: ("apsfailure", "binary", "class", "classification"),
     41164: ("fabert", "multiclass", "class", "classification"),
@@ -786,11 +800,9 @@ SUITE: dict[int, tuple[str, str, str, str]] = {
     41156: ("ada", "binary", "class", "classification"),
     41157: ("arcene", "binary", "class", "classification"),
     41168: ("jannis", "multiclass", "class", "classification"),
-    4541: ("diabetes130us", "multiclass", "readmitted", "classification"),
     1515: ("micro_mass", "multiclass", "Class", "classification"),
     41146: ("sylvine", "binary", "class", "classification"),
     41142: ("christine", "binary", "class", "classification"),
-    4135: ("amazon_employee_access", "binary", "target", "classification"),
     41169: ("helena", "multiclass", "class", "classification"),
     41166: ("volkert", "multiclass", "class", "classification"),
     40685: ("shuttle", "multiclass", "class", "classification"),
@@ -828,9 +840,19 @@ SUITE: dict[int, tuple[str, str, str, str]] = {
     531: ("boston", "regression", "MEDV", "regression"),
     42563: ("house_prices_nominal", "regression", "SalePrice", "regression"),
     574: ("house_16h", "regression", "price", "regression"),
-    3050: ("qsar_tid_11", "regression", "MEDIAN_PXC50", "regression"),
     3277: ("qsar_tid_10980", "regression", "MEDIAN_PXC50", "regression"),
     43071: ("mip_2016_regression", "regression", "PAR10", "regression"),
+}
+# The third round: OpenML100 tables taken by the rule of the module
+# docstring, in the study's order, in the same layout as `EXTRA`.
+FURTHER: dict[int, tuple[str, str, str, str]] = {
+    42: ("soybean", "multiclass", "class", "classification"),
+    60: ("waveform_5000", "multiclass", "class", "classification"),
+    312: ("scene", "binary", "Urban", "classification"),
+    375: ("japanesevowels", "multiclass", "speaker", "classification"),
+    377: ("synthetic_control", "multiclass", "class", "classification"),
+    451: ("irish", "binary", "Leaving_Certificate", "classification"),
+    470: ("profb", "binary", "Home/Away", "classification"),
 }
 # Suite datasets the selection rule drops as copies (rule 2): id -> the
 # table already used that it repeats.
@@ -868,9 +890,25 @@ COPIES: dict[int, str] = {
     40900: "satimage (182), relabelled for anomaly detection",
     541: "socmob (44987), taken earlier from OpenML-CTR23",
     42688: "brazilian_houses (44990), taken earlier from OpenML-CTR23",
+    20: "mfeat-factors (12): another feature view of the same numerals",
+    21: "car (991), before it was made binary",
+    334: "monks-problems-1 (333): the same robots under another concept",
+    335: "monks-problems-1 (333): the same robots under another concept",
 }
-# OpenML name, version and licence of each `EXTRA` and `SUITE` table, as
-# fetched.
+# Datasets the selection rule drops as copies of the sealed TabArena-v0.1
+# hold-out (rule 5): id -> the hold-out table it repeats.
+SEALED: dict[int, str] = {
+    31: "credit-g (TabArena task 363626)",
+    37: "diabetes (TabArena task 363629)",
+    42225: "diamonds (TabArena task 363631)",
+    4135: "Amazon_employee_access (TabArena task 363613)",
+    4541: "Diabetes130US (TabArena task 363630)",
+    1111: "kddcup09_appetency (TabArena task 363683)",
+    44963: "physiochemical_protein (TabArena task 363693)",
+    3050: "QSAR-TID-11 (TabArena task 363697)",
+}
+# OpenML name, version and licence of each `EXTRA`, `SUITE` and `FURTHER`
+# table, as fetched.
 SOURCES: dict[int, tuple[str, int, str]] = {
     3: ("kr-vs-kp", 1, "Public"),
     11: ("balance-scale", 1, "Public"),
@@ -931,7 +969,6 @@ SOURCES: dict[int, tuple[str, int, str]] = {
     23517: ("numerai28.6", 2, "Public"),
     40978: ("Internet-Advertisements", 2, "Public"),
     44958: ("auction_verification", 7, "CC BY 4.0"),
-    44963: ("physiochemical_protein", 7, "CC BY 4.0"),
     44964: ("superconductivity", 7, "CC BY 4.0"),
     44965: ("geographical_origin_of_music", 7, "CC BY 4.0"),
     44966: ("solar_flare", 7, "CC BY 4.0"),
@@ -951,7 +988,6 @@ SOURCES: dict[int, tuple[str, int, str]] = {
     44967: ("student_performance_por", 8, "CC BY 4.0"),
     44994: ("cars", 4, "Public"),
     181: ("yeast", 1, "Public"),
-    1111: ("KDDCup09_appetency", 1, "Public"),
     1457: ("amazon-commerce-reviews", 1, "Public"),
     41138: ("APSFailure", 1, "CC0"),
     41164: ("fabert", 1, "Public"),
@@ -963,11 +999,9 @@ SOURCES: dict[int, tuple[str, int, str]] = {
     41156: ("ada", 1, "Public"),
     41157: ("arcene", 2, "Public"),
     41168: ("jannis", 1, "Public"),
-    4541: ("Diabetes130US", 1, "Public"),
     1515: ("micro-mass", 2, "Public"),
     41146: ("sylvine", 1, "Public"),
     41142: ("christine", 1, "Public"),
-    4135: ("Amazon_employee_access", 1, "Public"),
     41169: ("helena", 1, "Public"),
     41166: ("volkert", 1, "Public"),
     40685: ("shuttle", 1, "public"),
@@ -990,9 +1024,15 @@ SOURCES: dict[int, tuple[str, int, str]] = {
     531: ("boston", 1, "Public"),
     42563: ("house_prices_nominal", 1, "Public"),
     574: ("house_16H", 1, "Public"),
-    3050: ("QSAR-TID-11", 1, "Public"),
     3277: ("QSAR-TID-10980", 1, "Public"),
     43071: ("MIP-2016-regression", 3, "Public"),
+    42: ("soybean", 1, "Public"),
+    60: ("waveform-5000", 1, "Public"),
+    312: ("scene", 1, "Public"),
+    375: ("JapaneseVowels", 1, "Public"),
+    377: ("synthetic_control", 1, "Public"),
+    451: ("irish", 1, "Public"),
+    470: ("profb", 1, "Public"),
 }
 # SHA-256 of each OpenML table's ARFF file as OpenML serves it (`pinned`):
 # every table read through `fetch`, the leakage set's (C2) among them.
@@ -1070,7 +1110,6 @@ PINS: dict[int, str] = {
     1063: "832b27ed0b34faddd8d4b3c23cdc65e5118bd7694f016b449f3d0b70c8575fd5",
     1067: "fe0ea9ab3977bf3d2411dc72eefed2462ef4bf750a77668bdcf2acbb351c521d",
     1068: "a22470def91454aa442e54104e2856c53725e8c9108bdfaac867504982483f97",
-    1111: "201abbcfec1177badbc60bd67433186edde5d01374977183a2f49ffa9d863eca",
     1120: "ff35972a47140925b0b698b3f0de8471d3d2f0ede19a553b2d3c58ba7caa19ee",
     1169: "c7683a90b40c2cabb1ddc950413da8efa231c058327b8c95511c40af13516c14",
     1457: "b5388cae01347259e7f8801c4220022f0d1349d88dd3e8ff9d0c21d2e3c23438",
@@ -1090,13 +1129,10 @@ PINS: dict[int, str] = {
     1497: "a7facd7720353055e1ef0af024448e002c551d0fd5defe0fc651661b7c187b3b",
     1501: "3a0bfdb44b8a11647d9ada08ceadac8523b220d880aff266d7321e605576246e",
     1515: "b4109c3ac28c6d248993fb1936df6137414c9d90efb46179880948e4cb46aa9f",
-    3050: "177dd4c56df846ffff3f266b8384333f47c50150bfa94290fc27d41fc669444d",
     3277: "54d22f442cb7cc1cdd54ea60d549d68faab9da1e78bea3784b68ec47056252a7",
     4134: "b8fbe587f40c8f48d1f30003b0b40f085cd32997f7167898228178c5a0919d92",
-    4135: "4f33c09f3612b5de1294ca664eec7fd1bb56a94b05d0352219794a37e4acc8cc",
     4534: "3bcf93b1612306537ee2737751f1bac185b2a77886ab376644c3bf0c7f7cb3e6",
     4538: "939a5a0dda808213908be1f2385fc1bbb13e9df68ca7d64d1466f2da3f9824e2",
-    4541: "0174efd57528ad19a289909e2eecb9079583106baad5d8e3b9a88af056870c05",
     6332: "6e792f09b2d59d0500a2ba9a5975b31b5eef9534b98f5bf87ab8047452e4c45e",
     23381: "44057bb677eb4a144d01816262fc164f923a46fdda019a026e83e0c44b58ee95",
     23517: "df837470119d913b9291342efe4b19abcb302c80bb86b5e372ededc4591b9d14",
@@ -1145,7 +1181,6 @@ PINS: dict[int, str] = {
     43939: "c4d895f661384b4030fb560ad031bb82f3e826af3c64907217bb633c0db65386",
     44958: "f0dcaf7165b3235a6031395f2068bb7833bfbeb32c263713cf8834bd679a4d97",
     44962: "25672c7dd97b7af4c00b5d5812c17f6fde8a9e422835e3610c730117c8d6e2b5",
-    44963: "2b1ff847f0eafa74cd582f789273bdca9c43decf8c46910d6e2a2f51ffddb9fc",
     44964: "fdd7d82630afd1b35718bcd1772403db6068d85ec4a1cd8b8dc3b9ca0e0440c8",
     44965: "56fda911ab67dbccc093345d5e8e112ee40186899c20a8dc8f29bd15b063adb8",
     44966: "34f377d0c949b0a35e7b6ce5fd9854f4154842dd03e46d24cfcebe2d5c267794",
@@ -1163,6 +1198,13 @@ PINS: dict[int, str] = {
     44993: "f97193f812b47d30dc3ae87cd30fab5c468ef04893e7792933df873340514605",
     44994: "98a42023fa9701a1266dcea95b0808807f33b1f346d24b5503d89048656ae48c",
     45012: "00b905455c0717e88a08e3e2021437889fd6a91d869b936cb1f46fc66f6e8297",
+    42: "673e0965c2cc18e70b177866afc8fcd15ad553a0b2098229abb2e0b3d4312f33",
+    60: "ea857b7e905331181e43f56af95b3d512d08d0b03a65d2af48cb4dbdda2334a3",
+    312: "bf94fc39f84c51b04cc0001f44e332e171c03d371faaa4611f579539d5b7de93",
+    375: "2290186e0b8723a88c8e52e48c396f06f6cf98733f13d0e62d08b2b5c6184190",
+    377: "2692c0c1bbf7b14485c94b151da9577f4b33acdd3352b448804f74f23e1dab39",
+    451: "4d79ad272bdbdc5e4cdbcaa30e153aa50439d0e145a86c5ca9900d1224c502d2",
+    470: "8a699382dcbf580a3b875644008d82171a2e54ef005bf20599b854cfb78cd23d",
 }
 
 
@@ -1237,15 +1279,6 @@ def catalog() -> dict[str, Task]:
             "regression",
             "real",
             table("load_diabetes", "target", "regression"),
-        ),
-        Task(
-            "credit_g", "binary", "real", table(31, "class", "classification")
-        ),
-        Task(
-            "pima_diabetes",
-            "binary",
-            "real",
-            table(37, "class", "classification"),
         ),
         Task(
             "abalone",
@@ -1358,12 +1391,6 @@ def catalog() -> dict[str, Task]:
         Task(
             "churn", "binary", "real", table(40701, "class", "classification")
         ),
-        Task(
-            "diamonds",
-            "regression",
-            "real",
-            table(42225, "price", "regression"),
-        ),
         Task("adult", "binary", "real", table(179, "class", "classification")),
         Task(
             "letter", "multiclass", "real", table(6, "class", "classification")
@@ -1404,7 +1431,9 @@ def catalog() -> dict[str, Task]:
     ]
     real.extend(
         Task(name, kind, "real", table(identifier, target, task))
-        for identifier, (name, kind, target, task) in (EXTRA | SUITE).items()
+        for identifier, (name, kind, target, task) in (
+            EXTRA | SUITE | FURTHER
+        ).items()
     )
     simulated = [
         Task(

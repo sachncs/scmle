@@ -1,11 +1,19 @@
 """Claim C14 evidence: refusal rate and precision of end-to-end runs."""
 
+import csv
+import json
+import pathlib
+
 import pytest
 
 from benchmarks.evidence import custody
 from benchmarks.evidence import leakage
 from benchmarks.evidence import refusal
 from scmle.contracts import errors
+
+SOTA = pathlib.Path(refusal.ROOT) / "benchmarks" / "sota"
+SPLIT = SOTA / "split.json"
+TABLE = SOTA / "tasks_tabarena_v0pt1.csv"
 
 
 def group(
@@ -209,8 +217,51 @@ def test_the_catalog_has_enough_sourced_real_tasks_for_the_rate():
     real = [t for t in refusal.catalog().values() if t.group == "real"]
     # validation and acceptance each need the rule's minimum on their own.
     assert len(real) >= 2 * rule.minimum(variables["alpha"].value)
-    assert set(refusal.SOURCES) == set(refusal.EXTRA) | set(refusal.SUITE)
+    assert set(refusal.SOURCES) == (
+        set(refusal.EXTRA) | set(refusal.SUITE) | set(refusal.FURTHER)
+    )
     assert all(source[2] for source in refusal.SOURCES.values())
+
+
+def simple(name: str) -> str:
+    return "".join(c for c in name.lower() if c.isalnum())
+
+
+def test_no_real_task_reads_a_table_of_the_sealed_hold_out():
+    split = json.loads(SPLIT.read_text(encoding="utf-8"))
+    with TABLE.open(encoding="utf-8") as handle:
+        rows = {int(r["task_id"]): r for r in csv.DictReader(handle)}
+    sealed = {simple(rows[t]["dataset_name"]) for t in split["holdout"]}
+    real = [t for t in refusal.catalog().values() if t.group == "real"]
+    used = {custody.identify(t) for t in real}
+    assert not used & {f"openml:{i}" for i in refusal.SEALED}
+    names = {simple(t.name) for t in real}
+    names |= {simple(s[0]) for s in refusal.SOURCES.values()}
+    assert not names & sealed
+    # Each listed copy names the hold-out table it repeats.
+    for reason in refusal.SEALED.values():
+        assert simple(reason.split(" (")[0]) in sealed, reason
+
+
+def test_the_real_tasks_fill_both_deciding_splits():
+    sets = custody.catalog()
+    each = next(s for s in sets if s.name == "refusal")
+    found = custody.shares(each, custody.assign(sets)["refusal"])["real"]
+    assert found["counts"][custody.VALIDATION] >= found["need"]
+    assert found["counts"][custody.ACCEPTANCE] >= found["need"]
+
+
+def test_the_further_tables_follow_the_stated_rule():
+    # Each added table is new, no listed copy, within the cell bound, and
+    # has a licence; none is read by the leakage set.
+    earlier = set(refusal.EXTRA) | set(refusal.SUITE)
+    for source in refusal.FURTHER:
+        assert source not in earlier
+        assert source not in refusal.COPIES
+        assert source not in refusal.SEALED
+        assert refusal.SOURCES[source][2]
+        assert source in refusal.PINS
+    assert not set(refusal.FURTHER) & {t.source for t in leakage.clean()}
 
 
 def test_every_openml_table_is_pinned_and_none_is_a_listed_copy():

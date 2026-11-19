@@ -14,7 +14,18 @@ was run: every dataset of OpenML-CC18 (study 99), the AutoML benchmark
 classification suite (271), OpenML-CTR23 (353) and the AutoML benchmark
 regression suite (269), less those already listed, copies of tables
 another evidence set uses (`refusal.COPIES`), tables over `refusal.CELLS`
-cells, and tables with no stated licence. Licences are as OpenML states
+cells, tables with no stated licence, copies of a table of the sealed
+TabArena-v0.1 hold-out (`refusal.SEALED`: credit-g, diabetes, diamonds,
+Amazon_employee_access, Diabetes130US, KDDCup09_appetency,
+physiochemical_protein and QSAR-TID-11 were removed by this rule) and
+datasets OpenML has deactivated.
+
+With the hold-out copies removed, custody gave validation and acceptance
+fewer than the 59 real tasks each that the rate needs, and the four suites
+held no further admissible table. The third round (`refusal.FURTHER`, from
+soybean on) takes the datasets of OpenML100 (study 14) in the study's order
+under the same rule until custody gives each of them 59; it stopped at
+profb. Those tables are not screened by the leakage set. Licences are as OpenML states
 them; the socmob table (44987) is for non-commercial scholarly use, and
 health_insurance (44993) and black_friday (41540) are GPL.
 
@@ -79,7 +90,6 @@ health_insurance (44993) and black_friday (41540) are GPL.
 | 23517 | numerai28.6 | 2 | Public | `attribute_21` | classification | `df837470119d913b9291342efe4b19abcb302c80bb86b5e372ededc4591b9d14` |
 | 40978 | Internet-Advertisements | 2 | Public | `class` | classification | `853b895fb12183ee665de29559d8aab1dc77abcf24602e4c3132b23b035b9a09` |
 | 44958 | auction_verification | 7 | CC BY 4.0 | `verification.time` | regression | `f0dcaf7165b3235a6031395f2068bb7833bfbeb32c263713cf8834bd679a4d97` |
-| 44963 | physiochemical_protein | 7 | CC BY 4.0 | `RMSD` | regression | `2b1ff847f0eafa74cd582f789273bdca9c43decf8c46910d6e2a2f51ffddb9fc` |
 | 44964 | superconductivity | 7 | CC BY 4.0 | `critical_temp` | regression | `fdd7d82630afd1b35718bcd1772403db6068d85ec4a1cd8b8dc3b9ca0e0440c8` |
 | 44965 | geographical_origin_of_music | 7 | CC BY 4.0 | `latitude` | regression | `56fda911ab67dbccc093345d5e8e112ee40186899c20a8dc8f29bd15b063adb8` |
 | 44966 | solar_flare | 7 | CC BY 4.0 | `c_class_flares` | regression | `34f377d0c949b0a35e7b6ce5fd9854f4154842dd03e46d24cfcebe2d5c267794` |
@@ -99,7 +109,6 @@ health_insurance (44993) and black_friday (41540) are GPL.
 | 44967 | student_performance_por | 8 | CC BY 4.0 | `G3` | regression | `ab4db935dca19424413e68129cab61609d6340d83194f185bb4e74e2268e4bd6` |
 | 44994 | cars | 4 | Public | `Price` | regression | `98a42023fa9701a1266dcea95b0808807f33b1f346d24b5503d89048656ae48c` |
 | 181 | yeast | 1 | Public | `class_protein_localization` | classification | `ae97eccd3ad5f9a998efec8acb2026f1748df6c8a392a5b2b0f321c2ef053933` |
-| 1111 | KDDCup09_appetency | 1 | Public | `APPETENCY` | classification | `201abbcfec1177badbc60bd67433186edde5d01374977183a2f49ffa9d863eca` |
 | 1457 | amazon-commerce-reviews | 1 | Public | `Class` | classification | `b5388cae01347259e7f8801c4220022f0d1349d88dd3e8ff9d0c21d2e3c23438` |
 | 41138 | APSFailure | 1 | CC0 | `class` | classification | `e95128fc82ef5d5bc5a732b0bc63dea0f6e285cc60f31290c81f82ea13429c4f` |
 | 41164 | fabert | 1 | Public | `class` | classification | `3afd98b3ff70400e7096ba55257947127abca4d3fb9f11bb9e465aafbc5329ed` |
@@ -111,11 +120,9 @@ health_insurance (44993) and black_friday (41540) are GPL.
 | 41156 | ada | 1 | Public | `class` | classification | `9f487bfee74bcf72538fcdc1a1336931e4437824843eef090fdf71506602a290` |
 | 41157 | arcene | 2 | Public | `class` | classification | `c58c70465382108be4261cd6828b01c54e49fa53282e88d1417928c5f29ad66f` |
 | 41168 | jannis | 1 | Public | `class` | classification | `ffc0530b7f98207096b603b33c5cb33d1f92bc8b4f2a62acbeb5fe70e4107d4c` |
-| 4541 | Diabetes130US | 1 | Public | `readmitted` | classification | `0174efd57528ad19a289909e2eecb9079583106baad5d8e3b9a88af056870c05` |
 | 1515 | micro-mass | 2 | Public | `Class` | classification | `b4109c3ac28c6d248993fb1936df6137414c9d90efb46179880948e4cb46aa9f` |
 | 41146 | sylvine | 1 | Public | `class` | classification | `cbd39adc5849eb951434e7194090e2611ff8a34033dbb0a78dd7c4249791cf48` |
 | 41142 | christine | 1 | Public | `class` | classification | `307099164edf07b914eeb2b968b0ef8e0393dedb7bfe0c04937aea49d9f949cd` |
-| 4135 | Amazon_employee_access | 1 | Public | `target` | classification | `4f33c09f3612b5de1294ca664eec7fd1bb56a94b05d0352219794a37e4acc8cc` |
 | 41169 | helena | 1 | Public | `class` | classification | `351c371c164b5ceacd9a87697d9efde170daf51ce4b3ce3819f25b7912e1042a` |
 | 41166 | volkert | 1 | Public | `class` | classification | `0b782b59f04b71397da65a05d1117095944d35450ec4d54c423eda6809122d29` |
 | 40685 | shuttle | 1 | public | `class` | classification | `d0e47eb009fe0b77e67ec16a21d64efb69073dfb5f405936b7a51fc1dc22c9fd` |
@@ -138,6 +145,12 @@ health_insurance (44993) and black_friday (41540) are GPL.
 | 531 | boston | 1 | Public | `MEDV` | regression | `2826ddb8cbce925e98114491f4774544b17d70ff0b7b1eede2af0a2ffd85a4f0` |
 | 42563 | house_prices_nominal | 1 | Public | `SalePrice` | regression | `1e83c38ec2f33615fc3308a641e6f3a1fe4a7b4fbb8dd54913c6082799602bdc` |
 | 574 | house_16H | 1 | Public | `price` | regression | `c9d4c46cb5f598fd9e3e1993a1ff06d85c662e50a9fe1fef9c1dc7d067d3b311` |
-| 3050 | QSAR-TID-11 | 1 | Public | `MEDIAN_PXC50` | regression | `177dd4c56df846ffff3f266b8384333f47c50150bfa94290fc27d41fc669444d` |
 | 3277 | QSAR-TID-10980 | 1 | Public | `MEDIAN_PXC50` | regression | `54d22f442cb7cc1cdd54ea60d549d68faab9da1e78bea3784b68ec47056252a7` |
 | 43071 | MIP-2016-regression | 3 | Public | `PAR10` | regression | `8b80c61c8c093f4c336b92552afb0d51c6ccdd7b49bb75b763e992391da297a1` |
+| 42 | soybean | 1 | Public | `class` | classification | `673e0965c2cc18e70b177866afc8fcd15ad553a0b2098229abb2e0b3d4312f33` |
+| 60 | waveform-5000 | 1 | Public | `class` | classification | `ea857b7e905331181e43f56af95b3d512d08d0b03a65d2af48cb4dbdda2334a3` |
+| 312 | scene | 1 | Public | `Urban` | classification | `bf94fc39f84c51b04cc0001f44e332e171c03d371faaa4611f579539d5b7de93` |
+| 375 | JapaneseVowels | 1 | Public | `speaker` | classification | `2290186e0b8723a88c8e52e48c396f06f6cf98733f13d0e62d08b2b5c6184190` |
+| 377 | synthetic_control | 1 | Public | `class` | classification | `2692c0c1bbf7b14485c94b151da9577f4b33acdd3352b448804f74f23e1dab39` |
+| 451 | irish | 1 | Public | `Leaving_Certificate` | classification | `4d79ad272bdbdc5e4cdbcaa30e153aa50439d0e145a86c5ca9900d1224c502d2` |
+| 470 | profb | 1 | Public | `Home/Away` | classification | `8a699382dcbf580a3b875644008d82171a2e54ef005bf20599b854cfb78cd23d` |
