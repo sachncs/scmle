@@ -3,12 +3,72 @@ name: release
 on:
   push:
     tags: ["v*"]
+  # The image job also runs on changes to what goes into the image; every
+  # other job runs only for a release tag.
+  pull_request:
+    paths:
+      - Dockerfile
+      - deploy/requirements.lock
+      - scmle/deploy/**
+      - scmle/runners/**
+      - .github/workflows/release.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  image:
+    name: container image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - run: uv sync --python 3.12
+      - run: uv build --wheel --python 3.12 --out-dir dist
+      - name: Build the image (pinned base, hashed wheel) and smoke-test scmle --help as non-root
+        run: uv run python -m scmle.deploy.packaging image --wheel dist/scmle-*.whl --tag scmle:ci
+      - name: A tiny run inside the image through the container runner
+        run: |
+          uv run python - "${RUNNER_TEMP}/job.json" <<'PY'
+          import json
+          import sys
+
+          from scmle.runners import base
+
+          options = {
+              "time_budget": 20,
+              "search": {"top_models": 0},
+              "models": {"exclude_families": ["boosting", "deep_learning"]},
+          }
+          spec = base.Job(
+              run_id="ci-tiny",
+              name="tiny",
+              project={"data": "data/train.csv", "target": "churned", "options": options},
+              identity="ci-train",
+              timeout_seconds=900,
+          )
+          with open(sys.argv[1], "w", encoding="utf-8") as handle:
+              json.dump(spec.to_dict(), handle)
+          PY
+          uv run python -m scmle.runners.local --runner container --image scmle:ci \
+            --store "${RUNNER_TEMP}/store" --spec "${RUNNER_TEMP}/job.json" \
+            --serving ci-serve --put data/train.csv=deploy/local/data/train.csv
+          test -s "${RUNNER_TEMP}/store/runs/ci-tiny/result.json"
+      - name: Runner and image tests against the built image
+        env:
+          SCMLE_IMAGE: scmle:ci
+          OMP_NUM_THREADS: "1"
+        run: >-
+          uv run pytest -q tests/integration/test_container_runner.py
+          tests/unit/test_runner_process.py tests/unit/test_image_build.py
+          --junitxml=image.xml
+      - name: Reject unexplained skips and xfails
+        run: uv run python scripts/check_pytest_skips.py image.xml
+
   verify:
+    if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -63,7 +123,7 @@ jobs:
         run: ./scripts/release_preflight.sh
 
   publish:
-    needs: [test, release-checks]
+    needs: [image, test, release-checks]
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     environment: pypi

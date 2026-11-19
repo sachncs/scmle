@@ -1,8 +1,8 @@
 # Portable training
 
-One job spec and a `Runner` interface (`scmle.runners`). The package ships the
-local runner; a runner for any other place is written by the user against the
-same interface.
+One job spec and a `Runner` interface (`scmle.runners`). The package ships
+three runners on this machine (inline, child process, container); a runner
+for any other place is written by the user against the same interface.
 
 ## The spec and the run
 
@@ -51,9 +51,19 @@ both.
 | Runner | Runs the attempt as | Identity | Interruption |
 | --- | --- | --- | --- |
 | `Runner` | the workload, in this process | the training role of `RoleStore` | injected, or `PreemptedError` |
+| `Process` | `python -m scmle.runners.entrypoint`, a child process | the training role, in the child | SIGTERM, then SIGKILL after `grace` |
+| `Container` | the same entrypoint in an image, through the Docker CLI | the training role, as uid 10001 on a read-only root | `docker stop`: SIGTERM, then SIGKILL |
 
+`Process` and `Container` read an attempt's end from the entrypoint's exit
+status (`base.Exit`: 0 succeeded, 1 failed, 75 transient, 143 interrupted by
+SIGTERM, 137 killed) and keep its output at `runs/<id>/logs/<n>.txt`;
+`Container` bind-mounts the store, drops every capability and applies the
+job's resources as limits, and tells an out-of-memory kill from a
+preemption. `python -m scmle.runners.local --runner process|container`
+runs a stored spec from the command line.
 A runner for a container platform starts `python -m scmle.runners.entrypoint`
-in the image, which opens the `file://` store named by `SCMLE_STORE_URI`, loads
+in the image, which opens the `file://` store named by `SCMLE_STORE_URI`
+(confined to `tenants/<tenant>/` when `SCMLE_TENANT` is set), loads
 the stored spec, refuses it if its digest is not the one the runner started,
 and runs the workload (`SCMLE_WORKLOAD`, default
 `scmle.runners.project:run_project`). `run_project` runs an unchanged
@@ -64,9 +74,23 @@ the trials since the last mirror. `reproducibility.compare` reports each
 metric of a result against tolerances declared before the runs; a miss is
 published, not hidden.
 
+## The image
+
+`Dockerfile` at the repository root builds the image that trains: the
+released wheel on `deploy/requirements.lock`, every file installed with
+`--require-hashes`, on a base pinned by the digest of its
+multi-architecture index (`scmle.deploy.base_image.PINNED`; the placeholder
+digest and a bare tag are refused), run as uid 10001.
+`python -m scmle.deploy.packaging image --wheel dist/<wheel> --tag <tag>`
+builds it and checks that `scmle --help` runs as non-root. The release
+workflow's `image` job builds it, runs a tiny job through `Container` and
+the runner and image tests against it, and `publish` waits for that job.
+
 ## Not done here
 
-Only the local runner ships and is tested. No container image was built, no
-job was interrupted on a remote platform, and no cost was measured against a
-bill. The reproducibility-tolerance report against a second place does not
-exist.
+The process runner is tested on every platform. The container tests need a
+built image named by `SCMLE_IMAGE` and are skipped without one; they run in
+the `image` job. On a macOS developer machine Docker Desktop could not
+bind-mount pytest's temporary directory, so they have not passed there. No job was
+interrupted on a remote platform, and no cost was measured against a bill.
+The reproducibility-tolerance report against a second place does not exist.

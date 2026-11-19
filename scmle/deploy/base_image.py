@@ -1,27 +1,34 @@
-r"""Resolve a base image tag to the digest it points at, at build time.
+r"""Base images pinned by digest, and resolving a tag to its digest.
 
-A generated Dockerfile never trusts a tag: it carries a placeholder digest and
-refuses to build until the placeholder is replaced by the digest of the
-multi-architecture index (so amd64 and arm64 builds use the same base).
-`resolve` asks the registry; `argument` prints the `--build-arg` value;
-`check` fails if a lock is missing, malformed or still the placeholder.
+A Dockerfile never trusts a tag. `PINNED` records the digest of the
+multi-architecture index (so amd64 and arm64 builds use the same base) of
+each Python base image scmle builds on, resolved on `PINNED_AT`; generated
+Dockerfiles default to it. The placeholder digest stays refused by every
+build, for a base that is not pinned. `resolve` asks the registry again (to
+refresh a pin or to pin another base), `argument` prints the `--build-arg`
+value of a lock, `check` fails if a lock is missing, malformed or still the
+placeholder, and `pinned` prints a recorded pin.
 
-    python -m scmle.deploy.base_image resolve --image python:3.12-slim \\
+    python -m scmle.deploy.base_image resolve --image python:3.12-slim \
         --output base-image.lock.json
-    docker build --build-arg BASE_IMAGE="$(python -m scmle.deploy.base_image \\
+    docker build --build-arg BASE_IMAGE="$(python -m scmle.deploy.base_image \
         argument --lock base-image.lock.json)" .
 
-Resolving needs network access to the registry; everything else here is
-offline and tested with a fake registry.
+Resolving speaks the registry protocol (distribution spec v2): an anonymous
+`HEAD` of the manifest, and on a `401` the bearer token its
+`WWW-Authenticate` challenge names. A registry on `localhost` is spoken to
+over plain HTTP, as Docker does.
 """
 
 import argparse
 from collections.abc import Callable
 import datetime
+import http
 import json
 import pathlib
 import re
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -34,10 +41,19 @@ INDEX_TYPES = (
     "application/vnd.docker.distribution.manifest.list.v2+json",
 )
 DEFAULT_REGISTRY = "registry-1.docker.io"
-AUTH_ENDPOINT = (
-    "https://auth.docker.io/token?service=registry.docker.io"
-    "&scope=repository:{repository}:pull"
-)
+LOCAL_HOSTS = ("localhost", "127.0.0.1", "[::1]")
+CHALLENGE = re.compile(r'(\w+)="([^"]*)"')
+PINNED_AT = "2026-11-19"
+PINNED = {
+    "python:3.11-slim": "sha256:"
+    "07d4824036af339fa1b6ef769cc99d9c10a141769538b52b3b597c84f7a7b535",
+    "python:3.12-slim": "sha256:"
+    "5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b",
+    "python:3.13-slim": "sha256:"
+    "e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90",
+    "python:3.14-slim": "sha256:"
+    "9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f",
+}
 IMAGE_PATTERN = re.compile(
     r"(?:(?P<registry>[a-z0-9.-]+(?::[0-9]+)?)/)?"
     r"(?P<repository>[a-z0-9][a-z0-9._/-]*):(?P<tag>[A-Za-z0-9._-]+)"
@@ -75,42 +91,126 @@ def decompose(image: str) -> tuple[str, str, str]:
     return registry, repository, match["tag"]
 
 
+def pinned(image: str) -> str:
+    """Returns the recorded digest of a base image.
+
+    Args:
+        image: `repository:tag`.
+
+    Returns:
+        The digest recorded in `PINNED`, or `PLACEHOLDER` (which every build
+        refuses) for a base that is not pinned.
+    """
+    decompose(image)
+    return PINNED.get(image, PLACEHOLDER)
+
+
+def origin(registry: str) -> str:
+    """Builds the base URL of a registry.
+
+    Args:
+        registry: The registry host, with an optional port.
+
+    Returns:
+        `http://` for a registry on this machine, otherwise `https://`.
+    """
+    host = registry.rsplit(":", 1)[0] if "]" not in registry else registry
+    local = host in LOCAL_HOSTS or registry.startswith("[::1]")
+    return f"{'http' if local else 'https'}://{registry}"
+
+
+def authorize(challenge: str, base: str, timeout: float) -> str:
+    """Fetches the bearer token a registry's challenge asks for.
+
+    Args:
+        challenge: The `WWW-Authenticate` header of the `401`.
+        base: The registry's base URL; the token realm must use its scheme
+            or `https`.
+        timeout: Seconds to wait.
+
+    Returns:
+        The token.
+
+    Raises:
+        ArtifactError: If the challenge is not a bearer challenge, its realm
+            is not HTTP(S), or the reply holds no token.
+    """
+    scheme, rest = [*challenge.split(" ", 1), ""][:2]
+    fields = dict(CHALLENGE.findall(rest))
+    realm = fields.pop("realm", "")
+    allowed = {"https", urllib.parse.urlsplit(base).scheme}
+    if scheme.lower() != "bearer" or urllib.parse.urlsplit(
+        realm
+    ).scheme not in (allowed):
+        raise errors.ArtifactError(
+            f"unsupported registry challenge {challenge!r}"
+        )
+    address = f"{realm}?{urllib.parse.urlencode(fields)}" if fields else realm
+    request = urllib.request.Request(address)  # noqa: S310 -- the scheme is checked above
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as reply:  # noqa: S310 -- the scheme is checked above  # nosec B310
+            body = json.loads(reply.read())
+        token: str = body.get("token") or body["access_token"]
+    except (OSError, json.JSONDecodeError, KeyError, AttributeError) as error:
+        raise errors.ArtifactError(f"no token from {realm}") from error
+    return token
+
+
+def head(address: str, headers: dict[str, str], timeout: float) -> str:
+    """Asks for a manifest's media type and digest.
+
+    Args:
+        address: The manifest URL.
+        headers: Request headers.
+        timeout: Seconds to wait.
+
+    Returns:
+        `<media type> <digest>`.
+    """
+    request = urllib.request.Request(  # noqa: S310 -- http(s) by construction
+        address, method="HEAD", headers=headers
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as reply:  # noqa: S310 -- http(s) by construction  # nosec B310
+        kind = reply.headers.get("Content-Type", "").split(";")[0]
+        return f"{kind} {reply.headers.get('Docker-Content-Digest', '')}"
+
+
 def query(image: str, timeout: float = 30.0) -> str:
     """Asks the registry for the digest of the index behind `image`.
 
-    Only Docker Hub-style token authentication is implemented. This needs
-    network access.
-
     Args:
-        image: Image reference as `repository:tag`.
+        image: Image reference as `[registry/]repository:tag`.
         timeout: Seconds to wait for each registry request.
 
     Returns:
         The `Docker-Content-Digest` of the image index.
 
     Raises:
-        ArtifactError: If the registry answers with something other than a
+        ArtifactError: If the registry cannot be reached, refuses the
+            request, or answers with something other than a
             multi-architecture index.
     """
     registry, repository, tag = decompose(image)
-    token_request = urllib.request.Request(  # noqa: S310 -- AUTH_ENDPOINT is an https constant
-        AUTH_ENDPOINT.format(
-            repository=urllib.parse.quote(repository, safe="/")
-        )
-    )
-    with urllib.request.urlopen(token_request, timeout=timeout) as reply:  # noqa: S310 -- the URL is https by construction  # nosec B310
-        token = json.loads(reply.read())["token"]
-    request = urllib.request.Request(
-        f"https://{registry}/v2/{repository}/manifests/{tag}",
-        method="HEAD",
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Accept": ", ".join(INDEX_TYPES),
-        },
-    )
-    with urllib.request.urlopen(request, timeout=timeout) as reply:  # noqa: S310 -- the URL is https by construction  # nosec B310
-        kind = reply.headers.get("Content-Type", "").split(";")[0]
-        digest: str = reply.headers.get("Docker-Content-Digest", "")
+    base = origin(registry)
+    address = f"{base}/v2/{repository}/manifests/{tag}"
+    headers = {"Accept": ", ".join(INDEX_TYPES)}
+    try:
+        try:
+            answer = head(address, headers, timeout)
+        except urllib.error.HTTPError as error:
+            challenge = error.headers.get("WWW-Authenticate", "")
+            if error.code != http.HTTPStatus.UNAUTHORIZED or not challenge:
+                raise
+            token = authorize(challenge, base, timeout)
+            headers["Authorization"] = f"Bearer {token}"
+            answer = head(address, headers, timeout)
+    except urllib.error.HTTPError as error:
+        raise errors.ArtifactError(
+            f"{image}: the registry answered {error.code}"
+        ) from error
+    except OSError as error:
+        raise errors.ArtifactError(f"{image}: {error}") from error
+    kind, digest = answer.split(" ", 1)
     if kind not in INDEX_TYPES:
         raise errors.ArtifactError(
             f"{image} is not a multi-architecture index ({kind or 'unknown'})"
@@ -185,7 +285,7 @@ def peruse(path: str | pathlib.Path) -> dict[str, str]:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Runs the command line (`resolve`, `argument` or `check`).
+    """Runs the command line (`resolve`, `argument`, `check` or `pinned`).
 
     Args:
         arguments: Command-line arguments; None reads `sys.argv`.
@@ -203,8 +303,17 @@ def main(arguments: list[str] | None = None) -> int:
     for name in ("argument", "check"):
         action = actions.add_parser(name)
         action.add_argument("--lock", required=True)
+    actions.add_parser("pinned", help="print a recorded pin").add_argument(
+        "--image", required=True
+    )
     options = parser.parse_args(arguments)
     try:
+        if options.action == "pinned":
+            digest = pinned(options.image)
+            if digest == PLACEHOLDER:
+                raise errors.ConfigError(f"{options.image} is not pinned")
+            print(f"{options.image.rsplit(':', 1)[0]}@{digest}")  # noqa: T201 -- command-line output
+            return 0
         if options.action == "resolve":
             record = resolve(options.image)
             pathlib.Path(options.output).write_text(

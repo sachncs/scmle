@@ -38,14 +38,15 @@ def needs(job):
 def test_publishing_waits_for_every_check_and_the_evidence():
     """Enforces docs/RELEASING.md:3.
 
-    PyPI upload is reachable only after the tag check, the platform tests and
-    the preflight have passed, and only after the full suite, the skip check,
+    PyPI upload is reachable only after the container image, the tag check,
+    the platform tests and the preflight have passed, and only after the full suite, the skip check,
     the benchmark regression gate and the artifact checks in its own job.
 
     Also enforces website/src/pages/docs/releasing.astro:9.
     """
     found = jobs()
-    assert needs(found["publish"]) == {"test", "release-checks"}
+    assert needs(found["publish"]) == {"image", "test", "release-checks"}
+    assert "needs" not in found["image"] and "if" not in found["image"]
     assert needs(found["test"]) == {"verify"}
     assert needs(found["release-checks"]) == {"verify"}
     preflight = " ".join(

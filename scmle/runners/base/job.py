@@ -291,6 +291,40 @@ class Job:
             "environment": dict(self.environment),
         }
 
+    @classmethod
+    def read(cls, record: Mapping[str, Any]) -> "Job":
+        """Rebuilds a spec from its stored form.
+
+        Args:
+            record: The spec as `to_dict` wrote it, in the current layout
+                (`identifier`, `timeout`, `digests.project`) or in version 1
+                (`run_id`, `timeout_seconds`, `project_digest`).
+
+        Returns:
+            The spec.
+
+        Raises:
+            ConfigError: If a field is missing or has the wrong shape.
+        """
+        try:
+            fields = cls.KEYS.downgrade(dict(record))
+            budget = fields["budget"]
+            return cls(
+                run_id=fields["run_id"],
+                name=fields["name"],
+                project=fields["project"],
+                identity=fields["identity"],
+                resources=Resources(**fields["resources"]),
+                timeout_seconds=fields["timeout_seconds"],
+                retries=retry.Retries.read(fields["retries"]),
+                budget=None
+                if budget is None
+                else CostBudget(budget["max_cost"], CostRate(**budget["rate"])),
+                environment=fields["environment"],
+            )
+        except (KeyError, TypeError, AttributeError) as error:
+            raise errors.ConfigError(f"malformed job spec: {error}") from error
+
     def digest(self) -> str:
         """Digests the whole spec, anchored at version 1.
 
@@ -346,6 +380,54 @@ class Status:
         ):
             return None
         return Progress.FAILED
+
+
+class Exit(enum.IntEnum):
+    """How a job process ends: the exit status of the entrypoint.
+
+    The numbers follow conventions a container platform already reports:
+    `TRANSIENT` is `EX_TEMPFAIL` from sysexits.h, `INTERRUPTED` is 128 plus
+    SIGTERM, and `KILLED` is 128 plus SIGKILL (a stop that outlived its
+    grace period, or a reclaimed host).
+
+    Attributes:
+        SUCCEEDED: The workload returned.
+        FAILED: The workload raised; another attempt would fail the same way.
+        TRANSIENT: The workload raised a transient error; a retry may pass.
+        INTERRUPTED: The platform asked the job to stop (SIGTERM).
+        KILLED: The platform killed the job (SIGKILL).
+    """
+
+    __module__ = "scmle.runners.base"
+
+    SUCCEEDED = 0
+    FAILED = 1
+    TRANSIENT = 75
+    INTERRUPTED = 143
+    KILLED = 137
+
+    @classmethod
+    def status(cls, code: int, reason: str = "") -> Status:
+        """Reads the exit status of a job process.
+
+        A negative code is how `subprocess` reports a child ended by a
+        signal; any signal counts as an interruption by the platform.
+
+        Args:
+            code: The process exit status.
+            reason: What the process said last (its stderr tail).
+
+        Returns:
+            `SUCCEEDED` for 0, an `INTERRUPTED` status for a signal, a
+            retryable `FAILED` for `TRANSIENT`, otherwise a final `FAILED`
+            whose reason names the code.
+        """
+        if code == cls.SUCCEEDED:
+            return Status(State.SUCCEEDED)
+        if code < 0 or code in {cls.INTERRUPTED, cls.KILLED}:
+            return Status(State.INTERRUPTED, f"signal (exit {code})")
+        detail = f"exit {code}" + (f": {reason}" if reason else "")
+        return Status(State.FAILED, detail, retryable=code == cls.TRANSIENT)
 
 
 class Clock:

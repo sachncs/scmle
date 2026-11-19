@@ -26,6 +26,7 @@ from scmle.runners.base.job import Clock
 from scmle.runners.base.job import ConflictError
 from scmle.runners.base.job import CostBudget
 from scmle.runners.base.job import CostRate
+from scmle.runners.base.job import Exit
 from scmle.runners.base.job import FINAL
 from scmle.runners.base.job import Job
 from scmle.runners.base.job import MAX_RUN_ID_LENGTH
@@ -56,6 +57,7 @@ __all__ = [
     "ConflictError",
     "CostBudget",
     "CostRate",
+    "Exit",
     "Job",
     "Meter",
     "Progress",

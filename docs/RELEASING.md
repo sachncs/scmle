@@ -25,11 +25,16 @@ unless the evidence holds. The checks live in [`scripts/`](../scripts/README.md)
 
 ## The pipeline (`release.yml`, on a `v*` tag)
 
-1. **verify**: the tag equals the package version, `scmle.__version__` and a
+1. **image**: builds the container image from the wheel on the pinned base,
+   smoke-tests `scmle --help` as non-root, runs a tiny job through the
+   container runner and the runner and image tests against that image (it
+   also runs on pull requests that touch what goes into the image).
+2. **verify**: the tag equals the package version, `scmle.__version__` and a
    changelog section.
-2. **test**: the bounded suite on Linux, macOS and Windows.
-3. **release-checks**: `release_preflight.sh`.
-4. **publish**: full test suite, benchmark regression gate, build, `twine check`,
+3. **test**: the bounded suite on Linux, macOS and Windows.
+4. **release-checks**: `release_preflight.sh`.
+5. **publish**, only after **image**, **test** and **release-checks**: full
+   test suite, benchmark regression gate, build, `twine check`,
    `verify_release_artifacts.sh` (reproducible, installs offline), a wheel and
    sdist smoke test, PyPI trusted publishing, then `verify_external_release.py`
    compares the public tag and PyPI files with the local build by digest.
