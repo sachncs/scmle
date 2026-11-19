@@ -10,8 +10,13 @@ column, in units of column standard deviations. The default cut is a policy
 value selected by the certification harness from a grid on clean data (see
 `benchmarks/qualification/f5.py`), not chosen by hand.
 
-MinHash on tokenised strings is not implemented: text columns only block
-exact matches.
+Text near-copies (`resemble`): the non-numeric columns of a row are
+read as one text and compared by MinHash with locality-sensitive hashing
+(`minhash`), so two rows whose texts are near copies (Jaccard similarity of
+their shingles at least `DEFAULT_SIMILARITY`, derived in
+`minhash.similarity` from the edits a near copy may make) are compared on
+their numeric columns too, and are near duplicates when those are within
+the cut. Rows with no numeric column are near duplicates on the text alone.
 
 The duplicate rate carries an exact (Clopper-Pearson) binomial interval.
 """
@@ -27,11 +32,13 @@ import pandas
 from scipy import stats
 from sklearn import neighbors
 
+from scmle.assurance.detectors import minhash
 from scmle.contracts import errors
 from scmle.contracts import records
 import scmle.data.splitting.duplicates
 
 DEFAULT_CUT = 0.01
+DEFAULT_SIMILARITY = minhash.similarity()
 MIN_BLOCK = 2
 CONFIDENCE = 0.95
 
@@ -50,9 +57,13 @@ class Duplicates:
         label_conflicts: Exact groups whose rows disagree on the target
             (0 when no target was given).
         groups: Number of exact duplicate groups.
+        similar: Rows whose text nearly copies an earlier row's (MinHash),
+            with numeric columns within the cut, that are neither exact
+            nor numeric near duplicates.
+        similarity: Jaccard threshold of the text comparison.
         migrations: The written layout's version steps, oldest first;
             version 2 writes `exact.{extra, rate, interval}`, `near` and
-            `conflicts`.
+            `conflicts`; version 3 adds `text.{near, threshold}`.
     """
 
     migrations: ClassVar[tuple[records.Migration, ...]] = (
@@ -66,6 +77,9 @@ class Duplicates:
                 }
             },
         ),
+        records.nest(
+            {}, groups={"text": {"similar": "near", "similarity": "threshold"}}
+        ),
     )
 
     rows: int
@@ -76,6 +90,8 @@ class Duplicates:
     cut: float
     label_conflicts: int
     groups: int
+    similar: int = 0
+    similarity: float = DEFAULT_SIMILARITY
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the report as a JSON-ready record.
@@ -139,13 +155,7 @@ def near_flags(
     other = [c for c in columns if c not in numeric]
     if not numeric:
         return flags
-    spread = frame[numeric].std(ddof=0).replace(0.0, 1.0).fillna(1.0)
-    # Non-finite entries count as missing: fill them with the column mean,
-    # then scale each column by its spread.
-    block = frame[numeric].to_numpy(dtype=float, copy=True)
-    block[~numpy.isfinite(block)] = numpy.nan
-    block = numpy.where(numpy.isnan(block), numpy.nanmean(block, axis=0), block)
-    block = numpy.asarray(block / spread.to_numpy(dtype=float))
+    block = standardize(frame, numeric)
     if other:
         text = frame[other].astype(str).fillna("<missing>")
         keys = text.agg("\x1f".join, axis=1).to_numpy()
@@ -166,24 +176,114 @@ def near_flags(
     return flags
 
 
-def duplicate_flags(
-    frame: pandas.DataFrame, cut: float = DEFAULT_CUT
-) -> pandas.Series:
-    """Flags rows that repeat an earlier row exactly or within the near cut.
+def resemble(
+    frame: pandas.DataFrame,
+    columns: Sequence[str],
+    cut: float = DEFAULT_CUT,
+    similarity: float = DEFAULT_SIMILARITY,
+) -> numpy.ndarray:
+    """True for rows whose text nearly copies an earlier row's.
 
-    A `cut` that is not positive and finite raises `ValueError`.
+    The non-numeric columns of a row, joined, are its text; texts at or
+    above `similarity` (exact Jaccard, after MinHash proposes the pair) are
+    compared on the numeric columns as in `near_flags`.
+
+    Args:
+        frame: Table.
+        columns: Columns that define a record.
+        cut: Maximum RMS standardized distance, positive.
+        similarity: Jaccard threshold of the texts, within (0, 1].
+
+    Returns:
+        A boolean per row; rows whose texts are identical are left to
+        `near_flags` and `verbatim`.
+
+    Raises:
+        InputError: If `cut` is not positive and finite, or `similarity`
+            is outside (0, 1].
+    """
+    if not math.isfinite(cut) or cut <= 0.0:
+        raise errors.InputError("cut must be positive and finite")
+    bands = minhash.Bands(similarity)
+    flags = numpy.zeros(len(frame), dtype=bool)
+    numeric = [
+        c
+        for c in columns
+        if pandas.api.types.is_numeric_dtype(frame[c])
+        and not pandas.api.types.is_bool_dtype(frame[c])
+    ]
+    other = [c for c in columns if c not in numeric]
+    if not other or len(frame) < MIN_BLOCK:
+        return flags
+    text = frame[other].astype(str).agg(" ".join, axis=1).to_numpy()
+    keys, labels = minhash.group([minhash.shingles(t) for t in text])
+    block = standardize(frame, numeric)
+    radius = cut * math.sqrt(max(len(numeric), 1))
+    for link in minhash.links(keys, bands):
+        mine = numpy.flatnonzero(labels == link[0])
+        theirs = numpy.flatnonzero(labels == link[1])
+        if not numeric:
+            flags[mine[mine > theirs[0]]] = True
+            flags[theirs[theirs > mine[0]]] = True
+            continue
+        tree = neighbors.NearestNeighbors(radius=radius).fit(block[mine])
+        found = tree.radius_neighbors(block[theirs], return_distance=False)
+        for row, near in zip(theirs, found, strict=True):
+            for peer in mine[near]:
+                flags[max(row, peer)] = True
+    return flags
+
+
+def standardize(
+    frame: pandas.DataFrame, numeric: Sequence[str]
+) -> numpy.ndarray:
+    """Scales numeric columns by their spread, filling non-finite values.
+
+    Args:
+        frame: Table.
+        numeric: Numeric columns.
+
+    Returns:
+        The scaled block, one row per row of `frame` (no columns when
+        `numeric` is empty).
+    """
+    if not numeric:
+        return numpy.zeros((len(frame), 0))
+    # Non-finite entries count as missing: fill them with the column mean,
+    # then scale each column by its spread.
+    spread = frame[list(numeric)].std(ddof=0).replace(0.0, 1.0).fillna(1.0)
+    block = frame[list(numeric)].to_numpy(dtype=float, copy=True)
+    block[~numpy.isfinite(block)] = numpy.nan
+    block = numpy.where(numpy.isnan(block), numpy.nanmean(block, axis=0), block)
+    return numpy.asarray(block / spread.to_numpy(dtype=float))
+
+
+def duplicate_flags(
+    frame: pandas.DataFrame,
+    cut: float = DEFAULT_CUT,
+    similarity: float = DEFAULT_SIMILARITY,
+) -> pandas.Series:
+    """Flags rows that repeat an earlier row exactly or nearly.
+
+    A `cut` that is not positive and finite raises `InputError`.
 
     Args:
         frame: Table; every column defines a record.
         cut: Largest root-mean-square standardized distance over the numeric
             columns at which two rows are near duplicates; rows must also
-            match exactly on the non-numeric columns.
+            match exactly on the non-numeric columns, or be text near
+            copies (`resemble`).
+        similarity: Jaccard threshold of the text comparison.
 
     Returns:
         A boolean Series on the index of `frame`.
     """
     columns = list(frame.columns)
-    flags = verbatim(frame, columns) | near_flags(frame, columns, cut)
+    flags = (
+        verbatim(frame, columns)
+        | near_flags(frame, columns, cut)
+        | resemble(frame, columns, cut, similarity)
+    )
     return pandas.Series(flags, index=frame.index)
 
 
@@ -209,8 +309,9 @@ def assess(
     columns: Sequence[str] | None = None,
     target: str | None = None,
     cut: float = DEFAULT_CUT,
+    similarity: float = DEFAULT_SIMILARITY,
 ) -> Duplicates:
-    """Counts exact and near duplicates and label conflicts.
+    """Counts exact, near and text-near duplicates and label conflicts.
 
     Args:
         frame: Exploration rows.
@@ -218,6 +319,7 @@ def assess(
         target: Optional label column checked for conflicts among exact
             duplicates.
         cut: Near-duplicate distance cut.
+        similarity: Jaccard threshold of the text comparison.
 
     Returns:
         The report.
@@ -225,6 +327,7 @@ def assess(
     names = list(frame.columns) if columns is None else list(columns)
     exact = verbatim(frame, names)
     near = near_flags(frame, names, cut) & ~exact
+    similar = resemble(frame, names, cut, similarity) & ~exact & ~near
     ids = scmle.data.splitting.duplicates.duplicate_groups(frame, names)
     members = ids[ids != scmle.data.splitting.duplicates.NOT_DUPLICATED]
     conflicts = 0
@@ -243,4 +346,6 @@ def assess(
         cut=cut,
         label_conflicts=conflicts,
         groups=len(numpy.unique(members)),
+        similar=int(similar.sum()),
+        similarity=similarity,
     )

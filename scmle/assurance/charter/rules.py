@@ -39,8 +39,10 @@ class Procedure:
             `saffron`).
         confirmation: Multiplicity rule of the single confirmation (`bh`,
             `by`, `holm` or `bonferroni`).
-        failure: Failure policy: what a crashed confirmation does
-            (`unconfirmed`).
+        failure: Failure policy: what a crashed confirmation does, one of
+            `confirm.POLICIES`: `unconfirmed` (claims stay unverified) or
+            `thresholdout` (the run also answers adaptive queries on the
+            single opening of `C` through a reuse session).
         stability: Stability filter: whether survivors with a `fragile`
             stability verdict are withdrawn before `C` is opened. It acts
             only when the stability rule has a current passing certificate
@@ -79,7 +81,7 @@ class Procedure:
         Raises:
             ValueError: If `ledger` is not in `online_fdr.RULE_NAMES`,
                 `confirmation` is not a `Correction` value, `failure` is not
-                `confirm.UNCONFIRMED`, `stability` is not a bool,
+                in `confirm.POLICIES`, `stability` is not a bool,
                 `agreement` or `exclusion` is not finite or outside (0, 1],
                 or `band` is not finite or not positive.
         """
@@ -90,10 +92,9 @@ class Procedure:
         allowed = tuple(r.value for r in budget.Correction)
         if self.confirmation not in allowed:
             raise errors.InputError(f"confirmation must be one of {allowed}")
-        if self.failure != confirm.UNCONFIRMED:
+        if self.failure not in confirm.POLICIES:
             raise errors.InputError(
-                f"failure must be '{confirm.UNCONFIRMED}': no other "
-                "policy is implemented"
+                f"failure must be one of {confirm.POLICIES}"
             )
         if not isinstance(self.stability, bool):
             raise errors.InputError("stability must be a boolean")

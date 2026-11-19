@@ -35,12 +35,20 @@ from scmle.assurance.ledger import explore
 from scmle.assurance.ledger import online_fdr
 from scmle.assurance.ledger import usage
 import scmle.assurance.ledger.budget
+from scmle.assurance.ledger.confirm import thresholdout
 import scmle.assurance.ledger.ledger
 import scmle.assurance.ledger.online_fdr
 from scmle.contracts import qualification
 
 CONTROL_FILE = "negative_control.json"
 DEFAULT_BLOCKS = 20
+# The reuse session's journal in the run directory, so an interrupted run
+# resumes with the budget it spent (distinct from the transcript the session
+# writes as `thresholdout.DOCUMENT`).
+JOURNAL = "thresholdout_journal.json"
+# Score of a row whose feature or target is missing: it neither agrees (1)
+# nor disagrees (0), so it pulls the query's mean towards chance, never away.
+UNDECIDED = 0.5
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -188,6 +196,7 @@ def run_governed(
     ]
     | None = None,
     claim_runner: confirm.Docket | None = None,
+    reuse: thresholdout.Session | None = None,
 ) -> Governance:
     """Explores `X` under the ledger, runs the control and confirms on `C`.
 
@@ -214,13 +223,17 @@ def run_governed(
             withdrawn survivors are not tested on `C`.
         claim_runner: Claims registered in the ledger and evaluated on the
             same opening of `C` (see `confirm.confirm`).
+        reuse: Reuse session answered on the same opening of `C`; required
+            by, and only allowed with, the `thresholdout` policy.
 
     Returns:
         The governed run; artifacts are written when `run_dir` is given.
         Errors from the steps it calls (a `ConfigError` for an unavailable
-        policy, a `LedgerError`, a `LeakageError` for a second confirmation)
-        propagate.
+        policy or a policy without its reuse session, raised before
+        exploration, a `LedgerError`, a `LeakageError` for a second
+        confirmation) propagate.
     """
+    confirm.match(policy, reuse)
     explored = scout(
         charter=charter,
         features=features,
@@ -240,6 +253,7 @@ def run_governed(
         confirmation_rule=confirmation_rule,
         policy=policy,
         claim_runner=claim_runner,
+        reuse=reuse,
     )
 
 
@@ -425,6 +439,7 @@ def finalise(
     policy: str = confirm.UNCONFIRMED,
     claim_runner: confirm.Docket | None = None,
     registry: str | Path | None = None,
+    reuse: thresholdout.Session | None = None,
 ) -> Governance:
     """Freezes the survivors and tests once on `C` (see `run_governed`).
 
@@ -438,6 +453,8 @@ def finalise(
         registry: Folder that keeps, across runs, the record of spent
             confirmation sets (`usage`); the pipeline passes the folder
             holding its run directories. None records nothing.
+        reuse: Reuse session answered on the same opening of `C` under the
+            `thresholdout` policy, or None.
 
     Returns:
         The governed run. When the exploration has a run directory, the
@@ -465,6 +482,7 @@ def finalise(
         withdrawal=withdrawal if withdrawal and withdrawal.accounted else None,
         claim_runner=claim_runner,
         register=spend(explored, source, registry),
+        reuse=reuse,
     )
     if explored.run_dir is not None:
         folder = Path(explored.run_dir)
@@ -515,4 +533,82 @@ def spend(
         usage.key(charter, explored.data, getattr(source, "ids", ())),
         folder.name,
         {"charter_hash": charter, "data": explored.data},
+    )
+
+
+def replication(
+    explored: Explored,
+    features: pandas.DataFrame,
+    target: pandas.Series,
+) -> thresholdout.Session:
+    """The reuse session a charter run asks on `C` under `thresholdout`.
+
+    One query per distinct survivor column, in registration order: the
+    share of rows on which the column lies above its median on `X` exactly
+    when the coded target lies above its median on `X` (a row with either
+    value missing scores `UNDECIDED`). The medians are fixed from `X` before
+    `C` opens and the analyst reads `C` only through the answers, so
+    Thresholdout keeps each answer within its tolerance of the population
+    agreement with probability at least ``1 - confidence`` (see
+    `thresholdout`); a train answer says the agreement found on `X` holds on
+    `C`, a holdout answer that it does not. The analyst stops at the
+    session's query limit or its overfitting budget.
+
+    Args:
+        explored: The state returned by `scout`; gives the survivors, the
+            target coding, the seed and the run directory.
+        features: The exploration features `X`.
+        target: The exploration target.
+
+    Returns:
+        The session, journalled in the run directory when there is one.
+    """
+    classification = explored.classification
+    classes = explored.classes
+    columns = list(
+        dict.fromkeys(
+            h.spec.column
+            for h in explored.ledger.survivors()
+            if h.spec.column is not None and h.spec.column in features.columns
+        )
+    )
+    middle = float(explore.vectorize(target, classification, classes).median())
+    medians = {
+        c: float(pandas.to_numeric(features[c], errors="coerce").median())
+        for c in columns
+    }
+
+    def agreement(column: str) -> thresholdout.Query:
+        def query(rows: pandas.DataFrame, labels: pandas.Series) -> Any:
+            values = pandas.to_numeric(rows[column], errors="coerce").to_numpy(
+                dtype=float
+            )
+            codes = explore.vectorize(labels, classification, classes).to_numpy(
+                dtype=float
+            )
+            agree = ((values > medians[column]) == (codes > middle)).astype(
+                float
+            )
+            missing = numpy.isnan(values) | numpy.isnan(codes)
+            return numpy.where(missing, UNDECIDED, agree)
+
+        return query
+
+    def analyst(guard: thresholdout.Thresholdout) -> dict[str, Any]:
+        found: dict[str, Any] = {}
+        for column in columns[: guard.terms.queries]:
+            if guard.left == 0:
+                break
+            answer = guard.query(agreement(column))
+            found[column] = {"agreement": answer.value, "origin": answer.origin}
+        return found
+
+    journal = (
+        None if explored.run_dir is None else Path(explored.run_dir) / JOURNAL
+    )
+    return thresholdout.Session(
+        (features, target),
+        analyst,
+        seed=explored.charter.seed,
+        journal=journal,
     )

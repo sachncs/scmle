@@ -275,10 +275,10 @@ def test_a_crash_while_opening_is_a_failure_not_an_exception():
     assert "OSError" in result.reason
 
 
-def test_thresholdout_is_refused_before_anything_happens():
+def test_thresholdout_without_a_session_is_refused_before_anything_happens():
     ledger = explored()
     source = source_with(*c_rows())
-    with pytest.raises(errors.ConfigError, match="not implemented"):
+    with pytest.raises(errors.ConfigError, match="needs a reuse session"):
         confirm.confirm(
             ledger, source, alpha_confirm=ALPHA, policy=confirm.THRESHOLDOUT
         )

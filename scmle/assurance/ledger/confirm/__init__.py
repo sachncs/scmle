@@ -1,7 +1,6 @@
 """The single confirmation of the exploration survivors on `C`.
 
 Order of events. The guarantee ``FDR <= alpha_confirm`` comes only
-import scmle.assurance.ledger.budget
 from this stage:
 
 1. The survivors, selected on `X` only, are frozen in the ledger with a hash.
@@ -64,10 +63,13 @@ unverified.
 Failure policy. A statistical failure to reject is a result, not a failure.
 If the confirmation run *crashes* after `C` was opened, `C` is spent and the
 charter's policy applies: ``unconfirmed`` (default) keeps every claim at tier
-`unverified` and says so. The Thresholdout reusable holdout of Dwork et al.
-(2015) is not implemented (it needs a query interface in front of `C`, which
-the one-time custody release does not offer) and is refused with a
-`ConfigError` instead of being faked.
+`unverified` and says so. ``thresholdout`` keeps that rule for the family and
+also answers adaptive queries on the same single opening of `C` through the
+reusable holdout of Dwork et al. (2015): it needs a reuse session
+(`thresholdout.Session`), registered in the ledger like any other claim and
+bound to the release before `C` opens (see `opening` and `thresholdout`).
+`match` refuses the policy without a session, and a session under another
+policy, with a `ConfigError` before anything is frozen or opened.
 
 Assumptions (stated on every claim): the rows of `C` are independent of the
 rows of `X` (grouped split by entity, embargo for temporal data); `C` is read
@@ -90,6 +92,7 @@ from scmle.assurance.ledger.confirm.opening import confirm
 from scmle.assurance.ledger.confirm.opening import deny
 from scmle.assurance.ledger.confirm.opening import enforce
 from scmle.assurance.ledger.confirm.opening import finish
+from scmle.assurance.ledger.confirm.opening import match
 from scmle.assurance.ledger.confirm.opening import phrase
 from scmle.assurance.ledger.confirm.opening import preregister
 from scmle.assurance.ledger.confirm.opening import tip
@@ -152,6 +155,7 @@ __all__ = [
     "disclaim",
     "enforce",
     "finish",
+    "match",
     "merge",
     "phrase",
     "preregister",

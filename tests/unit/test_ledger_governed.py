@@ -11,7 +11,9 @@ from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import explore
 from scmle.assurance.ledger import governed
 from scmle.assurance.ledger import online_fdr
+from scmle.assurance.ledger.confirm import thresholdout
 import scmle.assurance.ledger.ledger
+from scmle.contracts import errors
 from scmle.data.splitting.splitters import lockbox
 from tests.unit.test_charter_contracts import make_charter
 
@@ -199,15 +201,82 @@ def test_a_grouped_target_control_reports_strata_scope():
     assert run.scope == "strata" and run.control.scope == "strata"
 
 
-def test_unavailable_failure_policies_are_refused_up_front():
+def test_unavailable_failure_policies_are_refused_up_front(tmp_path):
     features, target = build()
-    with pytest.raises(Exception, match="not implemented"):
-        governed.run_governed(
-            charter=make_charter(),
-            features=features,
-            target=target,
-            classification=False,
-            source=None,
-            run_dir=None,
-            policy=confirm.THRESHOLDOUT,
-        )
+    for policy, message in (
+        (confirm.THRESHOLDOUT, "needs a reuse session"),
+        ("retry", "failure policy must be one of"),
+    ):
+        with pytest.raises(errors.ConfigError, match=message):
+            governed.run_governed(
+                charter=make_charter(),
+                features=features,
+                target=target,
+                classification=False,
+                source=None,
+                run_dir=tmp_path,
+                policy=policy,
+            )
+    # Refused before exploration: nothing was written to the run directory.
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_reuse_session_reaches_the_confirmation(monkeypatch):
+    features, target = build()
+    session = thresholdout.Session((features, target), lambda guard: {})
+    seen = {}
+    real = confirm.confirm
+
+    def spy(*args, **kwargs):
+        seen.update(kwargs)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(confirm, "confirm", spy)
+    governed.run_governed(
+        charter=make_charter(),
+        features=features,
+        target=target,
+        classification=False,
+        source=None,
+        run_dir=None,
+        policy=confirm.THRESHOLDOUT,
+        reuse=session,
+    )
+    assert seen["policy"] == confirm.THRESHOLDOUT
+    assert seen["reuse"] is session
+
+
+def test_the_replication_session_asks_each_survivor_on_the_one_opening(
+    tmp_path,
+):
+    features, target = build()
+    holdout = thresholdout.minimum()
+    cfeatures, ctarget = build(rows=holdout + holdout % 2, seed=9)
+    explored = governed.scout(
+        charter=make_charter(),
+        features=features,
+        target=target,
+        classification=False,
+        run_dir=tmp_path,
+        policy=confirm.THRESHOLDOUT,
+    )
+    session = governed.replication(explored, features, target)
+    assert session.journal == tmp_path / governed.JOURNAL
+    run = governed.finalise(
+        explored,
+        source=locate(cfeatures, ctarget),
+        policy=confirm.THRESHOLDOUT,
+        reuse=session,
+    )
+    assert run.confirmation.registered["thresholdout"]["status"] == "answered"
+    document = run.confirmation.documents["thresholdout.json"]
+    survivors = {h.spec.column for h in run.ledger.survivors()}
+    assert set(document["findings"]) == survivors >= {"f0", "f1"}
+    # The planted columns agree with the target well above chance (about
+    # 0.66 in population), whichever set the answer came from.
+    for column in ("f0", "f1"):
+        found = document["findings"][column]
+        assert found["agreement"] > 0.6
+        assert found["origin"] in {"train", "holdout"}
+    assert document["asked"] == len(survivors)
+    assert (tmp_path / governed.JOURNAL).exists()

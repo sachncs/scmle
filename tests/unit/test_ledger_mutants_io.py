@@ -281,12 +281,18 @@ def test_assumptions_are_stated_in_full():
 
 
 def test_policy_messages_are_exact():
+    confirm.enforce(confirm.THRESHOLDOUT)
     with raises(
         errors.ConfigError,
-        "the Thresholdout reusable holdout is not implemented; use the "
-        "'unconfirmed' failure policy",
+        "the 'thresholdout' failure policy needs a reuse session "
+        "(thresholdout.Session) to answer on C",
     ):
-        confirm.enforce(confirm.THRESHOLDOUT)
+        confirm.match(confirm.THRESHOLDOUT, None)
+    with raises(
+        errors.ConfigError,
+        "a reuse session needs the 'thresholdout' failure policy",
+    ):
+        confirm.match(confirm.UNCONFIRMED, object())
     with raises(
         errors.ConfigError,
         "failure policy must be one of ('unconfirmed', 'thresholdout')",

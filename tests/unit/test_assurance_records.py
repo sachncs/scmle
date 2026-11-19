@@ -80,7 +80,7 @@ def test_a_flag_gate_writes_rows():
 
 def test_duplicates_group_the_exact_counts():
     found = duplicates.Duplicates(10, 1, 0.1, (0.0, 0.4), 2, 0.01, 3, 1)
-    new = {
+    grouped = {
         "rows": 10,
         "cut": 0.01,
         "groups": 1,
@@ -88,21 +88,29 @@ def test_duplicates_group_the_exact_counts():
         "conflicts": 3,
         "exact": {"extra": 1, "rate": 0.1, "interval": (0.0, 0.4)},
     }
+    text = {"near": 0, "threshold": duplicates.DEFAULT_SIMILARITY}
+    new = {**grouped, "text": text}
     assert found.to_dict() == new
-    moves(
-        duplicates.Duplicates,
-        {
-            "rows": 10,
-            "exact_extra": 1,
-            "exact_rate": 0.1,
-            "exact_interval": (0.0, 0.4),
-            "near_extra": 2,
-            "cut": 0.01,
-            "label_conflicts": 3,
-            "groups": 1,
-        },
-        new,
-    )
+    old = {
+        "rows": 10,
+        "exact_extra": 1,
+        "exact_rate": 0.1,
+        "exact_interval": (0.0, 0.4),
+        "near_extra": 2,
+        "cut": 0.01,
+        "label_conflicts": 3,
+        "groups": 1,
+    }
+    first, second = duplicates.Duplicates.migrations
+    assert first.upgrade(dict(old)) == grouped
+    assert first.downgrade(dict(grouped)) == old
+    # Version 3 gathers the MinHash text fields under `text`.
+    middle = {**grouped, "similar": 0, "similarity": text["threshold"]}
+    assert second.upgrade(dict(middle)) == new
+    assert second.downgrade(dict(new)) == middle
+    migrations = duplicates.Duplicates.migrations
+    assert records.upgrade(migrations, dict(middle), 2) == new
+    assert records.downgrade(migrations, dict(new), 2) == middle
 
 
 def test_label_noise_and_missingness_write_single_words():

@@ -1,4 +1,13 @@
-"""The single opening of `C` and the confirmation row it writes."""
+"""The single opening of `C` and the confirmation row it writes.
+
+Under the `thresholdout` failure policy the caller hands over a
+`thresholdout.Session`: it is registered in the ledger like any other claim,
+bound to the release before `C` opens, and run on the same single opening,
+where the rows of `C` answer the session's adaptive queries through
+Thresholdout (Dwork et al. 2015) within its derived tolerance and budget.
+The transcript is attached to the confirmation row. The family's own test is
+not repeated: a crash while testing it still leaves its claims unverified.
+"""
 
 from collections.abc import Callable
 from collections.abc import Mapping
@@ -13,6 +22,7 @@ from scmle.assurance.ledger import budget
 from scmle.assurance.ledger import usage
 from scmle.assurance.ledger.confirm import evaluation
 from scmle.assurance.ledger.confirm import records
+from scmle.assurance.ledger.confirm import thresholdout
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 from scmle.contracts import qualification
@@ -138,17 +148,34 @@ def enforce(policy: str) -> None:
         policy: The failure policy name.
 
     Raises:
-        ConfigError: If the policy is `thresholdout` (not implemented) or is
-            not a known policy.
+        ConfigError: If the policy is not a known policy.
     """
-    if policy == records.THRESHOLDOUT:
-        raise errors.ConfigError(
-            "the Thresholdout reusable holdout is not implemented; use the "
-            "'unconfirmed' failure policy"
-        )
     if policy not in records.POLICIES:
         raise errors.ConfigError(
             f"failure policy must be one of {records.POLICIES}"
+        )
+
+
+def match(policy: str, reuse: thresholdout.Session | None) -> None:
+    """Refuses a failure policy without its reuse session, or the reverse.
+
+    Args:
+        policy: The failure policy name.
+        reuse: The reuse session, or None.
+
+    Raises:
+        ConfigError: If the policy is unknown, `thresholdout` comes without a
+            reuse session, or a session comes with another policy.
+    """
+    enforce(policy)
+    if policy == records.THRESHOLDOUT and reuse is None:
+        raise errors.ConfigError(
+            "the 'thresholdout' failure policy needs a reuse session "
+            "(thresholdout.Session) to answer on C"
+        )
+    if policy != records.THRESHOLDOUT and reuse is not None:
+        raise errors.ConfigError(
+            "a reuse session needs the 'thresholdout' failure policy"
         )
 
 
@@ -165,11 +192,12 @@ def confirm(
     withdrawal: records.Withdrawal | None = None,
     claim_runner: records.Docket | None = None,
     register: usage.Register | None = None,
+    reuse: thresholdout.Session | None = None,
 ) -> records.Confirmation:
     """Freezes the survivors and tests them once on the confirmation set.
 
-    An unavailable failure policy is refused first, by `enforce`, with a
-    `ConfigError`.
+    An unavailable failure policy, or one without its reuse session, is
+    refused first, by `match`, with a `ConfigError`.
 
     Args:
         ledger: The run's ledger, after exploration (and the negative
@@ -178,7 +206,8 @@ def confirm(
         alpha_confirm: The confirmation level (the charter's).
         rule: `by` (default, arbitrary dependence), `bh`, `holm` or
             `bonferroni`.
-        policy: Failure policy, `unconfirmed` (default).
+        policy: Failure policy, `unconfirmed` (default) or `thresholdout`
+            (needs `reuse`).
         require_control: Whether a missing negative control blocks promotion.
         custody_log: Log that receives the `selection_frozen` event and, when
             they occur, `denied` and `claims_failed` (the sealed set's own
@@ -192,6 +221,8 @@ def confirm(
             same opening (module docstring, "Registered claims").
         register: The durable record of this confirmation set across runs
             (`usage`); the use is written just before `C` is opened.
+        reuse: Adaptive queries answered on the same opening through
+            Thresholdout (module docstring); only with `thresholdout`.
 
     Returns:
         The confirmation, also recorded in the ledger. Cases that stop
@@ -209,7 +240,9 @@ def confirm(
             freezing the survivors or building the withdrawal accounting
             (a withdrawn id that is not a survivor) is not caught either.
     """
-    enforce(policy)
+    match(policy, reuse)
+    if reuse is not None:
+        claim_runner = records.merge(claim_runner, reuse.docket())
     if ledger.confirmation is not None:
         deny(custody_log or (source.log if source is not None else None))
         raise errors.LeakageError(
@@ -225,7 +258,7 @@ def confirm(
     if spent is not None:
         deny(log)
         raise errors.LeakageError(spent)
-    return unseal(ledger, source, log, blocked, terms)
+    return unseal(ledger, source, log, blocked, terms, policy)
 
 
 def enter(
@@ -410,6 +443,7 @@ def unseal(
     log: Any,
     blocked: tuple[str, str, tuple[qualification.Claim, ...]] | None,
     terms: records.Terms,
+    policy: str = records.UNCONFIRMED,
 ) -> records.Confirmation:
     """Opens `C` once, evaluates the registered claims and tests the family.
 
@@ -424,6 +458,7 @@ def unseal(
             opened for the registered claims only.
         terms: The rule, level, encoder, withdrawal accounting and claim
             runner.
+        policy: Failure policy, named in a crash's reason.
 
     Returns:
         The confirmation. A failure while opening or testing gives a
@@ -451,13 +486,14 @@ def unseal(
     except Exception as failure:  # noqa: BLE001 -- a failed opening is recorded as a pipeline-failure outcome, not raised
         # handled: opening failure returned as pipeline_failure outcome with
         # reason
-        return halt(ledger, crash(ledger, "opening C", failure), terms, log)
+        crashed = crash(ledger, "opening C", failure, policy)
+        return halt(ledger, crashed, terms, log)
     ran = evaluate(terms.runner, rows, log)
     if blocked is not None:
         outcome, reason, held = blocked
         reason += "; C was opened for the registered claims only"
         return halt(ledger, (outcome, reason, held), terms, log, ran)
-    return adjudicate(ledger, rows, terms, log, ran)
+    return adjudicate(ledger, rows, terms, log, ran, policy)
 
 
 def evaluate(
@@ -498,6 +534,7 @@ def adjudicate(
     terms: records.Terms,
     log: Any,
     ran: records.Output | None,
+    policy: str = records.UNCONFIRMED,
 ) -> records.Confirmation:
     """Tests the family on the opened rows and writes the confirmation.
 
@@ -508,6 +545,7 @@ def adjudicate(
             runner.
         log: The custody log.
         ran: What the claim runner produced, or None.
+        policy: Failure policy, named in a crash's reason.
 
     Returns:
         The `confirmed` outcome, or `pipeline_failure` with unverified claims
@@ -521,7 +559,7 @@ def adjudicate(
     except Exception as failure:  # noqa: BLE001 -- a failed test on C is recorded as a pipeline-failure outcome, not raised
         # handled: testing failure returned as pipeline_failure outcome with
         # reason
-        crashed = crash(ledger, "testing on C", failure)
+        crashed = crash(ledger, "testing on C", failure, policy)
         return halt(ledger, crashed, terms, log, ran)
     done = sum(1 for c in claims if c.tier is qualification.Tier.CONFIRMED)
     tested = len(claims) - (0 if record is None else len(record["withdrawn"]))
@@ -544,7 +582,10 @@ def adjudicate(
 
 
 def crash(
-    ledger: scmle.assurance.ledger.ledger.Ledger, stage: str, failure: Exception
+    ledger: scmle.assurance.ledger.ledger.Ledger,
+    stage: str,
+    failure: Exception,
+    policy: str = records.UNCONFIRMED,
 ) -> tuple[str, str, tuple[qualification.Claim, ...]]:
     """Builds the `pipeline_failure` outcome of a crash after `C` was opened.
 
@@ -552,6 +593,7 @@ def crash(
         ledger: The ledger with frozen survivors.
         stage: What was being done when it failed.
         failure: The exception that was caught.
+        policy: Failure policy, named in the reason.
 
     Returns:
         The outcome code, the sentence from `phrase` and one unverified
@@ -559,26 +601,36 @@ def crash(
     """
     return (
         records.PIPELINE_FAILURE,
-        phrase(stage, failure),
+        phrase(stage, failure, policy),
         evaluation.disclaim(ledger, "confirmation crashed"),
     )
 
 
-def phrase(stage: str, failure: Exception) -> str:
-    """Phrases why the confirmation crashed, under the 'unconfirmed' policy.
+def phrase(
+    stage: str, failure: Exception, policy: str = records.UNCONFIRMED
+) -> str:
+    """Phrases why the confirmation crashed, under its failure policy.
 
     Args:
         stage: What was being done when it failed.
         failure: The exception that was caught.
+        policy: Failure policy in force.
 
     Returns:
         A sentence naming the stage and the exception, and saying that all
-        claims stay unverified.
+        claims stay unverified (and, under `thresholdout`, that the reuse
+        session answers within its own budget).
     """
+    kept = (
+        "C is spent and all claims stay unverified"
+        if policy != records.THRESHOLDOUT
+        else "C is spent for the family and all its claims stay unverified; "
+        "the reuse session's answers, if any, are attached"
+    )
     return (
         f"the confirmation failed while {stage} "
-        f"({type(failure).__name__}: {failure}); C is spent and all claims "
-        "stay unverified (failure policy: unconfirmed)"
+        f"({type(failure).__name__}: {failure}); {kept} "
+        f"(failure policy: {policy})"
     )
 
 

@@ -324,12 +324,15 @@ def test_verify_leaves_withdrawn_survivors_untested():
 # ---- opening ---------------------------------------------------------------
 
 
-def test_enforce_refuses_thresholdout_and_unknown_policies():
+def test_enforce_accepts_both_policies_and_match_needs_the_session():
     opening.enforce("unconfirmed")
-    with pytest.raises(errors.ConfigError, match="Thresholdout"):
-        opening.enforce("thresholdout")
+    opening.enforce("thresholdout")
+    with pytest.raises(errors.ConfigError, match="needs a reuse session"):
+        opening.match("thresholdout", None)
     with pytest.raises(errors.ConfigError, match="failure policy must be one"):
         opening.enforce("lenient")
+    with pytest.raises(errors.ConfigError, match="failure policy must be one"):
+        opening.match("lenient", None)
 
 
 def test_phrase_and_tip_describe_a_crash_and_a_log():
