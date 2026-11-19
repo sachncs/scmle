@@ -12,13 +12,19 @@ depends on the confirmation set:
    it in an `View` with its declared time rule;
 3. synthesize the feature family for the run table's rows, at the cutoff
    `moment - lag`, capped at `B_feat`; the declared family size is fixed here;
-4. return the feature columns, the manifest and the provenance table, which
+4. compute every kept feature again with the relational engine
+   (`scmle.data.relational.engine`) from the same extracts: a feature that
+   differs beyond `AGREEMENT` stops the run, and the summary's `engine`
+   entry names each feature the engine has no primitive or rule for
+   (`std`, `nunique`, `time_since_last`, depth-2 nests, a `non_versioned`
+   view with an event time);
+5. return the feature columns, the manifest and the provenance table, which
    the caller joins to the table and hands to the admissibility stage.
 
-The plan file (JSON) names the database and the views; the charter fixes the
-budget, windows, lag and tolerances, so they are hashed and signed:
+The plan file (JSON) names the table store and the views; the charter fixes
+the budget, windows, lag and tolerances, so they are hashed and signed:
 
-    {"database": "warehouse.sqlite",
+    {"database": "warehouse.sqlite",     # or "store": {"kind", "path"}
      "key": "customer_id", "moment": "moment",       # columns of the run table
      "tables": ["customers", "orders"],
      "unit": "customer", "target_table": "customers",
@@ -27,11 +33,23 @@ budget, windows, lag and tolerances, so they are hashed and signed:
      "views": [{"name": "orders", "table": "orders", "order_by": "order_id",
                 "key": "customer_id", "target_key": "customer_id",
                 "role": "child", "event_time": "created", "permissive": false,
+                "cardinality": "one_to_many",
                 "rule": {"mode": "transaction", "known_column": "recorded",
                          "delta_rec_days": 0.0,
                          "attestation": {"name_or_id": ..., ...}}}],
      "nests": [{"mid": 0, "table": "events", "order_by": "order_id, created",
                 "key": "order_id", "mid_id": "order_id", ...same view keys}]}
+
+The tables live in a SQLite database (`database`, or a `store` of kind
+`sqlite`), a Parquet folder (`parquet`) or a CSV set (`csv`); see
+`scmle.data.relational.stores`. A folder is mirrored once into a SQLite file
+in a scratch directory for the run, its row counts checked, and every read,
+profile and source query below runs on that mirror; the source queries of a
+`reconcile` block then check the extract against the mirror, not the files.
+A view may declare its `cardinality`: `one_to_many` is the `child` role,
+`many_to_one` the `parent` role, and a `many_to_one` table whose rows repeat
+a (key, event time, recorded time) value stops the run before anything is
+synthesized (`scmle.data.relational.schema`).
 
 Entity resolution (charter format 8) runs on the run table itself:
 `resolve_entities` compares the declared fields, groups records linked above
@@ -66,12 +84,37 @@ import scmle.assurance.ingest.plan
 from scmle.contracts import errors
 from scmle.contracts import records
 from scmle.data.readers import connectors
+from scmle.data.relational import engine
+from scmle.data.relational import schema
+from scmle.data.relational import stores
 
 MANIFEST = "feature_manifest.json"
 PROVENANCE = "ingest_field_provenance.json"
 IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 ORDER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(, ?[A-Za-z_][A-Za-z0-9_]*)*$")
 BATCH_ROWS = 1000
+# The view role each declared cardinality stands for.
+ROLES = {schema.MANY: synthesize.CHILD, schema.ONE: synthesize.PARENT}
+# The engine primitive that computes each synthesizer primitive; `std`,
+# `nunique` and `time_since_last` have none. A lookup is `last` over every
+# visible row, which is the synthesizer's definition of it.
+PRIMITIVES = {
+    synthesize.COUNT: engine.COUNT,
+    synthesize.SUM: engine.SUM,
+    synthesize.MEAN: engine.MEAN,
+    synthesize.MIN: engine.MIN,
+    synthesize.MAX: engine.MAX,
+    synthesize.LAST: engine.LAST,
+    synthesize.SLOPE: engine.TREND,
+}
+# Largest relative (and absolute) difference allowed between a synthesized
+# feature and the engine's. Both sum the same float64 values in different
+# orders, which agree to about n * 2.2e-16 relative for n rows per target
+# (1e-12 at a million rows); a slope divides two such sums, which at most
+# squares the condition of its time spread. 1e-8 keeps four orders of
+# headroom above that, and is the reference tolerance (`reference_rel_tol`)
+# the C3 evidence holds statistics to.
+AGREEMENT = 1e-8
 
 
 @dataclasses.dataclass(frozen=True)
@@ -105,8 +148,8 @@ def recipe(path: str) -> dict[str, Any]:
         path: Path of the JSON ingest plan.
 
     Returns:
-        The plan document, which holds at least the `database`, `key`,
-        `moment`, `tables` and `views` entries.
+        The plan document, which holds at least the `key`, `moment`,
+        `tables` and `views` entries and a `database` or a `store`.
 
     Raises:
         ConfigError: If the file cannot be read or parsed, is not a JSON
@@ -118,10 +161,106 @@ def recipe(path: str) -> dict[str, Any]:
         raise errors.ConfigError(
             f"cannot read ingest plan {path}: {error}"
         ) from error
-    needed = ("database", "key", "moment", "tables", "views")
+    needed = ("key", "moment", "tables", "views")
     if not isinstance(document, dict) or any(k not in document for k in needed):
         raise errors.ConfigError(f"ingest plan {path} needs keys {needed}")
+    if ("database" in document) == ("store" in document):
+        raise errors.ConfigError(
+            f"ingest plan {path} needs one of `database` and `store`"
+        )
     return document
+
+
+def locate(plan_document: records.Layout) -> stores.Store:
+    """The table store a plan names.
+
+    Args:
+        plan_document: The loaded ingest plan: a `database` path, or a
+            `store` object with a `path` and an optional `kind` (one of
+            `stores.KINDS`; recognised from the path when absent).
+
+    Returns:
+        The store.
+
+    Raises:
+        ConfigError: If the plan names no store, or a malformed or absent
+            one.
+    """
+    if "database" in plan_document:
+        return stores.Database(plan_document["database"])
+    entry = plan_document.get("store")
+    if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
+        raise errors.ConfigError("ingest plan store needs a `path`")
+    return stores.locate(entry["path"], entry.get("kind"))
+
+
+def role(entry: records.Layout) -> str:
+    """The view role an entry states or its cardinality implies.
+
+    Args:
+        entry: A plan view entry.
+
+    Returns:
+        `child` or `parent`; `child` when the entry states neither.
+
+    Raises:
+        ConfigError: If the cardinality is unknown or contradicts the role.
+    """
+    cardinality = entry.get("cardinality")
+    if cardinality is None:
+        return str(entry.get("role", synthesize.CHILD))
+    if cardinality not in ROLES:
+        raise errors.ConfigError(
+            f"ingest plan cardinality {cardinality!r} is not one of "
+            f"{sorted(ROLES)}"
+        )
+    if entry.get("role", ROLES[cardinality]) != ROLES[cardinality]:
+        raise errors.ConfigError(
+            f"ingest plan view {entry.get('name', entry['table'])!r} is "
+            f"{cardinality} but has role {entry['role']!r}"
+        )
+    return ROLES[cardinality]
+
+
+def hold(
+    entries: list[records.Layout], extracts: list[pandas.DataFrame]
+) -> None:
+    """Holds each extract to the cardinality its entry declares.
+
+    Args:
+        entries: The plan's view entries.
+        extracts: The table extracted for each.
+
+    Raises:
+        ConfigError: If an entry's cardinality is malformed.
+        SchemaError: If a declared column is absent, or a `many_to_one`
+            table repeats a (key, event time, recorded time) value.
+    """
+    for entry, extract in zip(entries, extracts, strict=True):
+        if "cardinality" not in entry:
+            continue
+        role(entry)
+        name = str(entry.get("name", entry["table"]))
+        rule = entry.get("rule", {})
+        timed = rule.get("mode") != asof_view.NON_VERSIONED
+        layout = schema.Schema(
+            (
+                schema.Table(
+                    name,
+                    entry.get("event_time") if timed else None,
+                    rule.get("known_column") if timed else None,
+                ),
+            ),
+            (
+                schema.Link(
+                    name,
+                    entry["key"],
+                    str(entry.get("target_key", entry["key"])),
+                    str(entry["cardinality"]),
+                ),
+            ),
+        )
+        layout.check({name: extract})
 
 
 def identifier(value: Any, what: str) -> str:
@@ -327,7 +466,7 @@ def assemble(
         synthesize.Source(
             view,
             entry.get("target_key", entry["key"]),
-            entry.get("role", synthesize.CHILD),
+            role(entry),
         )
         for view, entry in zip(views, plan_document["views"], strict=True)
     ]
@@ -342,6 +481,122 @@ def assemble(
         for leaf, n in zip(leaves, plan_document.get("nests", []), strict=True)
     ]
     return views, sources, leaves, nests
+
+
+def timing(view: asof_view.View) -> schema.Table | None:
+    """The engine's declaration of a view's table and time rule.
+
+    Args:
+        view: The as-of view.
+
+    Returns:
+        The table, or None when the engine has no rule like the view's: a
+        `non_versioned` view with an event time (the synthesizer windows and
+        orders its rows by that time but shows them at every cutoff, while
+        the engine's static table has no times) or a versioned view without
+        a recording delay.
+    """
+    rule = view.rule
+    if rule.mode == asof_view.NON_VERSIONED:
+        return None if view.event_time else schema.Table(view.name)
+    if rule.delta_rec_days is None:
+        return None
+    known = rule.known_column if rule.mode == asof_view.TRANSACTION else None
+    return schema.Table(view.name, view.event_time, known, rule.delta_rec_days)
+
+
+def reason(
+    feature: synthesize.Feature, tables: list[schema.Table | None]
+) -> str | None:
+    """Why the engine cannot recompute a synthesized feature.
+
+    Args:
+        feature: The synthesized feature.
+        tables: The engine's declaration of each source, from `timing`.
+
+    Returns:
+        The reason, or None when the engine computes the same feature.
+    """
+    if feature.kind == "nested":
+        return "the engine has no depth-2 nest"
+    if feature.primitive not in PRIMITIVES:
+        return f"the engine has no {feature.primitive}"
+    if tables[feature.source] is None:
+        return "the engine has no time rule like its view's"
+    return None
+
+
+def confirm(
+    found: synthesize.Selection,
+    targets: pandas.DataFrame,
+    moment: str,
+    sources: list[synthesize.Source],
+    nests: list[synthesize.Nest],
+    extracts: list[pandas.DataFrame],
+    spec: ingest.Ingestion,
+) -> dict[str, Any]:
+    """Recomputes the kept features with the relational engine.
+
+    Every kept feature the engine can compute (`reason`) is computed again
+    by `engine.Engine.features` from the same extracts, at the same cutoffs,
+    and must equal the synthesizer's within `AGREEMENT`.
+
+    Args:
+        found: The synthesis result.
+        targets: The target rows the features are for.
+        moment: Their moment column.
+        sources: The synthesis sources, one per plan view.
+        nests: The depth-2 routes.
+        extracts: The table extracted for each source.
+        spec: The charter's ingest settings.
+
+    Returns:
+        The number of features checked, each one not checked with the
+        reason, and the tolerance.
+
+    Raises:
+        DataError: If a feature differs from the engine's.
+        InputError: If a target row has no moment.
+    """
+    tables = [timing(s.view) for s in sources]
+    kept = synthesize.propose(sources, nests, spec.windows)
+    kept = [f for f in kept if f.name in found.frame.columns]
+    unchecked = {f.name: r for f in kept if (r := reason(f, tables))}
+    checked = [f for f in kept if f.name not in unchecked]
+    aggregates = [
+        engine.Aggregate(
+            sources[f.source].view.name,
+            PRIMITIVES[f.primitive],
+            f.value,
+            f.window_days,
+        )
+        for f in checked
+    ]
+    named = zip(tables, sources, extracts, strict=True)
+    known = [(t, s, x) for t, s, x in named if t is not None]
+    layout = schema.Schema(
+        tuple(t for t, s, x in known),
+        tuple(
+            schema.Link(t.name, s.view.key, s.target_key) for t, s, x in known
+        ),
+    )
+    built = engine.Engine(layout, {t.name: x for t, s, x in known})
+    computed = built.features(targets, moment, aggregates, spec.lag)
+    differ = [
+        f.name
+        for f, a in zip(checked, aggregates, strict=True)
+        if not engine.agree(found.frame[f.name], computed[a.name], AGREEMENT)
+    ]
+    if differ:
+        raise errors.DataError(
+            f"{len(differ)} synthesized features differ from the relational "
+            f"engine's beyond {AGREEMENT:g}: {differ}"
+        )
+    return {
+        "checked": len(checked),
+        "unchecked": unchecked,
+        "tolerance": AGREEMENT,
+    }
 
 
 def deliver(
@@ -402,13 +657,44 @@ def run(
             extracted views do not reproduce the declared or source-queried
             totals of the charter's `reconcile` block.
         ConfigError: If `frame` lacks the key or moment column the ingest plan
-            names, or a table or ordering it names is not valid.
+            names, the store it names is absent or malformed, or a table,
+            ordering or cardinality it names is not valid.
+        SchemaError: If a view declared `many_to_one` repeats a version.
+        DataError: If a synthesized feature differs from the relational
+            engine's.
+        InputError: If a row of `frame` has no moment.
     """
     key, moment = plan_document["key"], plan_document["moment"]
     missing = [c for c in (key, moment) if c not in frame.columns]
     if missing:
         raise errors.ConfigError(f"ingest plan names columns {missing} absent")
-    factory = scmle.assurance.ingest.plan.opener(plan_document["database"])
+    store = locate(plan_document)
+    with tempfile.TemporaryDirectory() as mirror:
+        return synthesis(
+            plan_document, spec, frame, store.factory(mirror), run_dir
+        )
+
+
+def synthesis(
+    plan_document: records.Layout,
+    spec: ingest.Ingestion,
+    frame: pandas.DataFrame,
+    factory: Any,
+    run_dir: Path | None,
+) -> Output:
+    """Plans, extracts, checks and synthesizes over one table store.
+
+    Args:
+        plan_document: The loaded ingest plan.
+        spec: The charter's ingest settings.
+        frame: The target rows, holding the plan's key and moment columns.
+        factory: Opens a read-only connection to the store (or its mirror).
+        run_dir: Directory the ingest plan writes its records into, or None.
+
+    Returns:
+        The stage output, as `run` describes it.
+    """
+    key, moment = plan_document["key"], plan_document["moment"]
     settings, limits = configure(plan_document, spec)
     with tempfile.TemporaryDirectory() as scratch:
         folder = run_dir if run_dir is not None else Path(scratch)
@@ -425,6 +711,7 @@ def run(
         )
     entries = [*plan_document["views"], *plan_document.get("nests", [])]
     extracts = [read_frame(entry, factory) for entry in entries]
+    hold(entries, extracts)
     report = None
     if spec.reconcile is not None:
         report = reconcile(entries, extracts, spec, spec.reconcile, factory)
@@ -443,8 +730,12 @@ def run(
         max_features=spec.features,
         strict=spec.strict,
     )
+    count = len(plan_document["views"])
+    checks = confirm(
+        found, targets, moment, sources, nests, extracts[:count], spec
+    )
     table = synthesize.lineage(found, spec.lag, [*views, *leaves])
-    return deliver(found, table, report, summary)
+    return deliver(found, table, report, {**summary, "engine": checks})
 
 
 def resolve_entities(
