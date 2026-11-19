@@ -95,7 +95,7 @@ def test_an_empty_bytes_signing_key_is_rejected():
 
 
 def test_an_unusable_configured_key_is_refused_and_named(tmp_path):
-    # Enforces docs/SERVICE_SLO.md:123.
+    # Enforces docs/SERVICE_SLO.md:135.
     # Enforces website/src/pages/docs/service.astro:83.
     with pytest.raises(errors.ConfigError, match="set but empty"):
         signing.lookup({signing.SIGNING_KEY_ENV: ""})

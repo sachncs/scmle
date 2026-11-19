@@ -165,6 +165,8 @@ def validators(parser: argparse.ArgumentParser) -> None:
             "group",
             "temporal",
             "rolling",
+            "grouped_temporal",
+            "spatial_block",
         ],
         default="auto",
     )

@@ -13,6 +13,7 @@ from typing import ClassVar
 
 import numpy
 import pandas
+from pandas.api import types
 from sklearn import impute
 from sklearn import pipeline
 from sklearn import preprocessing
@@ -103,9 +104,16 @@ def floating(values: Any) -> numpy.ndarray:
 
     Returns:
         A writable float array of the same shape as `values`.
+
+    An all-numeric block is converted in one step; otherwise each column is
+    coerced by `scrub`.
     """
-    frame = pandas.DataFrame(values).apply(scrub)
-    return numpy.array(frame.to_numpy(), dtype=float, copy=True)
+    frame = pandas.DataFrame(values)
+    if all(types.is_numeric_dtype(dtype) for dtype in frame.dtypes):
+        array = frame.to_numpy(dtype=float, na_value=numpy.nan, copy=True)
+        array[numpy.isinf(array)] = numpy.nan
+        return array
+    return numpy.array(frame.apply(scrub).to_numpy(), dtype=float, copy=True)
 
 
 def stringify(values: Any) -> numpy.ndarray:

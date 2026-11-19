@@ -22,11 +22,12 @@ from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.splitting import duplicates
 from scmle.data.splitting import splitters
+from scmle.data.splitting.splitters import splitter
 
 LOGGER = logging.getLogger(__name__)
 
 
-TEMPORAL = frozenset({"temporal", "rolling"})
+TEMPORAL = splitter.TIMED
 
 
 @dataclasses.dataclass(slots=True)

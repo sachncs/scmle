@@ -367,12 +367,13 @@ def test_coverage_measures_three_families_and_names_the_other_two():
 
 
 def test_calibration_and_single_spend_are_policy_clauses(claims):
-    # Enforces docs/preregistration/c3.md:49.
+    # Enforces docs/preregistration/c3.md:53.
     row = claims["C3"]
-    for words in ("simulation-based calibration", "spent once per analysis"):
-        found = clause(row, words)
-        assert found.verdict == scorecard.UNMEASURED
-        assert found.evidence == ""
+    spend = clause(row, "spent once per analysis")
+    assert spend.verdict == scorecard.UNMEASURED
+    assert spend.evidence == ""
+    calibrated = clause(row, "simulation-based calibration")
+    assert calibrated.evidence == "benchmarks/evidence/calibration.json"
     statistical = {
         name
         for name, variable in acceptance.load().items()

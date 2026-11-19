@@ -4,9 +4,12 @@
 process may take traffic" (readiness): it becomes true only after the bundle
 was verified, loaded and warmed up, in that order. `Admission` bounds
 concurrent requests and the time one request may take, so an overloaded or
-stuck model answers quickly instead of queueing without limit; a call that
-timed out makes the replica not ready until it returns, and `STRIKES` of them
-in a row make it not alive, so the platform restarts it.
+stuck model answers quickly instead of queueing without limit. A call that
+timed out keeps its worker until it returns, but the replica stays ready while
+a free worker remains; it is not ready only when every worker holds a
+timed-out call (or a series model's lock is held). `STRIKES` timeouts in a
+row, or `STRIKES` times the timeout with no runnable call, make it not alive,
+so the platform restarts it.
 """
 
 from collections.abc import Callable
@@ -192,8 +195,9 @@ class Admission:
             max_concurrent: Requests allowed in flight; more get a 429.
             timeout_seconds: Time a scoring call may take before the caller
                 gets a 504. The computation itself cannot be cancelled, so a
-                timed-out call keeps its worker until it returns; while it
-                does the replica is not ready (SRV-1).
+                timed-out call keeps its worker until it returns; the
+                replica stays ready while a free worker remains and is not
+                ready only when every worker holds a timed-out call (SRV-1).
             strikes: Consecutive timeouts after which `alive` is false.
 
         Raises:

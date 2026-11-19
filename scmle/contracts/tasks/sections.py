@@ -312,7 +312,12 @@ class Validation(Section):
     Attributes:
         strategy: Validation protocol. `temporal` uses expanding training
             windows; `rolling` slides a fixed-size training window forward
-            (see `window_rows` and `horizon_rows`).
+            (see `window_rows` and `horizon_rows`); `grouped_temporal`
+            keeps each `data.group_column` group whole and orders groups by
+            their first `data.time_column` value; `spatial_block` keeps
+            square blocks of space whole, finding the coordinate columns by
+            name (x/y, longitude/latitude, lon/lat, lng/lat, long/lat,
+            easting/northing; case ignored).
         test_fraction: Share of rows locked away for the final test.
         folds: Number of validation folds.
         seed: Random seed.
@@ -346,6 +351,8 @@ class Validation(Section):
         "group",
         "temporal",
         "rolling",
+        "grouped_temporal",
+        "spatial_block",
     ] = "auto"
     test_fraction: float = pydantic.Field(default=0.20, gt=0, lt=1)
     folds: int = pydantic.Field(default=5, ge=2)

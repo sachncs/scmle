@@ -116,7 +116,7 @@ def test_the_index_rows_match_the_scorecard_and_the_files():
 
 def test_no_validation_or_acceptance_stream_is_drawn():
     # Enforces docs/preregistration/README.md:44.
-    # Enforces docs/preregistration/c3.md:34.
+    # Enforces docs/preregistration/c3.md:38.
     drawn = [
         f"{path.relative_to(ROOT)}: {match.group()}"
         for top in SOURCES
@@ -258,7 +258,8 @@ def test_the_scorecard_decides_each_registered_criterion():
             ),
         ],
         "C7": [
-            "service objectives under load and a 24-hour soak with flat memory",
+            "service objectives under load",
+            "a 24-hour soak with flat memory",
             "a hung request cannot wedge a replica",
             "zero reset connections on SIGTERM",
             (

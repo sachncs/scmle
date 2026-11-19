@@ -321,6 +321,475 @@ marked `Breaking:` and listed first in their group.
 
 ### Added
 
+- C3 reference clauses: `benchmarks/evidence/statistics.py` compares product
+  statistics with independent implementations, within `reference_rel_tol`
+  (1e-8; error `|product - reference| / max(|reference|, 1)`). Reported
+  statistics: every metric a run reports (`metrics.CATALOG.report_names`,
+  all ten tasks, through `Repertoire.evaluate`) against textbook formulas
+  written here, on real tables bundled with scikit-learn (breast cancer,
+  wine, digits, diabetes, linnerud) and simulated worlds with ties and an
+  absent ordinal level. Gate-deciding statistics (`DECIDING`, every other
+  `gates.toml` gate classified in `PREDICATES`) need two references beside
+  the product: the leakage screen's statistics, permutation p-values
+  (recounted on the screen's own permutation stream), Benjamini-Yekutieli
+  step and lower bounds; the missingness test (chi-square and Fisher);
+  Clopper-Pearson limits; the thresholdout terms; `MIN_TEST_CLASS_ROWS`;
+  the ONNX tolerance and row count; the p95 latency of
+  `resources.measure` that `select.serving_limits` and `select.pareto_front`
+  decide on, replayed through the product on tied, one-row and two-row
+  timing vectors and a recorded real run (type-7 quantile by hand and
+  `scipy.stats.mstats.mquantiles`). On the current code 1,145 gate values
+  agree to 1.6e-13. One reported value disagrees: `qwk`
+  (`scmle/evaluation/ordinal.py`) weights misses by the position of a level
+  among the levels present, not by its rank, so a level absent from the
+  scored rows shrinks the distances (0.710 against 0.695). Not compared yet,
+  and listed in the document's `residue`: the screen's encoding and
+  duplication p-values, the paired margin of a skill suspect, the ONNX
+  probability gap, metric intervals and the diagnostic reports.
+  `python -m benchmarks.evidence.statistics --show [--statistic NAME]`,
+  `--write`, `--check`.
+
+- `benchmarks/evidence/calibration.py` measures C3's clause "every interval
+  and test nominal by simulation-based calibration". Each of 30 scenarios
+  simulates a world with a known truth. It then calls one product interval or
+  test the way a user would: the bootstrap metric interval (three families),
+  split-conformal intervals, pooled and class-conditional conformal sets,
+  weighted conformal under covariate shift, CV+, the Nadeau-Bengio CV
+  interval, the RD effect with its balance, placebo and density tests, the
+  DiD ATT with its pre-trend test, the randomized difference in means, the
+  Holm subgroup family, IPW and AIPW effects and p-values, linear (HC3),
+  logistic and conjugate-Bayesian coefficients, the leakage skill
+  permutation test (with and without groups), the missingness test, the
+  leakage screen under the global null, the slice coverage flags, the
+  frozen-nuisance AIPW ATE and ATT, the IV headline, 2SLS and
+  Anderson-Rubin sets under a strong and a weak instrument, Sargan and
+  Hansen J under valid instruments, and the synthetic-control placebo
+  p-value under no effect.
+- The module checks 64 quantities: coverage, size and rank uniformity, each
+  against its exact nominal value. Those values include the finite-sample
+  conformal rank, the class-size mixture for Mondrian sets, and the exact
+  familywise rate of a Holm family. Each check gets a two-sided
+  Clopper-Pearson bound at `alpha / 64`, so a registry of nominal procedures
+  is flagged with chance at most `alpha`. Each scenario's sample is planned
+  by an exact binomial search, so every check sees a 0.025 miscalibration
+  with chance `power`.
+- A check outside its bound is `liberal`, `conservative` or `nonuniform`. It
+  is listed under `miscalibrated` together with the product location that
+  produced the number. Run it with
+  `python -m benchmarks.evidence.calibration --write | --check`.
+- The verdict is `partial`, never `pass`, while `NOT_MEASURED` lists a
+  product interval or test no scenario calibrates (18, each by
+  `path:name`). A judged field a trial did not report counts against the
+  product and is named in the scenario's messages. Bootstrap trials keep
+  their scikit-learn settings inside a context, so every other scenario
+  runs under the defaults, whatever the worker count.
+
+- C3 null clause: `benchmarks/evidence/nulls.py` measures how often the
+  product claims skill on tasks that have none. It runs 577 null tasks end to
+  end through `Project` (60 s budget, the C4 benchmark's): nine permutations
+  of the target of each of the 35 pinned C4 tables (315 real tasks) and 262
+  simulated tables whose target is drawn apart from the features (three
+  worlds, binary, multiclass and regression, 300 to 3,000 rows), seeded from
+  the registered stream `coverage.null.validation`. A run claims skill when
+  its CV or test interval lies wholly better than its `dummy` baseline (the
+  cross-validation baseline it reports, and the `dummy` fitted on its own
+  development rows and scored on its own test rows), or when its own fit
+  verdict is `healthy`; a crash counts as a claim, a refusal does not, and an
+  unknown metric direction is refused. The pooled one-sided upper bound at
+  `alpha` must be at most `null_skill_max` (0.05). The count is planned from
+  `acceptance.toml`: the smallest sample whose exact chance of passing
+  reaches `power` when the true rate is `null_skill_max / (1 + size_margin)`
+  = 0.0296, and never fewer than `null_tasks_min`.
+  `python -m benchmarks.evidence.nulls --write` measures it; `--check`
+  checks the stored result and refuses one measured with other code (the
+  module, the C4 catalog, the acceptance rules or the product), other pinned
+  data, or another bound, alpha, power or margin.
+
+- `benchmarks/evidence/crashes.py` measures C7's kill-and-resume clause at
+  every kill point it can find, without sampling. Four subjects run in child
+  processes: the pipeline engine (`Project.run`/`Project.resume`), the
+  workflow executor (leases and fenced records on a local object store), the
+  batch scorer's progress journal and the erasure journal. A fault hook in the
+  harness traces each stage record, completion marker, event, trial
+  checkpoint, custody entry, lease put/delete, executor record, batch chunk,
+  progress-journal write, atomic swap, erasure plan, erasure step and receipt.
+  It records the moment before and after each operation. At each traced point,
+  a fresh run gets SIGKILL to its whole process group and then resumes in a new
+  process. Its final outputs are compared byte for byte with an uninterrupted
+  reference, and the module also checks that no record durable at the kill is
+  written again. Stage products are unsealed and the leaderboard read into
+  canonical JSON, so they compare field by field; each stage record's digests
+  are replaced by whether they hold (its own body, its product file, the
+  products it needs). Executor records are checked for their fencing token: a
+  record the resume wrote must carry one more than the lease the killed run
+  left. Three control runs (`CONTROLS`) find what varies between
+  uninterrupted runs; only the exact JSON fields that differ in some control
+  are masked, and every other field is still compared. Outputs that are not
+  JSON and that differ as a whole are compared for presence only. An
+  essential output (the model, stage records and products, leaderboard,
+  trial records, predictions, receipt) fails the subject if it is volatile or
+  has a masked field that is not a timing. Masked fields and presence-only
+  outputs are listed in the document. Run it with
+  `python -m benchmarks.evidence.crashes --write | --check | --measure OUT`.
+
+- `benchmarks/evidence/protocols.py` measures C7's "lease and journal
+  protocols model-checked" clause. It holds executable models of three
+  protocols: the workflow run lease with fencing tokens, the custody journal
+  and the erasure journal. A small explicit-state model checker explores each
+  model breadth first over every interleaving, with a crash allowed before any
+  step. The lease is checked with distinct owner names and with the shared
+  default owner name. The journals are checked under process kills and under
+  power loss, where a line can be cut. The checker reports the shortest
+  counterexample of each failing invariant. `Link` ties each model action to
+  the function it models by text that function must contain. A gated object
+  store drives the real implementation through every counterexample and 20
+  sample paths per model, one store or file call per step. Each journal's
+  client resumes as its real caller does: `Erasure.execute` skips every step
+  the journal shows, so a step recorded twice breaks the `single` invariant;
+  the orchestrator's gate review decides every gate again on resume, so
+  repeated custody verdicts are by design and are outside the model.
+  After each step it
+  compares the real state with the model's. Run it with
+  `python -m benchmarks.evidence.protocols --show | --write | --check`.
+  The clause fails on these counterexamples, which the real code reproduces:
+  - Fence reuse in the run lease. `Leases.relinquish` deletes the lease, so the
+    next `acquire` takes fence 1 again. After a takeover at fence 2, the run's
+    records carry fence 2, and every later valid holder is refused
+    (`EvictionError`) for as long as the run lasts. With the default owner name
+    (`Executor(owner="executor")`), one executor's `relinquish` can delete
+    another's fresh lease, which has the same content and so the same store
+    version. Two holders can then write the run record interleaved.
+  - The custody journal's reader
+    (`scmle.assurance.custody.journal.Journal.read`) cannot read a journal
+    whose last line was cut by a power loss. It raises a raw
+    `json.JSONDecodeError`, so the run's custody record, and with it the run,
+    cannot be resumed. The erasure journal survives both crash kinds.
+
+- `benchmarks/evidence/service.py` measures C7's three service clauses
+  against the real `scmle serve` command in a child process over real HTTP
+  (client side in `benchmarks/evidence/traffic.py`). Objectives: 1-record and
+  100-record load profiles against the `docs/SERVICE_SLO.md` objectives, each
+  until zero failures bound the failure rate below 0.001 at alpha (2995
+  requests), the p95 decided by its distribution-free binomial upper bound;
+  startup and resident memory checked too. Hung request: a `Stall` step hangs
+  inside the model's predict for one request while load and slow-body clients
+  run; every other request must succeed, then every worker is hung and
+  `/livez` must fail so the platform restarts the replica, and SIGTERM must
+  still end the process. SIGTERM: 29 rounds under load behind a router that
+  stops routing on readiness, with `SCMLE_LINGER_SECONDS` at least the time
+  the router takes to stop, plus one round with the product's default
+  environment (no linger); zero resets, a router still routing at the
+  signal and requests answered after it are required in every one of them.
+  Three rounds of clients that ignore readiness are reported, not deciding.
+  `--soak SECONDS` runs the
+  soak for any duration (`python -m benchmarks.evidence.service --soak 86400
+  --output soak.json`). Run it with `--write | --check`.
+- `scmle serve` keeps serving out of rotation for `SCMLE_LINGER_SECONDS`
+  (default 0: close at once) after SIGTERM (`/readyz` answers 503
+  `draining`) before it closes the socket. Set it to the probe failure
+  threshold times (period + timeout) to get the zero-reset drain, so callers
+  the platform still routes there are answered instead of reset. A second
+  stop signal ends the wait.
+
+- `tests/redteam/test_redteam_attempts.py` runs every attempt in
+  `benchmarks/evidence/bypass.py` end to end as its own test. An attempt
+  passes only when the control it attacks refuses it, or a control it lists
+  as defence in depth (`Attempt.also`). An attempt that names a documented
+  override may instead go through that override. The record names what
+  stopped the attack: a registered gate, the raising site of an
+  unregistered control (`envelope.authenticate`, `bundle.authenticate`,
+  `charter.verify`), or for the CLI the label the refusal printed
+  (`cli.blocked`, `cli.artifact`). An attack that raises `Broken` because
+  it never reached its control is recorded as `error`, not as blocked.
+  Nothing may get through without an override, and no attempt may fail to
+  set up. An attempt that got through when it was added names the product
+  code at fault (`Attempt.defect`). It is a strict xfail that expects only
+  a bypass, so a broken or misdirected attack fails the suite.
+- `pickle_products` now reaches the control it tests. It resumes with a
+  checkpoint that approves selection, and it watches `envelope.read`, so
+  the record shows the swapped stage products were read and refused.
+- The search grew from 47 to 88 attempts. The new ones cover custody journal
+  edits, custody token reuse in process and in the vault, pickle payloads in
+  bundles, deep-learning checkpoints and stage products, a stripped charter
+  signature, a plugin stage, `SCMLE_TRUSTED`, budgets of NaN and infinity,
+  `pandas.NA` targets, and charter reruns into another output folder or
+  after deleting `.confirmations`. A pickle payload or a plugin counts as
+  through when it took effect (`witnessed`), even if the call was refused
+  afterwards.
+- Ten attempts got through. Each is a product defect, still open:
+  - `scmle/envelope.py`: `read` accepts a signed envelope with no key to
+    check it when `trusted=True`, and the attacker's pickle runs
+    (`pickle_checkpoint_trusted_nokey`). `Bundle.load` refuses the same
+    case (`pickle_bundle_trusted_nokey` is blocked), although the module
+    docstring says both follow one rule.
+  - `scmle/assurance/custody/journal.py`: the custody journal's hash chain
+    has no key and no anchored head. Removing its last line
+    (`journal_truncated`), recomputing the chain (`journal_rechained`,
+    `checkpoint_rechained`) or appending a `started` entry, which
+    `Journal.current` treats as a fresh start (`journal_restarted`,
+    `checkpoint_restarted`), lets a completed run score its locked test set
+    again. The same edits, or a forged approval (`checkpoint_approved`), let
+    a run that a checkpoint rejected resume.
+  - `scmle/assurance/ledger/usage.py`: the record of spent confirmation sets
+    is unsigned files in the output folder. A charter rerun into another
+    folder (`charter_rerun_elsewhere`), or after `.confirmations` is deleted
+    (`charter_rerun_forgotten`), confirms on the same rows a second time.
+  - `scmle/pipeline/stages/defaults.py`: a plugin stage gets the raw locked
+    test set from the board and can bind and open it before selection
+    (`plugin_peek`). Only `FinalEvaluationStage` wraps the set in the
+    journal's `Custodian`.
+- The C8 row stays `not measured`, or becomes `fail` once the lead
+  re-measures, because one bypass disproves "cannot be bypassed".
+  `bypass.json` must be re-measured (`--write`) for the new attempts.
+
+- `scmle.security.deserialisation` finds every call that deserialises
+  (pickle, joblib, cloudpickle, dill, marshal, shelve, `pandas.read_pickle`,
+  `torch.load` without `weights_only=True`, unsafe `yaml` loads, `numpy.load`
+  with `allow_pickle=True`, `keras` with `safe_mode=False`) in a package's
+  source. It does not import the package. Each call gets a verdict on where its
+  bytes come from: `authenticated`, `forwarded` (a helper whose every caller
+  passes authenticated bytes), `roundtrip` (a buffer the same function
+  dumped) or `unauthenticated`. `python -m scmle.security.deserialisation
+  scmle` exits 1 on an unauthenticated site. `scmle/` has 8 sites, none of
+  them unauthenticated.
+- `tests/unit/test_deserialisation_paths.py` attacks every site. It writes an
+  unsigned tripwire pickle and one signed with the wrong key, and calls the
+  public entry point. Each attack must be refused and the tripwire must never
+  run. A new site with no attack fails the test. A positive control signs
+  the same tripwire with the right key and requires it to run, so an attack
+  that is refused before it reaches the deserialiser cannot pass. The round
+  trip, which reads no input, has one attack (it must open no file) and no
+  control.
+- `scmle.security.leaks` scans everything a run wrote for the values of its
+  input table. It looks for:
+  - string cells outside the declared categorical levels (names,
+    identifiers, free text);
+  - category levels seen in fewer than 5 rows (k-anonymity);
+  - raw-row fragments (two precise numeric cells of one row in one file),
+    float cells with 12 significant digits and integer cells with 12 digits
+    (account numbers, long identifiers);
+  - given secrets, and environment secrets.
+  It searches UTF-8, UTF-16, UTF-32, JSON- and HTML-escaped forms and
+  unsalted SHA-256, SHA-1 and MD5 digests, and integers as decimal text and
+  int64 and float64 bytes. It opens zlib, gzip, bz2 and xz streams, scmle
+  envelopes, zip, Parquet and SQLite, and never unpickles. The report names
+  values by an HMAC-SHA256 prefix under a random salt drawn per scan, so a
+  label cannot be reversed by a dictionary search. `python -m scmle.security.leaks
+  RUN --data train.csv --schema RUN/model/schema.json` exits 1 on any leak.
+- `release.yml` now:
+  - attaches SLSA level 3 provenance (`slsa-github-generator`
+    `generator_generic_slsa3` v2.1.0). The generator accepts only a full
+    release tag, so it is referenced by tag, with its commit recorded beside
+    it and checked;
+  - signs every distribution with Sigstore before the GitHub release
+    (`gh-action-sigstore-python`, pinned by commit);
+  - runs `pip-audit` over every locked dependency before upload, judged by
+    `scmle.deploy.vuln_gate` (fail closed);
+  - refuses to release unless an active ruleset protects the release tag
+    from deletion and update.
+- `benchmarks/evidence/supply.py` measures the three clauses:
+  deserialisation (static scan plus attacks), artifacts (real runs on a
+  PII-planted corpus, scanned; a crashed validation run makes the clause
+  `not measured`, never a clean scan), and release (checks on the parsed
+  workflow, so a comment cannot satisfy one: pip-audit, the gate, upload,
+  Sigstore and the GitHub release found as steps and in order, none
+  skippable by `if` or `continue-on-error`; the generator exempt from
+  commit pinning only at an exact `vX.Y.Z` tag; and live checks of the
+  generator tag, the tag rulesets and pip-audit). A run refused for too
+  small a budget is retried once at twice the budget it names.
+
+* **A bundle's trace is verified, not only present.** `scmle.trail.origin.trace(bundle)`
+  (and `python -m scmle.trail trace BUNDLE`) checks that the four C6 trace
+  fields are recorded and that each verifies against records other than the
+  manifest: the data file rehashes to the data hash (raw bytes and, for a
+  tabular file read whole, the parsed frame); the run's `config.json`
+  rehashes to the configuration hash; the commit exists in the repository and
+  its `pyproject.toml` declares the scmle version the bundle records; the
+  pins agree with the manifest's own scikit-learn, pandas, scmle and library
+  versions and with the run's provenance lock. The manifest is trusted only
+  when every stored file matches its digest and the signature verifies.
+* **Rebuild a bundle from its manifest alone.** `scmle.trail.replica.rebuild(bundle)`
+  (and `python -m scmle.trail rebuild BUNDLE`) refuses a bundle that does not
+  trace, then creates a fresh `uv` environment at the manifest's Python with
+  exactly its pins (`--no-deps`), installs scmle from a clean clone at the
+  manifest's commit, retrains the stored configuration in an isolated
+  process with the manifest's thread counts, and compares every member byte
+  for byte and the locked-test metrics within `replica.TOLERANCE` (1e-6
+  relative). Exit codes: 0 traced/reproduced, 1 not, 2 on an error.
+* **C6 evidence for the trace and clean-runner clauses.**
+  `benchmarks/evidence/traceability.py` trains each task with the real
+  command line, traces every bundle, applies seven tamperings (including a
+  removed signature) that must each be caught by exactly the field they
+  break, and rebuilds each bundle in a temporary environment. It refuses to
+  build bundles from a working tree with uncommitted changes, counts an
+  unsigned bundle as not intact, records a bundle that cannot be rebuilt
+  instead of stopping (so `--rebuild` always writes its record before
+  exiting 1), and fails the clean-runner clause when a bundle does not trace
+  on that runner. The `reproducibility` workflow gains a `bundle` job and a
+  `rebuild` job that rebuilds those bundles on a fresh runner; its record is
+  stored with `--merge`.
+
+- C12: the remaining unlinked guarantees of the pre-registrations (C3 to C14)
+  and of the docs site pages (causal decision, evidence, extensions,
+  migrations, modelling, security, workflows) each name an enforcing test, in
+  `tests/docs/test_doc_protocols.py` and `tests/docs/test_doc_pages.py`.
+  Two statements were corrected to the truth: the migrations checklist now
+  sends readers to the capability matrix for status and resource limits and
+  to the changelog's breaking changes and `docs/RENAMES.md` for renamed
+  fields and newly blocking findings (the matrix records neither), and the C10
+  registration records that `benchmarks/evidence/mutation.py` pools a
+  stratified sample of modules rather than deciding each gated module, and
+  classifies no crash.
+- C7, C13, C14: three registrations now state what their modules do. C14's
+  real tables are placed by the custody record into development (40), the
+  deciding validation split (53) and acceptance (54), with 7 unplaced and a
+  3000 s window; the module runs every task, so the acceptance split is not
+  sealed. C7's compliance is decided on real tables with size-scaled budgets
+  and no validation split, and its 400 seeded practice runs decide nothing.
+  C13 records that no performance target has an upper-bound rule yet.
+
+- Forecasting and panels (backlog item 3). Panel data with an entity and a
+  time column (`scmle.models.forecast.Panel`) now has three forecast
+  families: the seasonal-naive baseline (`Seasonal`), simple exponential
+  smoothing with its weight fitted per series (`Smoothing`), and direct
+  multi-step gradient boosting on lag and rolling features scaled per
+  series, one model shared by every series (`Boosted`).
+  `scmle.evaluation.forecasting.backtest` compares them by rolling-origin
+  evaluation: origins one horizon apart back from the end, every family
+  refitted on the history before each origin, MAE and in-sample-scaled MASE
+  at each step ahead, and a one-sided Wilcoxon test against the baseline
+  that is left unassessed below the 5 pairs that can reach p < 0.05. A
+  history too short for a family to learn from is a `BlockedError`, not a
+  `DataError`. `forecasting.run(config, frame)` runs it from a project
+  configuration: the panel is read from `data.value_column`, the families
+  take the configured lags, windows, period and seed
+  (`forecasting.contenders`), and `validation.horizon_rows` is converted
+  from table rows to time points per series.
+- What the comparison shows: against the weekly seasonal-naive baseline,
+  boosting wins (p < 0.05) on seasonal series with a trend, which the
+  baseline trails by a season's rise. On a pure season with noise it is not
+  shown to beat seasonal naive (p = 0.44 in the test panel).
+- Two new split strategies. `grouped_temporal` (`temporal.Succession`)
+  keeps each group whole and on one side of the test split and of every
+  fold, orders groups by first timestamp, and keeps every training row
+  earlier than the rows it is checked against. With a forecast horizon its
+  embargo covers the horizon for the groups running at one time, not for
+  every group. `spatial_block` (`spatial.Tiling`) keeps square blocks of
+  space whole; the block side is derived from the label's semivariogram
+  and reported beside its range. The manifest records
+  `validation.entities` only for `temporal` and `rolling`;
+  `splitter.TIMED` names the three time-ordered strategies.
+
+- `scmle.evaluation.calibration` (a package: `verdict`, `labels`, `hazard`,
+  `relevance`, `treatment`) tests the calibration of held-out predictions
+  for the structured tasks and states the claim each supports
+  (`STATEMENTS`): ordinal cumulative probabilities `P(level <= k)` at every
+  threshold (`ordinal`), each label's probability (`multilabel`), event-free
+  probabilities at horizons against the Kaplan-Meier estimate with
+  Greenwood's variance within predicted-risk groups (`survival`; default
+  horizons are the event-time `quartiles`), and for ranking both the order
+  and the scale of the scores (`ranking`): the mean NDCG gain over a random
+  order of the same rows, with a query bootstrap interval that must lie
+  above zero (`gain`, `chance`), and the probability of relevance that an
+  increasing Platt map learnt on other query folds gives each score
+  (`crossfit`, `Platt`); a reversed scorer, whose map decreases, never
+  supports the claim. Every test is a grouped Hosmer-Lemeshow chi-square
+  with one degree of freedom per group (deciles, merged until each cell
+  expects 5 counts, Cochran's rule); a claim holds only when every test ran
+  and none rejects at 5% after a Bonferroni split, so an untestable check
+  never supports a claim.
+- `calibration.uplift` gives the Qini coefficient and the area under the
+  uplift curve (`area`) with arm-stratified bootstrap percentile intervals
+  (2,000 draws), and tests predicted effects against the treated-minus-
+  control difference within groups of at least 30 rows per arm. The uplift
+  claim needs the Qini interval above zero and the effect test not
+  rejected.
+- Measured size: `test_calibrated_predictions_are_rejected_at_most_at_the_level`
+  draws 1,000 seeded calibrated simulations per task and asserts that the
+  rate at which some check rejects stays within 5% plus a one-sided 99.9%
+  binomial margin (2.1 points). The measured rates are 5.1% ordinal, 4.8%
+  multilabel, 4.9% survival, 2.3% ranking and 6.1% uplift; uplift over
+  8,000 seeds is 5.35%, slightly above the nominal 5% because its group
+  test is a two-sample normal approximation with 30 rows per arm.
+- A linear family for ranking: `pairwise_linear_ranker`
+  (`scmle.models.ranking.estimators.Pairwise`), a logistic RankSVM on
+  within-query preference pairs, capped at 50,000 sampled pairs.
+- A linear family for uplift: `uplift_linear_t_learner`, a T-learner on
+  logistic or ridge outcome models. Every uplift learner takes
+  `kind="boosting" | "linear"` (`scmle.models.uplift.estimators.KINDS`); an
+  arm whose label has one class gets a prior classifier. A linear
+  S-learner's effect is homogeneous: one treatment coefficient for every
+  row.
+
+- Related tables (`scmle.data.relational`): declare tables (event time,
+  recorded time, recording delay) and links (`many_to_one`, `one_to_many`)
+  in code or as a JSON schema (`relational.parse`, which refuses an entry of
+  the wrong type with a `ConfigError`). Read them from a SQLite file, a
+  Parquet folder or a CSV set through one `Store` interface
+  (`stores.locate` recognises the kind). A folder table can be one file or a
+  directory of part files, either `orders/` or the Spark/pyarrow layout
+  `orders.parquet/`. A table held by two entries is refused.
+  `Engine.features` joins each target row to the latest version visible at
+  its cutoff (moment less lag). It aggregates `one_to_many` rows with
+  `count`, `sum`, `mean`, `min`, `max`, `last` and `trend` over windows
+  (default 7, 30 and 90 days and all rows). A row is visible only once its
+  event and recorded times are at or before the cutoff, so no feature reads
+  the future. A target row with no moment is refused with an `InputError`
+  rather than given a count of 0. On the five real relational datasets the
+  C5 evidence caches, the engine's aggregates match both the row-by-row
+  naive reference (`benchmarks/qualification/ingest_naive.py`) and the
+  as-of synthesizer, for every primitive, window, rule and lag. Its
+  `many_to_one` join matches the naive lookup on the four of those datasets
+  whose rows carry an identifier (baseball's do not).
+- The ingest stage (`--ingest-plan`) now runs the relational engine. After
+  synthesis it computes every kept feature again with `Engine.features`
+  from the same extracts. A feature that differs beyond 1e-8 stops the run
+  with a `DataError`. The run event's summary gains an `engine` entry: the
+  number of features checked, and each feature the engine cannot compute,
+  with the reason. Those are `std`, `nunique` and `time_since_last`,
+  depth-2 nests, and views that are `non_versioned` but have an event time.
+  The synthesizer is still what produces the run's features. A run-table row
+  with no moment now stops the run with an `InputError`. Before this change
+  it silently got a count of 0.
+- Ingest plans may name a `store` (`{"kind": "sqlite" | "parquet" | "csv",
+  "path": ...}`) instead of a `database`, but not both. A folder is mirrored
+  once into a SQLite file for the run, and its row counts are checked. A
+  view may declare `cardinality`: `one_to_many` sets the `child` role and
+  `many_to_one` the `parent` role, and a contradicting role is refused. A
+  `many_to_one` table whose rows repeat a (key, event time, recorded time)
+  value stops the run with a `SchemaError` before any feature is
+  synthesized.
+
+- `scmle.data.events` turns an append-only event log of (entity, time,
+  type, payload) records into point-in-time features. Events come from
+  whole files of any tabular format (`File`), JSON lines on a text stream
+  such as standard input (`Lines`), or a JSON-lines file another process
+  appends to, read as it grows and resumable from a byte offset (`Tail`); a
+  strict source names the bad record, a lenient one skips it and keeps the
+  reason. A `Store` takes events one at a time in any arrival order and
+  answers `snapshot(entity, cutoff)` (each `kind.field`'s newest value and
+  every window's value) and `frame(queries)` from events with
+  `time <= cutoff` only. Windows are written `KIND[.FIELD]:STATISTIC:SPAN`
+  (`purchase.amount:total:7d`, `*:count:1h`) over `(cutoff - span,
+  cutoff]`, with `count`, `total`, `mean`, `min`, `max`, `last`,
+  `distinct` and `recency`; a new `Statistic` subclass is found by its name
+  with no registry. Events out of order within the declared lateness bound
+  are placed where they belong; older ones are dropped, rejected
+  (`LatenessError`) or accepted and counted. Under `drop` and `reject` a
+  snapshot whose cutoff lies before the watermark is marked `final`; under
+  `accept` no snapshot is final, since an event of any age may revise it. `lateness.bound` estimates
+  the bound as a distribution-free 95% upper confidence bound on the 0.99
+  quantile of observed delays (binomial order statistic; needs 299
+  events). Tests check the incremental store against a from-scratch
+  recompute over random disordered streams under every policy, and that
+  final snapshots never change under every policy.
+- `python -m scmle.data.events features|follow|lateness`: features at query
+  cutoffs from files or stdin (`-`); `follow` answers each query from a
+  growing log the moment the watermark passes its cutoff (under
+  `--policy accept`, only once the log goes idle, marked not final);
+  `--lateness auto`
+  uses the estimated bound. Exit 2 on an input error, with a JSON summary of
+  arrivals, bound, watermark and skipped records on standard error.
 - Every data kind on the shared stages, experimental except `tabular`. Each
   kind is registered in `scmle.pipeline.kinds.KINDS` and declares its own
   capability records (`Kind.declare()`); `roster.enrol` enrols them by
@@ -1440,6 +1909,61 @@ marked `Breaking:` and listed first in their group.
 
 ### Changed
 
+- `scmle.models.survival.estimators.kaplan_meier` is vectorised (one sort
+  and a cumulative product instead of a pass over the rows per event time);
+  its values are unchanged.
+
+- Wide tables: `columns.floating`, the numeric cast step of every pipeline,
+  converts an all-numeric block in one vectorised step, mapping infinities
+  and nullable `NA` to NaN, and keeps the column-by-column `scrub` coercion
+  for any block with a non-numeric column. New unit tests in
+  `tests/unit/test_columns.py` pin its output to the per-column `scrub`
+  result for infinities, nullable `Int64`/`Float64`/`boolean` with `NA`, a
+  plain array, a mixed block with unparseable text and a block with no
+  columns, and check that the result is a writable copy. On Bioresponse
+  (3,751 x 1,776) one cast went from 0.154 s to 0.003 s.
+  Admission is unchanged: gina, Bioresponse, Internet-Advertisements and
+  fabert are still refused at `budget.minimum_run` (estimates 31.4, 41.8,
+  37.3 and 30.4 s). The shipped pipeline therefore does not train them at a
+  30 s budget. In a local measurement that bypassed admission through a site
+  override (not the shipped pipeline), gina at 30 s ended with
+  `logistic_regression` (AUC 0.90) in 26.4 s, where before it ended with
+  `dummy` in 31.1 s.
+
+- Phase 6 rename maps (`scripts/renames/*.toml`, not applied yet): resolved
+  the `[review]` tables, then corrected the mapped entries against the
+  naming rule. The four lanes now map 1,675 names (data_assurance 564,
+  models 243, pipeline 278, rest 590) and keep 737 in `[review]`, each with
+  two or three candidates and a reason. Mapped functions take verbs (for
+  example `cramers_v` to `associate`, `mde_mean` to `detect`, `metric_values`
+  to `centre`). Mapped classes take nouns (`FinalEvaluationStage` to
+  `Assessment`, `FinalNetBenefit` to `Examiner`). Mapped exceptions keep the
+  `Error` suffix (`RuntimeUnconfirmed` to `UnconfirmedError`). These go back
+  to `[review]` with a reason: eponyms and abbreviations (`kish`, `ipw`,
+  `mae`, `se`, `qini`, `lbfgs`), named-metric families, `is_*` predicates,
+  and every `scmle/cli` `run_*` handler that is found by
+  `getattr(self, f"run_{action}")`. rename.py cannot follow that computed
+  name, so renaming those handlers would break their subcommands.
+  Stored-record attributes take the written key that `docs/RECORD_KEYS.md`
+  records (for example `Draft.open_items` becomes `pending`).
+- Validation: every lane passes rename.py's dry run with rc=0 on the live
+  working tree on 2026-11-20. The runs used `--map` on a copy of each map
+  with its `[review]` table removed. `scripts/rename.py`'s `read()` now
+  drops the `[review]` table before flattening, so the plain lane command
+  (`scripts/rename.py <lane> --dry-run`) no longer raises `ValueError` on
+  it.
+- New `tests/unit/test_rename_kinds.py` finds each mapped definition in the
+  source tree and checks three things. A function's new name must be in a
+  reviewed verb vocabulary. An exception's new name must end in `Error`. No
+  method whose class finds it by a computed `getattr` name may be mapped.
+  Run against the maps from before these corrections, it flags 215
+  non-verb function names, 3 exceptions without the suffix and 20 handlers.
+- After the `--write` apply, docstrings that cite a `Migration.renames`
+  source key need the legacy key restored by hand. The rename otherwise
+  turns "version 2 spells `n_calibration` as `calibration`" into
+  "spells `calibration` as `calibration`". The map headers list the 12
+  sites (11 in data_assurance, `contracts/evaluation/parts.py:461` in
+  rest).
 - `scripts/recite.py` follows line moves in every scanned doc (including
   `website/src`, `docs/preregistration` and `#L` citations), moves both ends
   of a range, and follows a line reworded in place (similarity threshold
@@ -1754,6 +2278,9 @@ marked `Breaking:` and listed first in their group.
 
 ### Removed
 
+- `scmle.evaluation.calibration_uplift` is removed: its uplift check is
+  `scmle.evaluation.calibration.uplift`, and `calibration.horizons` is now
+  `calibration.quartiles`.
 - Gates `ingest.multiplicity` and `robustness.assessment_present`, which no
   input could reach (`tests/unit/test_unreachable_gates.py`). The declared
   family size and the synthesized columns are counted from one dictionary;
@@ -1787,6 +2314,24 @@ marked `Breaking:` and listed first in their group.
 
 ### Fixed
 
+- A request whose scoring hangs no longer wedges a replica. The server kept
+  refusing every request with 503 while one timed-out call was still running,
+  and a call that never returned kept it unready and alive forever. Now the
+  replica keeps serving on its other workers. It is unready only when no
+  call can run (every worker holds a timed-out call, or a series model's lock
+  is held), and `/livez` fails once that has lasted `STRIKES` times the scoring
+  timeout.
+- A hung scoring call no longer keeps a drained server process from exiting
+  after SIGTERM: scoring runs on daemon threads (`workers.Crew`).
+- A client that sends its body slowly no longer holds a scoring slot. The body
+  is read before admission, and a body not received within the request I/O
+  timeout gets a 408.
+- A caller that reset its connection while sending the body no longer
+  escapes the server's handling: it is logged and the connection dropped.
+- Connections the kernel had queued when the server stopped were reset. The
+  listener now answers the backlog before it closes. Its listen backlog is
+  `socket.SOMAXCONN` instead of 5, so bursts of callers were refused or reset
+  before.
 - C2 target-encoding plant bins by value, so tied values share a level
   (OpenML 1464 now blocks).
 
@@ -1958,6 +2503,17 @@ marked `Breaking:` and listed first in their group.
 
 ### Security
 
+- **A bundle member swapped after its checksum is checked no longer loads.**
+  `Bundle.load` checksummed each pickled member (model, calibrator, novelty
+  detector, quantile and CV+ models, shift weights) and then opened the file
+  again to unpickle it, and checked the manifest signature over a second
+  read of the manifest file. A file replaced between the two reads ran
+  unauthenticated code. Each member is now read once, checked against the
+  signed manifest and loaded from those bytes (`archive.resolve` returns
+  bytes, `archive.unpickle(data, name)`). The signature and the schema
+  checksum cover the bytes that were parsed (`archive.Snapshot`,
+  `seal.verify_signature(root, key, text)`). The JSON and Parquet members
+  are read the same way. `tests/unit/test_bundle_swap.py` covers it.
 - Tenant isolation at the storage layer: `scmle.storage.tenancy.Tenancy`
   confines every operation to `tenants/<tenant>/`, refuses crafted keys and
   keys naming the namespace root, and refuses a backend listing outside the

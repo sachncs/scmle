@@ -585,7 +585,7 @@ def test_the_shipped_policy_is_valid():
 def test_the_framework_may_be_unscanned_only_while_its_exception_lives(
     signed_service,
 ):
-    # Enforces docs/SERVICE_SLO.md:136.
+    # Enforces docs/SERVICE_SLO.md:148.
     # Enforces docs/ARTIFACTS.md:140.
     # Enforces website/src/pages/docs/service.astro:86.
     # Enforces website/src/pages/docs/artifacts.astro:86.

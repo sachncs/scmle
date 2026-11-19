@@ -39,6 +39,7 @@ from scmle.data.readers import streaming
 from scmle.data.readers import tabular
 from scmle.data.splitting import splitters
 from scmle.data.splitting.splitters import lockbox
+from scmle.data.splitting.splitters import splitter
 from scmle.pipeline import profiler
 from scmle.preparation import preprocessing
 
@@ -73,7 +74,7 @@ LIFECYCLE = (
 guard (`tests/unit/test_breadth.py`) keeps `supported` to tabular library
 inference."""
 
-TIMED = ("temporal", "rolling")
+TIMED = splitter.TIMED
 """Strategies that hold out the latest rows."""
 
 

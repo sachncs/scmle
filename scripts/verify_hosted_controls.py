@@ -35,6 +35,15 @@ ACTION_REFERENCE = re.compile(
 HTTP_SUCCESS_FIRST = 200
 HTTP_SUCCESS_END = 300
 SHA256_REVISION = re.compile(r"^[0-9a-f]{40}$")
+# The SLSA generator's reusable workflow verifies its own provenance only
+# when called at a full release tag, so it alone may be referenced by an
+# exact vX.Y.Z tag instead of a commit.
+GENERATOR = (
+    "slsa-framework/slsa-github-generator/.github/workflows/"
+    "generator_generic_slsa3.yml"
+)
+TAGGED_ACTIONS = frozenset({GENERATOR})
+RELEASE_TAG = re.compile(r"^v\d+\.\d+\.\d+$")
 WORKFLOW_NAMES = (
     "ci.yml",
     "full-suite.yml",
@@ -188,6 +197,24 @@ def load_workflows(workflow_root: Path, failures: list[str]) -> dict[str, str]:
     return contents
 
 
+def pinned(reference: dict[str, str]) -> bool:
+    """Whether an action reference is pinned.
+
+    Args:
+        reference: One record of `action_references`.
+
+    Returns:
+        True for a 40-character commit, or for an action in
+        `TAGGED_ACTIONS` at an exact `vX.Y.Z` tag.
+    """
+    revision = reference["revision"]
+    if SHA256_REVISION.fullmatch(revision):
+        return True
+    return reference["action"] in TAGGED_ACTIONS and bool(
+        RELEASE_TAG.fullmatch(revision)
+    )
+
+
 def pinning_failures(contents: dict[str, str]) -> list[str]:
     """Returns the unpinned actions and `pull_request_target` uses.
 
@@ -195,8 +222,8 @@ def pinning_failures(contents: dict[str, str]) -> list[str]:
         contents: The workflow text by file name.
 
     Returns:
-        One message per action not pinned to a 40-character commit and per
-        workflow that uses `pull_request_target`.
+        One message per action not `pinned` and per workflow that uses
+        `pull_request_target`.
     """
     failures: list[str] = []
     for name, content in contents.items():
@@ -204,7 +231,7 @@ def pinning_failures(contents: dict[str, str]) -> list[str]:
             f"{name}:{reference['line']} action is not pinned to a "
             f"40-character commit SHA: {reference['action']}"
             for reference in action_references(content)
-            if not SHA256_REVISION.fullmatch(reference["revision"])
+            if not pinned(reference)
         )
         if "pull_request_target:" in content:
             failures.append(f"{name} uses pull_request_target")

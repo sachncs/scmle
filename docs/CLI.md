@@ -41,7 +41,7 @@ The common ones:
 | `--target COL [COL ...]` | Target column(s). Required. |
 | `--task`, `--metric` | Override the resolved task or metric. |
 | `--budget S`, `--workers N` | Search budget in seconds and parallel trials. |
-| `--validation` | `auto`, `stratified`, `random`, `group`, `temporal`, `rolling`, and more. |
+| `--validation` | `auto`, `stratified`, `random`, `group`, `temporal`, `rolling`, `grouped_temporal`, `spatial_block`, and more. |
 | `--group`, `--time`, `--weight` | Data structure. |
 | `--exclude`, `--identifiers`, `--unavailable` | Keep columns out of the features. |
 | `--leakage {warn,block}` | Default `warn`: the run finishes, logs a warning and labels the score provisional. `block` (opt-in) stops the run on suspicious features. See [LEAKAGE](LEAKAGE.md). |

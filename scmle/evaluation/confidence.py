@@ -19,6 +19,8 @@ from typing import Any
 import numpy
 from scipy import stats
 
+from scmle.data.splitting.splitters import splitter
+
 LEVEL = 0.95
 MIN_FOLDS = 2
 MIN_CANDIDATES = 2
@@ -83,8 +85,8 @@ def cv_interval(
         training_rows: Mean training rows per fold.
         validation_rows: Mean validation rows per fold.
         strategy: Validation strategy name (stratified, random, group,
-            temporal); `temporal` and `group` add their own remark to the
-            note.
+            temporal, rolling, grouped_temporal); the time-ordered ones
+            (`splitter.TIMED`) and `group` add their own remark to the note.
         candidate_scores: Per-fold scores of every finished candidate the
             winner was chosen among, including the winner; None or a single
             candidate leaves the interval centred on the mean.
@@ -125,9 +127,9 @@ def cv_interval(
             f"candidates and the interval is moved by {optimism:.4f} for "
             "that, an estimate that assumes the winner is the best mean"
         )
-    if strategy == "temporal":
+    if strategy in splitter.TIMED:
         note += (
-            "; expanding temporal windows are more dependent still, so the "
+            "; time-ordered windows are more dependent still, so the "
             "interval is optimistic"
         )
     elif strategy == "group":

@@ -105,6 +105,8 @@ dev = [
     "validate-pyproject>=0.24",
     "check-wheel-contents>=0.6",
     "basedpyright>=1.31",
+    # benchmarks/evidence/supply.py parses the release workflow.
+    "pyyaml>=6.0",
 ]
 
 [tool.basedpyright]
@@ -197,7 +199,10 @@ packages = ["scmle"]
 testpaths = ["tests"]
 # `soak` runs `scmle serve` for minutes under load (tests/integration/
 # test_serve_soak.py); CI selects it with `-m soak`.
-markers = ["soak: minutes-long serving soak, selected with -m soak"]
+markers = [
+    "soak: minutes-long serving soak, selected with -m soak",
+    "rebuild: rebuilds an environment from PyPI, selected with -m rebuild",
+]
 filterwarnings = ["ignore::UserWarning", "ignore::FutureWarning"]
 
 [tool.ruff]

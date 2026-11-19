@@ -20,7 +20,7 @@ claim = "C5, C7"
 passes = "The unit verdict is None, match or finer, and, when the charter has a reconcile block, every declared and source-queried total is reproduced by the extract."
 blocks = "The unit verdict is coarser or unknown; a declared or source-queried reconciliation check failed (raised by declared.require)."
 override = "none; the unit check runs only when the ingest plan sets unit, and reconciliation runs only when the charter sets reconcile."
-variables = ["unit", "target_table", "tolerances.key", "tolerances.null", "tolerances.link", "queries", "scanned", "seconds", "features", "reconcile", "reconciliation"]
+variables = ["unit", "target_table", "tolerances.key", "tolerances.null", "tolerances.link", "queries", "scanned", "seconds", "features", "reconcile", "reconciliation", "store", "cardinality"]
 
 [policy.checkpoints]
 site = "scmle.pipeline.orchestrator:Orchestrator.consult_checkpoints"

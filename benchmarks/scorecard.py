@@ -22,16 +22,23 @@ import types
 from benchmarks import acceptance
 from benchmarks.evidence import budget
 from benchmarks.evidence import bypass
+from benchmarks.evidence import calibration
 from benchmarks.evidence import coverage
 from benchmarks.evidence import faults
 from benchmarks.evidence import guarantees
 from benchmarks.evidence import leakage
 from benchmarks.evidence import mutation
+from benchmarks.evidence import nulls
 from benchmarks.evidence import platforms
+from benchmarks.evidence import protocols
 from benchmarks.evidence import quality
 from benchmarks.evidence import reading
 from benchmarks.evidence import refusal
+from benchmarks.evidence import service
 from benchmarks.evidence import snippets
+from benchmarks.evidence import statistics
+from benchmarks.evidence import supply
+from benchmarks.evidence import traceability
 from scmle.contracts import errors
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -49,7 +56,7 @@ class Clause:
         criterion: What the clause requires, with its variables' values.
         value: What is measured now, or `not measured`.
         evidence: Where the value comes from.
-        verdict: `pass`, `fail` or `not measured`.
+        verdict: `pass`, `fail`, `partial` or `not measured`.
     """
 
     criterion: str
@@ -110,7 +117,9 @@ def value(name: str) -> str:
     return f"{VARIABLES[name].value:g}"
 
 
-def measured(criterion: str, module: types.ModuleType) -> Clause:
+def measured(
+    criterion: str, module: types.ModuleType, **options: str
+) -> Clause:
     """A clause decided by an evidence module's stored results.
 
     Every module under `benchmarks.evidence` has the same `summary()`,
@@ -120,6 +129,8 @@ def measured(criterion: str, module: types.ModuleType) -> Clause:
     Args:
         criterion: What the clause requires.
         module: The evidence module that measured it.
+        **options: Keyword arguments for `summary()`, naming the clause
+            when one module measures several (`scope=`, `clause=`).
 
     Returns:
         The clause, citing the module's stored results; `not measured`
@@ -128,7 +139,7 @@ def measured(criterion: str, module: types.ModuleType) -> Clause:
     stem = module.__name__.rsplit(".", 1)[-1]
     evidence = f"benchmarks/evidence/{stem}.json"
     try:
-        text, verdict = module.summary()
+        text, verdict = module.summary(**options)
     except (errors.InputError, KeyError, TypeError, ValueError) as error:
         text = f"{stem}.json cannot be read ({error})"
         return Clause(criterion, text, evidence, UNMEASURED)
@@ -205,25 +216,30 @@ def rows() -> list[Row]:
         (
             "C3 Statistics correct and uncertainty honest",
             [
-                pending(
+                measured(
                     "every reported statistic within "
-                    f"{value('reference_rel_tol')} of a reference"
+                    f"{value('reference_rel_tol')} of a reference",
+                    statistics,
                 ),
-                pending(
-                    "gate-deciding statistics match a second implementation"
+                measured(
+                    "gate-deciding statistics match a second implementation",
+                    statistics,
+                    scope="deciding",
                 ),
                 measured(
                     "interval coverage lower bound >= "
                     f"{value('interval_coverage_min')}",
                     coverage,
                 ),
-                pending(
+                measured(
                     f"on >= {value('null_tasks_min')} null tasks, skill-claim "
-                    f"upper bound <= {value('null_skill_max')}"
+                    f"upper bound <= {value('null_skill_max')}",
+                    nulls,
                 ),
-                pending(
+                measured(
                     "every interval and test nominal by simulation-based "
-                    "calibration"
+                    "calibration",
+                    calibration,
                 ),
                 pending(
                     "confirmation data, test set and exploration budget "
@@ -273,11 +289,17 @@ def rows() -> list[Row]:
                     f"platforms within {value('cross_platform_tol')}",
                     platforms,
                 ),
-                pending(
+                measured(
                     "every bundle traces to data hash, configuration, "
-                    "commit and environment"
+                    "commit and environment",
+                    traceability,
+                    clause=traceability.TRACE,
                 ),
-                pending("rebuild on a clean runner"),
+                measured(
+                    "rebuild on a clean runner",
+                    traceability,
+                    clause=traceability.REBUILD,
+                ),
             ],
         ),
         (
@@ -288,17 +310,22 @@ def rows() -> list[Row]:
                     f"{value('budget_compliance_min')}; kill and resume pass",
                     budget,
                 ),
-                pending(
-                    "service objectives under load and a 24-hour soak with "
-                    "flat memory"
+                measured(
+                    "service objectives under load; a hung request cannot "
+                    "wedge a replica; zero reset connections on SIGTERM for "
+                    "callers routed by readiness, with SCMLE_LINGER_SECONDS "
+                    ">= probe threshold x (period + timeout), and with the "
+                    "default linger reported and deciding",
+                    service,
                 ),
-                pending("a hung request cannot wedge a replica"),
-                pending("zero reset connections on SIGTERM"),
+                pending("a 24-hour soak with flat memory"),
                 pending(
                     "kill -9 at every stage boundary, journal append and "
                     "lease operation resumes identically"
                 ),
-                pending("lease and journal protocols model-checked"),
+                measured(
+                    "lease and journal protocols model-checked", protocols
+                ),
             ],
         ),
         (
@@ -311,13 +338,23 @@ def rows() -> list[Row]:
         (
             "C9 Secure, private, trustworthy supply chain",
             [
-                pending("no unauthenticated deserialisation path"),
-                pending("no raw rows, categories or secrets in artifacts"),
+                measured(
+                    "no unauthenticated deserialisation path",
+                    supply,
+                    clause="deserialisation",
+                ),
+                measured(
+                    "no raw rows, categories or secrets in artifacts",
+                    supply,
+                    clause="artifacts",
+                ),
                 pending("a forget operation"),
                 pending(f"OpenSSF Scorecard >= {value('openssf_score_min')}"),
-                pending(
+                measured(
                     "SLSA provenance, signed releases, tag protection, no "
-                    "known high vulnerability"
+                    "known high vulnerability",
+                    supply,
+                    clause="release",
                 ),
             ],
         ),

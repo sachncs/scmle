@@ -68,12 +68,24 @@ or retypes a field needs a new schema version; the service refuses a
 | Request body | 16 MiB | 413 |
 | Records per request | 10,000 | 413 |
 | Requests in flight | 8 | 429 with `Retry-After: 1`; the request is not queued |
-| Scoring time | 30 s | 504; the caller is answered, the computation itself cannot be cancelled and holds its worker until it returns. While it does, `/readyz` answers 503 (`reason` says how many timed-out calls are still running) and `/predict` answers 503, so traffic moves to other replicas; a request that would only queue behind busy workers gets 429 at once. A request answered with 504 does not change the series history. Three timeouts in a row with no success between them make `/livez` answer 503 (`status: wedged`), so the platform restarts the replica |
-| Request I/O | 10 s | connection closed |
+| Scoring time | 30 s | 504; the caller is answered, the computation itself cannot be cancelled and holds its worker until it returns. The replica stays ready and keeps serving on its other workers while a free worker remains. It is unready (`/readyz` and `/predict` answer 503, so traffic moves to other replicas) only when every worker holds a timed-out call, or when a series model's lock is held; a request that would only queue behind busy workers gets 429 at once. A request answered with 504 does not change the series history. `/livez` answers 503 (`status: wedged`), so the platform restarts the replica, after `STRIKES` (3) timeouts in a row with no success between them, or after `STRIKES` times the scoring timeout with no runnable call |
+| Request I/O | 10 s | 408; a body not received within the timeout is answered with 408 and never takes a scoring slot |
 
 Scoring is serialized by a lock because the bundle may update its series
 history, so throughput on one process is that of one scoring thread; scale by
 adding replicas, not threads.
+
+## Shutdown
+
+On SIGTERM `/readyz` answers 503 (`draining`) at once. The server then keeps
+serving for `SCMLE_LINGER_SECONDS` (default 0: close at once) before it
+closes the socket, so callers the platform still routes to it are answered
+instead of reset; a second stop signal ends the wait. Set it to the
+readiness probe's failure threshold times (period + timeout), 36 s for the
+probes in the deployment spec, and keep the platform's termination grace
+period above linger + drain, where drain is at most 2 x request I/O + the
+scoring timeout. `docker stop` waits 10 s by default, so raise its timeout
+(`--time`) when you set a linger.
 
 ## Batch
 

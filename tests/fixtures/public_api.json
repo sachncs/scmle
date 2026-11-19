@@ -154,6 +154,18 @@
         "signature_sha256": "c488893b3b946d797459363f2035d624114a5cd6680eda56ead815b3e14e572e"
       }
     },
+    "scmle.data.splitting.splitters.spatial": {
+      "Tiling": {
+        "kind": "class",
+        "signature_sha256": "4dc0a25cd4e6de45719df643ae575047b3093d0c4f581979b208d4ba12214bdc"
+      }
+    },
+    "scmle.data.splitting.splitters.temporal": {
+      "Succession": {
+        "kind": "class",
+        "signature_sha256": "4dc0a25cd4e6de45719df643ae575047b3093d0c4f581979b208d4ba12214bdc"
+      }
+    },
     "scmle.data.store.processing": {
       "Checkpoint": {
         "kind": "class",
@@ -386,6 +398,138 @@
         "signature_sha256": "ac48ce8e419a9558b2d5a642ab88618a1e3c2e24d2e203a5aabe0c868a664234"
       }
     },
+    "scmle.evaluation.calibration": {
+      "Check": {
+        "kind": "class",
+        "signature_sha256": "39a9778464131f78585e423c70f7c7b37cd4c7d41ace152d98417591526fcbaf"
+      },
+      "Claim": {
+        "kind": "class",
+        "signature_sha256": "a072a8468863c87a770ebd76a60d357d7ecc0938cb37dddd530caabf57b72871"
+      },
+      "Group": {
+        "kind": "class",
+        "signature_sha256": "171d042e2794b3b8aafcc28d7a08ee5e2c5238fe6ce41d26ff278ad1d3ea6037"
+      },
+      "Interval": {
+        "kind": "class",
+        "signature_sha256": "6539e9e6eaabeb4f4e41337c0ff6f40b57763b3dc547a8e056a15e7d18eb3e81"
+      },
+      "Platt": {
+        "kind": "class",
+        "signature_sha256": "db8e35344392f513210cb6964ec5058b3f7659bccd52411ec4b50b0afda2ad81"
+      },
+      "area": {
+        "kind": "callable",
+        "signature_sha256": "b93c4a2a035d6968b8d9f8f1f7942645ea663c2b2451b76101ad71afce5aa763"
+      },
+      "bernoulli": {
+        "kind": "callable",
+        "signature_sha256": "23045754dfb0de0495eafc26c6976a227a2d78a9086fb8a90a4af7ecd0f3a870"
+      },
+      "bootstrap": {
+        "kind": "callable",
+        "signature_sha256": "86dd5404954338ab9e43d2aeb5783b7a32b71ed9edc6422c236d888e94c08105"
+      },
+      "chance": {
+        "kind": "callable",
+        "signature_sha256": "c61a454f415846f10cffce3d58a04adf25b173aad00c2f8592824c8c447b5c37"
+      },
+      "crossfit": {
+        "kind": "callable",
+        "signature_sha256": "d577ed0499eef5a2b6ae85dc64e660a243bbe02c8ac8c87da1888331e2d77f6d"
+      },
+      "deviation": {
+        "kind": "callable",
+        "signature_sha256": "a44a7e08efca4a36876df760d6a00def1711db52c5084258bca1160f0e6f8ced"
+      },
+      "effects": {
+        "kind": "callable",
+        "signature_sha256": "8136eb143791b3f6e5f52c5f768b92e6c5779a7b7b5bc3e9a3430c6524fcdfcf"
+      },
+      "gain": {
+        "kind": "callable",
+        "signature_sha256": "eb08752e3a5ef20f5cd60b85657d0af4378471d523f2a103baa4aa4b6d9b7ca4"
+      },
+      "horizon": {
+        "kind": "callable",
+        "signature_sha256": "dac97c957e48a186727427f58ba80fa73973b7f7828ae7b626ff786e3ec12930"
+      },
+      "meier": {
+        "kind": "callable",
+        "signature_sha256": "3f88ef2e67c341f58c40016c84de7b9ef98f264953f2535b50da2e7ed302cb1a"
+      },
+      "multilabel": {
+        "kind": "callable",
+        "signature_sha256": "9ea5c58ee6bf6c12f384fa1f5a99c2a6ded2d31cf97821ee3f3525ed776b3189"
+      },
+      "ordinal": {
+        "kind": "callable",
+        "signature_sha256": "a139c8bf6dbab7eaea75c95184fdf39b5bb8769d76d0b90443045aa34822a01a"
+      },
+      "partition": {
+        "kind": "callable",
+        "signature_sha256": "22eed68703be9a1f4100b6e8ced7ecbcddf2396183d59fa98a12ec3898bb2378"
+      },
+      "probable": {
+        "kind": "callable",
+        "signature_sha256": "21426eb8f3c10c5932e43c7408ea4919a452159fafb0c54c578ec76751bcb136"
+      },
+      "quartiles": {
+        "kind": "callable",
+        "signature_sha256": "fdef5055f0a9393aa3e6ffa0424d592cc1190630d21f8c6de8660bae796bc42a"
+      },
+      "ranking": {
+        "kind": "callable",
+        "signature_sha256": "8e53839f51ab78bb0e6c01f6401b28e6425fff123a7cbbac74d8ba341a8678d6"
+      },
+      "spread": {
+        "kind": "callable",
+        "signature_sha256": "0cb83679c4dd298b3b8606bf345abca5b42a420fd6f4764d48ce3802c4fae728"
+      },
+      "survival": {
+        "kind": "callable",
+        "signature_sha256": "9ec74c245d2ef1cfd67fe4c893e33153e29e19da6d43faeaf8bf854fa3d43ec4"
+      },
+      "uplift": {
+        "kind": "callable",
+        "signature_sha256": "95cb11d143de6038a36c1af324c2d26bdca4c91b60b04f111c490c5d882206ba"
+      },
+      "vector": {
+        "kind": "callable",
+        "signature_sha256": "94b7093953b4984aae47755910718ad425c69397162a68a8b21459911e020a23"
+      }
+    },
+    "scmle.evaluation.forecasting": {
+      "Backtest": {
+        "kind": "class",
+        "signature_sha256": "43af5259024f7f86bdd418f0ec6b29838f2ebb193879c0dd7cc79254ea81af82"
+      },
+      "Score": {
+        "kind": "class",
+        "signature_sha256": "4a1095639090ab9d8570b1c7d9ea6e234367481a597ce0b8ad7fd0f2ece31556"
+      },
+      "backtest": {
+        "kind": "callable",
+        "signature_sha256": "ca0d4d3c25376efe25e3c817a473b2e762d6f1a5cc946c08a878df97b23531b4"
+      },
+      "contenders": {
+        "kind": "callable",
+        "signature_sha256": "b5566bcc437ef70518e26a846104526369aec8aa2db2f400c03d15ad52144223"
+      },
+      "origins": {
+        "kind": "callable",
+        "signature_sha256": "0f9747a1c89f94478e3a5f49f27469c85aafad365c5c855d34dcff8291945ca8"
+      },
+      "run": {
+        "kind": "callable",
+        "signature_sha256": "306fc61f7c5a6940266b949f6898ba7fa66c7a4fbd651ad9c65fe43e5ebdca4b"
+      },
+      "spacing": {
+        "kind": "callable",
+        "signature_sha256": "a7ad6598132fd0f2459aa6671d487c7a2c999769c1793010705f3cd9d3376ac3"
+      }
+    },
     "scmle.evaluation.longitudinal": {
       "Config": {
         "kind": "class",
@@ -474,6 +618,28 @@
       "unregister_estimator": {
         "kind": "callable",
         "signature_sha256": "fe0fd9428b7396a18a2f9240650f0dc4c56f5371ac4b9f56163fae9135fe6b8e"
+      }
+    },
+    "scmle.models.forecast": {
+      "Boosted": {
+        "kind": "class",
+        "signature_sha256": "33bbb0fd33b4ecaaf9d3593be7ab2e45555edb656891c0a76901bbb07df76c67"
+      },
+      "Forecaster": {
+        "kind": "class",
+        "signature_sha256": "9ec044f0a984a38ab0c4eda6249dd69a133b03645e371b9455e31c37e42a50d2"
+      },
+      "Panel": {
+        "kind": "class",
+        "signature_sha256": "07ba361593c2615e43c4c71ce02ff9a0a031b2e837d7bf0fe9fed279c81e2c94"
+      },
+      "Seasonal": {
+        "kind": "class",
+        "signature_sha256": "5333e753216648a744f551b3ecc4f5a7c684696dd9305bf8a5ab1596bd13ac48"
+      },
+      "Smoothing": {
+        "kind": "class",
+        "signature_sha256": "db8e35344392f513210cb6964ec5058b3f7659bccd52411ec4b50b0afda2ad81"
       }
     },
     "scmle.operations.classify": {

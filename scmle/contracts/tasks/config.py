@@ -35,6 +35,11 @@ ADDED: dict[str, dict[str, Any]] = {
     "validation": {"entities": "known"},
 }
 
+TIMED = frozenset({"temporal", "rolling", "grouped_temporal"})
+"""Strategies that need `data.time_column`; mirrors
+`scmle.data.splitting.splitters.splitter.TIMED`, which this layer cannot
+import."""
+
 FAIRNESS_WEIGHT = "fairness_weight"
 """Weight column the reweighing mitigation adds to development rows."""
 
@@ -380,11 +385,14 @@ def validate(config: Config) -> None:
             "strategy 'group' requires data.group_column (or "
             "data.query_column for ranking)"
         )
-    if validation.strategy in ("temporal", "rolling") and (
-        not data.time_column
-    ):
+    if validation.strategy in TIMED and not data.time_column:
         raise errors.InputError(
             f"strategy '{validation.strategy}' requires data.time_column"
+        )
+    if validation.strategy == "grouped_temporal" and not data.group_column:
+        raise errors.InputError(
+            "strategy 'grouped_temporal' requires data.group_column and "
+            "data.time_column"
         )
     if (
         validation.horizon_rows or validation.window_rows

@@ -23,8 +23,8 @@ const limits = [
   ["Request body", "16 MiB", "413"],
   ["Records per request", "10,000", "413"],
   ["Requests in flight", "8", "429 with <code>Retry-After: 1</code>; the request is not queued"],
-  ["Scoring time", "30 s", "504; the caller is answered, but the computation cannot be cancelled and holds its worker until it returns"],
-  ["Request I/O", "10 s", "connection closed"],
+  ["Scoring time", "30 s", "504; the caller is answered, but the computation cannot be cancelled and holds its worker until it returns; the replica stays ready while a free worker remains"],
+  ["Request I/O", "10 s", "408; a slow body never takes a scoring slot"],
 ];
 const objectives = [
   ["Startup: process start to <code>/readyz</code> 200", "at most 30 s (verify and load dominate; grows with bundle size)"],

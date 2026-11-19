@@ -409,6 +409,7 @@ def test_a_hung_call_leaves_the_replica_serving_on_its_other_workers(
     # fix then refused every request while one call hung, so a call that
     # never returned wedged the replica: not ready, never restarted.
     # Enforces website/src/pages/docs/service.astro:26.
+    # Enforces docs/SERVICE_SLO.md:71.
     adapter = scmle.serving.server.HttpServing(
         bundle, max_concurrent=2, scoring_timeout_seconds=0.2
     )

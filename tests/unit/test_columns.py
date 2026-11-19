@@ -261,3 +261,83 @@ def test_text_statistics_report_words_per_value():
     stats = columns.TextKind().statistics(sentences(40))
 
     assert stats["kind"] == "text" and stats["mean_words"] == 8.0
+
+
+def reference(values):
+    """The per-column `scrub` result `floating` must reproduce."""
+    frame = pandas.DataFrame(values)
+    return numpy.array(frame.apply(columns.scrub).to_numpy(), dtype=float)
+
+
+BLOCKS = {
+    "numeric-with-infinities": pandas.DataFrame(
+        {
+            "a": [1.0, numpy.inf, -numpy.inf, numpy.nan],
+            "b": [4, 5, 6, 7],
+            "c": numpy.array([0.5, -numpy.inf, 2.5, 3.5], dtype=numpy.float32),
+        }
+    ),
+    "nullable-with-na": pandas.DataFrame(
+        {
+            "i": pandas.array([1, None, 3, 4], dtype="Int64"),
+            "f": pandas.array([1.5, None, numpy.inf, 2.0], dtype="Float64"),
+            "b": pandas.array([True, None, False, True], dtype="boolean"),
+        }
+    ),
+    "ndarray": numpy.array(
+        [[1.0, numpy.inf], [numpy.nan, -numpy.inf], [3.0, 4.0]]
+    ),
+    "mixed-with-text": pandas.DataFrame(
+        {"n": [1.0, numpy.inf, 3.0], "s": ["2", "x", None]}
+    ),
+    "no-columns": pandas.DataFrame(index=range(3)),
+}
+
+EXPECTED = {
+    "numeric-with-infinities": numpy.array(
+        [
+            [1.0, 4.0, 0.5],
+            [numpy.nan, 5.0, numpy.nan],
+            [numpy.nan, 6.0, 2.5],
+            [numpy.nan, 7.0, 3.5],
+        ]
+    ),
+    "nullable-with-na": numpy.array(
+        [
+            [1.0, 1.5, 1.0],
+            [numpy.nan, numpy.nan, numpy.nan],
+            [3.0, numpy.nan, 0.0],
+            [4.0, 2.0, 1.0],
+        ]
+    ),
+    "ndarray": numpy.array(
+        [[1.0, numpy.nan], [numpy.nan, numpy.nan], [3.0, 4.0]]
+    ),
+    "mixed-with-text": numpy.array(
+        [[1.0, 2.0], [numpy.nan, numpy.nan], [3.0, numpy.nan]]
+    ),
+    "no-columns": numpy.empty((3, 0)),
+}
+
+
+@pytest.mark.parametrize("name", sorted(BLOCKS))
+def test_floating_equals_the_per_column_scrub(name):
+    block = BLOCKS[name]
+    result = columns.floating(block)
+    assert result.dtype == numpy.float64
+    assert result.shape == EXPECTED[name].shape
+    assert numpy.array_equal(result, EXPECTED[name], equal_nan=True)
+    assert numpy.array_equal(result, reference(block), equal_nan=True)
+
+
+@pytest.mark.parametrize("name", sorted(BLOCKS))
+def test_floating_returns_a_writable_copy(name):
+    block = BLOCKS[name]
+    result = columns.floating(block)
+    assert result.flags.writeable
+    source = block if isinstance(block, numpy.ndarray) else block.to_numpy()
+    assert not numpy.shares_memory(result, source)
+    if isinstance(block, numpy.ndarray):
+        before = block.copy()
+        result[...] = 0.0
+        assert numpy.array_equal(block, before, equal_nan=True)

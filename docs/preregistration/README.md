@@ -19,13 +19,13 @@ Registered on 2026-11-17, against `acceptance.toml` as of commit 53790feb.
 |---|---|---|---|---|
 | C1 No silent wrong outcome | [c1.md](c1.md) | validation | `benchmarks/evidence/faults.py` | measured, development only |
 | C2 Leakage caught, clean data not blocked | [c2.md](c2.md) | acceptance | `benchmarks/evidence/leakage.py` | measured, development only |
-| C3 Statistics correct and uncertainty honest | [c3.md](c3.md) | validation | `benchmarks/evidence/coverage.py` | coverage part only |
+| C3 Statistics correct and uncertainty honest | [c3.md](c3.md) | validation | `benchmarks/evidence/coverage.py`, `benchmarks/evidence/statistics.py`, `benchmarks/evidence/nulls.py`, `benchmarks/evidence/calibration.py` | coverage measured; reference, null and calibration modules written, not yet measured; single spend not measured |
 | C4 At least a competent practitioner's quality | [c4.md](c4.md) | acceptance | `benchmarks/evidence/quality.py` | tabular, development tasks |
 | C5 Data read and joined correctly | [c5.md](c5.md) | validation | `benchmarks/evidence/reading.py` | simulated worlds and builder's corpus |
-| C6 Reproducible and traceable | [c6.md](c6.md) | validation | `benchmarks/evidence/reproducibility.py`, `benchmarks/evidence/platforms.py` | one platform |
-| C7 Operates without loss or stall | [c7.md](c7.md) | validation | `benchmarks/evidence/budget.py` | budget and kill-resume only |
+| C6 Reproducible and traceable | [c6.md](c6.md) | validation | `benchmarks/evidence/reproducibility.py`, `benchmarks/evidence/platforms.py`, `benchmarks/evidence/traceability.py` | one platform; trace and rebuild written, not yet measured |
+| C7 Operates without loss or stall | [c7.md](c7.md) | validation | `benchmarks/evidence/budget.py`, `benchmarks/evidence/service.py`, `benchmarks/evidence/protocols.py` | budget and kill-resume measured; service and protocols written, not yet measured |
 | C8 Controls cannot be bypassed | [c8.md](c8.md) | stage D exercise | `benchmarks/evidence/bypass.py` | automated search only, not the exercise |
-| C9 Secure, private, trustworthy supply chain | [c9.md](c9.md) | validation | none | not measured |
+| C9 Secure, private, trustworthy supply chain | [c9.md](c9.md) | validation | `benchmarks/evidence/supply.py` | deserialisation, artifacts and release written, not yet measured; forget and Scorecard not measured |
 | C10 Can keep changing safely | [c10.md](c10.md) | validation | `scripts/structure.py`, `benchmarks/evidence/mutation.py` | size budgets and a mutation sample |
 | C11 A non-specialist uses it correctly | [c11.md](c11.md) | stage D sessions | none | not measured |
 | C12 Docs tell the truth | [c12.md](c12.md) | validation | `benchmarks/evidence/guarantees.py`, `benchmarks/evidence/snippets.py` | linkage and snippets |

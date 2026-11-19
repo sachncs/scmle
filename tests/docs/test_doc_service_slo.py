@@ -115,7 +115,7 @@ def test_three_timeouts_in_a_row_wedge_livez_and_leave_history_alone(
 
 
 def test_production_refuses_the_published_demo_key_unless_allowed(tmp_path):
-    """Enforces docs/SERVICE_SLO.md:128.
+    """Enforces docs/SERVICE_SLO.md:140.
 
     Also enforces website/src/pages/docs/service.astro:84.
     Also enforces website/src/pages/docs/security.astro:56.
