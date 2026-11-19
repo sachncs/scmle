@@ -90,8 +90,9 @@
       "policy": {
         "alarms": 0.05,
         "confidence": 0.95,
+        "method": "wilson",
         "recall": 0.95,
-        "schema_version": 2
+        "schema_version": 3
       },
       "schema_version": 2,
       "seeds": [
@@ -136,8 +137,9 @@
       "policy": {
         "alarms": 0.02,
         "confidence": 0.95,
+        "method": "wilson",
         "recall": 0.99,
-        "schema_version": 2
+        "schema_version": 3
       },
       "schema_version": 2,
       "seeds": [

@@ -15,7 +15,7 @@
     "entities": "3694b2536c29044c5396d103b339b814efd40df2251e7c0f99b500d92862a1fb",
     "grain": "f456400ae470399afcd0dc38e86ddf9562d5874d0e412a95ea15ae56e1c0816c",
     "joins": "57e8ffcd4c3736e3870615a2a9e435f8219daf8ed5c1652a6dd24ef62ac26133",
-    "point_in_time": "7a21c155a24056f5c36fd99b3c08d8f8deddd8aa70a9aa009655adf6821149b1",
+    "point_in_time": "695c45ba5fd3cc0eb07cdcf4dbff3fd1ff5f09cd769676ab3eb2024b0ae018cb",
     "reconcile": "e32d15fdad27c282b932dc7c9d9d66aa6b1679440cf927175270583e75893b08",
     "torn_read": "ef91ec6b6d84c4dc7a1c886451ca0a2011a2af933dc6e3a1bbb9a108873cb9ab"
   },
@@ -105,7 +105,7 @@
     "seed_offset": 0,
     "tolerance": 0.0
   },
-  "seconds": 71.1,
+  "seconds": 161.0,
   "torn_read": {
     "batch_rows": 5,
     "detected": 500,

@@ -2,7 +2,7 @@
   "alpha": 0.05,
   "assumed": 0.95,
   "claim": "C3",
-  "code": "187a8aa6ea3aaffe27c8ba374cf1dae5872d57071b575a545fbf56a0cf936293",
+  "code": "fccdef2e2b37bc662f45d956428b6bf2a136c6d0c86c2da0ec27140e970da2d2",
   "design": {
     "fresh_rows": 100000,
     "group_rows": 5,
@@ -67,6 +67,6 @@
     "trials": 5034
   },
   "power": 0.9,
-  "seconds": 148.9,
+  "seconds": 200.6,
   "variable": "interval_coverage_min"
 }

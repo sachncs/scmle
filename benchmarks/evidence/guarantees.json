@@ -13,8 +13,8 @@
       "unlinked": 0
     },
     "docs/ARTIFACTS.md": {
-      "guarantees": 21,
-      "unlinked": 0
+      "guarantees": 25,
+      "unlinked": 4
     },
     "docs/AUTONOMY.md": {
       "guarantees": 7,
@@ -33,8 +33,8 @@
       "unlinked": 0
     },
     "docs/CLI.md": {
-      "guarantees": 11,
-      "unlinked": 0
+      "guarantees": 16,
+      "unlinked": 5
     },
     "docs/DECISIONS.md": {
       "guarantees": 2,
@@ -81,8 +81,8 @@
       "unlinked": 0
     },
     "docs/READING_RESULTS.md": {
-      "guarantees": 4,
-      "unlinked": 0
+      "guarantees": 5,
+      "unlinked": 1
     },
     "docs/RELEASING.md": {
       "guarantees": 1,
@@ -149,8 +149,8 @@
       "unlinked": 4
     },
     "docs/preregistration/c2.md": {
-      "guarantees": 11,
-      "unlinked": 3
+      "guarantees": 12,
+      "unlinked": 2
     },
     "docs/preregistration/c3.md": {
       "guarantees": 3,
@@ -161,8 +161,8 @@
       "unlinked": 1
     },
     "docs/preregistration/c5.md": {
-      "guarantees": 5,
-      "unlinked": 1
+      "guarantees": 6,
+      "unlinked": 2
     },
     "docs/preregistration/c6.md": {
       "guarantees": 1,
@@ -362,11 +362,11 @@
     }
   },
   "claim": "C12",
-  "content_hash": "a04a76fe1b2eebe8d6ec5c9bf376c9e66929831a846f319bfa91de406f5f8c74",
+  "content_hash": "179bbf7c70ee173085929a9cd12f26aaabe7161e56f4565ea97fd4353a85d470",
   "counts": {
-    "guarantees": 703,
-    "linked": 665,
-    "unlinked": 38
+    "guarantees": 715,
+    "linked": 667,
+    "unlinked": 48
   },
   "definition": {
     "docs": "README.md, docs/**/*.md (with docs/preregistration) and the site source website/src/**/*.astro and *.html",
@@ -730,8 +730,8 @@
         "tests/unit/test_qualification_api_rule.py::test_no_previously_pinned_name_changed"
       ],
       "doc": "docs/API_STABILITY.md",
-      "end": 35,
-      "line": 35,
+      "end": 38,
+      "line": 38,
       "missing": [],
       "section": "qualification-types",
       "tests": [
@@ -749,8 +749,8 @@
         "tests/fixtures/public_api.json"
       ],
       "doc": "docs/API_STABILITY.md",
-      "end": 51,
-      "line": 47,
+      "end": 54,
+      "line": 50,
       "missing": [],
       "section": "leakage-screen",
       "tests": [
@@ -771,8 +771,8 @@
     {
       "cited": [],
       "doc": "docs/API_STABILITY.md",
-      "end": 58,
-      "line": 51,
+      "end": 61,
+      "line": 54,
       "missing": [],
       "section": "leakage-screen",
       "tests": [
@@ -792,8 +792,8 @@
     {
       "cited": [],
       "doc": "docs/API_STABILITY.md",
-      "end": 88,
-      "line": 85,
+      "end": 91,
+      "line": 88,
       "missing": [],
       "section": "leakage-screen",
       "tests": [
@@ -810,8 +810,8 @@
     {
       "cited": [],
       "doc": "docs/API_STABILITY.md",
-      "end": 93,
-      "line": 89,
+      "end": 96,
+      "line": 92,
       "missing": [],
       "section": "leakage-screen",
       "tests": [
@@ -828,8 +828,8 @@
     {
       "cited": [],
       "doc": "docs/API_STABILITY.md",
-      "end": 102,
-      "line": 99,
+      "end": 105,
+      "line": 102,
       "missing": [],
       "section": "leakage-screen",
       "tests": [
@@ -847,8 +847,8 @@
     {
       "cited": [],
       "doc": "docs/API_STABILITY.md",
-      "end": 107,
-      "line": 104,
+      "end": 110,
+      "line": 107,
       "missing": [],
       "section": "leakage-screen",
       "tests": [
@@ -865,8 +865,8 @@
     {
       "cited": [],
       "doc": "docs/API_STABILITY.md",
-      "end": 137,
-      "line": 135,
+      "end": 140,
+      "line": 138,
       "missing": [],
       "section": "leakage-screen",
       "tests": [
@@ -881,8 +881,8 @@
     {
       "cited": [],
       "doc": "docs/API_STABILITY.md",
-      "end": 175,
-      "line": 171,
+      "end": 178,
+      "line": 174,
       "missing": [],
       "section": "leakage-screen",
       "tests": [
@@ -901,8 +901,8 @@
     {
       "cited": [],
       "doc": "docs/API_STABILITY.md",
-      "end": 187,
-      "line": 184,
+      "end": 190,
+      "line": 187,
       "missing": [],
       "section": "leakage-screen",
       "tests": [
@@ -918,8 +918,8 @@
     {
       "cited": [],
       "doc": "docs/API_STABILITY.md",
-      "end": 188,
-      "line": 187,
+      "end": 191,
+      "line": 190,
       "missing": [],
       "section": "leakage-screen",
       "tests": [
@@ -935,8 +935,8 @@
     {
       "cited": [],
       "doc": "docs/API_STABILITY.md",
-      "end": 200,
-      "line": 198,
+      "end": 203,
+      "line": 201,
       "missing": [],
       "section": "deployment-contract",
       "tests": [
@@ -953,8 +953,8 @@
     {
       "cited": [],
       "doc": "docs/API_STABILITY.md",
-      "end": 201,
-      "line": 200,
+      "end": 204,
+      "line": 203,
       "missing": [],
       "section": "deployment-contract",
       "tests": [
@@ -969,8 +969,8 @@
     {
       "cited": [],
       "doc": "docs/API_STABILITY.md",
-      "end": 209,
-      "line": 205,
+      "end": 212,
+      "line": 208,
       "missing": [],
       "section": "security-surface",
       "tests": [
@@ -987,8 +987,8 @@
     {
       "cited": [],
       "doc": "docs/API_STABILITY.md",
-      "end": 212,
-      "line": 209,
+      "end": 215,
+      "line": 212,
       "missing": [],
       "section": "security-surface",
       "tests": [
@@ -1004,8 +1004,8 @@
     {
       "cited": [],
       "doc": "docs/API_STABILITY.md",
-      "end": 219,
-      "line": 217,
+      "end": 222,
+      "line": 220,
       "missing": [],
       "section": "governed-data-surface",
       "tests": [
@@ -1020,8 +1020,8 @@
     {
       "cited": [],
       "doc": "docs/API_STABILITY.md",
-      "end": 280,
-      "line": 276,
+      "end": 283,
+      "line": 279,
       "missing": [],
       "section": "bundle-migration",
       "tests": [
@@ -1039,8 +1039,8 @@
     {
       "cited": [],
       "doc": "docs/API_STABILITY.md",
-      "end": 282,
-      "line": 280,
+      "end": 285,
+      "line": 283,
       "missing": [],
       "section": "bundle-migration",
       "tests": [
@@ -1331,6 +1331,20 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
+      "end": 22,
+      "line": 22,
+      "missing": [],
+      "section": "read-first",
+      "tests": [],
+      "text": "`evaluation.json` | The one-time locked-test result and confidence intervals. `shipped` says whether the served model was refit on development and test rows together after the test (`refit`, `rows`, `reason` when it was not); the test metrics are those of the fit that never saw the test rows.",
+      "vague": [],
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
       "end": 23,
       "line": 23,
       "missing": [],
@@ -1393,7 +1407,7 @@
         "tests/integration/test_charter_run.py::test_a_charter_run_writes_valid_stability_and_shift_reports",
         "tests/integration/test_charter_run.py::test_a_reference_sample_gives_a_pass_or_fail_never_unverifiable"
       ],
-      "text": "`shift_report.json` | With `--charter`: the exploration set against the deployment sample named by `reference`. Status is `pass` (no shift detected), `fail` or `unverifiable`; without a deployment sample it is `unverifiable`, never `pass`. Holds the classifier and kernel two-sample tests (permutation p-values), per-feature KS or chi-square under Benjamini-Hochberg, subgroup coverage for `sensitive_columns`, and the forward check, which a run reports as skipped because the final-test set is opened only by the final evaluation. Per-period drift is not implemented.",
+      "text": "`shift_report.json` | With `--charter`: the exploration set against the deployment sample named by `reference`. Status is `pass` (no shift detected), `fail` or `unverifiable`; without a deployment sample it is `unverifiable`, never `pass`. Holds the classifier and kernel two-sample tests (permutation p-values), per-feature KS or chi-square under Benjamini-Hochberg, subgroup coverage for `sensitive_columns`, and the forward check, which a run reports as skipped because the final-test set is opened only by the final evaluation. With a time column, `periods` holds per-period drift: the exploration rows cut into contiguous periods of equal size (at least 50 rows, at most ten periods), each later period compared with the first per feature (KS or chi-square) under one Benjamini-Hochberg adjustment over every period and column, with status `pass`, `fail` or `unverifiable` (no time column; `not_run` in reports written before it existed).",
       "vague": [],
       "words": [
         "never"
@@ -1717,6 +1731,50 @@
       "words": [
         "block",
         "blocks"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 160,
+      "line": 160,
+      "missing": [],
+      "section": "parameter-estimation-scmle-estimate-scmle-run---estimation",
+      "tests": [],
+      "text": "`parameter_estimation_refusal.json` | When the declaration cannot be estimated on the data: `status` `refused`, the `reason`, its `category` and `details`, the estimand and the policy. Writing it removes a `parameter_estimation.json` left in the same folder, so the folder never holds both.",
+      "vague": [],
+      "words": [
+        "cannot",
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 181,
+      "line": 181,
+      "missing": [],
+      "section": "erasure-scmle-forget-retire-delete",
+      "tests": [],
+      "text": "`<bundle>/retired.json` | The retirement mark (`reason`, `retired`). It is not a checksummed member, so the bundle's content address is unchanged; `Bundle.load` refuses the directory with `RetiredError`, and a mark that cannot be parsed still retires it.",
+      "vague": [],
+      "words": [
+        "cannot",
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 189,
+      "line": 188,
+      "missing": [],
+      "section": "erasure-scmle-forget-retire-delete",
+      "tests": [],
+      "text": "They hold digests, ids, signatures and the run's decisions, never row values.",
+      "vague": [],
+      "words": [
+        "never"
       ]
     },
     {
@@ -2136,6 +2194,77 @@
       "vague": [],
       "words": [
         "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/CLI.md",
+      "end": 276,
+      "line": 272,
+      "missing": [],
+      "section": "parameter-estimation",
+      "tests": [],
+      "text": "When the declaration cannot be estimated on the data (a missing or inconsistent column, missing values under the `reject` policy, a likelihood the estimator does not fit, or the estimator's own refusal) it writes `parameter_estimation_refusal.json` with the reason and exits 2 (gate `estimate.refusal`).",
+      "vague": [],
+      "words": [
+        "cannot",
+        "refusal"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/CLI.md",
+      "end": 277,
+      "line": 276,
+      "missing": [],
+      "section": "parameter-estimation",
+      "tests": [],
+      "text": "`run --estimation` makes the same estimate beside model selection and keeps it in the run directory; model selection never reads it.",
+      "vague": [],
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/CLI.md",
+      "end": 302,
+      "line": 298,
+      "missing": [],
+      "section": "clustering",
+      "tests": [],
+      "text": "It tries each method at each count in `--counts` (each at least 2; default 2 to 8), scores each candidate by silhouette, Davies-Bouldin and Calinski-Harabasz and by its stability over `--rounds` bootstrap refits, and writes a bundle of task `clustering` with `clustering.json` beside it into `--output`, which must be new or empty.",
+      "vague": [],
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/CLI.md",
+      "end": 304,
+      "line": 303,
+      "missing": [],
+      "section": "clustering",
+      "tests": [],
+      "text": "`--truth` names a column of known groups to measure agreement against (it is never a feature).",
+      "vague": [],
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/CLI.md",
+      "end": 335,
+      "line": 332,
+      "missing": [],
+      "section": "forgetting-retiring-and-deleting",
+      "tests": [],
+      "text": "`retire` retires one bundle directory, or a registered version with `--model` and `--version`: the bundle is refused from then on (`RetiredError`, exit 2) and a registered version's release state becomes `retired`.",
+      "vague": [],
+      "words": [
+        "refused"
       ]
     },
     {
@@ -3126,8 +3255,22 @@
     {
       "cited": [],
       "doc": "docs/READING_RESULTS.md",
-      "end": 249,
-      "line": 247,
+      "end": 56,
+      "line": 54,
+      "missing": [],
+      "section": "the-two-scores-practice-and-exam",
+      "tests": [],
+      "text": "The exam score stays that of the fit that never saw the exam rows, so it is a slightly cautious preview of the served model.",
+      "vague": [],
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/READING_RESULTS.md",
+      "end": 258,
+      "line": 256,
       "missing": [],
       "section": "a-second-mode-the-charter",
       "tests": [
@@ -3142,8 +3285,8 @@
     {
       "cited": [],
       "doc": "docs/READING_RESULTS.md",
-      "end": 314,
-      "line": 313,
+      "end": 323,
+      "line": 322,
       "missing": [],
       "section": "a-second-mode-the-charter",
       "tests": [
@@ -3158,8 +3301,8 @@
     {
       "cited": [],
       "doc": "docs/READING_RESULTS.md",
-      "end": 325,
-      "line": 324,
+      "end": 334,
+      "line": 333,
       "missing": [],
       "section": "the-tiers-in-plain-words",
       "tests": [
@@ -3175,8 +3318,8 @@
     {
       "cited": [],
       "doc": "docs/READING_RESULTS.md",
-      "end": 346,
-      "line": 346,
+      "end": 355,
+      "line": 355,
       "missing": [],
       "section": "other-charter-files-worth-a-glance",
       "tests": [
@@ -3450,6 +3593,7 @@
     },
     {
       "cited": [
+        "tests/docs/test_site_custody.py::test_the_confirmation_stage_binds_the_release_before_it_opens_c",
         "tests/leakage/test_custody_access.py::test_a_release_for_a_different_selection_is_refused_by_the_vault",
         "tests/unit/test_custody_sealed.py::test_a_committed_set_opens_only_for_its_claims_and_ledger",
         "tests/unit/test_vault.py::test_a_bound_vault_refuses_a_release_for_another_selection"
@@ -3460,14 +3604,14 @@
       "missing": [],
       "section": "what-is-tested-about-custody-and-what-is-not",
       "tests": [
+        "tests/docs/test_site_custody.py::test_the_confirmation_stage_binds_the_release_before_it_opens_c",
         "tests/leakage/test_custody_access.py::test_a_release_for_a_different_selection_is_refused_by_the_vault",
         "tests/unit/test_custody_sealed.py::test_a_committed_set_opens_only_for_its_claims_and_ledger",
         "tests/unit/test_vault.py::test_a_bound_vault_refuses_a_release_for_another_selection"
       ],
-      "text": "The one release can be bound to a claims hash and a ledger hash; the vault refuses a release for any other pair | `tests/unit/test_vault.py::test_a_bound_vault_refuses_a_release_for_another_selection`, `tests/unit/test_custody_sealed.py::test_a_committed_set_opens_only_for_its_claims_and_ledger`, `tests/leakage/test_custody_access.py::test_a_release_for_a_different_selection_is_refused_by_the_vault` | Available as `Locker.commit` and `open(..., claims_hash, ledger_hash)`. The confirmation stage does not call `commit` yet, so charter runs are not bound; the vault enforces the binding only if someone sets it",
+      "text": "The one release is bound to a claims hash and a ledger hash; the vault refuses a release for any other pair, and the confirmation stage binds every charter run before it opens `C` | `tests/unit/test_vault.py::test_a_bound_vault_refuses_a_release_for_another_selection`, `tests/unit/test_custody_sealed.py::test_a_committed_set_opens_only_for_its_claims_and_ledger`, `tests/leakage/test_custody_access.py::test_a_release_for_a_different_selection_is_refused_by_the_vault`, `tests/docs/test_site_custody.py::test_the_confirmation_stage_binds_the_release_before_it_opens_c` | `Locker.commit` and `open(..., claims_hash, ledger_hash)`; the confirmation stage calls `commit` with the frozen claims hash and ledger head, unless the set was already committed. A caller that opens `C` outside the stage without a binding is not bound",
       "vague": [],
       "words": [
-        "enforces",
         "refuses"
       ]
     },
@@ -5531,7 +5675,7 @@
       "missing": [],
       "section": "statistic",
       "tests": [
-        "tests/benchmarks/test_evidence_leakage.py::test_a_clean_refusal_or_crash_counts_against_the_row"
+        "tests/benchmarks/test_evidence_leakage.py::test_a_clean_refusal_crash_or_missing_table_counts_against_the_row"
       ],
       "text": "False blocks: clean cases that did not reach a model plan (blocked, refused by another gate, or crashed) over clean cases.",
       "vague": [],
@@ -5549,6 +5693,7 @@
       "missing": [],
       "section": "decision-rule",
       "tests": [
+        "tests/benchmarks/test_evidence_leakage.py::test_holm_steps_down_over_the_four_stage_d_rows",
         "tests/benchmarks/test_evidence_leakage.py::test_low_recall_fails",
         "tests/benchmarks/test_evidence_leakage.py::test_too_many_false_blocks_fail"
       ],
@@ -5565,7 +5710,9 @@
       "line": 47,
       "missing": [],
       "section": "decision-rule",
-      "tests": [],
+      "tests": [
+        "tests/benchmarks/test_evidence_leakage.py::test_holm_steps_down_over_the_four_stage_d_rows"
+      ],
       "text": "False blocks: `Ceiling(false_block_max = 0.05)` upper bound at the Holm-adjusted `alpha`.",
       "vague": [],
       "words": [
@@ -5580,6 +5727,7 @@
       "missing": [],
       "section": "decision-rule",
       "tests": [
+        "tests/benchmarks/test_evidence_leakage.py::test_holm_steps_down_over_the_four_stage_d_rows",
         "tests/benchmarks/test_preregistration_rules.py::test_fewer_trials_than_the_minimum_cannot_pass",
         "tests/benchmarks/test_preregistration_rules.py::test_holm_sizes_the_four_stage_d_rows"
       ],
@@ -5597,6 +5745,7 @@
       "missing": [],
       "section": "decision-rule",
       "tests": [
+        "tests/benchmarks/test_evidence_leakage.py::test_holm_steps_down_over_the_four_stage_d_rows",
         "tests/benchmarks/test_preregistration_rules.py::test_fewer_trials_than_the_minimum_cannot_pass"
       ],
       "text": "Fewer cases than the rule's minimum cannot pass.",
@@ -5629,7 +5778,7 @@
       "missing": [],
       "section": "what-counts-as-a-failure",
       "tests": [
-        "tests/benchmarks/test_evidence_leakage.py::test_a_clean_refusal_or_crash_counts_against_the_row"
+        "tests/benchmarks/test_evidence_leakage.py::test_a_clean_refusal_crash_or_missing_table_counts_against_the_row"
       ],
       "text": "A clean case is a false block when it does not reach a plan for any reason.",
       "vague": [],
@@ -5644,7 +5793,9 @@
       "line": 77,
       "missing": [],
       "section": "what-counts-as-a-failure",
-      "tests": [],
+      "tests": [
+        "tests/benchmarks/test_evidence_leakage.py::test_a_clean_refusal_crash_or_missing_table_counts_against_the_row"
+      ],
       "text": "A case whose table cannot be loaded counts against the row (a miss or a false block), never drops out.",
       "vague": [],
       "words": [
@@ -5656,8 +5807,22 @@
     {
       "cited": [],
       "doc": "docs/preregistration/c2.md",
-      "end": 98,
-      "line": 97,
+      "end": 97,
+      "line": 94,
+      "missing": [],
+      "section": "where-the-current-module-differs",
+      "tests": [],
+      "text": "- Holm is applied with the two C14 rows entered as not rejected (they are decided in `benchmarks/evidence/refusal.py`), which can only lower the C2 levels; at the first step the 78 clean tables are below the 86 a pass needs.",
+      "vague": [],
+      "words": [
+        "rejected"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/preregistration/c2.md",
+      "end": 99,
+      "line": 98,
       "missing": [],
       "section": "where-the-current-module-differs",
       "tests": [],
@@ -5767,7 +5932,7 @@
       "tests": [
         "tests/benchmarks/test_preregistration_rules.py::test_the_scorecard_decides_each_registered_criterion"
       ],
-      "text": "The awkward-file corpus is 100 percent correct or refused; point-in-time features equal an independent naive implementation on at least 1,000 generated worlds and at least 5 real relational datasets; no entity, duplicate or tied timestamp on both sides of any split.",
+      "text": "The awkward-file corpus is 100 percent correct or refused; point-in-time features equal an independent naive implementation on at least 1,000 generated worlds and at least 5 real relational datasets; no declared entity and no tied timestamp on both sides of any split.",
       "vague": [],
       "words": [
         "refused"
@@ -5776,8 +5941,8 @@
     {
       "cited": [],
       "doc": "docs/preregistration/c5.md",
-      "end": 18,
-      "line": 14,
+      "end": 20,
+      "line": 16,
       "missing": [],
       "section": "population-and-data",
       "tests": [],
@@ -5790,14 +5955,14 @@
     {
       "cited": [],
       "doc": "docs/preregistration/c5.md",
-      "end": 41,
-      "line": 39,
+      "end": 44,
+      "line": 41,
       "missing": [],
       "section": "statistic",
       "tests": [
         "tests/benchmarks/test_preregistration_rules.py::test_a_refused_readable_file_is_reported_and_not_a_failure"
       ],
-      "text": "Counts: files `correct`, `refused` (with over-refusal of a readable file reported) and `wrong`; worlds and real datasets equal within tolerance; splits with a shared entity, duplicate or tied timestamp.",
+      "text": "Counts: files `correct`, `refused` (with over-refusal of a readable file reported) and `wrong`; worlds and real datasets equal within tolerance; splits with a shared entity, tied timestamp, duplicate record of one declared entity, or duplicate record (the last reported only).",
       "vague": [],
       "words": [
         "refusal"
@@ -5806,36 +5971,53 @@
     {
       "cited": [],
       "doc": "docs/preregistration/c5.md",
-      "end": 61,
-      "line": 58,
-      "missing": [],
-      "section": "what-counts-as-a-failure",
-      "tests": [
-        "tests/benchmarks/test_evidence_reading.py::test_judge_catches_renamed_columns_and_a_table_for_a_refusal",
-        "tests/benchmarks/test_evidence_reading.py::test_one_real_dataset_that_disagrees_fails",
-        "tests/benchmarks/test_evidence_reading.py::test_one_silent_error_or_mismatch_fails",
-        "tests/benchmarks/test_preregistration_rules.py::test_a_crash_other_than_a_data_error_is_not_a_refusal"
-      ],
-      "text": "A table returned that differs from the expected one, or returned where a refusal was expected; a world or dataset that differs; a crash other than `DataError` on a file; a split that shares an entity, duplicate or tied timestamp.",
-      "vague": [],
-      "words": [
-        "refusal"
-      ]
-    },
-    {
-      "cited": [],
-      "doc": "docs/preregistration/c5.md",
-      "end": 62,
+      "end": 64,
       "line": 61,
       "missing": [],
       "section": "what-counts-as-a-failure",
       "tests": [
+        "tests/benchmarks/test_evidence_reading.py::test_a_duplicate_of_one_declared_entity_fails_where_it_may_not_cross",
+        "tests/benchmarks/test_evidence_reading.py::test_judge_catches_renamed_columns_and_a_table_for_a_refusal",
+        "tests/benchmarks/test_evidence_reading.py::test_one_real_dataset_that_disagrees_fails",
+        "tests/benchmarks/test_evidence_reading.py::test_one_silent_error_or_mismatch_fails",
+        "tests/benchmarks/test_evidence_reading.py::test_one_split_with_an_entity_copy_or_timestamp_across_fails",
+        "tests/benchmarks/test_preregistration_rules.py::test_a_crash_other_than_a_data_error_is_not_a_refusal"
+      ],
+      "text": "A table returned that differs from the expected one, or returned where a refusal was expected; a world or dataset that differs; a crash other than `DataError` on a file; a split that shares a declared entity, a tied timestamp or a duplicate record of one declared entity.",
+      "vague": [],
+      "words": [
+        "refusal"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/preregistration/c5.md",
+      "end": 67,
+      "line": 65,
+      "missing": [],
+      "section": "what-counts-as-a-failure",
+      "tests": [
+        "tests/benchmarks/test_evidence_reading.py::test_a_duplicate_crossing_alone_is_reported_and_passes",
         "tests/benchmarks/test_preregistration_rules.py::test_a_refused_readable_file_is_reported_and_not_a_failure"
       ],
       "text": "A refusal of a readable file is not a failure of this row but is reported (it counts towards C14).",
       "vague": [],
       "words": [
         "refusal"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/preregistration/c5.md",
+      "end": 87,
+      "line": 84,
+      "missing": [],
+      "section": "where-the-current-module-differs",
+      "tests": [],
+      "text": "- Amended 2026-11-19 (owner decision): identical rows are independent draws and may cross a split, as in scikit-learn, OpenML and the practitioner baseline; copies of one declared entity (`group_column`, or `entities = unseen`) never cross.",
+      "vague": [],
+      "words": [
+        "never"
       ]
     },
     {
@@ -12684,8 +12866,8 @@
       ]
     }
   ],
-  "seconds": 4.6,
-  "test_links": 1225,
+  "seconds": 3.2,
+  "test_links": 1232,
   "vague": 0,
   "version": 2
 }

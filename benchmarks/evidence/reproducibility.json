@@ -1,6 +1,6 @@
 {
   "claim": "C6",
-  "code": "cf0c8c357ff4083035a393de6d27b599ffd3da14e8f5982c7ca54d30df9ec49d",
+  "code": "5facbb7f8105976fe3825fe68a2d8db0b7c6cb85fcce0155341ce7dd40a2d067",
   "not_measured": [
     "platforms other than those recorded here",
     "a clean-runner rebuild from the lock file",
@@ -27,7 +27,7 @@
         }
       },
       "rows": 600,
-      "seconds": 431.1,
+      "seconds": 47.0,
       "seed": 7,
       "tasks": {
         "binary": {
@@ -38,13 +38,13 @@
           },
           "hashes": {
             "conformal.json": "0acdda4b2b8c5dbe0edd17b67714f67870510c27b6aa4b098e905a1ef2cbf5b4",
-            "coverage_report.json": "f9bed89f1d321a3592f3d0dd6c7bf7098cbf8b4760552fd66b676194033b1e3b",
-            "model_manifest.json": "3405cbb00b4541f8f6a24f9b67538ffcbbecab5ed935109acd5375b97f5af571",
+            "coverage_report.json": "e2282ae6f28ad23f8ff48bc314bb0475a6c0a9b34c454600dce0de57184d71db",
+            "model_manifest.json": "8fc547ace8556f71bc4212e9c198e1d92745fadf2738be64ed887d7c9a0841e5",
             "novelty.joblib": "9064537f33db4f61ea6aec6caa8949613d712c7d86338820fc2c81e15f5d9ffc",
-            "pipeline.joblib": "25c6a38f56b6b844980d4c4249a0f3087cccfba417bcb956411d1c8e9f02f8a8",
+            "pipeline.joblib": "43571619fecd289e0cffc115b5646b33aa7eaee0d739ee4a07a06cb9e33ea7df",
             "reference.json": "f3a2b0a07b368a3db9d76bc84632627fa2e06ccfc5159d5d4cc54cd521e91b61",
             "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
-            "signature.json": "3693af0e88573bdbc66816fbeaa9714ecf6fec8d5876c6f88cac17dcf394e06a"
+            "signature.json": "f72a4fb27c5b405454d0d40e9b64a6caa82986a5fe19362fe81f8c9949db67dc"
           },
           "members": 8,
           "metrics": {
@@ -56,8 +56,8 @@
             "roc_auc": 0.9598997493734336
           },
           "seconds": [
-            90.8,
-            71.2
+            3.1,
+            3.1
           ],
           "selected": [
             "logistic_regression",
@@ -66,7 +66,7 @@
           "threads": [
             {
               "internal_api": "openmp",
-              "num_threads": 12,
+              "num_threads": 1,
               "version": null
             }
           ],
@@ -77,33 +77,37 @@
           "untraced": []
         },
         "interaction": {
-          "differing": [],
+          "differing": [
+            "model_manifest.json",
+            "pipeline.joblib",
+            "signature.json"
+          ],
           "gap": {
             "absolute": 0.0,
             "relative": 0.0
           },
           "hashes": {
-            "conformal.json": "c53e56dc776e7d91b89229f5d1e56fff73a83958ac28e8749622fca806b1682f",
-            "coverage_report.json": "55c021183fefafdc785e94307e24357426835fdde481bf6afa0d8d2cf80bf626",
-            "model_manifest.json": "b98f5de61d168979a5808f93b5273e6ab016400f102d7ba895bf118ba6658eb4",
+            "conformal.json": "8a97100747644726b7041f736619e5ae937d884cea87d442274ee2495cd4cd08",
+            "coverage_report.json": "a1f799a5a19dbc3b374b7dc650e7207e8cae6f897de2f5816896f46698a523a7",
+            "model_manifest.json": "c179469697727f37c7c307299b2cc5197bae06fb9abcb1ee6623628df57f0f23",
             "novelty.joblib": "72bb57854c0eb134a0a5841141e9a9fba807580b0e004a6e011ddb93387fd8c5",
-            "pipeline.joblib": "cd71db618141ea12d9303539a7690952599fa87864c4d1a7f78a4951b1eeb175",
-            "reference.json": "f29412558b3106cc485aec7a6205161133b031f43ccc0c4171a66969946a88d3",
+            "pipeline.joblib": "ddea31d2627a780f00f0dd55e3f23d890e52a351bb25bb2d749f700cc580717b",
+            "reference.json": "5458eb7ca147bf273db1ca9b297ead6ecd27167c25a6915d8d47a8bda2d79ff0",
             "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
-            "signature.json": "4f3d02baadb89bd2fd11c7cce9050444bb2dac70b73fbdaf5d2853a21f590e3e"
+            "signature.json": "7b328a954322f757cf2e8ee4a7e143e7d3f8fd25fe1e9916c8d51dc38b5ceffd"
           },
           "members": 8,
           "metrics": {
             "accuracy": 0.85,
             "balanced_accuracy": 0.8492769744160178,
             "f1": 0.8571428571428571,
-            "log_loss": 0.43491640012493477,
-            "pr_auc": 0.8252559564356262,
-            "roc_auc": 0.8672135706340378
+            "log_loss": 0.4343082532185374,
+            "pr_auc": 0.8182773493133442,
+            "roc_auc": 0.8670745272525028
           },
           "seconds": [
-            10.8,
-            17.0
+            4.2,
+            4.2
           ],
           "selected": [
             "random_forest",
@@ -112,7 +116,7 @@
           "threads": [
             {
               "internal_api": "openmp",
-              "num_threads": 12,
+              "num_threads": 1,
               "version": null
             }
           ],
@@ -130,13 +134,13 @@
           },
           "hashes": {
             "conformal.json": "fd926007ec8e2278e82be3604bf8682a74f60ddef350ff31a9e20e3377a6f383",
-            "coverage_report.json": "b962ed592bbe565cdd5f0f077845291d96ee79798a9ae931849d5300a6eecdfe",
-            "model_manifest.json": "c7d6d7afdcd26e5b8188f98acb206afe51899cade1f7dd0c74080632075d373e",
+            "coverage_report.json": "bdb4439e624675bf0a25e9c96075efcad2f537198b39438234eb0e84c797f10d",
+            "model_manifest.json": "428fa4aa91f457b67f849e50039bb8d5252dc29d220fd6a27f0d7d7676c98980",
             "novelty.joblib": "54146f7d822f6789680d2c004377f2e6997f4ee654b926cd59694542afbf9ad5",
-            "pipeline.joblib": "546d3b2c6b395a50e948d8721059e4debf844f63c3b43ed8bf74c7e780603d9b",
+            "pipeline.joblib": "8e3533d5eadb54f1f30c5945345f30b54a8b068d492fa90232bea39b6d2f99ac",
             "reference.json": "09bb8ca652ed2976ce402c34ee1e2f2654b787e23e762cf06680eb54569a354e",
             "schema.json": "9328b9e7e7899e6e6b1d43ca3a12e7f80488bcaa10e8c94828b369f9bf5b8af0",
-            "signature.json": "ac69afa110185008ef5a2ec40c1addea26c18d9b087cabbc3d37bd42b117f4db"
+            "signature.json": "b71f32b9bb0e9eb991c56923ff00d7e4b178f9abb3db9e7cbb530aab7ae38989"
           },
           "members": 8,
           "metrics": {
@@ -146,8 +150,8 @@
             "log_loss": 0.6388598548604971
           },
           "seconds": [
-            110.3,
-            80.4
+            6.5,
+            6.6
           ],
           "selected": [
             "logistic_regression",
@@ -156,7 +160,7 @@
           "threads": [
             {
               "internal_api": "openmp",
-              "num_threads": 12,
+              "num_threads": 1,
               "version": null
             }
           ],
@@ -174,15 +178,15 @@
           },
           "hashes": {
             "conformal.json": "8fb2722c2938e9ae4ae988f90d1cc883e82fb68af215402e43a6379b757a6e65",
-            "coverage_report.json": "f604902133c14be33cfe73a4accc206187de8048258ab0020f7a269da4ac7a2d",
+            "coverage_report.json": "986873f464b51707234a6f5db5134e2d04846051e5563b5b37ecb8d2a5c4fdde",
             "cv_plus.joblib": "5af87ecc7e65ebd6628eb6cb433fed95d124ab70977d640e464ef13d9aec755f",
-            "model_manifest.json": "28f25cf432e2f957ba1827d7c9bb8ca67871bd1c52fd126b181ce85c0aa19680",
+            "model_manifest.json": "1f4f139463ef5141606219d4b164dce801a129a11f6b22d4aa7c6edd5deb174f",
             "novelty.joblib": "73b4418b09c0fe119f7d1511ba86a24231b4a831d15cd245bafbb61a40214616",
-            "pipeline.joblib": "317b000b380bc7a615582d023de6d24ce9412569eb1d779cd48d37c253e96174",
-            "quantile.joblib": "6cb3e30bbc1fc6c492b0d4fbf2386468b23fffdcd15111246088d86ee745145f",
+            "pipeline.joblib": "72e5f4c2c290747ff09e39d8da192416d09a529f06ccdf0d6e1f89125ec92ef3",
+            "quantile.joblib": "2ab5c66108cb939147652541807387efbee9b40af9c54193f84da8df9600dbb4",
             "reference.json": "df3913ce339ff0d93403e28f4a9a3080dd5083de297d1ee92ee039ad2647df93",
             "schema.json": "26fb7bc1a1560ce271d432aedc31d2dfcb678bbb14221244681825785972337f",
-            "signature.json": "df08ffc366e1a8de64d04c93153418a32a7757410c66b635231652fdce9d7239"
+            "signature.json": "c0c18c1d5c003c725045311ae4a922c998ca3911c36f65014027c1eea988c1b0"
           },
           "members": 10,
           "metrics": {
@@ -191,8 +195,8 @@
             "rmse": 0.929535482795817
           },
           "seconds": [
-            18.9,
-            16.5
+            2.9,
+            3.0
           ],
           "selected": [
             "ridge",
@@ -201,7 +205,7 @@
           "threads": [
             {
               "internal_api": "openmp",
-              "num_threads": 12,
+              "num_threads": 1,
               "version": null
             }
           ],

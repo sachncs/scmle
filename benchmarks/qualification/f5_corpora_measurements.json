@@ -1,15 +1,15 @@
 {
   "code_hashes": {
-    "f5-duplicates": "5a0500b9a74c8a147d2846a314df9aef2dadad720cba42dda7b0bc8be118a693",
+    "f5-duplicates": "d90f8a54d6bffc7e5594e46ee3d5ce871a69f48cb597263fc3cfc0463a892c45",
     "f5-label-noise": "12d30138d73673c537192313dc438b95766e3ccc7b5c814fce2a159e902dbe8c",
     "f5-missingness": "11c53842564a7a4f14898eee4b539220610f3d440a99942bc544e4d6b06be2f3",
     "f5-outlier-triage": "89af4eaf67489c876d2f32e23e287c1d95d5bbfb6056052a9ae69a5e298037cf",
     "f5-sentinel": "d583f581be1c5fe326bb1d586207d4ca7a6e51f249d22b12f1ad9a28bde8e6df"
   },
   "policy": {
-    "confidence": 0.95,
+    "confidence": 0.9,
     "false_alarm_ceiling": 0.05,
-    "recall_floor": 0.8
+    "recall_floor": 0.9
   },
   "seeds": [
     0,
@@ -32,62 +32,62 @@
           "false_alarms": 1797,
           "passes_floor": false,
           "planted": 1689,
-          "recall_lower": 0.9977
+          "recall_lower": 0.9982
         },
         {
           "clean_rows": 1797,
           "defect_type": "duplicate_exact",
           "detected": 900,
           "detector": "f5-duplicates",
-          "false_alarm_upper": 0.0021,
+          "false_alarm_upper": 0.0017,
           "false_alarms": 0,
           "passes_floor": true,
           "planted": 900,
-          "recall_lower": 0.9957
+          "recall_lower": 0.9967
         },
         {
           "clean_rows": 1797,
           "defect_type": "duplicate_near",
           "detected": 900,
           "detector": "f5-duplicates",
-          "false_alarm_upper": 0.0021,
+          "false_alarm_upper": 0.0017,
           "false_alarms": 0,
           "passes_floor": true,
           "planted": 900,
-          "recall_lower": 0.9957
+          "recall_lower": 0.9967
         },
         {
           "clean_rows": 1797,
           "defect_type": "label_flip_symmetric",
           "detected": 785,
           "detector": "f5-label-noise",
-          "false_alarm_upper": 0.0057,
+          "false_alarm_upper": 0.0051,
           "false_alarms": 4,
-          "passes_floor": true,
+          "passes_floor": false,
           "planted": 900,
-          "recall_lower": 0.8488
+          "recall_lower": 0.8525
         },
         {
           "clean_rows": 1797,
           "defect_type": "label_flip_class_conditional",
           "detected": 500,
           "detector": "f5-label-noise",
-          "false_alarm_upper": 0.0057,
+          "false_alarm_upper": 0.0051,
           "false_alarms": 4,
-          "passes_floor": true,
+          "passes_floor": false,
           "planted": 585,
-          "recall_lower": 0.8238
+          "recall_lower": 0.8285
         },
         {
           "clean_rows": 1797,
           "defect_type": "outlier_error",
           "detected": 2102,
           "detector": "f5-outlier-triage",
-          "false_alarm_upper": 0.0021,
+          "false_alarm_upper": 0.0017,
           "false_alarms": 0,
-          "passes_floor": true,
+          "passes_floor": false,
           "planted": 2433,
-          "recall_lower": 0.8498
+          "recall_lower": 0.852
         }
       ],
       "rows": 1797
@@ -101,66 +101,66 @@
           "defect_type": "sentinel",
           "detected": 141,
           "detector": "f5-sentinel",
-          "false_alarm_upper": 0.2639,
+          "false_alarm_upper": 0.2541,
           "false_alarms": 29,
           "passes_floor": false,
           "planted": 141,
-          "recall_lower": 0.9735
+          "recall_lower": 0.979
         },
         {
           "clean_rows": 150,
           "defect_type": "duplicate_exact",
           "detected": 75,
           "detector": "f5-duplicates",
-          "false_alarm_upper": 0.0368,
+          "false_alarm_upper": 0.0312,
           "false_alarms": 1,
           "passes_floor": true,
           "planted": 75,
-          "recall_lower": 0.9513
+          "recall_lower": 0.9608
         },
         {
           "clean_rows": 150,
           "defect_type": "duplicate_near",
           "detected": 75,
           "detector": "f5-duplicates",
-          "false_alarm_upper": 0.0368,
+          "false_alarm_upper": 0.0312,
           "false_alarms": 1,
           "passes_floor": true,
           "planted": 75,
-          "recall_lower": 0.9513
+          "recall_lower": 0.9608
         },
         {
           "clean_rows": 150,
           "defect_type": "label_flip_symmetric",
           "detected": 58,
           "detector": "f5-label-noise",
-          "false_alarm_upper": 0.025,
+          "false_alarm_upper": 0.0198,
           "false_alarms": 0,
           "passes_floor": false,
           "planted": 75,
-          "recall_lower": 0.6666
+          "recall_lower": 0.6796
         },
         {
           "clean_rows": 150,
           "defect_type": "label_flip_class_conditional",
           "detected": 51,
           "detector": "f5-label-noise",
-          "false_alarm_upper": 0.025,
+          "false_alarm_upper": 0.0198,
           "false_alarms": 0,
           "passes_floor": false,
           "planted": 70,
-          "recall_lower": 0.6146
+          "recall_lower": 0.6276
         },
         {
           "clean_rows": 150,
           "defect_type": "outlier_error",
           "detected": 199,
           "detector": "f5-outlier-triage",
-          "false_alarm_upper": 0.025,
+          "false_alarm_upper": 0.0198,
           "false_alarms": 0,
           "passes_floor": true,
           "planted": 199,
-          "recall_lower": 0.9811
+          "recall_lower": 0.9851
         }
       ],
       "rows": 150
@@ -174,66 +174,66 @@
           "defect_type": "sentinel",
           "detected": 168,
           "detector": "f5-sentinel",
-          "false_alarm_upper": 0.255,
+          "false_alarm_upper": 0.246,
           "false_alarms": 34,
           "passes_floor": false,
           "planted": 168,
-          "recall_lower": 0.9776
+          "recall_lower": 0.9823
         },
         {
           "clean_rows": 178,
           "defect_type": "duplicate_exact",
           "detected": 90,
           "detector": "f5-duplicates",
-          "false_alarm_upper": 0.0211,
+          "false_alarm_upper": 0.0167,
           "false_alarms": 0,
           "passes_floor": true,
           "planted": 90,
-          "recall_lower": 0.9591
+          "recall_lower": 0.9673
         },
         {
           "clean_rows": 178,
           "defect_type": "duplicate_near",
           "detected": 90,
           "detector": "f5-duplicates",
-          "false_alarm_upper": 0.0211,
+          "false_alarm_upper": 0.0167,
           "false_alarms": 0,
           "passes_floor": true,
           "planted": 90,
-          "recall_lower": 0.9591
+          "recall_lower": 0.9673
         },
         {
           "clean_rows": 178,
           "defect_type": "label_flip_symmetric",
           "detected": 55,
           "detector": "f5-label-noise",
-          "false_alarm_upper": 0.0211,
+          "false_alarm_upper": 0.0167,
           "false_alarms": 0,
           "passes_floor": false,
           "planted": 90,
-          "recall_lower": 0.5078
+          "recall_lower": 0.5192
         },
         {
           "clean_rows": 178,
           "defect_type": "label_flip_class_conditional",
           "detected": 40,
           "detector": "f5-label-noise",
-          "false_alarm_upper": 0.0211,
+          "false_alarm_upper": 0.0167,
           "false_alarms": 0,
           "passes_floor": false,
           "planted": 90,
-          "recall_lower": 0.3462
+          "recall_lower": 0.3551
         },
         {
           "clean_rows": 178,
           "defect_type": "outlier_error",
           "detected": 247,
           "detector": "f5-outlier-triage",
-          "false_alarm_upper": 0.0211,
+          "false_alarm_upper": 0.0167,
           "false_alarms": 0,
           "passes_floor": true,
           "planted": 247,
-          "recall_lower": 0.9847
+          "recall_lower": 0.9879
         }
       ],
       "rows": 178
@@ -257,23 +257,23 @@
     {
       "defect_type": "label_flip_class_conditional",
       "detector": "f5-label-noise",
-      "table_level_wilson_lower": 0.0615,
+      "table_level_wilson_lower": 0.0,
       "tables": 3,
-      "tables_passing": 1
+      "tables_passing": 0
     },
     {
       "defect_type": "label_flip_symmetric",
       "detector": "f5-label-noise",
-      "table_level_wilson_lower": 0.0615,
+      "table_level_wilson_lower": 0.0,
       "tables": 3,
-      "tables_passing": 1
+      "tables_passing": 0
     },
     {
       "defect_type": "outlier_error",
       "detector": "f5-outlier-triage",
-      "table_level_wilson_lower": 0.4385,
+      "table_level_wilson_lower": 0.2077,
       "tables": 3,
-      "tables_passing": 3
+      "tables_passing": 2
     },
     {
       "defect_type": "sentinel",
