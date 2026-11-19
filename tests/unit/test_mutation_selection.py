@@ -48,3 +48,25 @@ def test_ties_prefer_the_default_strategy(registry) -> None:
         experiments.DEFAULT_STRATEGY,
         "aaa",
     ]
+
+
+def test_a_tolerance_and_one_standard_error_are_described_exactly() -> None:
+    rule = tasks.Selection(
+        tie_tolerance=0.005, uncertainty="one_standard_error"
+    )
+
+    assert selection.Averager.describe(rule) == (
+        "best mean CV score; 0.005 ties -> simpler_model; scores within one "
+        "standard error of the best are ties; dummy baseline excluded when "
+        "other models ran"
+    )
+
+
+def test_three_equal_folds_are_enough_for_a_bayesian_tie() -> None:
+    policy = selection.Averager(tasks.Selection(uncertainty="bayesian"))
+    best = trial("ridge", 0.8)
+    other = trial("lasso", 0.8)
+    best.fold_scores = [0.8, 0.8, 0.8]
+    other.fold_scores = [0.8, 0.8, 0.8]
+
+    assert policy.equivalent(best, other, 1) is True

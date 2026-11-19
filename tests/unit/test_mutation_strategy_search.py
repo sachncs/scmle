@@ -38,7 +38,10 @@ class Registry:
 
 
 class Context:
-    """Records every verdict, skip, allocation and transcription."""
+    """Records every verdict, skip, allocation and transcription.
+
+    It is its own services and journal, so it answers both.
+    """
 
     def __init__(self, names, top=2, better=True, reasons=None) -> None:
         self.spec = SimpleNamespace(
@@ -48,7 +51,7 @@ class Context:
             {"dummy": "baseline", "a": "linear", "b": "tree", "c": "tree"}
         )
         pending = list(reasons or [])
-        self.regulator = SimpleNamespace(
+        self.governor = SimpleNamespace(
             skip_reason=lambda first: pending.pop(0) if pending else None
         )
         self.metric = SimpleNamespace(name="accuracy", greater_is_better=better)
@@ -58,6 +61,8 @@ class Context:
         self.forgone: list[tuple[str, str]] = []
         self.counts: list[int] = []
         self.transcribed: list[experiments.Trial] = []
+        self.services = self
+        self.journal = self
 
     def enter(self, technique: str, edict: str, reason: str) -> None:
         self.entries.append((technique, edict, reason))
@@ -72,7 +77,7 @@ class Context:
     def transcribe(self, outcome: experiments.Trial) -> None:
         self.transcribed.append(outcome)
 
-    def check_cancelled(self) -> None:
+    def check(self) -> None:
         return None
 
 
@@ -165,7 +170,7 @@ def test_an_inapplicable_strategy_is_rejected_and_not_run(seen) -> None:
     context = Context(["w", "x", "y"], top=1)
     runner = Runner({"w": 0.95, "y": 0.85})
     strategy_search.Strategist(context, runner).search(SCREENED)
-    adapter = context.registry.adapters["c"]
+    adapter = context.services.registry.adapters["c"]
     assert seen == [
         (name, context.profile, tasks.Task.BINARY, adapter)
         for name in ("w", "x", "y")
