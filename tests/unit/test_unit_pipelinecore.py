@@ -196,7 +196,9 @@ def situation(spec=None, rows=10, width=2, wide=()):
         features=tuple(f"f{i}" for i in range(width)), high_cardinality=wide
     )
     profile = types.SimpleNamespace(
-        manifest=types.SimpleNamespace(rows=rows), feature_plan=plan
+        manifest=types.SimpleNamespace(rows=rows),
+        feature_plan=plan,
+        target_summary={"n_classes": 2},
     )
     return rules.Situation(spec or config(), profile, tasks.Task.BINARY)
 

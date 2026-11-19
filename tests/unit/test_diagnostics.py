@@ -50,6 +50,48 @@ def make_inputs(task, seed=0, rows=600):
     )
 
 
+def make_dated_inputs(rows=800):
+    """A model with a calendar part the pipeline derives from a date."""
+    month = tasks.Node(
+        name="when__month",
+        op="datepart",
+        inputs=["when"],
+        params={"part": "month"},
+    )
+    plan = data.Blueprint(
+        ("signal", "when__month"),
+        ("group",),
+        derived=(month,),
+        extra_inputs=("when",),
+    )
+    rng = numpy.random.default_rng(0)
+    frame = pandas.DataFrame(
+        {
+            "signal": rng.normal(size=rows),
+            "group": rng.choice(["a", "b"], rows),
+            "when": pandas.date_range("2025-01-01", periods=rows, freq="D"),
+        }
+    )
+    target = pandas.Series(
+        (frame.signal + rng.normal(0, 0.5, rows) > 0).astype(int)
+    )
+    task = tasks.Task.BINARY
+    split = rows // 2
+    model = preprocessing.instantiate(
+        plan, REGISTRY.get("logistic_regression"), task, 0
+    ).fit(frame.iloc[:split], target.iloc[:split])
+    return diagnostics.DiagnosticInput(
+        model,
+        frame.iloc[split:],
+        target.iloc[split:],
+        task,
+        metrics.CATALOG.resolve(None, task),
+        plan,
+        0,
+        reference_features=frame.iloc[:split],
+    )
+
+
 def test_importance_ranks_the_signal_feature_first():
     report = importance.Importance().compute(make_inputs(tasks.Task.BINARY))
     ranked = [row["feature"] for row in report["features"]]

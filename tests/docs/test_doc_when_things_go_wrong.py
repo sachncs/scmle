@@ -115,7 +115,7 @@ def test_every_handled_failure_exits_one(monkeypatch, error):
 def test_a_blocked_cli_run_exits_two_and_leaves_the_test_set_sealed(
     tmp_path, caplog
 ):
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:71.
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:83.
 
     Also enforces website/src/learn/when-things-go-wrong.html:39.
     """
@@ -136,7 +136,7 @@ def test_a_blocked_cli_run_exits_two_and_leaves_the_test_set_sealed(
 
 
 def test_no_model_that_can_enforce_the_monotonic_rule_blocks():
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:150.
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:171.
 
     Also enforces website/src/learn/when-things-go-wrong.html:72.
     """
@@ -159,7 +159,7 @@ def test_no_model_that_can_enforce_the_monotonic_rule_blocks():
 
 
 def test_an_unverified_feature_is_admitted_not_kept_out():
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:248.
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:269.
 
     Also enforces website/src/learn/when-things-go-wrong.html:110.
     """
@@ -191,7 +191,7 @@ def test_an_unverified_feature_is_admitted_not_kept_out():
 
 
 def test_an_attestation_that_expires_before_its_date_is_refused():
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:295.
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:316.
 
     Also enforces website/src/learn/leakage.html:97.
     Also enforces website/src/learn/when-things-go-wrong.html:135.
@@ -210,7 +210,7 @@ def test_an_attestation_that_expires_before_its_date_is_refused():
 
 
 def test_the_rollback_tolerance_defaults_to_one_hundredth():
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:554.
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:575.
 
     Also enforces website/src/learn/when-things-go-wrong.html:224-225.
     """
@@ -218,7 +218,7 @@ def test_the_rollback_tolerance_defaults_to_one_hundredth():
 
 
 def test_a_second_reply_to_the_same_escalation_is_refused(tmp_path, caplog):
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:685.
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:737.
 
     Also enforces website/src/learn/when-things-go-wrong.html:291.
     """
@@ -256,7 +256,7 @@ def test_a_second_reply_to_the_same_escalation_is_refused(tmp_path, caplog):
 
 
 def test_every_one_of_the_eleven_never_list_actions_needs_a_person(tmp_path):
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:709.
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:761.
 
     Also enforces website/src/learn/when-things-go-wrong.html:301.
     """
@@ -276,7 +276,7 @@ def test_every_one_of_the_eleven_never_list_actions_needs_a_person(tmp_path):
 
 
 def test_verify_cannot_see_that_the_newest_rows_were_removed(tmp_path, capsys):
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:713.
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:765.
 
     Also enforces website/src/learn/when-things-go-wrong.html:303.
     """
@@ -331,7 +331,7 @@ def problems(document=None, **changes):
 
 
 def test_each_live_failure_names_the_documented_problem():
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:754.
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:806.
 
     Also enforces website/src/learn/when-things-go-wrong.html:319.
     """
@@ -371,7 +371,7 @@ def test_each_live_failure_names_the_documented_problem():
 
 
 def test_verify_record_of_a_file_that_cannot_be_read_exits_one(tmp_path):
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:771.
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:823.
 
     Also enforces website/src/learn/when-things-go-wrong.html:323.
     """

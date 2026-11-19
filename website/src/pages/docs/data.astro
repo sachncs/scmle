@@ -23,11 +23,23 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
   <h2>Declare before you ingest</h2>
   <p>The modality is a semantic contract, not a file-extension guess. Set it explicitly when constructing <code>Project</code> or <code>Dataset</code>. The manifest carries that declaration into planning; a non-tabular declaration cannot silently inherit the tabular beta path.</p>
-  <pre><code>project = Project(
+  <pre><code class="language-python">{`import numpy as np
+import pandas as pd
+
+from scmle.api.project import Project
+
+rng = np.random.default_rng(0)
+pd.DataFrame({
+    "amount": rng.normal(size=300),
+    "visits": rng.integers(0, 9, size=300),
+    "label": rng.integers(0, 2, size=300),
+}).to_parquet("events.parquet")
+
+project = Project(
     data="events.parquet",
     target="label",
     modality="tabular",
-)</code></pre>
+)`}</code></pre>
 
   <h2>The curation pass</h2>
   <ol>
@@ -39,8 +51,13 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
   <h2 id="catalog-any-data">Catalog any dataset before modelling</h2>
   <p><code>Catalog</code> is the model-agnostic entry point for data that is not yet ready for a task or a model. It observes common Python forms—tables, arrays, column mappings, record sequences, scalars, and raw bytes—and records what was actually observed. For an opaque domain object, provide an adapter-owned observation and a caller-supplied SHA-256 identity; the catalog will not invent a process-dependent hash.</p>
-  <pre><code>{`from scmle.data.catalog import Catalog
+  <pre><code class="language-python">{`from scmle.data.catalog import Catalog
 
+records = [
+    {"order_id": 1, "amount": 12.5, "outcome": "paid"},
+    {"order_id": 2, "amount": None, "outcome": "refunded"},
+    {"order_id": 3, "amount": 8.0, "outcome": "paid"},
+]
 catalog = Catalog.from_data(
     records,
     source="warehouse://orders?versionId=17",
@@ -58,8 +75,33 @@ print(verified.blockers)
 
   <h2>Consume an event stream safely</h2>
   <p>The consumer contract separates three responsibilities. The source polls a bounded batch. Your writer commits unseen events to the downstream sink with event IDs as idempotency keys. Your broker adapter acknowledges only after that commit is durable. If acknowledgement delivery fails, the ledger keeps a JSON sidecar and retries it before polling the next batch; the sink is not run again.</p>
-  <pre><code>{`source = Stream("kafka://cluster/orders", poll)
-ledger = Ledger("state/orders.json", source.source_identity)
+  <pre><code class="language-python">{`from pathlib import Path
+
+from scmle.data.readers.incremental import Event, Ingestor, Ledger, Stream
+
+# Stand-ins for the broker SDK and the downstream sink.
+topic = [
+    Event(f"order-{index}", index, f"2026-10-20T10:0{index}:00+00:00",
+          {"amount": 10 * index})
+    for index in range(1, 4)
+]
+
+
+def poll(uri, checkpoint, limit):
+    return [event for event in topic
+            if event.sequence > checkpoint.sequence][:limit]
+
+
+def write_idempotently(events):
+    print("committed", [event.identifier for event in events])
+
+
+def broker_acknowledge(acknowledgement):
+    print("acknowledged", acknowledgement.events)
+
+
+source = Stream("kafka://cluster/orders", poll)
+ledger = Ledger(Path("state/orders.json"), source.source_identity)
 consumer = Ingestor(
     source,
     ledger,
@@ -74,8 +116,28 @@ print(evidence.to_dict())`}</code></pre>
   <h2>Read a large local snapshot with a durable ledger</h2>
   <p>For CSV, JSONL, and Parquet files, <code>Journal</code> binds each bounded batch to the raw snapshot digest, row offset, watermark column, and deterministic batch id. The sink receives that id as its idempotency key. A changed file, malformed state file, checkpoint from another source, or acknowledgement from another consumer group fails closed before the next commit.</p>
   <p>When the sink can return a transport-owned receipt, use <code>Sink</code> and <code>commit_transaction()</code>. The ledger atomically stores the receipt with the matching acknowledgement and checkpoint evidence, and a matching retry after restart does not call the sink again. This is a local idempotency boundary; it is not a broker transaction or distributed exactly-once guarantee.</p>
-  <pre><code>{`from pathlib import Path
-from scmle.data.readers import Consumer, Journal, locate
+  <pre><code class="language-python">{`from pathlib import Path
+
+import pandas as pd
+
+from scmle.data.readers.streaming import Consumer, Journal, locate
+
+pd.DataFrame({
+    "event_time": pd.date_range(
+        "2026-10-20", periods=1000, freq="min", tz="UTC"
+    ),
+    "value": range(1000),
+}).to_csv("events.csv", index=False)
+
+
+def write_batch_idempotently(frame, batch_id):
+    # The sink stores batch_id as its idempotency key.
+    print("wrote", len(frame), "rows as", batch_id)
+
+
+def acknowledge_external_delivery(acknowledgement):
+    print("acknowledged", acknowledgement.batch)
+
 
 source = locate(Path("events.csv"))
 ledger = Journal(Path("state/events.json"), source)
@@ -91,11 +153,18 @@ print(receipt.batch_id, receipt.duplicate, receipt.checkpoint.to_dict())`}</code
 
   <h2>Decode an object format you own</h2>
   <p>The built-in object decoder handles CSV, JSONL, and Parquet. For a domain-specific format, inject the transport and the decoder together. The decoder is deliberately required to return a bounded <code>pandas.DataFrame</code>; it owns parsing, schema interpretation, decompression, validation, and any format-specific security policy.</p>
-  <pre><code>{`from io import BytesIO
+  <pre><code class="language-python">{`from io import BytesIO
 
 import pandas as pd
 
-from scmle.data.readers import Bucket
+from scmle.data.readers.connectors import Bucket
+
+# A stand-in for the object store: one JSON-lines object held in memory.
+objects = {
+    "s3://events/events.custom": pd.DataFrame(
+        {"event": range(25_000), "value": 0.5}
+    ).to_json(orient="records", lines=True).encode(),
+}
 
 
 def decode_custom(uri: str, payload: bytes) -> pd.DataFrame:
@@ -104,21 +173,22 @@ def decode_custom(uri: str, payload: bytes) -> pd.DataFrame:
 
 
 connector = Bucket(
-    "store://events/events.custom",
-    read_bytes=object_store.read,
+    "s3://events/events.custom",
+    read_bytes=objects.__getitem__,
     decoder=decode_custom,
     decoder_name="events-jsonl-v2",
     max_bytes=256 * 1024 * 1024,
 )
 batch = connector.read_rows(limit=10_000)
-next_batch = connector.read_rows(batch.checkpoint, limit=10_000)`}</code></pre>
+next_batch = connector.read_rows(batch.checkpoint, limit=10_000)
+print(len(next_batch.rows), next_batch.has_more)`}</code></pre>
   <p>A custom decoder does not create a production capability by itself. Keep its dependency lock, license, parser limits, raw-byte identity, malformed-input tests, and resource evidence with the dataset run. Bounded object batches expose the raw payload SHA-256 and bind it into the resume checkpoint; if the object changes before the next batch, the connector fails closed instead of mixing snapshots. This connector is bounded in-memory ingestion; use a format-specific range or streaming adapter when the object cannot safely fit in memory.</p>
 
   <h2>What to review before modelling</h2>
   <p>Do not jump from a successful parse to a model score. Review source and profiled row counts, feature decisions, cleaning notes, quality findings, risk findings, duplicate-content label conflicts, and dropped columns. A curation finding is an input to the modelling decision—not noise around it. Blocking findings stop the run until a reviewer resolves, waives, or marks them false-positive.</p>
   <h2>The dataset card</h2>
   <p>Tabular packaged runs write <code>dataset_card.json</code>. Experimental modality lifecycles carry the equivalent card inside their documentation evidence. In both cases it is the human-facing summary of the snapshot: intended use, explicit exclusions, composition, source ownership, lineage, privacy controls, limitations, and findings that still need review. Its default status is <code>machine_generated_unreviewed</code>; that is deliberate. A generated card is context, not approval.</p>
-  <pre><code>{`{
+  <pre><code class="language-json">{`{
   "use": "Training and evaluation for binary classification...",
   "excluded": ["It is not a release approval..."],
   "review": "machine_generated_unreviewed",
@@ -127,7 +197,23 @@ next_batch = connector.read_rows(batch.checkpoint, limit=10_000)`}</code></pre>
 
   <h2>Bind non-tabular governance before modelling</h2>
   <p>Non-tabular lifecycles accept a typed <code>Passport</code>. It binds the exact content hash and sample count to the modality, task, source ownership, transformation and label lineage, privacy policy, and curation findings. The lifecycle rejects a manifest that does not match the adapter before it starts training. For unlabeled or unsupervised snapshots, <code>Curator</code> persists the data-understanding evidence without entering modelling.</p>
-  <pre><code>{`from scmle.contracts.data import Passport, Confidentiality, Origin
+  <pre><code class="language-python">{`from scmle.contracts.data import Passport, Confidentiality, Origin
+from scmle.data.modalities.document import Dataset, Sample
+from scmle.pipeline.modality_lifecycle import DocumentPreparer, Lifecycle
+
+dataset = Dataset(tuple(
+    Sample(
+        document_id=f"policy-{index}",
+        content=("approved terms " if index % 2 else "review terms ")
+        * (index + 2),
+        label="approved" if index % 2 else "review",
+    )
+    for index in range(12)
+))
+adapter = DocumentPreparer(dataset)
+lifecycle = Lifecycle()
+package_path = "artifacts/modality-package"
+signing_key = "documents-signing-key"
 
 manifest = Passport(
     identifier="documents-2026-10-21",
@@ -150,12 +236,31 @@ manifest = Passport(
     ),
 )
 
-report = lifecycle.run(adapter, package_path, signing_key, manifest=manifest)`}</code></pre>
+report = lifecycle.run(adapter, package_path, signing_key, manifest=manifest)
+print(report.documentation["dataset_card"]["provenance"]["status"])`}</code></pre>
   <p>The manifest is evidence, not approval. A reviewer still needs to inspect the source, consent, retention, label decisions, and open findings. If metadata is omitted, the generated card says so explicitly instead of implying that provenance or privacy was assessed.</p>
 
   <h2>Verify a modality package before prediction</h2>
   <p>The experimental lifecycle exposes a library predictor for callers that already own a typed adapter. It verifies the signed package, modality, feature names, and estimator dimension before converting new samples into features. Codec choice and raw transport remain caller-owned.</p>
-  <pre><code>{`from scmle.pipeline.modality_lifecycle import Predictor
+  <pre><code class="language-python">{`from scmle.data.modalities.document import Dataset, Sample
+from scmle.pipeline.modality_lifecycle import DocumentPreparer, Predictor
+
+# The adapter the package above was trained with, built again from the
+# same documents, and two new ones to score.
+adapter = DocumentPreparer(Dataset(tuple(
+    Sample(
+        document_id=f"policy-{index}",
+        content=("approved terms " if index % 2 else "review terms ")
+        * (index + 2),
+        label="approved" if index % 2 else "review",
+    )
+    for index in range(12)
+)))
+signing_key = "documents-signing-key"
+new_samples = (
+    Sample("policy-new-1", "approved terms approved terms"),
+    Sample("policy-new-2", "review terms review terms"),
+)
 
 predictor = Predictor.from_package(
     adapter, "artifacts/modality-package", signing_key
@@ -172,33 +277,57 @@ print(predictor.health())`}</code></pre>
     <div class="doc-card"><small>VIDEO</small><h3>Decoder and time policy are yours</h3><p>Video samples require dimensions, frame timing, codec, and audio-track metadata. Use the metadata matrix by default, or provide an audited decoder for bounded, evenly sampled frame statistics. When observation times exist, <code>cutover</code> creates a UTC-normalized past/future boundary and refuses mixed timestamp coverage. The core package never guesses from a filename or imports a codec stack implicitly.</p></div>
     <div class="doc-card"><small>GEOSPATIAL</small><h3>Coordinates need context</h3><p>GeoJSON geometry is validated before profiling; CRS is recorded explicitly. Spatial-block splitting keeps nearby features together in CRS units, and envelope crossings are surfaced as a review warning before modelling. Raster samples require dimensions, bands, dtype, CRS, and transform metadata; a caller-owned, named decoder may add bounded pixel summaries, measured nodata evidence, and decoded-pixel region occlusion with source-CRS window envelopes. That is pixel-window evidence, not reprojection, semantic localization, or encoded-byte attribution.</p></div>
   </div>
-  <pre><code>{`from scmle.data.modalities import Dataset, Sample, Dataset, Dataset
-from scmle.data.modalities import Sample
-from scmle.data.modalities import Dataset, Sample
+  <pre><code class="language-python">{`import io
+import wave
 
-audio = Sample.from_bytes(
+from scmle.data.modalities import audio, document, geospatial, video
+
+# Small stand-ins: one second of silent WAV, a caller's video probe
+# result, and a one-point GeoJSON collection.
+buffer = io.BytesIO()
+with wave.open(buffer, "wb") as writer:
+    writer.setnchannels(1)
+    writer.setsampwidth(2)
+    writer.setframerate(8000)
+    writer.writeframes(bytes(16000))
+wav_bytes = buffer.getvalue()
+video_metadata = video.Metadata(
+    format="mp4", width=64, height=48, frame_count=30,
+    frames_per_second=30.0, codec="h264",
+)
+feature_collection = {
+    "type": "FeatureCollection",
+    "features": [{
+        "type": "Feature",
+        "id": "site-1",
+        "geometry": {"type": "Point", "coordinates": [-0.12, 51.5]},
+        "properties": {},
+    }],
+}
+
+sound = audio.Sample.from_bytes(
     wav_bytes, source="clip.wav", group_id="speaker-17"
 )
-video = Sample.from_bytes(
-    encoded,
+clip = video.Sample.from_bytes(
+    b"caller-owned encoded video bytes",
     video_metadata,
     source="clip.mp4",
     observation_time="2026-01-01T00:00:00Z",
 )
-places = Dataset.from_geojson(
+places = geospatial.Dataset.from_geojson(
     feature_collection, source="places.geojson", crs="EPSG:4326"
 )
-documents = Dataset((
-    Sample("policy-1", "...", label="approved"),
-    Sample("policy-2", "...", label="review"),
+documents = document.Dataset((
+    document.Sample("policy-1", "...", label="approved"),
+    document.Sample("policy-2", "...", label="review"),
 ))
 curation = documents.curate()
 assert curation.dataset_hash == documents.content_hash
 
-audio_features = Dataset((audio,)).prepare_features(max_frames=100_000)
+audio_features = audio.Dataset((sound,)).prepare_features(max_frames=100_000)
 assert audio_features.frames_truncated == (False,)
-audio_split = Dataset((audio,)).split(test_fraction=0)
-video_split = Dataset((video,)).cutover(
+audio_split = audio.Dataset((sound,)).split(test_fraction=0)
+video_split = video.Dataset((clip,)).cutover(
     "2026-01-01T00:00:00Z"
 )
 assert not video_split.lookahead

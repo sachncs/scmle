@@ -38,3 +38,14 @@ scmle/preparation/synthesis.py Synthesizer lone-interface Copula and a test doub
 scmle/assurance/admissibility/plants.py copy getter one of the five leak-type methods that plant() dispatches to by name (scmle/assurance/admissibility/plants.py plant); Numbers.copy overrides it, so it is polymorphic, not a getter
 scmle/artifacts/bundle/environment.py pools single-use reads the loaded math-library thread pools and picks the BLAS implementation from threadpoolctl's records, an environment probe like detect and inventory beside it; tests/unit/test_bundle.py pins its output through the manifest, and inlined it would put a library probe inside the 120-line classmethod create
 scmle/runtime/logs.py degrade single-use the logging convention's one entry point for a reduced optional path (WARNING plus a Degraded warning); register task 2.1 rolls it out to data/, sampling/ and operations/, so its single caller today (limits.py) is the first of many
+scmle/api/erasure/steps.py read passthrough implements Table.read for Parquet; the erasure steps read every table through the Table interface
+scmle/pipeline/engine.py Regulator lone-interface names what the engine needs of a thread cap; limits.Governor satisfies it on both the run context and the modality lifecycle board, which the name-based check does not see
+scmle/pipeline/engine.py Board lone-interface names what the engine needs of a run context; Context and modality_lifecycle.state.Board both satisfy it, which the name-based check does not see
+scmle/pipeline/modality_lifecycle/state.py summary getter implements products.Product.summary, which the checkpoint digests; a Proof's summary is its evidence
+scmle/pipeline/services.py Random lone-method the run's randomness service, an object on Services so a test can replace it (the services module docstring), as Clock is
+scmle/pipeline/services.py generator passthrough the one method of the replaceable Random service; it keys every stream by seed, component and index
+scmle/pipeline/context.py require passthrough kept while about 40 stage, search and test modules still call it on the context; products.require is the definition, and this goes with context.py once they read products by type
+scmle/pipeline/kinds/__init__.py Kind lone-interface the one seam between the shared stages and a kind of data; Tabular is its first implementation, pinned in tests/fixtures/public_api.json for further kinds
+scmle/pipeline/kinds/__init__.py constrain passthrough implements Kind.constrain; the stages ask the kind for its splitter instead of naming the tabular one
+scmle/pipeline/kinds/__init__.py featurise passthrough implements Kind.featurise; the stages ask the kind for its transformer instead of naming the tabular one
+scmle/pipeline/kinds/__init__.py cost passthrough implements Kind.cost; the stages ask the kind for its preparation bound instead of naming the profiler

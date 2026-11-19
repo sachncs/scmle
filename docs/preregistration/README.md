@@ -28,7 +28,7 @@ Registered on 2026-11-17, against `acceptance.toml` as of commit 53790feb.
 | C9 Secure, private, trustworthy supply chain | [c9.md](c9.md) | validation | none | not measured |
 | C10 Can keep changing safely | [c10.md](c10.md) | validation | `scripts/structure.py`, `benchmarks/evidence/mutation.py` | size budgets and a mutation sample |
 | C11 A non-specialist uses it correctly | [c11.md](c11.md) | stage D sessions | none | not measured |
-| C12 Docs tell the truth | [c12.md](c12.md) | validation | `benchmarks/evidence/guarantees.py` | linkage only |
+| C12 Docs tell the truth | [c12.md](c12.md) | validation | `benchmarks/evidence/guarantees.py`, `benchmarks/evidence/snippets.py` | linkage and snippets |
 | C13 Every stage on steroids | [c13.md](c13.md) | validation; study in stage D | none | not measured |
 | C14 Refuses only when it should | [c14.md](c14.md) | acceptance | `benchmarks/evidence/refusal.py` | rate on development tables |
 

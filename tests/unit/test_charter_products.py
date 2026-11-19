@@ -362,7 +362,7 @@ def test_planning_returns_the_blueprint_without_applying_it(monkeypatch):
     monkeypatch.setattr(planning, "devise", lambda context: plan)
     monkeypatch.setattr(planning, "advise", lambda context: advice)
     context = board()
-    made = planning.Planning().draft(context)
+    made = planning.Planning().execute(context)
     assert made.plan is plan
     assert made.recommendations == advice
     assert made.capability_registry is context.services.capability_registry

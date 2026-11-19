@@ -101,7 +101,7 @@ def test_the_held_out_estimate_alone_never_confirms():
     # significant estimate on C, confounded by an unobserved variable, but no
     # negative control, no strata, no sensitivity analysis declared
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:126.
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:347.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:368.
     # Enforces website/src/learn/what-scmle-cannot-do.html:27-28.
     # Enforces website/src/learn/when-things-go-wrong.html:153.
     # Enforces website/src/pages/docs/causal-decision.astro:64.

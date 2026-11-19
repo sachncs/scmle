@@ -51,26 +51,70 @@ const options = [
   <DocTable label="Common plan and run options" head={["Option", "Meaning"]} rows={options} />
 
   <h2>Examples</h2>
-  <pre><code>{`scmle plan data.csv --target churn
-scmle run data.csv --target churn --workers 4 --budget 600
-scmle resume runs/run_20261015_001
+  <p>The examples on this page run as written, top to bottom, in an empty folder. They use a small table with a binary target <code>churn</code> and a demonstration signing key, which <code>charter sign</code>, <code>claims verify</code> and the bundle commands read from <code>SCMLE_SIGNING_KEY</code>. Save this as <code>make_data.py</code>:</p>
+  <pre><code class="language-python">{`import numpy
+import pandas
+
+rng = numpy.random.default_rng(0)
+rows = 800
+data = pandas.DataFrame(
+    {
+        "customer_id": numpy.arange(rows),
+        "tenure": rng.integers(1, 72, rows),
+        "spend": rng.normal(60, 20, rows).round(2),
+        "plan": rng.choice(["basic", "plus", "pro"], rows),
+    }
+)
+risk = -0.03 * data.tenure + 0.02 * data.spend + 0.8 * (data.plan == "basic")
+data["churn"] = (risk + rng.normal(scale=0.7, size=rows) > 0.5).astype(int)
+data.to_csv("data.csv", index=False)`}</code></pre>
+  <pre><code class="language-bash">{`python make_data.py
+export SCMLE_SIGNING_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+scmle plan data.csv --target churn
+scmle run data.csv --target churn --workers 4 --budget 120
+scmle resume runs/run_*                 # the run folder, for example runs/run_20261015_001
+echo "exit code: $?"
 scmle catalog data.csv --label-column churn --output catalog.json
+head -c 300 data.csv > payload.bin
 cat payload.bin | scmle catalog --raw-bytes`}</code></pre>
+  <p><code>resume</code> continues a cancelled, failed or crashed run from its finished trials. The run here finished, so it is refused with exit code 1 and <code>config error: run already completed; nothing to resume</code>.</p>
 
   <h2 id="charter">Analysis charter</h2>
   <p>A charter fixes the question, the estimand (population, target, prediction moment, intercurrent events, summary measure), the decision map, the set sizes and the error budget before any data is profiled. The <a href={`${base}/docs/qualification/`}>qualification instrument</a> page explains what the run does with it.</p>
-  <pre><code>{`scmle charter init charter.json                 # a template that fails \`check\` until filled in
-scmle charter check charter.json --rows 5000    # validate; report whether the
+  <pre><code class="language-bash">{`scmle charter init charter.json                 # a template that fails \`check\` until filled in`}</code></pre>
+  <p>Fill in the question, the population, the target, the prediction moment, one intercurrent event with its strategy, the unit and the deployment population, with an editor, or save this as <code>fill_charter.py</code>:</p>
+  <pre><code class="language-python">{`import json
+
+with open("charter.json") as file:
+    charter = json.load(file)
+charter["question"] = "Which customer traits are linked to churn?"
+charter["estimand"].update(
+    population="every customer of data.csv",
+    target="churn",
+    moment="the start of the month",
+    intercurrent=[{"event": "none", "strategy": "not applicable"}],
+    summary="rank correlation with churn",
+)
+charter["unit"] = "customer"
+charter["population"] = "every customer of data.csv"
+with open("charter.json", "w") as file:
+    json.dump(charter, file, indent=2)`}</code></pre>
+  <pre><code class="language-bash">{`python fill_charter.py
+scmle charter check charter.json --rows 600     # validate; report whether the
                                                 # confirmation set can support the promised power
-SCMLE_SIGNING_KEY=... scmle charter sign charter.json   # add an HMAC-SHA256 signature
-scmle run data.csv --target churn --charter charter.json`}</code></pre>
+scmle charter sign charter.json                 # add an HMAC-SHA256 signature (SCMLE_SIGNING_KEY,
+                                                # or --key-file FILE)
+scmle run data.csv --target churn --identifiers customer_id --charter charter.json \\
+  --budget 120 --output-dir charter_runs`}</code></pre>
   <p><code>check</code> verifies the charter hash and, when a key is configured, the signature; a one-byte edit fails verification. The signature proves possession of the key, not the signer's identity. If the confirmation set is too small to support the promised power the run still completes: the scope becomes <code>exploratory_unconfirmed</code> and <code>feasibility.json</code> reports the detectable effect.</p>
   <p>Charter formats 1 to 10 are all accepted, and a charter without a newer field keeps its hash and signature. Format 3 charters may carry a <code>rules</code> object that fixes, before data, the online rule of the ledger (<code>ledger</code>), the confirmation rule (<code>confirmation</code>), the failure policy (<code>failure</code>), whether <code>fragile</code> survivors are withdrawn before the confirmation set opens (<code>stability</code>) and the stability thresholds (<code>agreement</code>, <code>band</code>, <code>exclusion</code>). The charter hash and signature cover them. A charter without <code>rules</code> is hashed, signed and loaded exactly as before and the run uses the defaults, reporting <code>"rules": "not chartered"</code>. A run specification that names a different non-default rule than the charter is refused. The filter acts only if the stability rule has a current passing certificate for the chartered thresholds; otherwise it is recorded as requested and not applied, and the verdicts stay warnings.</p>
 
   <h2 id="claims">Claims of a charter run</h2>
-  <pre><code>{`scmle claims list runs/run_x [--tier confirmed] [--json]
-scmle claims show runs/run_x h000003
-SCMLE_SIGNING_KEY=... scmle claims verify runs/run_x [--json]`}</code></pre>
+  <pre><code class="language-bash">{`scmle claims list charter_runs/run_* --tier confirmed
+scmle claims list charter_runs/run_* --json
+scmle claims show charter_runs/run_* h000002
+scmle claims verify charter_runs/run_* --json`}</code></pre>
+  <p><code>--tier</code> keeps the claims of one tier (<code>confirmed</code> or <code>unverified</code>) and <code>--json</code> prints JSON. <code>verify</code> reads the key from <code>SCMLE_SIGNING_KEY</code>, or from a file with <code>--key-file</code>.</p>
   <p><code>verify</code> reads the run directory only. It checks that:</p>
   <ul>
     <li>the ledger's hash chain verifies and every recorded decision replays;</li>
@@ -87,12 +131,13 @@ SCMLE_SIGNING_KEY=... scmle claims verify runs/run_x [--json]`}</code></pre>
   <p>A step whose input is absent is reported <code>skipped</code>, never <code>pass</code>. Attestations use HMAC with a shared key, so a valid one shows that a holder of the key made the statement, not which person. This proves the artifacts agree; it does not recompute statistics from data, and a party who can rewrite every file consistently can pass it. Custody is tamper-evident, not adversary-proof.</p>
 
   <h2 id="deploy">Release evidence and the runtime</h2>
-  <pre><code>{`scmle deploy live --url https://staging.example --token-file token --environment staging \\
+  <p>These commands act on a service deployed over HTTPS, a release manifest with the evidence it names, and a model registry, none of which this page creates; their forms are below.</p>
+  <pre><code class="language-bash" data-snippet="synopsis">{`scmle deploy live --url https://staging.example --token-file token --environment staging \\
   --commit <sha> --container-digest sha256:... --model-digest sha256:... --output checks.json
-scmle deploy gate admit|certify manifest.json --key-file key [--output record.json]
+scmle deploy gate {admit,certify} manifest.json --key-file key [--output record.json]
 scmle deploy verify-record record.json --key-file key
-scmle deploy model-digest REGISTRY --model churn --version 3
-scmle deploy reconcile REGISTRY --model churn --environment production --observation observed.json [--ledger deployment_ledger.jsonl]`}</code></pre>
+scmle deploy model-digest <registry> --model churn --version 3
+scmle deploy reconcile <registry> --model churn --environment production --observation observed.json [--ledger deployment_ledger.jsonl]`}</code></pre>
   <p><code>live</code> runs the health, schema, inference and security checks and exits 1 if any fails. <code>gate</code> reads a release manifest and the evidence it names and exits 2 with every reason when the release is refused; <code>certify</code> writes the signed deployment record. Keys are read from files, never from the command line. <code>reconcile</code> exits 1 when the registry, the ledger and the observation disagree.</p>
 
   <h2 id="bundles">Bundles: signed versus trusted</h2>

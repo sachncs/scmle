@@ -5,7 +5,8 @@ Tests cite the documented guarantee they enforce as `docs/X.md:LINE`
 shifts its lines, so the citations of every line below the edit go stale.
 This maps each cited line of each changed doc from the committed version
 to the working copy (lines that did not change keep their text) and
-rewrites the citations in tests/.
+rewrites the citations in tests/. Only a citation still holding its
+committed number moves, so running it twice moves nothing twice.
 
     python scripts/recite.py            # against HEAD
     python scripts/recite.py REF        # against another commit
@@ -48,6 +49,85 @@ def align(before: list[str], after: list[str]) -> dict[int, int]:
     return found
 
 
+def blank(line: str) -> str:
+    """A line with its line ending and its citations' numbers removed."""
+    return CITATION.sub(r"\1:", line.rstrip("\r\n"))
+
+
+def restate(
+    before: str, line: str, maps: dict[str, dict[int, int]]
+) -> tuple[str, int]:
+    """Moves the citations of one line that still hold committed numbers.
+
+    `before` is the committed line `line` descends from: the two differ at
+    most in their citations' numbers, so their citations pair in order. A
+    citation still holding its committed number is moved; one whose number
+    differs was moved already or edited by hand and is kept.
+
+    Args:
+        before: The committed line.
+        line: The working line, with the same citations in the same order.
+        maps: Per doc, committed line number to working line number.
+
+    Returns:
+        The rewritten line and how many of its citations moved.
+    """
+    olds = iter(CITATION.findall(before))
+    moved = 0
+
+    def shift(match: re.Match[str]) -> str:
+        nonlocal moved
+        doc, number = match.group(1), int(match.group(2))
+        old = int(next(olds)[1])
+        if number != old:
+            return match.group(0)
+        target = maps.get(doc, {}).get(number, number)
+        moved += target != number
+        return f"{doc}:{target}"
+
+    return CITATION.sub(shift, line), moved
+
+
+def recite(
+    text: str, committed: list[str], maps: dict[str, dict[int, int]]
+) -> tuple[str, int]:
+    """Moves the citations of a test file that use the committed numbering.
+
+    The working file is aligned to the committed one line by line with
+    citation numbers ignored, so a moved citation still pairs with the one
+    it came from. On a line that pairs, a citation still holding its
+    committed number is moved and any other is kept, so a second run moves
+    nothing: every citation it finds is already at its target. A line added
+    or edited since the commit is kept as it is, so a test file edited for
+    other reasons is still kept in step on the lines it shares.
+
+    Args:
+        text: The working test file.
+        committed: The test file's lines at the commit; empty when new.
+        maps: Per doc, committed line number to working line number.
+
+    Returns:
+        The rewritten file and how many citations moved.
+    """
+    current = text.splitlines(keepends=True)
+    matcher = difflib.SequenceMatcher(
+        a=[blank(line) for line in committed],
+        b=[blank(line) for line in current],
+        autojunk=False,
+    )
+    moved = 0
+    for tag, first, last, start, _ in matcher.get_opcodes():
+        if tag != "equal":
+            continue
+        for offset in range(last - first):
+            index = start + offset
+            current[index], count = restate(
+                committed[first + offset], current[index], maps
+            )
+            moved += count
+    return "".join(current), moved
+
+
 def main(arguments: list[str] | None = None) -> int:
     """Rewrites stale citations; prints how many moved.
 
@@ -76,31 +156,9 @@ def main(arguments: list[str] | None = None) -> int:
     moved = 0
     for path in sorted((ROOT / "tests").rglob("*.py")):
         text = path.read_text("utf-8")
-        # A file whose citations differ from the committed file's was already
-        # moved or edited by hand; its numbers are not the committed ones,
-        # so it is left alone (running this twice moves nothing twice).
-        # A citation the committed test already had uses the committed
-        # numbering and is moved; one added or moved since is left alone,
-        # citation by citation, so a test file edited for other reasons is
-        # still kept in step. Run this once after each doc edit.
-        committed = set(
-            CITATION.findall(
-                "\n".join(lines(ref[0], str(path.relative_to(ROOT))))
-            )
-        )
-
-        def shift(
-            match: re.Match[str], kept: set[tuple[str, str]] = committed
-        ) -> str:
-            nonlocal moved
-            doc, number = match.group(1), int(match.group(2))
-            if (doc, str(number)) not in kept:
-                return match.group(0)
-            target = maps.get(doc, {}).get(number, number)
-            moved += target != number
-            return f"{doc}:{target}"
-
-        rewritten = CITATION.sub(shift, text)
+        committed = lines(ref[0], str(path.relative_to(ROOT)))
+        rewritten, count = recite(text, committed, maps)
+        moved += count
         if rewritten != text:
             path.write_text(rewritten, "utf-8")
     print(f"{moved} citations moved")

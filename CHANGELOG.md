@@ -12,6 +12,17 @@ marked `Breaking:` and listed first in their group.
 
 ### Breaking changes
 
+* **ONNX export is verified by default.** `Bundle.export_onnx(path)` and
+  `scmle export-onnx BUNDLE` score at least 299 rows held out from training
+  (`check=` / `--check`) with both the graph and the pipeline, and raise
+  `BlockedError` (exit 2), removing the graph, when none are given or the
+  graph diverges (gate `export.onnx.divergence`). `unverified=True` /
+  `--unverified` skips the check; `<path>.manifest.json` records the graph's
+  digest and whether, and on how many rows, it was verified.
+* **A model plugin may not shadow a built-in model.** `Catalog.load_plugins`
+  refuses an entry-point adapter that takes a built-in model's name and lists
+  it in `plugin_failures`; before, it silently replaced the built-in.
+
 * **Splitter classes renamed, old names removed.** The splitters are single
   nouns in `scmle.data.splitting.splitters.splits` (`Random`, `Stratified`,
   `Events`, `Treatment`, `Group`, `Rolling`, `Chronology`, ...) and the sealed
@@ -309,6 +320,26 @@ marked `Breaking:` and listed first in their group.
   `sequester` and `ledger` return.
 
 ### Added
+
+- ONNX divergence gate (`export.onnx.divergence`, claim C1):
+  `onnx_export.verify` blocks a graph whose probabilities (scaled values for
+  regression) differ from the pipeline's by more than gamma_1024 for float32
+  (about 6.1e-5, was a fixed 1e-4), or whose label differs on a row whose
+  native margin exceeds twice that, on fewer than `ROWS` = 299 rows (a 1%
+  divergence rate ruled out at 95%). `scmle export-onnx --tolerance` is the
+  override. Infinite inputs reach the graph as missing, as in the pipeline,
+  and an unknown `FunctionTransformer` is refused instead of exported as the
+  identity. C1 faults inject it on simulated data and on OpenML 31 credit-g.
+- `scmle.pipeline.kinds`: the `Kind` protocol (`read`, `survey`,
+  `constrain`, `featurise`, `decode`, `cost`), the one seam between the shared
+  stages and a kind of data; `Tabular` is its first implementation. Stage
+  products are held on the run context by type (`Context.get`). One golden
+  per modality (`tests/fixtures/modality/`) pins each modality's run.
+- C12 snippet check (`python -m benchmarks.evidence.snippets`): every code
+  block of the README, `docs/` and the site runs as a reader would follow its
+  page, in a fresh folder and process, against the working tree. Usage
+  patterns marked `synopsis` are listed and not run. CI checks the stored
+  result and the scorecard reports it as a C12 clause.
 
 - `Dataset.known` (`Project(known=...)`): per column, `prediction` or
   `outcome`, when the column becomes known relative to the prediction. The
@@ -1345,6 +1376,18 @@ marked `Breaking:` and listed first in their group.
 
 ### Changed
 
+- Selection is evidence-based: a variant (a data strategy, tuned
+  hyperparameters or an ensemble) competes only when a paired test on the
+  shared folds gives it at least a 0.95 probability of beating its default
+  pipeline (`strategy_search.odds`, `selecting.earn`, `tuning.shortlist`);
+  each one dropped is rejected on record. Before, the best cross-validation
+  mean of whichever variants finished in time won.
+- Budget admission (C14): the first trial's estimated cost grows with the
+  column count (`cheapest(rows, columns)`), so a wide table is admitted with
+  a linear model first instead of refused at `budget.minimum_run`; the
+  bootstrap holds a 10% share of the budget, between the cost of its 200
+  minimum resamples and its full cost.
+
 - The leakage screen does not test duplicated records when the screened
   columns' value space holds no more records than the table has rows (an
   enumerated design, such as monks); screens a table with fewer than
@@ -1655,6 +1698,12 @@ marked `Breaking:` and listed first in their group.
   budget.
 
 ### Fixed
+
+- A charter run's leakage screen reads the declared `data.cutoff` and
+  `data.known` (admission passes them to `qualify.run`), so a column known
+  only after the outcome is quarantined there as in a run without a charter.
+- `scripts/recite.py` is idempotent: a citation moves only while it still
+  holds its committed line number, so a second run changes nothing.
 
 - MinHash near-duplicates (`duplicates.resemble`) no longer raise
   `TypeError` on a missing text value under pandas 3, whose `astype(str)`

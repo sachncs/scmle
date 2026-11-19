@@ -235,13 +235,17 @@ class Adversary(diagnostics.Diagnostic):
 
         Returns:
             A copy of `frame` with categorical columns replaced by category
-            codes and numeric columns converted to numbers.
+            codes, and numeric and datetime columns converted to numbers.
+            Numeric features the pipeline derives itself (calendar parts,
+            say) are not in `frame`; their source columns are.
         """
         encoded = frame.copy()
         for column in inputs.feature_plan.categorical:
             encoded[column] = encoded[column].astype("category").cat.codes
-        for column in inputs.feature_plan.numeric:
-            encoded[column] = pandas.to_numeric(encoded[column])
+        for column in encoded.columns:
+            dated = pandas.api.types.is_datetime64_any_dtype(encoded[column])
+            if dated or column in inputs.feature_plan.numeric:
+                encoded[column] = pandas.to_numeric(encoded[column])
         return encoded
 
     @staticmethod
@@ -287,7 +291,8 @@ class Adversary(diagnostics.Diagnostic):
             `distance`, largest distance first.
         """
         found = []
-        for column in inputs.feature_plan.numeric:
+        sourced = inputs.feature_plan.sourced
+        for column in (c for c in inputs.feature_plan.numeric if c in sourced):
             values = pandas.concat(
                 [pandas.to_numeric(old[column]), pandas.to_numeric(new[column])]
             )

@@ -243,24 +243,63 @@ cost of each (see [Decisions](DECISIONS.md)).
 
 Everything above is the ordinary mode. The careful mode adds a written plan
 (the charter) and sealed rows. You use it when someone will act on a *finding*
-("fare is linked to survival") and needs to know it was not luck. Create the
-plan, check it, sign it and run with it:
+("fare is linked to survival") and needs to know it was not luck.
+
+To follow along in a fresh folder, take the Titanic extract from the
+repository and make a signing key (`charter sign` and `claims verify` read it
+from `SCMLE_SIGNING_KEY`):
+
+```bash
+git clone https://github.com/sachncs/scmle
+cp scmle/tests/fixtures/titanic_extract.csv titanic.csv
+export SCMLE_SIGNING_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+```
+
+Create the plan:
 
 ```bash
 scmle charter init charter.json
-scmle charter check charter.json --rows 1093
+```
+
+`charter init` writes a template that fails `check` until you fill in the
+question, population, target, prediction moment, one intercurrent event with
+its strategy, unit and deployment population. The template does not show the
+shape of the event; it is `{"event": "...", "strategy": "..."}`. Fill it in
+with an editor, or save this as `fill_charter.py`:
+
+```python
+import json
+from pathlib import Path
+
+path = Path("charter.json")
+charter = json.loads(path.read_text())
+charter["question"] = "Which passenger traits are linked to survival?"
+charter["estimand"].update(
+    population="every passenger of titanic.csv",
+    target="survived",
+    moment="boarding",
+    intercurrent=[{"event": "none", "strategy": "not applicable"}],
+    summary="rank correlation with survival",
+)
+charter["unit"] = "passenger"
+charter["population"] = "every passenger of titanic.csv"
+charter["effect"] = 0.25
+path.write_text(json.dumps(charter, indent=2))
+```
+
+Then fill it in, sign it, check it and run with it:
+
+```bash
+python fill_charter.py
 scmle charter sign charter.json
-scmle run titanic.csv --target survived --unavailable boat body --charter charter.json
+scmle charter check charter.json --rows 1093
+scmle run titanic.csv --target survived --unavailable boat body --charter charter.json \
+  --budget 120 --output-dir runs_charter
 ```
 
 (Edit the file *before* you sign it: `charter sign` wraps the plan inside a
 `charter` key next to the hash and signature, so later edits must go inside
 that key, and then fail verification anyway.)
-
-(`charter init` writes a template that fails `check` until you fill in the
-question, population, target, prediction moment, one intercurrent event with
-its strategy, unit and deployment population. The template does not show the
-shape of the event; it is `{"event": "...", "strategy": "..."}`.)
 
 When the charter is filled in correctly, `check` prints something like:
 
@@ -280,8 +319,9 @@ rows.
 After the run, list the claims:
 
 ```bash
-scmle claims list runs_charter/run_20261105_001
-scmle claims verify runs_charter/run_20261105_001
+run=$(ls -d runs_charter/run_* | tail -n 1)    # for example runs_charter/run_20261105_001
+scmle claims list "$run"
+scmle claims verify "$run"
 ```
 
 Real output:
@@ -303,7 +343,8 @@ PASS    confirmation replays from the p-values on C: 3 hypotheses, rule by
 SKIPPED second-stage accounting is consistent: no withdrawal rule ran
 PASS    custody log: selection frozen before C opened, C opened once: 5 entries, chain verified
 PASS    negative control matches the ledger: hash equal
-7 of 9 steps passed
+SKIPPED causal attestations verify: no causal claims or charter file
+7 of 10 steps passed
 ```
 
 How to read the claims:

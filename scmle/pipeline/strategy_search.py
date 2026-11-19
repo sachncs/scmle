@@ -2,14 +2,72 @@
 
 After screening, the top models are each combined with every applicable data
 strategy (class weighting, resampling, feature engineering) and cross-validated
-on the *original* validation folds. A strategy is adopted only if it beats the
-same model's default pipeline; every verdict is written to the decision log.
+on the *original* validation folds. A strategy is adopted only if the shared
+folds make it credibly better than the same model's default pipeline
+(`odds`, `CONFIDENCE`); every verdict is written to the decision log.
 """
 
+import math
+
 from scmle.contracts import experiments
+from scmle.evaluation import comparison
 from scmle.pipeline import trials
 import scmle.pipeline.context
 from scmle.preparation import strategies
+
+# A variant of a model's default pipeline (a data strategy, tuned
+# hyperparameters, an ensemble) is adopted only when the correlated Bayesian
+# t-test on the shared folds (`comparison.pair`) puts the probability that it
+# is better at `CONFIDENCE` or more: a one-sided test at ERROR, the 0.05 of
+# the claims' one-sided tests, per variant. Adopting on any positive mean
+# difference let the best of about 15 variants win on fold noise (C4,
+# Is-this-a-good-customer, 1,148 rows: an undersampled booster at +0.010 in
+# cross-validation had probability 0.62 of being better, and its pick
+# changed from run to run with the trials that fitted in the budget). A
+# Bonferroni share ERROR / m over the m variants of a run (0.995 at m = 10)
+# was measured too: on five folds it also rejected the log transform of
+# skewed columns on Marketing_Campaign (+0.013, probability 0.971), whose
+# test ROC AUC it raised from 0.890 to 0.902, so it is not used.
+ERROR = 0.05
+CONFIDENCE = 1.0 - ERROR
+
+
+def plain(trial: experiments.Trial) -> bool:
+    """Whether a trial is its model's default pipeline.
+
+    Args:
+        trial: A trial.
+
+    Returns:
+        True for the default strategy with no hyperparameter overrides.
+    """
+    return trial.strategy == experiments.DEFAULT_STRATEGY and not trial.params
+
+
+def odds(
+    variant: experiments.Trial, reference: experiments.Trial, sign: int
+) -> float:
+    """The probability that a variant beats its reference.
+
+    Args:
+        variant: The variant's trial.
+        reference: The trial it must beat, scored on the same folds.
+        sign: 1 when larger scores are better, -1 otherwise.
+
+    Returns:
+        `comparison.pair`'s posterior probability that the variant is
+        better; 0 when the two were not scored on the same, enough folds or
+        a score is not finite.
+    """
+    first, second = variant.fold_scores, reference.fold_scores
+    if len(first) != len(second) or len(first) < comparison.MIN_FOLDS:
+        return 0.0
+    if not all(math.isfinite(s) for s in [*first, *second]):
+        return 0.0
+    verdict = comparison.pair(
+        [sign * s for s in first], [sign * s for s in second]
+    )
+    return verdict.probability_first_better
 
 
 class Strategist:
@@ -116,8 +174,9 @@ class Strategist:
     ) -> None:
         """Compares a strategy trial with its model's default pipeline.
 
-        The strategy is included if it beats the default in the metric's favour,
-        otherwise rejected; a trial that did not succeed is rejected.
+        The strategy is included if the shared folds make it credibly better
+        than the default (`odds` at least `CONFIDENCE`), otherwise rejected;
+        a trial that did not succeed is rejected.
 
         Args:
             leader: The model's default-pipeline trial.
@@ -133,12 +192,16 @@ class Strategist:
             return
         sign = 1 if self.metric.greater_is_better else -1
         gain = sign * (outcome.score_mean - leader.score_mean)
+        chance = odds(outcome, leader, sign)
         verdict = (
-            experiments.Edict.INCLUDE if gain > 0 else experiments.Edict.REJECT
+            experiments.Edict.INCLUDE
+            if chance >= CONFIDENCE
+            else experiments.Edict.REJECT
         )
         self.context.journal.enter(
             technique,
             verdict,
             f"cv {self.metric.name} {outcome.score_mean:.4f} vs default "
-            f"{leader.score_mean:.4f} ({gain:+.4f} in the metric's favour)",
+            f"{leader.score_mean:.4f} ({gain:+.4f} in the metric's favour; "
+            f"probability better {chance:.3f}, needed {CONFIDENCE:.3f})",
         )

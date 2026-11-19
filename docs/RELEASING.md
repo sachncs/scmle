@@ -5,6 +5,16 @@ unless the evidence holds. The checks live in [`scripts/`](../scripts/README.md)
 
 ## Before tagging
 
+Work in a checkout of the repository, with the package installed:
+
+```bash
+git clone https://github.com/sachncs/scmle
+cd scmle
+python3 -m venv .venv
+source .venv/bin/activate
+pip install .
+```
+
 1. Set the version in `pyproject.toml` and `scmle/__init__.py`.
 2. Move the `Unreleased` entries in `CHANGELOG.md` under `## [<version>] - <date>`, as Keep a Changelog does.
 3. If the public API changed deliberately, regenerate
@@ -57,7 +67,7 @@ Two controls need people, and the release stays open without them:
   reviewed by someone other than the author.
 * An independent review record, checked with
 
-  ```bash
+  ```bash synopsis
   python scripts/verify_release_review.py review.json --source-commit <sha>
   ```
 

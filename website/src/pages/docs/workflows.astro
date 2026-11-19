@@ -1,5 +1,6 @@
 ---
 import DocsLayout from "../../layouts/DocsLayout.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 ---
 
 <DocsLayout title="Workflows" description="Configure, plan, run, resume, and score scmle projects." current="workflows">
@@ -8,7 +9,31 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   <p class="lead">A project declaration is a decision record. It says what the target means, when a feature is available, how rows may be split, how much compute is allowed, and what evidence must exist before a result is used.</p>
 
   <h2>Declare the problem</h2>
-  <pre><code>from scmle.api.project import Project
+  <p>The examples on this page run as written in an empty folder. To follow along, write a small table of orders, with a column (<code>renewal_reason</code>) that is only known after the outcome:</p>
+  <pre><code class="language-python">{`from pathlib import Path
+
+import numpy
+import pandas
+
+rng = numpy.random.default_rng(0)
+rows = 1200
+orders = pandas.DataFrame(
+    {
+        "account_id": rng.integers(0, 150, rows),
+        "observed_at": pandas.date_range("2025-01-01", periods=rows, freq="6h"),
+        "seats": rng.integers(1, 50, rows),
+        "usage": rng.gamma(2.0, 10.0, rows).round(1),
+        "tickets": rng.poisson(2, rows),
+    }
+)
+score = 0.04 * orders.usage - 0.3 * orders.tickets + rng.normal(size=rows)
+orders["renewed"] = (score > 0).astype(int)
+orders["renewal_reason"] = numpy.where(orders.renewed == 1, "renewed", "lapsed")
+Path("data").mkdir(exist_ok=True)
+orders.iloc[:1000].to_parquet("data/orders.parquet")
+new = orders.iloc[1000:].drop(columns=["renewed", "renewal_reason"])
+new.to_parquet("data/new_orders.parquet")`}</code></pre>
+  <pre><code class="language-python">from scmle.api.project import Project
 
 project = Project(
     data="data/orders.parquet",
@@ -25,18 +50,22 @@ project = Project(
   <p>The important fields are the constraints around the model. <code>group_column</code> prevents one account leaking across splits. <code>time_column</code> preserves ordering. <code>unavailable_at_prediction</code> makes post-outcome columns explicit instead of relying on a reviewer to notice them later.</p>
 
   <h2>Plan before you spend compute</h2>
-  <pre><code>scmle plan data/orders.parquet \
+  <pre><code class="language-bash">scmle plan data/orders.parquet \
   --target renewed \
   --task binary_classification \
   --validation group \
-  --group account_id</code></pre>
+  --group account_id \
+  --unavailable renewal_reason</code></pre>
   <p>A plan is the cheapest place to catch an unclear target, an incompatible split, missing labels, or a dataset too large for the selected training mode. Treat it as a reviewable artifact in a pull request.</p>
 
   <h2>Run, resume, predict</h2>
-  <pre><code>scmle run data/orders.parquet --target renewed --output-dir runs/orders
-scmle resume runs/orders/&lt;run-id&gt;
-scmle predict runs/orders/&lt;run-id&gt;/model --input data/new_orders.parquet</code></pre>
-  <p>Runs are bounded and restartable. If a worker or host disappears, resume from the run directory rather than starting a second experiment with a different implicit state. Predictions should be made from the packaged bundle, not from an estimator reconstructed by hand.</p>
+  <pre><code class="language-bash">{`scmle run data/orders.parquet --target renewed --validation group --group account_id \\
+  --unavailable renewal_reason --budget 120 --output-dir runs/orders
+run=$(ls -d runs/orders/run_* | tail -n 1)    # for example runs/orders/run_20261015_001
+scmle resume "$run"            # refused here: this run finished
+echo "exit code: $?"
+scmle predict "$run/model" data/new_orders.parquet --trusted --output predictions.csv`}</code></pre>
+  <p>Runs are bounded and restartable. If a worker or host disappears, resume from the run directory (a finished run, like the one above, is refused with exit code 1) rather than starting a second experiment with a different implicit state. Predictions should be made from the packaged bundle, not from an estimator reconstructed by hand. <code>--trusted</code> loads this bundle because it is unsigned and your own; set <code>SCMLE_SIGNING_KEY</code> to sign and verify bundles instead (see the <a href={`${base}/docs/cli/#bundles`}>command line</a>).</p>
   <p>The full command set is <code>plan</code>, <code>run</code>, <code>resume</code>, <code>catalog</code>, <code>predict</code>, <code>serve</code>, <code>export-onnx</code>, and <code>package</code>; see <code>scmle --help</code>.</p>
 
   <h2>Choose the task explicitly when it matters</h2>

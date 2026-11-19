@@ -11,7 +11,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
   <h2>One claim, one evidence record</h2>
   <p>Every release criterion is a named record. Do not write “quality checked” when the useful claim is “the curation report contains a structured finding for every detected issue.” The record should make the claim falsifiable.</p>
-  <pre><code>{`criterion:
+  <pre><code class="language-text">{`criterion:
   claim: structured curation findings are persisted
   scope: {release: beta, area: data}
   inputs: {dataset: sha256:...}
@@ -34,7 +34,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
   <h2>Read fairness evidence without overclaiming</h2>
   <p>The fairness report evaluates each declared sensitive attribute and, when two or more are declared, the intersection of those attributes. It reports selection, error, and bias differences for cells that meet the minimum sample threshold. Cells below that threshold are not silently treated as evidence: their observed counts appear in <code>excluded_groups</code> and <code>power_warning</code> is set to <code>true</code>.</p>
-  <pre><code>{`fairness.json
+  <pre><code class="language-text">{`fairness.json
 ├── columns.group
 ├── columns.region
 └── columns.intersectional
@@ -59,7 +59,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
       <p class="note">The default budget is at most 10 numeric features and 200 evaluation rows. Deadline or budget exhaustion is recorded as truncation rather than silently presented as complete coverage.</p>
     </div>
   </div>
-  <pre><code>{`run.diagnostics
+  <pre><code class="language-text">{`run.diagnostics
 ├── error_analysis
 │   ├── classification: {row_id, actual, predicted, confidence}
 │   └── regression: {row_id, actual, predicted, residual, absolute_error}
@@ -84,15 +84,60 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   <h2>Independent review is a separate proof</h2>
   <p><code>release_evidence.json</code> is itself versioned and HMAC-signed when <code>SCMLE_SIGNING_KEY</code> is configured. The release evaluator verifies that signature before accepting the evidence index, and the run lineage records its digest. This protects the evidence collection from being edited after the run; it does not replace signer custody, key rotation, or independent review.</p>
   <p><code>Signoff</code> is the signed record for the final human or external review. It binds the reviewer to the exact source commit, clean-clone and environment digests, reproducible commands, artifact digests, and independently recomputed metric, fairness, and explanation claims. The reviewer must not appear in the implementer set, every claim must pass, and the decision must be approved. A valid record proves the review contract; it does not manufacture an external reviewer or turn a local rehearsal into production evidence.</p>
-  <pre><code>{`review.accepted(
-    source_commit="&lt;exact-release-sha&gt;",
+  <p>The steps below rehearse that contract locally. The reviewer starts from the exact source and notes its commit:</p>
+  <pre><code class="language-bash">{`git clone https://github.com/sachncs/scmle
+cd scmle
+export RELEASE="$(git rev-parse HEAD)"`}</code></pre>
+  <p>This rehearsal record carries example identities, digests and claim values; a real record carries the external reviewer's own. It is signed, written to <code>release/independent-review.json</code> and checked against the commit:</p>
+  <pre><code class="language-python">{`import os
+
+from scmle.governance.review import Kind, Recomputation, Signoff, Verdict
+
+
+def claim(kind, criterion, observed, reference):
+    return Recomputation(
+        criterion=criterion,
+        kind=kind,
+        passed=True,
+        observed=observed,
+        reference=reference,
+        uri=f"evidence/{criterion}.json",
+        notes="Recomputed from the clean checkout.",
+    )
+
+
+review = Signoff(
+    release="beta-rehearsal",
+    commit=os.environ["RELEASE"],
+    digests={
+        "clone": "sha256:clone",
+        "environment": "sha256:environment",
+        "artifacts": {"wheel": "sha256:wheel"},
+    },
+    reviewer="reviewer@example.com",
+    implementers=("engineer@example.com",),
+    commands=("uv run pytest -q",),
+    claims=(
+        claim(Kind.METRIC, "metric.roc_auc", "0.91", "at least 0.90"),
+        claim(Kind.FAIRNESS, "fairness.equalized_odds", "0.03", "at most 0.05"),
+        claim(Kind.EXPLANATION, "explanation.fidelity", "0.94", "at least 0.90"),
+        claim(Kind.RELIABILITY, "reliability.faults", "12/12", "all"),
+        claim(Kind.SECURITY, "security.provenance", "verified", "verified"),
+    ),
+    observed="2026-10-20T12:00:00+00:00",
+    decision=Verdict.APPROVED,
+).sign("rehearsal-review-key")
+review.write("release/independent-review.json")
+
+assert review.accepted(
+    source_commit=os.environ["RELEASE"],
     required_kinds=("metric", "fairness", "explanation"),
-    signing_key="&lt;review-key&gt;",
+    signing_key="rehearsal-review-key",
 )`}</code></pre>
   <p>For a reviewer who has checked out the exact source, the persisted record can be verified without opening the application:</p>
-  <pre><code>{`SCMLE_REVIEW_SIGNING_KEY="..." \\
+  <pre><code class="language-bash">{`SCMLE_REVIEW_SIGNING_KEY="rehearsal-review-key" \\
   python scripts/verify_release_review.py release/independent-review.json \\
-  --source-commit "&lt;exact-release-sha&gt;"`}</code></pre>
+  --source-commit "$RELEASE"`}</code></pre>
   <p>A zero exit status proves that the signed record is accepted for that commit and required claim set. It still does not create the reviewer identity, recompute the claims, or prove that the external environment was independent; those are inputs to the record.</p>
 
   <h2>Read the evidence in order</h2>
@@ -109,7 +154,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
   <h2>The run also carries a lineage graph</h2>
   <p>Completed packages write <code>evidence_graph.json</code>. It is a deterministic, content-linked DAG rather than a second copy of the event log: each node names an identity and each edge says how one artifact produced or constrained the next. Serving can append an inference node only when the event names the exact bundle digest recorded by the graph.</p>
-  <pre><code>{`raw-source → snapshot → curation → split → model
+  <pre><code class="language-text">{`raw-source → snapshot → curation → split → model
                                       ├→ evaluation → explanations
                                       └→ bundle → inference event
 

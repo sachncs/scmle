@@ -823,7 +823,9 @@ def admissibility(attest: bool) -> str | None:
             )
         spec = types.SimpleNamespace(
             leakage_attestations=None if path is None else str(path),
-            data=types.SimpleNamespace(group_column=None, time_column=None),
+            data=types.SimpleNamespace(
+                group_column=None, time_column=None, cutoff=None, known={}
+            ),
         )
         context: Any = types.SimpleNamespace(
             services=types.SimpleNamespace(spec=spec),
@@ -2116,6 +2118,97 @@ class Injection:
     reason: str = ""
 
 
+# Rows held out from the model for the ONNX divergence gate: at least the
+# gate's minimum (`onnx_export.ROWS`, 299), the rest trains the model.
+HELD_OUT = 300
+
+
+def exported(fault: str, part: str = "simulated") -> Any:
+    """Exports a logistic model of a binary table as an ONNX graph.
+
+    The model is fitted on the rows not held out and saved as a bundle;
+    the simulated part exports it through `Bundle.export_onnx`, the real
+    part through the `scmle export-onnx` command on the saved bundle.
+
+    Args:
+        fault: `unchecked` (no held-out rows given: the fault the default
+            verification blocks), `checked` (`HELD_OUT` held-out rows: the
+            pass path) or `unverified` (the check skipped: the override).
+        part: `simulated` (a generated table of `ROWS` plus `HELD_OUT`
+            rows) or `real` (`CREDIT`, see `clean`).
+
+    Returns:
+        The export manifest's record of the skipped check for
+        `unverified`; otherwise the path written or the exit status.
+    """
+    import scmle.artifacts.bundle
+    from scmle.cli import delivery
+    import scmle.models.registry
+    from scmle.preparation import preprocessing
+
+    if part == "simulated":
+        frame, target, _ = refusal.simulate("binary", ROWS + HELD_OUT, SEED)
+    else:
+        frame, target, _ = clean("binary", part)
+    features = frame.drop(columns=[target])
+    numeric = tuple(features.select_dtypes("number").columns)
+    plan = data.Blueprint(
+        numeric, tuple(c for c in features.columns if c not in numeric)
+    )
+    training, held = features.iloc[HELD_OUT:], features.iloc[:HELD_OUT]
+    fitted = preprocessing.instantiate(
+        plan,
+        scmle.models.registry.Catalog.stock().get("logistic_regression"),
+        tasks.Task.BINARY,
+        SEED,
+    ).fit(training, frame[target].iloc[HELD_OUT:].astype(str))
+    bundle = scmle.artifacts.bundle.Bundle.create(
+        fitted,
+        plan,
+        training,
+        target,
+        tasks.Task.BINARY.value,
+        "roc_auc",
+        "logistic_regression",
+    )
+    folder = Path(tempfile.mkdtemp(prefix="faults-"))
+    graph = folder / "model.onnx"
+    check = held if fault == "checked" else None
+    if part == "simulated":
+        written: Any = bundle.export_onnx(
+            graph, check=check, unverified=fault == "unverified"
+        )
+    else:
+        bundle.save(folder / "bundle")
+        held.to_csv(folder / "held.csv", index=False)
+        options = {
+            "unchecked": [],
+            "checked": ["--check", str(folder / "held.csv")],
+            "unverified": ["--unverified"],
+        }[fault]
+        parser = argparse.ArgumentParser()
+        step = delivery.Export()
+        step.configure(parser)
+        arguments = parser.parse_args(
+            [
+                str(folder / "bundle"),
+                "--trusted",
+                "--output",
+                str(graph),
+                *options,
+            ]
+        )
+        written = step.execute(arguments)
+    if fault != "unverified":
+        return written
+    manifest = json.loads(
+        graph.with_name(graph.name + ".manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    return f"{graph.name}.manifest.json: verified {manifest['verified']}"
+
+
 def series(values: Any) -> pandas.Series:
     """A target column named `y`.
 
@@ -2148,6 +2241,14 @@ def bind(
 
 
 INJECTIONS: dict[str, Injection] = {
+    "export.onnx.divergence": Injection(
+        "site",
+        "Bundle.export_onnx with no held-out rows (verification is the "
+        "default)",
+        bind(exported, "unchecked"),
+        bind(exported, "checked"),
+        override=bind(exported, "unverified"),
+    ),
     "ingest.cli.unit_verdict": Injection(
         "site",
         "scmle ingest with unit customer-month on a customer table",
@@ -2476,6 +2577,14 @@ BANKED = "OpenML 1461 bank marketing"
 MARKET = "a SQLite source of the OpenML 42731 house sales by zip code"
 
 REAL: dict[str, Injection] = {
+    "export.onnx.divergence": Injection(
+        "run",
+        f"scmle export-onnx of a logistic model of {CREDIT} with no "
+        f"held-out rows (verification is the default)",
+        bind(exported, "unchecked", part="real"),
+        bind(exported, "checked", part="real"),
+        override=bind(exported, "unverified", part="real"),
+    ),
     "ingest.cli.unit_verdict": Injection(
         "run",
         f"scmle ingest with unit zipcode-month on the zip-code table "

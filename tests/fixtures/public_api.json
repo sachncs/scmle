@@ -598,6 +598,20 @@
         "signature_sha256": "06b0437d0e2c1ce293dfb4f2cf009737aeb69dfe41f1565e90d3ffc9838dbe18"
       }
     },
+    "scmle.pipeline.kinds": {
+      "Kind": {
+        "kind": "class",
+        "signature_sha256": "1c303ca2030af1773341a1776f5ff77dbd505c9d0bc58cf8f62af8fc41e3f2e8"
+      },
+      "Tabular": {
+        "kind": "class",
+        "signature_sha256": "9ec044f0a984a38ab0c4eda6249dd69a133b03645e371b9455e31c37e42a50d2"
+      },
+      "pick": {
+        "kind": "callable",
+        "signature_sha256": "8300fcdffbf1edab41836f8841a283b7bd2e3d2746bad556a4df8b479df0154c"
+      }
+    },
     "scmle.pipeline.modality_lifecycle": {
       "Cancellation": {
         "kind": "class",

@@ -7,23 +7,23 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   <p class="eyebrow"><span></span> First run</p>
   <h1>From table to<br /><em>evidence.</em></h1>
   <p class="lead">Install, create an example table, run one bounded workflow, read what it recorded, and score new rows. It takes about five minutes, of which the run itself is about half a minute. Needs Python 3.11 or newer.</p>
-  <div class="callout"><p><strong>Everything here was run.</strong> Every command and every block of output below was executed in a fresh virtual environment, in an empty folder, with the package installed from a local checkout, on macOS with Python 3.14. The PowerShell variants differ only in how the shell activates the environment and sets a variable; they were not run on Windows. Your scores can differ in the last digits and with the speed of your computer, because the search stops at a time budget.</p></div>
+  <div class="callout"><p><strong>Everything here was run.</strong> The macOS and Linux commands below, and the output shown for each, come from a fresh virtual environment, in an empty folder, on macOS with Python 3.14, with the package installed from a local checkout in place of the GitHub install line of step 1; the C12 snippet check (<code>benchmarks/evidence/snippets.py</code>) reruns the commands the same way, with that install line. The PowerShell variants differ only in how the shell activates the environment and sets a variable; they were not run on Windows. Your scores can differ in the last digits and with the speed of your computer, because the search stops at a time budget.</p></div>
 
   <h2>1. Install</h2>
   <p>macOS and Linux:</p>
-  <pre><code>python3 -m venv .venv
+  <pre><code class="language-bash">python3 -m venv .venv
 source .venv/bin/activate
 pip install "scmle @ git+https://github.com/sachncs/scmle"</code></pre>
   <p>Windows PowerShell:</p>
-  <pre><code>py -m venv .venv
+  <pre><code class="language-powershell">py -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install "scmle @ git+https://github.com/sachncs/scmle"</code></pre>
   <p>Check it worked: <code>scmle --help</code> prints the list of commands.</p>
 
   <h2>2. Create an example table</h2>
   <p>A model needs enough rows of each answer to hold some back for a final test. The script below writes 500 customers whose churn depends on tenure, spend and support tickets (<code>customers.csv</code>), and five new customers with no answer (<code>new_customers.csv</code>) that you will score at the end. It uses a fixed random seed, so you get the same files every time, and it needs nothing but Python.</p>
-  <p>Save it as <code>make_data.py</code> in an empty folder, using any text editor, then run <code>python make_data.py</code> (on Windows, <code>py make_data.py</code>).</p>
-  <pre><code>{`import csv
+  <p>Save it as <code>make_data.py</code> in an empty folder, using any text editor.</p>
+  <pre><code class="language-python">{`import csv
 import math
 import random
 
@@ -51,8 +51,10 @@ def write(name, n, with_label, start):
 
 write("customers.csv", 500, True, 1)
 write("new_customers.csv", 5, False, 9001)`}</code></pre>
-  <p>Look at the first lines to be sure you have the same table:</p>
-  <pre><code>customer_id,tenure_months,monthly_spend,support_tickets,churned
+  <p>Run it (on Windows, <code>py make_data.py</code>), then look at the first lines to be sure you have the same table:</p>
+  <pre><code class="language-bash">{`python make_data.py
+head -4 customers.csv`}</code></pre>
+  <pre><code class="language-text">customer_id,tenure_months,monthly_spend,support_tickets,churned
 c0001,21,114.79,3,1
 c0002,5,102.13,0,1
 c0003,4,110.97,1,1</code></pre>
@@ -60,9 +62,9 @@ c0003,4,110.97,1,1</code></pre>
 
   <h2>3. Run a project</h2>
   <p>The target is <code>churned</code>, the column to predict. <code>customer_id</code> only names a row, so it is kept out of the features. The time budget is set explicitly to 60 seconds; without it the command line uses a much longer default.</p>
-  <pre><code>scmle run customers.csv --target churned --identifiers customer_id --budget 60 --output-dir runs/customers</code></pre>
+  <pre><code class="language-bash">scmle run customers.csv --target churned --identifiers customer_id --budget 60 --output-dir runs/customers</code></pre>
   <p>It prints one line for each step, then stops. On the author's machine it took about 30 seconds. The last lines were:</p>
-  <pre><code>[run_20261105_001] state.COMPLETED: run complete
+  <pre><code class="language-text">[run_20261105_001] state.COMPLETED: run complete
 run_20261105_001: selected stacking (cv roc_auc=0.7739); test: roc_auc=0.7350, pr_auc=0.8141, log_loss=0.5874, f1=0.7317, balanced_accuracy=0.6500, accuracy=0.6700
 artifacts: runs/customers/run_20261105_001</code></pre>
   <p>How to read the line: SCMLE tried seven kinds of model within the budget and kept the one with the best cross-validated ROC AUC (0.7739). It then scored that model <em>once</em> on rows it had held back from the start, and the ROC AUC there was 0.7350. The held-back score is the one to trust. The run folder is named with today's date, so yours will not say <code>20261105</code>; it is the path on the <code>artifacts:</code> line. No line mentioned leakage suspects, so the screen flagged no column.</p>
@@ -70,7 +72,7 @@ artifacts: runs/customers/run_20261105_001</code></pre>
 
   <h2>4. Inspect the evidence</h2>
   <p>The run folder holds the decisions, not only the model. The files to open first:</p>
-  <pre><code>runs/customers/run_20261105_001/
+  <pre><code class="language-text">runs/customers/run_20261105_001/
 ├── report.html            the summary to open in a browser
 ├── leaderboard.parquet    every candidate and its cross-validated score
 ├── evaluation.json        the one-time held-back result
@@ -82,29 +84,30 @@ artifacts: runs/customers/run_20261105_001</code></pre>
 
   <h2>5. Score new rows</h2>
   <p>Find the run folder first. macOS and Linux:</p>
-  <pre><code>RUN=$(ls -d runs/customers/run_* | tail -1)
+  <pre><code class="language-bash">RUN=$(ls -d runs/customers/run_* | tail -1)
 echo $RUN</code></pre>
   <p>Windows PowerShell:</p>
-  <pre><code>$RUN = (Get-ChildItem runs\customers\run_* | Select-Object -Last 1).FullName
+  <pre><code class="language-powershell">$RUN = (Get-ChildItem runs\customers\run_* | Select-Object -Last 1).FullName
 $RUN</code></pre>
   <p>Now try to predict (use <code>"$RUN/model"</code> on macOS and Linux, <code>"$RUN\model"</code> in PowerShell):</p>
-  <pre><code>scmle predict "$RUN/model" new_customers.csv --output predictions.csv</code></pre>
+  <pre><code class="language-bash" data-snippet="refused">scmle predict "$RUN/model" new_customers.csv --output predictions.csv</code></pre>
   <p>It refuses:</p>
-  <pre><code>artifact error: refusing to load an unauthenticated bundle: it is pickle-based and loading executes code. Sign bundles with $SCMLE_SIGNING_KEY, or pass trusted=True if you trust its source.</code></pre>
+  <pre><code class="language-text">artifact error: refusing to load an unauthenticated bundle: it is pickle-based and loading executes code. Sign bundles with $SCMLE_SIGNING_KEY, or pass trusted=True if you trust its source.</code></pre>
   <p><strong>This refusal is a safety feature, not a fault.</strong> A bundle stores its model in Python's pickle format, and loading a pickle can run any code it contains. A bundle from someone else could therefore take over your computer. SCMLE will only load a bundle whose signature proves it was written by someone holding your key. The run you just made was written without a key, so it is unsigned.</p>
 
   <h3>Recommended: sign the bundle, then predict with the key</h3>
   <p>Make a secret key and keep it in the environment variable <code>SCMLE_SIGNING_KEY</code>, then run again. The bundle is signed when it is written. macOS and Linux:</p>
-  <pre><code>export SCMLE_SIGNING_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+  <pre><code class="language-bash">export SCMLE_SIGNING_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
 scmle run customers.csv --target churned --identifiers customer_id --budget 60 --output-dir runs/signed</code></pre>
   <p>Windows PowerShell:</p>
-  <pre><code>$env:SCMLE_SIGNING_KEY = python -c "import secrets; print(secrets.token_hex(32))"
+  <pre><code class="language-powershell">$env:SCMLE_SIGNING_KEY = python -c "import secrets; print(secrets.token_hex(32))"
 scmle run customers.csv --target churned --identifiers customer_id --budget 60 --output-dir runs/signed</code></pre>
-  <p>The run prints the same kind of last lines (the same scores, since the data and seed are the same). Then predict, with the key still set in that terminal (<code>RUN</code> now points at <code>runs/signed</code>; set it again with <code>ls -d runs/signed/run_* | tail -1</code> or the PowerShell equivalent):</p>
-  <pre><code>scmle predict "$RUN/model" new_customers.csv --output predictions.csv</code></pre>
-  <pre><code>wrote 5 predictions to predictions.csv</code></pre>
+  <p>The run prints the same kind of last lines (the same scores, since the data and seed are the same). Then point <code>RUN</code> at the signed run and predict, with the key still set in that terminal (in PowerShell, repeat the <code>Get-ChildItem</code> line of step 5 with <code>runs\signed</code>):</p>
+  <pre><code class="language-bash">{`RUN=$(ls -d runs/signed/run_* | tail -1)
+scmle predict "$RUN/model" new_customers.csv --output predictions.csv`}</code></pre>
+  <pre><code class="language-text">wrote 5 predictions to predictions.csv</code></pre>
   <p><code>predictions.csv</code> holds the predicted class and a probability for each class:</p>
-  <pre><code>prediction,proba_0,proba_1
+  <pre><code class="language-text">prediction,proba_0,proba_1
 1,0.31868781430216964,0.6813121856978304
 1,0.23590496931089688,0.7640950306891031
 1,0.1901939121773094,0.8098060878226906
@@ -114,7 +117,8 @@ scmle run customers.csv --target churned --identifiers customer_id --budget 60 -
 
   <h3>Only for a bundle you just made yourself: <code>--trusted</code></h3>
   <p>If you are certain the bundle is the unsigned one you created a minute ago on your own computer, you can vouch for it:</p>
-  <pre><code>scmle predict "$RUN/model" new_customers.csv --trusted --output predictions.csv</code></pre>
+  <pre><code class="language-bash">{`RUN=$(ls -d runs/customers/run_* | tail -1)   # the unsigned run of step 3
+scmle predict "$RUN/model" new_customers.csv --trusted --output predictions.csv`}</code></pre>
   <div class="callout"><p><strong>Never use <code>--trusted</code> on a model you downloaded, received, or did not create.</strong> It switches off the check that protects you from running someone else's code. A real deployment should always sign.</p></div>
-  <p>Next: learn how to bring <a href={`${base}/docs/data/`}>different kinds of data</a> into the curation pipeline, then use the <a href={`${base}/docs/workflows/`}>workflow guide</a> to move beyond the first run. If a step fails, <a href={`${base}/docs/when-things-go-wrong/`}>When things go wrong</a> lists every refusal.</p>
+  <p>Next: learn how to bring <a href={`${base}/docs/data/`}>different kinds of data</a> into the curation pipeline, then use the <a href={`${base}/docs/workflows/`}>workflow guide</a> to move beyond the first run. If a step fails, <a href={`${base}/docs/when-things-go-wrong/`}>When things go wrong</a> explains the messages a first run most often prints and what to do about each.</p>
 </DocsLayout>

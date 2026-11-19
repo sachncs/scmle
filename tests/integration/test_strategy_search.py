@@ -126,8 +126,17 @@ def test_strategies_can_be_forced_to_win_and_are_then_used(
     )
     assert (
         best_under > best_default
-    )  # undersampling helps balanced accuracy here
-    assert result.evaluation["selected"]["strategy"] == "random_undersample"
+    )  # undersampling helps balanced accuracy here, by a little
+    # It is used only when the shared folds make it credibly better.
+    verdicts = {
+        o["technique"]: o["action"] for o in decision_log(result)["outcomes"]
+    }
+    adopted = any(
+        technique.startswith("random_undersample@") and action == "include"
+        for technique, action in verdicts.items()
+    )
+    chosen = result.evaluation["selected"]["strategy"]
+    assert (chosen == "random_undersample") is adopted
 
 
 def test_balanced_data_skips_imbalance_strategies_with_logged_reasons(

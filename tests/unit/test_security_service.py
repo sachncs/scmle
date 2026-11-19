@@ -89,7 +89,7 @@ def record_of(reference):
 
 def test_probes_are_public_and_everything_else_needs_a_token(service):
     # Enforces docs/TENANT_ISOLATION.md:23.
-    # Enforces README.md:266.
+    # Enforces README.md:285.
     # Enforces website/src/pages/docs/tenant-isolation.astro:29.
     # Enforces website/src/pages/docs/threat-model.astro:19.
     # Enforces website/src/pages/docs/operations.astro:8.
@@ -298,7 +298,7 @@ def test_no_unauthenticated_server_can_listen_beyond_loopback(reference):
     # Enforces docs/TENANT_ISOLATION.md:118.
     # Enforces docs/API_STABILITY.md:212.
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:184.
-    # Enforces README.md:266.
+    # Enforces README.md:285.
     # Enforces website/src/learn/what-scmle-cannot-do.html:46-47.
     # Enforces website/src/pages/docs/api-stability.astro:76.
     # Enforces website/src/pages/docs/architecture.astro:102.

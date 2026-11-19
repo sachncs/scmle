@@ -48,7 +48,7 @@ def signed(tmp_path):
 def test_predict_refuses_a_wrong_key_and_missing_columns_with_exit_one(
     signed, tmp_path, monkeypatch, caplog
 ):
-    """Enforces docs/START_HERE.md:518.
+    """Enforces docs/START_HERE.md:521.
 
     Also enforces website/src/learn/start-here.html:265.
     Also enforces website/src/pages/docs/quickstart.astro:113.

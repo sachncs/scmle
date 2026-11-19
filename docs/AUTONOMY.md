@@ -60,8 +60,41 @@ the loop's own rules (F13); the controller adds only the following.
 An envelope is authority a person signs in advance for an action that is not on
 the never list. Today there is one such action: `train_challenger`.
 
+The person writes and signs it with their own key (`Envelope.create`). Save
+this as `make_envelope.py`:
+
+```python
+import datetime
+import json
+import pathlib
+
+from scmle.governance import deployment_ledger
+
+key = "a-key-only-the-person-holds"
+today = datetime.date.today()
+envelope = deployment_ledger.Envelope.create(
+    key,
+    identifier="e1",
+    limits={"train_challenger": 2},
+    statement="train a challenger when the alarm gates retraining",
+    role="model owner",
+    attestor="P. Owner",
+    date=today.isoformat(),
+    scope="stream",
+    expires=(today + datetime.timedelta(days=30)).isoformat(),
+)
+pathlib.Path("envelope.json").write_text(json.dumps(envelope.to_dict()))
+pathlib.Path("person.key").write_text(key)
+```
+
+Then open a deployment (`scmle loop init`, here with a stand-in charter hash),
+grant the envelope, and use the other actions:
+
 ```bash
-# the person writes and signs it with their own key (Envelope.create)
+echo '{"reference": 0.1}' > policy.json
+scmle loop init deploy/ --policy policy.json \
+  --charter-hash "$(python -c 'import hashlib; print(hashlib.sha256(b"charter").hexdigest())')"
+python make_envelope.py               # writes envelope.json and person.key
 scmle operate grant deploy/ --envelope envelope.json --key-file person.key
 scmle operate status deploy/          # uses left per envelope
 scmle operate revoke deploy/ e1 --reason "model retired"

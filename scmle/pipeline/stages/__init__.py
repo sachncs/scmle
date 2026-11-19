@@ -37,7 +37,6 @@ from scmle.pipeline.stages.scoring import choose_decision_threshold
 from scmle.pipeline.stages.scoring import COVERAGE_LEVELS
 from scmle.pipeline.stages.scoring import coverage_on_confirmation
 from scmle.pipeline.stages.scoring import decisional
-from scmle.pipeline.stages.scoring import freeze
 from scmle.pipeline.stages.scoring import MATRIX_DIMENSIONS
 from scmle.pipeline.stages.scoring import pin
 from scmle.pipeline.stages.scoring import reference_scores
@@ -79,7 +78,6 @@ __all__ = [
     "devise",
     "dimensions",
     "foldcost",
-    "freeze",
     "frontier",
     "governing",
     "graft",

@@ -29,6 +29,7 @@ from scmle.operations import notify
 from scmle.operations import recovery
 from scmle.operations import signals
 from scmle.operations import spool
+from scmle.pipeline import kinds
 from scmle.runners import base
 from scmle.runners import checkpoint
 from scmle.runners import local
@@ -222,6 +223,7 @@ EXTENSION_SURFACES = {
         ("ApprovalError", "Executor", "Progress", "StepContext"),
     ),
     "scmle.workflow.schedule": (schedule, ("Scheduler", "Tick")),
+    "scmle.pipeline.kinds": (kinds, ("Kind", "Tabular", "pick")),
     "scmle.data.store.processing": (
         processing,
         ("Checkpoint", "IncrementalProcessor", "Processing"),

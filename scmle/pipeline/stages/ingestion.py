@@ -6,14 +6,13 @@ from typing import ClassVar
 
 import pandas
 
-from scmle.contracts import capabilities
 from scmle.contracts import errors
-from scmle.contracts import tasks
 from scmle.contracts.data import provenance
 from scmle.data import feature_graph
 from scmle.data.readers import streaming
 from scmle.data.readers import tabular
 import scmle.data.readers.registry
+from scmle.pipeline import kinds
 from scmle.pipeline import products
 import scmle.pipeline.context
 from scmle.pipeline.stages import interface
@@ -31,6 +30,8 @@ class Intake(products.Derived):
         cleaning_notes: Repairs made while reading.
         read_seconds: Seconds the read took.
         stream: The chunked source and its totals, when streamed.
+        kind: The kind of the rows, which the later stages profile, split
+            and decode through; rows given in memory are a table.
     """
 
     frame: pandas.DataFrame
@@ -38,6 +39,7 @@ class Intake(products.Derived):
     cleaning_notes: list[str]
     read_seconds: float
     stream: tuple[streaming.Feed, streaming.Totals] | None
+    kind: kinds.Kind = kinds.TABULAR
 
     def summary(self) -> object:
         """The content and schema digests and the repairs, not the timing.
@@ -74,61 +76,12 @@ class IngestStage(interface.Stage):
         """
         return "ingest dataset"
 
-    @staticmethod
-    def overflows(data: tasks.Dataset) -> bool:
-        """Returns whether the file is bigger than the memory budget.
-
-        Args:
-            data: The data specification, giving the source and the optional
-                memory budget in gigabytes.
-
-        Returns:
-            True if a memory budget is set and the source's estimated size
-            exceeds it; False if no budget is set.
-        """
-        if data.memory_budget_gb is None:
-            return False
-        size = streaming.locate(data.uri).footprint()
-        return size > data.memory_budget_gb * 1e9
-
-    def read_stream(
-        self, context: scmle.pipeline.context.Context, data: tasks.Dataset
-    ) -> tuple[pandas.DataFrame, tuple[streaming.Feed, streaming.Totals]]:
-        """Reads the file in one pass, keeping a sample of both sides.
-
-        A hash of each row's position assigns it to the locked or the
-        development side, and a capped sample of each side is kept.
-
-        Args:
-            context: The run context, supplying the validation settings.
-            data: The data specification naming the source and memory budget.
-
-        Returns:
-            The kept development and locked rows together, with a
-            `split_side` column marking the side of each row, and the
-            streaming source with the pass totals.
-        """
-        source = streaming.locate(data.uri)
-        columns = source.shape()[1]
-        development, locked = streaming.budgets(
-            columns,
-            data.memory_budget_gb or 1.0,
-            context.services.spec.validation.test_fraction,
-        )
-        frame, totals = streaming.sweep(
-            source,
-            development,
-            locked,
-            context.services.spec.validation.test_fraction,
-            context.services.spec.validation.seed,
-        )
-        return frame, (source, totals)
-
     def execute(self, context: scmle.pipeline.context.Context) -> Intake:
         """Loads the data, records its manifest and applies the feature graph.
 
-        An in-memory input frame is copied; otherwise the file is read whole,
-        or in one streaming pass when it exceeds the memory budget. Infinite
+        An in-memory input frame is copied; otherwise the data's kind reads
+        the source (`kinds.Kind.read`): a table is read whole, or in one
+        streaming pass when it exceeds the memory budget. Infinite
         values are treated as missing and noted. The source snapshot and the
         dataset manifest are written. A schema change that is incompatible
         with the stored snapshot, or checkpoints computed on different data,
@@ -142,30 +95,19 @@ class IngestStage(interface.Stage):
             The intake: the rows, their manifest and the read's repairs.
 
         Raises:
-            UnsupportedError: If the data is not tabular and no
-                in-memory frame was supplied, since no other modality has an
-                ingestion adapter.
+            UnsupportedError: If no in-memory frame was supplied and no kind
+                is registered for the declared modality (`kinds.pick`).
         """
-        data = context.services.spec.data
-        if data.modality != "tabular" and context.services.input_frame is None:
-            raise capabilities.UnsupportedError(
-                "file-backed modality has no registered ingestion adapter",
-                {
-                    "status": "unsupported",
-                    "reason": "file-backed modality has no ingestion adapter",
-                    "modality": data.modality,
-                    "uri": data.uri,
-                    "supported_modalities": ["tabular"],
-                },
-            )
+        spec = context.services.spec
+        data = spec.data
         started = context.services.clock.monotonic()
         stream = None
+        kind: kinds.Kind = kinds.TABULAR
         if context.services.input_frame is not None:
             frame = context.services.input_frame.copy(deep=False)
-        elif self.overflows(data):
-            frame, stream = self.read_stream(context, data)
         else:
-            frame = tabular.read_table(data.uri)
+            kind = kinds.pick(data)
+            frame, stream = kind.read(spec)
         if data.horizon:
             frame = forecasting.augment(frame, data)
         seconds = context.services.clock.monotonic() - started
@@ -190,7 +132,7 @@ class IngestStage(interface.Stage):
         context.journal.track(
             dataset_id=manifest.identifier, data_hash=manifest.digests["data"]
         )
-        made = Intake(frame, manifest, notes, seconds, stream)
+        made = Intake(frame, manifest, notes, seconds, stream, kind)
         made.apply(context)
         return made
 

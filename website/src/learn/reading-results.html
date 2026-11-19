@@ -29,6 +29,7 @@ dummy baseline   : 0.5</code></pre>
 </li><li><strong>Exam score</strong> (<code>metrics</code>): the winner scored once on held-out data, rows nobody touched. This is the fair preview.
 </li><li><strong>Band</strong>: with 216 exam rows the true score could be 0.84 or 0.93. Quote the band, not just the point. When the bands of two models overlap, the data do not say which is better.
 </li><li><strong>Baseline</strong>: the dummy model scores 0.5. Check that you beat it by a margin that matters to you.
+</li><li><strong>Served model</strong> (<code>shipped</code>): after the exam, the winner is refit on every row, learning and exam, and that refit is what the bundle serves. The exam score stays that of the fit that never saw the exam rows, so it is a slightly cautious preview of the served model. <code>shipped.refit</code> is false, with the <code>reason</code>, when a charter governs the run, training was streamed, or the refit would not finish in time.
 </li></ul>
 <p>A trustworthy gap between practice and exam is small, and the exam is often a little lower. If the exam is much lower than practice, the model memorised. If the exam is higher, that is luck or a small exam set; do not count on it.</p>
 <h2 id="the-leaderboard">The leaderboard</h2>
@@ -116,7 +117,7 @@ dummy baseline   : 0.5</code></pre>
 <h2 id="duplicates-and-noise">Duplicates and noise</h2>
 <p>The run also told us:</p>
 <pre><code class="language-text">14% of rows are exact duplicates; duplicates can appear in both training and validation folds and inflate scores.</code></pre>
-<p>It means the exam score of 0.885 may be a little high, because a copy of an exam row might sit among the learning rows. Cure: remove duplicates, or name a group column if copies belong to one entity. In a charter run, SCMLE keeps copies on the same side of the split automatically (the run logged <code>110 groups of duplicate rows (339 rows) kept on one side of every split</code>).</p>
+<p>It means the exam score of 0.885 may be a little high, because a copy of an exam row might sit among the learning rows. Cure: remove duplicates, or name a group column if copies belong to one entity. Otherwise SCMLE treats rows as exchangeable draws, as scikit-learn's k-fold and OpenML's splits do: a future case may repeat a past one, so repeats may fall on both sides, and the split notes count them (for example <code>68 of 203 test rows repeat a development record</code>). In a charter run, SCMLE keeps copies of one record on the same side of the split automatically.</p>
 <h2 id="reading-calibration-and-thresholds">Reading calibration and thresholds</h2>
 <p>If you use the predicted chance (for example, "call everyone above 70 percent"), read <code>calibration.json</code>. Each bin lists the chance the model said (<code>mean_predicted</code>) and how often it happened (<code>observed_frequency</code>). In our run the bin around 0.14 saw 0.10: a model that is slightly too pessimistic. Close enough for ranking, but do not quote its probabilities as exact.</p>
 <p><code>threshold_analysis.json</code> shows what each cut-off buys:</p>
@@ -125,20 +126,46 @@ threshold 0.8: precision 0.94, recall 0.55
 threshold 0.3: precision 0.67, recall 0.85</code></pre>
 <p>A higher cut means fewer false alarms and more misses. Choose the cut from the cost of each (see <a href="@@BASE@@/docs/decisions/">Decisions</a>).</p>
 <h2 id="a-second-mode-the-charter">A second mode: the charter</h2>
-<p>Everything above is the ordinary mode. The careful mode adds a written plan (the charter) and sealed rows. You use it when someone will act on a <em>finding</em> ("fare is linked to survival") and needs to know it was not luck. Create the plan, check it, sign it and run with it:</p>
-<pre><code class="language-bash">scmle charter init charter.json
-scmle charter check charter.json --rows 1093
+<p>Everything above is the ordinary mode. The careful mode adds a written plan (the charter) and sealed rows. You use it when someone will act on a <em>finding</em> ("fare is linked to survival") and needs to know it was not luck.</p>
+<p>To follow along in a fresh folder, take the Titanic extract from the repository and make a signing key (<code>charter sign</code> and <code>claims verify</code> read it from <code>SCMLE_SIGNING_KEY</code>):</p>
+<pre><code class="language-bash">git clone https://github.com/sachncs/scmle
+cp scmle/tests/fixtures/titanic_extract.csv titanic.csv
+export SCMLE_SIGNING_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")</code></pre>
+<p>Create the plan:</p>
+<pre><code class="language-bash">scmle charter init charter.json</code></pre>
+<p><code>charter init</code> writes a template that fails <code>check</code> until you fill in the question, population, target, prediction moment, one intercurrent event with its strategy, unit and deployment population. The template does not show the shape of the event; it is <code>{"event": "...", "strategy": "..."}</code>. Fill it in with an editor, or save this as <code>fill_charter.py</code>:</p>
+<pre><code class="language-python">import json
+from pathlib import Path
+
+path = Path("charter.json")
+charter = json.loads(path.read_text())
+charter["question"] = "Which passenger traits are linked to survival?"
+charter["estimand"].update(
+    population="every passenger of titanic.csv",
+    target="survived",
+    moment="boarding",
+    intercurrent=[{"event": "none", "strategy": "not applicable"}],
+    summary="rank correlation with survival",
+)
+charter["unit"] = "passenger"
+charter["population"] = "every passenger of titanic.csv"
+charter["effect"] = 0.25
+path.write_text(json.dumps(charter, indent=2))</code></pre>
+<p>Then fill it in, sign it, check it and run with it:</p>
+<pre><code class="language-bash">python fill_charter.py
 scmle charter sign charter.json
-scmle run titanic.csv --target survived --unavailable boat body --charter charter.json</code></pre>
+scmle charter check charter.json --rows 1093
+scmle run titanic.csv --target survived --unavailable boat body --charter charter.json \
+  --budget 120 --output-dir runs_charter</code></pre>
 <p>(Edit the file <em>before</em> you sign it: <code>charter sign</code> wraps the plan inside a <code>charter</code> key next to the hash and signature, so later edits must go inside that key, and then fail verification anyway.)</p>
-<p>(<code>charter init</code> writes a template that fails <code>check</code> until you fill in the question, population, target, prediction moment, one intercurrent event with its strategy, unit and deployment population. The template does not show the shape of the event; it is <code>{"event": "...", "strategy": "..."}</code>.)</p>
 <p>When the charter is filled in correctly, <code>check</code> prints something like:</p>
 <pre><code class="language-text">charter be7b4e8c968abdd66a37234df0280bacc2c9bfae4837ccaa6709b955fc90f813 signature verified
 feasibility: feasible (273 rows &gt;= 214 needed for power 0.8)</code></pre>
 <p><code>--rows</code> is the number of development rows: the table minus the exam rows (1309 minus 216 is 1093). With the default effect size of 0.2, the same table gave <code>feasibility: downgrade (273 rows &lt; 333 needed for power 0.8 at effect 0.2; detectable effect is 0.221)</code>. That is a warning that your sealed set is too small for your promise. You either lower the promise (<code>effect</code> 0.25 made it feasible) or you get more rows.</p>
 <p>After the run, list the claims:</p>
-<pre><code class="language-bash">scmle claims list runs_charter/run_20261105_001
-scmle claims verify runs_charter/run_20261105_001</code></pre>
+<pre><code class="language-bash">run=$(ls -d runs_charter/run_* | tail -n 1)    # for example runs_charter/run_20261105_001
+scmle claims list "$run"
+scmle claims verify "$run"</code></pre>
 <p>Real output:</p>
 <pre><code class="language-text">h000001  confirmed   pclass                    adj.p=2.358e-06  effect=-0.2927
 h000004  confirmed   parch                     adj.p=0.0005005  effect=0.2186
@@ -153,7 +180,8 @@ PASS    confirmation replays from the p-values on C: 3 hypotheses, rule by
 SKIPPED second-stage accounting is consistent: no withdrawal rule ran
 PASS    custody log: selection frozen before C opened, C opened once: 5 entries, chain verified
 PASS    negative control matches the ledger: hash equal
-7 of 9 steps passed</code></pre>
+SKIPPED causal attestations verify: no causal claims or charter file
+7 of 10 steps passed</code></pre>
 <p>How to read the claims:</p>
 <ul><li>Each row is a <strong>claim</strong>: a finding that survived exploration on rows <code>X</code> and was then tested once on the sealed rows <code>C</code>. Here: "<code>pclass</code>, <code>parch</code> and <code>fare</code> are each linked to survival".
 </li><li><code>confirmed</code> is the tier: it passed on fresh rows, with the stated error allowance for the whole list.

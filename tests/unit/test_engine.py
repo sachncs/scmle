@@ -44,6 +44,7 @@ def stage(name, progress, needs=(), effect=None):
         {
             "state": progress,
             "requires": needs,
+            "makes": None,
             "describe": lambda self, context: f"enter {name}",
             "execute": execute,
         },

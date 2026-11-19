@@ -12,7 +12,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
   <h2>Dataset card: what went into the run</h2>
   <p>The dataset card starts at ingestion, not at the end of modelling. It should identify the source snapshot, schema, curation rules, findings, privacy decisions, and the population the data can represent. Tabular runs write a standalone <code>dataset_card.json</code>; experimental modality lifecycles carry the equivalent card inside their documentation evidence and mark missing provenance or privacy review explicitly.</p>
-  <pre><code>{`dataset_card:
+  <pre><code class="language-text">{`dataset_card:
   snapshot_id: snapshot-2026-10-20
   source: orders.parquet
   content_digest: sha256:...
@@ -44,7 +44,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
   <h2>Explanation card: what the explanation actually measures</h2>
   <p>Every explanation should name the model digest, input fingerprint, method, parameters, timestamp, software version, stability or fidelity evidence, privacy decision, and limitation. State whether the result is associational; do not let a feature attribution sound causal by accident.</p>
-  <pre><code>{`explanation:
+  <pre><code class="language-text">{`explanation:
   model_digest: sha256:...
   input_fingerprint: row:customer-42
   method: permutation_importance

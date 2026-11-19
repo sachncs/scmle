@@ -25,7 +25,7 @@ def test_cpu_limit_caps_workers_and_splits_threads():
 
 
 def test_the_trial_window_and_memory_gate_trials(monkeypatch):
-    # Enforces README.md:138. Time applies to the first trial too (the run
+    # Enforces README.md:157. Time applies to the first trial too (the run
     # was admitted only if one fits); memory spares it so a result exists.
     tight = limits.Governor(
         tasks.Resources(time_budget_seconds=1),
@@ -46,7 +46,7 @@ def test_peak_memory_is_positive_and_plausible():
 
 def test_report_states_enforcement_honestly(monkeypatch):
     # Enforces docs/ARCHITECTURE.md:90.
-    # Enforces README.md:138.
+    # Enforces README.md:157.
     monkeypatch.setattr(limits, "peak_memory_gb", lambda: 1.5)
     report = governor(workers=4, cpu_limit=2, memory_limit_gb=1.0).report()
     assert (

@@ -29,15 +29,36 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
   <h2>Model-family declarations are not support claims</h2>
   <p>The capability registry separates a known model family from a complete end-to-end capability. Transformer families are catalogued with their modality, extra, resource, and failure boundaries; JEPA is explicitly declared as <strong>tabular-only and experimental</strong>. A caller still needs a full eight-dimensional declaration—modality, task, model family, evaluation, uncertainty, fairness, explainability, and inference—before a run can cross the support gate.</p>
-  <pre><code>{`from scmle.contracts.capabilities import Registry
+  <pre><code class="language-python">{`from scmle.contracts.capabilities import Coordinate, Environment, Evaluation
+from scmle.contracts.capabilities import Explainability, Fairness, Inference
+from scmle.contracts.capabilities import Modality, Registry, Uncertainty
+from scmle.contracts.capabilities import UnsupportedError
+from scmle.contracts.tasks import Task
 
 registry = Registry.seed()
 family = registry.find("jepa")
 assert family.status.value == "experimental"
 assert family.modalities == (Modality.TABULAR,)
 
+requested_capability = Coordinate(
+    modality=Modality.TABULAR,
+    task=Task.BINARY,
+    model_family="jepa",
+    evaluation=Evaluation.CALIBRATED,
+    uncertainty=Uncertainty.CALIBRATED_PROBABILITY,
+    fairness=Fairness.GROUP_REPORT,
+    explainability=Explainability.FULL,
+    inference=Inference.LIBRARY,
+)
+runtime_facts = Environment(
+    available_extras=frozenset({"deeplearning"}), cpu_cores=4, memory_gb=8.0
+)
+
 # Missing complete declarations fail before training with diagnostics.
-registry.require(requested_capability, environment=runtime_facts)`}</code></pre>
+try:
+    registry.require(requested_capability, environment=runtime_facts)
+except UnsupportedError as refusal:
+    print(refusal.details["reason"])`}</code></pre>
   <p class="note">The registry does not guess whether an optional extra, GPU, memory budget, or evidence artifact exists. Supply those facts explicitly.</p>
 
   <section class="doc-section">
@@ -52,16 +73,46 @@ registry.require(requested_capability, environment=runtime_facts)`}</code></pre>
     <p class="eyebrow">Reference serving</p>
     <h2>Bring the decoder. Keep the boundary visible.</h2>
     <p><code>ModalityHttpServing</code> exposes a signed <code>Predictor</code> through <code>/health</code>, <code>/schema</code>, and <code>/predict</code>. The core deliberately does not guess how a PDF, image, audio stream, graph, or geospatial object should be decoded. Supply a <code>ModalitySampleDecoder</code> that owns that policy, validates its payload, and returns the adapter's sample type.</p>
-    <pre><code>{`class DocumentDecoder(ModalitySampleDecoder):
+    <pre><code class="language-python">{`import json
+import urllib.request
+
+from scmle.data.modalities.document import Dataset, Sample
+from scmle.pipeline.modality_lifecycle import DocumentPreparer, Lifecycle
+from scmle.pipeline.modality_lifecycle import Predictor
+from scmle.serving.modality import ModalityHttpServing, ModalitySampleDecoder
+
+# A small signed document package to serve.
+adapter = DocumentPreparer(Dataset(tuple(
+    Sample(f"policy-{index}", ("approved " if index % 2 else "review ")
+           * (index + 2), label="approved" if index % 2 else "review")
+    for index in range(12)
+)))
+Lifecycle().run(adapter, "documents", "serving-signing-key")
+predictor = Predictor.from_package(
+    adapter, "documents", "serving-signing-key"
+)
+
+
+class DocumentDecoder(ModalitySampleDecoder):
     def decode(self, payload):
-        return tuple(Sample.from_dict(item)
+        return tuple(Sample(item["document_id"], item["content"])
                      for item in payload["samples"])
 
     def schema(self):
-        return {"required": ["samples"], "sample_fields": ["content"]}
+        return {"required": ["samples"],
+                "sample_fields": ["document_id", "content"]}
+
 
 serving = ModalityHttpServing(predictor, DocumentDecoder())
-serving.start()`}</code></pre>
+serving.start()
+body = {"samples": [{"document_id": "new-1", "content": "approved terms"}]}
+request = urllib.request.Request(
+    serving.address + "/predict", json.dumps(body).encode(),
+    {"Content-Type": "application/json"},
+)
+with urllib.request.urlopen(request) as response:
+    print(json.loads(response.read()))
+serving.stop()`}</code></pre>
     <p>The server bounds body size and sample count, verifies the package before prediction, and returns structured request errors. For a release-bound serving process, load the predictor with the signed lifecycle report and set <code>require_lifecycle_report=True</code>; health and prediction evidence then include the report digest. It is still a reference transport: put it behind authentication, TLS, request tracing, redaction, and an owned operational gateway before claiming production service coverage.</p>
   </section>
   <p class="meta">* The supported claim is intentionally narrow: the explicitly gated tabular library workflow, not every possible tabular source or model.</p>

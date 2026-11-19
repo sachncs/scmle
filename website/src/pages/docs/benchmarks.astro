@@ -807,7 +807,10 @@ const reliability = [
   </div>
 
   <h2>Reproducing the numbers</h2>
-  <pre><code>{`python -m benchmarks.run_benchmarks --offline --output results.json
+  <p>The benchmark harness lives in the repository, not in the installed package, so start from a clone. The offline suite takes tens of minutes; the Hugging Face and extended suites download their data and take hours.</p>
+  <pre><code class="language-bash">{`git clone https://github.com/sachncs/scmle
+cd scmle
+python -m benchmarks.run_benchmarks --offline --output results.json
 python -m benchmarks.run_benchmarks --suite huggingface
 python -m benchmarks.run_benchmarks --suite extended
 python -m benchmarks.check_regression results.json

@@ -350,6 +350,21 @@ def test_export_onnx_command_writes_a_graph_that_matches_the_pipeline(
 
 
 @needs_onnx
+def test_a_plain_export_onnx_is_blocked_until_rows_verify_it(
+    exportable, tmp_path
+):
+    output = tmp_path / "m.onnx"
+    base = ["export-onnx", str(exportable / "bundle"), "--trusted"]
+
+    blocked = cli.main([*base, "--output", str(output)])
+    assert blocked == cli.EXIT_BLOCKED and not output.exists()
+
+    skipped = cli.main([*base, "--output", str(output), "--unverified"])
+    manifest = json.loads(output.with_name("m.onnx.manifest.json").read_text())
+    assert skipped == cli.EXIT_OK and manifest["verified"] is False
+
+
+@needs_onnx
 def test_export_onnx_command_fails_cleanly_for_an_unsupported_model(
     saved, tmp_path, caplog
 ):

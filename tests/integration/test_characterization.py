@@ -20,9 +20,13 @@ import pathlib
 import numpy
 import pandas
 import pytest
+from sklearn import naive_bayes
 import support
 
 from scmle.contracts import tasks
+from scmle.models import custom
+from scmle.models import registry
+from scmle.runtime import plugins
 
 GOLDENS = (
     pathlib.Path(__file__).resolve().parents[1]
@@ -115,23 +119,26 @@ def capture(run_dir):
     }
 
 
-@pytest.mark.parametrize("task", ["binary", "multiclass", "regression"])
-def test_a_run_produces_what_its_golden_records(task, tmp_path):
+def produce(task, folder):
+    """Runs one task's characterization table on the built-in catalog."""
     options = {"task": "regression"} if task == "regression" else {}
     models = tasks.Candidates(
         exclude_families=support.FAST_MODELS.exclude_families,
         exclude_models=OPTIONAL,
     )
-    result = support.make_project(
-        table(task), "y", output_dir=tmp_path, models=models, **options
-    ).run()
-    found = capture(pathlib.Path(result.run_dir))
-    goldens = json.loads(GOLDENS.read_text()) if GOLDENS.exists() else {}
-    if WRITE:
-        goldens[task] = found
-        GOLDENS.write_text(json.dumps(goldens, indent=1, sort_keys=True) + "\n")
-        return
-    expected = goldens[task]
+    project = support.make_project(
+        table(task), "y", output_dir=folder, models=models, **options
+    )
+    # The goldens record the built-in catalog. Estimators registered in this
+    # process (`register_estimator`, or a plugin enrolled by an earlier test's
+    # `load_plugins`) join every later stock catalog and would add trials.
+    project.orchestrator.registry = registry.Catalog.stock(include_user=False)
+    result = project.run()
+    return capture(pathlib.Path(result.run_dir))
+
+
+def compare(found, expected):
+    """Asserts a capture equals a golden, metrics within `TOLERANCE`."""
     assert found["files"] == expected["files"]
     assert found["structure"] == expected["structure"]
     assert set(found["metrics"]) == set(expected["metrics"])
@@ -143,3 +150,33 @@ def test_a_run_produces_what_its_golden_records(task, tmp_path):
             assert math.isclose(
                 actual, value, rel_tol=TOLERANCE, abs_tol=TOLERANCE
             ), name
+
+
+@pytest.mark.parametrize("task", ["binary", "multiclass", "regression"])
+def test_a_run_produces_what_its_golden_records(task, tmp_path):
+    found = produce(task, tmp_path)
+    goldens = json.loads(GOLDENS.read_text()) if GOLDENS.exists() else {}
+    if WRITE:
+        goldens[task] = found
+        GOLDENS.write_text(json.dumps(goldens, indent=1, sort_keys=True) + "\n")
+        return
+    compare(found, goldens[task])
+
+
+def test_an_estimator_enrolled_in_the_process_leaves_the_golden_alone(
+    tmp_path, monkeypatch
+):
+    # tests/docs/test_doc_readme.py enrols `plugin_nb` through
+    # `load_plugins`; in the same process it added a trial to the binary and
+    # multiclass runs (trial_010.json) until the run pinned its catalog.
+    shared = plugins.Registry()
+    adapter = custom.rebuild(
+        custom.Registration("plugin_nb", naive_bayes.GaussianNB, None, cost=1)
+    )
+    shared.enrol(plugins.Kind.ESTIMATORS, adapter.name, adapter)
+    monkeypatch.setattr(plugins, "REGISTRY", shared)
+    assert "plugin_nb" in registry.Catalog.stock().adapters
+
+    found = produce("binary", tmp_path)
+
+    compare(found, json.loads(GOLDENS.read_text())["binary"])

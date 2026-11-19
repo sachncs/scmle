@@ -56,9 +56,21 @@ installed it. Every new terminal needs it.
 `if __name__ == "__main__":`. SCMLE trains in helper processes. On macOS and
 Windows each helper starts by importing your script, which runs the training
 again.
-**What to do.** Put your code in a `main()` function and end the file with:
+**What to do.** Put your code in a `main()` function and end the file with
+the guard, as here:
 
 ```python
+from sklearn import datasets
+
+from scmle.api import project
+
+
+def main():
+    data = datasets.load_breast_cancer(as_frame=True).frame
+    result = project.Project(data, "target", time_budget=60).run()
+    print(result.summary())
+
+
 if __name__ == "__main__":
     main()
 ```
@@ -69,7 +81,16 @@ tool does not have this problem.
 ## A run is blocked
 
 A blocked run exits with code 2, writes `state.BLOCKED` in its event log, and
-leaves the sealed test rows unopened. Nothing is broken. You can read why:
+leaves the sealed test rows unopened. Nothing is broken. For example, the
+Titanic extract that ships with the repository, run with `--leakage block`:
+
+```bash
+git clone https://github.com/sachncs/scmle
+scmle run scmle/tests/fixtures/titanic_extract.csv --target survived --leakage block --budget 60
+echo "exit code: $?"
+```
+
+You can read why:
 
 ```bash
 tail -n 1 runs/run_*/events.jsonl
@@ -589,13 +610,38 @@ numbers meanwhile.
 The closed loop is a set of commands (`scmle loop ...`) that watch a deployed
 model batch by batch. When it is unsure, it stops and asks a person. This is an
 **escalation**. These are the real commands and outputs, using a made-up
-stream of cases (the author wrote the files by hand; see "What the loop needs").
+stream of cases: three batches of five cases, every one with a loss of 1.0
+against an expected 0.1 (see "What the loop needs"). Save this as
+`make_stream.py`:
+
+```python
+import json
+
+with open("policy.json", "w") as file:
+    json.dump({"reference": 0.1, "matured": 5, "maturity": 0}, file)
+for batch in range(3):
+    cases = [f"c{batch}-{i}" for i in range(5)]
+    with open(f"b{batch}.csv", "w") as file:
+        file.write("case_id,prediction,decision\n")
+        file.writelines(f"{case},1,1\n" for case in cases)
+    with open(f"l{batch}.csv", "w") as file:
+        file.write("case_id,loss\n")
+        file.writelines(f"{case},1.0\n" for case in cases)
+```
+
+Then open the ledger (`--charter-hash` takes the `charter_hash` of your signed
+charter; here a stand-in), feed it the batches and list what it asks:
 
 ```bash
-scmle loop init deploy_c --policy policy.json --charter-hash <charter-hash>
-scmle loop observe deploy_c --batch b0.csv
-scmle loop mature deploy_c --labels l0.csv
-scmle loop step deploy_c
+python make_stream.py
+hash=$(python -c "print('0' * 64)")
+scmle loop init deploy_c --policy policy.json --charter-hash "$hash"
+for batch in 0 1 2; do
+  scmle loop observe deploy_c --batch b$batch.csv
+  scmle loop mature deploy_c --labels l$batch.csv
+  echo "step $batch:"
+  scmle loop step deploy_c
+done
 scmle loop pending deploy_c
 ```
 
@@ -612,7 +658,7 @@ scmle loop pending deploy_c
 
 ### Seen: an alarm and an escalation
 
-After three batches whose losses were all 1.0 against an expected 0.1:
+After the third batch, the step and the pending list read:
 
 ```text
 step 2:
@@ -651,12 +697,23 @@ Python:
 
 ```python
 import json
+import subprocess
+
 from scmle.governance import deployment_ledger as dl
 
+pending = subprocess.run(
+    ["scmle", "loop", "pending", "deploy_c"],
+    capture_output=True,
+    check=True,
+    text=True,
+).stdout
+question = json.loads(pending)[0][
+    "question_hash"
+]  # as `scmle loop pending` prints it
 reply = dl.Attestation.create(
     "alices-own-secret",  # your key, never the system's
     escalation="esc-5",
-    digests={"question": "d1044b61..."},  # copy from `scmle loop pending`
+    digests={"question": question},
     decision="approve",  # approve | override | reject | cannot_decide
     statement="I looked at the batch: the labels were mis-keyed, not the model.",
     evidence="ticket-1234",

@@ -52,7 +52,7 @@ def rehashed(tmp_path, monkeypatch):
 
 
 def test_trusted_load_refuses_a_signature_it_cannot_check(rehashed):
-    # Enforces docs/CLI.md:186.
+    # Enforces docs/CLI.md:272.
     # Enforces docs/GLOSSARY.md:613.
     # Enforces website/src/learn/glossary.html:306.
     # Enforces website/src/pages/docs/quickstart.astro:118.

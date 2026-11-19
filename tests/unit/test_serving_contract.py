@@ -251,7 +251,7 @@ def test_policies_can_reject_nulls_and_unseen_categories(golden, bundle):
 
 def test_schema_changes_are_explicit(golden, running):
     # Enforces docs/SERVICE_SLO.md:38.
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:509.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:530.
     # Enforces website/src/learn/when-things-go-wrong.html:206.
     # Enforces website/src/pages/docs/service.astro:53.
     base = running.address
@@ -532,7 +532,7 @@ def test_a_failed_verification_keeps_the_service_alive_but_never_ready(
     # Enforces docs/SERVICE_SLO.md:15.
     # Enforces docs/SERVICE_SLO.md:14.
     # Enforces docs/GLOSSARY.md:629.
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:484.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:505.
     # Enforces website/src/learn/glossary.html:314.
     # Enforces website/src/learn/when-things-go-wrong.html:196.
     # Enforces website/src/pages/docs/service.astro:6.

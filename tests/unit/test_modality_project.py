@@ -354,6 +354,23 @@ def test_extension_curation_adapter_rejects_detached_report():
         adapter.curate()
 
 
+def test_extension_curation_adapter_rejects_non_digest_identity():
+    """The dataset identity must be the SHA-256 digest the card records.
+
+    A free-text identity used to pass construction and fail later, inside
+    the dataset card, after the curation callback had run.
+    """
+    extension = modalities.Bespoke("acme/point-cloud")
+    with pytest.raises(ValueError, match="SHA-256 hex digest"):
+        scmle.pipeline.modality_lifecycle.ExtensionCurator(
+            extension=extension,
+            sample_values=({"x": 1},),
+            dataset_hash_value="sha256-of-the-immutable-snapshot",
+            curation_callback=lambda: None,
+            limitations=("The caller owns validation.",),
+        )
+
+
 def test_extension_curation_adapter_accepts_empty_raw_snapshot(tmp_path):
     """Empty snapshots remain valid curation evidence without modelling.
 

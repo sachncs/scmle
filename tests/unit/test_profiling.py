@@ -62,7 +62,7 @@ def test_task_resolution(classification_frame):
 
 
 def test_ambiguous_integer_target_blocks(classification_frame):
-    # Enforces README.md:132.
+    # Enforces README.md:151.
     # Enforces website/src/pages/index.astro:313.
     # Enforces website/src/pages/docs/architecture.astro:48.
     ambiguous = classification_frame.assign(

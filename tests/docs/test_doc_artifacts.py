@@ -8,6 +8,7 @@ import pandas
 import pytest
 
 from benchmarks import reliability
+from scmle.api.erasure import holdings
 from scmle.artifacts import bundle
 from scmle.assurance.custody import sealed
 from scmle.contracts import errors
@@ -15,6 +16,7 @@ from scmle.data.splitting.splitters import lockbox
 from scmle.deploy import packaging
 from scmle.deploy import parity
 from scmle.deploy import vuln_gate
+from scmle.pipeline.stages import assessment
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 MODEL_FILES = (
@@ -183,3 +185,73 @@ def test_the_shipped_gate_policy_blocks_high_with_one_dated_waiver(service):
 
     assert not vuln_gate.evaluate(report("HIGH"), policy, today=today)["passed"]
     assert vuln_gate.evaluate(report("MEDIUM"), policy, today=today)["passed"]
+
+
+# A feature value no digest, id or timestamp of a run record can contain.
+MARKER = 0.918273645546372
+
+
+@pytest.fixture(scope="module")
+def watched(tmp_path_factory):
+    """A quick run whose final stage is watched, with a planted value.
+
+    Returns:
+        The run directory and, in order, the stage calls seen: `measure`
+        with the model it scored and `ship` with the model it was given and
+        the one it returned.
+    """
+    directory = tmp_path_factory.mktemp("watched")
+    data = reliability.binary_data(240)
+    data.loc[5, "a"] = MARKER
+    calls = []
+    stage = assessment.FinalEvaluationStage
+    measure, ship = stage.measure, stage.ship
+
+    def measuring(self, context, pipeline, *rows):
+        calls.append(("measure", pipeline))
+        return measure(self, context, pipeline, *rows)
+
+    def shipping(self, context, evaluated, rows, pseudolabels):
+        served, record = ship(self, context, evaluated, rows, pseudolabels)
+        calls.append(("ship", evaluated, served))
+        return served, record
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(stage, "measure", measuring)
+        patch.setattr(stage, "ship", shipping)
+        project = reliability.fast_project(data, "y", directory, time_budget=30)
+        run = pathlib.Path(project.run().run_dir)
+    return run, calls
+
+
+def test_the_test_score_is_of_the_fit_that_never_saw_the_test_rows(watched):
+    """Enforces docs/ARTIFACTS.md:22.
+
+    Also enforces docs/READING_RESULTS.md:54-56 and its site copy,
+    website/src/learn/reading-results.html:32.
+    """
+    run, calls = watched
+    assert [call[0] for call in calls] == ["measure", "ship"]
+    scored = calls[0][1]
+    evaluated, served = calls[1][1:]
+    assert scored is evaluated
+    evaluation = read(run / "evaluation.json")
+    shipped = evaluation["shipped"]
+    rows = evaluation["rows"]
+    assert shipped["refit"]
+    assert served is not evaluated
+    assert shipped["rows"] == rows["development"] + rows["test"]
+    assert not shipped["reason"]
+
+
+def test_the_records_an_erasure_keeps_hold_no_row_value(watched):
+    """Enforces docs/ARTIFACTS.md:188-189."""
+    run = watched[0]
+    kept = [run / name for name in sorted(holdings.CUSTODY)]
+    kept += sorted((run.parent / "custody").glob("*.jsonl"))
+    present = [path for path in kept if path.is_file()]
+    names = {path.name for path in present}
+    assert {"provenance.json", "dataset_manifest.json", "events.jsonl"} <= names
+    for path in present:
+        text = path.read_text(encoding="utf-8")
+        assert repr(MARKER)[:12] not in text, path.name

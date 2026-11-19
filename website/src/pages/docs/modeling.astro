@@ -59,27 +59,57 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   <p class="note">* “Supported” is intentionally narrow: it describes the explicitly gated tabular library path, not every dataset, model, accelerator, or deployment environment.</p>
 
   <h2 id="transformers">Try an optional transformer path</h2>
-  <p>The extra is a deliberate boundary. It keeps the base install small and makes the dependency, worker process, resource cost, and failure mode visible in the run. Start with a small budget and compare the transformer against a simple baseline on the same split.</p>
-  <pre><code>{`from scmle.api.project import Project
-from scmle.contracts.tasks import Candidates
+  <p>The extra is a deliberate boundary. It keeps the base install small and makes the dependency, worker process, resource cost, and failure mode visible in the run. Install the optional runtime first, in a fresh virtual environment:</p>
+  <pre><code class="language-bash">python3 -m venv .venv
+source .venv/bin/activate
+pip install "scmle[deeplearning] @ git+https://github.com/sachncs/scmle"</code></pre>
+  <p>Then compare the transformer against simple baselines on the same split. Give the run at least 300 seconds: a smaller budget keeps fast models only, and the plan records both opt-ins as rejected. Screening each candidate once, without tuning, keeps the run short.</p>
+  <pre><code class="language-python">{`from sklearn.datasets import load_breast_cancer
 
-# The opt-in is part of the hashed project configuration and the run plan.
-project = Project(
-    data,
-    target="label",
-    models=Candidates(
-        experimental_models=["torch_ft_transformer", "torch_jepa"]
-    ),
-)
-plan = project.plan()
-result = project.run(plan)
-predictions = result.predict(new_rows)
-result.save("bundle", signing_key="load-this-from-your-secret-store")`}</code></pre>
-  <p>Install the optional runtime before running this example: <code>pip install "scmle[deeplearning]"</code>. Before treating the result as useful, inspect the run evidence for the resolved adapter, dependency versions, seed, train/validation/test identity, resource observations, failed trials, and explanation limitations. An explicit opt-in makes the path runnable; it does not make it production-supported. There is no general transformer registry, distributed training guarantee, hosted weight registry, or production text-understanding claim behind this optional extra.</p>
+from scmle.api.project import Project
+from scmle.contracts.tasks import Candidates, Search, Strategies
+
+
+def main():
+    data = load_breast_cancer(as_frame=True).frame
+    data = data.rename(columns={"target": "label"})
+    new_rows = data.drop(columns="label").head(5)
+
+    # The opt-in is part of the hashed project configuration and the run plan.
+    project = Project(
+        data,
+        target="label",
+        models=Candidates(
+            experimental_models=["torch_ft_transformer", "torch_jepa"],
+            exclude_families=["boosting", "tree", "kernel", "neighbors"],
+        ),
+        search=Search(top_models=0),
+        strategies=Strategies(top_models=0),
+        time_budget=300,
+    )
+    plan = project.plan()
+    result = project.run(plan)
+    predictions = result.predict(new_rows)
+    result.save("bundle", signing_key="load-this-from-your-secret-store")
+    print(result.leaderboard())
+
+
+# Trials run in worker processes that import this script, so the run
+# itself sits behind the main guard.
+if __name__ == "__main__":
+    main()`}</code></pre>
+  <p>Before treating the result as useful, inspect the run evidence for the resolved adapter, dependency versions, seed, train/validation/test identity, resource observations, failed trials, and explanation limitations. An explicit opt-in makes the path runnable; it does not make it production-supported. There is no general transformer registry, distributed training guarantee, hosted weight registry, or production text-understanding claim behind this optional extra.</p>
 
   <h2 id="jepa">Pretrain a tabular JEPA representation</h2>
   <p>JEPA is a transformer-adjacent self-supervised representation workflow, not a target-label model. The project integration accepts a tabular feature plan, masks the resulting finite numeric matrix, predicts an EMA target representation, and trains a small supervised head on the embeddings. The downstream benchmark, split, and model card remain your responsibility.</p>
-  <pre><code>{`from scmle.models.deeplearning import Embedder
+  <pre><code class="language-python">{`from sklearn.datasets import load_breast_cancer
+from sklearn.linear_model import LogisticRegression
+
+from scmle.models.deeplearning.jepa import Embedder
+
+numeric_features, labels = load_breast_cancer(return_X_y=True)
+train, test = slice(0, 400), slice(400, None)
+downstream_model = LogisticRegression(max_iter=1000)
 
 encoder = Embedder(
     embedding_size=64,
@@ -87,11 +117,14 @@ encoder = Embedder(
     epochs=50,
     random_state=42,
 )
-embeddings = encoder.fit_transform(numeric_features)
+# Fit the representation on the training rows only, then embed every row.
+encoder.fit(numeric_features[train])
+embeddings = encoder.transform(numeric_features)
 
 # Evaluate the representation with a declared downstream split.
 downstream_model.fit(embeddings[train], labels[train])
-score = downstream_model.score(embeddings[test], labels[test])`}</code></pre>
+score = downstream_model.score(embeddings[test], labels[test])
+print(score)`}</code></pre>
   <p>This is experimental and opt-in only. It does not decode raw documents, images, audio, video, graphs, or geospatial objects; it does not provide a universal pretrained checkpoint; and it is never automatically included in supervised model search. A project package contains the fitted representation and head together, so normal bundle loading and prediction are reproducible within the declared environment.</p>
 
   <h2>JEPA is implemented narrowly, not implied broadly</h2>
@@ -160,7 +193,7 @@ score = downstream_model.score(embeddings[test], labels[test])`}</code></pre>
 
   <h2 id="api-onboarding">Run a declared estimate</h2>
   <p>The estimation API is intentionally explicit. You supply the design matrix, outcome, scientific declaration, and covariance policy; the result tells you what was estimated, how many rows were used, how uncertainty was computed, and whether the independent reference calculation agreed. This example is self-contained apart from NumPy and the installed package:</p>
-  <pre><code>{`import numpy as np
+  <pre><code class="language-python">{`import numpy as np
 
 from scmle.evaluation.parameter_estimation import Config, Estimand, Estimation
 from scmle.evaluation.parameter_estimation import estimate_parameters
@@ -196,27 +229,77 @@ print(verified.reference)`}</code></pre>
 
   <h2 id="project-integration">Attach the estimate to an Project run</h2>
   <p>Use the project API when the estimate must travel with the same tabular snapshot and run evidence as model selection. The estimation policy does not choose the predictive model, and the predictive model does not silently define the estimand.</p>
-  <pre><code>{`from scmle.api.project import Project
+  <pre><code class="language-python">{`import numpy as np
+import pandas as pd
 
-project = Project(
-    data=frame,
-    target="conversion_score",
-    task="regression",
-    modality="tabular",
-    estimand=estimand,
-    estimation_policy=policy,
-    output_dir="runs/conversion-score",
+from scmle.api.project import Project
+from scmle.evaluation.parameter_estimation import Config, Estimand
+
+# The declaration from the example above, on a 300-row table.
+rng = np.random.default_rng(7)
+treatment = rng.integers(0, 2, size=300)
+prior_visits = rng.integers(1, 5, size=300)
+frame = pd.DataFrame({
+    "treatment": treatment,
+    "prior_visits": prior_visits,
+    "conversion_score": 1.0 + 0.8 * treatment + 0.4 * prior_visits
+    + rng.normal(scale=0.3, size=300),
+})
+estimand = Estimand(
+    name="conversion_score_association",
+    outcome="conversion_score",
+    population="eligible visitors observed in 2026",
+    likelihood="gaussian",
+    feature_names=("treatment", "prior_visits"),
+    assumptions=("rows are conditionally independent",),
 )
-result = project.run()
-assert result.estimation is not None
-print(result.run_dir / "parameter_estimation.json")`}</code></pre>
+policy = Config(estimator="linear", covariance="hc3", seed=7)
+
+
+def main():
+    project = Project(
+        data=frame,
+        target="conversion_score",
+        task="regression",
+        modality="tabular",
+        estimand=estimand,
+        estimation_policy=policy,
+        output_dir="runs/conversion-score",
+        time_budget=60,
+    )
+    result = project.run()
+    assert result.estimation is not None
+    print(result.run_dir / "parameter_estimation.json")
+
+
+# Trials run in worker processes that import this script, so the run
+# itself sits behind the main guard.
+if __name__ == "__main__":
+    main()`}</code></pre>
   <p>The run binds the digest-verified <code>parameter_estimation.json</code> artifact into evaluation and lineage. Missing, malformed, or tampered reports fail closed. Resume and replay reconstruct the signed declaration and rerun the scientific track; they do not infer an undeclared question from logs.</p>
 
   <h2 id="longitudinal">Estimate period-specific effects safely</h2>
   <p>Use <code>Estimator</code> when each subject contributes ordered rows at several periods and you want a separate effect per period. The contract requires unique subject-time identities, baseline covariates, treatment support, overlap, and explicit assumptions about consistency, positivity, exchangeability, and time-varying confounding.</p>
-  <pre><code>{`from scmle.evaluation.longitudinal import Estimator
+  <pre><code class="language-python">{`import numpy as np
+import pandas as pd
+
+from scmle.evaluation.longitudinal import Estimator
 from scmle.evaluation.longitudinal import Config
 from scmle.evaluation.longitudinal import Estimand
+
+# 60 subjects, three periods each; treatment depends on the baseline score.
+rng = np.random.default_rng(17)
+rows = []
+for subject_id in range(60):
+    baseline_score = rng.normal()
+    for period in range(3):
+        treated = int(rng.random() < 1 / (1 + np.exp(-0.6 * baseline_score)))
+        outcome = (1 + 1.5 * treated + 0.4 * baseline_score
+                   + rng.normal(scale=0.5))
+        rows.append((subject_id, period, treated, outcome, baseline_score))
+long_frame = pd.DataFrame(rows, columns=[
+    "subject_id", "period", "treated", "outcome", "baseline_score",
+])
 
 longitudinal_estimand = Estimand(
     name="period_specific_treatment_effect",
@@ -243,9 +326,32 @@ report.write("artifacts/longitudinal-ate.json")`}</code></pre>
 
   <h2 id="sequential">Estimate a sustained treatment-history contrast</h2>
   <p>Use <code>Estimator</code> when the scientific question is a static regime contrast—every period treated versus every period untreated—and the data contains one complete, ordered row per subject and period. At each period, the denominator model conditions on observed treatment history, baseline covariates, and declared pre-treatment time-varying covariates. A numerator model conditions on treatment history to stabilize the cumulative weights.</p>
-  <pre><code>{`from scmle.evaluation.sequential import Estimand
+  <pre><code class="language-python">{`import numpy as np
+import pandas as pd
+
+from scmle.evaluation.sequential import Estimand
 from scmle.evaluation.sequential import Config
 from scmle.evaluation.sequential import Estimator
+
+# 400 subjects, three periods; the current risk follows the last treatment.
+rng = np.random.default_rng(31)
+rows = []
+for subject_id in range(400):
+    baseline_score = rng.normal(scale=0.8)
+    treated = 0
+    for period in range(3):
+        current_risk = (0.35 * baseline_score + 0.45 * treated
+                        + rng.normal(scale=0.35))
+        logit = 0.35 * baseline_score + 0.3 * current_risk + 0.25 * treated
+        treated = int(rng.random() < 1 / (1 + np.exp(-logit)))
+        outcome = (1 + 1.4 * treated + 0.3 * current_risk
+                   + rng.normal(scale=0.45))
+        rows.append((subject_id, period, treated, outcome,
+                     baseline_score, current_risk))
+long_frame = pd.DataFrame(rows, columns=[
+    "subject_id", "period", "treated", "outcome",
+    "baseline_score", "current_risk",
+])
 
 sequential_estimand = Estimand(
     name="sustained_treatment_effect",
@@ -275,9 +381,20 @@ report.write("artifacts/sequential-ate.json")
 
   <h2 id="continuous-treatment">Estimate a continuous-treatment dose response</h2>
   <p>Use <code>continuous_ipw_ate</code> when treatment is numeric and the scientific quantity is a one-unit marginal outcome change. The estimator fits an explicit Gaussian generalized propensity score—treatment conditional on every declared non-treatment feature—then uses stabilized marginal-to-conditional density weights for a weighted linear dose-response regression.</p>
-  <pre><code>{`from scmle.evaluation.parameter_estimation import Estimand
+  <pre><code class="language-python">{`import numpy as np
+
+from scmle.evaluation.parameter_estimation import Estimand
 from scmle.evaluation.parameter_estimation import Config
 from scmle.evaluation.parameter_estimation import estimate_parameters
+
+# 400 observations from 20 sites; the dose depends on age and risk.
+rng = np.random.default_rng(11)
+age = rng.normal(size=400)
+risk_score = rng.normal(size=400)
+dose = 0.5 * age - 0.3 * risk_score + rng.normal(size=400)
+outcome = 2.0 * dose + 0.5 * age + 0.4 * risk_score + rng.normal(size=400)
+features = np.column_stack([dose, age, risk_score])
+site_id = np.repeat(np.arange(20), 20)
 
 estimand = Estimand(
     name="dose_response_slope",
@@ -309,6 +426,7 @@ report = estimate_parameters(
     clusters=site_id,
 )
 report.write("artifacts/continuous-treatment.json")
+print(report.diagnostics["overlap"])
 `}</code></pre>
   <p>Inspect <code>report.diagnostics["overlap"]</code> and <code>report.diagnostics["weights"]</code> before interpreting the slope. They include observed treatment support, conditional-density scale, raw and capped weight ranges, capped fraction, weight quantiles, and effective sample size. The result says <em>diagnosed, not proven</em> for positivity: a cap controls numerical influence but cannot repair unsupported treatment regions. The current contract does not estimate a nonlinear dose-response, continuous-treatment AIPW, or propagated generalized-propensity uncertainty.</p>
 

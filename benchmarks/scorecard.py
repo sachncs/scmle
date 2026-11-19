@@ -31,6 +31,7 @@ from benchmarks.evidence import platforms
 from benchmarks.evidence import quality
 from benchmarks.evidence import reading
 from benchmarks.evidence import refusal
+from benchmarks.evidence import snippets
 from scmle.contracts import errors
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -342,7 +343,10 @@ def rows() -> list[Row]:
                     "test",
                     guarantees,
                 ),
-                pending("every snippet and command runs in a fresh process"),
+                measured(
+                    "every snippet and command runs in a fresh process",
+                    snippets,
+                ),
                 pending("a planted false statement fails CI"),
             ],
         ),

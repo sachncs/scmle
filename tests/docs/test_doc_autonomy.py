@@ -47,7 +47,7 @@ def test_an_envelope_never_authorizes_moving_the_champion(world):
 
 
 def test_a_use_is_on_the_ledger_before_the_training_runs(world):
-    """Enforces docs/AUTONOMY.md:72 (chained before the action)."""
+    """Enforces docs/AUTONOMY.md:105 (chained before the action)."""
     seen = []
 
     def trainer():
@@ -70,7 +70,7 @@ def test_a_use_is_on_the_ledger_before_the_training_runs(world):
 
 
 def test_the_ledger_refuses_a_use_the_envelope_does_not_allow(world):
-    """Enforces docs/AUTONOMY.md:72 (the ledger itself refuses)."""
+    """Enforces docs/AUTONOMY.md:105 (the ledger itself refuses)."""
     controller = world.controller()
     ledger = controller.loop.ledger
     controller.envelopes.grant(tests.simulation.world.envelope(limit=1))

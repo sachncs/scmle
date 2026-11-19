@@ -106,26 +106,51 @@ class Outputs(core.Core):
         path: str | pathlib.Path,
         check: pandas.DataFrame | None = None,
         tolerance: float = onnx_export.DEFAULT_TOLERANCE,
+        unverified: bool = False,
     ) -> pathlib.Path:
-        """Writes the pipeline as an ONNX graph (`onnx` extra).
+        """Writes the pipeline as an ONNX graph (`onnx` extra), verified.
 
-        Models that cannot be exported faithfully (only binary or multiclass
-        classification and regression are supported), an attached probability
-        calibrator, a missing `onnx` extra, or a failed check raise
-        `ArtifactError`.
+        Verification is the default: the graph and the pipeline score
+        `check`, rows held out from training, and the export is blocked
+        when they diverge (`onnx_export.verify`). A blocked graph is
+        removed. `<path>.manifest.json` records the graph's digest and the
+        check's result, or that the check was skipped.
 
         Args:
             path: Destination file.
-            check: Rows to score with both the graph and the pipeline; the
-                export fails if they disagree beyond `tolerance`.
-            tolerance: Largest allowed probability / scaled value difference.
+            check: At least `onnx_export.ROWS` held-out rows to score with
+                both the graph and the pipeline.
+            tolerance: Largest allowed probability / scaled value difference;
+                a larger value is the gate's override.
+            unverified: Skip the check (the manifest says so); `check` must
+                then be None.
 
         Returns:
             The path written.
+
+        Raises:
+            ArtifactError: For models that cannot be exported faithfully
+                (only binary or multiclass classification and regression
+                are supported), an attached probability calibrator, or a
+                missing `onnx` extra.
+            BlockedError: When the check fails: fewer than
+                `onnx_export.ROWS` rows (none given included), or a
+                divergence beyond `tolerance`.
+            ConfigError: When `check` is given with `unverified`.
         """
+        if unverified and check is not None:
+            raise errors.ConfigError(
+                "pass held-out rows to check, or unverified, not both"
+            )
         written = onnx_export.export(self, path)
-        if check is not None:
-            onnx_export.verify(self, written, check, tolerance)
+        report = None
+        if not unverified:
+            try:
+                report = onnx_export.verify(self, written, check, tolerance)
+            except errors.BlockedError:
+                written.unlink(missing_ok=True)
+                raise
+        onnx_export.record(self, written, report, tolerance)
         return written
 
     def predict_survival(

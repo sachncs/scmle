@@ -157,7 +157,7 @@ def test_each_signed_field_is_covered_by_the_signature():
 
 
 def test_validate_target_checks_identity_decision_independence_and_signature():
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:523.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:544.
     # Enforces website/src/learn/when-things-go-wrong.html:214.
     # Enforces website/src/pages/docs/operations.astro:141.
     # Enforces website/src/pages/docs/operations.astro:154.
@@ -361,8 +361,8 @@ def test_a_staging_alias_moves_without_approval_and_leaves_no_previous(
 
 
 def test_the_champion_needs_an_approval_that_names_the_exact_bundle(tmp_path):
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:521.
-    # Enforces docs/START_HERE.md:746.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:542.
+    # Enforces docs/START_HERE.md:749.
     # Enforces website/src/learn/start-here.html:377.
     # Enforces website/src/learn/when-things-go-wrong.html:214.
     # Enforces website/src/pages/docs/operations.astro:141.

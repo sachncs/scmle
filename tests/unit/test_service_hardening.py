@@ -238,9 +238,9 @@ def test_production_verification_accepts_a_signed_service(signed_service):
 def test_trusted_is_refused_in_production_everywhere(
     signed_service, reference, tmp_path, monkeypatch
 ):
-    # Enforces docs/CLI.md:179.
+    # Enforces docs/CLI.md:265.
     # Enforces docs/GLOSSARY.md:612.
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:442.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:463.
     # Enforces website/src/learn/glossary.html:306.
     # Enforces website/src/learn/when-things-go-wrong.html:183.
     # Enforces website/src/pages/docs/cli.astro:99.
@@ -636,3 +636,18 @@ def test_a_lock_is_refused_rather_than_cut_short(monkeypatch):
     monkeypatch.setitem(sys.modules, "packaging", None)
     with pytest.raises(errors.ArtifactError, match="install 'packaging'"):
         lockfile.applies('python_version >= "3.8"')
+
+
+def test_a_core_install_can_build_a_runtime_lock():
+    # `scmle package` evaluates requirement markers with `packaging`; a core
+    # `pip install` must bring it, or the first package of a fresh install
+    # is refused (docs/START_HERE.md, step 9).
+    import tomllib
+
+    root = pathlib.Path(__file__).resolve().parents[2]
+    project = tomllib.loads((root / "pyproject.toml").read_text())
+    names = [
+        lockfile.canonical(lockfile.NAME_PATTERN.match(item).group(0))
+        for item in project["project"]["dependencies"]
+    ]
+    assert "packaging" in names

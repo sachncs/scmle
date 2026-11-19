@@ -11,6 +11,7 @@ from scmle import durability
 from scmle.artifacts import bundle
 from scmle.cli import command
 from scmle.deploy import packaging
+from scmle.inference import onnx_export
 import scmle.inference.mapping
 from scmle.operations import signals
 from scmle.security import access
@@ -244,7 +245,7 @@ class Export(command.Command):
     help = "export a saved model bundle as ONNX (needs the onnx extra)"
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds bundle, output and parity-check options.
+        """Adds bundle, output, check, tolerance and skip options.
 
         Args:
             parser: The argument parser of this command.
@@ -252,12 +253,28 @@ class Export(command.Command):
         parser.add_argument("bundle", help="bundle directory")
         parser.add_argument("--output", default="model.onnx")
         parser.add_argument(
-            "--check", help="CSV or Parquet rows to compare graph and pipeline"
+            "--check",
+            help=(
+                "CSV or Parquet rows held out from training; the graph is "
+                f"exported only when it matches the pipeline on at least "
+                f"{onnx_export.ROWS} of them"
+            ),
+        )
+        parser.add_argument(
+            "--tolerance",
+            type=float,
+            default=onnx_export.DEFAULT_TOLERANCE,
+            help="largest allowed probability / scaled value difference",
+        )
+        parser.add_argument(
+            "--unverified",
+            action="store_true",
+            help="skip the check (recorded in the export manifest)",
         )
         parser.add_argument("--trusted", action="store_true")
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Exports the ONNX graph, optionally comparing it on sample rows.
+        """Exports the ONNX graph, verified on held-out rows by default.
 
         Args:
             args: The parsed command-line arguments.
@@ -267,7 +284,12 @@ class Export(command.Command):
         """
         model = bundle.Bundle.load(args.bundle, trusted=args.trusted)
         check = None if args.check is None else model.read_frame(args.check)
-        written = model.export_onnx(args.output, check=check)
+        written = model.export_onnx(
+            args.output,
+            check=check,
+            tolerance=args.tolerance,
+            unverified=args.unverified,
+        )
         LOGGER.info("wrote %s", written)
         return command.EXIT_OK
 

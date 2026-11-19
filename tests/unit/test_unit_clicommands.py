@@ -169,8 +169,8 @@ def test_export_and_package_pass_their_options(monkeypatch, tmp_path):
     calls = []
     model = types.SimpleNamespace(
         read_frame=lambda path: f"frame:{path}",
-        export_onnx=lambda output, check: (
-            calls.append((output, check)) or output
+        export_onnx=lambda output, check, tolerance, unverified: (
+            calls.append((output, check, tolerance, unverified)) or output
         ),
     )
     monkeypatch.setattr(
@@ -185,10 +185,15 @@ def test_export_and_package_pass_their_options(monkeypatch, tmp_path):
         False,
     )
     assert delivery.Export().execute(args) == command.EXIT_OK
-    assert calls == [("b", False), ("model.onnx", None)]
+    default = delivery.onnx_export.DEFAULT_TOLERANCE
+    assert calls == [("b", False), ("model.onnx", None, default, False)]
     calls.clear()
-    delivery.Export().execute(parse(delivery.Export, ["b", "--check", "c"]))
-    assert calls[-1] == ("model.onnx", "frame:c")
+    delivery.Export().execute(
+        parse(delivery.Export, ["b", "--check", "c", "--tolerance", "0.01"])
+    )
+    assert calls[-1] == ("model.onnx", "frame:c", 0.01, False)
+    delivery.Export().execute(parse(delivery.Export, ["b", "--unverified"]))
+    assert calls[-1] == ("model.onnx", None, default, True)
     monkeypatch.setattr(
         delivery.packaging,
         "scaffold",

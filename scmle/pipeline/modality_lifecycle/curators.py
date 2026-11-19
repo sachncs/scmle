@@ -424,13 +424,16 @@ class ExtensionCurator(Curator):
         Raises:
             TypeError: If `extension` is not an `Bespoke` or the
                 callback is not callable.
-            ValueError: If the dataset hash is blank or the limitations are
-                empty or contain blank values.
+            ValueError: If the dataset hash is not a lowercase SHA-256 hex
+                digest (the dataset card's manifest requires one) or the
+                limitations are empty or contain blank values.
         """
         if not isinstance(self.extension, modalities.Bespoke):
             raise errors.KindError("extension must be Bespoke")
-        if not self.dataset_hash_value.strip():
-            raise errors.InputError("dataset_hash_value must not be empty")
+        if not containers.hashlike(self.dataset_hash_value):
+            raise errors.InputError(
+                "dataset_hash_value must be a SHA-256 hex digest"
+            )
         if not callable(self.curation_callback):
             raise errors.KindError("curation_callback must be callable")
         if not self.limitations or any(

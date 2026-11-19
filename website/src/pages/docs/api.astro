@@ -10,37 +10,55 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   <p class="lead">The package keeps its supported surface small: define an <code>Project</code>, inspect a <code>RunResult</code>, save or load a signed <code>Bundle</code>, and extend registries when the built-ins are not enough.</p>
 
   <h2>The lifecycle objects</h2>
-  <pre><code>from scmle.api.project import Project
+  <pre><code class="language-python">{`from sklearn import datasets
+
 from scmle.api.predict import load_model, predict
+from scmle.api.project import Project
 
-project = Project(data=df, target="outcome", task="regression")
-plan = project.plan()
-result = project.run()
-print(result.metrics)
+KEY = "load-this-from-your-secret-manager"
 
-bundle = result.bundle
-bundle.save("artifacts/outcome-model")
-loaded = load_model("artifacts/outcome-model")
-predictions = predict(loaded, new_rows)</code></pre>
+if __name__ == "__main__":  # training starts helper processes
+    df = datasets.load_diabetes(as_frame=True).frame
+    df = df.rename(columns={"target": "outcome"})
+    new_rows = df.drop(columns="outcome").head(5)
+
+    project = Project(
+        data=df, target="outcome", task="regression", time_budget=60
+    )
+    plan = project.plan()
+    result = project.run()
+    print(result.evaluation["metrics"])
+
+    bundle = result.bundle
+    bundle.save("artifacts/outcome-model", signing_key=KEY)
+    loaded = load_model("artifacts/outcome-model", signing_key=KEY)
+    print(loaded.predict(new_rows))
+    print(predict("artifacts/outcome-model", new_rows, signing_key=KEY))`}</code></pre>
   <ul>
     <li><code>Project</code> is the declarative input and policy boundary.</li>
     <li><code>RunResult</code> points to metrics, evidence, and the selected model.</li>
     <li><code>Bundle</code> packages the schema, preprocessing, estimator, provenance, and signature.</li>
-    <li><code>load_model</code> verifies a bundle before it is used for inference.</li>
+    <li><code>load_model</code> verifies a bundle before it is used for inference; <code>predict</code> loads, verifies and scores in one call.</li>
   </ul>
 
   <h2>Declare the dataset family</h2>
   <p><code>modality</code> is keyword-only and becomes part of the dataset manifest and capability decision. The current supported workflow is explicitly tabular; declaring another family preserves the claim in evidence and fails closed before modelling until that lifecycle is registered.</p>
-  <pre><code>project = Project(
+  <pre><code class="language-python">{`from sklearn import datasets
+
+from scmle.api.project import Project
+
+records = datasets.load_diabetes(as_frame=True).frame
+records = records.rename(columns={"target": "outcome"})
+project = Project(
     data=records,
     target="outcome",
     modality="tabular",
-)</code></pre>
+)`}</code></pre>
 
   <h2>Run a non-tabular lifecycle explicitly</h2>
   <p><code>ModalityProject</code> is the public entry point for typed experimental adapters. It accepts the built-in document, image, audio, video, graph, geospatial-vector, and raster families, or a caller-defined <code>Bespoke</code>, through the same fifteen-stage lifecycle. The adapter owns decoding and representation policy; the project owns signed packaging, evidence persistence, inference parity, monitoring, documentation, and recovery checks. <code>Predictor</code>, <code>ModalityHttpServing</code>, and <code>ModalitySampleDecoder</code> are also exported for verified library inference and explicit reference serving.</p>
-  <pre><code>from scmle.api.project import ModalityProject
-from scmle.data.modalities import Dataset, Sample
+  <pre><code class="language-python">from scmle.api.project import ModalityProject
+from scmle.data.modalities.document import Dataset, Sample
 from scmle.pipeline.modality_lifecycle import Plaintext
 
 adapter = Plaintext(Dataset((
@@ -64,8 +82,20 @@ print(report.documentation["status"])  # experimental</code></pre>
 
   <h2>Use the bounded non-tabular model API</h2>
   <p><code>Modeler</code> is the narrower modelling boundary for applications that need a durable package around an existing built-in representation. It allowlists the exact document, text, image, audio, video, graph, geospatial, and raster adapter types; it does not discover codecs, accept arbitrary adapter subclasses, infer semantics from raw bytes, or claim Transformer, JEPA, GNN, OCR, layout, or foundation-model support. Video and raster metadata-only paths remain metadata representations, not visual modelling.</p>
-  <pre><code>{`from scmle.api.non_tabular import Modeler
+  <pre><code class="language-python">{`from scmle.api.non_tabular import Modeler
+from scmle.data.modalities.document import Dataset, Sample
+from scmle.pipeline.modality_lifecycle import Plaintext
 
+adapter = Plaintext(Dataset((
+    Sample("a", "red apple", label="fruit"),
+    Sample("b", "blue ocean", label="water"),
+    Sample("c", "red orchard", label="fruit"),
+    Sample("d", "blue lake", label="water"),
+    Sample("e", "sweet fruit", label="fruit"),
+    Sample("f", "deep water", label="water"),
+    Sample("g", "orange crop", label="fruit"),
+    Sample("h", "lake vessel", label="water"),
+)))
 project = Modeler(
     adapter,
     signing_key="load-this-from-your-secret-manager",
@@ -80,7 +110,8 @@ print(result.predict(adapter.samples[:2]))`}</code></pre>
 
   <h2>Bring a new dataset family</h2>
   <p>Use <code>Bespoke</code> when your dataset does not fit a built-in identity. It gives the family a stable serialized name and keeps the declaration <code>extension-only</code> even when all fifteen local stages have evidence. For raw records that are not ready for modelling, <code>ExtensionCurator</code> supplies only source identity, sample ownership, and a caller-owned curation callback; it does not force unused split or feature methods. Read the <a href={`${base}/docs/extensions/`}>extension contract guide</a> for the raw-fixture, curation, adapter, and promotion requirements.</p>
-  <pre><code>{`from scmle.contracts import modalities
+  <pre><code class="language-python" data-snippet="synopsis">{`from scmle.api.project import ModalityProject
+from scmle.contracts import modalities
 from scmle.pipeline import modality_lifecycle
 
 class PointCloudAdapter(modality_lifecycle.Preparer):
@@ -96,16 +127,30 @@ assert report.documentation["status"] == "extension-only"`}</code></pre>
 
   <h2>Connect a warehouse without hiding its boundary</h2>
   <p><code>Lakehouse</code> is a transport-neutral contract for a caller-owned warehouse or lakehouse engine. Inject callbacks for schema and bounded batches; the connector records the query in source identity, validates row shape, retries engine failures, and returns a resumable checkpoint. It does not pretend that a callback is a broker, a distributed transaction, or an exactly-once guarantee.</p>
-  <pre><code>from scmle.data.readers import Columns, Lakehouse
+  <pre><code class="language-python">{`from scmle.data.readers.connectors import Columns, Field, Lakehouse
+
+# A stand-in engine; bind both callbacks to the engine you operate.
+events = [(index, "click") for index in range(25_000)]
+schema = Columns((Field("id", "int"), Field("kind", "string")))
+
+
+def read_schema(query):
+    return schema
+
+
+def read_batch(query, offset, limit):
+    rows = events[offset : offset + limit]
+    return schema, rows, len(events) > offset + limit
+
 
 connector = Lakehouse(
     "warehouse://analytics/events",
-    "select * from events",
-    schema_reader=engine.read_schema,
-    batch_reader=engine.read_batch,
+    "select * from events order by id",
+    schema_reader=read_schema,
+    batch_reader=read_batch,
 )
 batch = connector.read_rows(limit=10_000)
-next_batch = connector.read_rows(batch.checkpoint, limit=10_000)</code></pre>
+next_batch = connector.read_rows(batch.checkpoint, limit=10_000)`}</code></pre>
   <p>Implement the callbacks around the engine you operate—DuckDB, Spark, BigQuery, Snowflake, or another system—and keep its authentication, query planning, and transport evidence in the run record.</p>
 
   <h2>Curation is a release input</h2>
@@ -116,8 +161,7 @@ next_batch = connector.read_rows(batch.checkpoint, limit=10_000)</code></pre>
 
   <h2>Experimental document baseline</h2>
   <p>Documents have a deliberately bounded library path for exploration. It curates labelled samples before fitting, evaluates a TF-IDF/logistic baseline on a held-out split, exposes linear global/local term evidence and bounded raw-text term ablation, and writes an atomic package whose manifest verifies both the payload and model digests.</p>
-  <pre><code>from scmle.data.modalities import Dataset, Sample
-from scmle.data.modalities import Reader
+  <pre><code class="language-python">from scmle.data.modalities.document import Dataset, Sample
 from scmle.models.documents import Classifier, Config
 
 train = Dataset((
@@ -139,27 +183,58 @@ restored = Classifier.load(artifact.path, trusted=True)</code></pre>
   <p>Term ablation removes lexical matches from the original text one at a time and measures the predicted-class score change; its candidate work is explicitly bounded by <code>max_terms</code>. This is perturbation evidence, not semantic citation grounding or a causal claim. The path is not part of the supported <code>Project</code> workflow. <code>trusted=True</code> is required because loading a serialized estimator is executable-code deserialization; the package checks its manifest, payload digest, model digest, and fitted type before returning it.</p>
   <h3>Attach source-backed citations</h3>
   <p><code>Reader</code> hashes the raw bytes before decoding them. A loaded sample carries the source URI, raw-source SHA-256 digest, and deterministic page or section locators. Local explanations and raw-span occlusion include those citations when the sample has a source identity. Manually created in-memory samples remain explicitly citation-free; the curation report exposes their traceability coverage instead of inventing a source.</p>
-  <pre><code>reader = Reader()
+  <pre><code class="language-python">{`from pathlib import Path
+
+from scmle.data.modalities.document import Dataset, Reader
+from scmle.models.documents import Classifier
+
+Path("policy.txt").write_text(
+    "Refunds are paid within 30 days.\\n", encoding="utf-8"
+)
+model = Classifier.load("artifacts/document-model", trusted=True)
+
+reader = Reader()
 sample = reader.load("policy.txt", document_id="policy-2026")
 curation = Dataset((sample,)).curate()
 explanation = model.spotlight(sample)
 
 assert curation.source_traceability_coverage == 1.0
-assert explanation.to_dict()["citations"][0]["source_digest"] == sample.source_digest</code></pre>
+citation = explanation.to_dict()["citations"][0]
+assert citation["digests"]["source"] == sample.source_digest`}</code></pre>
   <p>Layout, OCR, and table extraction stay an explicit dependency boundary. Supply a <code>layout_reader</code> callback when you own a parser; it receives the raw bytes, document ID, and resolved format. The reader validates the returned <code>Layout</code>, rejects malformed extraction results, and fails closed when the optional parser is unavailable.</p>
-  <pre><code>{`def extract_layout(raw_bytes, document_id, document_format):
-    # Call your pinned parser and return Layout(...).
-    return layout
+  <pre><code class="language-python">{`from pathlib import Path
 
+from scmle.data.modalities.document import Element, Layout, Reader
+
+
+def extract_layout(raw_bytes, document_id, document_format):
+    # Call your pinned parser; this stand-in marks the first line a heading.
+    heading = raw_bytes.split(b"\\n")[0].decode()
+    return Layout(
+        source=document_id,
+        provider="first-line",
+        provider_version="1",
+        elements=(Element("heading", 0, len(heading), 1),),
+    )
+
+
+Path("policy.txt").write_text(
+    "Refund policy\\nRefunds are paid within 30 days.\\n", encoding="utf-8"
+)
 reader = Reader(layout_reader=extract_layout)
-sample = reader.load("policy.pdf", document_id="policy-2026")`}</code></pre>
+sample = reader.load("policy.txt", document_id="policy-2026")
+print(sample.layout)`}</code></pre>
   <p>OCR, layout, tables, signed <code>Bundle</code> integration, HTTP serving, and release-grade document evidence are still outside this experimental boundary. A source-backed locator proves where the decoded span came from; it does not prove that a generated answer is semantically grounded in that span.</p>
 
   <h2>Experimental image baseline</h2>
-  <p>The image path follows the same evidence-first boundary. Labelled <code>Dataset</code> samples are curated for exact and near-duplicate content, mixed label state, augmentation lineage, and sensitive metadata, resized into a bounded pixel matrix, evaluated with held-out data, and explained with global/local pixel contributions plus a deterministic black-baseline occlusion report.</p>
-  <pre><code>from scmle.data.modalities import Augmentation, Dataset
-from scmle.data.modalities import Sample
+  <p>The image path needs the <code>multimodal</code> extra (Pillow) and follows the same evidence-first boundary. Labelled <code>Dataset</code> samples are curated for exact and near-duplicate content, mixed label state, augmentation lineage, and sensitive metadata, resized into a bounded pixel matrix, evaluated with held-out data, and explained with global/local pixel contributions plus a deterministic black-baseline occlusion report.</p>
+  <pre><code class="language-python">{`from PIL import Image
+
+from scmle.data.modalities.image import Dataset, Sample
 from scmle.models.images import Classifier, Config
+
+Image.new("RGB", (32, 32), (220, 30, 30)).save("red.png")
+Image.new("RGB", (32, 32), (30, 30, 220)).save("blue.png")
 
 train = Dataset((
     Sample.from_path("red.png", label="red"),
@@ -172,10 +247,23 @@ occlusion = model.occlude(
     train.samples[0], patch_size=(4, 4), top_k=5
 )
 artifact = model.save("artifacts/image-model")
-restored = Classifier.load(artifact.path, trusted=True)</code></pre>
+restored = Classifier.load(artifact.path, trusted=True)`}</code></pre>
   <p>The occlusion report replaces transformed pixels with a zero-valued black baseline and reports the predicted-class score change for each region. It is perturbation evidence, not raw-image saliency or object localization. This is an experimental library path, not a supported image capability. It does not claim saliency fidelity, localization, OCR, signed <code>Bundle</code> integration, HTTP serving, or full release recovery evidence.</p>
   <p><code>Dataset.near_duplicate_groups()</code> computes a bounded quantized-luminance signature for likely visually similar samples. This is review evidence, not a semantic similarity model. If a caller creates a transformed sample, <code>Augmentation</code> records the parent source, operation, parameters, and tool; that provenance is included in dataset identity and curation.</p>
-  <pre><code>{`augmented = Sample.from_bytes(
+  <pre><code class="language-python">{`import io
+
+from PIL import Image, ImageOps
+
+from scmle.data.modalities.image import Augmentation, Dataset, Sample
+
+picture = Image.linear_gradient("L").resize((32, 32))
+picture.save("original.png")
+flipped = io.BytesIO()
+ImageOps.mirror(picture).save(flipped, format="PNG")
+transformed_bytes = flipped.getvalue()
+
+original = Sample.from_path("original.png")
+augmented = Sample.from_bytes(
     transformed_bytes,
     source="augmented.png",
     augmentation=Augmentation(
@@ -192,7 +280,16 @@ print(dataset.curate().profile["augmentation"])`}</code></pre>
 
   <h2>Image metadata review</h2>
   <p><code>Sample.from_bytes()</code> keeps source bytes and records EXIF tags as lineage evidence. Use the curation report to find metadata that can identify a person, device, location, or capture event.</p>
-  <pre><code>{`sample = Sample.from_path("field-photo.jpg")
+  <pre><code class="language-python">{`from PIL import Image
+
+from scmle.data.modalities.image import Dataset, Sample
+
+exif = Image.Exif()
+exif[0x010F] = "Acme"  # camera make
+exif[0x0110] = "FieldCam 2"  # camera model
+Image.new("RGB", (32, 32), (90, 120, 60)).save("field-photo.jpg", exif=exif)
+
+sample = Sample.from_path("field-photo.jpg")
 print(sample.exif_tags)
 print(sample.sensitive_metadata)
 report = Dataset((sample,)).curate()
@@ -201,7 +298,18 @@ assert report.release_ready is False if sample.sensitive_metadata else True`}</c
 
   <h2>Experimental audio feature preparation</h2>
   <p>The audio foundation can produce bounded signal statistics for inspection and future baseline work. It makes the observation boundary explicit; it is not an audio classifier and does not silently decode non-WAV containers.</p>
-  <pre><code>from scmle.data.modalities import Dataset, Sample
+  <pre><code class="language-python">import io
+import wave
+
+from scmle.data.modalities.audio import Dataset, Sample
+
+recording = io.BytesIO()
+with wave.open(recording, "wb") as writer:
+    writer.setnchannels(1)
+    writer.setsampwidth(2)
+    writer.setframerate(8_000)
+    writer.writeframes(bytes(2 * 8_000))  # one second of silence
+wav_bytes = recording.getvalue()
 
 clip = Sample.from_bytes(
     wav_bytes, source="clip.wav", group_id="speaker-17"
@@ -216,15 +324,27 @@ print(features.frames_truncated)</code></pre>
 
   <h2>Experimental video metadata features</h2>
   <p>Video exposes metadata evidence by default. When you own a versioned decoder, you can opt into a bounded temporal baseline without hiding codec or resource decisions inside the core package.</p>
-  <pre><code>from scmle.data.modalities import Dataset, Sample
+  <pre><code class="language-python">from scmle.data.modalities.video import Dataset, Metadata, Sample
 
+# The bytes, and what your audited probe reported about them.
+encoded = bytes(range(64))
+metadata = Metadata("mp4", 32, 24, 120, 30.0, "h264")
 clip = Sample.from_bytes(encoded, metadata, source="clip.mp4")
 features = Dataset((clip,)).numerize()
 print(features.feature_names)
 print(features.to_numpy())</code></pre>
-  <pre><code>def decode_frame(encoded_bytes, frame_index):
-    # Bind this to your audited codec/runtime.
-    return decoder.read(encoded_bytes, frame_index)
+  <pre><code class="language-python">import numpy
+
+from scmle.data.modalities.video import Dataset, Metadata, Sample
+
+metadata = Metadata("mp4", 32, 24, 120, 30.0, "h264")
+clip = Sample.from_bytes(bytes(range(64)), metadata, source="clip.mp4")
+
+
+def decode_frame(encoded_bytes, frame_index):
+    # Bind this to your audited codec/runtime; this stand-in draws flat frames.
+    return numpy.full((24, 32), frame_index % 256, dtype=numpy.uint8)
+
 
 temporal = Dataset((clip,)).summarize(
     decode_frame, max_frames=8, max_frame_pixels=1_000_000
@@ -233,11 +353,11 @@ print(temporal.sampled_frame_indices)</code></pre>
   <p><code>summarize</code> selects evenly spaced frames, records their indices, computes bounded pixel statistics, and rejects oversized, malformed, or non-finite decoder output. The lifecycle can use the same explicit decoder to emit frame-statistics occlusion evidence. This is not raw saliency, motion attribution, synchronization proof, or a production video model; those require a versioned decoder policy, temporal leakage review, independent evaluation, serving, and recovery evidence. Use <code>group_id</code> for subject, session, camera, or other identity-aware splits; without it, the source is the only safe grouping unit.</p>
   <h2>Video temporal boundaries</h2>
   <p>A video clip may have an observation time independent of its encoded container timestamp. Pass a timezone-aware ISO-8601 value or <code>datetime</code> to <code>Sample.from_bytes</code>. The sample stores the canonical UTC value and binds it into the dataset identity. <code>Dataset.curate()</code> reports absent, mixed, or complete temporal coverage; <code>cutover</code> fails closed unless every clip is timed. To make the experimental lifecycle use this policy, pass the same cutoff as <code>Footage(temporal_cutoff=...)</code>; otherwise the adapter retains its explicit group-aware split.</p>
-  <pre><code>{`from scmle.data.modalities import Dataset, Sample
+  <pre><code class="language-python">{`from scmle.data.modalities.video import Dataset, Metadata, Sample
 
 clip = Sample.from_bytes(
-    encoded,
-    metadata,
+    bytes(range(64)),
+    Metadata("mp4", 32, 24, 120, 30.0, "h264"),
     source="clip.mp4",
     observation_time="2026-01-03T00:00:00+00:00",
 )
@@ -248,8 +368,36 @@ print(future_boundary.future)`}</code></pre>
   <p>This boundary prevents a random split from silently mixing past and future observations. It does not infer event time from a filename, prove causal ordering, or replace domain-specific watermark and late-arrival policy.</p>
 
   <h2>Experimental spatial splitting</h2>
-  <p>Geospatial data uses a spatial-block split instead of pretending that random feature splits are independent.</p>
-  <pre><code>split = places.tile(
+  <p>Geospatial data uses a spatial-block split instead of pretending that random feature splits are independent. The examples below read a small GeoJSON file of sites, which this writes:</p>
+  <pre><code class="language-python">{`import json
+from pathlib import Path
+
+# Twenty sites on a 500 m grid, in Web Mercator metres (EPSG:3857).
+sites = {
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "id": f"site-{index}",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [500.0 * (index % 5), 500.0 * (index // 5)],
+            },
+            "properties": {},
+        }
+        for index in range(20)
+    ],
+}
+Path("places.geojson").write_text(json.dumps(sites), encoding="utf-8")`}</code></pre>
+  <pre><code class="language-python">import json
+from pathlib import Path
+
+from scmle.data.modalities.geospatial import Dataset
+
+document = json.loads(Path("places.geojson").read_text(encoding="utf-8"))
+places = Dataset.from_geojson(document, crs="EPSG:3857")
+
+split = places.tile(
     block_size=1_000,
     validation_fraction=0.2,
     test_fraction=0.2,
@@ -257,11 +405,46 @@ print(future_boundary.future)`}</code></pre>
 )
 print(split.tiles())</code></pre>
   <p><code>block_size</code> is expressed in the declared CRS units. The implementation uses feature centroids and reports the assigned block IDs. Before the split, <code>Dataset.straddle(block_size)</code> counts the blocks touched by each feature envelope; the modality adapter carries crossings into curation as <code>quality.geospatial-boundary-leakage</code>. This is conservative review evidence, not proof that the exact geometry occupies every touched block. Spatial autocorrelation diagnostics and map-based explanation remain domain-specific work.</p>
-  <pre><code>features = places.prepare_features()
+  <pre><code class="language-python">import json
+from pathlib import Path
+
+from scmle.data.modalities.geospatial import Dataset
+
+document = json.loads(Path("places.geojson").read_text(encoding="utf-8"))
+places = Dataset.from_geojson(document, crs="EPSG:3857")
+
+features = places.prepare_features()
 print(features.feature_names)
 print(features.to_numpy())</code></pre>
   <p>Feature preparation refuses a missing CRS and preserves the source coordinate units. A bounded join can be made explicit when both datasets share a CRS:</p>
-  <pre><code>{`join = places.spatial_join(
+  <pre><code class="language-python">{`import json
+from pathlib import Path
+
+from scmle.data.modalities.geospatial import Dataset, Placemark
+
+document = json.loads(Path("places.geojson").read_text(encoding="utf-8"))
+places = Dataset.from_geojson(document, crs="EPSG:3857")
+
+square = [[0, 0], [1_000, 0], [1_000, 1_000], [0, 1_000], [0, 0]]
+boundaries = Dataset(
+    features=(
+        Placemark(
+            feature_id="district-1",
+            geometry={"type": "Polygon", "coordinates": [square]},
+        ),
+    ),
+    crs="EPSG:3857",
+)
+
+
+def intersects_v1(site, district):
+    # Your pinned geometry engine decides; this one tests a point in a box.
+    x, y = site.geometry["coordinates"]
+    xs, ys = zip(*district.geometry["coordinates"][0])
+    return max(xs) >= x >= min(xs) and max(ys) >= y >= min(ys)
+
+
+join = places.spatial_join(
     boundaries,
     predicate=intersects_v1,
     predicate_name="intersects/v1",
@@ -269,8 +452,30 @@ print(features.to_numpy())</code></pre>
 )
 print(join.to_dict())`}</code></pre>
   <p>The caller owns <code>intersects_v1</code> and its geometry dependency. The evidence records dataset identities and limits; the core does not reproject, choose a geometry engine, rasterize, or calculate distances. For different CRSs, reproject through an explicit versioned caller policy before joining.</p>
-  <pre><code>{`projected = places.reproject(
-    target_crs="EPSG:3857",
+  <pre><code class="language-python">{`import dataclasses
+import json
+import math
+from pathlib import Path
+
+from scmle.data.modalities.geospatial import Dataset
+
+document = json.loads(Path("places.geojson").read_text(encoding="utf-8"))
+places = Dataset.from_geojson(document, crs="EPSG:3857")
+
+RADIUS = 6_378_137.0  # the sphere of EPSG:3857, in metres
+
+
+def project_coordinates_v1(feature, source_crs, target_crs):
+    # Your pinned CRS library transforms; this is the spherical inverse.
+    x, y = feature.geometry["coordinates"]
+    longitude = math.degrees(x / RADIUS)
+    latitude = math.degrees(2 * math.atan(math.exp(y / RADIUS)) - math.pi / 2)
+    geometry = {"type": "Point", "coordinates": [longitude, latitude]}
+    return dataclasses.replace(feature, geometry=geometry)
+
+
+projected = places.reproject(
+    target_crs="EPSG:4326",
     transformer=project_coordinates_v1,
     transformer_name="project_coordinates/v1",
 )

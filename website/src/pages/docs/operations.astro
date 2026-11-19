@@ -17,18 +17,44 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
   <h2>Safe recovery</h2>
   <p>Interrupted or failed runs preserve checkpoints and recoverable trials. Resume only with the same configuration and data identity; stale checkpoints are refused.</p>
-  <pre><code>scmle resume runs/&lt;run-id&gt;</code></pre>
+  <p>The examples on this page run as written in an empty folder. They start from a small table, a demonstration signing key and one run:</p>
+  <pre><code class="language-python">{`import numpy
+import pandas
+
+rng = numpy.random.default_rng(0)
+data = pandas.DataFrame(
+    {
+        "tenure": rng.integers(1, 72, 800),
+        "spend": rng.normal(60, 20, 800).round(2),
+        "plan": rng.choice(["basic", "plus", "pro"], 800),
+    }
+)
+risk = -0.03 * data.tenure + 0.02 * data.spend + 0.8 * (data.plan == "basic")
+data["churn"] = (risk + rng.normal(scale=0.7, size=800) > 0.5).astype(int)
+data.to_csv("data.csv", index=False)`}</code></pre>
+  <pre><code class="language-bash">{`export SCMLE_SIGNING_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+scmle run data.csv --target churn --budget 120
+run=$(ls -d runs/run_* | tail -n 1)    # for example runs/run_20261015_001
+scmle resume "$run"
+echo "exit code: $?"`}</code></pre>
+  <p>This run finished, so <code>resume</code> refuses it with exit code 1 (<code>run already completed; nothing to resume</code>); a cancelled, failed or crashed run continues from its finished trials.</p>
 
   <h2>Durable state</h2>
   <p>Run evidence, incremental checkpoints, source registries, observability retention files, fault evidence, and signing-key rotation use a temporary file, flush its contents, atomically replace the destination, and flush the containing directory. This protects both the bytes and the rename across a sudden process or power failure. It does not make a remote object store transactional; distributed transports still need their own commit protocol.</p>
 
   <h2>Bundle security</h2>
   <p>Sign bundles with <code>SCMLE_SIGNING_KEY</code> and verify them at load time. Rotate keys without reserializing the model:</p>
-  <pre><code>Bundle.rotate_signing_key(
-    "runs/&lt;run-id&gt;/model",
-    current_key,
-    new_key,
-)</code></pre>
+  <pre><code class="language-python">{`import glob
+import os
+import secrets
+
+from scmle.artifacts.bundle.model import Bundle
+
+bundle = sorted(glob.glob("runs/run_*/model"))[-1]
+current_key = os.environ["SCMLE_SIGNING_KEY"]
+new_key = secrets.token_hex(32)
+Bundle.rotate_signing_key(bundle, current_key, new_key)
+Bundle.rotate_signing_key(bundle, new_key, current_key)  # and back, for the examples below`}</code></pre>
 
   <h2>Read the release controls</h2>
   <p>A packaged run includes <code>provenance.json</code> for dataset, model, software, and environment identity; <code>sbom.json</code> for the deterministic CycloneDX component inventory; <code>release_attestation.json</code> for the canonical HMAC binding across those records; and <code>fault_injection_plan.json</code> for the release-blocking recovery scenarios. Set <code>SCMLE_SIGNING_KEY</code> in the release environment. The release evaluator verifies the attestation and blocks unsigned or tampered evidence. <code>Harness</code> persists digest-bound scenario artifacts, while <code>Executor</code> supplies bounded local execution evidence. External transport, container, and kernel-resource injectors remain a separate release requirement.</p>
@@ -36,7 +62,26 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
   <h2>Make reliability operable</h2>
   <p>An alert threshold is not an SLO until someone owns the response. <code>Slo</code> binds a metric and worst-sample window to a minimum sample count, an owner, a runbook, and an alert route. Missing telemetry and future-dated samples are incident-visible states; they are never treated as healthy.</p>
-  <pre><code>{`target = Slo(
+  <p>Save this as <code>slo_check.py</code>; it evaluates forty minutes of samples, one of them above the target:</p>
+  <pre><code class="language-python">{`import datetime
+
+from scmle.contracts.observability import Indicator, Sample
+from scmle.monitoring import slo
+from scmle.monitoring.slo import Slo
+
+clock = datetime.datetime.now(datetime.UTC)
+now = clock.isoformat()
+metrics = [
+    Sample(
+        name="p95_latency_ms",
+        kind=Indicator.LATENCY,
+        value=180.0 if minutes else 410.0,
+        unit="ms",
+        timestamp=(clock - datetime.timedelta(minutes=minutes)).isoformat(),
+    )
+    for minutes in range(40)
+]
+target = Slo(
     name="prediction-latency",
     metric_name="p95_latency_ms",
     kind=Indicator.LATENCY,
@@ -47,12 +92,16 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
     runbook="https://runbooks.example/prediction-latency",
     alert_route="on-call",
 )
-evaluation = slo.evaluate(target, metrics, observed_at=now)`}</code></pre>
+evaluation = slo.evaluate(target, metrics, observed_at=now)
+
+if __name__ == "__main__":
+    print(evaluation.status)`}</code></pre>
   <p>Use the result's status, remaining error budget, owner, runbook, and route in the incident record. The evaluation uses the worst observation in the window so a breach cannot disappear inside an average.</p>
 
   <h2>Deliver the alert once</h2>
-  <p><code>Dispatcher</code> keeps the SLO decision separate from delivery. It derives a stable alert identity from the evidence, records successful delivery, and deduplicates replays. Use the local JSONL sink for an operator handoff or the bounded HTTPS webhook sink for an authenticated incident gateway.</p>
-  <pre><code>{`from scmle.monitoring.alerts import Alert, Dispatcher, Pager
+  <p><code>Dispatcher</code> keeps the SLO decision separate from delivery. It derives a stable alert identity from the evidence, records successful delivery, and deduplicates replays. Use the local JSONL sink (<code>Jsonl</code>) for an operator handoff or the bounded HTTPS webhook sink (<code>Pager("https://pager.example/alerts", token=token)</code>) for an authenticated incident gateway. Save this as <code>alert.py</code>:</p>
+  <pre><code class="language-python">{`from scmle.monitoring.alerts import Alert, Dispatcher, Jsonl
+from slo_check import evaluation, now
 
 alert = Alert.from_evidence(
     route="on-call",
@@ -63,16 +112,18 @@ alert = Alert.from_evidence(
     created_at=now,
 )
 delivery = Dispatcher(
-    {"on-call": Pager("https://pager.example/alerts", token=token)},
-    "runs/run-42/alert-deliveries.jsonl",
-).dispatch(alert)`}</code></pre>
+    {"on-call": Jsonl("alerts.jsonl")},
+    "alert-deliveries.jsonl",
+).dispatch(alert)
+print(delivery.status)`}</code></pre>
   <p>Retries are bounded and a failed webhook is recorded as failed rather than silently treated as a page. This proves the local routing contract; the organisation still needs to exercise its real pager, ticketing, authentication, and on-call escalation path.</p>
 
   <h2>Turn a breach into an incident</h2>
-  <p>An alert is not a recovery plan. Open an incident with the affected run and the exact rollback target, then require an explicit acknowledgement before resolution. The journal is append-only, hash-chained, and rejects tampering; repeating a transition is idempotent.</p>
-  <pre><code>{`from scmle.monitoring.incidents import Incidents
+  <p>An alert is not a recovery plan. Open an incident with the affected run and the exact rollback target, then require an explicit acknowledgement before resolution. The journal is append-only, hash-chained, and rejects tampering; repeating a transition is idempotent. Save this as <code>incident.py</code>:</p>
+  <pre><code class="language-python">{`from scmle.monitoring.incidents import Incidents
+from slo_check import evaluation, now
 
-workflow = Incidents("runs/&lt;run-id&gt;/incidents.jsonl")
+workflow = Incidents("incidents.jsonl")
 incident = workflow.open(
     evaluation,
     opened_at=now,
@@ -87,22 +138,37 @@ workflow.acknowledge(
 workflow.resolve(
     incident.identifier,
     actor="ml-on-call",
-    resolved_at=resolved_at,
+    resolved_at=now,
     resolution="rolled back and replayed the affected window",
-    evidence_digest="sha256:...",
-)`}</code></pre>
+    evidence_digest="sha256:" + "0" * 64,  # the digest of your recovery evidence
+)
+print(workflow.read_events()[-1])`}</code></pre>
+  <p>Then run the three:</p>
+  <pre><code class="language-bash">python slo_check.py
+python alert.py
+python incident.py</code></pre>
   <p>This local workflow supplies operator evidence; connect its alert route to the organisation's authenticated incident system before claiming external on-call coverage.</p>
 
   <h2>Join serving evidence to the run</h2>
   <p>Prediction telemetry tells you what happened; the evidence graph tells you what produced the bundle. Link an event only with the input and output fingerprints captured at the serving boundary and the exact bundle digest loaded for that request.</p>
-  <pre><code>{`from scmle.inference.evidence import Linker
+  <pre><code class="language-python">{`import glob
+import hashlib
+import json
 
+from scmle.inference.evidence import Linker
+
+graph = sorted(glob.glob("runs/run_*/evidence_graph.json"))[-1]
+with open(graph) as file:
+    nodes = json.load(file)["nodes"]
+bundle = next(n["digest"] for n in nodes if n["identifier"] == "bundle")
+request = b'{"rows": [{"tenure": 12, "spend": 70.5, "plan": "basic"}]}'
+response = b'{"predictions": [1]}'
 Linker().link(
-    "runs/&lt;run-id&gt;/evidence_graph.json",
+    graph,
     event_id="request-123",
-    input_fingerprint="sha256:...",
-    output_fingerprint="sha256:...",
-    bundle_digest="sha256:...",
+    input_fingerprint="sha256:" + hashlib.sha256(request).hexdigest(),
+    output_fingerprint="sha256:" + hashlib.sha256(response).hexdigest(),
+    bundle_digest=bundle,
     timestamp="2026-10-20T12:00:00+00:00",
 )`}</code></pre>
   <p>The linker verifies the graph and bundle identities, writes the graph atomically, and makes exact event replay idempotent. It does not replace redaction, retention, access control, or independent release review.</p>
@@ -115,7 +181,7 @@ Linker().link(
     <div class="doc-card"><small>INFRASTRUCTURE FAILURE</small><h3>Resume or quarantine</h3><p>Signals include worker loss, timeout, disk or memory guard, partial write, stale checkpoint, or dependency mismatch. Verify the terminal state and artifact digest; resume only from a matching checkpoint or quarantine the incomplete run.</p></div>
     <div class="doc-card"><small>POLICY FAILURE</small><h3>Block the release</h3><p>Signals include missing signing evidence, expired approval, absent reviewer, unsupported capability, missing retention decision, or an unexecuted fault scenario. A policy failure is not fixed by a better score; it needs an explicit decision record.</p></div>
   </div>
-  <pre><code>{`failure signal
+  <pre><code class="language-text">{`failure signal
       ↓ classify
 data ───────→ preserve snapshot + curation evidence
 model ──────→ retain champion + review challenger
@@ -126,7 +192,7 @@ only a verified, digest-bound state may move forward`}</code></pre>
 
   <h2>Run the local fault matrix</h2>
   <p>SCMLE includes a bounded local executor for all 15 declared fault scenarios. It exercises real child-process termination, timeout cancellation, atomic publication, artifact quarantine, signature rejection, checkpoint and snapshot mismatch, retry exhaustion, duplicate-event idempotency, incomplete lineage, and rejected approvals.</p>
-  <pre><code>{`from pathlib import Path
+  <pre><code class="language-python">{`from pathlib import Path
 
 from scmle.contracts import reliability
 from scmle.rehearsal.local_faults import Executor
@@ -139,7 +205,22 @@ for scenario in reliability.Contingency:
 
   <h2>Promote only an approved bundle</h2>
   <p>A better challenger is not automatically the new champion. The lifecycle stages it under the <code>challenger</code> alias. An independent reviewer must approve the exact model version and content digest, and the approval must be HMAC-signed, before the registry moves <code>champion</code>.</p>
-  <pre><code>candidate = registry.resolve("customers", "challenger")
+  <pre><code class="language-python">{`import glob
+import os
+
+from scmle.governance.registry import ModelRegistryStore, Sanction, Verdict
+from scmle.operations.lifecycle import Maintainer
+
+registry = ModelRegistryStore("registry")
+staged = registry.register(
+    "customers",
+    sorted(glob.glob("runs/run_*/model"))[-1],
+    signing_key=os.environ["SCMLE_SIGNING_KEY"],
+)
+registry.promote("customers", staged.version, alias="challenger")
+manager = Maintainer(registry, "customers", "work")
+
+candidate = registry.resolve("customers", "challenger")
 approval = Sanction(
     model="customers",
     version=candidate.version,
@@ -150,13 +231,57 @@ approval = Sanction(
     evidence=("evidence/release-2026-10-20.json",),
     approved_at="2026-10-20T00:00:00+00:00",
 ).sign("release-key")
-manager.elevate(approval, signing_key="release-key")</code></pre>
+manager.elevate(approval, signing_key="release-key")
+print(registry.resolve("customers").version)`}</code></pre>
   <p>The approval is bound to the bundle content, reviewer decision, evidence, and timestamp, then written to the append-only audit log. A missing, rejected, mismatched, tampered, or non-independent approval cannot move the serving alias. Rollback uses the same gate.</p>
 
   <h2>Deployment boundary</h2>
   <p>The built-in HTTP adapter is a reference server. Put it behind an authenticating gateway with TLS, request policy, logs, and operational ownership.</p>
   <p>For experimental modalities, <code>ModalityHttpServing</code> has the same deliberate boundary: it serves only a verified <code>Predictor</code> and a caller-owned <code>ModalitySampleDecoder</code>. The decoder is where transport-specific limits, privacy checks, codec policy, and raw-payload provenance belong.</p>
-  <pre><code>{`server = ModalityHttpServing(
+  <p>A complete example, with a small document package and a decoder for <code>&#123;&quot;samples&quot;: [&#123;&quot;document_id&quot;: ..., &quot;content&quot;: ...&#125;]&#125;</code>:</p>
+  <pre><code class="language-python">{`import json
+import urllib.request
+
+from scmle.data.modalities import document
+from scmle.pipeline import modality_lifecycle
+from scmle.serving.modality import ModalityHttpServing, ModalitySampleDecoder
+
+
+class Decoder(ModalitySampleDecoder):
+    """Reads samples with a document_id and a content."""
+
+    def decode(self, payload):
+        return tuple(
+            document.Sample(
+                document_id=str(record["document_id"]),
+                content=str(record["content"]),
+                label="unknown",
+            )
+            for record in payload["samples"]
+        )
+
+    def schema(self):
+        return {"required": ["samples"], "sample_fields": ["document_id", "content"]}
+
+
+samples = tuple(
+    document.Sample(
+        document_id=f"document-{index}",
+        content=("alpha " if index % 2 else "beta ") * (index + 2),
+        label="alpha" if index % 2 else "beta",
+    )
+    for index in range(12)
+)
+reference = modality_lifecycle.DocumentPreparer(document.Dataset(samples))
+report = modality_lifecycle.Lifecycle().run(
+    reference, "package", signing_key="serving-key"
+)
+predictor = modality_lifecycle.Predictor.from_package(
+    reference, report.package.path, "serving-key"
+)
+decoder = Decoder()
+
+server = ModalityHttpServing(
     predictor,
     decoder,
     max_request_bytes=16 * 1024 * 1024,
@@ -164,7 +289,8 @@ manager.elevate(approval, signing_key="release-key")</code></pre>
 )
 server.start()
 try:
-    wait_for_shutdown()
+    with urllib.request.urlopen(f"{server.address}/health") as response:
+        print(json.loads(response.read()))
 finally:
     server.stop()`}</code></pre>
   <p><code>/health</code> reports the verified package and modality identity; <code>/schema</code> reports the decoder contract; <code>/predict</code> accepts <code>&#123;&quot;samples&quot;: ...&#125;</code>. This is not an implicit codec registry and it does not provide authentication or distributed serving by itself.</p>

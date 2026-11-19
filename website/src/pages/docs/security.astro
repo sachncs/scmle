@@ -23,25 +23,65 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   </div>
 
   <h2>Bundle verification is mandatory</h2>
-  <p>A bundle load verifies the manifest signature, model payload digest, model digest, and fitted type before deserialization. Treat <code>trusted=True</code> as an explicit executable-code boundary, not as a convenience switch.</p>
-  <pre><code>{`from scmle.artifacts.bundle import Bundle
+  <p>A bundle load verifies the manifest signature, model payload digest, model digest, and fitted type before deserialization. Treat <code>trusted=True</code> as an explicit executable-code boundary, not as a convenience switch. The first lines train a short run to have a signed bundle to load; the <code>if __name__</code> guard is required, because the search starts worker processes that import the script.</p>
+  <pre><code class="language-python">{`import numpy
+import pandas
 
-bundle = Bundle.load(
-    "runs/run-42/model",
-    trusted=True,
-    signing_key=release_key,
-)
-# Verify the exact bundle digest before promotion or serving.`}</code></pre>
+from scmle.api.project import Project
+from scmle.artifacts.bundle import Bundle
+
+release_key = "load-this-from-your-secret-manager"
+
+
+def main():
+    # A short run on a small table, to have a signed bundle to load.
+    rng = numpy.random.default_rng(0)
+    data = pandas.DataFrame(
+        {"age": rng.integers(18, 80, 300), "income": rng.normal(50, 15, 300)}
+    )
+    data["approved"] = (0.04 * data.age - 0.05 * data.income > 0).astype(int)
+    result = Project(data, "approved", time_budget=30).run()
+    result.save("runs/run-42/model", signing_key=release_key)
+
+    bundle = Bundle.load(
+        "runs/run-42/model",
+        trusted=True,
+        signing_key=release_key,
+    )
+    # Verify the exact bundle digest before promotion or serving.
+
+
+if __name__ == "__main__":
+    main()`}</code></pre>
   <p>The key shown above must come from a deployment secret or approved key service. Do not commit it, print it into logs, or use one shared development key as release identity.</p>
 
   <h2>Key identity and emergency rotation</h2>
   <p>Bundle rotation changes the signature, but release operations also need to know which signer was allowed to create it. The metadata-only <code>Keyring</code> records key identity, owner, expiry, retirement, replacement, and revocation without storing the secret. Keep the secret in the deployment secret manager.</p>
-  <pre><code>{`registry.sign(payload, key_id, secret, signed_at)
+  <pre><code class="language-python">{`from scmle.governance.keyring import Credential, Keyring
+
+owner = "release-engineering"
+registry = Keyring((
+    Credential("release-2026-10", owner, "2026-10-01T00:00:00+00:00"),
+    Credential("release-2026-11", owner, "2026-11-01T00:00:00+00:00"),
+))
+key_id, replacement_key_id = "release-2026-10", "release-2026-11"
+secret = "load-this-from-your-secret-manager"
+secrets = {key_id: secret}
+payload = {"release": "candidate-1"}
+signed_at = "2026-10-15T00:00:00+00:00"
+changed_at = "2026-11-02T00:00:00+00:00"
+observed_at = "2026-11-03T00:00:00+00:00"
+
+envelope = registry.sign(payload, key_id, secret, signed_at)
 registry.retire(key_id, changed_at, "scheduled rotation", replacement_key_id)
-registry.revoke(key_id, changed_at, "credential compromise")
 
 # Retired keys verify old evidence only when explicitly requested.
-registry.verify(payload, envelope, secrets, observed_at, historical=True)`}</code></pre>
+assert not registry.verify(payload, envelope, secrets, observed_at)
+assert registry.verify(payload, envelope, secrets, observed_at, historical=True)
+
+# Revocation ends historical verification too.
+registry.revoke(key_id, changed_at, "credential compromise")
+assert not registry.verify(payload, envelope, secrets, observed_at, historical=True)`}</code></pre>
   <p>Retirement stops new signatures while preserving auditable historical proof. Revocation is immediate, including historical verification. That is the intended emergency boundary: rotate forward without silently accepting evidence from a compromised signer.</p>
 
   <h2>Remote keys and revocation</h2>

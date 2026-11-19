@@ -186,10 +186,14 @@ def planted() -> dict[str, Any]:
         for seed in PLANT_SEEDS:
             names = screen_certify.real_columns(frame, PLANT_COLUMNS, seed)
             plant = screen_certify.plant_column(frame, defect, seed)
-            table = frame[[*names, f4_certify.TARGET]].assign(**{defect: plant})
+            # Not the leak type's own name: the screen plants its own copy
+            # of each type (its probe) and refuses a table that already
+            # holds a column of that name.
+            column = f"planted_{defect}"
+            table = frame[[*names, f4_certify.TARGET]].assign(**{column: plant})
             report = screened(table, f4_certify.TARGET)
             flagged = flagged_names(report)
-            found += int(defect in flagged)
+            found += int(column in flagged)
             false_flags += len([c for c in flagged if c in names])
             real_total += len(names)
         rows[defect] = {
@@ -204,13 +208,17 @@ def planted() -> dict[str, Any]:
 def certified_rates() -> dict[str, Any]:
     """The certified false-alarm and detection rates, from the repository.
 
+    The certificate holds one section per kind of target; the rates quoted
+    are those of the two-class section (breast cancer), the kind of the
+    planted tables measured here.
+
     Returns:
-        The values copied from `screen_measurements.json`: the level, null
-        replicates and false alarms with their Wilson interval, plant
-        replicates per type, detections with their intervals, and the
-        certified ceilings.
+        The values copied from the `binary` section of
+        `screen_measurements.json`: the level, null replicates and false
+        alarms with their Wilson interval, plant replicates per type,
+        detections with their intervals, and the certified ceilings.
     """
-    record = json.loads(CERTIFIED.read_text(encoding="utf-8"))
+    record = json.loads(CERTIFIED.read_text(encoding="utf-8"))["binary"]
     return {
         "source": "benchmarks/qualification/screen_measurements.json",
         "alpha": record["alpha"],

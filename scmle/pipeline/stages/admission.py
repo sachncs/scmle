@@ -156,6 +156,8 @@ class Admission(identification.Identification):
             structure=structure,
             group_column=spec.data.group_column,
             time_column=spec.data.time_column,
+            cutoff=spec.data.cutoff,
+            known=spec.data.known,
             attestations=given,
             scope=charter.charter_hash,
             causal=charter.estimand.causal,

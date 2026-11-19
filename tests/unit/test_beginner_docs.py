@@ -19,6 +19,7 @@ import shlex
 
 import pytest
 
+from benchmarks import leakage_screen_measurements
 from scmle import cli
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -310,6 +311,18 @@ MEASUREMENTS = ROOT / "benchmarks" / "leakage_screen_measurements.json"
 
 def measurements():
     return json.loads(MEASUREMENTS.read_text(encoding="utf-8"))
+
+
+def test_the_measurements_quote_the_two_class_certificate():
+    certificate = json.loads(
+        leakage_screen_measurements.CERTIFIED.read_text(encoding="utf-8")
+    )["binary"]
+    certified = leakage_screen_measurements.certified_rates()
+    assert certified["alpha"] == certificate["alpha"]
+    assert certified["null_replicates"] == certificate["null_replicates"]
+    assert certified["detected"] == {
+        k: v["detected"] for k, v in certificate["recall"].items()
+    }
 
 
 def test_leakage_doc_quotes_the_committed_measurements():

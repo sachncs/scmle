@@ -285,7 +285,7 @@ def test_covariate_drift_alone_does_not_retrain(tmp_path):
 def test_mnar_without_an_audit_slice_never_retrains_and_halts_on_an_alarm(
     tmp_path,
 ):
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:705.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:757.
     # Enforces website/src/learn/when-things-go-wrong.html:297.
     loop = open_loop(
         tmp_path, hooks=scmle.governance.loop.Hooks(retrain=lambda: "x")
@@ -555,7 +555,7 @@ def test_rejecting_or_undecided_replies_apply_the_safe_default(tmp_path):
     ],
 )
 def test_replies_that_do_not_fit_are_refused(tmp_path, changes, message):
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:692.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:744.
     # Enforces website/src/learn/when-things-go-wrong.html:293.
     loop, esc = pending_one(tmp_path)
     with pytest.raises(scmle.governance.loop.RefusalError, match=message):
@@ -564,7 +564,7 @@ def test_replies_that_do_not_fit_are_refused(tmp_path, changes, message):
 
 
 def test_signature_key_and_system_key_checks(tmp_path):
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:692.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:744.
     # Enforces website/src/learn/when-things-go-wrong.html:293.
     loop, esc = pending_one(tmp_path)
     with pytest.raises(
@@ -664,7 +664,7 @@ def test_never_list_action_without_attestation_raises_and_escalates(
 ):
     # Enforces docs/AUTONOMY.md:47.
     # Enforces docs/GLOSSARY.md:559.
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:709.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:761.
     # Enforces website/src/learn/glossary.html:277.
     # Enforces website/src/learn/when-things-go-wrong.html:301.
     loop = attested_loop(tmp_path)

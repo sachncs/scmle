@@ -1,7 +1,12 @@
-"""Enforces the project naming rule: no underscore-prefixed identifiers.
+"""Enforces the project conventions: naming, aliases and the run board.
 
 Dunder names (`__init__`, `__all__`, ...) are language protocol and exempt.
 Everything else, in the package and in the tests, must be a public name.
+
+The run context (`scmle/pipeline/context.py`) is on its way out: stages
+read the products the board holds instead of its fields. `CONTEXTUAL` lists
+the package modules that still import it; the list may only shrink, and
+the context is deleted when it is empty.
 """
 
 import ast
@@ -165,3 +170,84 @@ def test_checker_detects_violations():
         "_",
     }
     assert not is_private("__init__")
+
+
+CONTEXT = "scmle.pipeline.context"
+CONTEXTUAL = frozenset(
+    {
+        "scmle/pipeline/ensemble_search.py",
+        "scmle/pipeline/hyperband.py",
+        "scmle/pipeline/orchestrator.py",
+        "scmle/pipeline/policies.py",
+        "scmle/pipeline/strategy_search.py",
+        "scmle/pipeline/trials.py",
+        "scmle/pipeline/tuning.py",
+        *(
+            f"scmle/pipeline/stages/{name}.py"
+            for name in (
+                "admission",
+                "assessment",
+                "bracketing",
+                "calibration",
+                "cost",
+                "diagnosis",
+                "documentation",
+                "examination",
+                "exploration",
+                "identification",
+                "impounding",
+                "ingestion",
+                "interface",
+                "labelling",
+                "packaging",
+                "planning",
+                "profiling",
+                "qualification",
+                "relabelling",
+                "releasing",
+                "remedy",
+                "reporting",
+                "reservation",
+                "scoring",
+                "screening",
+                "selecting",
+                "summary",
+                "surveying",
+                "tracing",
+                "training",
+            )
+        ),
+    }
+)
+
+
+def imported(tree):
+    """Every module an AST imports, at any depth, by its dotted name."""
+    found = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            found.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            found.add(node.module)
+            found.update(f"{node.module}.{alias.name}" for alias in node.names)
+    return found
+
+
+def test_only_the_recorded_modules_still_import_the_run_context():
+    importers = {
+        path.relative_to(ROOT).as_posix()
+        for path in (ROOT / "scmle").rglob("*.py")
+        if CONTEXT in imported(ast.parse(path.read_text(encoding="utf-8")))
+    } - {"scmle/pipeline/context.py"}
+    assert importers <= CONTEXTUAL, sorted(importers - CONTEXTUAL)
+
+
+def test_the_import_checker_finds_nested_and_from_imports():
+    tree = ast.parse(
+        "def f():\n    import scmle.pipeline.context\n"
+        "from scmle.pipeline import context\n"
+    )
+    assert CONTEXT in imported(tree)
+    assert CONTEXT not in imported(
+        ast.parse("from scmle.pipeline import kinds")
+    )

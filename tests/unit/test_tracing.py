@@ -116,6 +116,7 @@ def test_pipeline_stages_and_batch_files_are_spans(
     class Load:
         state = state.Progress.VALIDATING
         requires = ()
+        makes = None
 
         def describe(self, context):
             return "load"

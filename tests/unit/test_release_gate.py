@@ -137,7 +137,7 @@ SEEDED = {
 
 @pytest.mark.parametrize("name", sorted(SEEDED))
 def test_each_seeded_live_failure_fails_its_check_only(name):
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:754.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:806.
     # Enforces website/src/learn/when-things-go-wrong.html:319.
     document, failing = SEEDED[name]
     results = named(support_release.run_live(document))
@@ -311,7 +311,7 @@ SCAN_FAILURES = {
 @pytest.mark.parametrize("name", sorted(SCAN_FAILURES))
 def test_missing_or_failed_pre_deploy_evidence_is_refused(name):
     # Enforces docs/DECISIONS.md:201.
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:737.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:789.
     # Enforces website/src/learn/decisions.html:73.
     # Enforces website/src/learn/when-things-go-wrong.html:312-313.
     changes, expected = SCAN_FAILURES[name]
@@ -468,7 +468,7 @@ def test_a_staging_record_signed_with_another_key_is_refused():
 
 
 def test_every_reason_is_reported_not_only_the_first():
-    # Enforces docs/CLI.md:161.
+    # Enforces docs/CLI.md:241.
     # Enforces docs/GLOSSARY.md:700.
     # Enforces website/src/learn/glossary.html:351.
     # Enforces website/src/pages/docs/cli.astro:96.

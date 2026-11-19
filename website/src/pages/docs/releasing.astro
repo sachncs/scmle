@@ -9,14 +9,20 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   <p class="lead">A release is a version bump, a tag, and a pipeline that refuses to publish unless the evidence holds. This page is about releasing the Python package. Releasing a trained model is a different act: the package provides the release gate, live checks and signed deployment record (<code>scmle deploy</code>), and how a model reaches a runtime is your own adapter.</p>
 
   <h2>Before tagging</h2>
+  <p>Work in a checkout of the repository, with the package installed:</p>
+  <pre><code class="language-bash">{`git clone https://github.com/sachncs/scmle
+cd scmle
+python3 -m venv .venv
+source .venv/bin/activate
+pip install .`}</code></pre>
   <ol>
     <li>Set the version in <code>pyproject.toml</code> and in the package's <code>__version__</code>.</li>
     <li>Move the <code>Unreleased</code> changelog entries under a heading for the new version.</li>
     <li>If the public API changed deliberately, regenerate the pinned snapshot and record the change in the changelog and on <a href={`${base}/docs/api-stability/`}>API stability</a>:
-      <pre><code>python scripts/check_api_compatibility.py tests/fixtures/public_api.json --write</code></pre>
+      <pre><code class="language-bash">python scripts/check_api_compatibility.py tests/fixtures/public_api.json --write</code></pre>
     </li>
     <li>Run the full local evidence chain:
-      <pre><code>./scripts/release_preflight.sh        # SCMLE_PYTHON_VERSION=3.11 to vary</code></pre>
+      <pre><code class="language-bash">./scripts/release_preflight.sh        # SCMLE_PYTHON_VERSION=3.11 to vary</code></pre>
       It builds the artifacts and the site, then runs lint, types, <code>bandit</code>, <code>pip-audit</code>, the API check and the complete test suite.
     </li>
   </ol>
@@ -38,7 +44,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   <ul>
     <li>The operational rehearsal, reviewed by someone other than the author (the steps are on <a href={`${base}/docs/rehearsal/`}>Operational rehearsal</a>).</li>
     <li>An independent review record, checked with
-      <pre><code>python scripts/verify_release_review.py review.json --source-commit &lt;sha&gt;</code></pre>
+      <pre><code class="language-bash" data-snippet="synopsis">python scripts/verify_release_review.py review.json --source-commit &lt;sha&gt;</code></pre>
     </li>
   </ul>
 

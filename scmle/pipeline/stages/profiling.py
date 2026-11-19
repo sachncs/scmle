@@ -11,6 +11,7 @@ import scmle.contracts.data
 import scmle.contracts.metrics
 from scmle.data.splitting import splitters
 from scmle.evaluation import backtest
+from scmle.pipeline import kinds
 from scmle.pipeline import knowledge
 from scmle.pipeline import products
 import scmle.pipeline.context
@@ -65,6 +66,15 @@ class Partition(bridge.Bridge):
             "profile": self.profile.to_dict(),
         }
 
+    def apply(self, board: object) -> None:
+        """Sets the renamed fields on the run context and holds the product.
+
+        Args:
+            board: The run context.
+        """
+        super().apply(board)
+        self.hold(board)
+
 
 class ProfileStage(impounding.Impounding):
     """Resolves the task, splits the data, and profiles the development rows.
@@ -112,6 +122,9 @@ class ProfileStage(impounding.Impounding):
         Until the partition is returned the stage owns the split: a failure
         after it closes the locked rows.
 
+        The rows are the ingested ones (`ingestion.Intake`), read from the
+        product the context holds.
+
         Args:
             context: The run context; the partition is applied to it, so a
                 caller that runs the stage outside the engine finds it there.
@@ -131,14 +144,14 @@ class ProfileStage(impounding.Impounding):
             DataError: If a declared group, time or weight column is missing
                 from the data.
         """
-        frame = scmle.pipeline.context.require(context.frame, "frame")
-        resolution = self.infer(context, frame)
+        intake = context.get(ingestion.Intake)
+        resolution = self.infer(context, intake.frame)
         resolution.apply(context)
         self.vet(context.services.spec, resolution.frame)
         screen = self.synthesize(context, resolution.frame)
         screen.apply(context)
         split, rows, seasonal = self.divide(
-            context, resolution.task, screen.frame
+            context, intake.kind, resolution.task, screen.frame
         )
         try:
             made = self.portray(
@@ -208,10 +221,11 @@ class ProfileStage(impounding.Impounding):
     def divide(
         self,
         context: scmle.pipeline.context.Context,
+        kind: kinds.Kind,
         task: tasks.Task,
         frame: pandas.DataFrame,
     ) -> tuple[splitters.Split, pandas.DataFrame, numpy.ndarray | None]:
-        """Splits the dataset and records the manifest.
+        """Splits the data under its kind's constraints; records the manifest.
 
         Also computes the seasonal baseline for a forecast with a seasonal
         period, seals the confirmation set under a charter and applies
@@ -219,6 +233,8 @@ class ProfileStage(impounding.Impounding):
 
         Args:
             context: The run context; receives the split's manifest.
+            kind: The kind of the rows, whose split constraints apply
+                (`kinds.Kind.constrain`).
             task: The resolved task.
             frame: The data to split.
 
@@ -229,7 +245,7 @@ class ProfileStage(impounding.Impounding):
             else `frame`. Last, the seasonal-naive forecasts of the locked
             rows, or None.
         """
-        split = splitters.Splitter(context.services.spec, task).split(frame)
+        split = kind.constrain(context.services.spec, task).split(frame)
         data = context.services.spec.data
         seasonal = None
         if task is tasks.Task.FORECAST and data.seasonal_period:

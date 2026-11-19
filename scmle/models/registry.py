@@ -185,22 +185,34 @@ class Catalog:
         Discovery goes through the shared registry (`plugins.REGISTRY`), so
         a discovered adapter is also offered to later catalogs. Every plugin
         adapter must pass the shared conformance suite before it is
-        registered. Reasons for failures are kept in `plugin_failures`.
+        registered, and may not take a built-in model's name (as
+        `custom.register_estimator` refuses too). Reasons for failures are
+        kept in `plugin_failures`.
 
         Returns:
-            Names of plugins that failed to load or conform; a broken plugin
-            never breaks the framework.
+            Names of plugins that failed to load or conform (entry-point
+            names) or that shadow a built-in (adapter names); a broken
+            plugin never breaks the framework.
         """
         found = plugins.REGISTRY.discover(
             plugins.Kind.ESTIMATORS, conformance.comply
         )
         self.plugin_failures = dict(found.failures)
+        builtin = builtin_names()
         for adapter in found.items:
+            if adapter.name in builtin:
+                LOGGER.warning(
+                    "model plugin %s shadows a built-in model", adapter.name
+                )
+                self.plugin_failures[adapter.name] = (
+                    f"'{adapter.name}' is a built-in model name"
+                )
+                continue
             plugins.REGISTRY.enrol(
                 plugins.Kind.ESTIMATORS, adapter.name, adapter, replace=True
             )
             self.register(adapter, overwrite=True)
-        return list(found.failures)
+        return list(self.plugin_failures)
 
     def get(self, name: str) -> models.Model:
         """Returns the adapter called `name`.

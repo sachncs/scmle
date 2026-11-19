@@ -47,7 +47,9 @@ class Bridge(products.Derived):
         )
 
     def apply(self, board: object) -> None:
-        """Sets the product's fields on the run context, renamed by `names`.
+        """Sets the product's fields on the run context and holds it there.
+
+        The fields are renamed by `names`.
 
         Args:
             board: The run context.
@@ -58,3 +60,4 @@ class Bridge(products.Derived):
                 self.names.get(field.name, field.name),
                 getattr(self, field.name),
             )
+        self.hold(board)

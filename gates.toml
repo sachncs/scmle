@@ -473,3 +473,12 @@ passes = "The declared estimand and policy were estimated on the data: parameter
 blocks = "estimate refused the declaration on this data (a missing or inconsistent column, missing values under the reject policy, a likelihood the estimator does not fit, or the estimator's own refusal); parameter_estimation_refusal.json in --output-dir gives the reason, its category and details."
 override = "none; fix the data or the declaration (for missing values, declare policy.missing = \"complete_case\"), as the recorded reason says."
 variables = ["--estimation", "--treatment", "policy.missing", "policy.estimator"]
+
+[export.onnx.divergence]
+site = "scmle.inference.onnx_export:verify"
+error = "BlockedError"
+claim = "C1"
+passes = "At least ROWS (299) held-out rows; the largest probability difference (regression: scaled difference) is at most the tolerance (gamma_1024 for float32, about 6.1e-5); no label differs on a row whose native margin exceeds twice the tolerance."
+blocks = "No held-out rows (Bundle.export_onnx and scmle export-onnx verify by default) or fewer than ROWS; a difference above the tolerance or NaN; a label disagreement beyond the margin. The blocked graph is removed."
+override = "Pass a larger tolerance (Bundle.export_onnx(path, check=rows, tolerance=...), or --tolerance); or skip the check with unverified=True (--unverified), which the export manifest records as verified false."
+variables = ["tolerance", "check", "unverified", "OPERATIONS", "RATE", "CONFIDENCE"]

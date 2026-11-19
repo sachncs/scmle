@@ -17,6 +17,7 @@ from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.contracts import tasks
+from scmle.decision import threshold
 from scmle.evaluation import resources
 from scmle.pipeline import services
 from scmle.pipeline.stages import admission
@@ -325,7 +326,7 @@ def test_without_a_charter_there_are_no_slices_or_decision_layer():
 def test_freeze_needs_a_decision_layer():
     charter = types.SimpleNamespace(decision=None, costs=object())
     with pytest.raises(errors.ScmleError, match="no decision layer"):
-        scoring.freeze(None, None, None, charter, 0, 0)
+        threshold.freeze(None, None, None, charter, 0, 0)
 
 
 def test_no_threshold_is_chosen_outside_binary_tasks():

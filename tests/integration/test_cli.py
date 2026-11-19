@@ -69,7 +69,7 @@ def test_plan_run_predict_roundtrip(binary_frame, tmp_path, caplog):
 
 def test_blocked_run_returns_exit_code_two(binary_frame, tmp_path, caplog):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:22.
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:71.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:83.
     # Enforces website/src/learn/when-things-go-wrong.html:11.
     # Enforces website/src/learn/when-things-go-wrong.html:39.
     broken = binary_frame.assign(y=range(len(binary_frame)))

@@ -165,7 +165,11 @@ def convert(md, glossary=False):
     while i < len(L):
         l = L[i]
         if l.startswith("```"):
-            lang = l[3:].strip().split(" ")[0]
+            words = l[3:].split()
+            lang = words[0] if words else ""
+            # The words after the language are the snippet marks
+            # (`background`, `refused`, `synopsis`) the snippet check reads.
+            marks = " ".join(words[1:])
             i += 1
             buf = []
             while not L[i].startswith("```"):
@@ -175,6 +179,7 @@ def convert(md, glossary=False):
             out.append(
                 "<pre><code"
                 + (f' class="language-{lang}"' if lang else "")
+                + (f' data-snippet="{marks}"' if marks else "")
                 + ">"
                 + html.escape("\n".join(buf), quote=False)
                 + "</code></pre>"

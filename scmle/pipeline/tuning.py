@@ -49,8 +49,10 @@ class Tuner(hyperband.Hyperband):
     ) -> list[tuple[str, str]]:
         """Picks the best (model, strategy) per model, best models first.
 
-        Only successful default-hyperparameter trials compete, across all
-        strategies, and only tunable models are kept.
+        Only successful default-hyperparameter trials compete, under the
+        default strategy or one the strategy search adopted on evidence
+        (`strategy_search.Strategist.judge`), and only tunable models are
+        kept.
 
         Args:
             screened: Trials from screening and strategy search.
@@ -59,10 +61,20 @@ class Tuner(hyperband.Hyperband):
             Up to `search.top_models` distinct (model, strategy) pairs.
         """
         sign = 1 if self.metric.greater_is_better else -1
+        adopted = {
+            d.technique
+            for d in self.context.journal.outcomes
+            if d.action is experiments.Edict.INCLUDE
+        }
         ok = [
             t
             for t in screened
-            if t.status is experiments.Termination.OK and not t.params
+            if t.status is experiments.Termination.OK
+            and not t.params
+            and (
+                t.strategy == experiments.DEFAULT_STRATEGY
+                or f"{t.strategy}@{t.model_name}" in adopted
+            )
         ]
         ranked = sorted(ok, key=lambda t: -sign * t.score_mean)
         registry = self.context.services.registry

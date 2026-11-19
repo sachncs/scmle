@@ -324,26 +324,29 @@ import pathlib
 run = sorted(pathlib.Path("runs").glob("run_*"))[-1]
 ev = json.loads((run / "evaluation.json").read_text())
 print("run folder       :", run)
-print("chosen model     :", ev["selected_model"])
+print("chosen model     :", ev["selected"]["model"])
 print("metric           :", ev["metric"])
 print(
     "practice score   :",
-    round(ev["selected_cv_score"], 3),
+    round(ev["selected"]["score"], 3),
     "+/-",
-    round(ev["selected_cv_std"], 3),
+    round(ev["selected"]["deviation"], 3),
 )
-low, high = ev["cv_confidence"]["interval"]
+low, high = ev["confidence"]["interval"]
 print("practice 95% band:", round(low, 3), "to", round(high, 3))
-print("exam score       :", round(ev["test_metrics"]["roc_auc"], 3))
+print("exam score       :", round(ev["metrics"]["roc_auc"], 3))
 unc = json.loads((run / "diagnostics" / "metric_uncertainty.json").read_text())
-print("exam 95% band    :", [round(x, 3) for x in unc["ci_95"]])
-print("dummy baseline   :", ev["baseline_cv_score"])
-print("fit health       :", ev["fit_health"]["verdict"])
+if unc.get("ci_95"):
+    print("exam 95% band    :", [round(x, 3) for x in unc["ci_95"]])
+else:
+    print("exam 95% band    : not finished in time; raise --budget")
+print("dummy baseline   :", ev["baseline"])
+print("fit health       :", ev["health"]["verdict"])
 print(
     "rows             :",
-    ev["n_dev"],
+    ev["rows"]["development"],
     "to learn from,",
-    ev["n_test"],
+    ev["rows"]["test"],
     "kept for the exam",
 )
 cm = json.loads(
@@ -397,8 +400,8 @@ same command, the winner was `bagged_logistic_regression` (practice 0.835, exam
 0.869) instead of `stacking` (practice 0.848, exam 0.885), and the importance
 rows were missing because the time ran out. What to check on your machine: the
 exam score is clearly above 0.5, it is close to the practice score, and
-`fit health` says `healthy`. If the importance rows are missing, rerun with
-`--budget 300`.
+`fit health` says `healthy`. If the importance rows are missing, or the exam
+band says `not finished in time`, rerun with `--budget 300`.
 
 How to read it, line by line:
 
@@ -447,7 +450,7 @@ note after):
 ```python runnable
 import pathlib
 
-import scmle
+import scmle.artifacts.bundle
 
 
 def main():
@@ -554,7 +557,7 @@ To let other programs ask for predictions, run the model as a small web
 service. Start it (leave this terminal open; open a second one for the next
 commands, activate the environment there too, and `export` the key again):
 
-```bash runnable
+```bash runnable background
 scmle serve artifacts/titanic --port 8765
 ```
 
@@ -599,7 +602,7 @@ Stop the service with Ctrl-C in the first terminal.
 
 Two safety rules to see once:
 
-```bash runnable
+```bash runnable refused
 scmle serve artifacts/titanic --host 0.0.0.0 --port 8766
 ```
 
@@ -669,7 +672,7 @@ behaves. Save as `monitor_model.py`:
 ```python runnable
 import pandas as pd
 
-import scmle
+import scmle.artifacts.bundle
 from scmle.monitoring import monitor
 
 
@@ -751,7 +754,7 @@ data with the answers shuffled. Save as `bad_model.py`:
 ```python runnable
 import pandas as pd
 
-import scmle
+import scmle.api.project
 
 
 def main():

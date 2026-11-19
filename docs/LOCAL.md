@@ -5,7 +5,13 @@ service and contracts that any deployment uses, run locally.
 
 ## One command
 
+From a checkout of the repository with its Python environment in `.venv`:
+
 ```bash
+git clone https://github.com/sachncs/scmle
+cd scmle
+python3 -m venv .venv
+.venv/bin/pip install .
 make demo        # native: needs only the project's Python environment
 ```
 

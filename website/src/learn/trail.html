@@ -45,6 +45,10 @@
 </li><li>The release state is <code>approved</code>, not <code>production</code>, unless a runtime confirmed a deployment.
 </li></ul>
 <h2 id="reviewing-a-trail">Reviewing a trail</h2>
+<p>The repository ships a trail built from a real run of the Titanic extract, with its demonstration keys, in <code>tests/fixtures/trail_sample</code>. To review it:</p>
+<pre><code class="language-bash">git clone https://github.com/sachncs/scmle
+cd scmle
+cp -r tests/fixtures/trail_sample/trail tests/fixtures/trail_sample/keys.json .</code></pre>
 <pre><code class="language-bash">python scripts/trace_model.py trail --keys keys.json
 scmle trail verify trail --keys keys.json</code></pre>
 <p><code>keys.json</code> maps <code>analyst</code>, <code>stakeholder</code> and <code>reviewer</code> to the keys that verify them. Demonstration keys show tamper evidence, not a statement by their holder. Without keys the script exits 2 and says which signatures it did not check.</p>

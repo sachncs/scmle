@@ -85,7 +85,7 @@ def test_a_decreasing_constraint_is_respected_too(tmp_path):
 def test_constraints_on_unusable_columns_or_multiclass_tasks_are_refused(
     tmp_path,
 ):
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:150.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:171.
     # Enforces website/src/learn/when-things-go-wrong.html:72.
     with pytest.raises(errors.BlockedError, match="numeric feature"):
         support.make_project(

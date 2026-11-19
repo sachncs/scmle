@@ -87,8 +87,8 @@ def test_temporal_split_respects_order(frame):
 
 
 def test_temporal_with_unparseable_time_blocks(frame):
-    # Enforces README.md:132.
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:147.
+    # Enforces README.md:151.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:168.
     # Enforces website/src/learn/when-things-go-wrong.html:69.
     broken = frame.assign(t=frame.t.astype(str))
     broken.loc[3, "t"] = "not a date"
@@ -97,7 +97,7 @@ def test_temporal_with_unparseable_time_blocks(frame):
 
 
 def test_group_split_blocks_with_few_groups(frame):
-    # Enforces README.md:132.
+    # Enforces README.md:151.
     few = frame.assign(g=frame.index % 3)
     with pytest.raises(errors.BlockedError, match="groups"):
         split(few, make_spec(group_column="g"))
@@ -111,7 +111,7 @@ def test_manifest_is_deterministic(frame):
 
 
 def test_tiny_minority_class_blocks(frame):
-    # Enforces README.md:132.
+    # Enforces README.md:151.
     rare = frame.assign(y=0)
     rare.loc[0, "y"] = 1
     with pytest.raises(errors.BlockedError):

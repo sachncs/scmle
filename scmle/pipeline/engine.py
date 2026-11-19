@@ -13,12 +13,13 @@ after the completed state; on a resumed run a stage whose product the
 archive restores is not run again, its product is applied instead
 (`Archive.restore`). A stage that returns its product has it applied to the
 board (`Product.apply`), the one path by which a product enters the board
-whether the stage ran or was restored. `Pipeline.advance(until=...)` runs
-only the stages a given stage needs, which is the side-effect-free plan
-preview. The tabular run and the modality lifecycle are two boards and two
-archives on this one engine: the run directory's stage records
-(`archive.Directory`) and the modality run's signed checkpoint
-(`modality_lifecycle.checkpoints.Replay`).
+whether the stage ran or was restored; a board that keeps products holds
+each one by type (`Product.hold`), and later stages read it from there.
+`Pipeline.advance(until=...)` runs only the stages a given stage needs,
+which is the side-effect-free plan preview. The tabular run and the
+modality lifecycle are two boards and two archives on this one engine: the
+run directory's stage records (`archive.Directory`) and the modality run's
+signed checkpoint (`modality_lifecycle.checkpoints.Replay`).
 """
 
 from collections.abc import Callable
@@ -320,10 +321,13 @@ class Pipeline(Generic[BoardT]):
                 following is None or following.state is not stage.state
             ):
                 review(stage.state, context)
+            if made is None and restored is None and stage.makes is not None:
+                # A stage that sets the context itself: its product is read
+                # back and held, so the stages after it read it as a product.
+                made = stage.makes.capture(context)
+                made.hold(context)
             if self.records is not None and restored is None:
                 needs = self.ancestry(stage)
-                if made is None and stage.makes is not None:
-                    made = stage.makes.capture(context)
                 record = self.records.record(
                     self.stages.index(stage),
                     name,

@@ -160,3 +160,12 @@ def test_adversary_cost_grows_with_rows_and_columns():
 
     assert adversary.estimate(more) > adversary.estimate(small)
     assert adversary.estimate(small) > adversary.estimate(narrow) > 0
+
+
+def test_a_date_input_is_compared_and_its_derived_parts_are_not_read():
+    report = shift.Adversary().compute(test_diagnostics.make_dated_inputs())
+
+    # Reference rows are the earlier dates, so the date alone separates them.
+    assert report["verdict"] == "strong shift"
+    named = {item["feature"] for item in report["most_shifted"]}
+    assert "when__month" not in named

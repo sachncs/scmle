@@ -19,7 +19,7 @@ def trial(model, score, **changes) -> experiments.Trial:
         "accuracy",
         score,
         0.0,
-        [score],
+        changes.pop("folds", [score]),
         **changes,
     )
 
@@ -185,10 +185,11 @@ def test_an_inapplicable_strategy_is_rejected_and_not_run(seen) -> None:
         ("x@c", experiments.Edict.REJECT, "not applicable: no minority class"),
         (
             "w@c",
-            experiments.Edict.INCLUDE,
+            experiments.Edict.REJECT,
             (
                 "cv accuracy 0.9500 vs default 0.9000 "
-                "(+0.0500 in the metric's favour)"
+                "(+0.0500 in the metric's favour; probability better "
+                "0.000, needed 0.950)"
             ),
         ),
         (
@@ -196,7 +197,8 @@ def test_an_inapplicable_strategy_is_rejected_and_not_run(seen) -> None:
             experiments.Edict.REJECT,
             (
                 "cv accuracy 0.8500 vs default 0.9000 "
-                "(-0.0500 in the metric's favour)"
+                "(-0.0500 in the metric's favour; probability better "
+                "0.000, needed 0.950)"
             ),
         ),
     ]
@@ -205,15 +207,20 @@ def test_an_inapplicable_strategy_is_rejected_and_not_run(seen) -> None:
 def test_a_lower_score_is_a_gain_when_lower_is_better(seen) -> None:
     context = Context(["w"], better=False)
     strategist = strategy_search.Strategist(context, Runner({}))
-    strategist.judge(trial("c", 0.4), trial("c", 0.3, strategy="w"))
-    strategist.judge(trial("c", 0.4), trial("c", 0.5, strategy="v"))
+    spread = [0.0, 0.02, -0.02, 0.01, -0.01]
+    default = trial("c", 0.4, folds=[0.4 + s for s in spread])
+    lower = [0.3 + s / 2 for s in spread]
+    higher = [0.5 + s / 2 for s in spread]
+    strategist.judge(default, trial("c", 0.3, strategy="w", folds=lower))
+    strategist.judge(default, trial("c", 0.5, strategy="v", folds=higher))
     assert context.entries == [
         (
             "w@c",
             experiments.Edict.INCLUDE,
             (
                 "cv accuracy 0.3000 vs default 0.4000 "
-                "(+0.1000 in the metric's favour)"
+                "(+0.1000 in the metric's favour; probability better "
+                "1.000, needed 0.950)"
             ),
         ),
         (
@@ -221,7 +228,8 @@ def test_a_lower_score_is_a_gain_when_lower_is_better(seen) -> None:
             experiments.Edict.REJECT,
             (
                 "cv accuracy 0.5000 vs default 0.4000 "
-                "(-0.1000 in the metric's favour)"
+                "(-0.1000 in the metric's favour; probability better "
+                "0.000, needed 0.950)"
             ),
         ),
     ]

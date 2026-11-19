@@ -27,12 +27,14 @@ import json
 import pathlib
 import pickle  # nosec B403 -- for PicklingError only
 from typing import Self
+from typing import TypeVar
 
 import joblib
 
 from scmle import envelope
 from scmle.contracts import errors
 
+T = TypeVar("T")
 TIMING = "seconds"
 """The key suffix of a measured duration (`seconds`, `read_seconds`): it
 differs between two runs of the same inputs, so it is no part of a digest."""
@@ -55,6 +57,26 @@ def untimed(value: object) -> object:
         }
     if isinstance(value, list | tuple):
         return [untimed(item) for item in value]
+    return value
+
+
+def require(value: T | None, name: str) -> T:
+    """Returns a product field, failing loudly if its stage has not run.
+
+    Args:
+        value: The possibly unset field.
+        name: Field name used in the error message.
+
+    Returns:
+        `value`, narrowed to non-None.
+
+    Raises:
+        ScmleError: If the producing stage has not executed.
+    """
+    if value is None:
+        raise errors.ScmleError(
+            f"'{name}' is unavailable: its stage has not run yet"
+        )
     return value
 
 
@@ -90,13 +112,28 @@ class Product(abc.ABC):
         )
 
     def apply(self, board: object) -> None:
-        """Sets the product's fields on the run context of a resumed run.
+        """Sets the product's fields on the run context and holds it there.
 
         Args:
             board: The run context.
         """
         for field in dataclasses.fields(self):
             setattr(board, field.name, getattr(self, field.name))
+        self.hold(board)
+
+    def hold(self, board: object) -> None:
+        """Keeps the product on a board that holds products by type.
+
+        A board that keeps a `made` mapping (the run context) holds the
+        latest product of each type there, which is what a stage reading a
+        product (`get`) finds; on another board this does nothing.
+
+        Args:
+            board: The run context.
+        """
+        made = getattr(board, "made", None)
+        if isinstance(made, dict):
+            made[type(self)] = self
 
     @abc.abstractmethod
     def save(self, path: pathlib.Path) -> str | None:

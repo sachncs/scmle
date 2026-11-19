@@ -13,6 +13,8 @@ from scmle.contracts import data
 from scmle.contracts import experiments
 from scmle.contracts import models
 from scmle.contracts import tasks
+from scmle.pipeline import profiler
+from scmle.runtime import budget
 
 EXPENSIVE_COST = 3
 FAST_EXCEPTIONS = frozenset(
@@ -44,6 +46,58 @@ class Situation:
     task: tasks.Task
     approved_models: tuple[str, ...] | None = None
     history: tuple[experiments.Precedent, ...] = ()
+
+
+def shape(context: Situation) -> tuple[int, int, int]:
+    """Returns the profiled table's shape the cost models read.
+
+    Args:
+        context: Planning facts.
+
+    Returns:
+        Development rows, feature columns and target classes (0 when the
+        profile counts none).
+    """
+    rows = context.profile.manifest.rows
+    columns = len(context.profile.feature_plan.features)
+    classes = int(context.profile.target_summary.get("n_classes", 0) or 0)
+    return rows, columns, classes
+
+
+def window(context: Situation) -> float:
+    """Estimates the trial window of a run on the profiled table.
+
+    Args:
+        context: Planning facts.
+
+    Returns:
+        The budget less the preparation estimate and the post-training
+        reserve (`budget.reservation`), never below zero.
+    """
+    rows, columns, classes = shape(context)
+    seconds = context.spec.resources.time_budget_seconds
+    held = sum(budget.reservation(rows, columns, classes, seconds).values())
+    prepared = profiler.estimate(rows, columns, classes, seconds)
+    return max(seconds - prepared - held, 0.0)
+
+
+def outlasts(context: Situation, adapter: models.Model) -> bool:
+    """Whether a boosted learner's default trial would outlast the window.
+
+    Such a trial is killed when the window closes and leaves no model, so on
+    a wide table under a tight budget the cheaper learners run first.
+
+    Args:
+        context: Planning facts.
+        adapter: A candidate.
+
+    Returns:
+        True for a learner of `FAST_EXCEPTIONS` whose estimated default
+        trial (`budget.boosted`) is longer than the trial window (`window`).
+    """
+    if adapter.name not in FAST_EXCEPTIONS:
+        return False
+    return budget.boosted(*shape(context)) > window(context)
 
 
 class Refiner(abc.ABC):
@@ -139,7 +193,10 @@ class Budget(Refiner):
             cost below 3 or listed in `FAST_EXCEPTIONS`, the baselines first,
             then the `FAST_EXCEPTIONS` and then the rest in their order, so a
             trial window that closes early skips a weak model, not the
-            boosted learner.
+            boosted learner. A boosted learner that would outlast the whole
+            window (`outlasts`) goes last instead, after the linear learners
+            (the trial `budget.cheapest` bounds) and the rest by cost, so the
+            window holds an honest model first.
         """
         if not context.spec.brief:
             return candidates
@@ -170,8 +227,24 @@ class Budget(Refiner):
             else:
                 kept.append(adapter)
         first = [a for a in kept if a.family == "baseline"]
-        first += [a for a in kept if a.name in FAST_EXCEPTIONS]
-        return first + [a for a in kept if a not in first]
+        late = [a for a in kept if outlasts(context, a)]
+        first += [
+            a for a in kept if a.name in FAST_EXCEPTIONS and a not in late
+        ]
+        rest = [a for a in kept if a not in first and a not in late]
+        if late:
+            rest.sort(key=lambda a: (a.family != "linear", a.capabilities.cost))
+            decisions.append(
+                experiments.Decision(
+                    "cheapest_learner_first",
+                    experiments.Edict.INCLUDE,
+                    f"{', '.join(a.name for a in late)} would outlast the "
+                    f"{window(context):.1f} s trial window on "
+                    f"{len(context.profile.feature_plan.features)} columns; "
+                    "the cheaper learners run first",
+                )
+            )
+        return first + rest + late
 
 
 class Streaming(Refiner):
@@ -298,6 +371,7 @@ class Cardinality(Refiner):
             if a.capabilities.native_categorical
             and a.nominals([0])
             and a.family != "baseline"
+            and not (context.spec.brief and outlasts(context, a))
         ]
         if native:
             decisions.append(

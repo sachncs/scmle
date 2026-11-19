@@ -62,7 +62,7 @@ def entry(name, adapter):
 
 
 def test_the_plan_gives_a_reason_for_every_technique():
-    """Enforces README.md:103."""
+    """Enforces README.md:122."""
     rng = numpy.random.default_rng(0)
     frame = pandas.DataFrame(
         {"x": rng.normal(size=300), "y": rng.integers(0, 2, 300)}
@@ -84,7 +84,7 @@ def test_the_plan_gives_a_reason_for_every_technique():
 
 
 def test_the_reliability_benchmark_checks_the_nine_named_properties():
-    """Enforces README.md:148."""
+    """Enforces README.md:167."""
     assert list(reliability.CHECKS) == [
         "determinism",
         "replay",
@@ -102,7 +102,7 @@ def test_the_reliability_benchmark_checks_the_nine_named_properties():
 
 
 def test_titanic_boat_and_body_are_flagged_by_the_documented_mechanisms():
-    """Enforces README.md:180.
+    """Enforces README.md:199.
 
     Also enforces website/src/pages/docs/benchmarks.astro:773.
     """
@@ -126,7 +126,7 @@ def test_titanic_boat_and_body_are_flagged_by_the_documented_mechanisms():
 def test_an_entry_point_adapter_is_registered_only_if_it_complies(
     monkeypatch,
 ):
-    """Enforces README.md:228.
+    """Enforces README.md:247.
 
     Also enforces website/src/pages/docs/architecture.astro:95.
     """
@@ -135,6 +135,9 @@ def test_an_entry_point_adapter_is_registered_only_if_it_complies(
     )
     found = [entry("good", good), entry("bad", Taskless())]
     monkeypatch.setattr(plugins.metadata, "entry_points", lambda group: found)
+    # The enrolment ends with the test: later runs in this process must not
+    # train `plugin_nb` as an extra candidate.
+    monkeypatch.setattr(plugins, "REGISTRY", plugins.Registry())
     catalog = registry.Catalog.stock()
     assert catalog.load_plugins() == ["bad"]
     assert catalog.get("plugin_nb") is good

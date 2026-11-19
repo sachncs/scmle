@@ -23,13 +23,18 @@ machine learning? Start with
 to understand how the system is composed.
 
 ```bash
-# not on PyPI yet: install from GitHub
+# not on PyPI yet: install from GitHub, into a fresh virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
 pip install "scmle @ git+https://github.com/sachncs/scmle"  # core
 pip install "scmle[boosting] @ git+https://github.com/sachncs/scmle"  # + LightGBM, XGBoost
-pip install "scmle[all] @ git+https://github.com/sachncs/scmle"  # most optional extras
 ```
 
 On macOS, the `boosting` extra needs the OpenMP runtime (`brew install libomp`).
+`pip install "scmle[all] @ git+https://github.com/sachncs/scmle"` adds most
+optional extras. It does not install on the free-threaded 3.14 build, where
+Ray and CatBoost have no wheel yet; there, install the extras you need one by
+one.
 
 The PyPI distribution is `scmle`; the import name and the command
 are both `scmle`. **Status: beta.** The public API may change between `0.x`
@@ -37,20 +42,34 @@ releases; see [`CHANGELOG.md`](CHANGELOG.md).
 The supported entry points are documented in
 [`docs/API_STABILITY.md`](docs/API_STABILITY.md).
 
+A first run, on scikit-learn's breast-cancer table written to a Parquet file.
+Run it as a script: on macOS and Windows the `if __name__` guard is required,
+because the search trains in helper processes.
+
 ```python
 import logging
 
+import sklearn.datasets
+
 import scmle.api.project
 
-logging.basicConfig(level=logging.INFO)
-project = scmle.api.project.Project(
-    "customers.parquet", target="churn", metric="roc_auc"
-)
-logging.info(project.plan().summary())  # inspect before any training
-result = project.run()  # profile, split, search, test, package
-logging.info("\n%s", result.leaderboard())
-result.save("artifacts/churn", signing_key="...")  # signed with your key
-result.predict("new_customers.parquet")
+
+def main():
+    logging.basicConfig(level=logging.INFO)
+    table = sklearn.datasets.load_breast_cancer(as_frame=True).frame
+    table.to_parquet("cancer.parquet")
+    project = scmle.api.project.Project(
+        "cancer.parquet", target="target", metric="roc_auc", time_budget=60
+    )
+    logging.info(project.plan().summary())  # inspect before any training
+    result = project.run()  # profile, split, search, test, package
+    logging.info("\n%s", result.leaderboard())
+    result.save("artifacts/cancer", signing_key="your-own-secret")
+    logging.info(result.predict(table.drop(columns="target").head()))
+
+
+if __name__ == "__main__":
+    main()
 ```
 
 CLI: `scmle plan | run | resume | catalog | predict | serve | export-onnx | package`

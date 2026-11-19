@@ -51,7 +51,7 @@ const objectives = [
 
   <h2>Schema version 1</h2>
   <p><strong>Request.</strong> A <code>records</code> list of objects, plus an optional <code>schema_version</code> (<code>"1"</code>) and an optional <code>expected_schema_digest</code> (<code>"sha256:..."</code>). Unknown fields are refused. Every record must carry every required feature; a feature that is unknown for a record is sent as <code>null</code>, never omitted.</p>
-  <pre><code>{`POST /v1/predict
+  <pre><code class="language-text">{`POST /v1/predict
 {
   "records": [{"age": 41, "plan": "pro", "tenure": null}],
   "schema_version": "1",

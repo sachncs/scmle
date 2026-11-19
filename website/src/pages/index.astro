@@ -20,15 +20,27 @@ const families = [
 
 const quickstart = `<span class="tok-k">import</span> logging
 
+<span class="tok-k">import</span> sklearn.datasets
+
 <span class="tok-k">import</span> scmle.api.project
 
-logging.basicConfig(level=logging.INFO)
-project = scmle.api.project.Project(<span class="tok-s">"customers.parquet"</span>, target=<span class="tok-s">"churn"</span>, metric=<span class="tok-s">"roc_auc"</span>)
-logging.info(project.plan().summary())  <span class="tok-c"># inspect before any training</span>
-result = project.run()  <span class="tok-c"># profile, split, search, test, package</span>
-logging.info(<span class="tok-s">"\\n%s"</span>, result.leaderboard())
-result.save(<span class="tok-s">"artifacts/churn"</span>, signing_key=<span class="tok-s">"..."</span>)  <span class="tok-c"># signed with your key</span>
-result.predict(<span class="tok-s">"new_customers.parquet"</span>)`;
+
+<span class="tok-k">def</span> main():
+    logging.basicConfig(level=logging.INFO)
+    table = sklearn.datasets.load_breast_cancer(as_frame=<span class="tok-k">True</span>).frame
+    table.to_parquet(<span class="tok-s">"cancer.parquet"</span>)
+    project = scmle.api.project.Project(
+        <span class="tok-s">"cancer.parquet"</span>, target=<span class="tok-s">"target"</span>, metric=<span class="tok-s">"roc_auc"</span>, time_budget=60
+    )
+    logging.info(project.plan().summary())  <span class="tok-c"># inspect before any training</span>
+    result = project.run()  <span class="tok-c"># profile, split, search, test, package</span>
+    logging.info(<span class="tok-s">"\\n%s"</span>, result.leaderboard())
+    result.save(<span class="tok-s">"artifacts/cancer"</span>, signing_key=<span class="tok-s">"your-own-secret"</span>)
+    logging.info(result.predict(table.drop(columns=<span class="tok-s">"target"</span>).head()))
+
+
+<span class="tok-k">if</span> __name__ == <span class="tok-s">"__main__"</span>:
+    main()`;
 
 const output = `<span class="tok-c"># project.plan().summary(), first line</span>
 Plan plan_59f5a6e13d: binary_classification, metric=roc_auc,
@@ -64,9 +76,10 @@ const bundle = `artifacts/churn/
 ├── schema.json
 └── signature.json    <span class="tok-c"># HMAC over the manifest</span>`;
 
-const install = `<span class="cmd">$ </span>pip install "scmle @ git+https://github.com/sachncs/scmle" <span class="tok-c"># core</span>
-<span class="cmd">$ </span>pip install "scmle[boosting] @ git+https://github.com/sachncs/scmle" <span class="tok-c"># + LightGBM, XGBoost</span>
-<span class="cmd">$ </span>pip install "scmle[all] @ git+https://github.com/sachncs/scmle" <span class="tok-c"># most optional extras</span>`;
+const install = `<span class="cmd">$ </span>python3 -m venv .venv
+<span class="cmd">$ </span>source .venv/bin/activate
+<span class="cmd">$ </span>pip install "scmle @ git+https://github.com/sachncs/scmle" <span class="tok-c"># core</span>
+<span class="cmd">$ </span>pip install "scmle[boosting] @ git+https://github.com/sachncs/scmle" <span class="tok-c"># + LightGBM, XGBoost</span>`;
 
 const aheadRows = [
   { label: "Nine core datasets", ahead: 7, total: 9 },
@@ -205,7 +218,7 @@ const bw = 360;
           </div>
           <div class="code-block reveal" data-delay="1">
             <div class="code-label">plan · nothing has trained yet</div>
-            <pre tabindex="0"><code set:html={planLines}></code></pre>
+            <pre tabindex="0"><code class="language-text" set:html={planLines}></code></pre>
           </div>
         </div>
       </div>
@@ -228,7 +241,7 @@ const bw = 360;
           <div class="reveal" data-delay="1">
             <div class="code-block">
               <div class="code-label">result.save("artifacts/churn", signing_key=...)</div>
-              <pre tabindex="0"><code set:html={bundle}></code></pre>
+              <pre tabindex="0"><code class="language-text" set:html={bundle}></code></pre>
             </div>
             <div class="panel" style="margin-top:16px">
               <ul class="sig-list">
@@ -349,11 +362,11 @@ const bw = 360;
         <div class="code-grid">
           <div class="code-block reveal">
             <div class="code-label">python · README quickstart</div>
-            <pre tabindex="0"><code set:html={quickstart}></code></pre>
+            <pre tabindex="0"><code class="language-python" set:html={quickstart}></code></pre>
           </div>
           <div class="code-block reveal" data-delay="1">
             <div class="code-label">output · local run on the breast-cancer table</div>
-            <pre tabindex="0"><code set:html={output}></code></pre>
+            <pre tabindex="0"><code class="language-text" set:html={output}></code></pre>
           </div>
         </div>
         <p class="note reveal" style="margin-top:16px;text-align:center">Output comes from running these calls on scikit-learn's breast-cancer data with <code>time_budget=60</code>. Trial order can differ between runs. <a href={`${base}/docs/quickstart/`}>Full command-line quickstart</a>.</p>
@@ -459,7 +472,7 @@ const bw = 360;
         <div class="reveal">
           <p class="kicker">Install</p>
           <h2 class="h2" id="install-title" style="text-wrap:balance">Start with a table. Keep the evidence.</h2>
-          <div class="code-block"><pre tabindex="0"><code set:html={install}></code></pre></div>
+          <div class="code-block"><pre tabindex="0"><code class="language-bash" set:html={install}></code></pre></div>
           <p class="install-meta"><span>Linux, macOS and Windows</span><span>Python 3.11 or newer</span><span>Apache-2.0</span><span>Beta: API may change between 0.x releases</span></p>
           <div class="cta-row">
             <a class="btn btn-primary" href={`${base}/docs/quickstart/`}>Read the quickstart</a>

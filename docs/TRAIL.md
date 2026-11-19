@@ -111,6 +111,15 @@ independent review. Read these limits before relying on one.
 
 ## Reviewing a trail
 
+The repository ships a trail built from a real run of the Titanic extract,
+with its demonstration keys, in `tests/fixtures/trail_sample`. To review it:
+
+```bash
+git clone https://github.com/sachncs/scmle
+cd scmle
+cp -r tests/fixtures/trail_sample/trail tests/fixtures/trail_sample/keys.json .
+```
+
 ```bash
 python scripts/trace_model.py trail --keys keys.json
 scmle trail verify trail --keys keys.json

@@ -603,6 +603,8 @@ def predict(
     ],
     scope: str,
     declared: Sequence[provenance.Pedigree],
+    cutoff: str | None = None,
+    known: Mapping[str, str] | None = None,
 ) -> Qualification:
     """Runs the leakage screen and the admissibility table of a prediction.
 
@@ -615,10 +617,14 @@ def predict(
             legitimate.
         scope: Charter hash the attestations must name.
         declared: Provenance records for columns the run derived.
+        cutoff: The declared prediction time (`Dataset.cutoff`), or None.
+        known: When each column becomes known (`Dataset.known`), or None.
 
     Returns:
         The qualification with the leakage screen, the admissibility table
-        and the ledger diagnostics.
+        and the ledger diagnostics. A candidate dated after `cutoff` or
+        declared known only after the outcome blocks, as in a run without a
+        charter.
     """
     task = "classification" if classification else "regression"
     report = screen.screen_table(
@@ -629,6 +635,8 @@ def predict(
         sample.seed,
         group_column,
         time_column,
+        cutoff=cutoff,
+        known=known,
     )
     if not any(
         g is certificates.Authority.GATING for g in report.gates.values()
@@ -670,6 +678,8 @@ def run(
     causal: scmle.assurance.charter.causal.Question | None = None,
     dag: scmle.assurance.admissibility.dag.Dag | None = None,
     declared: Sequence[provenance.Pedigree] = (),
+    cutoff: str | None = None,
+    known: Mapping[str, str] | None = None,
 ) -> Qualification:
     """Runs leakage, admissibility and the detector pipeline on `X`.
 
@@ -697,6 +707,8 @@ def run(
             not a candidate, or that is covered by an applied attestation,
             is ignored. The other columns stay undeclared. Used for a
             predictive estimand only.
+        cutoff: The declared prediction time (`Dataset.cutoff`), or None.
+        known: When each column becomes known (`Dataset.known`), or None.
 
     Returns:
         The results. A predictive estimand gets the leakage screen, the
@@ -724,4 +736,6 @@ def run(
         attestations,
         scope,
         declared,
+        cutoff,
+        known,
     )

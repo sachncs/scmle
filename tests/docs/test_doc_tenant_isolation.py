@@ -1,6 +1,7 @@
 """Guarantees of docs/TENANT_ISOLATION.md that no other test enforced."""
 
 import json
+import os
 import pathlib
 import time
 import urllib.error
@@ -363,3 +364,85 @@ def test_each_tenant_reaches_only_its_own_prefix(tmp_path):
     foreign = gate.verifier.verify(bearer(clock, tenant="globex"))
     with pytest.raises(access.DeniedError):
         gate.confine(shared, foreign)
+
+
+def test_keys_are_relative_and_the_prefix_is_added_underneath(tmp_path):
+    """Enforces docs/TENANT_ISOLATION.md:40-43."""
+    shared = objectstore.LocalObjectStore(tmp_path / "root")
+    acme = tenancy.Tenancy(shared, "acme")
+    meta = acme.put("bundles/v1.json", b"acme")
+    assert meta.key == "bundles/v1.json"
+    assert shared.get("tenants/acme/bundles/v1.json")[0] == b"acme"
+    assert [m.key for m in acme.list_objects()] == ["bundles/v1.json"]
+    # A key naming another namespace is never taken as the prefix.
+    with pytest.raises(objectstore.StoreError):
+        acme.put("tenants/globex/x.json", b"x")
+    assert not shared.exists("tenants/globex/x.json")
+
+
+class Leaky(objectstore.LocalObjectStore):
+    """A backend whose listing ignores the prefix it is given."""
+
+    def list_objects(self, prefix=""):
+        return super().list_objects("")
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "../globex/secret.json",
+        "/tenants/globex/secret.json",
+        "..\\globex\\secret.json",
+        "..%2Fglobex%2Fsecret.json",
+        "tenants/globex/secret.json",
+    ],
+    ids=["dots", "absolute", "backslash", "percent", "root"],
+)
+def test_a_crafted_key_and_a_listing_outside_are_refused(tmp_path, key):
+    """Enforces docs/TENANT_ISOLATION.md:43-45."""
+    shared = objectstore.LocalObjectStore(tmp_path / "root")
+    acme = tenancy.Tenancy(shared, "acme")
+    tenancy.Tenancy(shared, "globex").put("secret.json", b"globex")
+    for operation in (
+        lambda: acme.get(key),
+        lambda: acme.put(key, b"x"),
+        lambda: acme.delete(key),
+    ):
+        with pytest.raises(objectstore.StoreError):
+            operation()
+    leaky = Leaky(tmp_path / "leaky")
+    tenancy.Tenancy(leaky, "globex").put("secret.json", b"globex")
+    with pytest.raises(tenancy.TenantError):
+        tenancy.Tenancy(leaky, "acme").list_objects()
+
+
+def test_tenant_names_are_lowercase_dns_labels(tmp_path):
+    """Enforces docs/TENANT_ISOLATION.md:46-47."""
+    shared = objectstore.LocalObjectStore(tmp_path / "root")
+    tenancy.Tenancy(shared, "acme")
+    for name in ("Acme", "ACME", "ac_me", "-acme", "acme-", "a" * 64):
+        with pytest.raises(tenancy.TenantError):
+            tenancy.Tenancy(shared, name)
+    assert tenancy.Tenancy(shared, "a" * 63).put("x", b"1").key == "x"
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="symbolic links need privileges on Windows"
+)
+def test_a_local_store_refuses_any_path_through_a_symbolic_link(tmp_path):
+    """Enforces docs/TENANT_ISOLATION.md:55."""
+    store = objectstore.LocalObjectStore(tmp_path / "root")
+    store.put("real/file.json", b"x")
+    root = tmp_path / "root"
+    (root / "door").symlink_to(root / "real", target_is_directory=True)
+    (root / "copy.json").symlink_to(root / "real" / "file.json")
+    for operation in (
+        lambda: store.get("door/file.json"),
+        lambda: store.put("door/new.json", b"x"),
+        lambda: store.delete("door/file.json"),
+        lambda: store.get("copy.json"),
+        lambda: store.put("copy.json", b"y"),
+    ):
+        with pytest.raises(objectstore.EscapeError):
+            operation()
+    assert store.get("real/file.json")[0] == b"x"

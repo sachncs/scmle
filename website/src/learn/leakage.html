@@ -57,9 +57,11 @@
 <p>The screen is part of the run, so it is bounded by the project's <code>--budget</code> (default 1800 seconds) and not by the clock. Its work is the number of cross-fitted fits: permutations x skill columns x classes (one versus rest above two classes). Each scan is predicted to take 1 second plus 8.0e-8 seconds per row per fit for classification (1.2e-8 for regression), measured on one thread, the slowest case. The real scan and the planted probe together may take 15 percent of the budget: the real scan first, the probe from what is left (a probe that does not fit is recorded as "probe not run"). The cap is arithmetic on rows, work and budget, so the same table gets the same flags on every machine. A breast-cancer sized table (455 rows, 72,000 fits) is predicted at 3.6 s and is screened under any budget from 120 s. Digits (64 columns, 10 classes, about 3.6 million fits on 1,437 rows) is predicted at about 415 s, more than the 270 s that 15 percent of the default 1800 s budget allows, so it is <strong>not run</strong> under the default budget; it needs <code>--budget 2800</code> or more.</p>
 <p>A screen that does not run is never a clean bill. The run says so in the last line of its summary, for example <code>WARNING leakage screen NOT RUN for 64 columns (work limit for a 120 s time budget): these columns are unchecked, not clean; raise --budget or screen fewer columns</code>. The same sentence is the first warning of the plan and the profile, the first finding of <code>report.html</code> and a <code>leakage_screen</code> entry in <code>diagnostics/decision_log.json</code>; the test score is labelled <code>PROVISIONAL: leakage screen incomplete</code>. <code>--leakage warn</code> trains on and says so; <code>--leakage block</code> <strong>refuses</strong> to run, because <code>block</code> means do not train on unchecked suspicion (choose <code>warn</code>, or raise the budget, to proceed). A table that needs more than 100,000 permutations is reported the same way. The statistics of the screen did not change; only the point at which it declines did, so the certificate is unchanged in content.</p>
 <h3 id="reproduce">Reproduce</h3>
-<pre><code class="language-bash">python -m benchmarks.leakage_screen_measurements --check
+<pre><code class="language-bash">git clone https://github.com/sachncs/scmle
+cd scmle
+python -m benchmarks.leakage_screen_measurements --check
 python -m benchmarks.qualification.screen_certify --check</code></pre>
-<p>Run both from a source checkout (they read <code>tests/fixtures/titanic_extract.csv</code> and the certificate files). The first takes several minutes. <code>--write</code> rewrites the file. The second re-measures the 1000 null worlds and the planted leaks.</p>
+<p>Run both from a source checkout (they read <code>tests/fixtures/titanic_extract.csv</code> and the certificate files). The first re-measures every table and compares the result with the committed file; it takes about a minute, and <code>--write</code> rewrites the file. The second checks that each certificate was measured on the screen's current code; <code>--write</code> re-measures the 1000 null worlds and the planted leaks.</p>
 <h2 id="what-the-product-does-about-it">What the product does about it</h2>
 <p>The aim is a <strong>qualification instrument</strong>: it attaches evidence and a tier to its claims and says what it found, instead of handing you a silent verdict. For leakage:</p>
 <ul><li><strong>It trains and reports loudly.</strong> The default <code>leakage_policy</code> is <code>warn</code>. The run logs a line naming the flagged columns, labels the score <code>test (PROVISIONAL: N flagged column(s) not attested: ...)</code> on its last line and in the first line of <code>report.html</code>, and lists the suspicions under "Findings" at the top of the report.
@@ -71,12 +73,41 @@ python -m benchmarks.qualification.screen_certify --check</code></pre>
 <h2 id="how-to-settle-a-flag">How to settle a flag</h2>
 <p>Ask: <strong>when is this value known?</strong></p>
 <h3 id="titanic-the-value-is-not-known-in-time">Titanic: the value is not known in time</h3>
-<p><code>boat</code> and <code>body</code> are only known after the sinking. Declare them:</p>
-<pre><code class="language-bash">scmle run titanic.csv --target survived --unavailable boat body \
+<p><code>boat</code> and <code>body</code> are only known after the sinking. Declare them (in the source checkout above, the Titanic extract is <code>tests/fixtures/titanic_extract.csv</code>; in the folder of <a href="@@BASE@@/docs/start-here/">Start here</a> it is <code>titanic.csv</code>):</p>
+<pre><code class="language-bash">scmle run tests/fixtures/titanic_extract.csv --target survived --unavailable boat body \
   --budget 120 --workers 2 --output-dir runs</code></pre>
 <p>The flag is gone, the label is gone, and the exam ROC AUC falls from 0.988 to the honest 0.885 (see <a href="@@BASE@@/docs/start-here/">Start here</a>, Steps 4 and 6).</p>
 <h3 id="breast-cancer-the-value-is-known-in-time">Breast cancer: the value is known in time</h3>
 <p>Suppose a pathologist confirms that <code>worst radius</code>, <code>worst perimeter</code> and <code>worst area</code> are computed from the same image at the time the sample is taken, so they are available at prediction. Settling the flag means recording that, with a name, a statement and an expiry. Attestations are used in charter runs.</p>
+<p>To follow along, make a demonstration signing key and a charter template:</p>
+<pre><code class="language-bash">export SCMLE_SIGNING_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+scmle charter init charter2.json</code></pre>
+<p>Then write the table (it ships with scikit-learn) and fill in the charter, with a 10 percent confirmation set:</p>
+<pre><code class="language-python">import json
+
+from sklearn import datasets
+
+datasets.load_breast_cancer(as_frame=True).frame.to_csv(
+    "cancer.csv", index=False
+)
+with open("charter2.json") as file:
+    charter = json.load(file)
+charter["question"] = (
+    "Which measurements of a sample are linked to the diagnosis?"
+)
+charter["estimand"].update(
+    population="every sample of cancer.csv",
+    target="target",
+    moment="imaging",
+    intercurrent=[{"event": "none", "strategy": "not applicable"}],
+    summary="rank correlation with the diagnosis",
+)
+charter["unit"] = "sample"
+charter["population"] = "every sample of cancer.csv"
+charter["sets"]["confirmation"] = 0.1
+with open("charter2.json", "w") as file:
+    json.dump(charter, file, indent=2)</code></pre>
+<pre><code class="language-bash">scmle charter sign charter2.json</code></pre>
 <p>The file (<code>att2.json</code>; <code>scope</code> must be the <code>charter_hash</code> of your signed charter, so an attestation cannot be reused for another analysis):</p>
 <pre><code class="language-json">{
   "schema_version": 2,
@@ -94,7 +125,32 @@ python -m benchmarks.qualification.screen_certify --check</code></pre>
     }
   ]
 }</code></pre>
-<p>All nine keys are required for each entry (one entry per column). <code>expires</code> must not be before <code>date</code>. The run is told about the file with <code>--attestations att2.json</code>:</p>
+<p>All nine keys are required for each entry (one entry per column). <code>expires</code> must not be before <code>date</code>. To write it for all three columns, with the hash of <code>charter2.json</code>:</p>
+<pre><code class="language-python">import json
+
+with open("charter2.json") as file:
+    scope = json.load(file)["charter_hash"]
+statement = (
+    "Measured from the same image as every other column, when the sample is "
+    "imaged; available at prediction."
+)
+entries = [
+    {
+        "column": column,
+        "attestor": "A. Pathologist",
+        "role": "data owner",
+        "statement": statement,
+        "evidence": "imaging protocol v2, section 4",
+        "date": "2026-11-05",
+        "expires": "2027-11-05",
+        "scope": scope,
+        "seconds": 0,
+    }
+    for column in ("worst radius", "worst perimeter", "worst area")
+]
+with open("att2.json", "w") as file:
+    json.dump({"schema_version": 2, "attestations": entries}, file, indent=2)</code></pre>
+<p>The run is told about the file with <code>--attestations att2.json</code>:</p>
 <pre><code class="language-bash">scmle run cancer.csv --target target --charter charter2.json \
   --attestations att2.json --budget 120 --workers 2 --output-dir runs_att</code></pre>
 <p>What happened in the real runs (charter with a 10 percent confirmation set; all three columns attested in the file):</p>

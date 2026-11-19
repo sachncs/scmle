@@ -64,8 +64,26 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   </div>
 
   <h2>Use the typed manifest as the hand-off</h2>
-  <p>The manifest is the boundary between raw material and an experimental lifecycle. It binds the exact snapshot to the modality, task, owner, label lineage, privacy policy, and content hash. It does not guess missing governance information.</p>
-  <pre><code>{`from scmle.contracts.data import Passport, Confidentiality, Origin
+  <p>The manifest is the boundary between raw material and an experimental lifecycle. It binds the exact snapshot to the modality, task, owner, label lineage, privacy policy, and content hash. It does not guess missing governance information. The first lines build a small labelled document corpus for the manifest to bind.</p>
+  <pre><code class="language-python">{`from scmle.contracts.data import Passport, Confidentiality, Origin
+from scmle.data.modalities.document import Dataset, Sample
+from scmle.pipeline.modality_lifecycle import DocumentPreparer, Lifecycle
+
+dataset = Dataset(
+    tuple(
+        Sample(
+            document_id=f"case-{index}",
+            content=("approved claim " if index % 2 else "denied claim ")
+            * (index + 2),
+            label="approved" if index % 2 else "denied",
+        )
+        for index in range(12)
+    )
+)
+adapter = DocumentPreparer(dataset)
+lifecycle = Lifecycle()
+package_path = "runs/documents/model"
+signing_key = "load-this-from-your-secret-manager"
 
 manifest = Passport(
     identifier="documents-2026-10-21",

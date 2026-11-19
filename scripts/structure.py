@@ -16,7 +16,10 @@ below it is a ratchet the next `--write` records.
 Three counts serve the naming phase (register phase 6). `external_names`
 counts the multi-word names the package defines that a library it imports
 also offers (a module name or a class attribute), so `pandas.read_json`
-and an scmle `read_json` read alike; `--external` lists them.
+and an scmle `read_json` read alike; `--external` lists them. The libraries
+are the standard library and the dependency set `uv.lock` declares, not
+whatever is installed: `--write` records the collisions in `external.json`,
+and a declared library absent here keeps its recorded ones.
 `import_aliases` counts `import ... as` bindings, which the naming rule
 forbids. `compound_attributes` counts multi-word attribute names per class,
 in the class body and on `self`. `EXEMPT` lists the names no count
@@ -34,6 +37,7 @@ ended with its map applied and deleted; import-linter's layers contract in
 import argparse
 import ast
 import importlib
+import importlib.metadata
 import inspect
 import json
 import pathlib
@@ -44,6 +48,11 @@ import tomllib
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "scmle"
 BUDGET = pathlib.Path(__file__).with_name("structure.json")
+# The external collisions found at the last `--write`, by name, with the
+# library that offers each: a declared library not installed here keeps its
+# recorded collisions, so the count is the same on every machine.
+COLLISIONS = pathlib.Path(__file__).with_name("external.json")
+LOCK = ROOT / "uv.lock"
 LOOSE = re.compile(r"dict\[str, *(Any|object)\]")
 CAPITALS = re.compile(r"[A-Z][a-z0-9]*")
 BARE = frozenset({"ValueError", "TypeError", "RuntimeError"})
@@ -180,12 +189,31 @@ def aliases(tree: ast.AST) -> int:
     return count
 
 
+def locked() -> set[str]:
+    """The distributions of the declared dependency set.
+
+    Returns:
+        The normalized name of every package `uv.lock` resolves for the
+        project's dependencies and extras.
+    """
+    packages = tomllib.loads(LOCK.read_text(encoding="utf-8"))["package"]
+    return {normal(package["name"]) for package in packages}
+
+
+def normal(name: str) -> str:
+    """A distribution name normalized as PEP 503 does."""
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
 def external(imported: set[str], defined: set[str]) -> dict[str, str]:
-    """Defined names that a library the package imports also offers.
+    """Defined names that a declared library the package imports offers.
 
     A library's public names are its module's names and the attributes of
-    the classes it exposes. Only libraries installed here are read, so the
-    count depends on the environment (`torch` adds `state_dict`).
+    the classes it exposes. The libraries are the standard library and the
+    declared dependency set (`locked`), not whatever is installed: a
+    declared library installed here is read, and one that is not keeps the
+    collisions recorded for it at the last `--write` (`COLLISIONS`), so the
+    count is the same on every machine with the same lock file.
 
     Args:
         imported: Modules the package imports.
@@ -194,8 +222,14 @@ def external(imported: set[str], defined: set[str]) -> dict[str, str]:
     Returns:
         Each colliding name and the first module that also offers it.
     """
+    declared = locked()
+    installed = importlib.metadata.packages_distributions()
     found: dict[str, str] = {}
     for module in sorted(imported):
+        top = module.partition(".")[0]
+        owners = {normal(owner) for owner in installed.get(top, [])}
+        if top not in sys.stdlib_module_names and not owners & declared:
+            continue
         try:
             loaded = importlib.import_module(module)
         except Exception:  # noqa: BLE001 - an optional library is absent
@@ -206,7 +240,15 @@ def external(imported: set[str], defined: set[str]) -> dict[str, str]:
                 offered.update(dir(value))
         for name in sorted(defined & offered):
             found.setdefault(name, module)
-    return found
+    recorded = (
+        json.loads(COLLISIONS.read_text(encoding="utf-8"))
+        if COLLISIONS.exists()
+        else {}
+    )
+    for name, module in sorted(recorded.items()):
+        if name in defined and module.partition(".")[0] not in installed:
+            found.setdefault(name, module)
+    return dict(sorted(found.items()))
 
 
 def measure() -> dict[str, int]:
@@ -499,10 +541,13 @@ def main(arguments: list[str] | None = None) -> int:
         print(*breaks, sep="\n")
         print(f"breaks: {len(breaks)}, largest package cycle: {largest}")
         return 1 if breaks else 0
-    found = measure()
+    found, collisions = scan()
     print(json.dumps(found, indent=2))
     if options.write:
         BUDGET.write_text(json.dumps(found, indent=2) + "\n", encoding="utf-8")
+        COLLISIONS.write_text(
+            json.dumps(collisions, indent=2) + "\n", encoding="utf-8"
+        )
         return 0
     worse = compare(found, json.loads(BUDGET.read_text(encoding="utf-8")))
     for line in worse:

@@ -109,12 +109,14 @@ class Noise(Stressor):
             rng: Source of randomness.
 
         Returns:
-            A copy in which every numeric column has normal noise added,
-            with standard deviation `scale` times the column's own (no
-            change when that is 0).
+            A copy in which every numeric input column has normal noise
+            added, with standard deviation `scale` times the column's own
+            (no change when that is 0). Numeric features the pipeline
+            derives itself (calendar parts, say) are not inputs.
         """
         damaged = features.copy()
-        for column in inputs.feature_plan.numeric:
+        sourced = inputs.feature_plan.sourced
+        for column in (c for c in inputs.feature_plan.numeric if c in sourced):
             spread = float(pandas.to_numeric(damaged[column]).std())
             if not numpy.isfinite(spread):
                 spread = 0.0

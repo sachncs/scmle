@@ -154,9 +154,10 @@ class Operation(command.Command):
             The exit status, EXIT_OK (0).
 
         Raises:
-            ConfigError: If the envelope is refused.
+            ConfigError: If the key file cannot be read or holds no key, or
+                the envelope is refused.
         """
-        key = pathlib.Path(args.key_file).read_text(encoding="utf-8").strip()
+        key = Deployment.read(args.key_file)
         envelope = deployment_ledger.Envelope.from_dict(
             json.loads(pathlib.Path(args.envelope).read_text(encoding="utf-8"))
         )
@@ -302,9 +303,14 @@ class Deployment(command.Command):
             The key, with surrounding whitespace removed.
 
         Raises:
-            ConfigError: If the file holds no key.
+            ConfigError: If the file cannot be read or holds no key.
         """
-        key = pathlib.Path(path).read_text(encoding="utf-8").strip()
+        try:
+            key = pathlib.Path(path).read_text(encoding="utf-8").strip()
+        except OSError as error:
+            raise errors.ConfigError(
+                f"cannot read the key file {path}: {error.strerror}"
+            ) from error
         if not key:
             raise errors.ConfigError(f"{path} holds no key")
         return key

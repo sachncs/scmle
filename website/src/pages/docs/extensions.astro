@@ -29,7 +29,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
   <h2>Give the family a stable identity</h2>
   <p>Use <code>Bespoke</code> with a lowercase, namespaced name. The serialized identity is explicit—for example, <code>extension:acme/point-cloud</code>. It cannot collide with <code>image</code>, <code>audio</code>, or another built-in modality.</p>
-  <pre><code>{`from scmle.contracts.modalities import Bespoke
+  <pre><code class="language-python">{`from scmle.contracts.modalities import Bespoke
 
 modality = Bespoke("acme/point-cloud")
 print(modality.value)
@@ -37,49 +37,109 @@ print(modality.value)
   <p>Names are identifiers, not display labels. Keep the human explanation in your dataset card and documentation. Changing the identity is a new capability and should be reviewed as a migration, not treated as a cosmetic rename.</p>
 
   <h2>Implement the polymorphic adapter</h2>
-  <p>An extension adapter implements the same narrow interface as the built-in adapters. Each method has one responsibility: source identity, canonical samples, data understanding, leakage-aware partitions, bounded representations, stable sample identity, labels, monitoring, and user-visible limitations. The optional explanation hook is where your domain-specific raw-data explanation belongs; the shared lifecycle never invents one.</p>
-  <pre><code>{`from scmle.contracts import modalities
+  <p>An extension adapter implements the same narrow interface as the built-in adapters. Each method has one responsibility: source identity, canonical samples, data understanding, leakage-aware partitions, bounded representations, stable sample identity, labels, monitoring, and user-visible limitations. The optional explanation hook is where your domain-specific raw-data explanation belongs; the shared lifecycle never invents one. Save this as <code>pointcloud.py</code>: a minimal adapter, with a small synthetic snapshot (<code>scans</code>) that the two scripts below import.</p>
+  <pre><code class="language-python">{`import hashlib
+import json
+
+import numpy
+
+from scmle.contracts import modalities
+from scmle.data.modalities.curation import Curation
 from scmle.pipeline import modality_lifecycle
 
 
 class PointCloudAdapter(modality_lifecycle.Preparer):
     modality = modalities.Bespoke("acme/point-cloud")
 
+    def __init__(self, scans):
+        self.scans = tuple(scans)  # (scan_id, points, label) in source order
+
     @property
-    def dataset_hash(self) -> str:
-        ...  # hash the immutable source snapshot
+    def digest(self) -> str:
+        # hash the immutable source snapshot
+        text = json.dumps(self.scans, sort_keys=True)
+        return hashlib.sha256(text.encode()).hexdigest()
 
     @property
     def samples(self) -> tuple[object, ...]:
-        ...  # canonical samples in source order
+        return self.scans
 
     def curate(self):
-        ...  # structured findings before feature preparation
+        # structured findings before feature preparation
+        sizes = [len(points) for _, points, _ in self.scans]
+        return Curation(
+            modality=self.modality.value,
+            dataset_hash=self.digest,
+            sample_count=len(self.scans),
+            profile={"smallest": min(sizes), "largest": max(sizes)},
+        )
 
     def split(self, seed: int):
-        ...  # group, time, or spatial policy—not a blind random split
+        # one scan never spans two partitions; the seed is unused here
+        train, validation, test = [], [], []
+        for index, scan in enumerate(self.scans):
+            (train, train, train, validation, test)[index % 5].append(scan)
+        return modality_lifecycle.Partitions(
+            train,
+            validation,
+            test,
+            {
+                "train": tuple(scan[0] for scan in train),
+                "validation": tuple(scan[0] for scan in validation),
+                "test": tuple(scan[0] for scan in test),
+            },
+        )
 
     def features(self, samples):
-        ...  # bounded, finite representation with named features
+        # bounded, finite representation with named features
+        rows = [
+            (len(points), numpy.mean(points, axis=0)[2], numpy.ptp(points))
+            for _, points, _ in samples
+        ]
+        return modality_lifecycle.Batch(
+            tuple(self.sample_id(sample) for sample in samples),
+            ("points", "height", "extent"),
+            numpy.asarray(rows, dtype=float),
+        )
 
     def sample_id(self, sample: object) -> str:
-        ...  # stable source identity
+        return sample[0]  # stable source identity
 
     def label(self, sample: object) -> object | None:
-        ...  # preserve unlabeled state; do not invent labels
+        return sample[2]  # None stays unlabelled; never invent a label
 
     def monitor(self, observed):
-        ...  # compare the reference and observed source populations
+        # compare the reference and observed source populations
+        mean = self.features(self.scans).values.mean(axis=0)
+        shifted = observed.features(observed.samples).values.mean(axis=0)
+        return {"shift": (shifted - mean).tolist()}
 
     def remarks(self) -> tuple[str, ...]:
-        ...  # representation and interpretation limits`}</code></pre>
-  <p>The ellipses above are a contract outline, not a compatibility shim. A real adapter must implement every abstract method and test its boundaries against raw fixtures. Keep domain code in the adapter; do not add a generic wrapper that hides missing semantics.</p>
+        return (
+            "Three summary statistics per scan; no geometry is learned.",
+            "Labels come from the source; none is inferred.",
+        )
+
+
+def scans(count=60, seed=0):
+    """A small synthetic snapshot: tall and flat scans."""
+    generator = numpy.random.default_rng(seed)
+    result = []
+    for index in range(count):
+        label = "tall" if index % 2 else "flat"
+        points = generator.normal(size=(20 + index % 7, 3))
+        points[:, 2] *= 3.0 if label == "tall" else 0.5
+        result.append((f"scan-{index}", points.round(3).tolist(), label))
+    return result`}</code></pre>
+  <p>This adapter is deliberately small: three summary statistics per scan and a fixed rotation split that keeps each scan whole. A real adapter must implement every abstract method with its domain's policy and test its boundaries against raw fixtures. Keep domain code in the adapter; do not add a generic wrapper that hides missing semantics.</p>
 
   <h2>Run the lifecycle with explicit governance</h2>
-  <pre><code>{`from scmle.api.project import ModalityProject
+  <p>Save this as <code>train.py</code> next to the adapter and run <code>python train.py</code>.</p>
+  <pre><code class="language-python">{`from pointcloud import PointCloudAdapter, scans
+from scmle.api.project import ModalityProject
 
 project = ModalityProject(
-    PointCloudAdapter(...),
+    PointCloudAdapter(scans()),
     signing_key="load-this-from-your-secret-manager",
     output_dir="runs/point-cloud",
 )
@@ -91,11 +151,12 @@ assert len(report.evidence) == 15`}</code></pre>
   <p>When source, lineage, privacy, and task metadata are available, pass a <code>Passport</code>. The lifecycle rejects a manifest whose content hash or sample count does not match the adapter before modelling begins. Missing governance metadata remains visible as a gap in the dataset card.</p>
 
   <h2>Curate without modelling</h2>
-  <p>Not every useful dataset is labelled, supervised, or ready for a classifier. Use <code>Curator</code> when the immediate job is to understand the raw snapshot. It writes an atomic, signed curation record and dataset card, accepts empty and unlabeled snapshots, and never invents labels, features, metrics, or a model.</p>
-  <pre><code>{`from scmle.api.project import Curator
+  <p>Not every useful dataset is labelled, supervised, or ready for a classifier. Use <code>Curator</code> when the immediate job is to understand the raw snapshot. It writes an atomic, signed curation record and dataset card, accepts empty and unlabeled snapshots, and never invents labels, features, metrics, or a model. Save this as <code>curate.py</code> and run <code>python curate.py</code>.</p>
+  <pre><code class="language-python">{`from pointcloud import PointCloudAdapter, scans
+from scmle.api.project import Curator
 
 curation = Curator(
-    PointCloudAdapter(...),
+    PointCloudAdapter(scans()),
     signing_key="load-this-from-your-secret-manager",
     output_dir="runs/point-cloud-curation",
 ).run()
@@ -103,15 +164,19 @@ curation = Curator(
 print(curation.card["curation"])
 print(curation.path)
 # No modelling stage was run.`}</code></pre>
-  <p>If the family is not ready for a full lifecycle adapter, use <code>ExtensionCurator</code>. It accepts arbitrary caller-owned records and a curation callback, but deliberately has no split, feature, label, or model hooks. The callback must return a report bound to the extension identity, dataset hash, and sample count.</p>
-  <pre><code>{`from scmle.pipeline.modality_lifecycle import ExtensionCurator
+  <p>If the family is not ready for a full lifecycle adapter, use <code>ExtensionCurator</code>. It accepts arbitrary caller-owned records and a curation callback, but deliberately has no split, feature, label, or model hooks. The dataset hash is the SHA-256 hex digest of the snapshot, and the callback must return a report bound to the extension identity, that hash, and the sample count.</p>
+  <pre><code class="language-python">{`import hashlib
+import json
+
+from scmle.pipeline.modality_lifecycle import ExtensionCurator
 from scmle.api.project import Curator
 from scmle.contracts import modalities
 from scmle.data.modalities.curation import Curation
 
 records = ({"x": 1, "y": 2}, {"x": 3, "y": 4})
 extension = modalities.Bespoke("acme/point-cloud")
-snapshot = "sha256-of-the-immutable-snapshot"
+# The SHA-256 hex digest of the immutable snapshot.
+snapshot = hashlib.sha256(json.dumps(records).encode()).hexdigest()
 
 adapter = ExtensionCurator(
     extension=extension,
@@ -125,7 +190,7 @@ adapter = ExtensionCurator(
     ),
     limitations=("The caller owns point-cloud validation.",),
 )
-Curator(adapter, signing_key="...", output_dir="runs/curation").run()`}</code></pre>
+Curator(adapter, signing_key="load-this-from-your-secret-manager", output_dir="runs/curation").run()`}</code></pre>
   <p>This is the honest starting point for data curation: make the raw snapshot understandable first. Do not implement modelling methods merely to satisfy a curation-only workflow.</p>
   <p>Move to <code>ModalityProject</code> only after labels, a task, a split policy, a bounded representation, and a modelling decision are justified by the curation evidence. A failed or incomplete curation decision should stop the hand-off.</p>
 

@@ -220,3 +220,19 @@ def test_the_operate_command_ticks_grants_revokes_and_halts(
 
 def test_a_missing_deployment_is_a_clean_error(tmp_path):
     assert run("operate", "status", tmp_path / "nothing") != 0
+
+
+def test_a_missing_key_file_is_a_config_error_not_a_defect(world, tmp_path):
+    envelope = tmp_path / "envelope.json"
+    envelope.write_text(json.dumps(tests.simulation.world.envelope().to_dict()))
+    missing = tmp_path / "person.key"
+    code = run(
+        "operate",
+        "grant",
+        world.deploy,
+        "--envelope",
+        envelope,
+        "--key-file",
+        missing,
+    )
+    assert code == cli.EXIT_FAILED

@@ -246,17 +246,6 @@ class Planning(interface.Stage):
         return "build execution plan"
 
     def execute(self, context: scmle.pipeline.context.Context) -> Blueprint:
-        """Builds the blueprint, which the engine applies to the context.
-
-        Args:
-            context: The run context, holding the profile, task and manifest.
-
-        Returns:
-            The execution plan and the recommendations.
-        """
-        return self.draft(context)
-
-    def draft(self, context: scmle.pipeline.context.Context) -> Blueprint:
         """Builds the execution plan and the recommendations.
 
         First records the runtime resources the capability gate plans

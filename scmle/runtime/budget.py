@@ -4,8 +4,8 @@ Before training, the post-training work (final refit, diagnostics,
 packaging) is estimated from measured cost models and held back as a
 `Reserve`, so trials run in a window that closes that many seconds before
 the run's end (`limits.Governor.until`). A run whose minimum (preparation,
-one cheapest trial and the reserve) cannot fit is refused before any work
-(`Reserve.admit`).
+the first honest trial and the reserve) cannot fit is refused before any
+work (`Reserve.admit`).
 """
 
 from collections.abc import Callable
@@ -28,6 +28,24 @@ START_SECONDS = 1.0
 # 0.6-1.4 s on 702-2,949 rows; START_SECONDS plus 2e-5 s per row covers
 # all seven.
 CHEAPEST_RATE = 2e-5
+# The first honest trial: five-fold cross-validation of the linear model
+# (imputation, scaling, logistic regression), the cheapest learner that is
+# not a baseline. On the eleven wide tables C14 refused (gina, madelon,
+# philippine, Bioresponse, christine, Internet-Advertisements, isolet,
+# cnae-9, har, fabert, micro-mass: 571-4,000 rows, 308-1,776 columns,
+# OMP_NUM_THREADS=1, 2026-11-19) it took 1.1e-7 to 5.18e-7 s per row and
+# column; the largest, rounded up, bounds it. Its process start is the
+# later-trial one, inside START_SECONDS' margin.
+LINEAR_CELL = 6e-7
+# Boosting: one round of one tree costs at most 1.81e-8 s per row and
+# column on the same eleven tables (8e-9 to 1.81e-8; 77-194 rounds),
+# rounded up. A default fit stops early after about `BOOSTED_ROUNDS`
+# rounds: the untuned shrinkage 0.05 needs about twice the 100 rounds
+# scikit-learn runs at 0.1 (`scmle.models.sklearn.classical.SHRINKAGE`),
+# which the measured 77-194 confirm; a class adds a tree per round.
+BOOSTED_CELL = 2e-8
+BOOSTED_ROUNDS = 200
+FOLDS = 5
 # metric_uncertainty bootstrap: R = min(2000, max(200, 4e6 / t)) resamples
 # of the t = 0.2 n test rows; classification takes R (5.7e-4 + 7.6e-6 p) +
 # 1.9e-6 R t seconds (within 15 %), regression 0.4 ms per resample.
@@ -39,6 +57,15 @@ RESAMPLE_SECONDS = 5.7e-4
 RESAMPLE_COLUMN = 7.6e-6
 RESAMPLE_ROW = 1.9e-6
 RESAMPLE_REGRESSION = 4e-4
+# The bootstrap checks its deadline before each resample and draws what
+# fits (skipping below `RESAMPLES_MIN`), like the explanations below, so it
+# gets a share of the budget, never less than its `RESAMPLES_MIN` cost and
+# never more than its full cost. The full bootstrap took at most 3.6 s (6 %
+# of 60 s) on the seven tasks; with the 1.5 margin of the diagnostics' cost
+# models that is 9 %, rounded up to 10 %. Without the share, the column
+# term of 2,000 resamples alone held 15-153 s of a 30 s budget on wide
+# tables (C14: Bioresponse, gina, arcene) and refused them.
+BOOTSTRAP_SHARE = 0.1
 # Calibration, slices, robustness and adversarial validation together took
 # 0.8-1.7 s on the seven tasks; held at the largest rounded up.
 OTHER_DIAGNOSTIC_SECONDS = 2.0
@@ -69,32 +96,59 @@ def factor(classes: int) -> int:
     return classes if classes > BINARY_CLASSES else 1
 
 
-def cheapest(rows: int) -> float:
-    """Estimates the seconds of the run's first trial on the cheapest model.
+def cheapest(rows: int, columns: int = 0) -> float:
+    """Estimates the seconds of the run's first honest trial.
+
+    The baseline runs first, then the cheapest learner that is not one; the
+    planner puts that learner first when the boosted one would outlast the
+    trial window (`scmle.pipeline.rules.Budget`), so a wide table gets a
+    model in the window this cost bounds.
 
     Args:
         rows: Training rows.
+        columns: Feature columns.
 
     Returns:
-        The process start plus a per-row cost.
+        The process start and per-row cost of the baseline trial plus the
+        per-cell cost of the linear trial.
     """
-    return START_SECONDS + CHEAPEST_RATE * rows
+    return START_SECONDS + CHEAPEST_RATE * rows + LINEAR_CELL * rows * columns
 
 
-def bootstrap(tested: int, columns: int, classes: int) -> float:
+def boosted(rows: int, columns: int, classes: int) -> float:
+    """Estimates the seconds of a default boosted trial.
+
+    Args:
+        rows: Training rows.
+        columns: Feature columns.
+        classes: Target classes (0 for regression).
+
+    Returns:
+        `FOLDS` fits on the rows outside one fold, `BOOSTED_ROUNDS` rounds
+        of `factor(classes)` trees each.
+    """
+    fitted = rows * (FOLDS - 1) * columns
+    return BOOSTED_CELL * BOOSTED_ROUNDS * factor(classes) * fitted
+
+
+def bootstrap(
+    tested: int, columns: int, classes: int, draws: float | None = None
+) -> float:
     """Estimates the seconds of the metric-uncertainty bootstrap.
 
     Args:
         tested: Test rows.
         columns: Feature columns.
         classes: Target classes (0 for regression).
+        draws: Resamples, or None for the number the diagnostic plans.
 
     Returns:
-        The fitted cost of the resamples the diagnostic draws.
+        The fitted cost of the resamples.
     """
-    draws = min(
-        RESAMPLES_MAX, max(RESAMPLES_MIN, RESAMPLE_WORK / max(tested, 1))
-    )
+    if draws is None:
+        draws = min(
+            RESAMPLES_MAX, max(RESAMPLES_MIN, RESAMPLE_WORK / max(tested, 1))
+        )
     if not classes:
         return draws * RESAMPLE_REGRESSION
     return (
@@ -116,13 +170,16 @@ def reservation(
 
     Returns:
         Seconds for `refit` (final refit, threshold and measurement),
-        `diagnostics` (bootstrap, the other diagnostics and an explanation
-        share) and `package` (learning curve and conformal fold fits).
+        `diagnostics` (the bootstrap's share, the other diagnostics and an
+        explanation share) and `package` (learning curve and conformal fold
+        fits).
     """
     tested = round(TEST_SHARE * rows)
+    least = bootstrap(tested, columns, classes, RESAMPLES_MIN)
+    full = bootstrap(tested, columns, classes)
     return {
         "refit": REFIT_SHARE * budget,
-        "diagnostics": bootstrap(tested, columns, classes)
+        "diagnostics": min(full, max(least, BOOTSTRAP_SHARE * budget))
         + OTHER_DIAGNOSTIC_SECONDS
         + EXPLAIN_SHARE * budget,
         "package": PACKAGE_SHARE * budget,
@@ -196,7 +253,7 @@ class Reserve:
                 estimate.
 
         Returns:
-            Preparation plus one cheapest trial plus the reserve.
+            Preparation plus the first honest trial plus the reserve.
 
         Raises:
             InputError: If `provision` has not run.
@@ -204,7 +261,7 @@ class Reserve:
         rows, columns, classes = self.measured()
         if prepared is None:
             prepared = self.estimate(rows, columns, classes, self.budget)
-        return prepared + cheapest(rows) + self.total
+        return prepared + cheapest(rows, columns) + self.total
 
     def smallest(self, prepared: float | None = None) -> int:
         """Estimates the smallest budget the minimum run fits in.
@@ -229,7 +286,7 @@ class Reserve:
                 else prepared
             )
             reserve = sum(reservation(rows, columns, classes, budget).values())
-            return done + cheapest(rows) + reserve <= budget
+            return done + cheapest(rows, columns) + reserve <= budget
 
         high = 1
         while not fits(high):
@@ -264,8 +321,8 @@ class Reserve:
                 estimate.
 
         Raises:
-            BlockedError: If preparation, one cheapest trial and the reserve
-                exceed the budget; the message and details name the
+            BlockedError: If preparation, the first honest trial and the
+                reserve exceed the budget; the message and details name the
                 estimate and the smallest budget that would fit.
         """
         estimate = self.minimum(prepared)
@@ -274,7 +331,7 @@ class Reserve:
         smallest = self.smallest(prepared)
         raise errors.BlockedError(
             f"the {self.budget} s time budget cannot fit the minimum run "
-            f"(preparation, one cheapest trial and {self.total:.1f} s "
+            f"(preparation, the first honest trial and {self.total:.1f} s "
             f"reserved for the final refit, diagnostics and packaging), "
             f"estimated at {estimate:.1f} s; the smallest budget that fits "
             f"is about {smallest} s",

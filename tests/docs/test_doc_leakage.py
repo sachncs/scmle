@@ -34,7 +34,7 @@ def table(rows=240, seed=0):
 
 
 def test_every_entry_point_defaults_to_the_warn_policy():
-    """Enforces docs/LEAKAGE.md:223.
+    """Enforces docs/LEAKAGE.md:228.
 
     What `warn` does with a flagged column (it trains and labels the score)
     is enforced by tests/leakage/test_leakage.py, which runs it end to end.
@@ -56,7 +56,7 @@ def test_every_entry_point_defaults_to_the_warn_policy():
 def test_the_probe_screens_plants_with_the_real_screens_settings(
     monkeypatch, structure
 ):
-    """Enforces docs/LEAKAGE.md:233.
+    """Enforces docs/LEAKAGE.md:238.
 
     Also enforces website/src/learn/leakage.html:67-68.
     """
@@ -104,7 +104,7 @@ def test_the_probe_screens_plants_with_the_real_screens_settings(
 
 
 def test_an_attestation_that_expires_before_its_date_is_refused(tmp_path):
-    """Enforces docs/LEAKAGE.md:302.
+    """Enforces docs/LEAKAGE.md:347.
 
     Also enforces website/src/learn/leakage.html:97.
     Also enforces website/src/learn/when-things-go-wrong.html:135.
@@ -142,7 +142,7 @@ def test_an_attestation_that_expires_before_its_date_is_refused(tmp_path):
 
 @pytest.mark.parametrize("kind", screen_certify.KINDS)
 def test_no_null_world_of_the_certification_was_flagged(kind):
-    """Enforces docs/LEAKAGE.md:357 (0 of 1000 null worlds flagged).
+    """Enforces docs/LEAKAGE.md:431 (0 of 1000 null worlds flagged).
 
     Also enforces website/src/learn/leakage.html:118.
     """

@@ -109,33 +109,6 @@ def decisional(
     return charter
 
 
-def freeze(
-    fitted: Any,
-    probabilities: numpy.ndarray,
-    actual: numpy.ndarray,
-    charter: contracts.AnalysisCharter,
-    seed: int,
-    rows: int,
-) -> tuple[Any, records.Layout]:
-    """Wraps a classifier in the chartered cost model's frozen threshold.
-
-    Args:
-        fitted: The fitted classifier to wrap.
-        probabilities: Out-of-fold development probabilities.
-        actual: The observed labels.
-        charter: The analysis charter with its decision layer and cost model.
-        seed: Seed for the calibration check and its replicates.
-        rows: Number of validation rows, recorded in the description.
-
-    Returns:
-        The thresholded classifier and its description
-        (`scmle.decision.threshold.freeze`).
-    """
-    return scmle.decision.threshold.freeze(
-        fitted, probabilities, actual, charter, seed, rows
-    )
-
-
 def appraise(
     context: scmle.pipeline.context.Context,
     pipeline: Any,

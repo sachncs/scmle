@@ -12,6 +12,7 @@ from scmle.contracts import records
 from scmle.data.splitting import splitters
 from scmle.evaluation import resources
 from scmle.pipeline import products
+from scmle.pipeline import strategy_search
 import scmle.pipeline.context
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import exploration
@@ -249,14 +250,14 @@ class SelectStage(interface.Stage):
     ) -> Pick:
         """Chooses the best trial that satisfies the serving constraints.
 
-        Without serving limits and without the Pareto option the top-ranked
-        trial whose refit ends before the run's end is taken unmeasured
-        (`affordable`). Candidates whose refit cannot end in time are not
-        measured; if none can, the choice falls back to `affordable`. With
-        the Pareto option the choice is made on the front
-        (`select_on_front`). Otherwise candidates are walked in policy order,
-        up to `max_candidates_checked`; each is refit and measured on this
-        machine, and the first one within every limit wins.
+        Only the trials that earned their place compete (`earn`). Without
+        serving limits and without the Pareto option the top-ranked trial
+        whose refit ends in time is taken unmeasured (`affordable`).
+        Candidates whose refit cannot end in time are not measured; if none
+        can, the choice falls back to `affordable`. With the Pareto option
+        the choice is made on the front (`select_on_front`). Otherwise the
+        first `max_candidates_checked` in policy order are refit and measured
+        on this machine, and the first one within every limit wins.
 
         Args:
             context: The run context, holding the trials, split and profile.
@@ -268,23 +269,16 @@ class SelectStage(interface.Stage):
         Raises:
             BlockedError: If no checked candidate satisfies the constraints.
         """
+        metric = scmle.pipeline.context.require(context.metric, "metric")
+        earned = earn(context, list(context.journal.trials))
         ranked = context.services.policy.rank(
-            context.journal.trials,
-            scmle.pipeline.context.require(context.metric, "metric"),
-            context.services.registry,
+            earned, metric, context.services.registry
         )
         limits = self.limits(context)
         spec = context.services.spec.selection
         if not limits.active and not spec.pareto:
             return self.announce(context, cost.affordable(context, ranked))
-        split = scmle.pipeline.context.require(context.split, "split")
-        task = scmle.pipeline.context.require(context.task, "task")
-        plan = scmle.pipeline.context.require(
-            context.profile, "profile"
-        ).feature_plan
-        checked = ranked[
-            : context.services.spec.selection.max_candidates_checked
-        ]
+        checked = ranked[: spec.max_candidates_checked]
         if spec.pareto:
             return self.select_on_front(context, checked, limits, refits)
         measured = 0
@@ -292,36 +286,114 @@ class SelectStage(interface.Stage):
             if cost.late(context, trial):
                 continue
             measured += 1
-            candidate = strategies.lookup(trial.strategy).build(
-                plan,
-                context.services.registry.get(trial.model_name),
-                task,
-                context.services.spec.validation.seed,
-                trial.params,
-            )
-            candidate.fit(split.dev_features, split.dev_target)
-            usage = resources.measure(candidate, split.dev_features)
-            broken = limits.violations(usage)
-            label = f"{trial.model_name}/{trial.strategy}"
-            if broken:
-                context.journal.enter(
-                    label, experiments.Edict.REJECT, "; ".join(broken)
-                )
-                continue
-            context.journal.enter(
-                label,
-                experiments.Edict.INCLUDE,
-                f"within serving limits ({usage.model_mb:.2f} MB, p95 "
-                f"{usage.p95_latency_ms:.1f} ms on {usage.machine})",
-            )
-            refits[trial.trial_id] = candidate
-            return self.announce(context, trial)
+            candidate = self.measure(context, trial, limits)
+            if candidate is not None:
+                refits[trial.trial_id] = candidate
+                return self.announce(context, trial)
         if not measured:
             return self.announce(context, cost.affordable(context, checked))
         raise errors.BlockedError(
             f"none of the top {len(checked)} candidates satisfies the "
             "serving constraints; relax the limits or allow more candidates"
         )
+
+    def measure(
+        self,
+        context: scmle.pipeline.context.Context,
+        trial: experiments.Trial,
+        limits: resources.Constraints,
+    ) -> models.Estimator | None:
+        """Refits a candidate on the development rows and checks its cost.
+
+        The verdict is entered in the journal: included with its measured
+        size and latency, or rejected with the limits it broke.
+
+        Args:
+            context: The run context, holding the split, task and profile.
+            trial: The candidate's trial.
+            limits: The serving limits.
+
+        Returns:
+            The refit when it is within every limit, else None.
+        """
+        split = scmle.pipeline.context.require(context.split, "split")
+        task = scmle.pipeline.context.require(context.task, "task")
+        plan = scmle.pipeline.context.require(
+            context.profile, "profile"
+        ).feature_plan
+        candidate = strategies.lookup(trial.strategy).build(
+            plan,
+            context.services.registry.get(trial.model_name),
+            task,
+            context.services.spec.validation.seed,
+            trial.params,
+        )
+        candidate.fit(split.dev_features, split.dev_target)
+        usage = resources.measure(candidate, split.dev_features)
+        broken = limits.violations(usage)
+        label = f"{trial.model_name}/{trial.strategy}"
+        if broken:
+            context.journal.enter(
+                label, experiments.Edict.REJECT, "; ".join(broken)
+            )
+            return None
+        context.journal.enter(
+            label,
+            experiments.Edict.INCLUDE,
+            f"within serving limits ({usage.model_mb:.2f} MB, p95 "
+            f"{usage.p95_latency_ms:.1f} ms on {usage.machine})",
+        )
+        return candidate
+
+
+def earn(
+    context: scmle.pipeline.context.Context,
+    trials: list[experiments.Trial],
+) -> list[experiments.Trial]:
+    """Keeps the default pipelines and the variants that beat theirs.
+
+    A variant (a data strategy, tuned hyperparameters or an ensemble) stays
+    only when the shared folds make it credibly better than its reference
+    (`strategy_search.odds` at least `strategy_search.CONFIDENCE`): its
+    model's default pipeline, or the best default pipeline for an ensemble.
+    Each one dropped is rejected on record.
+
+    Args:
+        context: The run context, holding the metric and the journal.
+        trials: Every trial of the run.
+
+    Returns:
+        The trials that compete, in their order; all of them when there is
+        no successful default pipeline or no successful variant.
+    """
+    metric = scmle.pipeline.context.require(context.metric, "metric")
+    sign = 1 if metric.greater_is_better else -1
+    ok = [t for t in trials if t.status is experiments.Termination.OK]
+    defaults = {t.model_name: t for t in ok if strategy_search.plain(t)}
+    variants = {id(t) for t in ok if not strategy_search.plain(t)}
+    if not defaults or not variants:
+        return trials
+    best = max(defaults.values(), key=lambda t: sign * t.score_mean)
+    needed = strategy_search.CONFIDENCE
+    kept = []
+    for trial in trials:
+        reference = defaults.get(trial.model_name, best)
+        chance = (
+            strategy_search.odds(trial, reference, sign)
+            if id(trial) in variants
+            else 1.0
+        )
+        if chance >= needed:
+            kept.append(trial)
+            continue
+        context.journal.enter(
+            f"{trial.model_name}/{trial.strategy}",
+            experiments.Edict.REJECT,
+            f"{trial.trial_id}: cv {metric.name} {trial.score_mean:.4f} vs "
+            f"{reference.model_name} default {reference.score_mean:.4f}; "
+            f"probability better {chance:.3f}, needed {needed:.3f}",
+        )
+    return kept
 
 
 @dataclasses.dataclass

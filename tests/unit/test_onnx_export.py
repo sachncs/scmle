@@ -2,6 +2,7 @@
 
 import dataclasses
 import importlib.util
+import json
 
 import numpy
 import pandas
@@ -62,7 +63,7 @@ def make_bundle(name, task, features=None):
 def test_classifiers_match_the_pipeline_within_tolerance(name, tmp_path):
     bundle, features = make_bundle(name, tasks.Task.BINARY)
 
-    path = bundle.export_onnx(tmp_path / "m.onnx")
+    path = bundle.export_onnx(tmp_path / "m.onnx", check=features)
     report = onnx_export.verify(bundle, path, features)
 
     assert report["max_difference"] <= onnx_export.DEFAULT_TOLERANCE
@@ -97,7 +98,7 @@ def test_a_regressor_matches_on_scaled_values(tmp_path):
 
 def test_the_exported_classifier_agrees_in_class_order(tmp_path):
     bundle, features = make_bundle("logistic_regression", tasks.Task.BINARY)
-    path = bundle.export_onnx(tmp_path / "m.onnx")
+    path = bundle.export_onnx(tmp_path / "m.onnx", check=features)
 
     result = onnx_export.verify(bundle, path, features)
 
@@ -131,10 +132,52 @@ def test_survival_models_are_refused(tmp_path):
 
 def test_a_failed_parity_check_names_the_difference(tmp_path):
     bundle, features = make_bundle("logistic_regression", tasks.Task.BINARY)
-    path = bundle.export_onnx(tmp_path / "m.onnx")
+    path = bundle.export_onnx(tmp_path / "m.onnx", unverified=True)
 
-    with pytest.raises(errors.ArtifactError, match="differs"):
+    with pytest.raises(errors.BlockedError, match="differs"):
         onnx_export.verify(bundle, path, features, tolerance=0.0)
+
+
+def test_an_export_without_held_out_rows_is_blocked_by_default(tmp_path):
+    bundle = make_bundle("logistic_regression", tasks.Task.BINARY)[0]
+
+    with pytest.raises(errors.BlockedError, match="at least"):
+        bundle.export_onnx(tmp_path / "m.onnx")
+
+    assert not (tmp_path / "m.onnx").exists()
+
+
+def test_a_diverging_export_is_blocked_and_its_graph_removed(tmp_path):
+    bundle, features = make_bundle("logistic_regression", tasks.Task.BINARY)
+
+    with pytest.raises(errors.BlockedError, match="differs"):
+        bundle.export_onnx(tmp_path / "m.onnx", check=features, tolerance=0.0)
+
+    assert not (tmp_path / "m.onnx").exists()
+
+
+def test_the_manifest_records_the_check_or_its_skipping(tmp_path):
+    bundle, features = make_bundle("logistic_regression", tasks.Task.BINARY)
+
+    checked = bundle.export_onnx(tmp_path / "a.onnx", check=features)
+    skipped = bundle.export_onnx(tmp_path / "b.onnx", unverified=True)
+
+    def read(path):
+        manifest = path.with_name(path.name + onnx_export.MANIFEST)
+        return json.loads(manifest.read_text())
+
+    assert read(checked)["verified"] is True
+    assert read(checked)["rows"] == len(features)
+    assert read(skipped)["verified"] is False
+    assert read(skipped)["rows"] is None
+    assert read(skipped)["graph_sha256"].startswith("sha256:")
+
+
+def test_rows_and_unverified_together_are_a_config_error(tmp_path):
+    bundle, features = make_bundle("logistic_regression", tasks.Task.BINARY)
+
+    with pytest.raises(errors.ConfigError, match="not both"):
+        bundle.export_onnx(tmp_path / "m.onnx", check=features, unverified=True)
 
 
 needs_boosters = pytest.mark.skipif(
@@ -187,7 +230,7 @@ def test_nan_outputs_do_not_pass_the_parity_check(monkeypatch, tmp_path):
             pass
 
         def run(self, names, inputs):
-            return [numpy.full(3, numpy.nan)]
+            return [numpy.full(onnx_export.ROWS, numpy.nan)]
 
     bundle = types.SimpleNamespace(
         classes=None,
@@ -200,7 +243,9 @@ def test_nan_outputs_do_not_pass_the_parity_check(monkeypatch, tmp_path):
         lambda: (None, types.SimpleNamespace(InferenceSession=Session)),
     )
     monkeypatch.setattr(onnx_export, "feed", lambda b, rows: {})
-    with pytest.raises(errors.ArtifactError, match="differs"):
+    with pytest.raises(errors.BlockedError, match="differs"):
         onnx_export.verify(
-            bundle, tmp_path / "m.onnx", pandas.DataFrame({"a": [1, 2, 3]})
+            bundle,
+            tmp_path / "m.onnx",
+            pandas.DataFrame({"a": range(onnx_export.ROWS)}),
         )

@@ -27,9 +27,11 @@ from scmle.data.readers import interchange
 from scmle.evaluation import parameter_estimation
 from scmle.pipeline import modality_lifecycle
 from scmle.pipeline import policies
-import scmle.pipeline.context
+from scmle.pipeline import products
 import scmle.pipeline.orchestrator
 import scmle.pipeline.recommendations
+from scmle.pipeline.stages import planning
+from scmle.pipeline.stages import profiling
 
 __all__ = [
     "Curator",
@@ -75,9 +77,7 @@ class Definition:
             `uplift`.
         metric: Primary metric; defaults per task.
         time_budget: Wall-clock budget in seconds.
-        modality: Dataset family declaration. The supported beta path is
-            `tabular`; other families fail closed until their complete
-            lifecycle is registered.
+        modality: Dataset family; a file needs a registered `kinds.Kind`.
         workers: Concurrent trial processes (1 = sequential).
         enforcement: `hard` supervises every trial in its own process and
             kills it past the time or memory limit; `cooperative` only stops
@@ -444,10 +444,11 @@ class Project(Definition):
         """
         context = self.orchestrator.prepare()
         try:
-            self.profile = context.profile
-            return scmle.pipeline.context.require(context.plan, "plan")
+            self.profile = context.get(profiling.Partition).profile
+            made = context.get(planning.Blueprint)
         finally:
             context.close()
+        return products.require(made.plan, "plan")
 
     def recommendations(
         self,
@@ -459,7 +460,7 @@ class Project(Definition):
         """
         context = self.orchestrator.prepare()
         try:
-            return context.recommendations
+            return context.get(planning.Blueprint).recommendations
         finally:
             context.close()
 

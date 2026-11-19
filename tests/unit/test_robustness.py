@@ -83,3 +83,16 @@ def test_robustness_is_skipped_once_its_deadline_has_passed():
     report = robustness.Robustness().compute(data)
 
     assert report["skipped"] and report["available"] is False
+
+
+def test_noise_skips_numeric_features_the_pipeline_derives_from_a_date():
+    data = test_diagnostics.make_dated_inputs()
+
+    report = robustness.Robustness().compute(data)
+
+    assert "noise_0.5sd" in report["scenarios"]
+    noisy = robustness.Noise(0.5).corrupt(
+        data.features, data, numpy.random.default_rng(0)
+    )
+    assert "when__month" not in noisy.columns
+    assert not noisy["signal"].equals(data.features["signal"])

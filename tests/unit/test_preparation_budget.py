@@ -159,14 +159,13 @@ def test_the_profiler_applies_the_thread_cap(monkeypatch):
     assert seen == [1]
 
 
-def test_estimate_bounds_every_part_of_preparation_by_its_share():
+def test_estimate_bounds_the_capped_parts_by_their_share():
     budget = 60
     rows, columns, classes = 1600, 30, 2
     total = profiler.estimate(rows, columns, classes, budget)
-    shares = (
-        screen.SCREEN_SHARE + fingerprint.SHARE + label_noise.SHARE
-    ) * budget
-    assert 0 < total <= profiler.rest(rows) + shares
+    shares = (screen.SCREEN_SHARE + fingerprint.SHARE) * budget
+    checked = profiler.noise(rows, columns, classes, budget)
+    assert 0 < total <= profiler.rest(rows, columns) + shares + checked
     assert profiler.estimate(rows, columns, 0, budget) < total
     tiny = profiler.estimate(100, 2, 2, budget)
     assert tiny < total
@@ -176,3 +175,23 @@ def test_estimate_bounds_every_part_of_preparation_by_its_share():
 def test_estimate_rejects_an_impossible_shape():
     with pytest.raises(errors.InputError):
         profiler.estimate(-1, 3, 2, 60)
+
+
+def test_the_label_noise_check_is_priced_as_it_runs():
+    # gina: 2,522 development rows of 970 columns took 8.8 s, which the
+    # narrow-table `label_noise.cost` put at 1.1 s.
+    assert label_noise.cost(2522, 970, 2) < 1.5
+    assert 8.8 <= profiler.noise(2522, 970, 2, 30) < 8.8 * 1.1
+    assert profiler.noise(2522, 970, 10, 30) == 0.0  # skipped: no rows fit
+    assert profiler.noise(1274, 256, 10, 60) > profiler.noise(1274, 256, 2, 60)
+
+
+def test_the_rest_grows_with_the_columns():
+    assert profiler.rest(2522, 970) > 2 * profiler.rest(2522, 0)
+
+
+def test_gina_preparation_is_estimated_within_its_measured_seconds():
+    # Measured 2026-11-19: 20.7 s to the first trial at a 30 s budget and
+    # 22.8 s at 60 s (OMP_NUM_THREADS=1).
+    assert profiler.estimate(2522, 970, 2, 30) >= 20.7
+    assert profiler.estimate(2522, 970, 2, 60) >= 22.8

@@ -59,6 +59,7 @@ The stored result goes stale when a scanned doc or page, the listing of
 `tests/`, any test-side doc mention (form 2), a cited test file, or the
 code of this module or of `pages` changes.
 
+    python -m benchmarks.evidence.guarantees --list    # unlinked, no write
     python -m benchmarks.evidence.guarantees --write
     python -m benchmarks.evidence.guarantees --check
 """
@@ -542,11 +543,14 @@ def load(document: dict[str, Any] | None) -> dict[str, Any] | None:
     return document
 
 
-def problems(document: dict[str, Any] | None = None) -> list[str]:
+def problems(
+    document: dict[str, Any] | None = None, root: Path = ROOT
+) -> list[str]:
     """Why the stored result is not for the current docs, tests and code.
 
     Args:
         document: The results document; read from `RESULTS_PATH` when None.
+        root: Repository root whose docs and tests are compared.
 
     Returns:
         A message for a missing file, a hash that differs from the current
@@ -556,10 +560,10 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
     found = load(document)
     if found is None:
         return ["guarantees.json is missing"]
-    paths, listing, records, guarantees = gather(ROOT)
-    exists = links.resolve(ROOT, {c for g in guarantees for c in g["cited"]})
+    paths, listing, records, guarantees = gather(root)
+    exists = links.resolve(root, {c for g in guarantees for c in g["cited"]})
     issues = []
-    current = fingerprint(ROOT, paths, listing, records, exists)
+    current = fingerprint(root, paths, listing, records, exists)
     if found.get("content_hash") != current:
         issues.append("guarantees: result is for other docs, tests or code")
     if found.get("counts") != tally(found.get("guarantees", [])):
@@ -594,20 +598,28 @@ def summary(document: dict[str, Any] | None = None) -> tuple[str, str]:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Writes (`--write`) or checks (`--check`) the stored result.
+    """Lists unlinked guarantees, or writes or checks the stored result.
 
     Args:
         arguments: Command-line arguments; `None` reads `sys.argv`.
 
     Returns:
-        0 for `--write`; for `--check`, 0 when the result is current and 1
-        otherwise.
+        0 for `--list` and `--write`; for `--check`, 0 when the result is
+        current and 1 otherwise.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--list", action="store_true")
     mode.add_argument("--write", action="store_true")
     mode.add_argument("--check", action="store_true")
     options = parser.parse_args(arguments)
+    if options.list:
+        document = measure()
+        for item in document["guarantees"]:
+            if not item["tests"]:
+                print(f"{item['doc']}:{item['line']}\t{item['text']}")
+        print(json.dumps(document["counts"]))
+        return 0
     if options.write:
         document = measure()
         RESULTS_PATH.write_text(

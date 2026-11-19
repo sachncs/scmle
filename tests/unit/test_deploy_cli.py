@@ -90,10 +90,10 @@ def gate(root, stage="certify", *extra):
 def test_a_complete_release_is_certified_and_the_record_verifies(
     release, capsys
 ):
-    # Enforces docs/CLI.md:161.
+    # Enforces docs/CLI.md:241.
     # Enforces docs/GLOSSARY.md:698.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:21.
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:771.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:823.
     # Enforces website/src/learn/glossary.html:349.
     # Enforces website/src/learn/when-things-go-wrong.html:10.
     # Enforces website/src/learn/when-things-go-wrong.html:323.
@@ -137,7 +137,7 @@ def test_a_complete_release_is_certified_and_the_record_verifies(
 def test_evidence_that_is_not_supplied_blocks_the_release(
     release, capsys, drop
 ):
-    # Enforces docs/CLI.md:161.
+    # Enforces docs/CLI.md:241.
     # Enforces docs/GLOSSARY.md:698-698.
     # Enforces website/src/learn/glossary.html:349.
     # Enforces website/src/pages/docs/cli.astro:96.
@@ -240,7 +240,7 @@ def test_production_with_the_staging_record_is_certified(release, capsys):
 def test_live_writes_results_and_fails_when_a_check_fails(
     release, monkeypatch, capsys
 ):
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:754.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:806.
     # Enforces website/src/learn/when-things-go-wrong.html:319.
     root, ignored, digest = release
     (root / "token").write_text("good-token\n", encoding="utf-8")

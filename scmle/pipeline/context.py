@@ -21,6 +21,8 @@ import scmle.contracts.data
 import scmle.contracts.metrics
 from scmle.data.readers import streaming
 from scmle.data.splitting import splitters
+from scmle.pipeline import kinds
+from scmle.pipeline import products
 import scmle.pipeline.journal
 import scmle.pipeline.recommendations
 import scmle.pipeline.services
@@ -28,6 +30,7 @@ from scmle.runtime import limits
 
 LOGGER = logging.getLogger(__name__)
 T = TypeVar("T")
+ProductT = TypeVar("ProductT", bound=products.Product)
 BRIDGE = {
     "governor": "services",
     "capability_registry": "services",
@@ -57,11 +60,7 @@ def require(value: T | None, name: str) -> T:
     Raises:
         ScmleError: If the producing stage has not executed.
     """
-    if value is None:
-        raise errors.ScmleError(
-            f"'{name}' is unavailable: its stage has not run yet"
-        )
-    return value
+    return products.require(value, name)
 
 
 @dataclasses.dataclass
@@ -111,6 +110,7 @@ class Context:
         test_rows: The released locked rows and labels, kept for reports
             written after the test was opened.
         stream: The chunked source and totals when the file was streamed.
+        kind: The kind of the ingested rows (`kinds.Kind`).
         pareto_front: Score / latency / size of measured candidates.
         seasonal_baseline: Seasonal-naive forecasts for the locked rows,
             computed at split time (forecasting).
@@ -125,6 +125,8 @@ class Context:
         evaluation: Final evaluation record.
         bundle: Packaged model.
         result: Final run result.
+        made: The latest product of each type applied to the context
+            (`products.Product.hold`), read with `get`.
     """
 
     services: scmle.pipeline.services.Services
@@ -160,6 +162,7 @@ class Context:
     shipped: Any = None
     test_rows: tuple[pandas.DataFrame, pandas.Series] | None = None
     stream: tuple[streaming.Feed, streaming.Totals] | None = None
+    kind: kinds.Kind = kinds.TABULAR
     pareto_front: list[dict[str, Any]] | None = None
     seasonal_baseline: Any = None
     propensity: dict[str, Any] | None = None
@@ -171,6 +174,9 @@ class Context:
     evaluation: dict[str, Any] | None = None
     bundle: scmle.artifacts.bundle.Bundle | None = None
     result: results.Run | None = None
+    made: dict[type[products.Product], products.Product] = dataclasses.field(
+        default_factory=dict
+    )
 
     if not TYPE_CHECKING:
         # Hidden from the type checker, so it still flags every attribute a
@@ -230,6 +236,23 @@ class Context:
                 given.spec, given.store, given.log, given.tracker
             ),
         )
+
+    def get(self, kind: type[ProductT]) -> ProductT:
+        """The latest product of a type, as its stage made or restored it.
+
+        Args:
+            kind: The product type.
+
+        Returns:
+            The product.
+
+        Raises:
+            OrderError: If no product of the type was applied yet.
+        """
+        found = self.made.get(kind)
+        if not isinstance(found, kind):
+            raise errors.OrderError(f"{kind.__name__} is not made yet")
+        return found
 
     @property
     def regulator(self) -> limits.Governor:

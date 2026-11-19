@@ -48,7 +48,7 @@ def applies(marker: str) -> bool:
     if "extra" in marker:
         return False
     try:
-        from packaging import markers  # noqa: PLC0415 -- optional dependency
+        from packaging import markers  # noqa: PLC0415 -- guarded import
     except ImportError as error:
         raise errors.ArtifactError(
             f"cannot evaluate the environment marker {marker!r}: install "

@@ -18,6 +18,8 @@ from scmle.inference import novelty
 from scmle.pipeline import products
 import scmle.pipeline.context
 from scmle.pipeline.stages import assessment
+from scmle.pipeline.stages import ingestion
+from scmle.pipeline.stages import planning
 from scmle.pipeline.stages import tracing
 import scmle.runtime.state
 
@@ -82,7 +84,8 @@ class PackageStage(tracing.Tracing):
         graph, leaderboard and HTML report. The stages build the evaluation
         record in its version-1 layout; it is moved to the current layout
         (`results.evaluation`) just before `evaluation.json` is written, and
-        the result carries that layout.
+        the result carries that layout. The plan is the product
+        `planning.Blueprint` the context holds.
 
         Args:
             context: The run context; read only (`Package.apply` sets it).
@@ -135,7 +138,9 @@ class PackageStage(tracing.Tracing):
             run_id=store.run_id,
             run_dir=store.directory,
             state=scmle.runtime.state.Progress.COMPLETED.value,
-            plan=scmle.pipeline.context.require(context.plan, "plan"),
+            plan=scmle.pipeline.context.require(
+                context.get(planning.Blueprint).plan, "plan"
+            ),
             profile=profile,
             trials=context.journal.trials,
             selected_model=selected.model_name,
@@ -157,9 +162,12 @@ class PackageStage(tracing.Tracing):
     ) -> scmle.artifacts.bundle.Bundle:
         """Builds the model bundle of the final pipeline.
 
+        The labels the model's outputs decode to are the kind's
+        (`kinds.Kind.decode`).
+
         Args:
             context: The run context, holding the model to serve, the
-                split, the selection and the evaluation.
+                split, the selection and the evaluation, and the intake.
 
         Returns:
             The bundle, before its conformal, quantile and novelty evidence.
@@ -170,6 +178,7 @@ class PackageStage(tracing.Tracing):
             context.evaluation, "evaluation"
         )
         profile = scmle.pipeline.context.require(context.profile, "profile")
+        intake = context.get(ingestion.Intake)
         return scmle.artifacts.bundle.Bundle.create(
             context.shipped
             if context.shipped is not None
@@ -189,12 +198,10 @@ class PackageStage(tracing.Tracing):
             group_column=context.services.spec.data.group_column,
             time_column=context.services.spec.data.time_column,
             history_source=context.frame,
-            class_labels=context.ordinal_labels,
+            class_labels=intake.kind.decode(context.ordinal_labels),
             seed=context.services.spec.validation.seed,
             configuration=context.services.spec.config_hash(),
-            dataset=context.manifest.digests["data"]
-            if context.manifest
-            else "",
+            dataset=intake.manifest.digests["data"],
             split=split.manifest.fingerprint,
             reference=scmle.data.reference.Baseline.build(
                 split.dev_features,
@@ -231,7 +238,7 @@ class PackageStage(tracing.Tracing):
         selected = scmle.pipeline.context.require(context.selected, "selected")
         profile = scmle.pipeline.context.require(context.profile, "profile")
         card = model_card.Card.from_run(
-            scmle.pipeline.context.require(context.manifest, "manifest"),
+            context.get(ingestion.Intake).manifest,
             profile,
             bundle,
             evaluation,
@@ -272,7 +279,7 @@ class PackageStage(tracing.Tracing):
                 "plan": [
                     d.to_dict()
                     for d in scmle.pipeline.context.require(
-                        context.plan, "plan"
+                        context.get(planning.Blueprint).plan, "plan"
                     ).decisions
                 ],
                 "outcomes": [d.to_dict() for d in context.journal.outcomes],

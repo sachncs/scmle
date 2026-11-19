@@ -55,6 +55,38 @@ The options renamed to single words in this release (for example
 `--horizon-rows` to `--rolling-horizon`) still accept their old spelling
 for one release; each prints a deprecation warning once.
 
+## Following along
+
+The examples on this page run as written, top to bottom, in an empty folder.
+They use a small table with a binary target `churn` and a demonstration
+signing key: `charter sign`, `claims verify`, `records upgrade` and the
+commands that load or write a bundle read it from `SCMLE_SIGNING_KEY`. Save
+this as `make_data.py`:
+
+```python
+import numpy
+import pandas
+
+rng = numpy.random.default_rng(0)
+rows = 800
+data = pandas.DataFrame(
+    {
+        "customer_id": numpy.arange(rows),
+        "tenure": rng.integers(1, 72, rows),
+        "spend": rng.normal(60, 20, rows).round(2),
+        "plan": rng.choice(["basic", "plus", "pro"], rows),
+    }
+)
+risk = -0.03 * data.tenure + 0.02 * data.spend + 0.8 * (data.plan == "basic")
+data["churn"] = (risk + rng.normal(scale=0.7, size=rows) > 0.5).astype(int)
+data.to_csv("data.csv", index=False)
+```
+
+```bash
+python make_data.py
+export SCMLE_SIGNING_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+```
+
 ## Analysis charter
 
 A charter fixes the question, the estimand (population, target, prediction
@@ -63,10 +95,39 @@ and the error budget before any data is profiled.
 
 ```bash
 scmle charter init charter.json        # a template that fails `check` until filled in
-scmle charter check charter.json --rows 5000   # validate; report whether the
-                                       # confirmation set can support the promised power
-SCMLE_SIGNING_KEY=... scmle charter sign charter.json   # add an HMAC-SHA256 signature
-scmle run data.csv --target churn --charter charter.json
+```
+
+Fill in the question, the population, the target, the prediction moment, one
+intercurrent event with its strategy, the unit and the deployment population,
+with an editor, or save this as `fill_charter.py`:
+
+```python
+import json
+
+with open("charter.json") as file:
+    charter = json.load(file)
+charter["question"] = "Which customer traits are linked to churn?"
+charter["estimand"].update(
+    population="every customer of data.csv",
+    target="churn",
+    moment="the start of the month",
+    intercurrent=[{"event": "none", "strategy": "not applicable"}],
+    summary="rank correlation with churn",
+)
+charter["unit"] = "customer"
+charter["population"] = "every customer of data.csv"
+with open("charter.json", "w") as file:
+    json.dump(charter, file, indent=2)
+```
+
+```bash
+python fill_charter.py
+scmle charter check charter.json --rows 600    # validate; report whether the
+                                               # confirmation set can support the promised power
+scmle charter sign charter.json                # add an HMAC-SHA256 signature (SCMLE_SIGNING_KEY,
+                                               # or --key-file FILE)
+scmle run data.csv --target churn --identifiers customer_id --charter charter.json \
+  --budget 120 --output-dir charter_runs
 ```
 
 `check` verifies the charter hash and, when a key is configured, the
@@ -90,10 +151,15 @@ requested and not applied, and the verdicts stay warnings.
 ## Claims of a charter run
 
 ```bash
-scmle claims list runs/run_x [--tier confirmed] [--json]
-scmle claims show runs/run_x h000003
-SCMLE_SIGNING_KEY=... scmle claims verify runs/run_x [--json]
+scmle claims list charter_runs/run_* --tier confirmed
+scmle claims list charter_runs/run_* --json
+scmle claims show charter_runs/run_* h000002
+scmle claims verify charter_runs/run_* --json
 ```
+
+`--tier` keeps the claims of one tier (`confirmed` or `unverified`) and
+`--json` prints JSON. `verify` reads the key from `SCMLE_SIGNING_KEY`, or from
+a file with `--key-file`.
 
 `verify` reads the run directory only. It checks that the ledger's hash chain
 verifies and every recorded decision replays, that `confirmed_claims.json`
@@ -115,14 +181,16 @@ consistently can pass it (custody is tamper-evident, not adversary-proof).
 ## Unattended operation
 
 `scmle operate` runs the controller of a deployment that `scmle loop init`
-created; see [Autonomous operation](AUTONOMY.md).
+created. The forms of its commands are below; [Autonomous
+operation](AUTONOMY.md) runs `grant`, `status`, `revoke` and `halt` on a
+deployment, with the envelope a person signs.
 
-```bash
-scmle operate tick deploy/ --inbox inbox/ [--keys-file keys.json]
-scmle operate status deploy/
-scmle operate grant deploy/ --envelope envelope.json --key-file person.key
-scmle operate revoke deploy/ ENVELOPE_ID --reason TEXT
-scmle operate halt deploy/ --reason TEXT
+```bash synopsis
+scmle operate tick <deploy> --inbox <inbox> [--keys-file keys.json]
+scmle operate status <deploy>
+scmle operate grant <deploy> --envelope envelope.json --key-file person.key
+scmle operate revoke <deploy> <envelope-id> --reason <text>
+scmle operate halt <deploy> --reason <text>
 ```
 
 `tick` applies each new file of `inbox/batches` and `inbox/labels` once, steps
@@ -131,10 +199,18 @@ person's approval.
 
 ## Business trail
 
+The repository ships the records of one deployed model, from a real run of
+the Titanic extract, with demonstration keys. Rebuilt into a trail and
+checked:
+
 ```bash
-scmle trail build trail/ --run runs/run_x --framing framing/ --registry registry/ \
-  --deployment deploy/ --inputs inputs.json --keys keys.json
-scmle trail verify trail/ --keys keys.json [--json]
+git clone https://github.com/sachncs/scmle
+sample=scmle/tests/fixtures/trail_sample
+scmle trail build trail/ --run $sample/trail/retained/run \
+  --framing $sample/trail/retained/framing --registry $sample/trail/retained/registry \
+  --deployment $sample/trail/retained/deployment --inputs $sample/trail/inputs.json \
+  --keys $sample/keys.json
+scmle trail verify trail/ --keys $sample/keys.json --json
 scmle trail show trail/
 ```
 
@@ -147,13 +223,17 @@ Findings are `missing_link`, `broken_chain`, `unsigned_step`,
 
 ## Release evidence and the runtime
 
-```bash
+These commands act on a service deployed over HTTPS, a release manifest with
+the evidence it names, and a model registry, none of which this page creates;
+their forms are below.
+
+```bash synopsis
 scmle deploy live --url https://staging.example --token-file token --environment staging \
   --commit <sha> --container-digest sha256:... --model-digest sha256:... --output checks.json
-scmle deploy gate admit|certify manifest.json --key-file key [--output record.json]
+scmle deploy gate {admit,certify} manifest.json --key-file key [--output record.json]
 scmle deploy verify-record record.json --key-file key
-scmle deploy model-digest REGISTRY --model churn --version 3
-scmle deploy reconcile REGISTRY --model churn --environment production --observation observed.json [--ledger deployment_ledger.jsonl]
+scmle deploy model-digest <registry> --model churn --version 3
+scmle deploy reconcile <registry> --model churn --environment production --observation observed.json [--ledger deployment_ledger.jsonl]
 ```
 
 `live` runs the health, schema, inference and security checks and exits 1 if
@@ -168,11 +248,17 @@ file is written by the runtime adapter you provide.
 
 ```bash
 scmle plan data.csv --target churn
-scmle run data.csv --target churn --workers 4 --budget 600
-scmle resume runs/run_20261015_001
+scmle run data.csv --target churn --workers 4 --budget 120
+scmle resume runs/run_*                 # the run folder, for example runs/run_20261015_001
+echo "exit code: $?"
 scmle catalog data.csv --label-column churn --output catalog.json
+head -c 300 data.csv > payload.bin
 cat payload.bin | scmle catalog --raw-bytes
 ```
+
+`resume` continues a cancelled, failed or crashed run from its finished
+trials. The run here finished, so it is refused with exit code 1 and
+`config error: run already completed; nothing to resume`.
 
 ## Bundles: signed versus trusted
 
@@ -195,8 +281,8 @@ verification. See [`SECURITY.md`](SECURITY.md).
 ## Stored records
 
 ```bash
-scmle records upgrade runs/run_x --dry-run
-scmle records upgrade runs/run_x [--key-file key]
+scmle records upgrade charter_runs/run_* --dry-run
+scmle records upgrade charter_runs/run_*
 ```
 
 Records written by an older scmle load without change (each record kind
@@ -205,7 +291,7 @@ rewrites them on disk at the current schema version: the charter, the split
 and dataset manifests, the feasibility, error budget and cost model records
 and the claims file, in the folder and its sub-folders. It first verifies
 the stored bytes (each record loads and its seal holds, the charter's hash
-and signature verify with `--key-file` or `SCMLE_SIGNING_KEY`, and a charter
+and signature verify with `--key-file FILE` or `SCMLE_SIGNING_KEY`, and a charter
 run passes `claims verify`); if that fails it writes nothing and exits 1.
 It then keeps each old file as `NAME.bak`, writes the new one and verifies
 again; if that fails, every file is restored from its `.bak` and it exits 1.
@@ -215,12 +301,12 @@ the files of a sealed trail are left as stored.
 
 ## Serving lifecycle and tracing
 
-```bash
-scmle serve model/ [--drain-seconds S] [--signals-file signals.jsonl] \
+```bash synopsis
+scmle serve <bundle> [--drain-seconds S] [--signals-file signals.jsonl] \
   [--signals-interval 60] [--signals-window 300]
 kill -HUP <pid>     # reload the bundle directory; the old model serves until the new one is loaded
 kill -TERM <pid>    # stop accepting connections, drain the requests in flight, exit 0
-scmle --trace serve model/
+scmle --trace serve <bundle>
 ```
 
 `serve` runs the same loop as the packaged service. SIGTERM or SIGINT stops
@@ -245,7 +331,8 @@ without it the degraded path is reported and every span is a no-op.
 ## Batch scoring
 
 ```bash
-scmle batch model/ big.csv --output predictions.csv [--chunk-rows 10000] [--restart]
+scmle batch runs/run_*/model data.csv --output predictions.csv --chunk-rows 200
+scmle batch runs/run_*/model data.csv --output predictions.csv --restart
 ```
 
 `batch` reads and scores `--chunk-rows` rows at a time (default 10,000), so
@@ -259,17 +346,49 @@ journal is removed.
 
 ## Parameter estimation
 
-```bash
-scmle estimate data.csv --estimation declaration.json [--treatment COL] [--output-dir estimates]
-scmle run data.csv --target y --estimation declaration.json
-```
-
 The declaration is a JSON object with `estimand` and `policy`, in the
 layout a run stores (`schema_version` 2, the default) or the version-1
 layout; a run's own `parameter_estimation_declaration.json` is accepted as
-it is. `estimate` trains no model: it writes `parameter_estimation.json` to
+it is. For example, a slope on a table where it is 2 (save this as
+`make_estimation.py`):
+
+```python
+import json
+
+import numpy
+import pandas
+
+rng = numpy.random.default_rng(21)
+signal = rng.normal(size=400)
+outcome = 1.25 + 2.0 * signal + rng.normal(scale=0.5, size=400)
+pandas.DataFrame({"signal": signal, "outcome": outcome}).to_csv(
+    "signal.csv", index=False
+)
+declaration = {
+    "estimand": {
+        "name": "slope",
+        "outcome": "outcome",
+        "population": "the rows of signal.csv",
+        "likelihood": "gaussian",
+        "features": ["signal"],
+        "assumptions": ["the conditional mean is linear"],
+    },
+    "policy": {"estimator": "linear"},
+}
+with open("declaration.json", "w") as file:
+    json.dump(declaration, file, indent=2)
+```
+
+```bash
+python make_estimation.py
+scmle estimate signal.csv --estimation declaration.json --output-dir estimates
+scmle run signal.csv --target outcome --estimation declaration.json --budget 120 \
+  --output-dir estimation_runs
+```
+
+`estimate` trains no model: it writes `parameter_estimation.json` to
 `--output-dir` (default `estimates`) and logs each parameter's estimate,
-interval and p-value. When the declaration cannot be estimated on the data
+interval and p-value (`--treatment COL` names a treatment column). When the declaration cannot be estimated on the data
 (a missing or inconsistent column, missing values under the `reject` policy,
 a likelihood the estimator does not fit, or the estimator's own refusal) it
 writes `parameter_estimation_refusal.json` with the reason and exits 2 (gate
@@ -288,35 +407,45 @@ equal-count bins); `group_thresholds` sets a decision threshold per group
 ## Clustering
 
 ```bash
-scmle cluster data.csv --output segments/ [--counts 2 3 4 5] \
-  [--methods kmeans gaussian_mixture agglomerative] [--rounds 10] [--seed 0] \
-  [--exclude customer_id] [--truth known_group]
-scmle predict segments/ new.csv --trusted
+scmle cluster data.csv --output segments/ --counts 2 3 4 \
+  --methods kmeans gaussian_mixture agglomerative --rounds 3 --seed 0 \
+  --exclude customer_id --truth churn
+scmle predict segments/ data.csv --output segments.csv
 ```
 
 `cluster` uses the numeric columns, less `--exclude` (repeatable) and
-`--truth`, as features. It tries each method at each count in `--counts`
-(each at least 2; default 2 to 8), scores each candidate by silhouette,
-Davies-Bouldin and Calinski-Harabasz and by its stability over `--rounds`
-bootstrap refits, and writes a bundle of task `clustering` with
-`clustering.json` beside it into `--output`, which must be new or empty.
-`--truth` names a column of known groups to measure agreement against (it
-is never a feature). `scmle predict` and `Bundle.predict` return cluster
-labels. The bundle is signed when `SCMLE_SIGNING_KEY` is set and otherwise
+`--truth`, as features. It tries each method in `--methods` (default all
+three) at each count in `--counts` (each at least 2; default 2 to 8), scores
+each candidate by silhouette, Davies-Bouldin and Calinski-Harabasz and by its
+stability over `--rounds` bootstrap refits (default 10), and writes a bundle
+of task `clustering` with `clustering.json` beside it into `--output`, which
+must be new or empty. `--truth` names a column of known groups to measure
+agreement against (it is never a feature; here the churn label stands in for
+one). `scmle predict` and `Bundle.predict` return cluster labels. The bundle is signed when `SCMLE_SIGNING_KEY` is set and otherwise
 loads only with `--trusted`. Clustering is not qualified; see
 [`BREADTH.md`](BREADTH.md).
 
 ## Forgetting, retiring and deleting
 
 ```bash
-scmle forget dataset runs/ registry/ --data old.csv --reason "ticket 118"
-scmle forget dataset runs/ --digest <sha256> --reason "ticket 118"
-scmle forget subject runs/ --data customers.csv --column customer_id \
-  --values-file ids.txt [--earlier <digest>] [--retrain] --reason "request 2026-118"
-scmle forget verify receipts/forget-0123456789abcdef.json [--key-file key]
-scmle retire registry/ --model churn --version 3 --reason "drift"
-scmle retire model/ --reason "superseded"
-scmle delete runs/run_20261118_001 --reason "retention expired"
+scmle forget dataset runs/ --data data.csv --reason "ticket 118" --dry-run
+scmle forget dataset runs/ --data data.csv --reason "ticket 118"
+scmle forget verify receipts/forget-*.json
+printf '3\n17\n' > ids.txt
+scmle forget subject charter_runs/ --data data.csv --column customer_id \
+  --values-file ids.txt --reason "request 2026-118"
+scmle retire segments/ --reason "superseded"
+scmle delete estimation_runs/run_* --reason "retention expired"
+```
+
+The forms not run above:
+
+```bash synopsis
+scmle forget dataset <folder>... --digest <sha256> --reason <text>
+scmle forget subject <folder>... --data <file> --column <col> --value <id> \
+  [--earlier <digest>] [--retrain] --reason <text>
+scmle forget verify <receipt> [--key-file key]
+scmle retire <registry> --model churn --version 3 --reason "drift"
 ```
 
 `forget dataset` searches the given folders for every run, model bundle,
@@ -347,6 +476,7 @@ when a receipt's signature does not verify. See
 ## Adopting a store into a tenant
 
 ```bash
+mkdir -p store
 scmle store adopt --root store/ --tenant acme
 ```
 

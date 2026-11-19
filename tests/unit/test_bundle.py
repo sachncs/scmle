@@ -85,7 +85,7 @@ def test_unknown_categories_and_missing_values_are_reported(trained):
 
 
 def test_tampering_is_detected(trained, tmp_path):
-    # Enforces README.md:135.
+    # Enforces README.md:154.
     # Enforces website/src/pages/index.astro:433.
     bundle = trained[0]
     directory = bundle.save(tmp_path / "m")
@@ -106,7 +106,7 @@ def test_schema_tampering_is_detected(trained, tmp_path):
 
 def test_version_mismatch_blocks_unless_allowed(trained, tmp_path):
     # Enforces docs/SECURITY.md:27.
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:452.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:473.
     # Enforces website/src/learn/when-things-go-wrong.html:187.
     # Enforces website/src/pages/docs/threat-model.astro:8.
     bundle, features = trained
@@ -297,7 +297,7 @@ def test_unsigned_bundles_are_refused_unless_trusted(
 ):
     # Enforces docs/GLOSSARY.md:603.
     # Enforces docs/ARTIFACTS.md:108.
-    # Enforces README.md:135 and docs/START_HERE.md:433.
+    # Enforces README.md:154 and docs/START_HERE.md:436.
     # Enforces docs/BEGINNER_FINDINGS.md:37.
     # Enforces website/src/learn/beginner-findings.html:22.
     # Enforces website/src/learn/glossary.html:302.
@@ -329,8 +329,8 @@ def test_signed_bundles_load_without_trust_and_detect_tampering(
 ):
     # Enforces docs/ARTIFACTS.md:108.
     # Enforces docs/BENCHMARKS.md:18.
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:437.
-    # Enforces README.md:135.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:458.
+    # Enforces README.md:154.
     # Enforces website/src/learn/when-things-go-wrong.html:181.
     # Enforces website/src/pages/docs/benchmarks.astro:719-721.
     # Enforces website/src/pages/docs/artifacts.astro:130.
@@ -357,7 +357,7 @@ def test_a_swapped_model_file_cannot_ride_a_valid_signature(
     trained, tmp_path, monkeypatch
 ):
     # Enforces docs/BENCHMARKS.md:18.
-    # Enforces README.md:135.
+    # Enforces README.md:154.
     # Enforces website/src/pages/docs/benchmarks.astro:719-721.
     # Enforces website/src/pages/index.astro:223.
     # Enforces website/src/pages/index.astro:413.
@@ -435,8 +435,8 @@ def test_resaving_unsigned_removes_a_stale_signature(
 
 def test_default_policy_requires_exact_column_names(trained):
     # Enforces docs/GLOSSARY.md:588.
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:461.
-    # Enforces docs/START_HERE.md:538.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:482.
+    # Enforces docs/START_HERE.md:541.
     # Enforces website/src/learn/glossary.html:294.
     # Enforces website/src/learn/start-here.html:276.
     # Enforces website/src/learn/when-things-go-wrong.html:189.
@@ -447,7 +447,7 @@ def test_default_policy_requires_exact_column_names(trained):
 
 
 def test_explicit_renames_map_incoming_names(trained):
-    # Enforces docs/START_HERE.md:538.
+    # Enforces docs/START_HERE.md:541.
     # Enforces website/src/learn/start-here.html:276.
     bundle, features = trained
     renamed = features.rename(columns={"num": "customer_age", "cat": "segment"})
@@ -462,7 +462,7 @@ def test_explicit_renames_map_incoming_names(trained):
 
 
 def test_case_and_whitespace_insensitive_matching_is_opt_in(trained):
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:461.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:482.
     # Enforces website/src/learn/when-things-go-wrong.html:189.
     bundle, features = trained
     messy = features.rename(columns={"num": "  NUM ", "cat": "Cat"})

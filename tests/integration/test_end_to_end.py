@@ -149,8 +149,8 @@ def test_group_and_temporal_runs(binary_frame, tmp_path):
 
 
 def test_blocked_run_records_terminal_state(binary_frame, tmp_path):
-    # Enforces README.md:132.
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:71.
+    # Enforces README.md:151.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:83.
     # Enforces website/src/learn/when-things-go-wrong.html:39.
     # Enforces website/src/pages/index.astro:313.
     # Enforces website/src/pages/docs/architecture.astro:48.

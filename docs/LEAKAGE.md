@@ -201,13 +201,18 @@ point at which it declines did, so the certificate is unchanged in content.
 ### Reproduce
 
 ```bash
+git clone https://github.com/sachncs/scmle
+cd scmle
 python -m benchmarks.leakage_screen_measurements --check
 python -m benchmarks.qualification.screen_certify --check
 ```
 
 Run both from a source checkout (they read `tests/fixtures/titanic_extract.csv`
-and the certificate files). The first takes several minutes. `--write` rewrites
-the file. The second re-measures the 1000 null worlds and the planted leaks.
+and the certificate files). The first re-measures every table and compares
+the result with the committed file; it takes about a minute, and `--write`
+rewrites the file. The second checks that each certificate was measured on
+the screen's current code; `--write` re-measures the 1000 null worlds and the
+planted leaks.
 
 ## What the product does about it
 
@@ -260,10 +265,13 @@ Ask: **when is this value known?**
 
 ### Titanic: the value is not known in time
 
-`boat` and `body` are only known after the sinking. Declare them:
+`boat` and `body` are only known after the sinking. Declare them (in the
+source checkout above, the Titanic extract is
+`tests/fixtures/titanic_extract.csv`; in the folder of
+[Start here](START_HERE.md) it is `titanic.csv`):
 
 ```bash
-scmle run titanic.csv --target survived --unavailable boat body \
+scmle run tests/fixtures/titanic_extract.csv --target survived --unavailable boat body \
   --budget 120 --workers 2 --output-dir runs
 ```
 
@@ -276,6 +284,47 @@ Suppose a pathologist confirms that `worst radius`, `worst perimeter` and
 `worst area` are computed from the same image at the time the sample is taken,
 so they are available at prediction. Settling the flag means recording that,
 with a name, a statement and an expiry. Attestations are used in charter runs.
+
+To follow along, make a demonstration signing key and a charter template:
+
+```bash
+export SCMLE_SIGNING_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+scmle charter init charter2.json
+```
+
+Then write the table (it ships with scikit-learn) and fill in the charter, with
+a 10 percent confirmation set:
+
+```python
+import json
+
+from sklearn import datasets
+
+datasets.load_breast_cancer(as_frame=True).frame.to_csv(
+    "cancer.csv", index=False
+)
+with open("charter2.json") as file:
+    charter = json.load(file)
+charter["question"] = (
+    "Which measurements of a sample are linked to the diagnosis?"
+)
+charter["estimand"].update(
+    population="every sample of cancer.csv",
+    target="target",
+    moment="imaging",
+    intercurrent=[{"event": "none", "strategy": "not applicable"}],
+    summary="rank correlation with the diagnosis",
+)
+charter["unit"] = "sample"
+charter["population"] = "every sample of cancer.csv"
+charter["sets"]["confirmation"] = 0.1
+with open("charter2.json", "w") as file:
+    json.dump(charter, file, indent=2)
+```
+
+```bash
+scmle charter sign charter2.json
+```
 
 The file (`att2.json`; `scope` must be the `charter_hash` of your signed
 charter, so an attestation cannot be reused for another analysis):
@@ -300,8 +349,37 @@ charter, so an attestation cannot be reused for another analysis):
 ```
 
 All nine keys are required for each entry (one entry per column). `expires`
-must not be before `date`. The run is told about the file with
-`--attestations att2.json`:
+must not be before `date`. To write it for all three columns, with the hash
+of `charter2.json`:
+
+```python
+import json
+
+with open("charter2.json") as file:
+    scope = json.load(file)["charter_hash"]
+statement = (
+    "Measured from the same image as every other column, when the sample is "
+    "imaged; available at prediction."
+)
+entries = [
+    {
+        "column": column,
+        "attestor": "A. Pathologist",
+        "role": "data owner",
+        "statement": statement,
+        "evidence": "imaging protocol v2, section 4",
+        "date": "2026-11-05",
+        "expires": "2027-11-05",
+        "scope": scope,
+        "seconds": 0,
+    }
+    for column in ("worst radius", "worst perimeter", "worst area")
+]
+with open("att2.json", "w") as file:
+    json.dump({"schema_version": 2, "attestations": entries}, file, indent=2)
+```
+
+The run is told about the file with `--attestations att2.json`:
 
 ```bash
 scmle run cancer.csv --target target --charter charter2.json \

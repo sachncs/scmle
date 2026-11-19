@@ -1,14 +1,19 @@
-"""ONNX export of a bundle's fitted pipeline, with a parity check.
+"""ONNX export of a bundle's fitted pipeline, with a divergence gate.
 
 The exported graph reproduces the pipeline's preprocessing and model for
 inputs prepared the same way the framework prepares them: numeric columns as
-float32, categorical columns as strings. Models or preprocessing steps the
-converter cannot express are refused with a message naming them, never
-exported approximately.
+float32 with unparseable and infinite values missing, categorical columns as
+strings. Models or preprocessing steps the converter cannot express are
+refused with a message naming them, never exported approximately. `verify`
+is the gate: it blocks a graph whose predictions on held-out rows differ from
+the native model beyond the float32 rounding bound.
 """
 
 import copy
+import hashlib
 import importlib
+import json
+import math
 import pathlib
 from typing import Any
 
@@ -29,7 +34,26 @@ from scmle.preparation import wrappers
 
 OPSET = 17
 ML_OPSET = 3
-DEFAULT_TOLERANCE = 1e-4
+UNIT = float(numpy.finfo(numpy.float32).eps) / 2
+"""Unit roundoff of float32, the arithmetic the graph runs in."""
+OPERATIONS = 1024
+"""Roundings along one prediction: a dot product or tree-ensemble sum over
+at most this many terms, then one link function."""
+DEFAULT_TOLERANCE = OPERATIONS * UNIT / (1 - OPERATIONS * UNIT)
+"""gamma_n = n u / (1 - n u), the bound on the relative error of a float32
+sum of n = OPERATIONS terms (Higham, Accuracy and Stability of Numerical
+Algorithms, Lemma 3.1); about 6.1e-5, tighter than the former fixed 1e-4."""
+RATE = 0.01
+"""Share of diverging rows the gate rules out."""
+CONFIDENCE = 0.95
+"""Confidence with which the gate rules out `RATE`."""
+ROWS = math.ceil(math.log(1 - CONFIDENCE) / math.log(1 - RATE))
+"""Held-out rows needed: with none of `ROWS` rows diverging, a divergence
+rate of `RATE` or more has probability (1 - RATE)**ROWS <= 1 - CONFIDENCE
+(exact one-sided binomial bound); 299 rows for 1% at 95%."""
+CASTS = (columns.floating, columns.objectify)
+"""Functions `feed` applies before the graph runs; any other function
+transformer is refused, never replaced by an identity."""
 INSTALL_HINT = "install the 'onnx' extra (skl2onnx, onnxruntime)"
 WRAPPERS = (
     weighting.Reweighter,
@@ -68,6 +92,8 @@ MODEL_WRAPPERS = (
     wrappers.MonotoneEstimator,
 )
 CODES_KEY = "label_codes"
+MANIFEST = ".manifest.json"
+"""Suffix of the export manifest written beside the graph."""
 
 
 def enrol() -> None:
@@ -173,20 +199,50 @@ def passthrough() -> Any:
     return preprocessing.FunctionTransformer().fit(numpy.zeros((1, 1)))
 
 
+def casts(step: Any) -> bool:
+    """Checks whether `feed` already does what `step` does.
+
+    Args:
+        step: A pipeline step.
+
+    Returns:
+        True for a cast in `CASTS`, an identity function transformer, or a
+        constant text imputer.
+
+    Raises:
+        ArtifactError: For a function transformer whose function the graph
+            cannot express; replacing it by an identity would diverge.
+    """
+    if not isinstance(step, preprocessing.FunctionTransformer):
+        return imputes(step)
+    if step.func is None or step.func in CASTS:
+        return True
+    raise errors.ArtifactError(
+        "ONNX export cannot express the function transformer "
+        f"'{getattr(step.func, '__name__', step.func)}'; "
+        "scmle.deploy.packaging.scaffold(bundle, directory) packages any "
+        "model as a ready-to-run service instead"
+    )
+
+
 def uncast(model: Any) -> Any:
     """Copies a model, replacing its type casts and text imputers by identities.
 
-    Casting columns to float or string, and filling missing text with the
-    missing token, happen before the graph runs (see `feed`), because the
-    converter cannot express them. Only pipelines and column transformers
-    (found through `transformers_`) are searched, nested to any depth.
+    Casting columns to float (infinite values to missing) or to objects, and
+    filling missing text with the missing token, happen before the graph runs
+    (see `feed`), because the converter cannot express them. Only pipelines
+    and column transformers (found through `transformers_`) are searched,
+    nested to any depth.
 
     Args:
         model: A fitted pipeline.
 
     Returns:
-        A deep copy in which every function transformer and constant text
-        imputer is an identity; `model` is not modified.
+        A deep copy in which every cast and constant text imputer is an
+        identity; `model` is not modified.
+
+    Raises:
+        ArtifactError: For any other function transformer (see `casts`).
     """
     clone = copy.deepcopy(model)
     stack: list[Any] = [clone]
@@ -194,17 +250,13 @@ def uncast(model: Any) -> Any:
         node = stack.pop()
         if isinstance(node, pipeline.Pipeline):
             for index, (name, step) in enumerate(node.steps):
-                if isinstance(
-                    step, preprocessing.FunctionTransformer
-                ) or imputes(step):
+                if casts(step):
                     node.steps[index] = (name, passthrough())
                 else:
                     stack.append(step)
         elif hasattr(node, "transformers_"):
             for index, (name, step, cols) in enumerate(node.transformers_):
-                if isinstance(
-                    step, preprocessing.FunctionTransformer
-                ) or imputes(step):
+                if casts(step):
                     node.transformers_[index] = (name, passthrough(), cols)
                 elif not isinstance(step, str):
                     stack.append(step)
@@ -323,16 +375,15 @@ def feed(bundle: Any, frame: pandas.DataFrame) -> dict[str, numpy.ndarray]:
 
     Returns:
         One column array of shape (rows, 1) per input, keyed by column name:
-        float32 for numeric columns (values that are not numbers become
-        NaN) and strings for categorical ones, with missing categories
+        float32 for numeric columns (values that are not numbers and
+        infinite values become NaN, as `columns.floating` does in the
+        pipeline) and strings for categorical ones, with missing categories
         replaced by the missing token.
     """
     prepared = bundle.prepare(frame)
     schema = bundle.schema
     inputs = {
-        c: pandas.to_numeric(prepared[c], errors="coerce")
-        .to_numpy(numpy.float32)
-        .reshape(-1, 1)
+        c: columns.scrub(prepared[c]).to_numpy(numpy.float32).reshape(-1, 1)
         for c in schema.numeric
     }
     inputs |= {
@@ -350,41 +401,59 @@ def feed(bundle: Any, frame: pandas.DataFrame) -> dict[str, numpy.ndarray]:
 def verify(
     bundle: Any,
     path: str | pathlib.Path,
-    frame: pandas.DataFrame,
+    frame: pandas.DataFrame | None,
     tolerance: float = DEFAULT_TOLERANCE,
 ) -> dict[str, float]:
-    """Compares the exported graph with the in-process pipeline.
+    """Blocks a graph whose predictions diverge from the native model.
+
+    The gate scores held-out rows with both the graph and the in-process
+    pipeline. Classes may disagree only on rows whose native top-two
+    probability margin is within twice `tolerance`, the most a difference of
+    `tolerance` per class can move the decision.
 
     Args:
         bundle: The bundle the graph came from.
         path: The ONNX file.
-        frame: Rows to compare on.
-        tolerance: Largest allowed difference.
+        frame: Held-out rows to compare on, at least `ROWS` of them; None
+            (no rows given) blocks.
+        tolerance: Largest allowed difference; a larger value is the
+            override.
 
     Returns:
-        `max_difference` (largest absolute probability difference, or for
-        regression the largest absolute difference relative to the larger of
-        the largest absolute value and 1) and `label_agreement` (share of
-        identical predicted labels, 1.0 for regression).
+        `rows`, `max_difference` (largest absolute probability difference,
+        or for regression the largest absolute difference relative to the
+        larger of the largest absolute value and 1) and `label_agreement`
+        (share of identical predicted labels, 1.0 for regression).
 
     Raises:
-        ArtifactError: If the difference exceeds `tolerance` or is NaN.
+        BlockedError: With no rows or fewer than `ROWS`, when the difference
+            exceeds `tolerance` or is NaN, or when a label differs on a row
+            whose margin exceeds twice `tolerance`.
     """
+    rows = 0 if frame is None else len(frame)
+    if frame is None or rows < ROWS:
+        raise errors.BlockedError(
+            f"the ONNX divergence gate needs at least {ROWS} rows held out "
+            f"from training to rule out a {RATE:.0%} divergence rate at "
+            f"{CONFIDENCE:.0%} confidence; got {rows}"
+        )
     runtime = load_converter()[1]
     session = runtime.InferenceSession(str(path))
     outputs = session.run(None, feed(bundle, frame))
     prepared = bundle.prepare(frame)
+    agreement, disagreements = 1.0, 0
     if bundle.classes is not None:
         expected = numpy.asarray(bundle.pipeline.predict_proba(prepared))
         difference = float(
             numpy.abs(numpy.asarray(outputs[1]) - expected).max()
         )
-        agreement = float(
-            numpy.mean(
-                decode(bundle, session, outputs[0]).astype(str)
-                == numpy.asarray(bundle.pipeline.predict(prepared)).astype(str)
-            )
+        agrees = decode(bundle, session, outputs[0]).astype(str) == (
+            numpy.asarray(bundle.pipeline.predict(prepared)).astype(str)
         )
+        agreement = float(numpy.mean(agrees))
+        ranked = numpy.sort(expected, axis=1)
+        clear = ranked[:, -1] - ranked[:, -2] > 2 * tolerance
+        disagreements = int(numpy.sum(clear & ~agrees))
     else:
         expected = numpy.asarray(bundle.pipeline.predict(prepared), dtype=float)
         scale = max(float(numpy.abs(expected).max()), 1.0)
@@ -392,10 +461,57 @@ def verify(
             numpy.abs(numpy.asarray(outputs[0]).ravel() - expected).max()
             / scale
         )
-        agreement = 1.0
     if not difference <= tolerance:
-        raise errors.ArtifactError(
+        raise errors.BlockedError(
             f"the ONNX graph differs from the pipeline by {difference:.2e} "
-            f"(tolerance {tolerance:.0e})"
+            f"on {rows} held-out rows (tolerance {tolerance:.1e})"
         )
-    return {"max_difference": difference, "label_agreement": agreement}
+    if disagreements:
+        raise errors.BlockedError(
+            f"the ONNX graph's labels differ from the pipeline's on "
+            f"{disagreements} of {rows} held-out rows whose margin exceeds "
+            f"{2 * tolerance:.1e}"
+        )
+    return {
+        "rows": float(rows),
+        "max_difference": difference,
+        "label_agreement": agreement,
+    }
+
+
+def record(
+    bundle: Any,
+    path: pathlib.Path,
+    report: dict[str, float] | None,
+    tolerance: float,
+) -> pathlib.Path:
+    """Writes the export manifest beside the graph.
+
+    The manifest names the graph by digest and says whether the divergence
+    gate passed on it or was skipped on request.
+
+    Args:
+        bundle: The bundle the graph came from.
+        path: The ONNX file.
+        report: What `verify` returned, or None when the check was skipped.
+        tolerance: The tolerance the gate used.
+
+    Returns:
+        The manifest's path: the graph's path with `MANIFEST` appended.
+    """
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    document = {
+        "graph_sha256": f"sha256:{digest}",
+        "model_name": bundle.info.model_name,
+        "verified": report is not None,
+        "tolerance": tolerance,
+        "rows": None if report is None else int(report["rows"]),
+        "max_difference": None if report is None else report["max_difference"],
+        "label_agreement": (
+            None if report is None else report["label_agreement"]
+        ),
+    }
+    manifest = path.with_name(path.name + MANIFEST)
+    content = json.dumps(document, indent=2, sort_keys=True) + "\n"
+    durability.write_atomically(manifest, content.encode("utf-8"))
+    return manifest

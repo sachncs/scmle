@@ -204,7 +204,7 @@ def leaky_frame(binary_frame):
 def test_a_charter_run_writes_the_admissibility_artifacts(
     binary_frame, tmp_path
 ):
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:248.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:269.
     # Enforces website/src/learn/when-things-go-wrong.html:110.
     result = run(binary_frame, tmp_path, inscribe(tmp_path))
     folder = pathlib.Path(result.run_dir)
@@ -281,7 +281,7 @@ def test_a_stale_certificate_no_longer_keeps_a_suspect_field(
 def test_a_valid_attestation_keeps_a_certified_suspect_and_is_ledgered(
     binary_frame, tmp_path
 ):
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:297.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:318.
     # Enforces website/src/learn/when-things-go-wrong.html:135.
     attestation = {
         "column": "echo",
@@ -530,7 +530,7 @@ def test_a_charter_without_rules_is_reported_as_not_chartered(
 
 
 def test_a_specification_that_contradicts_the_chartered_rule_is_refused():
-    # Enforces docs/CLI.md:85.
+    # Enforces docs/CLI.md:146.
     # Enforces website/src/pages/docs/cli.astro:68.
     from scmle.pipeline import stages
 

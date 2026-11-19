@@ -1,0 +1,253 @@
+{
+ "files": [
+  "modality_lifecycle.json",
+  "package/manifest.json",
+  "package/model.joblib"
+ ],
+ "report": {
+  "digests": {
+   "dataset": "str"
+  },
+  "documentation": {
+   "dataset_card": {
+    "curation": {
+     "blockers": [],
+     "digests": {
+      "dataset": "str"
+     },
+     "findings": {
+      "quality": [],
+      "risk": []
+     },
+     "modality": "str",
+     "profile": {
+      "components": "int",
+      "digests": {
+       "graph": "str"
+      },
+      "directed": "bool",
+      "edge": {
+       "duplicates": "int",
+       "edges": "int",
+       "loops": "int",
+       "weight": {
+        "high": "float",
+        "low": "float",
+        "mean": "float"
+       }
+      },
+      "node": {
+       "degree": {
+        "high": "int",
+        "low": "int",
+        "mean": "float"
+       },
+       "dimension": "int",
+       "isolated": "int",
+       "label_counts": {
+        "str:alpha": "int",
+        "str:beta": "int"
+       },
+       "labeled": "int",
+       "nodes": "int"
+      },
+      "temporal": {
+       "status": "str"
+      }
+     },
+     "ready": "bool",
+     "samples": "int",
+     "schema_version": "int"
+    },
+    "digests": {
+     "dataset": "str"
+    },
+    "limitations": [
+     "str"
+    ],
+    "manifest": {
+     "digests": {
+      "content": "str"
+     },
+     "findings": [],
+     "identifier": "str",
+     "lineage": {
+      "adjudication": "str",
+      "annotator": "str",
+      "digests": {},
+      "evolution": "str",
+      "generator": "str",
+      "labelling": "str",
+      "parents": [],
+      "partitions": [],
+      "snapshot": "str",
+      "transformations": []
+     },
+     "modality": "str",
+     "privacy": {
+      "access": "str",
+      "classification": "str",
+      "consent": "str",
+      "deletion": "str",
+      "identifying": "bool",
+      "redaction": "bool",
+      "retention": "str",
+      "sensitive": []
+     },
+     "samples": "int",
+     "schema_version": "int",
+     "snapshot": "str",
+     "source": {
+      "access": "str",
+      "acquisition": "str",
+      "captured": "str",
+      "definitions": {},
+      "license": "str",
+      "owner": "str",
+      "prefix": "str",
+      "query": "str",
+      "sampling": "str",
+      "timezone": "str",
+      "units": {}
+     },
+     "task": "str"
+    },
+    "modality": "str",
+    "privacy": {
+     "required_action": "str",
+     "status": "str"
+    },
+    "provenance": {
+     "required_action": "str",
+     "status": "str"
+    },
+    "samples": "int",
+    "schema_version": "int",
+    "use": "str"
+   },
+   "dataset_hash": "str",
+   "intended_use": "str",
+   "limitations": [
+    "str"
+   ],
+   "modality": "str",
+   "model_family": "str",
+   "promotion_requirements": [
+    "str"
+   ],
+   "status": "str"
+  },
+  "evaluation": {
+   "accuracy": "float",
+   "labels": [
+    "str"
+   ],
+   "log_loss": "float",
+   "macro_f1": "float",
+   "predictions": [
+    "str"
+   ],
+   "samples": "int"
+  },
+  "evidence": [
+   {
+    "evidence": {
+     "dataset_hash": "str",
+     "sample_count": "int"
+    },
+    "links": [
+     "str"
+    ],
+    "notes": [
+     "str"
+    ],
+    "stage": "str"
+   }
+  ],
+  "inference": {
+   "package_verified": "bool",
+   "prediction_count": "int",
+   "predictions_match": "bool"
+  },
+  "modality": "str",
+  "monitoring": {
+   "observed_hash": "str",
+   "profile_delta": {
+    "components": "bool",
+    "digests": "bool",
+    "directed": "bool",
+    "edge": "bool",
+    "node": "bool"
+   },
+   "reference_hash": "str"
+  },
+  "package": {
+   "digests": {
+    "model": "str"
+   },
+   "path": "str",
+   "schema_version": "int",
+   "signature": "str"
+  },
+  "performance": {
+   "baseline": "NoneType",
+   "budget": "NoneType",
+   "comparison": "NoneType",
+   "observations": [
+    {
+     "elapsed": "float",
+     "machine": "str",
+     "memory": "float",
+     "observed": "str",
+     "operation": "str",
+     "samples": "int",
+     "software": "str"
+    }
+   ],
+   "result": "NoneType",
+   "run": {
+    "identifier": "str",
+    "observations": [
+     {
+      "elapsed": "float",
+      "machine": "str",
+      "memory": "float",
+      "observed": "str",
+      "operation": "str",
+      "samples": "int",
+      "software": "str"
+     }
+    ],
+    "schema_version": "int"
+   }
+  },
+  "recovery": {
+   "bounded": "bool",
+   "feature_columns": "int",
+   "feature_rows": "int",
+   "tampered_manifest_rejected": "bool"
+  },
+  "schema_version": "int",
+  "signature": {
+   "algorithm": "str",
+   "value": "str"
+  }
+ },
+ "stages": [
+  "ingestion",
+  "validation",
+  "profiling",
+  "curation",
+  "splitting",
+  "feature_preparation",
+  "modelling",
+  "evaluation",
+  "data_explainability",
+  "model_explainability",
+  "packaging",
+  "inference",
+  "monitoring",
+  "documentation",
+  "recovery_and_resource_tests"
+ ]
+}

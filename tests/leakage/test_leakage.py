@@ -28,9 +28,9 @@ def test_pure_noise_is_not_inflated_by_the_pipeline(tmp_path):
 
 
 def test_leaked_feature_is_flagged_and_can_block(binary_frame, tmp_path):
-    # Enforces README.md:93 and README.md:180.
-    # Enforces docs/BENCHMARKS.md:16 and docs/LEAKAGE.md:228.
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:89.
+    # Enforces README.md:112 and README.md:199.
+    # Enforces docs/BENCHMARKS.md:16 and docs/LEAKAGE.md:233.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:110.
     # Enforces website/src/learn/leakage.html:67-68.
     # Enforces website/src/learn/when-things-go-wrong.html:44.
     # Enforces website/src/pages/docs/benchmarks.astro:709-711.
@@ -108,8 +108,8 @@ def test_a_regression_leak_blocks_under_block(tmp_path):
 
 
 def test_a_regression_leak_warns_under_warn(tmp_path):
-    # Enforces docs/LEAKAGE.md:223.
-    # Enforces docs/WHEN_THINGS_GO_WRONG.md:89.
+    # Enforces docs/LEAKAGE.md:228.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:110.
     # Enforces website/src/learn/leakage.html:66-67.
     # Enforces website/src/learn/when-things-go-wrong.html:44.
     result = support.make_project(

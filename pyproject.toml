@@ -30,6 +30,7 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=2.3",
+    "packaging>=24.0",
     "pandas>=3.0",
     "pyarrow>=22",
     "pydantic>=2.12",
@@ -155,8 +156,6 @@ DEP002 = [
     "pillow",
     "scmle",
 ]
-# `packaging` is imported inside a try block and its absence is handled.
-DEP003 = ["packaging"]
 
 [tool.vulture]
 paths = ["scmle"]
