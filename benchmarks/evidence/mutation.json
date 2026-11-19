@@ -11,12 +11,12 @@
       "entry point": 5,
       "no mutants": 110
     },
-    "frame": 699,
+    "frame": 700,
     "kill_set": "tests/unit/test_*.py files importing the module",
     "modules": 19,
     "mutants": "default_rng([SEED, position]).choice of mutmut names",
     "per_module": 30,
-    "population": 814,
+    "population": 815,
     "rule": "out of the frame before the draw: an entry point (__main__.py) or no mutmut mutants; an untested module stays in and its drawn mutants count as survivors",
     "seed": 10,
     "strata": {
@@ -37,7 +37,7 @@
       "monitoring": 11,
       "operations": 18,
       "optimization": 1,
-      "pipeline": 72,
+      "pipeline": 73,
       "preparation": 17,
       "rehearsal": 16,
       "root": 2,
@@ -51,7 +51,7 @@
       "workflow": 10
     },
     "timeout": "2 * 2.0 * (baseline + 5.0) CPU s",
-    "untested": 7,
+    "untested": 8,
     "workers": 2
   },
   "excluded": {
@@ -204,7 +204,7 @@
       "mutants": 10,
       "not_run": 0,
       "note": null,
-      "seconds": 5.5,
+      "seconds": 5.0,
       "stratum": "artifacts",
       "survivors": [],
       "tests": [
@@ -216,54 +216,60 @@
     {
       "counts": {
         "crash": 0,
-        "killed": 30,
+        "killed": 26,
         "no tests": 0,
-        "survived": 0,
+        "survived": 4,
         "timeout": 0
       },
       "decided": 30,
       "drawn": [
-        "scmle.assurance.admissibility.screen.records.x_dated__mutmut_26",
-        "scmle.assurance.admissibility.screen.records.x_duplication__mutmut_18",
-        "scmle.assurance.admissibility.screen.records.x_duplication__mutmut_24",
-        "scmle.assurance.admissibility.screen.records.x_duplication__mutmut_41",
-        "scmle.assurance.admissibility.screen.records.x_duplication__mutmut_58",
-        "scmle.assurance.admissibility.screen.records.x_encodings__mutmut_29",
-        "scmle.assurance.admissibility.screen.records.x_encodings__mutmut_34",
-        "scmle.assurance.admissibility.screen.records.x_encodings__mutmut_8",
-        "scmle.assurance.admissibility.screen.records.x_excess__mutmut_15",
-        "scmle.assurance.admissibility.screen.records.x_excess__mutmut_29",
-        "scmle.assurance.admissibility.screen.records.x_groupings__mutmut_5",
-        "scmle.assurance.admissibility.screen.records.x_judge__mutmut_16",
-        "scmle.assurance.admissibility.screen.records.x_judge__mutmut_62",
-        "scmle.assurance.admissibility.screen.records.x_judge__mutmut_63",
-        "scmle.assurance.admissibility.screen.records.x_keys__mutmut_12",
-        "scmle.assurance.admissibility.screen.records.x_keys__mutmut_23",
-        "scmle.assurance.admissibility.screen.records.x_keys__mutmut_28",
-        "scmle.assurance.admissibility.screen.records.x_keys__mutmut_4",
-        "scmle.assurance.admissibility.screen.records.x_outcomes__mutmut_11",
-        "scmle.assurance.admissibility.screen.records.x_precision__mutmut_31",
-        "scmle.assurance.admissibility.screen.records.x_precision__mutmut_37",
-        "scmle.assurance.admissibility.screen.records.x_precision__mutmut_40",
-        "scmle.assurance.admissibility.screen.records.x_precision__mutmut_53",
-        "scmle.assurance.admissibility.screen.records.x_precision__mutmut_54",
-        "scmle.assurance.admissibility.screen.records.x_precision__mutmut_8",
-        "scmle.assurance.admissibility.screen.records.x_precision__mutmut_9",
-        "scmle.assurance.admissibility.screen.records.x_runs__mutmut_13",
-        "scmle.assurance.admissibility.screen.records.x_runs__mutmut_30",
+        "scmle.assurance.admissibility.screen.records.x_dated__mutmut_28",
+        "scmle.assurance.admissibility.screen.records.x_declared__mutmut_25",
+        "scmle.assurance.admissibility.screen.records.x_declared__mutmut_32",
+        "scmle.assurance.admissibility.screen.records.x_duplication__mutmut_16",
+        "scmle.assurance.admissibility.screen.records.x_duplication__mutmut_35",
+        "scmle.assurance.admissibility.screen.records.x_encodings__mutmut_19",
+        "scmle.assurance.admissibility.screen.records.x_encodings__mutmut_24",
+        "scmle.assurance.admissibility.screen.records.x_encodings__mutmut_42",
+        "scmle.assurance.admissibility.screen.records.x_encodings__mutmut_9",
+        "scmle.assurance.admissibility.screen.records.x_enumerated__mutmut_9",
+        "scmle.assurance.admissibility.screen.records.x_excess__mutmut_73",
+        "scmle.assurance.admissibility.screen.records.x_fingerprint__mutmut_6",
+        "scmle.assurance.admissibility.screen.records.x_judge__mutmut_46",
+        "scmle.assurance.admissibility.screen.records.x_judge__mutmut_48",
+        "scmle.assurance.admissibility.screen.records.x_judge__mutmut_56",
+        "scmle.assurance.admissibility.screen.records.x_keys__mutmut_10",
+        "scmle.assurance.admissibility.screen.records.x_keys__mutmut_14",
+        "scmle.assurance.admissibility.screen.records.x_keys__mutmut_16",
+        "scmle.assurance.admissibility.screen.records.x_keys__mutmut_25",
+        "scmle.assurance.admissibility.screen.records.x_precision__mutmut_25",
+        "scmle.assurance.admissibility.screen.records.x_precision__mutmut_30",
+        "scmle.assurance.admissibility.screen.records.x_precision__mutmut_34",
+        "scmle.assurance.admissibility.screen.records.x_precision__mutmut_48",
+        "scmle.assurance.admissibility.screen.records.x_precision__mutmut_5",
+        "scmle.assurance.admissibility.screen.records.x_precision__mutmut_6",
+        "scmle.assurance.admissibility.screen.records.x_precision__mutmut_62",
+        "scmle.assurance.admissibility.screen.records.x_runs__mutmut_10",
+        "scmle.assurance.admissibility.screen.records.x_runs__mutmut_29",
         "scmle.assurance.admissibility.screen.records.x_runs__mutmut_38",
-        "scmle.assurance.admissibility.screen.records.x_runs__mutmut_4"
+        "scmle.assurance.admissibility.screen.records.x_runs__mutmut_39"
       ],
-      "files": "11063af6fc406c52d3d0f879b018d0f1acbcd51796f7709ac27182b9039f8456",
+      "files": "635146e89d55769f2a12773371f7e6e5c941436c2e6b7a45cd9c069e72adb8ef",
       "module": "scmle/assurance/admissibility/screen/records.py",
-      "mutants": 495,
+      "mutants": 556,
       "not_run": 0,
       "note": null,
-      "seconds": 8.8,
+      "seconds": 28.4,
       "stratum": "assurance",
-      "survivors": [],
+      "survivors": [
+        "scmle.assurance.admissibility.screen.records.x_dated__mutmut_28",
+        "scmle.assurance.admissibility.screen.records.x_declared__mutmut_32",
+        "scmle.assurance.admissibility.screen.records.x_judge__mutmut_56",
+        "scmle.assurance.admissibility.screen.records.x_runs__mutmut_29"
+      ],
       "tests": [
         "tests/unit/test_mutation_records.py",
+        "tests/unit/test_screen_declarations.py",
         "tests/unit/test_unit_screenparts.py"
       ]
     },
@@ -313,7 +319,7 @@
       "mutants": 465,
       "not_run": 0,
       "note": null,
-      "seconds": 18.3,
+      "seconds": 18.7,
       "stratum": "assurance",
       "survivors": [],
       "tests": [
@@ -373,7 +379,7 @@
       "mutants": 127,
       "not_run": 0,
       "note": null,
-      "seconds": 14.8,
+      "seconds": 15.7,
       "stratum": "assurance",
       "survivors": [],
       "tests": [
@@ -429,7 +435,7 @@
       "mutants": 495,
       "not_run": 0,
       "note": null,
-      "seconds": 5.9,
+      "seconds": 6.0,
       "stratum": "causal",
       "survivors": [],
       "tests": [
@@ -537,7 +543,7 @@
       "mutants": 259,
       "not_run": 0,
       "note": null,
-      "seconds": 4.6,
+      "seconds": 4.5,
       "stratum": "data",
       "survivors": [],
       "tests": [
@@ -591,7 +597,7 @@
       "mutants": 108,
       "not_run": 0,
       "note": null,
-      "seconds": 4.3,
+      "seconds": 4.2,
       "stratum": "data",
       "survivors": [],
       "tests": [
@@ -645,7 +651,7 @@
       "mutants": 230,
       "not_run": 0,
       "note": null,
-      "seconds": 5.5,
+      "seconds": 5.4,
       "stratum": "data",
       "survivors": [],
       "tests": [
@@ -771,12 +777,12 @@
     {
       "counts": {
         "crash": 0,
-        "killed": 30,
+        "killed": 0,
         "no tests": 0,
         "survived": 0,
         "timeout": 0
       },
-      "decided": 30,
+      "decided": 0,
       "drawn": [
         "scmle.evaluation.selection.x\u01c1Averager\u01c1__init____mutmut_4",
         "scmle.evaluation.selection.x\u01c1Averager\u01c1describe__mutmut_13",
@@ -809,19 +815,21 @@
         "scmle.evaluation.selection.x\u01c1Averager\u01c1rank__mutmut_88",
         "scmle.evaluation.selection.x\u01c1Selector\u01c1select__mutmut_1"
       ],
-      "files": "9bc51ddbd1e01d226db6dde426c3972a0e24939209e218b9222bfa6b1f878289",
+      "files": "e6332ac852b76c5ecef04b3021f79a3879151888dbaa7c2a05e20343d8e5e025",
       "module": "scmle/evaluation/selection.py",
       "mutants": 138,
-      "not_run": 0,
-      "note": null,
-      "seconds": 8.1,
+      "not_run": 30,
+      "note": "mutmut exited 1: /python3.14t/site-packages/mutmut/__main__.py\", line 1050, in _run\n    drain_one_result()\n    ~~~~~~~~~~~~~~~~^^\n  File \"/Users/sachin/Documents/Codex/github-repos/scmle/.venv/lib/python3.14t/site-packages/mutmut/__main__.py\", line 1007, in drain_one_result\n    result = runner.wait_for_result()\n  File \"/Users/sachin/Documents/Codex/github-repos/scmle/.venv/lib/python3.14t/site-packages/mutmut/workers/isolation.py\", line 889, in wait_for_result\n    worker = self._running.pop(pid)\nKeyError: 20420\n",
+      "seconds": 21.1,
       "stratum": "evaluation",
       "survivors": [],
       "tests": [
+        "tests/unit/test_charter_products.py",
         "tests/unit/test_component_contracts.py",
         "tests/unit/test_evaluation.py",
         "tests/unit/test_mutation_selection.py",
-        "tests/unit/test_services.py"
+        "tests/unit/test_services.py",
+        "tests/unit/test_unit_stagemade.py"
       ]
     },
     {
@@ -924,7 +932,7 @@
       "mutants": 270,
       "not_run": 0,
       "note": null,
-      "seconds": 9.1,
+      "seconds": 9.0,
       "stratum": "models",
       "survivors": [
         "scmle.models.ensembles.x\u01c1Blender\u01c1fit__mutmut_29",
@@ -1041,7 +1049,7 @@
       "mutants": 202,
       "not_run": 0,
       "note": null,
-      "seconds": 5.3,
+      "seconds": 5.2,
       "stratum": "pipeline",
       "survivors": [
         "scmle.pipeline.modality_lifecycle.predictors.x\u01c1Predictor\u01c1predict__mutmut_1"
@@ -1072,32 +1080,32 @@
         "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1decide__mutmut_68",
         "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1decide__mutmut_70",
         "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1decide__mutmut_72",
-        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1decide__mutmut_75",
+        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1decide__mutmut_74",
         "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1decide__mutmut_8",
-        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1decide__mutmut_82",
-        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1decide__mutmut_94",
-        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1deposit__mutmut_2",
-        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1deposit__mutmut_36",
-        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1deposit__mutmut_7",
+        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1decide__mutmut_81",
+        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1decide__mutmut_93",
+        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1deposit__mutmut_19",
+        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1deposit__mutmut_35",
+        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1deposit__mutmut_6",
+        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1notarize__mutmut_6",
         "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1notarize__mutmut_7",
-        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1notarize__mutmut_8",
-        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1pledge__mutmut_11",
-        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1pledge__mutmut_17",
-        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1pledge__mutmut_2",
+        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1pledge__mutmut_10",
+        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1pledge__mutmut_16",
+        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1pledge__mutmut_19",
+        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1pledge__mutmut_26",
         "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1pledge__mutmut_27",
-        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1pledge__mutmut_50",
+        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1pledge__mutmut_5",
+        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1pledge__mutmut_52",
         "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1pledge__mutmut_53",
-        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1pledge__mutmut_54",
-        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1pledge__mutmut_61",
-        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1pledge__mutmut_64",
-        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1pledge__mutmut_66"
+        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1pledge__mutmut_60",
+        "scmle.pipeline.stages.reporting.x\u01c1Reporting\u01c1pledge__mutmut_65"
       ],
-      "files": "86f73d87051ee0730b8d8bb516012e1ac5e270059daf4db148dbf3f16a1660b1",
+      "files": "94e361f9f43cfb32b2b5085b5d79471cd5d22095e05b900f3f429c973ddf012b",
       "module": "scmle/pipeline/stages/reporting.py",
-      "mutants": 253,
+      "mutants": 252,
       "not_run": 0,
       "note": null,
-      "seconds": 52.4,
+      "seconds": 52.7,
       "stratum": "pipeline",
       "survivors": [],
       "tests": [
@@ -1151,7 +1159,7 @@
       "mutants": 53,
       "not_run": 0,
       "note": null,
-      "seconds": 4.6,
+      "seconds": 4.8,
       "stratum": "preparation",
       "survivors": [
         "scmle.preparation.ranking.x\u01c1Ranker\u01c1fit__mutmut_17",
@@ -1200,7 +1208,7 @@
       "mutants": 19,
       "not_run": 0,
       "note": null,
-      "seconds": 5.4,
+      "seconds": 5.3,
       "stratum": "rehearsal",
       "survivors": [],
       "tests": [
@@ -1220,16 +1228,16 @@
   "pooled": {
     "counts": {
       "crash": 0,
-      "killed": 518,
+      "killed": 484,
       "no tests": 5,
-      "survived": 16,
+      "survived": 20,
       "timeout": 0
     },
-    "decided": 539,
-    "killed": 518,
-    "lower": 0.944377850142337,
-    "not_run": 0,
-    "score": 0.961038961038961
+    "decided": 509,
+    "killed": 484,
+    "lower": 0.9320742138337998,
+    "not_run": 30,
+    "score": 0.9508840864440079
   },
   "power": 0.8,
   "sample": [
@@ -1253,7 +1261,7 @@
     "scmle/preparation/ranking.py",
     "scmle/rehearsal/local_faults/executor.py"
   ],
-  "seconds": 415.1,
+  "seconds": 476.2,
   "untested": [
     "scmle/api/clustering.py",
     "scmle/api/erasure/erasures.py",
@@ -1261,7 +1269,8 @@
     "scmle/assurance/detectors/intervals.py",
     "scmle/cli/clustering.py",
     "scmle/cli/erasure.py",
-    "scmle/cli/storage.py"
+    "scmle/cli/storage.py",
+    "scmle/pipeline/stages/bridge.py"
   ],
   "variable": "mutation_score_min"
 }

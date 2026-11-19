@@ -149,8 +149,8 @@
       "unlinked": 4
     },
     "docs/preregistration/c2.md": {
-      "guarantees": 14,
-      "unlinked": 4
+      "guarantees": 17,
+      "unlinked": 7
     },
     "docs/preregistration/c3.md": {
       "guarantees": 3,
@@ -362,11 +362,11 @@
     }
   },
   "claim": "C12",
-  "content_hash": "c8faf1bcb1068476f2d337b4bdf52a838deb6b3b79a8c9b82c366661f684cf79",
+  "content_hash": "3a537b67cbb5125c6a7676cabc72a1446de80d9bbec5db5cb3fb23c7348de343",
   "counts": {
-    "guarantees": 723,
+    "guarantees": 726,
     "linked": 665,
-    "unlinked": 58
+    "unlinked": 61
   },
   "definition": {
     "docs": "README.md, docs/**/*.md (with docs/preregistration) and the site source website/src/**/*.astro and *.html",
@@ -4063,8 +4063,8 @@
     {
       "cited": [],
       "doc": "docs/TENANT_ISOLATION.md",
-      "end": 51,
-      "line": 51,
+      "end": 55,
+      "line": 55,
       "missing": [],
       "section": "rules",
       "tests": [],
@@ -4077,8 +4077,8 @@
     {
       "cited": [],
       "doc": "docs/TENANT_ISOLATION.md",
-      "end": 55,
-      "line": 52,
+      "end": 59,
+      "line": 56,
       "missing": [],
       "section": "rules",
       "tests": [
@@ -4094,8 +4094,8 @@
     {
       "cited": [],
       "doc": "docs/TENANT_ISOLATION.md",
-      "end": 57,
-      "line": 56,
+      "end": 61,
+      "line": 60,
       "missing": [],
       "section": "rules",
       "tests": [
@@ -4111,8 +4111,8 @@
     {
       "cited": [],
       "doc": "docs/TENANT_ISOLATION.md",
-      "end": 58,
-      "line": 57,
+      "end": 62,
+      "line": 61,
       "missing": [],
       "section": "rules",
       "tests": [
@@ -4128,8 +4128,8 @@
     {
       "cited": [],
       "doc": "docs/TENANT_ISOLATION.md",
-      "end": 63,
-      "line": 60,
+      "end": 67,
+      "line": 64,
       "missing": [],
       "section": "rules",
       "tests": [
@@ -4145,8 +4145,8 @@
     {
       "cited": [],
       "doc": "docs/TENANT_ISOLATION.md",
-      "end": 79,
-      "line": 77,
+      "end": 83,
+      "line": 81,
       "missing": [],
       "section": "what-this-does-not-give-you",
       "tests": [
@@ -4162,8 +4162,8 @@
     {
       "cited": [],
       "doc": "docs/TENANT_ISOLATION.md",
-      "end": 82,
-      "line": 80,
+      "end": 86,
+      "line": 84,
       "missing": [],
       "section": "what-this-does-not-give-you",
       "tests": [
@@ -4179,8 +4179,8 @@
     {
       "cited": [],
       "doc": "docs/TENANT_ISOLATION.md",
-      "end": 111,
-      "line": 111,
+      "end": 115,
+      "line": 115,
       "missing": [],
       "section": "configuration",
       "tests": [
@@ -4196,8 +4196,8 @@
     {
       "cited": [],
       "doc": "docs/TENANT_ISOLATION.md",
-      "end": 116,
-      "line": 114,
+      "end": 120,
+      "line": 118,
       "missing": [],
       "section": "configuration",
       "tests": [
@@ -5893,8 +5893,8 @@
     {
       "cited": [],
       "doc": "docs/preregistration/c2.md",
-      "end": 101,
-      "line": 98,
+      "end": 109,
+      "line": 106,
       "missing": [],
       "section": "where-the-current-module-differs",
       "tests": [],
@@ -5907,8 +5907,50 @@
     {
       "cited": [],
       "doc": "docs/preregistration/c2.md",
-      "end": 104,
-      "line": 102,
+      "end": 114,
+      "line": 110,
+      "missing": [],
+      "section": "where-the-current-module-differs",
+      "tests": [],
+      "text": "- A documented real leak is screened with its availability declared (`Dataset.known`, column to `prediction` or `outcome`) only when its source's documentation says when the column becomes known relative to the prediction, and never from knowing the answer: bank marketing `V12` (the UCI page: \"the duration is not known before a call is performed.",
+      "vague": [],
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/preregistration/c2.md",
+      "end": 121,
+      "line": 119,
+      "missing": [],
+      "section": "where-the-current-module-differs",
+      "tests": [],
+      "text": "A feature declared `outcome` blocks the run whatever its statistics; the plan does not mention the declaration.",
+      "vague": [],
+      "words": [
+        "blocks"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/preregistration/c2.md",
+      "end": 130,
+      "line": 128,
+      "missing": [],
+      "section": "where-the-current-module-differs",
+      "tests": [],
+      "text": "- No ceiling was tuned to a clean table: sylvine (OpenML 41146) `V7` still blocks; it looks like the covertype elevation it derives from, but nothing documents it as a leak.",
+      "vague": [],
+      "words": [
+        "blocks"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/preregistration/c2.md",
+      "end": 133,
+      "line": 131,
       "missing": [],
       "section": "where-the-current-module-differs",
       "tests": [],
@@ -5923,8 +5965,8 @@
     {
       "cited": [],
       "doc": "docs/preregistration/c2.md",
-      "end": 109,
-      "line": 107,
+      "end": 138,
+      "line": 136,
       "missing": [],
       "section": "where-the-current-module-differs",
       "tests": [],
@@ -5937,8 +5979,8 @@
     {
       "cited": [],
       "doc": "docs/preregistration/c2.md",
-      "end": 112,
-      "line": 110,
+      "end": 141,
+      "line": 139,
       "missing": [],
       "section": "where-the-current-module-differs",
       "tests": [],

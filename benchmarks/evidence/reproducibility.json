@@ -1,6 +1,6 @@
 {
   "claim": "C6",
-  "code": "fc1b2754ce7e3489bde0a654f0f56404dcd489648d53fbd9e7eafa9dde6356c0",
+  "code": "53b96469072acaccf0d55b6656d151812f401c7adbc0f59cfce3b7f128d8a679",
   "not_measured": [
     "platforms other than those recorded here",
     "a clean-runner rebuild from the lock file",
@@ -27,7 +27,7 @@
         }
       },
       "rows": 600,
-      "seconds": 86.0,
+      "seconds": 110.6,
       "seed": 7,
       "tasks": {
         "binary": {
@@ -37,14 +37,14 @@
             "relative": 0.0
           },
           "hashes": {
-            "conformal.json": "85d1ef7567a14ee6e088931c0ff7aeb6c8792d52406abdee5fb939c8d9ab2cca",
+            "conformal.json": "ae4afed6b93e70339f744b51a4c9ea15fc34df1d233e1bf588cca2791f4eac82",
             "coverage_report.json": "3d00dec91cee9256e8f6f5b8cc6e59d4a3b026551381ada22cb50477e3857468",
-            "model_manifest.json": "53e1c1bc958e75da521f0666af10ab2e4d6e62058340a74d43d3cbf6a6630a47",
+            "model_manifest.json": "3d7dd7a228e6625f91ada5b4983d0c4f082b6947c148bd06660b30bc5c8ee950",
             "novelty.joblib": "9826d7f62b291b1f792165624b9214860fd5265f01e2811681f55cab6348f3bd",
-            "pipeline.joblib": "c0bf74dc89f5f02f74ccd54424b6a260a92912e1ae834698811333188a911fb5",
-            "reference.json": "ad09616c6c4a5715359d58577bd4847ab5ca5d567f57d4fe0cbf50c96bedd8db",
+            "pipeline.joblib": "d8a9144a36a83a2efd4a8f5cd6d52e19da8ded8b5eb0b7f80088ee7edc0a736c",
+            "reference.json": "419f75364947805f675d6807735e915e362a11dc7cb171f770f2e0ea9c1dfc64",
             "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
-            "signature.json": "4bc3f6929a345a9256e181f67024191287c6c7e6786c16fce35cc17d0e9dc136"
+            "signature.json": "499c033e952071e5eee4c572bc44d605e42a83961a0de76c342b5c76882c339d"
           },
           "members": 8,
           "metrics": {
@@ -56,14 +56,19 @@
             "roc_auc": 0.9598997493734336
           },
           "seconds": [
-            7.1,
-            7.0
+            8.9,
+            8.8
           ],
           "selected": [
             "logistic_regression",
             "logistic_regression"
           ],
           "threads": [
+            {
+              "internal_api": "openblas",
+              "num_threads": 4,
+              "version": "0.3.31.dev"
+            },
             {
               "internal_api": "openblas",
               "num_threads": 4,
@@ -78,11 +83,6 @@
               "internal_api": "openmp",
               "num_threads": 4,
               "version": null
-            },
-            {
-              "internal_api": "openblas",
-              "num_threads": 4,
-              "version": "0.3.31.dev"
             }
           ],
           "trials": [
@@ -100,12 +100,12 @@
           "hashes": {
             "conformal.json": "8a97100747644726b7041f736619e5ae937d884cea87d442274ee2495cd4cd08",
             "coverage_report.json": "13a0f0f3353dbd304fdf0e50783cc081d98a768b9a1328f2bdc62652afe4f581",
-            "model_manifest.json": "9392625157b200c7a8d9362c7e5964f0275f95291c76701b64c038f7062029e0",
+            "model_manifest.json": "263386a1bbf4d034f41e6192d3b36f5ee24afd4ef7c58258a9f6c0861e29b6f7",
             "novelty.joblib": "321b033fec4339a81fdd4d8bb71611775bf07fc9543ccf147db865ceeb17a774",
             "pipeline.joblib": "c9a2182d905433bbdbbdbf9ae545eed413d7d71041c237b5ae125bc771a5738e",
             "reference.json": "5458eb7ca147bf273db1ca9b297ead6ecd27167c25a6915d8d47a8bda2d79ff0",
             "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
-            "signature.json": "7f3443d35e235160b1888b2e8f116cec4cc243958c70c0391fdf9b02d59da6cb"
+            "signature.json": "e6ecb679591f04ff7ee961034c7e379eaa0aca6e0eb5e0a3b6ff4e7bd3c955ff"
           },
           "members": 8,
           "metrics": {
@@ -117,8 +117,8 @@
             "roc_auc": 0.8670745272525028
           },
           "seconds": [
-            8.4,
-            8.6
+            11.2,
+            11.0
           ],
           "selected": [
             "random_forest",
@@ -126,14 +126,14 @@
           ],
           "threads": [
             {
-              "internal_api": "openblas",
-              "num_threads": 4,
-              "version": "0.3.34.106.0"
-            },
-            {
               "internal_api": "openmp",
               "num_threads": 4,
               "version": null
+            },
+            {
+              "internal_api": "openblas",
+              "num_threads": 4,
+              "version": "0.3.34.106.0"
             },
             {
               "internal_api": "openblas",
@@ -159,36 +159,31 @@
             "relative": 0.0
           },
           "hashes": {
-            "conformal.json": "5fa21828ead70a789f98f75098ac14655e838f9524ce7de343196dfccb2df478",
+            "conformal.json": "1ccafbc5df6afe5679a7dcff567fee377037ff5d8052f17d903022dd890b612c",
             "coverage_report.json": "a4f8d9b5a4e56973ceda08ed92afcaeea61f56c481eb5b8bb8f1ee94de7052aa",
-            "model_manifest.json": "abd7b889321a432e692bab40a3ebfe0bb18632f55c0377a27cc550814c0e901e",
+            "model_manifest.json": "813622882f52afbb783d1ae93cc45ec8fd07ceb26cc41b39ef43bbdebe591476",
             "novelty.joblib": "74344b8323e913459cc1064e40aad9ab3d3c3def6c5e07979bbb0dcbaf451b73",
-            "pipeline.joblib": "a7df5b1fd28863b450d1f43459343ed08fa081257d296beed689e4d1f63435ea",
-            "reference.json": "09bb8ca652ed2976ce402c34ee1e2f2654b787e23e762cf06680eb54569a354e",
+            "pipeline.joblib": "c5a7063df8fa49b3fd23a476598664558d43cfbda1f2a72a980dab33b8e23bbf",
+            "reference.json": "3e4f3a8db56dbb89ab5d72b8938a0079361a9d3a47ec3079f277ba5ffe50dcb7",
             "schema.json": "9328b9e7e7899e6e6b1d43ca3a12e7f80488bcaa10e8c94828b369f9bf5b8af0",
-            "signature.json": "cfbd3f0530dd60f5bbcc3c0ea5ee42df151db040e8dce5066df49b7ca4a33761"
+            "signature.json": "2900282b9a282cde79e764c43ddbd1d4a92fb1544cd3754e0374350b9f097996"
           },
           "members": 8,
           "metrics": {
             "accuracy": 0.7416666666666667,
             "balanced_accuracy": 0.7384259259259259,
             "f1_macro": 0.7441074110255131,
-            "log_loss": 0.6388598548604971
+            "log_loss": 0.638859854860497
           },
           "seconds": [
-            14.2,
-            12.3
+            18.2,
+            17.6
           ],
           "selected": [
             "logistic_regression",
             "logistic_regression"
           ],
           "threads": [
-            {
-              "internal_api": "openblas",
-              "num_threads": 4,
-              "version": "0.3.31.dev"
-            },
             {
               "internal_api": "openmp",
               "num_threads": 4,
@@ -203,6 +198,11 @@
               "internal_api": "openmp",
               "num_threads": 4,
               "version": null
+            },
+            {
+              "internal_api": "openblas",
+              "num_threads": 4,
+              "version": "0.3.31.dev"
             }
           ],
           "trials": [
@@ -218,26 +218,26 @@
             "relative": 0.0
           },
           "hashes": {
-            "conformal.json": "e98a5b1b0ba943c8f5cbc5f1e1ede57e9a3dc566a43625750f350dc7bc151385",
-            "coverage_report.json": "c858934ca1b0999c7eb3f5af1c9e45956810343ac3661a6b2023ade4c4d81c76",
-            "cv_plus.joblib": "d14f772599774343bae28ce534994e9f79947499e6f3318dfa14190a3acab142",
-            "model_manifest.json": "4c02dd0b74cb0c5720aad6dc4026b2a7d16fd56995182f023834a9b125f2495e",
+            "conformal.json": "b00323eeb64d706ceff3b640297ed4256264485072012ebd969f038e1e768de5",
+            "coverage_report.json": "919e2e2b8359c369868eba3e86ee33e768c174cc841516b9536b75bf4d46886a",
+            "cv_plus.joblib": "02d63a30064e4df8fd3d1d99891de44ec6b45dca4b64047e9c662b5586070808",
+            "model_manifest.json": "c159f1467a07080f340a68c3b70cefc0e97c7d16406560b85586a6c8abe84805",
             "novelty.joblib": "7cc2b3cf3132ccb2627c0480077648e2524354c14fc4d6fd4789183ae28e5933",
-            "pipeline.joblib": "7b7eef329e6979251216706895cbc7635d22784ced51d6ca44c1bb5f724ddce2",
+            "pipeline.joblib": "83f579c9fdd905bb6479f5bfa198c2f8d35644dec18dc9308232220211a3aa44",
             "quantile.joblib": "b79bf3b213981226eb894b5815a67681a386f05c85ca7352c53ead8f65034d16",
-            "reference.json": "8e983f6aa396730573f02328356f6fa13799e401627ce1fd46e3da277b794626",
+            "reference.json": "df3540d607fbc0b88c23826cef723ba5810b0a9905b686ccbdad7f4c6a04267b",
             "schema.json": "26fb7bc1a1560ce271d432aedc31d2dfcb678bbb14221244681825785972337f",
-            "signature.json": "cc8cc0d67886860b68ffe4fcbb4d9508e7f6182c5e94bfa98160473ac8814ce1"
+            "signature.json": "da5554eca8d0e2c31aad227ea58daad3cc4439340a91126005061e9d21a531cc"
           },
           "members": 10,
           "metrics": {
-            "mae": 0.7315561729885645,
+            "mae": 0.7315561729885643,
             "r2": 0.9260151759343607,
             "rmse": 0.9295354827958173
           },
           "seconds": [
-            6.9,
-            6.0
+            7.9,
+            7.9
           ],
           "selected": [
             "ridge",
@@ -250,9 +250,9 @@
               "version": null
             },
             {
-              "internal_api": "openblas",
+              "internal_api": "openmp",
               "num_threads": 4,
-              "version": "0.3.34.106.0"
+              "version": null
             },
             {
               "internal_api": "openblas",
@@ -260,9 +260,9 @@
               "version": "0.3.31.dev"
             },
             {
-              "internal_api": "openmp",
+              "internal_api": "openblas",
               "num_threads": 4,
-              "version": null
+              "version": "0.3.34.106.0"
             }
           ],
           "trials": [
@@ -292,7 +292,7 @@
         }
       },
       "rows": 600,
-      "seconds": 144.0,
+      "seconds": 128.6,
       "seed": 7,
       "tasks": {
         "binary": {
@@ -302,14 +302,14 @@
             "relative": 0.0
           },
           "hashes": {
-            "conformal.json": "1441d7399f726e085a3a95d2ea283308296a678e68d9d37e979ce841a1341416",
+            "conformal.json": "3280b084c04b65dbd7aee26bceaf870e6cf5e05f04bf646594accc03377b4c3f",
             "coverage_report.json": "3d00dec91cee9256e8f6f5b8cc6e59d4a3b026551381ada22cb50477e3857468",
-            "model_manifest.json": "68f1764354fd66d31c8fb09582e6d4742c9fc1a7e6d3e42a1e382666924d478e",
+            "model_manifest.json": "19ce1736c6e1e014cb81f1088a01e7aa00872551fd8cef19ef245c85abebacaf",
             "novelty.joblib": "80eee0350d638beeaa97f18c7138dbd77389df2fc527e3df13b9fa82e7bd2af1",
-            "pipeline.joblib": "c2b5d853fd81aa62ca83089003e1ecd4cbea8f8b5d790d2a10c5021e2dfae9f7",
+            "pipeline.joblib": "05b42d6153ebeb047bec419751c515f1f1bb9f1195dd84d5beb6d608ee1626ff",
             "reference.json": "ad09616c6c4a5715359d58577bd4847ab5ca5d567f57d4fe0cbf50c96bedd8db",
             "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
-            "signature.json": "c7013394b5a3303f8ea784e3c5fb42699f51dd21998b9c7a5e93ece2e4333679"
+            "signature.json": "83f737ba17afe9fc7fc14332f60690eaf4bbfb5b58a0430f50f2584214e245e4"
           },
           "members": 8,
           "metrics": {
@@ -321,8 +321,8 @@
             "roc_auc": 0.9598997493734336
           },
           "seconds": [
-            12.1,
-            11.6
+            8.6,
+            8.2
           ],
           "selected": [
             "logistic_regression",
@@ -360,12 +360,12 @@
           "hashes": {
             "conformal.json": "8a97100747644726b7041f736619e5ae937d884cea87d442274ee2495cd4cd08",
             "coverage_report.json": "13a0f0f3353dbd304fdf0e50783cc081d98a768b9a1328f2bdc62652afe4f581",
-            "model_manifest.json": "623d9371b1f00df46254ac2a6c037ac0fdaac3e7cee0304e20383ff7bfe01cf1",
+            "model_manifest.json": "63cdd2fb9a56fbd8022f1d9bc8591735fa369ce893feb9732063a3f214fc3717",
             "novelty.joblib": "9bb5215471e3b61c9434a9453500328ef2b64a9e38ce84b21366d0dfadaefed2",
             "pipeline.joblib": "78f00440f2cd16693bc853f7765b0124198f62e6843d8504e7e2ef55546967d6",
             "reference.json": "5458eb7ca147bf273db1ca9b297ead6ecd27167c25a6915d8d47a8bda2d79ff0",
             "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
-            "signature.json": "9b96a157729ed2e2516a1a157b93a13563f940ba9bd2818972d3cd22308f9ea2"
+            "signature.json": "71c2f216638cd16dce38fa9d32023e891d1287ec039701fef93778c54467a930"
           },
           "members": 8,
           "metrics": {
@@ -377,8 +377,8 @@
             "roc_auc": 0.8670745272525028
           },
           "seconds": [
-            14.5,
-            14.4
+            10.3,
+            10.0
           ],
           "selected": [
             "random_forest",
@@ -414,14 +414,14 @@
             "relative": 0.0
           },
           "hashes": {
-            "conformal.json": "ae16d841e19cd483e4f4ef64f7bef2c8eacbcf4d3f0811eb35c52b3a8b2ecfae",
+            "conformal.json": "e4b6fc3e91b59a52e6e0ee3239a1330b30424354dc7ab66aa2ee09e106d00d04",
             "coverage_report.json": "f0c49a4586da226b9f921740923678c40653354e66c39e3e4b02109411a9033f",
-            "model_manifest.json": "26e60255eb44f2dce5608cd4c3098724216de34691e7dbbc1371b6ad9b2e2db3",
+            "model_manifest.json": "12c6b6efac374e0901201e87d7c6a9ad39ec4d4675ca03e9bbf06b9f6dba22f7",
             "novelty.joblib": "71655cf2ae19d5df4d163d4c6bd1432404bc2ac2abeae47a130e0055bee0150d",
-            "pipeline.joblib": "d49cd8368ba11892e53d8989137d4b5a0bf97a11d8dee6b2e98c4b2c17970a30",
+            "pipeline.joblib": "6ec88bdabb3acba17bfcaf0ad5f08d86d52629e1b597d120abc40e93c75beebe",
             "reference.json": "09bb8ca652ed2976ce402c34ee1e2f2654b787e23e762cf06680eb54569a354e",
             "schema.json": "9328b9e7e7899e6e6b1d43ca3a12e7f80488bcaa10e8c94828b369f9bf5b8af0",
-            "signature.json": "39ee2cffb931d09ec0888fa67987ccc646e6e8da6a28a33bf5d4bb3c5edae2c6"
+            "signature.json": "b8e500095b281508660e9bba7072fb352644a8c364d71f0dd591816e73d01026"
           },
           "members": 8,
           "metrics": {
@@ -431,8 +431,8 @@
             "log_loss": 0.6388598548604971
           },
           "seconds": [
-            21.9,
-            22.2
+            14.9,
+            21.2
           ],
           "selected": [
             "logistic_regression",
@@ -468,26 +468,26 @@
             "relative": 0.0
           },
           "hashes": {
-            "conformal.json": "85c1d784a9a69ef4335f4dd4026e822bd668802a4492d8c7f102feceeedb19fd",
-            "coverage_report.json": "0829b8ad97326079b8c147c756a838905b0c523155c4a0cd23044866dc95a750",
-            "cv_plus.joblib": "d25733f1ef9e74e3a9b3250dd2ec244eb16af712daeec8626141009b69628525",
-            "model_manifest.json": "064bcc10ec102c9c09456a0c5451a8a233a1f4d235d55944501e89b3b341396b",
+            "conformal.json": "e98a5b1b0ba943c8f5cbc5f1e1ede57e9a3dc566a43625750f350dc7bc151385",
+            "coverage_report.json": "2db9864019456b2f0fb66f1b0c4605a7fc4ef9c929706111d486ac50ede298b3",
+            "cv_plus.joblib": "d14f772599774343bae28ce534994e9f79947499e6f3318dfa14190a3acab142",
+            "model_manifest.json": "976ad001b2ac3a955e827e7d9673c19e3bff920666e8946346bf6de6ade682bc",
             "novelty.joblib": "28813470464fe6bd71439685158a8c4612d740d13cc1f0fa575f2ce3aae4f6ba",
-            "pipeline.joblib": "37b3773830eac3d0d7fa2b365c34055e14f10331f105077d6db44b39ef90b82f",
+            "pipeline.joblib": "7b7eef329e6979251216706895cbc7635d22784ced51d6ca44c1bb5f724ddce2",
             "quantile.joblib": "b79bf3b213981226eb894b5815a67681a386f05c85ca7352c53ead8f65034d16",
-            "reference.json": "e7c669032c7039f61e60bfcc3c3b4cc93d29bd58497a6efd8ce6477d5f8651ec",
+            "reference.json": "8e983f6aa396730573f02328356f6fa13799e401627ce1fd46e3da277b794626",
             "schema.json": "26fb7bc1a1560ce271d432aedc31d2dfcb678bbb14221244681825785972337f",
-            "signature.json": "3f53141a7143c086712e4e5447fa0067ef6b8827f8435f18bc1f5ab702592f41"
+            "signature.json": "d2b19c7afb3898b993d5f1bcdd2b9e70ced35732a5472fecce29cd4379f3a0fc"
           },
           "members": 10,
           "metrics": {
-            "mae": 0.7315561729885643,
-            "r2": 0.9260151759343608,
-            "rmse": 0.9295354827958169
+            "mae": 0.7315561729885645,
+            "r2": 0.9260151759343607,
+            "rmse": 0.9295354827958173
           },
           "seconds": [
-            10.7,
-            10.7
+            26.6,
+            8.3
           ],
           "selected": [
             "ridge",
@@ -537,7 +537,7 @@
         }
       },
       "rows": 600,
-      "seconds": 131.0,
+      "seconds": 107.1,
       "seed": 7,
       "tasks": {
         "binary": {
@@ -549,12 +549,12 @@
           "hashes": {
             "conformal.json": "0acdda4b2b8c5dbe0edd17b67714f67870510c27b6aa4b098e905a1ef2cbf5b4",
             "coverage_report.json": "e2282ae6f28ad23f8ff48bc314bb0475a6c0a9b34c454600dce0de57184d71db",
-            "model_manifest.json": "5cf9bccb513e10ae601e39714c3d06f126dda8d3a078c1b7dd04cc429e5697d6",
+            "model_manifest.json": "5cd89360253de1d956daca6832e4c3fd0ca7784d6feef4ddfaa0de7e8ba7852b",
             "novelty.joblib": "9064537f33db4f61ea6aec6caa8949613d712c7d86338820fc2c81e15f5d9ffc",
             "pipeline.joblib": "43571619fecd289e0cffc115b5646b33aa7eaee0d739ee4a07a06cb9e33ea7df",
             "reference.json": "f3a2b0a07b368a3db9d76bc84632627fa2e06ccfc5159d5d4cc54cd521e91b61",
             "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
-            "signature.json": "2d81150bf92fea996073db05e6acaa6e43e608747a28524a71f2d82a50dbb688"
+            "signature.json": "fb477fac1db81aa70c46f1a5424b576aae688204f6db2a4bca80eb8cb5c5180f"
           },
           "members": 8,
           "metrics": {
@@ -566,8 +566,8 @@
             "roc_auc": 0.9598997493734336
           },
           "seconds": [
-            14.0,
-            12.1
+            8.5,
+            7.6
           ],
           "selected": [
             "logistic_regression",
@@ -600,12 +600,12 @@
           "hashes": {
             "conformal.json": "8a97100747644726b7041f736619e5ae937d884cea87d442274ee2495cd4cd08",
             "coverage_report.json": "a1f799a5a19dbc3b374b7dc650e7207e8cae6f897de2f5816896f46698a523a7",
-            "model_manifest.json": "d8f81e2a8146c0ac3adffe19f7e1683119dabbb7109f82f85e547981142ef6dc",
+            "model_manifest.json": "650403bd90c90122b277a831326e5991b8cf42963b1e7b80f65016935c3e5985",
             "novelty.joblib": "72bb57854c0eb134a0a5841141e9a9fba807580b0e004a6e011ddb93387fd8c5",
             "pipeline.joblib": "c9a2182d905433bbdbbdbf9ae545eed413d7d71041c237b5ae125bc771a5738e",
             "reference.json": "5458eb7ca147bf273db1ca9b297ead6ecd27167c25a6915d8d47a8bda2d79ff0",
             "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
-            "signature.json": "16bedff89f5bc486a51b3920581fc9aa2c0b94798b08a4c679fb935090336d5a"
+            "signature.json": "10affed079b37c7a1378a7ee3c5e864dfa18c07df520eb9017c73dcdece98525"
           },
           "members": 8,
           "metrics": {
@@ -617,8 +617,8 @@
             "roc_auc": 0.8670745272525028
           },
           "seconds": [
-            9.6,
-            12.9
+            7.0,
+            8.6
           ],
           "selected": [
             "random_forest",
@@ -651,12 +651,12 @@
           "hashes": {
             "conformal.json": "fd926007ec8e2278e82be3604bf8682a74f60ddef350ff31a9e20e3377a6f383",
             "coverage_report.json": "bdb4439e624675bf0a25e9c96075efcad2f537198b39438234eb0e84c797f10d",
-            "model_manifest.json": "19fbbe9177a4f7271f30feb0e96315523f8a6b525d1849cf4592f6fac7ae0dc6",
+            "model_manifest.json": "798400ffc7d962ce78888cb879902781505da3271d308f03bbf69aed600178b2",
             "novelty.joblib": "54146f7d822f6789680d2c004377f2e6997f4ee654b926cd59694542afbf9ad5",
             "pipeline.joblib": "8e3533d5eadb54f1f30c5945345f30b54a8b068d492fa90232bea39b6d2f99ac",
             "reference.json": "09bb8ca652ed2976ce402c34ee1e2f2654b787e23e762cf06680eb54569a354e",
             "schema.json": "9328b9e7e7899e6e6b1d43ca3a12e7f80488bcaa10e8c94828b369f9bf5b8af0",
-            "signature.json": "89651de5858e45115082f08a6c16b7f6b91ba7f032243f46e006990617e24099"
+            "signature.json": "91364927fa45a084dd0fdc36fd70a6d4ce3d0386de12a24d4b4cb20825255a26"
           },
           "members": 8,
           "metrics": {
@@ -666,8 +666,8 @@
             "log_loss": 0.6388598548604971
           },
           "seconds": [
-            14.7,
-            16.5
+            12.7,
+            17.2
           ],
           "selected": [
             "logistic_regression",
@@ -701,13 +701,13 @@
             "conformal.json": "8fb2722c2938e9ae4ae988f90d1cc883e82fb68af215402e43a6379b757a6e65",
             "coverage_report.json": "986873f464b51707234a6f5db5134e2d04846051e5563b5b37ecb8d2a5c4fdde",
             "cv_plus.joblib": "5af87ecc7e65ebd6628eb6cb433fed95d124ab70977d640e464ef13d9aec755f",
-            "model_manifest.json": "42b95707bbeb55d6e1edbe5fb4d52332d536f8e6c1aecf575f9caa6453ee7f87",
+            "model_manifest.json": "c635a4dd9631b7a847400587d5b34468ca55e066b1380b7784e22374ded86b54",
             "novelty.joblib": "73b4418b09c0fe119f7d1511ba86a24231b4a831d15cd245bafbb61a40214616",
             "pipeline.joblib": "72e5f4c2c290747ff09e39d8da192416d09a529f06ccdf0d6e1f89125ec92ef3",
             "quantile.joblib": "b46d1cafa93f7afb81028dee86fb579d206ee519444a9051dafcb4ef53a4f3ad",
             "reference.json": "df3913ce339ff0d93403e28f4a9a3080dd5083de297d1ee92ee039ad2647df93",
             "schema.json": "26fb7bc1a1560ce271d432aedc31d2dfcb678bbb14221244681825785972337f",
-            "signature.json": "7cf01fa493f9a969f25d532ff870ad94935b7db5651cddb3f69be4dae6c1802a"
+            "signature.json": "466113348959b2d4a6271593479c6b002fec75fd950cc3ba8a200437622b00db"
           },
           "members": 10,
           "metrics": {
@@ -716,8 +716,8 @@
             "rmse": 0.929535482795817
           },
           "seconds": [
-            6.7,
-            11.6
+            8.9,
+            8.0
           ],
           "selected": [
             "ridge",

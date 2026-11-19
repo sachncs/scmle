@@ -128,7 +128,7 @@
         "clean/openml_42734": "validation",
         "clean/openml_43071": "acceptance",
         "clean/openml_43939": "validation",
-        "clean/openml_44": "validation",
+        "clean/openml_44": "development",
         "clean/openml_44958": "acceptance",
         "clean/openml_44962": "development",
         "clean/openml_44963": "validation",
@@ -158,7 +158,7 @@
         "clean/openml_469": "development",
         "clean/openml_50": "acceptance",
         "clean/openml_503": "acceptance",
-        "clean/openml_505": "development",
+        "clean/openml_505": "validation",
         "clean/openml_507": "development",
         "clean/openml_53": "acceptance",
         "clean/openml_531": "validation",
@@ -235,11 +235,13 @@
         "leak/openml_43939/future_timestamp": "validation",
         "leak/openml_43939/post_outcome": "validation",
         "leak/openml_43939/target_encoding": "validation",
-        "leak/openml_44/duplicates": "validation",
-        "leak/openml_44/future_timestamp": "validation",
-        "leak/openml_44/post_outcome": "validation",
-        "leak/openml_44/target_encoding": "validation",
+        "leak/openml_44/duplicates": "development",
+        "leak/openml_44/future_timestamp": "development",
+        "leak/openml_44/post_outcome": "development",
+        "leak/openml_44/target_encoding": "development",
         "leak/taxi_total": "validation",
+        "leak/tecator_moisture": "validation",
+        "leak/tecator_protein": "validation",
         "leak/titanic_boat": "validation",
         "leak/titanic_body": "validation"
       },
@@ -248,7 +250,7 @@
         "clean": 59,
         "leak": 29
       },
-      "seal": "a07eaca4363e72daa1195e7516c814ce55563a7d385d09b79cfd87e310d3fd80",
+      "seal": "deeb34e6a5ada77763743db6df016c2d0ca1ef4e4c1605f493125f2492fb39e4",
       "strata": {
         "clean": {
           "counts": {
@@ -268,17 +270,17 @@
         "leak": {
           "counts": {
             "acceptance": 33,
-            "development": 4,
-            "validation": 31
+            "development": 8,
+            "validation": 29
           },
           "need": 29,
           "share": {
-            "acceptance": 0.4264705882352941,
-            "development": 0.1470588235294118,
-            "validation": 0.4264705882352941
+            "acceptance": 0.4142857142857143,
+            "development": 0.17142857142857137,
+            "validation": 0.4142857142857143
           },
           "short": false,
-          "size": 68
+          "size": 70
         }
       }
     },
@@ -441,12 +443,12 @@
         "socmob": "validation",
         "solar_flare": "validation",
         "space_ga": "development",
-        "spambase": "validation",
+        "spambase": "development",
         "steel_plates": "validation",
         "student_performance_por": "acceptance",
         "superconductivity": "validation",
         "sylvine": "validation",
-        "tecator": "development",
+        "tecator": "validation",
         "texture": "acceptance",
         "tic_tac_toe": "acceptance",
         "titanic": "validation",

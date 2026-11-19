@@ -1,6 +1,6 @@
 {
   "alpha": 0.05,
-  "code": "0279ace4737a1fdebae85ea0946d742a59635a1c8c40396f028b8c0e3a9a6d13",
+  "code": "7ad89e2d813c3293203e4399a78e66aeab69ecc1baf4c99e94dd986465232a73",
   "development_seed_base": 10000,
   "feasibility": {
     "agreement": 0.986,
@@ -40,7 +40,7 @@
     "accepted": 0,
     "malformed": 1000
   },
-  "seconds": 12.6,
+  "seconds": 14.5,
   "selective_labels": {
     "alpha": 0.01,
     "clean": 500,
