@@ -46,10 +46,10 @@ class Strategist:
         Args:
             screened: Default-configuration trials from the screening step.
         """
-        spec = self.context.spec.effective()
+        spec = self.context.services.spec.effective()
         if not spec.names or spec.top_models == 0:
             return
-        registry = self.context.registry
+        registry = self.context.services.registry
         baselines = frozenset(
             name
             for name, adapter in registry.adapters.items()
@@ -68,13 +68,13 @@ class Strategist:
             : spec.top_models
         ]
         for leader in leaders:
-            reason = self.context.regulator.skip_reason(first=False)
+            reason = self.context.services.governor.skip_reason(first=False)
             if reason:
-                self.context.forgo(
+                self.context.journal.forgo(
                     f"strategy search for {leader.model_name}", reason
                 )
                 continue
-            self.context.check_cancelled()
+            self.context.services.check()
             self.tune(leader, spec.names)
 
     def tune(self, leader: experiments.Trial, names: list[str]) -> None:
@@ -89,7 +89,7 @@ class Strategist:
             leader: The model's default-pipeline trial.
             names: Names of the strategies to try.
         """
-        adapter = self.context.registry.get(leader.model_name)
+        adapter = self.context.services.registry.get(leader.model_name)
         chosen: list[str] = []
         for name in names:
             strategy = strategies.lookup(name)
@@ -97,18 +97,18 @@ class Strategist:
             if reason is None:
                 chosen.append(name)
             else:
-                self.context.enter(
+                self.context.journal.enter(
                     f"{name}@{leader.model_name}",
                     experiments.Edict.REJECT,
                     f"not applicable: {reason}",
                 )
-        ids = self.context.allocate(len(chosen))
+        ids = self.context.journal.allocate(len(chosen))
         jobs = [
             trials.Job(trial_id, leader.model_name, {}, None, name)
             for trial_id, name in zip(ids, chosen, strict=True)
         ]
         for outcome in self.runner.run_many(jobs):
-            self.context.transcribe(outcome)
+            self.context.journal.transcribe(outcome)
             self.judge(leader, outcome)
 
     def judge(
@@ -125,7 +125,7 @@ class Strategist:
         """
         technique = f"{outcome.strategy}@{outcome.model_name}"
         if outcome.status is not experiments.Termination.OK:
-            self.context.enter(
+            self.context.journal.enter(
                 technique,
                 experiments.Edict.REJECT,
                 f"trial {outcome.status}: {outcome.error}",
@@ -136,7 +136,7 @@ class Strategist:
         verdict = (
             experiments.Edict.INCLUDE if gain > 0 else experiments.Edict.REJECT
         )
-        self.context.enter(
+        self.context.journal.enter(
             technique,
             verdict,
             f"cv {self.metric.name} {outcome.score_mean:.4f} vs default "

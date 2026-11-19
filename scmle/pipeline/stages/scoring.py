@@ -81,7 +81,7 @@ def slicers(
         The declared columns; empty if there is no charter or no
         uncertainty block.
     """
-    path = context.spec.charter_path
+    path = context.services.spec.charter_path
     if not path:
         return ()
     block = sealing.read_verified(str(path)).charter.uncertainty
@@ -100,7 +100,7 @@ def decisional(
         The charter if it declares both a decision layer and a cost model,
         else None.
     """
-    path = context.spec.charter_path
+    path = context.services.spec.charter_path
     if path is None:
         return None
     charter = sealing.read_verified(str(path)).charter
@@ -210,8 +210,9 @@ def appraise(
     positive = pipeline.classes_[1]
     split = scmle.pipeline.context.require(context.split, "split")
     clusters = (
-        features[context.spec.data.group_column]
-        if split.manifest.strategy == "group" and context.spec.data.group_column
+        features[context.services.spec.data.group_column]
+        if split.manifest.strategy == "group"
+        and context.services.spec.data.group_column
         else None
     )
     guard = netbenefit.FinalNetBenefit(decision["f11"]["rule_hash"])
@@ -282,7 +283,7 @@ def choose_decision_threshold(
         charter's cost model takes precedence over the specification's
         objective and is always applied.
     """
-    decision = context.spec.decision
+    decision = context.services.spec.decision
     task = scmle.pipeline.context.require(context.task, "task")
     chartered = decisional(context)
     if task is not tasks.Task.BINARY or (
@@ -292,20 +293,20 @@ def choose_decision_threshold(
     split = scmle.pipeline.context.require(context.split, "split")
     selected = scmle.pipeline.context.require(context.selected, "selected")
     if chartered is None:
-        governor = context.regulator
+        governor = context.services.governor
         reason = governor.overdue(
             cost.foldcost(selected) * len(split.manifest.folds),
             governor.reserve.parts.get("package", 0.0),
         )
         if reason is not None:
-            context.forgo("decision threshold", reason)
+            context.journal.forgo("decision threshold", reason)
             return fitted, None
     strategy = strategies.lookup(selected.strategy)
-    adapter = context.registry.get(selected.model_name)
+    adapter = context.services.registry.get(selected.model_name)
     plan = scmle.pipeline.context.require(
         context.profile, "profile"
     ).feature_plan
-    seed = context.spec.validation.seed
+    seed = context.services.spec.validation.seed
     probabilities, positions = thresholds.heldout(
         lambda: strategy.build(plan, adapter, task, seed, selected.params),
         split.dev_features,

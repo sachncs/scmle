@@ -46,10 +46,10 @@ class Examination(interface.Stage):
             The total seconds the diagnostics may use: a fixed share of the time
             budget (never less than the minimum), capped by the time left.
         """
-        budget = context.spec.resources.time_budget_seconds
+        budget = context.services.spec.resources.time_budget_seconds
         share = DIAGNOSTIC_BUDGET_SHARE * budget
         allowance = max(DIAGNOSTIC_MIN_SECONDS, share)
-        governor = context.regulator
+        governor = context.services.governor
         left = governor.left("finish") - governor.reserve.parts.get(
             "package", 0.0
         )
@@ -73,7 +73,7 @@ class Examination(interface.Stage):
         """
         health = fit_health.sanity(
             selected,
-            context.trials,
+            context.journal.trials,
             scmle.pipeline.context.require(
                 context.metric, "metric"
             ).greater_is_better,
@@ -98,8 +98,11 @@ class Examination(interface.Stage):
         if context.stream is None:
             return None
         source, totals = context.stream
-        data, seed = context.spec.data, context.spec.validation.seed
-        fraction = context.spec.validation.test_fraction
+        data, seed = (
+            context.services.spec.data,
+            context.services.spec.validation.seed,
+        )
+        fraction = context.services.spec.validation.test_fraction
         task = scmle.pipeline.context.require(context.task, "task")
         labels, guesses, scores = [], [], []
         offset = 0
@@ -130,7 +133,7 @@ class Examination(interface.Stage):
                 getattr(pipeline, "classes_", None),
             ),
         )
-        metrics = context.catalog.evaluate(
+        metrics = context.services.catalog.evaluate(
             stand_in, pandas.DataFrame(index=truth.index), truth, task
         )
         return {
@@ -165,7 +168,9 @@ class Examination(interface.Stage):
             is not tasks.Task.UPLIFT
         ):
             return None
-        arm = features[context.spec.data.treatment_column].to_numpy(dtype=int)
+        arm = features[context.services.spec.data.treatment_column].to_numpy(
+            dtype=int
+        )
         predicted = numpy.asarray(fitted.predict(features), dtype=float)
         rows, curve = uplift.qini_curve(outcome.to_numpy(float), arm, predicted)
         keep = numpy.unique(numpy.linspace(0, len(rows) - 1, 50).astype(int))

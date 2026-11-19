@@ -1,7 +1,6 @@
 """The final evaluation stage on the locked test set."""
 
 import dataclasses
-import time
 from typing import Any
 from typing import ClassVar
 
@@ -90,12 +89,12 @@ class FinalEvaluationStage(summary.Summary):
             context: The run context; receives the final model, the test rows
                 and the evaluation.
         """
-        context.check_cancelled()
+        context.services.check()
         split = scmle.pipeline.context.require(context.split, "split")
         if not isinstance(split.locked_test, journal.Custodian):
             split.locked_test = journal.Custodian(
                 split.locked_test,
-                journal.Journal.locate(context.workspace.directory),
+                journal.Journal.locate(context.services.workspace.directory),
             )
         selected = scmle.pipeline.context.require(context.selected, "selected")
         task = scmle.pipeline.context.require(context.task, "task")
@@ -114,7 +113,7 @@ class FinalEvaluationStage(summary.Summary):
         self.corroborate(
             context, unmitigated, pipeline, test_features, test_target
         )
-        context.emit(
+        context.journal.emit(
             "test.opened",
             "locked test set released once, after selection was frozen",
             data={
@@ -143,12 +142,12 @@ class FinalEvaluationStage(summary.Summary):
             {"decision": decision, "net_benefit": net_benefit},
         ) | {
             "resources": usage.to_dict(),
-            "resource_limits": context.regulator.report(),
-            "skipped_for_time": context.skipped,
+            "resource_limits": context.services.governor.report(),
+            "skipped_for_time": context.journal.skipped,
             "test_set_opened": locked.opened,
             "shipped": shipped,
             "diagnostics": sorted(context.diagnostics),
-            "elapsed_seconds": time.monotonic() - context.started_at,
+            "elapsed_seconds": context.services.elapsed(),
             "reproducibility": (
                 "same seed/data/environment replays; threaded backends may "
                 "differ"
@@ -178,9 +177,9 @@ class FinalEvaluationStage(summary.Summary):
                 scmle.pipeline.context.require(
                     context.profile, "profile"
                 ).feature_plan,
-                context.registry.get(selected.model_name),
+                context.services.registry.get(selected.model_name),
                 task,
-                context.spec.validation.seed,
+                context.services.spec.validation.seed,
                 selected.params,
             )
             pipeline.fit(split.dev_features, split.dev_target)
@@ -219,7 +218,7 @@ class FinalEvaluationStage(summary.Summary):
         rows = scmle.pipeline.context.require(context.test_rows, "test_rows")
         reason = self.hold(context, len(rows[0]))
         if reason:
-            context.forgo("refit on every row", reason)
+            context.journal.forgo("refit on every row", reason)
             return evaluated, {
                 "refit": False,
                 "rows": len(split.dev_features),
@@ -231,9 +230,9 @@ class FinalEvaluationStage(summary.Summary):
             scmle.pipeline.context.require(
                 context.profile, "profile"
             ).feature_plan,
-            context.registry.get(selected.model_name),
+            context.services.registry.get(selected.model_name),
             task,
-            context.spec.validation.seed,
+            context.services.spec.validation.seed,
             selected.params,
         )
         fitted.fit(features, target)
@@ -246,9 +245,9 @@ class FinalEvaluationStage(summary.Summary):
                 features,
                 target,
                 unlabeled,
-                context.spec.data.pseudo_label_confidence,
+                context.services.spec.data.pseudo_label_confidence,
             )[0]
-        context.emit(
+        context.journal.emit(
             "model.shipped",
             f"selected model refit on all {len(features)} rows to serve",
             data={"rows": len(features)},
@@ -273,21 +272,21 @@ class FinalEvaluationStage(summary.Summary):
             The reason: a charter governs the run, training was streamed, or
             the refit would not end before the packaging reserve.
         """
-        if context.spec.charter_path is not None:
+        if context.services.spec.charter_path is not None:
             return "a charter governs the run"
         if (
             context.stream is not None
-            and context.spec.data.training == "stream"
+            and context.services.spec.data.training == "stream"
         ):
             return "training was streamed"
         split = scmle.pipeline.context.require(context.split, "split")
         selected = scmle.pipeline.context.require(context.selected, "selected")
         developed = max(len(split.dev_features), 1)
-        return context.regulator.overdue(
+        return context.services.governor.overdue(
             cost.refitcost(context, selected)
             * (developed + tested)
             / developed,
-            context.regulator.reserve.parts.get("package", 0.0),
+            context.services.governor.reserve.parts.get("package", 0.0),
         )
 
     def unlock(
@@ -311,7 +310,7 @@ class FinalEvaluationStage(summary.Summary):
         locked.bind(binding)
         features, target = locked.open(locked.mint(), binding)
         if (
-            context.spec.data.weight_column == tasks.FAIRNESS_WEIGHT
+            context.services.spec.data.weight_column == tasks.FAIRNESS_WEIGHT
             and tasks.FAIRNESS_WEIGHT not in features
         ):
             # Reweighing weights development rows only; locked rows carry a

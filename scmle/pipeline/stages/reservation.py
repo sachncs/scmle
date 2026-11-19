@@ -74,13 +74,13 @@ class Reservation(interface.Stage):
             BlockedError: If preparation, one cheapest trial and the reserve
                 cannot fit in the time budget (`budget.Reserve.admit`).
         """
-        reserve = context.regulator.reserve
+        reserve = context.services.governor.reserve
         parts = reserve.provision(*cost.dimensions(context), profiler.estimate)
-        context.emit(
+        context.journal.emit(
             "budget.reserved",
             f"{reserve.total:.1f} s of the "
-            f"{context.spec.resources.time_budget_seconds} s budget held for "
-            "the final refit, diagnostics and packaging",
+            f"{context.services.spec.resources.time_budget_seconds} s budget "
+            "held for the final refit, diagnostics and packaging",
             data={"reserve_seconds": parts},
         )
         reserve.admit()

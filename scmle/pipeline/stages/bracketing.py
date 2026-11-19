@@ -56,7 +56,7 @@ class Bracketing(diagnosis.Diagnosis):
                 bundle, task.value, context.coverage_claim_sha256
             )
         if runner is None:
-            context.write_json(
+            context.journal.write_json(
                 coverage_confirm.DOCUMENT,
                 coverage_confirm.not_evaluated(
                     "the bundle holds no conformal calibration, so there is "
@@ -94,8 +94,8 @@ class Bracketing(diagnosis.Diagnosis):
         plan = scmle.pipeline.context.require(
             context.profile, "profile"
         ).feature_plan
-        adapter = context.registry.get("hist_gradient_boosting")
-        seed = context.spec.validation.seed
+        adapter = context.services.registry.get("hist_gradient_boosting")
+        seed = context.services.spec.validation.seed
 
         def build(level: float) -> Any:
             return preprocessing.instantiate(
@@ -184,8 +184,8 @@ class Bracketing(diagnosis.Diagnosis):
             )
             if measured is not None:
                 bundle.coverage_report = measured
-                context.write_json("coverage_report.json", measured)
-                context.emit(
+                context.journal.write_json("coverage_report.json", measured)
+                context.journal.emit(
                     "coverage.reported",
                     "coverage of the stored intervals or sets was measured "
                     "on the final test rows",

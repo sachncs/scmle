@@ -21,6 +21,28 @@ import scmle.runtime.state
 LOGGER = logging.getLogger(__name__)
 
 
+def observe(context: scmle.pipeline.context.Context) -> None:
+    """Persists the runtime facts immediately before capability planning.
+
+    Args:
+        context: The run context, whose services hold the facts.
+
+    Raises:
+        ScmleError: If the services carry no resource observation.
+    """
+    observation = scmle.pipeline.context.require(
+        context.services.capability_observation, "capability_observation"
+    )
+    path = "evidence/capability_resources.json"
+    context.journal.write_json(path, observation.to_dict())
+    context.journal.emit(
+        "capability.environment.observed",
+        "runtime facts captured for the capability gate",
+        (path,),
+        observation.to_dict()["environment"],
+    )
+
+
 def devise(
     context: scmle.pipeline.context.Context,
 ) -> experiments.Plan:
@@ -45,21 +67,23 @@ def devise(
             accepted capability declaration, or the requested fairness
             mitigation is not implemented for the task.
     """
-    approved = context.approved_plan
-    planner = scmle.pipeline.planner.Planner(context.registry, context.catalog)
+    approved = context.services.approved_plan
+    planner = scmle.pipeline.planner.Planner(
+        context.services.registry, context.services.catalog
+    )
     plan = planner.plan(
         scmle.pipeline.planner.Situation(
-            context.spec,
+            context.services.spec,
             scmle.pipeline.context.require(context.profile, "profile"),
             scmle.pipeline.context.require(context.task, "task"),
             approved.candidates if approved is not None else None,
-            context.history,
+            context.services.history,
         )
     )
     task = scmle.pipeline.context.require(context.task, "task")
     manifest = scmle.pipeline.context.require(context.manifest, "manifest")
     for model_name in plan.candidates:
-        adapter = context.registry.get(model_name)
+        adapter = context.services.registry.get(model_name)
         model_family = adapter.capability_family or adapter.family
         key = requisition(context, task, model_family)
         allowed_statuses = (
@@ -67,11 +91,11 @@ def devise(
                 capabilities.Status.SUPPORTED,
                 capabilities.Status.EXPERIMENTAL,
             }
-            if model_name in context.spec.models.experimental_models
+            if model_name in context.services.spec.models.experimental_models
             else None
         )
         try:
-            context.capability_registry.require(
+            context.services.capability_registry.require(
                 key,
                 allowed_statuses=allowed_statuses,
                 row_count=manifest.rows,
@@ -85,11 +109,11 @@ def devise(
                 model_family,
                 error,
             )
-            if context.capability_registry.records.get(key) is None:
-                context.capability_registry.register(
+            if context.services.capability_registry.records.get(key) is None:
+                context.services.capability_registry.register(
                     roster.extension_capability(key)
                 )
-            context.capability_registry.require(
+            context.services.capability_registry.require(
                 key,
                 allowed_statuses={capabilities.Status.EXTENSION_ONLY},
                 row_count=manifest.rows,
@@ -123,9 +147,7 @@ def requisition(
         ConfigError: If the manifest's modality differs from the data spec's.
     """
     manifest = scmle.pipeline.context.require(context.manifest, "manifest")
-    try:
-        modality = capabilities.Modality(manifest.modality)
-    except ValueError as error:
+    if manifest.modality not in {m.value for m in capabilities.Modality}:
         raise capabilities.UnsupportedError(
             "unsupported dataset modality before training",
             {
@@ -133,15 +155,17 @@ def requisition(
                 "reason": "dataset manifest has an unknown modality",
                 "modality": manifest.modality,
             },
-        ) from error
-    if manifest.modality != context.spec.data.modality:
+        )
+    modality = capabilities.Modality(manifest.modality)
+    if manifest.modality != context.services.spec.data.modality:
         raise errors.ConfigError(
             "dataset manifest modality does not match the project data "
-            f"spec: {manifest.modality!r} != {context.spec.data.modality!r}"
+            f"spec: {manifest.modality!r} != "
+            f"{context.services.spec.data.modality!r}"
         )
     fairness = (
         capabilities.Fairness.NONE
-        if context.spec.fairness.mitigation == "none"
+        if context.services.spec.fairness.mitigation == "none"
         else capabilities.Fairness.MITIGATION
     )
     key = capabilities.Coordinate(
@@ -155,10 +179,10 @@ def requisition(
         inference=capabilities.Inference.LIBRARY,
     )
     if (
-        context.spec.fairness.mitigation == "group_thresholds"
+        context.services.spec.fairness.mitigation == "group_thresholds"
         and task is not tasks.Task.BINARY
     ):
-        context.capability_registry.refuse(
+        context.services.capability_registry.refuse(
             key,
             "group-threshold mitigation is implemented for binary tasks "
             "only; reweighing mitigates multiclass and regression tasks",
@@ -176,7 +200,8 @@ def advise(context: scmle.pipeline.context.Context) -> tuple[Any, ...]:
         The recommendations, also kept on the context.
     """
     advice = recommendations.recommend(
-        scmle.pipeline.context.require(context.profile, "profile"), context.spec
+        scmle.pipeline.context.require(context.profile, "profile"),
+        context.services.spec,
     )
     context.recommendations = advice
     return advice
@@ -234,24 +259,24 @@ class Planning(interface.Stage):
         Args:
             context: The run context; receives the execution plan.
         """
-        context.observe()
+        observe(context)
         plan = devise(context)
         context.plan = plan
-        context.write_json("execution_plan.json", plan.to_dict())
-        context.write_json(
+        context.journal.write_json("execution_plan.json", plan.to_dict())
+        context.journal.write_json(
             "capability_registry.json",
-            context.capability_registry.to_dict(),
+            context.services.capability_registry.to_dict(),
         )
-        context.write_json(
+        context.journal.write_json(
             "diagnostics/decision_log.json",
             {"plan": [d.to_dict() for d in plan.decisions], "outcomes": []},
         )
         advice = advise(context)
-        context.write_json(
+        context.journal.write_json(
             "diagnostics/recommendations.json",
             [item.to_dict() for item in advice],
         )
-        context.emit(
+        context.journal.emit(
             "plan.recommendations",
             f"{len(advice)} recommendation(s) for the user",
             ("diagnostics/recommendations.json",),

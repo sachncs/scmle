@@ -69,7 +69,7 @@ class Admission(identification.Identification):
                 the rule cannot be fitted (no numeric input column, or fewer
                 than two observed outcome classes).
         """
-        data = context.spec.data
+        data = context.services.spec.data
         column = data.baseline_column
         if not column:
             return None
@@ -89,7 +89,9 @@ class Admission(identification.Identification):
         ceiling, why = scmle.assurance.framing.claim.source_ceiling(
             data.framing_draft, charter.charter_hash, model, signed=signed
         )
-        context.write_json(scmle.assurance.framing.claim.PROVENANCE, why)
+        context.journal.write_json(
+            scmle.assurance.framing.claim.PROVENANCE, why
+        )
         return scmle.assurance.framing.claim.rig(
             rule=rule if subject is None else subject,
             reference=None if subject is None else rule,
@@ -142,7 +144,7 @@ class Admission(identification.Identification):
             BlockedError: If every feature would be quarantined.
             ConfigError: If the leakage attestations file is invalid.
         """
-        spec = context.spec
+        spec = context.services.spec
         given = attested(spec)
         found = qualify.run(
             view.features,
@@ -263,10 +265,12 @@ def register(
     """
     written: list[str] = []
     if found.table is not None:
-        context.write_json("admissibility_table.json", found.table.to_dict())
+        context.journal.write_json(
+            "admissibility_table.json", found.table.to_dict()
+        )
         written.append("admissibility_table.json")
     if found.f5_store is not None:
-        context.write_json(
+        context.journal.write_json(
             "detector_certificates.json", found.f5_store.to_dict()
         )
         written.append("detector_certificates.json")
@@ -336,7 +340,7 @@ def amend(
     profile = scmle.pipeline.context.require(context.profile, "profile")
     profile = dataclasses.replace(profile, feature_plan=plan)
     context.profile = profile
-    context.write_json("dataset_profile.json", profile.to_dict())
+    context.journal.write_json("dataset_profile.json", profile.to_dict())
     curation = context.curation
     if curation is not None:
         amended = dataclasses.replace(
@@ -349,8 +353,8 @@ def amend(
             dropped_columns=plan.dropped,
         )
         context.curation = amended
-        context.write_json("curation_report.json", amended.to_dict())
-        context.write_json(
+        context.journal.write_json("curation_report.json", amended.to_dict())
+        context.journal.write_json(
             "dataset_card.json",
             scmle.contracts.data.Datasheet.distill(amended).to_dict(),
         )
@@ -370,7 +374,7 @@ def announce(
         found: The qualification.
         written: The files written for it.
     """
-    context.emit(
+    context.journal.emit(
         "admissibility.completed",
         "admissibility and detectors ran on the exploration set",
         written,

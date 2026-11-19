@@ -42,7 +42,7 @@ class Relabelling(remedy.Remedy):
             (including when the judgement was abandoned for lack of time or
             confident rows).
         """
-        data = context.spec.data
+        data = context.services.spec.data
         unlabeled = context.unlabeled
         if data.unlabeled != "pseudo_label" or unlabeled is None:
             return pipeline
@@ -53,9 +53,9 @@ class Relabelling(remedy.Remedy):
             scmle.pipeline.context.require(
                 context.profile, "profile"
             ).feature_plan,
-            context.registry.get(selected.model_name),
+            context.services.registry.get(selected.model_name),
             task,
-            context.spec.validation.seed,
+            context.services.spec.validation.seed,
             selected.params,
         )
         outcome = pseudo_labeling.judge(
@@ -69,9 +69,9 @@ class Relabelling(remedy.Remedy):
             ),
             data.pseudo_label_confidence,
             lambda: bool(
-                context.regulator.overdue(
+                context.services.governor.overdue(
                     cost.foldcost(selected),
-                    context.regulator.reserve.parts.get("package", 0.0),
+                    context.services.governor.reserve.parts.get("package", 0.0),
                 )
             ),
         )

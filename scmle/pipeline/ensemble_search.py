@@ -56,7 +56,8 @@ class Stacker:
             if t.status is experiments.Termination.OK
             and t.strategy == experiments.DEFAULT_STRATEGY
             and t.model_name not in COMBINERS
-            and self.context.registry.get(t.model_name).family != "baseline"
+            and self.context.services.registry.get(t.model_name).family
+            != "baseline"
         ]
         best: dict[str, experiments.Trial] = {}
         for trial in sorted(eligible, key=lambda t: -sign * t.score_mean):
@@ -77,15 +78,16 @@ class Stacker:
         Args:
             evaluated: All trials produced before the ensemble step.
         """
-        size = self.context.spec.ensemble.size
-        if size < ensembles.MIN_MEMBERS or self.context.regulator.skip_reason(
-            first=False
+        size = self.context.services.spec.ensemble.size
+        if (
+            size < ensembles.MIN_MEMBERS
+            or self.context.services.governor.skip_reason(first=False)
         ):
             return
         members = self.members(evaluated, size)
         if len(members) < ensembles.MIN_MEMBERS:
             for combiner in COMBINERS:
-                self.context.enter(
+                self.context.journal.enter(
                     combiner,
                     experiments.Edict.REJECT,
                     "fewer than two eligible distinct models",
@@ -99,16 +101,20 @@ class Stacker:
         }
         task = scmle.pipeline.context.require(self.context.task, "task")
         for combiner in COMBINERS:
-            if self.context.regulator.skip_reason(first=False):
+            if self.context.services.governor.skip_reason(first=False):
                 return
-            reason = self.context.registry.get(combiner).objection(task)
+            reason = self.context.services.registry.get(combiner).objection(
+                task
+            )
             if reason is not None:
-                self.context.enter(combiner, experiments.Edict.REJECT, reason)
+                self.context.journal.enter(
+                    combiner, experiments.Edict.REJECT, reason
+                )
                 continue
-            self.context.check_cancelled()
-            trial_id = self.context.allocate(1)[0]
+            self.context.services.check()
+            trial_id = self.context.journal.allocate(1)[0]
             outcome = self.runner.run(trial_id, combiner, params)
-            self.context.transcribe(outcome)
+            self.context.journal.transcribe(outcome)
             self.judge(
                 combiner,
                 members[0],
@@ -135,7 +141,7 @@ class Stacker:
             names: Model names of the members, for the explanation.
         """
         if outcome.status is not experiments.Termination.OK:
-            self.context.enter(
+            self.context.journal.enter(
                 combiner,
                 experiments.Edict.REJECT,
                 f"trial {outcome.status}: {outcome.error}",
@@ -143,7 +149,7 @@ class Stacker:
             return
         sign = 1 if self.metric.greater_is_better else -1
         gain = sign * (outcome.score_mean - leader.score_mean)
-        self.context.enter(
+        self.context.journal.enter(
             combiner,
             experiments.Edict.INCLUDE if gain > 0 else experiments.Edict.REJECT,
             f"{combiner} of {', '.join(names)}: cv {self.metric.name} "

@@ -1,9 +1,7 @@
 """The ingest stage: reading, validating and admitting the data."""
 
 import dataclasses
-import datetime
 import json
-import time
 from typing import ClassVar
 
 import pandas
@@ -116,14 +114,14 @@ class IngestStage(interface.Stage):
         development, locked = streaming.budgets(
             columns,
             data.memory_budget_gb or 1.0,
-            context.spec.validation.test_fraction,
+            context.services.spec.validation.test_fraction,
         )
         frame, totals = streaming.sweep(
             source,
             development,
             locked,
-            context.spec.validation.test_fraction,
-            context.spec.validation.seed,
+            context.services.spec.validation.test_fraction,
+            context.services.spec.validation.seed,
         )
         context.stream = (source, totals)
         return frame
@@ -148,8 +146,8 @@ class IngestStage(interface.Stage):
                 in-memory frame was supplied, since no other modality has an
                 ingestion adapter.
         """
-        data = context.spec.data
-        if data.modality != "tabular" and context.input_frame is None:
+        data = context.services.spec.data
+        if data.modality != "tabular" and context.services.input_frame is None:
             raise capabilities.UnsupportedError(
                 "file-backed modality has no registered ingestion adapter",
                 {
@@ -160,16 +158,16 @@ class IngestStage(interface.Stage):
                     "supported_modalities": ["tabular"],
                 },
             )
-        started = time.monotonic()
-        if context.input_frame is not None:
-            frame = context.input_frame.copy(deep=False)
+        started = context.services.clock.monotonic()
+        if context.services.input_frame is not None:
+            frame = context.services.input_frame.copy(deep=False)
         elif self.overflows(data):
             frame = self.read_stream(context, data)
         else:
             frame = tabular.read_table(data.uri)
         if data.horizon:
             frame = forecasting.augment(frame, data)
-        context.read_seconds = time.monotonic() - started
+        context.read_seconds = context.services.clock.monotonic() - started
         context.manifest = tabular.manifested(
             frame, data.target, data.uri, data.modality
         )
@@ -185,14 +183,14 @@ class IngestStage(interface.Stage):
                 f"streamed {totals.rows} rows; {totals.development_sample} "
                 f"development rows kept in memory, {totals.locked} rows locked"
             )
-        graph = context.spec.feature_graph
+        graph = context.services.spec.feature_graph
         if graph.nodes:
             feature_graph.validate_graph(graph, set(frame.columns), data)
             ordered = feature_graph.segregate(graph)[0]
             frame = feature_graph.Temporal(
                 ordered, data.group_column, data.time_column
             ).apply(frame)
-            context.emit(
+            context.journal.emit(
                 "features.graph",
                 f"feature graph v{graph.version} {graph.fingerprint()}",
                 data={
@@ -202,8 +200,9 @@ class IngestStage(interface.Stage):
             )
         context.frame = frame
         self.forbid(context)
-        context.write_json("dataset_manifest.json", context.manifest.to_dict())
-        context.track(
+        manifest = context.manifest.to_dict()
+        context.journal.write_json("dataset_manifest.json", manifest)
+        context.journal.track(
             dataset_id=context.manifest.identifier,
             data_hash=context.manifest.digests["data"],
         )
@@ -231,11 +230,11 @@ class IngestStage(interface.Stage):
                 str(name): str(dtype)
                 for name, dtype in zip(frame.columns, frame.dtypes, strict=True)
             },
-            datetime.datetime.now(datetime.UTC).isoformat(),
+            context.services.clock.now().isoformat(),
         )
         registry = scmle.data.readers.registry.Sources()
-        if context.store is not None:
-            saved = context.store.path("source_registry.json")
+        if context.services.store is not None:
+            saved = context.services.store.path("source_registry.json")
             if saved.exists():
                 registry = scmle.data.readers.registry.Sources.from_json(
                     saved.read_text(encoding="utf-8")
@@ -253,8 +252,8 @@ class IngestStage(interface.Stage):
         record = registry.to_dict()
         record["current_snapshot_id"] = snapshot.snapshot
         record["schema_compatibility"] = compatibility.to_dict()
-        context.write_json("source_registry.json", record)
-        context.emit(
+        context.journal.write_json("source_registry.json", record)
+        context.journal.emit(
             "source.snapshot",
             "source identity and schema evolution recorded",
             ("source_registry.json",),
@@ -275,9 +274,9 @@ class IngestStage(interface.Stage):
             ConfigError: If the run has checkpoints and the data hash differs
                 from the one recorded when they were computed.
         """
-        if context.store is None or not context.checkpoints:
+        if context.services.store is None or not context.services.checkpoints:
             return
-        saved = context.store.path("dataset_manifest.json")
+        saved = context.services.store.path("dataset_manifest.json")
         if not saved.exists():
             return
         previous = provenance.DatasetManifest.from_dict(

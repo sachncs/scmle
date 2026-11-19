@@ -6,6 +6,7 @@ from typing import Any
 from scmle.assurance.admissibility import qualify
 from scmle.assurance.charter import contracts
 from scmle.assurance.charter import sealing
+import scmle.assurance.charter.rules
 import scmle.assurance.framing.claim
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import governed
@@ -86,13 +87,13 @@ class Exploration(admission.Admission):
         if outcome is None or vault is None:
             return
         if task not in tasks.STANDARD_TASKS:
-            context.emit(
+            context.journal.emit(
                 "ledger.skipped",
                 f"the claim ledger does not cover {task.value} tasks; "
                 "findings stay unconfirmed",
             )
             return
-        spec = context.spec
+        spec = context.services.spec
         verified = sealing.read_verified(str(spec.charter_path))
         charter = verified.charter
         data = spec.data
@@ -161,7 +162,7 @@ class Exploration(admission.Admission):
             The exploration, its ledger and its survivors.
         """
         structure, found, stage = setting
-        spec = context.spec
+        spec = context.services.spec
         data = spec.data
         view = scmle.pipeline.context.require(context.custody, "custody").view
         rules = charter.rules
@@ -170,8 +171,8 @@ class Exploration(admission.Admission):
             features=view.features,
             target=view.target,
             classification=task.is_classification,
-            run_dir=context.store.directory
-            if context.store is not None
+            run_dir=context.services.store.directory
+            if context.services.store is not None
             else None,
             exclude=structure + tuple(found.quarantined),
             strata=governed.strata_labels(
@@ -206,13 +207,13 @@ class Exploration(admission.Admission):
             Whether the confirmation waits: the baseline claim is about the
             selected model, or the coverage claim needs the calibrated model.
         """
-        data = context.spec.data
+        data = context.services.spec.data
         selected = bool(
             data.baseline_column and data.baseline_subject == "selected_model"
         )
         if selected or pending.holds_for_coverage:
             context.pending_ledger = pending
-            context.emit(
+            context.journal.emit(
                 "ledger.deferred",
                 "the confirmation set stays sealed until "
                 + (
@@ -234,6 +235,9 @@ class Exploration(admission.Admission):
         extra: confirm.Docket | None = None,
     ) -> None:
         """Registers the claims, opens `C` once and writes the reports.
+
+        Under the charter's `thresholdout` failure policy the confirmation
+        also runs the reuse session `governed.replication` builds from `X`.
 
         Args:
             context: The run context, holding the custody vault whose set `C`
@@ -262,33 +266,30 @@ class Exploration(admission.Admission):
         vault = scmle.pipeline.context.require(
             context.custody_vault, "custody vault"
         )
+        policy, correction = govern(context, rules)
+        # A charter that pre-registers `thresholdout` gets its reuse session:
+        # the survivors' agreement asked again on the same opening of C.
+        reuse = (
+            governed.replication(pending.explored, view.features, view.target)
+            if policy == confirm.THRESHOLDOUT
+            else None
+        )
         run = governed.finalise(
             pending.explored,
             source=vault.sets.get("C"),
-            confirmation_rule=scmle.assurance.ledger.budget.Correction(
-                governing(
-                    "confirmation_rule",
-                    context.spec.confirmation_rule,
-                    None if rules is None else rules.confirmation,
-                    "by",
-                )
-            ),
-            policy=governing(
-                "failure_policy",
-                context.spec.confirmation_failure_policy,
-                None if rules is None else rules.failure,
-                "unconfirmed",
-            ),
+            confirmation_rule=correction,
+            policy=policy,
             claim_runner=runner,
+            reuse=reuse,
             # The record of spent confirmation sets lives beside the run
             # directories, so a second run of the same charter on the same
             # data is refused before it reopens C (C8 charter_rerun).
             registry=None
-            if context.store is None
-            else context.store.directory.parent,
+            if context.services.store is None
+            else context.services.store.directory.parent,
         )
         self.publish(context, run, runner)
-        context.emit(
+        context.journal.emit(
             "ledger.completed",
             run.confirmation.reason,
             (
@@ -304,6 +305,37 @@ class Exploration(admission.Admission):
         self.assess_robustness(context, pending.stage)
         self.ground(context, charter, view)
         self.identify(context, charter, view, run, pending.graph, pending.found)
+
+
+def govern(
+    context: scmle.pipeline.context.Context,
+    rules: scmle.assurance.charter.rules.Procedure | None,
+) -> tuple[str, scmle.assurance.ledger.budget.Correction]:
+    """Reads the failure policy and the confirmation rule of the run.
+
+    Args:
+        context: The run context, whose spec may set either.
+        rules: The charter's pre-registered rules, or None.
+
+    Returns:
+        The failure policy and the multiplicity correction, each from
+        `governing` (the charter's choice wins).
+    """
+    policy = governing(
+        "failure_policy",
+        context.services.spec.confirmation_failure_policy,
+        None if rules is None else rules.failure,
+        "unconfirmed",
+    )
+    correction = scmle.assurance.ledger.budget.Correction(
+        governing(
+            "confirmation_rule",
+            context.services.spec.confirmation_rule,
+            None if rules is None else rules.confirmation,
+            "by",
+        )
+    )
+    return policy, correction
 
 
 def governing(

@@ -47,10 +47,10 @@ class Summary(reporting.Reporting):
         selected = scmle.pipeline.context.require(context.selected, "selected")
         task = scmle.pipeline.context.require(context.task, "task")
         metric = scmle.pipeline.context.require(context.metric, "metric")
-        test_metrics = context.catalog.evaluate(
+        test_metrics = context.services.catalog.evaluate(
             pipeline, features, target, task
         )
-        context.track(
+        context.journal.track(
             selected_strategy=selected.strategy,
             selected_model=selected.model_name,
             metric=metric.name,
@@ -78,7 +78,7 @@ class Summary(reporting.Reporting):
             target: The test labels.
         """
         split = scmle.pipeline.context.require(context.split, "split")
-        data = context.spec.data
+        data = context.services.spec.data
         context.diagnostics = suite.run_suite(
             diagnostics.DiagnosticInput(
                 pipeline,
@@ -89,7 +89,7 @@ class Summary(reporting.Reporting):
                 scmle.pipeline.context.require(
                     context.profile, "profile"
                 ).feature_plan,
-                context.spec.validation.seed,
+                context.services.spec.validation.seed,
                 groups=(
                     features[data.group_column]
                     if (
@@ -105,17 +105,17 @@ class Summary(reporting.Reporting):
             ),
             suite.lineup(),
             self.ration(context),
-            context.regulator.until("finish")
-            - context.regulator.reserve.parts.get("package", 0.0),
+            context.services.governor.until("finish")
+            - context.services.governor.reserve.parts.get("package", 0.0),
         )
         for name, report_body in context.diagnostics.items():
-            context.write_json(f"diagnostics/{name}.json", report_body)
+            context.journal.write_json(f"diagnostics/{name}.json", report_body)
             if report_body.get("skipped") is True:
-                context.forgo(
+                context.journal.forgo(
                     f"diagnostic {name}", report_body.get("reason", "")
                 )
             elif report_body.get("truncated"):
-                context.forgo(
+                context.journal.forgo(
                     f"diagnostic {name} (cut short)",
                     str(report_body.get("reason", "")),
                 )
@@ -149,18 +149,18 @@ class Summary(reporting.Reporting):
         baseline = next(
             (
                 t
-                for t in context.trials
+                for t in context.journal.trials
                 if t.model_name == BASELINE
                 and t.status is experiments.Termination.OK
             ),
             None,
         )
         return {
-            "run_id": context.store.run_id if context.store else "",
+            "run_id": store.run_id if (store := context.services.store) else "",
             "task": task.value,
             "metric": metric.name,
             "metric_greater_is_better": metric.greater_is_better,
-            "selection_policy": context.policy.description,
+            "selection_policy": context.services.policy.description,
             "selected_model": selected.model_name,
             "selected_trial_id": selected.trial_id,
             "selected_params": selected.params,
@@ -176,7 +176,7 @@ class Summary(reporting.Reporting):
             ),
             "semi_supervised": context.semi_supervised,
             "fairness_mitigation": context.fairness_mitigation,
-            "execution_backend": context.backend.name,
+            "execution_backend": context.services.backend.name,
             "pareto_front": context.pareto_front,
             "evaluation_prevalence": {
                 "natural": True,
@@ -187,9 +187,9 @@ class Summary(reporting.Reporting):
             "success_criteria": [
                 r.to_dict()
                 for r in criteria.check(
-                    context.spec.problem.success_criteria,
+                    context.services.spec.problem.success_criteria,
                     test_metrics,
-                    context.catalog,
+                    context.services.catalog,
                 )
             ],
             "streamed_locked": self.tally(context, pipeline),
@@ -220,7 +220,7 @@ class Summary(reporting.Reporting):
             split.manifest.strategy,
             [
                 trial.fold_scores
-                for trial in context.trials
+                for trial in context.journal.trials
                 if trial.status is experiments.Termination.OK
             ],
             metric.greater_is_better,
@@ -245,10 +245,10 @@ class Summary(reporting.Reporting):
             The weighted test metrics, or None without a weight column (the
             fairness reweighing column does not count).
         """
-        column = context.spec.data.weight_column
+        column = context.services.spec.data.weight_column
         if not column or column == tasks.FAIRNESS_WEIGHT:
             return None
-        return context.catalog.evaluate(
+        return context.services.catalog.evaluate(
             pipeline,
             features,
             target,

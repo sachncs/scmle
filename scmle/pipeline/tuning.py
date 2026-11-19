@@ -41,7 +41,7 @@ class Tuner(hyperband.Hyperband):
         """
         self.context = context
         self.runner = runner
-        self.search = context.spec.budgeted()
+        self.search = context.services.spec.budgeted()
         self.metric = scmle.pipeline.context.require(context.metric, "metric")
 
     def shortlist(
@@ -65,7 +65,7 @@ class Tuner(hyperband.Hyperband):
             if t.status is experiments.Termination.OK and not t.params
         ]
         ranked = sorted(ok, key=lambda t: -sign * t.score_mean)
-        registry = self.context.registry
+        registry = self.context.services.registry
         chosen: dict[str, str] = {}
         for trial in ranked:
             tunable = registry.get(trial.model_name).search_space is not None
@@ -95,12 +95,13 @@ class Tuner(hyperband.Hyperband):
         """
         context, search = self.context, self.search
         space = scmle.pipeline.context.require(
-            context.registry.get(name).search_space, f"{name}.search_space"
+            context.services.registry.get(name).search_space,
+            f"{name}.search_space",
         )
         optimizer = optimizers.instantiate(
             search.optimizer,
             space,
-            context.spec.validation.seed + index,
+            context.services.spec.validation.seed + index,
             self.metric.greater_is_better,
         )
         if search.pruning == "hyperband":
@@ -111,13 +112,13 @@ class Tuner(hyperband.Hyperband):
         )
         remaining = search.configs_per_model
         while remaining > 0:
-            reason = context.regulator.skip_reason(first=False)
+            reason = context.services.governor.skip_reason(first=False)
             if reason:
-                context.forgo(
+                context.journal.forgo(
                     f"tuning {name}: {remaining} configurations", reason
                 )
                 return
-            context.check_cancelled()
+            context.services.check()
             size = min(batch_size, remaining)
             remaining -= size
             self.run_batch(name, strategy, optimizer, size)
@@ -145,7 +146,7 @@ class Tuner(hyperband.Hyperband):
         proposals = list(
             map(operator.call, itertools.repeat(optimizer.ask, size))
         )
-        ids = self.context.allocate(len(proposals))
+        ids = self.context.journal.allocate(len(proposals))
         first_rung = self.runner.run_many(
             [
                 trials.Job(trial_id, name, params, rung_folds, strategy)
@@ -169,7 +170,7 @@ class Tuner(hyperband.Hyperband):
             }
         for trial in first_rung:
             if trial.status is not experiments.Termination.OK:
-                self.context.transcribe(trial)
+                self.context.journal.transcribe(trial)
             elif survivors is None:
                 self.complete(trial, optimizer)
             elif trial.trial_id in finished:

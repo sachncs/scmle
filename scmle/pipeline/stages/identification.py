@@ -39,11 +39,11 @@ class Identification(qualification.Qualification):
                 matched.
             view: The exploration view, supplying the column names.
         """
-        data = context.spec.data
+        data = context.services.spec.data
         columns = [*view.features.columns, data.target]
         document = draft.linkage(charter, columns)
-        context.write_json("framing_link.json", document)
-        context.emit(
+        context.journal.write_json("framing_link.json", document)
+        context.journal.emit(
             "framing.completed",
             "the charter's target, moment and unit were matched to columns",
             ("framing_link.json",),
@@ -82,11 +82,11 @@ class Identification(qualification.Qualification):
         if block is None:
             return None
         frame = view.features.copy()
-        frame[context.spec.data.target] = view.target
+        frame[context.services.spec.data.target] = view.target
         return claim.rig(
             block,
             frame,
-            context.spec.data.target,
+            context.services.spec.data.target,
             charter.budget,
             dag=graph,
             seed=charter.seed,
@@ -128,7 +128,7 @@ class Identification(qualification.Qualification):
         documents = run.confirmation.documents
         if claim.CLAIM_FILE in documents:
             claims = documents[claim.CLAIM_FILE]
-            context.emit(
+            context.journal.emit(
                 "identification.completed",
                 f"causal claim status {claims['status']}, tier {claims['tier']}"
                 " (estimated on the single opening of C)",
@@ -141,7 +141,7 @@ class Identification(qualification.Qualification):
             )
             return
         frame = view.features.copy()
-        frame[context.spec.data.target] = view.target
+        frame[context.services.spec.data.target] = view.target
         outcome = scmle.causal.identification.run.design_only(
             block,
             frame,
@@ -151,9 +151,9 @@ class Identification(qualification.Qualification):
             dag_checks=found.dag,
         )
         for name, document in outcome.documents.items():
-            context.write_json(name, document)
+            context.journal.write_json(name, document)
         claims = outcome.documents["causal_claims.json"]
-        context.emit(
+        context.journal.emit(
             "identification.completed",
             f"causal claim status {claims['status']}, tier {claims['tier']}",
             tuple(outcome.documents),

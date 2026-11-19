@@ -1,6 +1,5 @@
 """Release evaluation against explicit success criteria."""
 
-import datetime
 import logging
 from typing import Any
 
@@ -52,7 +51,7 @@ class Releasing(interface.Stage):
         manifest = scmle.pipeline.context.require(context.manifest, "manifest")
         raw_inputs = {
             "snapshot_id": manifest.snapshot or manifest.digests["data"],
-            "config_hash": context.spec.config_hash(),
+            "config_hash": context.services.spec.config_hash(),
         }
         records: list[scmle.contracts.evidence.Record] = []
         for reference in release.citations(policy):
@@ -79,7 +78,7 @@ class Releasing(interface.Stage):
                     },
                     result=scmle.contracts.evidence.Outcome.PASS,
                     reviewer="scmle.automation",
-                    observed=datetime.datetime.now(datetime.UTC).isoformat(),
+                    observed=context.services.clock.now().isoformat(),
                     limitations=(
                         (
                             "automated artifact-presence and digest check; "
@@ -121,7 +120,7 @@ class Releasing(interface.Stage):
             task,
             metric.name,
             metric.greater_is_better,
-            context.spec.problem.success_criteria,
+            context.services.spec.problem.success_criteria,
         )
         if policy is None:
             self.abstain(store, evaluation)

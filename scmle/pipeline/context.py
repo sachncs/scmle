@@ -2,21 +2,18 @@
 
 import dataclasses
 import logging
-import threading
-import time
 from typing import Any
+from typing import Self
+from typing import TYPE_CHECKING
 from typing import TypeVar
 
 import pandas
 
 from scmle.artifacts import results
 import scmle.artifacts.bundle
-import scmle.artifacts.store
 from scmle.assurance.custody import pipeline
 from scmle.assurance.custody import sealed
-from scmle.contracts import capabilities
 from scmle.contracts import errors
-from scmle.contracts import events
 from scmle.contracts import experiments
 from scmle.contracts import lineage
 from scmle.contracts import tasks
@@ -24,19 +21,27 @@ import scmle.contracts.data
 import scmle.contracts.metrics
 from scmle.data.readers import streaming
 from scmle.data.splitting import splitters
-from scmle.evaluation import metrics
-from scmle.evaluation import selection
-import scmle.models.registry
-from scmle.pipeline import journal
-from scmle.pipeline import roster
+import scmle.pipeline.journal
 import scmle.pipeline.recommendations
+import scmle.pipeline.services
 from scmle.runtime import limits
-from scmle.runtime import resource_observation
-from scmle.runtime import scheduler
-from scmle.storage import stores
 
 LOGGER = logging.getLogger(__name__)
 T = TypeVar("T")
+BRIDGE = {
+    "governor": "services",
+    "capability_registry": "services",
+    "trials": "journal",
+    "outcomes": "journal",
+    "trial_counter": "journal",
+    "skipped": "journal",
+}
+"""Product fields that live on the services or the journal, by owner.
+
+`products.Product.capture` and `apply` read and set a product's fields by
+name on the context; these names reach the owner instead. The bridge goes
+when the products stop naming context attributes (phase 4, commits 12 to 22).
+"""
 
 
 def require(value: T | None, name: str) -> T:
@@ -60,33 +65,16 @@ def require(value: T | None, name: str) -> T:
 
 
 @dataclasses.dataclass
-class Context(journal.Journal):
-    """Inputs, services and progressively produced artifacts of a run.
+class Context:
+    """The services, the journal and the products made so far in a run.
 
-    Services and inputs are set at construction; the remaining fields are
-    filled by stages in order. When `store` is None (plan preview) writes and
-    events are skipped. The records a run keeps (files, events, trials and
-    decisions) are written through the `journal.Journal` methods.
+    The services and the journal are set at construction; the remaining
+    fields are filled by stages in order. A stage reads its inputs from
+    `services`, records through `journal`, and sets the fields below.
 
     Attributes:
-        spec: Project specification.
-        registry: Model registry.
-        catalog: Metric catalog.
-        policy: Model selection policy.
-        capability_registry: Declared capabilities that planning checks the
-            run against (the tabular beta registry by default).
-        store: Run directory, or None for previews.
-        log: Event log, or None for previews.
-        capability_observation: Runtime resource facts captured before the
-            capability gate.
-        tracker: Experiment tracking backend (no-op by default).
-        checkpoints: Completed trials from an interrupted run, by trial id,
-            reused instead of recomputed when resuming.
-        backend: Where independent trials run (sequential by default).
-        governor: Applies and reports the resource limits.
-        cancel_event: Set to request cancellation.
-        input_frame: In-memory data, if the project was built from one.
-        approved_plan: Human-approved plan restricting candidates.
+        services: The run's fixed inputs and collaborators.
+        journal: Where the run's files, events, trials and decisions go.
         frame: Ingested dataset.
         read_seconds: Time spent reading the dataset.
         cleaning_notes: Data repairs made at ingestion (reported as quality
@@ -107,11 +95,6 @@ class Context(journal.Journal):
         plan: Experiment plan.
         recommendations: Advice for the user derived from the profile.
         metric: Primary metric.
-        trials: Trial results.
-        history: Past runs available for meta-learning.
-        outcomes: Evidence-based decisions made while running (which
-            strategies helped), appended to the planner's decision log.
-        trial_counter: Number of trial identifiers handed out so far.
         selected: Winning trial.
         diagnostics: Post-selection diagnostic reports by name.
         reference_scores: Model scores / predicted classes on the held-out
@@ -142,36 +125,10 @@ class Context(journal.Journal):
         evaluation: Final evaluation record.
         bundle: Packaged model.
         result: Final run result.
-        started_at: Monotonic time at which the context was created; the
-            time budget (and the `deadline` property) counts from it.
-        skipped: Work reduced or skipped to keep the time budget, each as
-            `{"work": ..., "reason": ...}`; also in the events and the
-            evaluation.
     """
 
-    spec: tasks.Config
-    registry: scmle.models.registry.Catalog
-    catalog: metrics.Repertoire
-    policy: selection.Selector
-    capability_registry: capabilities.Registry = dataclasses.field(
-        default_factory=roster.enrol
-    )
-    capability_observation: resource_observation.Observation | None = None
-    store: scmle.artifacts.store.Workspace | None = None
-    log: events.Log | None = None
-    tracker: stores.Store = dataclasses.field(default_factory=stores.Null)
-    checkpoints: dict[str, experiments.Trial] = dataclasses.field(
-        default_factory=dict
-    )
-    backend: scheduler.Executor = dataclasses.field(
-        default_factory=scheduler.Serial
-    )
-    governor: limits.Governor | None = None
-    cancel_event: threading.Event = dataclasses.field(
-        default_factory=threading.Event
-    )
-    input_frame: pandas.DataFrame | None = None
-    approved_plan: experiments.Plan | None = None
+    services: scmle.pipeline.services.Services
+    journal: scmle.pipeline.journal.Journal
     frame: pandas.DataFrame | None = None
     read_seconds: float = 0.0
     cleaning_notes: list[str] = dataclasses.field(default_factory=list)
@@ -191,12 +148,6 @@ class Context(journal.Journal):
         scmle.pipeline.recommendations.Recommendation, ...
     ] = ()
     metric: scmle.contracts.metrics.Metric | None = None
-    trials: list[experiments.Trial] = dataclasses.field(default_factory=list)
-    history: tuple[experiments.Precedent, ...] = ()
-    outcomes: list[experiments.Decision] = dataclasses.field(
-        default_factory=list
-    )
-    trial_counter: int = 0
     selected: experiments.Trial | None = None
     diagnostics: dict[str, dict[str, Any]] = dataclasses.field(
         default_factory=dict
@@ -220,39 +171,91 @@ class Context(journal.Journal):
     evaluation: dict[str, Any] | None = None
     bundle: scmle.artifacts.bundle.Bundle | None = None
     result: results.Run | None = None
-    started_at: float = dataclasses.field(default_factory=time.monotonic)
-    skipped: list[dict[str, str]] = dataclasses.field(default_factory=list)
 
-    def __post_init__(self) -> None:
-        """Binds the captured facts to the registry used by planning."""
-        if self.capability_observation is not None:
-            self.capability_registry.bind(
-                self.capability_observation.environment
-            )
+    if not TYPE_CHECKING:
+        # Hidden from the type checker, so it still flags every attribute a
+        # context does not have.
+
+        def __getattr__(self, name: str) -> Any:
+            """Reads a bridged product field from its owner (`BRIDGE`).
+
+            Args:
+                name: The attribute normal lookup did not find.
+
+            Returns:
+                The owner's attribute.
+
+            Raises:
+                AttributeError: If `name` is not bridged, or its owner is not
+                    set yet.
+            """
+            owner = BRIDGE.get(name)
+            if owner is None or owner not in vars(self):
+                raise AttributeError(name)
+            return getattr(vars(self)[owner], name)
+
+        def __setattr__(self, name: str, value: Any) -> None:
+            """Sets an attribute; a bridged product field is set on its owner.
+
+            The services are frozen, so a bridged services field gives the
+            context a copy of them with the field replaced.
+
+            Args:
+                name: The attribute.
+                value: Its new value.
+            """
+            owner = BRIDGE.get(name)
+            if owner == "journal":
+                setattr(self.journal, name, value)
+            elif owner == "services":
+                self.services = dataclasses.replace(
+                    self.services, **{name: value}
+                )
+            else:
+                object.__setattr__(self, name, value)
+
+    @classmethod
+    def start(cls, given: scmle.pipeline.services.Services) -> Self:
+        """Starts the context of a run with an empty journal.
+
+        Args:
+            given: The run's services.
+
+        Returns:
+            A context with no products yet.
+        """
+        return cls(
+            given,
+            scmle.pipeline.journal.Journal(
+                given.spec, given.store, given.log, given.tracker
+            ),
+        )
 
     @property
     def regulator(self) -> limits.Governor:
-        """The governor, created on first use from the specification."""
-        if self.governor is None:
-            self.governor = limits.Governor(
-                self.spec.resources, self.started_at
-            )
-        return self.governor
+        """The governor, which caps the threads while a stage runs."""
+        return self.services.governor
 
-    @property
-    def deadline(self) -> float:
-        """Monotonic time at which the budget is exhausted."""
-        return self.started_at + self.spec.resources.time_budget_seconds
+    def check_cancelled(self) -> None:
+        """Raises if cancellation was requested (`Services.check`).
 
-    @property
-    def workspace(self) -> scmle.artifacts.store.Workspace:
-        """The run store; raises for previews that have none."""
-        return require(self.store, "store")
+        Raises:
+            CancelledError: Carrying the run directory in its details.
+        """
+        self.services.check()
 
-    @property
-    def directory(self) -> str:
-        """Runs directory as a string, empty for previews."""
-        return str(self.store.directory) if self.store else ""
+    def amend(self, spec: tasks.Config) -> None:
+        """Replaces the specification the later stages read and events carry.
+
+        The charter's entity block and fairness reweighing amend the data
+        block this way today; fixing the specification for the whole run is
+        STG-3 (phase 4, commit 11).
+
+        Args:
+            spec: The amended specification.
+        """
+        self.services = dataclasses.replace(self.services, spec=spec)
+        self.journal.spec = spec
 
     def close(self) -> None:
         """Releases resources owned by a prepared or executing context.
@@ -266,28 +269,3 @@ class Context(journal.Journal):
             self.split.locked_test.close()
         if self.custody_vault is not None:
             self.custody_vault.close()
-
-    def observe(self) -> None:
-        """Persists the runtime facts immediately before capability planning."""
-        observation = require(
-            self.capability_observation, "capability_observation"
-        )
-        path = "evidence/capability_resources.json"
-        self.write_json(path, observation.to_dict())
-        self.emit(
-            "capability.environment.observed",
-            "runtime facts captured for the capability gate",
-            (path,),
-            observation.to_dict()["environment"],
-        )
-
-    def check_cancelled(self) -> None:
-        """Raises if cancellation was requested.
-
-        Raises:
-            CancelledError: Carrying the run directory in its details.
-        """
-        if self.cancel_event.is_set():
-            raise errors.CancelledError(
-                "run cancelled", {"run_dir": self.directory}
-            )

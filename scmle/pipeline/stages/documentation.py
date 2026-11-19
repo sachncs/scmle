@@ -1,6 +1,5 @@
 """Explanation evidence, provenance and the SBOM of a package."""
 
-import datetime
 from typing import Any
 
 import scmle
@@ -51,8 +50,8 @@ class Documentation(releasing.Releasing):
             digest=manifest.digests["data"],
         )
         feature_graph = explanations.Lineage(
-            version=context.spec.feature_graph.version,
-            fingerprint=context.spec.feature_graph.fingerprint(),
+            version=context.services.spec.feature_graph.version,
+            fingerprint=context.services.spec.feature_graph.fingerprint(),
         )
         diagnostics_by_name = {
             diagnostic.name: diagnostic
@@ -125,8 +124,8 @@ class Documentation(releasing.Releasing):
             input_fingerprint=split.manifest.fingerprint,
             dataset_snapshot=snapshot,
             feature_graph=feature_graph,
-            method_parameters={"seed": context.spec.validation.seed},
-            timestamp=datetime.datetime.now(datetime.UTC),
+            method_parameters={"seed": context.services.spec.validation.seed},
+            timestamp=context.services.clock.now(),
             software_version=scmle.__version__,
             uncertainty={
                 "status": "not_estimated",
@@ -186,7 +185,7 @@ class Documentation(releasing.Releasing):
             "schema_version": 1,
             "run_id": store.run_id,
             "software_version": scmle.__version__,
-            "config_hash": context.spec.config_hash(),
+            "config_hash": context.services.spec.config_hash(),
             "dataset": {
                 "snapshot_id": manifest.snapshot or manifest.digests["data"],
                 "dataset_id": manifest.identifier,

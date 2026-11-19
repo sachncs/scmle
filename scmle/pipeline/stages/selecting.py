@@ -60,7 +60,7 @@ class SelectStage(interface.Stage):
         Returns:
             The selection policy's description.
         """
-        return context.policy.description
+        return context.services.policy.description
 
     def announce(self, context: scmle.pipeline.context.Context) -> None:
         """Emits the `selection.frozen` event for the selected trial.
@@ -69,7 +69,7 @@ class SelectStage(interface.Stage):
             context: The run context, holding the selected trial.
         """
         selected = scmle.pipeline.context.require(context.selected, "selected")
-        context.emit(
+        context.journal.emit(
             "selection.frozen",
             f"{selected.model_name}/{selected.strategy}",
             (f"trials/{selected.trial_id}.json",),
@@ -91,7 +91,7 @@ class SelectStage(interface.Stage):
         Returns:
             The model-size and latency limits.
         """
-        spec = context.spec.selection
+        spec = context.services.spec.selection
         return resources.Constraints(
             spec.max_model_mb,
             spec.max_p95_latency_ms,
@@ -131,9 +131,9 @@ class SelectStage(interface.Stage):
                 continue
             candidate = strategies.lookup(trial.strategy).build(
                 plan,
-                context.registry.get(trial.model_name),
+                context.services.registry.get(trial.model_name),
                 task,
-                context.spec.validation.seed,
+                context.services.spec.validation.seed,
                 trial.params,
             )
             candidate.fit(split.dev_features, split.dev_target)
@@ -156,7 +156,7 @@ class SelectStage(interface.Stage):
             r
             for r in feasible
             if best - sign * r.trial.score_mean
-            <= context.spec.selection.pareto_tolerance
+            <= context.services.spec.selection.pareto_tolerance
         ]
         chosen = min(
             near,
@@ -164,10 +164,11 @@ class SelectStage(interface.Stage):
         )
         context.pareto_front = frontier(rows, chosen, sign)
         trial = chosen.trial
-        context.enter(
+        context.journal.enter(
             f"{trial.model_name}/{trial.strategy}",
             experiments.Edict.INCLUDE,
-            f"fastest within {context.spec.selection.pareto_tolerance} of the "
+            "fastest within "
+            f"{context.services.spec.selection.pareto_tolerance} of the "
             f"best score ({chosen.usage.p95_latency_ms:.1f} ms p95)",
         )
         context.refits[trial.trial_id] = chosen.candidate
@@ -191,7 +192,7 @@ class SelectStage(interface.Stage):
             return
         selected = scmle.pipeline.context.require(context.selected, "selected")
         split = scmle.pipeline.context.require(context.split, "split")
-        data = context.spec.data
+        data = context.services.spec.data
         subject = None
         if data.baseline_column and data.baseline_subject == "selected_model":
             subject = self.codify(context, pending, selected, split)
@@ -230,9 +231,9 @@ class SelectStage(interface.Stage):
                 scmle.pipeline.context.require(
                     context.profile, "profile"
                 ).feature_plan,
-                context.registry.get(selected.model_name),
+                context.services.registry.get(selected.model_name),
                 scmle.pipeline.context.require(context.task, "task"),
-                context.spec.validation.seed,
+                context.services.spec.validation.seed,
                 selected.params,
             )
             pipeline.fit(split.dev_features, split.dev_target)
@@ -251,7 +252,7 @@ class SelectStage(interface.Stage):
                 "params": selected.params,
                 "trial_id": selected.trial_id,
                 "split": split.manifest.fingerprint,
-                "seed": context.spec.validation.seed,
+                "seed": context.services.spec.validation.seed,
             },
         )
 
@@ -273,13 +274,13 @@ class SelectStage(interface.Stage):
         Raises:
             BlockedError: If no checked candidate satisfies the constraints.
         """
-        ranked = context.policy.rank(
-            context.trials,
+        ranked = context.services.policy.rank(
+            context.journal.trials,
             scmle.pipeline.context.require(context.metric, "metric"),
-            context.registry,
+            context.services.registry,
         )
         limits = self.limits(context)
-        spec = context.spec.selection
+        spec = context.services.spec.selection
         if not limits.active and not spec.pareto:
             context.selected = cost.affordable(context, ranked)
             self.announce(context)
@@ -289,7 +290,9 @@ class SelectStage(interface.Stage):
         plan = scmle.pipeline.context.require(
             context.profile, "profile"
         ).feature_plan
-        checked = ranked[: context.spec.selection.max_candidates_checked]
+        checked = ranked[
+            : context.services.spec.selection.max_candidates_checked
+        ]
         if spec.pareto:
             self.select_on_front(context, checked, limits)
             return
@@ -300,9 +303,9 @@ class SelectStage(interface.Stage):
             measured += 1
             candidate = strategies.lookup(trial.strategy).build(
                 plan,
-                context.registry.get(trial.model_name),
+                context.services.registry.get(trial.model_name),
                 task,
-                context.spec.validation.seed,
+                context.services.spec.validation.seed,
                 trial.params,
             )
             candidate.fit(split.dev_features, split.dev_target)
@@ -310,11 +313,11 @@ class SelectStage(interface.Stage):
             broken = limits.violations(usage)
             label = f"{trial.model_name}/{trial.strategy}"
             if broken:
-                context.enter(
+                context.journal.enter(
                     label, experiments.Edict.REJECT, "; ".join(broken)
                 )
                 continue
-            context.enter(
+            context.journal.enter(
                 label,
                 experiments.Edict.INCLUDE,
                 f"within serving limits ({usage.model_mb:.2f} MB, p95 "

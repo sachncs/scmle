@@ -143,13 +143,17 @@ class Tracing(bracketing.Bracketing):
         )
         graph.connect(lineage.Edge("snapshot", "curation", "curated"))
 
-        if context.spec.feature_graph.nodes:
+        if context.services.spec.feature_graph.nodes:
             graph.add_node(
                 lineage.Node(
                     "feature-graph",
                     lineage.Kind.FEATURE_GRAPH,
-                    context.spec.feature_graph.fingerprint(),
-                    {"version": str(context.spec.feature_graph.version)},
+                    context.services.spec.feature_graph.fingerprint(),
+                    {
+                        "version": str(
+                            context.services.spec.feature_graph.version
+                        )
+                    },
                 )
             )
             graph.connect(

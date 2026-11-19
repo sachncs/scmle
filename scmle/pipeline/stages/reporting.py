@@ -36,9 +36,9 @@ class Reporting(relabelling.Relabelling):
         """
         split = scmle.pipeline.context.require(context.split, "split")
         charter_hash = None
-        if context.spec.charter_path:
+        if context.services.spec.charter_path:
             charter_hash = sealing.read_verified(
-                str(context.spec.charter_path)
+                str(context.services.spec.charter_path)
             ).charter_hash
         claim = coverage_run.claim_document(
             task=scmle.pipeline.context.require(context.task, "task").value,
@@ -51,7 +51,7 @@ class Reporting(relabelling.Relabelling):
         if claim is None:
             return
         sha = scmle.assurance.ledger.ledger.digest(claim)
-        context.write_json(coverage_run.CLAIM_FILE, claim)
+        context.journal.write_json(coverage_run.CLAIM_FILE, claim)
         context.coverage_claim_sha256 = sha
         vault = context.custody_vault
         if vault is not None:
@@ -61,7 +61,7 @@ class Reporting(relabelling.Relabelling):
                 "scmle.coverage",
                 {"sha256": sha},
             )
-        context.emit(
+        context.journal.emit(
             "coverage.registered",
             "coverage claim fixed before the final test rows are released",
             (coverage_run.CLAIM_FILE,),
@@ -78,13 +78,13 @@ class Reporting(relabelling.Relabelling):
             context: The run context, holding the vault and the run directory.
         """
         vault = context.custody_vault
-        if vault is None or context.store is None:
+        if vault is None or context.services.store is None:
             return
         vault.log.append(
             "final_test",
             reports.REGISTRATION_EVENT,
             "scmle.decision",
-            {"files": reports.hashsums(context.store.directory)},
+            {"files": reports.hashsums(context.services.store.directory)},
         )
 
     def decide(
@@ -122,7 +122,7 @@ class Reporting(relabelling.Relabelling):
         ):
             return
         layer = charter.decision
-        data = context.spec.data
+        data = context.services.spec.data
         positive = pipeline.classes_[1]
         outcome = (target == positive).to_numpy(dtype=float)
         actions = (
@@ -152,9 +152,9 @@ class Reporting(relabelling.Relabelling):
             None if built is None else built[0],
         )
         written = self.deposit(context, value, decision, net_benefit, built)
-        context.write_json("decision_report.json", report)
+        context.journal.write_json("decision_report.json", report)
         self.notarize(context)
-        context.emit(
+        context.journal.emit(
             "decision.reported",
             "policy value, fairness satisfaction and rollout design written",
             tuple(written),
@@ -200,18 +200,20 @@ class Reporting(relabelling.Relabelling):
             The decision files, with `decision_report.json` (written later)
             first.
         """
-        context.write_json(reports.POLICY_FILE, value)
+        context.journal.write_json(reports.POLICY_FILE, value)
         written = ["decision_report.json", reports.POLICY_FILE]
         if decision is not None:
-            context.write_json(reports.THRESHOLD_FILE, decision)
+            context.journal.write_json(reports.THRESHOLD_FILE, decision)
             written.append(reports.THRESHOLD_FILE)
         if net_benefit is not None:
-            context.write_json(reports.NET_BENEFIT_FILE, net_benefit)
+            context.journal.write_json(reports.NET_BENEFIT_FILE, net_benefit)
             written.append(reports.NET_BENEFIT_FILE)
         if built is not None:
             design, log = built
-            context.write_json("rollout_design.json", design)
-            if context.store is not None:
-                log.write(context.store.directory / "rollout_decisions.jsonl")
+            context.journal.write_json("rollout_design.json", design)
+            if context.services.store is not None:
+                log.write(
+                    context.services.store.directory / "rollout_decisions.jsonl"
+                )
             written += ["rollout_design.json", "rollout_decisions.jsonl"]
         return written

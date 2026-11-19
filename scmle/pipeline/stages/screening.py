@@ -96,8 +96,8 @@ class Screening(surveying.Surveying):
             ConfigError: If only one of the ingest plan and the charter block
                 is set, or a synthesized name collides with a column.
         """
-        data = context.spec.data
-        path = context.spec.charter_path
+        data = context.services.spec.data
+        path = context.services.spec.charter_path
         block = (
             sealing.read_verified(str(path)).charter.ingest if path else None
         )
@@ -116,7 +116,9 @@ class Screening(surveying.Surveying):
             ingest_stage.recipe(data.ingest_plan),
             block,
             frame,
-            context.store.directory if context.store is not None else None,
+            context.services.store.directory
+            if context.services.store is not None
+            else None,
         )
         clash = sorted(set(result.features.columns) & set(frame.columns))
         if clash:
@@ -131,8 +133,8 @@ class Screening(surveying.Surveying):
         context.frame = merged
         context.ingest = result
         for name, document in result.documents.items():
-            context.write_json(name, document)
-        context.emit(
+            context.journal.write_json(name, document)
+        context.journal.emit(
             "ingest.completed",
             f"{result.declared} features synthesized through the as-of views",
             (ingest_stage.MANIFEST, ingest_stage.PROVENANCE),
@@ -160,7 +162,7 @@ class Screening(surveying.Surveying):
             ConfigError: If the data spec names a group column, or the
                 resolved column collides with a column of the table.
         """
-        data = context.spec.data
+        data = context.services.spec.data
         if data.group_column:
             raise errors.ConfigError(
                 f"data.group_column {data.group_column!r} conflicts with the "
@@ -174,13 +176,17 @@ class Screening(surveying.Surveying):
             )
         groups, document = ingest_stage.resolve_entities(frame, entity)
         frame = frame.assign(**{entity.column: groups})
-        context.spec = context.spec.model_copy(
-            update={
-                "data": data.model_copy(update={"group_column": entity.column})
-            }
+        context.amend(
+            context.services.spec.model_copy(
+                update={
+                    "data": data.model_copy(
+                        update={"group_column": entity.column}
+                    )
+                }
+            )
         )
-        context.write_json("entity_resolution.json", document)
-        context.emit(
+        context.journal.write_json("entity_resolution.json", document)
+        context.journal.emit(
             "ingest.entities",
             f"{document['records']} rows resolved to {document['groups']} "
             f"entities; the split groups by {entity.column!r}",

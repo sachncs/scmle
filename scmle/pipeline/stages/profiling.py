@@ -111,16 +111,18 @@ class ProfileStage(impounding.Impounding):
             DataError: If a declared group, time or weight column is missing
                 from the data.
         """
-        spec = context.spec
+        spec = context.services.spec
         frame = scmle.pipeline.context.require(context.frame, "frame")
         frame, task = self.infer(context, frame)
         self.vet(spec, frame)
         frame = self.synthesize(context, frame)
         split = self.divide(context, task, frame)
-        spec = context.spec  # reweighing may have set the weight column
+        spec = (
+            context.services.spec
+        )  # reweighing may have set the weight column
         profile, development = self.survey(context, spec, task, frame, split)
         self.curate(context, frame, development, profile)
-        context.emit(
+        context.journal.emit(
             "features.selected",
             "feature set and exclusions fixed from the profile",
             ("dataset_profile.json",),
@@ -130,7 +132,7 @@ class ProfileStage(impounding.Impounding):
                 "dropped": dict(profile.feature_plan.dropped),
             },
         )
-        context.track(
+        context.journal.track(
             fingerprint=knowledge.fingerprint(profile, task), task=task.value
         )
         self.enforce_leakage_policy(spec, profile)
@@ -157,8 +159,8 @@ class ProfileStage(impounding.Impounding):
             The split; under a charter, or when resources are hard-enforced, its
             locked rows are sealed in a separate vault process.
         """
-        split = splitters.Splitter(context.spec, task).split(frame)
-        data = context.spec.data
+        split = splitters.Splitter(context.services.spec, task).split(frame)
+        data = context.services.spec.data
         if task is tasks.Task.FORECAST and data.seasonal_period:
             # Computed now: under hard isolation the frame held afterwards has
             # no locked rows, but the seasonal baseline needs their history.
@@ -170,23 +172,25 @@ class ProfileStage(impounding.Impounding):
                 len(data.targets),
                 data.seasonal_period,
             )
-        chartered = bool(context.spec.charter_path)
+        chartered = bool(context.services.spec.charter_path)
         if chartered:
             split = self.impound(context, task, frame, split)
         self.reweigh(context, task, split)
         isolation = "in-process protocol"
         # A charter requests custody regardless of the resource-enforcement
         # mode: sealing the rows must not depend on trial supervision.
-        if context.regulator.hard or chartered:
+        if context.services.governor.hard or chartered:
             split.locked_test = self.seal(split.locked_test)
             context.frame = split.dev_features.assign(
-                **{context.spec.data.target: split.dev_target}
+                **{context.services.spec.data.target: split.dev_target}
             )
             isolation = "separate vault process"
         context.split = split
-        context.write_json("validation_manifest.json", split.manifest.to_dict())
-        context.track(split_fingerprint=split.manifest.fingerprint)
-        context.emit(
+        context.journal.write_json(
+            "validation_manifest.json", split.manifest.to_dict()
+        )
+        context.journal.track(split_fingerprint=split.manifest.fingerprint)
+        context.journal.emit(
             "split.created",
             f"{split.manifest.strategy} split",
             ("validation_manifest.json",),

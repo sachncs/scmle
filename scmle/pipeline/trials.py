@@ -343,7 +343,7 @@ class Runner:
     @property
     def workers(self) -> int:
         """The concurrency of the execution backend."""
-        return self.context.backend.workers
+        return self.context.services.backend.workers
 
     def payload(self, job: Job) -> Payload:
         """Builds the self-contained payload for a job.
@@ -356,14 +356,14 @@ class Runner:
             for it, a weight column exists and the metric accepts weights.
         """
         context = self.context
-        governor = context.regulator
+        governor = context.services.governor
         return Payload(
             job=job,
-            adapter=context.registry.get(job.model_name),
+            adapter=context.services.registry.get(job.model_name),
             strategy=strategies.lookup(job.strategy),
             feature_plan=self.feature_plan,
             task=self.task,
-            seed=context.spec.validation.seed,
+            seed=context.services.spec.validation.seed,
             metric=self.metric,
             positive_label=metrics.positive_label(
                 self.split.dev_target, self.task
@@ -373,9 +373,9 @@ class Runner:
             folds=self.folds,
             threadcap=governor.threadcap,
             ceiling_seconds=governor.deadline(),
-            memory_gb=context.spec.resources.memory_limit_gb,
+            memory_gb=context.services.spec.resources.memory_limit_gb,
             weighted=bool(
-                context.spec.selection.weighted
+                context.services.spec.selection.weighted
                 and self.feature_plan.weight_column
                 and self.metric.weightable()
             ),
@@ -429,7 +429,7 @@ class Runner:
                 results[index] = cached
             else:
                 pending.append(index)
-        governor = self.context.regulator
+        governor = self.context.services.governor
         function = supervise if governor.hard else evaluate_payload
         size = max(self.workers, 1)
         for start in range(0, len(pending), size):
@@ -439,9 +439,11 @@ class Runner:
                 for index in slots:
                     results[index] = self.forgo(jobs[index], reason)
                 continue
-            self.context.check_cancelled()
+            self.context.services.check()
             payloads = [self.payload(jobs[index]) for index in slots]
-            outputs = self.context.backend.map(function, payloads, lose)
+            outputs = self.context.services.backend.map(
+                function, payloads, lose
+            )
             for index, output in zip(slots, outputs, strict=True):
                 results[index] = output
         return [r for r in results if r is not None]
@@ -460,7 +462,7 @@ class Runner:
         Returns:
             A result view with exactly the requested folds, or None.
         """
-        checkpoint = self.context.checkpoints.get(job.trial_id)
+        checkpoint = self.context.services.checkpoints.get(job.trial_id)
         usable = (experiments.Termination.OK, experiments.Termination.PRUNED)
         if (
             checkpoint is None

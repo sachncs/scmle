@@ -50,9 +50,9 @@ class Diagnosis(calibration.Calibration):
             scmle.pipeline.context.require(
                 context.profile, "profile"
             ).feature_plan,
-            context.registry.get(selected.model_name),
+            context.services.registry.get(selected.model_name),
             scmle.pipeline.context.require(context.task, "task"),
-            context.spec.validation.seed,
+            context.services.spec.validation.seed,
             selected.params,
         )
         metric = scmle.pipeline.context.require(context.metric, "metric")
@@ -90,7 +90,7 @@ class Diagnosis(calibration.Calibration):
             not binary, multiclass or regression, or the budget was spent; None
             when no replicates are configured.
         """
-        replicates = context.spec.selection.bias_variance_replicates
+        replicates = context.services.spec.selection.bias_variance_replicates
         task = scmle.pipeline.context.require(context.task, "task")
         if not replicates:
             return None
@@ -101,12 +101,12 @@ class Diagnosis(calibration.Calibration):
         ):
             return {"skipped": f"not defined for {task.value}"}
         split = scmle.pipeline.context.require(context.split, "split")
-        adapter = context.registry.get(selected.model_name)
+        adapter = context.services.registry.get(selected.model_name)
         strategy = strategies.lookup(selected.strategy)
         plan = scmle.pipeline.context.require(
             context.profile, "profile"
         ).feature_plan
-        seed = context.spec.validation.seed
+        seed = context.services.spec.validation.seed
         found = bias_variance.decompose(
             lambda: strategy.build(plan, adapter, task, seed, selected.params),
             split.dev_features,
@@ -142,7 +142,7 @@ class Diagnosis(calibration.Calibration):
             `skipped` reason for other tasks or when the budget was spent; None
             when no repeats are configured.
         """
-        repeats = context.spec.selection.sensitivity_repeats
+        repeats = context.services.spec.selection.sensitivity_repeats
         task = scmle.pipeline.context.require(context.task, "task")
         if not repeats:
             return None
@@ -157,12 +157,12 @@ class Diagnosis(calibration.Calibration):
         split = scmle.pipeline.context.require(context.split, "split")
         if len(split.dev_target) < sensitivity.MIN_ROWS:
             return {"skipped": "too few rows"}
-        adapter = context.registry.get(selected.model_name)
+        adapter = context.services.registry.get(selected.model_name)
         strategy = strategies.lookup(selected.strategy)
         plan = scmle.pipeline.context.require(
             context.profile, "profile"
         ).feature_plan
-        seed = context.spec.validation.seed
+        seed = context.services.spec.validation.seed
         metric = scmle.pipeline.context.require(context.metric, "metric")
         scorer = metric.scorer(
             scmle.evaluation.metrics.positive_label(split.dev_target, task)
@@ -195,7 +195,7 @@ class Diagnosis(calibration.Calibration):
             spent or there were too few rows; None when nested validation is
             off.
         """
-        if not context.spec.selection.nested_cv:
+        if not context.services.spec.selection.nested_cv:
             return None
         split = scmle.pipeline.context.require(context.split, "split")
         if split.manifest.strategy not in {"random", "stratified"}:
@@ -206,12 +206,12 @@ class Diagnosis(calibration.Calibration):
         if cost.halt(context, selected, "nested validation"):
             return {"skipped": "time budget spent"}
         task = scmle.pipeline.context.require(context.task, "task")
-        adapter = context.registry.get(selected.model_name)
+        adapter = context.services.registry.get(selected.model_name)
         strategy = strategies.lookup(selected.strategy)
         plan = scmle.pipeline.context.require(
             context.profile, "profile"
         ).feature_plan
-        seed = context.spec.validation.seed
+        seed = context.services.spec.validation.seed
         metric = scmle.pipeline.context.require(context.metric, "metric")
         positive = scmle.evaluation.metrics.positive_label(
             split.dev_target, task
@@ -260,14 +260,14 @@ class Diagnosis(calibration.Calibration):
         if cost.halt(context, selected, "forecast backtest"):
             return None
         split = scmle.pipeline.context.require(context.split, "split")
-        data = context.spec.data
+        data = context.services.spec.data
         template = strategies.lookup(selected.strategy).build(
             scmle.pipeline.context.require(
                 context.profile, "profile"
             ).feature_plan,
-            context.registry.get(selected.model_name),
+            context.services.registry.get(selected.model_name),
             scmle.pipeline.context.require(context.task, "task"),
-            context.spec.validation.seed,
+            context.services.spec.validation.seed,
             selected.params,
         )
         fitted = []

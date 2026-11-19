@@ -1,6 +1,5 @@
 """Time estimates that keep the final fits inside the run's budget."""
 
-import time
 from typing import Any
 
 import pandas
@@ -75,17 +74,17 @@ def affordable(
     Returns:
         The trial to select.
     """
-    governor = context.regulator
+    governor = context.services.governor
     for trial in ranked:
         reason = governor.overdue(refitcost(context, trial))
         if reason is None:
             return trial
-        context.forgo(
+        context.journal.forgo(
             f"selecting {trial.model_name}/{trial.strategy}",
             f"its refit {reason}",
         )
     cheapest = min(ranked, key=lambda t: refitcost(context, t))
-    context.forgo(
+    context.journal.forgo(
         f"selecting {cheapest.model_name}/{cheapest.strategy}",
         "no refit fits before the run's end; the cheapest refit is taken",
     )
@@ -106,12 +105,12 @@ def late(
     Returns:
         True if its refit would not end before the run's end.
     """
-    reason = context.regulator.overdue(refitcost(context, trial))
+    reason = context.services.governor.overdue(refitcost(context, trial))
     if reason is None:
         return False
     label = f"{trial.model_name}/{trial.strategy}"
-    context.enter(label, experiments.Edict.REJECT, f"refit {reason}")
-    context.forgo(f"measuring {label}", f"its refit {reason}")
+    context.journal.enter(label, experiments.Edict.REJECT, f"refit {reason}")
+    context.journal.forgo(f"measuring {label}", f"its refit {reason}")
     return True
 
 
@@ -131,9 +130,9 @@ def halt(
         The reason (also recorded with `forgo`), or None if a fold fit ends
         `TAIL_SECONDS` before the run's end.
     """
-    reason = context.regulator.overdue(foldcost(selected), TAIL_SECONDS)
+    reason = context.services.governor.overdue(foldcost(selected), TAIL_SECONDS)
     if reason is not None:
-        context.forgo(work, reason)
+        context.journal.forgo(work, reason)
     return reason
 
 
@@ -155,15 +154,15 @@ def meter(
     Returns:
         The measured usage.
     """
-    governor = context.regulator
-    started = time.monotonic()
+    governor = context.services.governor
+    started = context.services.clock.monotonic()
     pipeline.predict(features.head(1))
-    single = FIT_MARGIN * (time.monotonic() - started)
+    single = FIT_MARGIN * (context.services.clock.monotonic() - started)
     left = governor.left("finish") - governor.reserve.parts.get("package", 0.0)
     rows = resources.LATENCY_ROWS
     if single * rows > left:
         rows = max(int(left / single), 1) if single > 0 else rows
-        context.forgo(
+        context.journal.forgo(
             "serving measurement",
             f"timed {rows} of {resources.LATENCY_ROWS} rows: one prediction "
             f"takes about {single:.2f} s and {max(left, 0.0):.1f} s remain",
@@ -182,12 +181,12 @@ def dimensions(context: scmle.pipeline.context.Context) -> tuple[int, int, int]:
         target classes (0 when the task is not classification).
     """
     frame = scmle.pipeline.context.require(context.frame, "frame")
-    data = context.spec.data
+    data = context.services.spec.data
     target = frame[data.target].dropna()
     named = {data.target, *data.targets}
     columns = sum(1 for column in frame.columns if column not in named)
     task = context.task or scmle.data.validation.target.TaskResolver(
-        context.spec
+        context.services.spec
     ).resolve(target)
     classes = int(target.nunique()) if task.is_classification else 0
     return len(target), columns, classes

@@ -46,14 +46,16 @@ class Remedy(examination.Examination):
         Returns:
             A group-threshold classifier when applied, else `pipeline`.
         """
-        fairness = context.spec.fairness
+        fairness = context.services.spec.fairness
         task = scmle.pipeline.context.require(context.task, "task")
         if fairness.mitigation != "group_thresholds":
             return pipeline
-        column = fairness.column or context.spec.data.sensitive_columns[0]
+        column = (
+            fairness.column or context.services.spec.data.sensitive_columns[0]
+        )
         label = f"fairness:{column}"
         if task is not tasks.Task.BINARY:
-            context.enter(
+            context.journal.enter(
                 label,
                 experiments.Edict.REJECT,
                 "group thresholds apply to binary classification only",
@@ -80,7 +82,7 @@ class Remedy(examination.Examination):
             fairness.min_reduction,
             fairness.max_accuracy_cost,
         )
-        context.enter(
+        context.journal.enter(
             label,
             experiments.Edict.INCLUDE
             if result.applied
@@ -111,11 +113,11 @@ class Remedy(examination.Examination):
         split = scmle.pipeline.context.require(context.split, "split")
         task = scmle.pipeline.context.require(context.task, "task")
         strategy = strategies.lookup(selected.strategy)
-        adapter = context.registry.get(selected.model_name)
+        adapter = context.services.registry.get(selected.model_name)
         plan = scmle.pipeline.context.require(
             context.profile, "profile"
         ).feature_plan
-        seed = context.spec.validation.seed
+        seed = context.services.spec.validation.seed
         return thresholds.heldout(
             lambda: strategy.build(plan, adapter, task, seed, selected.params),
             split.dev_features,
@@ -142,11 +144,17 @@ class Remedy(examination.Examination):
             `pipeline`, updated in place when the data is streamed for training,
             otherwise unchanged.
         """
-        if context.stream is None or context.spec.data.training != "stream":
+        if (
+            context.stream is None
+            or context.services.spec.data.training != "stream"
+        ):
             return pipeline
         source = context.stream[0]
-        data, seed = context.spec.data, context.spec.validation.seed
-        fraction = context.spec.validation.test_fraction
+        data, seed = (
+            context.services.spec.data,
+            context.services.spec.validation.seed,
+        )
+        fraction = context.services.spec.validation.test_fraction
         preprocess, model = pipeline[:-1], pipeline.steps[-1][1]
         classes = getattr(pipeline, "classes_", None)
         offset, rows_seen = 0, 0
@@ -164,7 +172,7 @@ class Remedy(examination.Examination):
             else:
                 model.partial_fit(matrix, part[data.target], classes=classes)
             rows_seen += len(part)
-        context.emit(
+        context.journal.emit(
             "training.streamed",
             f"final model updated on {rows_seen} streamed development rows",
             data={"rows": rows_seen},

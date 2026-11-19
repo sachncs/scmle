@@ -84,7 +84,7 @@ class PackageStage(tracing.Tracing):
             context: The run context; receives the bundle, the result and the
                 evaluation record at its current layout.
         """
-        store = context.workspace
+        store = context.services.workspace
         split = scmle.pipeline.context.require(context.split, "split")
         selected = scmle.pipeline.context.require(context.selected, "selected")
         evaluation = scmle.pipeline.context.require(
@@ -106,7 +106,7 @@ class PackageStage(tracing.Tracing):
             evaluation["forecast_backtest"] = self.forecast_backtest(
                 context, selected
             )
-            context.write_json(
+            context.journal.write_json(
                 "diagnostics/forecast_backtest.json",
                 evaluation["forecast_backtest"],
             )
@@ -115,7 +115,7 @@ class PackageStage(tracing.Tracing):
             split.dev_features,
             bundle.schema.numeric,
             bundle.schema.categorical,
-            context.spec.validation.seed,
+            context.services.spec.validation.seed,
         )
         bundle.save(store.path("model"))
         self.certify(context, bundle, evaluation)
@@ -133,13 +133,13 @@ class PackageStage(tracing.Tracing):
             state=scmle.runtime.state.Progress.COMPLETED.value,
             plan=scmle.pipeline.context.require(context.plan, "plan"),
             profile=profile,
-            trials=context.trials,
+            trials=context.journal.trials,
             selected_model=selected.model_name,
             evaluation=evaluation,
             bundle=bundle,
             diagnostics=context.diagnostics,
         )
-        context.track(artifacts=self.lineage(store))
+        context.journal.track(artifacts=self.lineage(store))
         board = result.leaderboard()
         board.to_parquet(store.path("leaderboard.parquet"), index=False)
         store.write_text(
@@ -172,22 +172,22 @@ class PackageStage(tracing.Tracing):
             else context.final_pipeline,
             profile.feature_plan,
             split.dev_features,
-            context.spec.data.target,
+            context.services.spec.data.target,
             scmle.pipeline.context.require(context.task, "task").value,
             scmle.pipeline.context.require(context.metric, "metric").name,
             selected.model_name,
             model_params=selected.params,
             strategy=selected.strategy,
             decision_threshold=(evaluation["decision"] or {}).get("threshold"),
-            graph_fingerprint=context.spec.feature_graph.fingerprint()
-            if context.spec.feature_graph.nodes
+            graph_fingerprint=context.services.spec.feature_graph.fingerprint()
+            if context.services.spec.feature_graph.nodes
             else "",
-            group_column=context.spec.data.group_column,
-            time_column=context.spec.data.time_column,
+            group_column=context.services.spec.data.group_column,
+            time_column=context.services.spec.data.time_column,
             history_source=context.frame,
             class_labels=context.ordinal_labels,
-            seed=context.spec.validation.seed,
-            configuration=context.spec.config_hash(),
+            seed=context.services.spec.validation.seed,
+            configuration=context.services.spec.config_hash(),
             dataset=context.manifest.digests["data"]
             if context.manifest
             else "",
@@ -222,7 +222,7 @@ class PackageStage(tracing.Tracing):
                 plan, SBOM, provenance, attestation, explanation evidence and
                 round-trip check.
         """
-        store = context.workspace
+        store = context.services.workspace
         split = scmle.pipeline.context.require(context.split, "split")
         selected = scmle.pipeline.context.require(context.selected, "selected")
         profile = scmle.pipeline.context.require(context.profile, "profile")
@@ -257,7 +257,7 @@ class PackageStage(tracing.Tracing):
             "diagnostics/data_access.json",
             ledger.compose(
                 split,
-                context.trials,
+                context.journal.trials,
                 int(split.locked_test.opened),
                 evaluation["decision"] is not None,
             ),
@@ -271,12 +271,12 @@ class PackageStage(tracing.Tracing):
                         context.plan, "plan"
                     ).decisions
                 ],
-                "outcomes": [d.to_dict() for d in context.outcomes],
+                "outcomes": [d.to_dict() for d in context.journal.outcomes],
                 "selection": {
                     "model": selected.model_name,
                     "strategy": selected.strategy,
                     "params": selected.params,
-                    "policy": context.policy.description,
+                    "policy": context.services.policy.description,
                 },
             },
         )

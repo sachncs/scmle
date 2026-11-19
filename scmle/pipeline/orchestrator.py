@@ -27,19 +27,15 @@ from scmle.contracts import events
 from scmle.contracts import experiments
 from scmle.contracts import records
 from scmle.contracts import tasks
-from scmle.evaluation import metrics
 from scmle.evaluation import selection
 import scmle.models.registry
 from scmle.pipeline import archive
 from scmle.pipeline import engine
 from scmle.pipeline import policies
-from scmle.pipeline import roster
+from scmle.pipeline import services
 import scmle.pipeline.context
 import scmle.pipeline.stages
-from scmle.runtime import limits
 from scmle.runtime import logs
-from scmle.runtime import resource_observation
-from scmle.runtime import scheduler
 from scmle.runtime import state
 import scmle.runtime.engine
 from scmle.storage import stores
@@ -116,6 +112,7 @@ class Orchestrator:
         store: scmle.artifacts.store.Workspace | None = None,
         log: events.Log | None = None,
         approved_plan: experiments.Plan | None = None,
+        **fields: Any,
     ) -> scmle.pipeline.context.Context:
         """Creates a run context wired with this orchestrator's services.
 
@@ -123,29 +120,24 @@ class Orchestrator:
             store: Run directory, or None for a side-effect-free preview.
             log: Event log, or None for a preview.
             approved_plan: Plan restricting which models may be considered.
+            **fields: Further services (`services.start`), such as `started`.
 
         Returns:
             A fresh context.
         """
-        return scmle.pipeline.context.Context(
-            spec=self.spec,
-            registry=self.registry,
-            catalog=metrics.CATALOG,
-            policy=self.policy,
-            capability_registry=self.capability_registry or roster.enrol(),
-            capability_observation=resource_observation.observe_runtime_resources(
-                store.directory if store is not None else None
-            ),
-            backend=scheduler.select(
-                limits.Governor(self.spec.resources).workers,
-                self.spec.resources.executor,
-                self.spec.resources.cluster_address,
-            ),
-            cancel_event=self.cancel_event,
-            input_frame=self.frame,
-            store=store,
-            log=log,
-            approved_plan=approved_plan,
+        return scmle.pipeline.context.Context.start(
+            services.start(
+                self.spec,
+                self.registry,
+                self.policy,
+                store=store,
+                capability_registry=self.capability_registry,
+                log=log,
+                approved_plan=approved_plan,
+                cancel_event=self.cancel_event,
+                input_frame=self.frame,
+                **fields,
+            )
         )
 
     def prepare(
@@ -166,8 +158,8 @@ class Orchestrator:
             are populated.
         """
         self.spec = bind(self.spec, approved)
-        context = self.new_context(approved_plan=approved)
-        context.history = recall(self.tracker, self.tracking_path)
+        history = recall(self.tracker, self.tracking_path)
+        context = self.new_context(approved_plan=approved, history=history)
         self.pipeline = engine.Pipeline(self.stages)
         self.pipeline.advance(context, until=scmle.pipeline.stages.Planning)
         return context
@@ -276,7 +268,7 @@ class Orchestrator:
             BlockedError: If any checkpoint rejects, or the gate was rejected
                 before and no checkpoint here reviews it.
         """
-        record = journal.Journal.locate(context.workspace.directory)
+        record = journal.Journal.locate(context.services.workspace.directory)
         reviewers = [c for c in self.checkpoints if gate in c.gates]
         earlier = record.rejected().get(gate.value)
         if earlier is not None and not reviewers:
@@ -286,7 +278,7 @@ class Orchestrator:
             )
         for checkpoint in reviewers:
             verdict = checkpoint.review(policies.describe(gate, context))
-            context.emit(
+            context.journal.emit(
                 f"policy.{'approved' if verdict.approved else 'rejected'}",
                 verdict.reason,
                 data={"gate": gate.value, "reviewer": verdict.reviewer},
@@ -335,13 +327,17 @@ class Orchestrator:
         machine = state.Tracker(
             store.run_id, log, self.spec.config_hash(), reason
         )
-        context = self.new_context(store=store, log=log, approved_plan=approved)
-        context.started_at = docket.started
-        context.tracker = tracker
-        context.history = recall(tracker, self.tracking_path)
-        context.checkpoints = docket.trials()
+        context = self.new_context(
+            store=store,
+            log=log,
+            approved_plan=approved,
+            tracker=tracker,
+            history=recall(tracker, self.tracking_path),
+            checkpoints=docket.trials(),
+            started=docket.started,
+        )
         for name, failure in self.registry.plugin_failures.items():
-            context.emit("plugin.rejected", f"{name}: {failure}")
+            context.journal.emit("plugin.rejected", f"{name}: {failure}")
         self.pipeline = engine.Pipeline(self.stages, docket)
         try:
             self.pipeline.run(

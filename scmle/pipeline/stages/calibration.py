@@ -18,7 +18,6 @@ import scmle.pipeline.context
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import documentation
 from scmle.preparation import strategies
-from scmle.runtime import randomness
 
 MARGINLESS = (
     tasks.Task.SURVIVAL,
@@ -48,7 +47,7 @@ class Calibration(documentation.Documentation):
             context: The run context that receives the event.
             reason: Why calibration was skipped.
         """
-        context.emit(
+        context.journal.emit(
             "conformal.skipped",
             f"conformal calibration skipped: {reason}",
             data={"reason": reason},
@@ -94,14 +93,14 @@ class Calibration(documentation.Documentation):
         if entity_column is not None:
             chosen = conformal.representatives(
                 held_entities,
-                randomness.component_rng(
-                    context.spec.validation.seed, "conformal.entity", 0
+                context.services.random.generator(
+                    context.services.spec.validation.seed, "conformal.entity", 0
                 ),
             )
             held_labels = [held_labels[i] for i in chosen]
             held_scores = [held_scores[i] for i in chosen]
             fold_models = []
-            context.emit(
+            context.journal.emit(
                 "conformal.entity_wise",
                 f"calibrated on one score for each of {len(chosen)} "
                 "entities (unit_of_prediction: new_entity)",
@@ -162,9 +161,9 @@ class Calibration(documentation.Documentation):
             scmle.pipeline.context.require(
                 context.profile, "profile"
             ).feature_plan,
-            context.registry.get(selected.model_name),
+            context.services.registry.get(selected.model_name),
             task,
-            context.spec.validation.seed,
+            context.services.spec.validation.seed,
             selected.params,
         )
         for fit_positions, evaluate_positions in split.manifest.folds:
@@ -210,13 +209,13 @@ class Calibration(documentation.Documentation):
         Returns:
             The group column name, or None when row-wise calibration applies.
         """
-        path = context.spec.charter_path
+        path = context.services.spec.charter_path
         if not path:
             return None
         charter = sealing.read_verified(str(path)).charter
         if charter.purpose != contracts.NEW_ENTITY:
             return None
-        return context.spec.data.group_column
+        return context.services.spec.data.group_column
 
     def retain(
         self,
@@ -250,13 +249,13 @@ class Calibration(documentation.Documentation):
             models,
             self.allowance(context),
         )
-        context.emit(
+        context.journal.emit(
             "conformal.scores",
             f"calibration scores are {plan.mode.replace('_', ' ')}",
             data={"source": plan.mode, "rows": len(observed)},
         )
         if plan.folds is None:
-            context.emit(
+            context.journal.emit(
                 "cv_plus.skipped",
                 f"CV+ ensemble not stored: {plan.reason}",
                 data={"reason": plan.reason},
@@ -276,7 +275,7 @@ class Calibration(documentation.Documentation):
             The byte limit from the charter's uncertainty block, or the default
             limit if the charter sets none.
         """
-        path = context.spec.charter_path
+        path = context.services.spec.charter_path
         if path:
             block = sealing.read_verified(str(path)).charter.uncertainty
             if block is not None and block.limit is not None:

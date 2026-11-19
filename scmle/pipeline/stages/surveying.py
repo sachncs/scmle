@@ -131,10 +131,10 @@ class Surveying(labelling.Labelling):
         card = scmle.contracts.data.Datasheet.distill(curation)
         context.profile = profile
         context.curation = curation
-        context.write_json("dataset_profile.json", profile.to_dict())
-        context.write_json("curation_report.json", curation.to_dict())
-        context.write_json("dataset_card.json", card.to_dict())
-        context.emit(
+        context.journal.write_json("dataset_profile.json", profile.to_dict())
+        context.journal.write_json("curation_report.json", curation.to_dict())
+        context.journal.write_json("dataset_card.json", card.to_dict())
+        context.journal.emit(
             "curation.completed",
             "dataset curation findings and feature decisions recorded",
             (

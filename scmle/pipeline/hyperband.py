@@ -81,13 +81,13 @@ class Hyperband:
         for index, rungs in enumerate(brackets):
             if remaining <= 0:
                 return
-            reason = self.context.regulator.skip_reason(first=False)
+            reason = self.context.services.governor.skip_reason(first=False)
             if reason:
-                self.context.forgo(
+                self.context.journal.forgo(
                     f"tuning {name}: {remaining} configurations", reason
                 )
                 return
-            self.context.check_cancelled()
+            self.context.services.check()
             share = max(
                 MIN_BATCH,
                 round(self.search.configs_per_model * weights[index] / total),
@@ -116,7 +116,7 @@ class Hyperband:
         proposals = list(
             map(operator.call, itertools.repeat(optimizer.ask, size))
         )
-        ids = self.context.allocate(len(proposals))
+        ids = self.context.journal.allocate(len(proposals))
         current = self.runner.run_many(
             [
                 trials.Job(trial_id, name, params, rungs[0], strategy)
@@ -156,7 +156,7 @@ class Hyperband:
             if trial.status is experiments.Termination.OK:
                 self.complete(trial, optimizer)
             else:
-                self.context.transcribe(trial)
+                self.context.journal.transcribe(trial)
 
     def complete(
         self, trial: experiments.Trial, optimizer: optimizers.Optimizer
@@ -174,4 +174,4 @@ class Hyperband:
             experiments.Termination.PRUNED,
         ):
             optimizer.tell(trial.params, trial.score_mean)
-        self.context.transcribe(trial)
+        self.context.journal.transcribe(trial)

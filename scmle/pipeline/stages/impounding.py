@@ -65,17 +65,19 @@ class Impounding(exploration.Exploration):
             split: The split whose development features receive the weights
                 (the weight column is added to them in place).
         """
-        fairness = context.spec.fairness
+        fairness = context.services.spec.fairness
         if fairness.mitigation != "reweighing":
             return
-        column = fairness.column or context.spec.data.sensitive_columns[0]
+        column = (
+            fairness.column or context.services.spec.data.sensitive_columns[0]
+        )
         label = f"fairness:{column}"
         if task not in (
             tasks.Task.BINARY,
             tasks.Task.MULTICLASS,
             tasks.Task.REGRESSION,
         ):
-            context.enter(
+            context.journal.enter(
                 label,
                 experiments.Edict.REJECT,
                 "reweighing applies to binary, multiclass and regression "
@@ -91,14 +93,16 @@ class Impounding(exploration.Exploration):
             split.dev_features[column].astype(str), levels
         )
         split.dev_features[tasks.FAIRNESS_WEIGHT] = weights
-        context.spec = context.spec.model_copy(
-            update={
-                "data": context.spec.data.model_copy(
-                    update={"weight_column": tasks.FAIRNESS_WEIGHT}
-                )
-            }
+        context.amend(
+            context.services.spec.model_copy(
+                update={
+                    "data": context.services.spec.data.model_copy(
+                        update={"weight_column": tasks.FAIRNESS_WEIGHT}
+                    )
+                }
+            )
         )
-        context.enter(
+        context.journal.enter(
             label,
             experiments.Edict.INCLUDE,
             "development rows reweighted so group and label are independent "
@@ -138,12 +142,12 @@ class Impounding(exploration.Exploration):
             ConfigError: If the charter's unit of prediction is `new_entity`
                 and the data spec has no group column.
         """
-        path = str(context.spec.charter_path)
+        path = str(context.services.spec.charter_path)
         verified = sealing.read_verified(path)
         charter = verified.charter
         if (
             charter.purpose == contracts.NEW_ENTITY
-            and not context.spec.data.group_column
+            and not context.services.spec.data.group_column
         ):
             raise errors.ConfigError(
                 "the charter's unit_of_prediction is new_entity, which needs "
@@ -152,8 +156,8 @@ class Impounding(exploration.Exploration):
             )
         self.check_known_entity(context, charter, split)
         log = scmle.assurance.custody.sealed.Journal(
-            context.store.directory / "custody_log.jsonl"
-            if context.store is not None
+            context.services.store.directory / "custody_log.jsonl"
+            if context.services.store is not None
             else None
         )
         vault_set = scmle.assurance.custody.sealed.Vault(log)
@@ -168,7 +172,7 @@ class Impounding(exploration.Exploration):
             charter=charter,
             split=split,
             frame=frame,
-            spec=context.spec,
+            spec=context.services.spec,
             task=task,
             data_hash=data_hash,
             vault=vault_set,
@@ -193,13 +197,19 @@ class Impounding(exploration.Exploration):
             verified: The verified charter and whether it is signed.
             outcome: The custody outcome of the sealing.
         """
-        context.write_json("analysis_charter.json", contracts.deserialize(path))
-        context.write_json(
+        context.journal.write_json(
+            "analysis_charter.json", contracts.deserialize(path)
+        )
+        context.journal.write_json(
             "error_budget.json", verified.charter.budget.to_dict()
         )
-        context.write_json("feasibility.json", outcome.feasibility.to_dict())
-        context.write_json("split_manifest.json", outcome.manifest.to_dict())
-        context.emit(
+        context.journal.write_json(
+            "feasibility.json", outcome.feasibility.to_dict()
+        )
+        context.journal.write_json(
+            "split_manifest.json", outcome.manifest.to_dict()
+        )
+        context.journal.emit(
             "custody.sealed",
             outcome.feasibility.reason,
             (
@@ -246,7 +256,7 @@ class Impounding(exploration.Exploration):
         """
         if charter.purpose != contracts.KNOWN_ENTITY_FUTURE:
             return
-        data = context.spec.data
+        data = context.services.spec.data
         for role, column in (
             ("group_column", data.group_column),
             ("time_column", data.time_column),
@@ -267,7 +277,7 @@ class Impounding(exploration.Exploration):
                 "new entities"
             )
         context.cluster_column = data.group_column
-        context.emit(
+        context.journal.emit(
             "unit.known_entity_future",
             "entities are not split units: their rows sit on both sides, "
             "the confirmation rows are time blocks with an embargo and the "

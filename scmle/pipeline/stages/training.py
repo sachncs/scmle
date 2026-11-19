@@ -1,7 +1,6 @@
 """The training stage."""
 
 import dataclasses
-import time
 from typing import ClassVar
 
 from scmle.contracts import errors
@@ -77,7 +76,7 @@ class TrainStage(interface.Stage):
             BlockedError: If preparation left no trial window for the first
                 trial; the message names the smallest budget that fits.
         """
-        governor = context.regulator
+        governor = context.services.governor
         if governor.reserve.shape is None:
             governor.reserve.provision(
                 *cost.dimensions(context), profiler.estimate
@@ -86,9 +85,9 @@ class TrainStage(interface.Stage):
         plan = scmle.pipeline.context.require(context.plan, "plan")
         names = plan.candidates
         for start in range(0, len(names), runner.workers):
-            context.check_cancelled()
+            context.services.check()
             chunk = names[start : start + runner.workers]
-            ids = context.allocate(len(chunk))
+            ids = context.journal.allocate(len(chunk))
             jobs = [
                 trials.Job(trial_id, name)
                 for trial_id, name in zip(ids, chunk, strict=True)
@@ -97,7 +96,7 @@ class TrainStage(interface.Stage):
             if start == 0 and all(
                 o.status is experiments.Termination.SKIPPED for o in outcomes
             ):
-                prepared = time.monotonic() - context.started_at
+                prepared = context.services.elapsed()
                 smallest = governor.reserve.smallest(prepared)
                 raise errors.BlockedError(
                     f"preparation took {prepared:.1f} s and left no time "
@@ -109,7 +108,11 @@ class TrainStage(interface.Stage):
                     },
                 )
             for outcome in outcomes:
-                context.transcribe(outcome)
-        strategy_search.Strategist(context, runner).search(list(context.trials))
-        tuning.Tuner(context, runner).tune(list(context.trials))
-        ensemble_search.Stacker(context, runner).search(list(context.trials))
+                context.journal.transcribe(outcome)
+        strategy_search.Strategist(context, runner).search(
+            list(context.journal.trials)
+        )
+        tuning.Tuner(context, runner).tune(list(context.journal.trials))
+        ensemble_search.Stacker(context, runner).search(
+            list(context.journal.trials)
+        )

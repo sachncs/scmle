@@ -33,7 +33,7 @@ class Labelling(interface.Stage):
         Raises:
             BlockedError: Under the default `block` policy.
         """
-        data = context.spec.data
+        data = context.services.spec.data
         missing = frame[data.target].isna()
         if data.unlabeled == "block":
             raise errors.BlockedError(
@@ -74,7 +74,7 @@ class Labelling(interface.Stage):
                 resolves to, or a success criterion names a metric that is not
                 reported.
         """
-        spec = context.spec
+        spec = context.services.spec
         target = frame[spec.data.target]
         if target.isna().any():
             frame = self.set_aside_unlabeled(context, frame)
@@ -88,7 +88,7 @@ class Labelling(interface.Stage):
             raise errors.ConfigError(
                 "unlabeled='pseudo_label' supports classification only"
             )
-        approved = context.approved_plan
+        approved = context.services.approved_plan
         if approved is not None and approved.task != task.value:
             raise errors.ConfigError(
                 f"the approved plan is for {approved.task} but the data "
@@ -107,15 +107,18 @@ class Labelling(interface.Stage):
             context.frame = frame
             context.ordinal_labels = tuple(spec.data.ordinal_order)
         context.task = task
-        context.metric = context.catalog.resolve(spec.primary_metric, task)
+        context.metric = context.services.catalog.resolve(
+            spec.primary_metric, task
+        )
         unknown = sorted(
             set(spec.problem.success_criteria)
-            - set(context.catalog.report_names[task])
+            - set(context.services.catalog.report_names[task])
         )
         if unknown:
             raise errors.ConfigError(
                 f"success criteria name unreported metrics {unknown}; "
-                f"available: {sorted(context.catalog.report_names[task])}"
+                "available: "
+                f"{sorted(context.services.catalog.report_names[task])}"
             )
         return frame, task
 

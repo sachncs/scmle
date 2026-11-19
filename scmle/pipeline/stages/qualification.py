@@ -65,8 +65,8 @@ class Qualification(screening.Screening):
                 ],
             }
         for name, document in documents.items():
-            context.write_json(name, document)
-        context.emit(
+            context.journal.write_json(name, document)
+        context.journal.emit(
             "claims.registered",
             "registered claims were evaluated on the one opening of C",
             tuple(documents),
@@ -99,7 +99,7 @@ class Qualification(screening.Screening):
             The stability and shift assessment of the survivors, with each
             time period of the exploration rows compared with the first.
         """
-        data = context.spec.data
+        data = context.services.spec.data
         profile = scmle.pipeline.context.require(context.profile, "profile")
         plan = profile.feature_plan
         candidates = [*plan.numeric, *plan.categorical]
@@ -166,13 +166,13 @@ class Qualification(screening.Screening):
         shift_document = scmle.assurance.robustness.report.shift_report(found)
         scmle.assurance.robustness.report.conform(stability_document)
         scmle.assurance.robustness.report.validate_shift(shift_document)
-        context.write_json("stability_report.json", stability_document)
-        context.write_json("shift_report.json", shift_document)
-        context.write_text(
+        context.journal.write_json("stability_report.json", stability_document)
+        context.journal.write_json("shift_report.json", shift_document)
+        context.journal.write_text(
             "eda_report.html",
             html_report.render(stability_document, shift_document),
         )
-        context.emit(
+        context.journal.emit(
             "robustness.completed",
             "stability and shift were assessed on the exploration set",
             ("stability_report.json", "shift_report.json", "eda_report.html"),
