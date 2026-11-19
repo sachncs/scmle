@@ -252,7 +252,7 @@ def test_policies_can_reject_nulls_and_unseen_categories(golden, bundle):
 def test_schema_changes_are_explicit(golden, running):
     # Enforces docs/SERVICE_SLO.md:38.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:530.
-    # Enforces website/src/learn/when-things-go-wrong.html:206.
+    # Enforces website/src/learn/when-things-go-wrong.html:221.
     # Enforces website/src/pages/docs/service.astro:53.
     base = running.address
     status, body = call(
@@ -401,16 +401,61 @@ def settle(adapter, seconds=10.0):
     return False
 
 
-def test_a_hung_call_makes_the_replica_unready_until_it_returns(
+def test_a_hung_call_leaves_the_replica_serving_on_its_other_workers(
     golden, bundle, monkeypatch
 ):
-    # Enforces docs/SERVICE_SLO.md:71.
     # SRV-1: a timed-out call kept its worker and the lock while readiness
-    # stayed true, so traffic kept arriving and queued behind it.
+    # stayed true, so traffic kept arriving and queued behind it. C7: the
+    # fix then refused every request while one call hung, so a call that
+    # never returned wedged the replica: not ready, never restarted.
     # Enforces website/src/pages/docs/service.astro:26.
     adapter = scmle.serving.server.HttpServing(
         bundle, max_concurrent=2, scoring_timeout_seconds=0.2
     )
+    gate = SlowGate()
+    original = adapter.respond
+
+    def hung(records):
+        if records[0].get("note") == "hang":
+            gate.release.wait(20)
+        return original(records)
+
+    monkeypatch.setattr(adapter, "respond", hung)
+    adapter.start()
+    url = f"{adapter.address}/predict"
+    stalled = {"records": [{**golden.records[0], "note": "hang"}]}
+    plain = {"records": golden.records[:1]}
+    try:
+        assert call(url, stalled)[0] == 504
+        status, body = call(f"{adapter.address}/readyz")
+        assert status == 200 and body["workers"]["stuck"] == 1
+        started = time.monotonic()
+        assert [call(url, plain)[0] for ignored in range(5)] == [200] * 5
+        assert time.monotonic() - started < 2
+        assert call(f"{adapter.address}/livez")[0] == 200
+        assert call(url, stalled)[0] == 504
+        status, body = call(f"{adapter.address}/readyz")
+        assert status == 503
+        assert body["reason"] == "2 timed-out call(s) hold every worker"
+        status, body = call(url, plain)
+        assert status == 503 and body["category"] == "not_ready"
+        gate.release.set()
+        assert settle(adapter)
+        assert call(f"{adapter.address}/readyz")[0] == 200
+        assert call(url, plain)[0] == 200
+        assert adapter.admission.state()["misses"] == 0
+    finally:
+        gate.release.set()
+        adapter.stop()
+
+
+def test_a_replica_no_call_can_run_on_stops_being_alive(
+    golden, bundle, monkeypatch
+):
+    adapter = scmle.serving.server.HttpServing(
+        bundle, max_concurrent=1, scoring_timeout_seconds=0.1
+    )
+    adapter.capacity.patience = 0.3
     gate = SlowGate()
     original = adapter.respond
 
@@ -420,23 +465,18 @@ def test_a_hung_call_makes_the_replica_unready_until_it_returns(
 
     monkeypatch.setattr(adapter, "respond", hung)
     adapter.start()
-    url = f"{adapter.address}/predict"
     try:
-        assert call(url, {"records": golden.records[:1]})[0] == 504
-        status, body = call(f"{adapter.address}/readyz")
-        assert status == 503
-        assert "still running" in body["reason"]
-        assert body["workers"]["stuck"] == 1
-        started = time.monotonic()
-        status, body = call(url, {"records": golden.records[:1]})
-        assert status == 503 and body["category"] == "not_ready"
-        assert time.monotonic() - started < 2
+        assert (
+            call(f"{adapter.address}/predict", {"records": golden.records[:1]})[
+                0
+            ]
+            == 504
+        )
         assert call(f"{adapter.address}/livez")[0] == 200
-        gate.release.set()
-        assert settle(adapter)
-        assert call(f"{adapter.address}/readyz")[0] == 200
-        assert call(url, {"records": golden.records[:1]})[0] == 200
-        assert adapter.admission.state()["misses"] == 0
+        time.sleep(0.4)
+        status, body = call(f"{adapter.address}/livez")
+        assert status == 503 and body["status"] == "wedged"
+        assert body["misses"] == 1
     finally:
         gate.release.set()
         adapter.stop()
@@ -534,7 +574,7 @@ def test_a_failed_verification_keeps_the_service_alive_but_never_ready(
     # Enforces docs/GLOSSARY.md:629.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:505.
     # Enforces website/src/learn/glossary.html:314.
-    # Enforces website/src/learn/when-things-go-wrong.html:196.
+    # Enforces website/src/learn/when-things-go-wrong.html:211.
     # Enforces website/src/pages/docs/service.astro:6.
     # Enforces website/src/pages/docs/service.astro:7.
     def loader(readiness):

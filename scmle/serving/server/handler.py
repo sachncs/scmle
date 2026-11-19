@@ -220,7 +220,7 @@ class Responder(Exchange):
         adapter = self.adapter
         readiness = adapter.health()
         if self.path == "/livez":
-            alive = adapter.admission.alive
+            alive = adapter.capacity.alive()
             self.transmit(
                 200 if alive else 503,
                 {
@@ -278,7 +278,8 @@ class Responder(Exchange):
         Returns:
             The body, or None after an error response was sent for a wrong
             `Content-Type`, a missing, malformed or oversized
-            `Content-Length`, or an incomplete body.
+            `Content-Length`, an incomplete body, or a body not received
+            within the request I/O timeout (408).
         """
         content_type = self.headers.get("Content-Type", "")
         if content_type.split(";", 1)[0].strip().lower() != (
@@ -303,7 +304,31 @@ class Responder(Exchange):
                 "request",
             )
             return None
-        body = self.rfile.read(length)
+        return self.collect(length)
+
+    def collect(self, length: int) -> bytes | None:
+        """Reads exactly `length` bytes of body within the I/O timeout.
+
+        Args:
+            length: The declared `Content-Length`.
+
+        Returns:
+            The body, or None after a 408 (not received within the request
+            I/O timeout) or a 400 (the connection ended early) was sent, or
+            after the caller reset the connection (logged, nothing sent).
+        """
+        try:
+            body = self.rfile.read(length)
+        except TimeoutError:
+            # handled: a body slower than the request I/O timeout gets a 408
+            self.fail(408, "request body not received in time", "request")
+            return None
+        except OSError:
+            # handled: the caller reset or broke the connection mid-body;
+            # nobody is left to answer, so the connection is dropped
+            LOGGER.info("request body read failed")
+            self.close_connection = True
+            return None
         if len(body) != length:
             self.fail(400, "request body is incomplete", "request")
             return None
@@ -325,7 +350,7 @@ class Responder(Exchange):
             return
         # Not `health`: draining takes the service out of rotation, but a
         # request accepted before the drain began is still finished.
-        readiness = guard.assess(adapter.readiness, adapter.admission)
+        readiness = adapter.capacity.assess(adapter.readiness)
         if not readiness["ready"]:
             self.fail(
                 503,
@@ -335,9 +360,14 @@ class Responder(Exchange):
                 {"Retry-After": "1"},
             )
             return
+        # The body is read before a slot is taken: a client that sends it
+        # slowly holds its own thread for the I/O timeout, never a slot.
+        body = self.receive()
+        if body is None:
+            return
         try:
             with adapter.admission.admit():
-                self.predict()
+                self.predict(body)
         except guard.OverloadedError as error:
             # handled: admission overload answered with HTTP 429 and Retry-After
             self.fail(
@@ -348,10 +378,14 @@ class Responder(Exchange):
                 {"Retry-After": "1"},
             )
 
-    def predict(self) -> None:
-        """Scores the request and answers it, mapping failures to statuses."""
+    def predict(self, body: bytes) -> None:
+        """Scores the request and answers it, mapping failures to statuses.
+
+        Args:
+            body: The request body, already read.
+        """
         try:
-            self.answer()
+            self.answer(body)
         except guard.DeadlineError as error:
             # handled: scoring deadline exceeded answered with HTTP 504
             self.fail(504, str(error), error.category)
@@ -393,15 +427,15 @@ class Responder(Exchange):
             LOGGER.exception("internal serving failure")
             self.fail(500, "internal serving failure", "internal")
 
-    def answer(self) -> None:
-        """Reads, parses and scores the request body and sends the answer.
+    def answer(self, body: bytes) -> None:
+        """Parses and scores the request body and sends the answer.
 
         An error response is sent, and nothing is scored, when the body is
-        unreadable or is not JSON. Other failures propagate to `predict`.
+        not JSON. Other failures propagate to `predict`.
+
+        Args:
+            body: The request body, already read.
         """
-        body = self.receive()
-        if body is None:
-            return
         try:
             payload = json.loads(body)
         except json.JSONDecodeError as error:

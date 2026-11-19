@@ -7,8 +7,10 @@ leaves the process alive and unready, with the reason at `/readyz`, so the
 orchestrator keeps it out of rotation and an operator can read why.
 
 `hold` is the serving loop `run` and `scmle serve` share: SIGTERM or
-SIGINT drains the requests in flight and stops, SIGHUP reloads the bundle
-without downtime, and a background thread writes the operations signals.
+SIGINT takes the service out of rotation, serves on for the linger
+(`SCMLE_LINGER_SECONDS`), drains the requests in flight and stops, SIGHUP
+reloads the bundle without downtime, and a background thread writes the
+operations signals.
 """
 
 from collections.abc import Mapping
@@ -44,6 +46,13 @@ INTERVAL = 60.0
 # The signals that stop the service (drained) and that reload its bundle.
 STOPS = (signal.SIGTERM, signal.SIGINT)
 RELOAD = getattr(signal, "SIGHUP", None)
+# Seconds a stopping service stays out of rotation (`/readyz` 503) while it
+# still serves, before it closes its socket: set it to the longest the
+# platform takes to stop routing to a replica that is not ready (failure
+# threshold times probe period plus timeout, 36 s for the deployment spec's
+# probes). The default, 0, closes the socket at once: a container stop
+# (`docker stop` waits 10 s) must not kill a service still lingering.
+LINGER = "SCMLE_LINGER_SECONDS"
 
 
 def number(environ: Mapping[str, str], name: str, default: float) -> float:
@@ -67,6 +76,50 @@ def number(environ: Mapping[str, str], name: str, default: float) -> float:
         return float(raw)
     except ValueError as error:
         raise errors.ConfigError(f"{name} must be a number") from error
+
+
+def lingering(environ: Mapping[str, str]) -> float:
+    """Reads how long a stopping service keeps serving out of rotation.
+
+    Args:
+        environ: The environment (`SCMLE_LINGER_SECONDS`).
+
+    Returns:
+        The seconds; 0 when unset, which closes the socket at once.
+
+    Raises:
+        ConfigError: If the setting is not a number or is negative.
+    """
+    found = number(environ, LINGER, 0.0)
+    if found < 0:
+        raise errors.ConfigError(f"{LINGER}: the linger must not be negative")
+    return found
+
+
+def withdraw(
+    adapter: server.HttpServing, inbox: queue.SimpleQueue[int], linger: float
+) -> None:
+    """Takes the service out of rotation and serves on for `linger` seconds.
+
+    `/readyz` answers 503 (`draining`) at once, so the platform stops
+    routing here, while every request that still arrives is served. A
+    second stop signal ends the wait early; a reload signal is ignored.
+
+    Args:
+        adapter: The running server.
+        inbox: The signals received.
+        linger: Seconds to keep serving.
+    """
+    adapter.draining = True
+    deadline = time.monotonic() + linger
+    while (left := deadline - time.monotonic()) > 0:
+        try:
+            got = inbox.get(timeout=left)
+        except queue.Empty:
+            # handled: the linger ran out with no further signal
+            return
+        if got != RELOAD:
+            return
 
 
 def settings(environ: Mapping[str, str]) -> dict[str, Any]:
@@ -281,14 +334,16 @@ def hold(
     path: pathlib.Path | str | None,
     interval: float,
     loader: server.Loader | None = None,
+    linger: float | None = None,
 ) -> None:
     """Serves until SIGTERM or SIGINT, reloading on SIGHUP, then drains.
 
     Must run on the main thread, which receives the signals. Starts the
     server and the thread that writes the signals; each SIGHUP reloads the
     bundle while the old one keeps serving (`HttpServing.reload`). SIGTERM
-    or SIGINT stops accepting connections, lets the requests in flight
-    finish (`HttpServing.stop`), writes the signals one last time and
+    or SIGINT makes `/readyz` answer 503 and keeps serving for the linger
+    (`withdraw`), then stops accepting connections, lets the requests in
+    flight finish (`HttpServing.stop`), writes the signals one last time and
     restores the previous signal handlers.
 
     Args:
@@ -297,6 +352,9 @@ def hold(
         path: File the signals are appended to, or None for the log.
         interval: Seconds between two evaluations of the signals.
         loader: The loader SIGHUP reloads from; the adapter's own if None.
+        linger: Seconds the stopping service stays out of rotation while
+            still serving (`withdraw`) before it closes its socket;
+            `SCMLE_LINGER_SECONDS` (default 0) when None.
 
     Raises:
         ConfigError: If `interval` is not positive or this is not the main
@@ -306,6 +364,7 @@ def hold(
         raise errors.ConfigError("the signals interval must be positive")
     if threading.current_thread() is not threading.main_thread():
         raise errors.ConfigError("serve from the main thread")
+    wait = lingering(os.environ) if linger is None else linger
     inbox: queue.SimpleQueue[int] = queue.SimpleQueue()
     wanted = [*STOPS, *([] if RELOAD is None else [RELOAD])]
     previous = {
@@ -323,6 +382,7 @@ def hold(
         while inbox.get() == RELOAD:
             refresh(adapter, loader)
         LOGGER.info("stopping: draining the requests in flight")
+        withdraw(adapter, inbox, wait)
     finally:
         stop.set()
         adapter.stop()
@@ -359,7 +419,13 @@ def run(folder: pathlib.Path, environ: Mapping[str, str]) -> None:
         **settings(environ),
     )
     try:
-        hold(adapter, monitor, chosen["path"], chosen["interval"])
+        hold(
+            adapter,
+            monitor,
+            chosen["path"],
+            chosen["interval"],
+            linger=lingering(environ),
+        )
     finally:
         tracing.TRACING.disable()
 
