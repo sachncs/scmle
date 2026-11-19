@@ -9,12 +9,18 @@ outcome (no unmeasured confounding), which a randomized experiment
 guarantees and observational data do not.
 """
 
+from collections.abc import Callable
+from collections.abc import Mapping
 from typing import Any
 from typing import Self
 
 import numpy
 from sklearn import base
+from sklearn import dummy
 from sklearn import ensemble
+from sklearn import linear_model
+
+from scmle.contracts import errors
 
 MIN_ARM_ROWS = 20
 
@@ -37,6 +43,77 @@ def booster(
     if classify:
         return ensemble.HistGradientBoostingClassifier(random_state=seed)
     return ensemble.HistGradientBoostingRegressor(random_state=seed)
+
+
+def linear(
+    classify: bool, seed: int
+) -> linear_model.LogisticRegression | linear_model.Ridge:
+    """A fresh linear outcome model: logistic for a label, ridge otherwise.
+
+    Args:
+        classify: True for a 0/1 label outcome, False for a numeric one.
+        seed: Random seed of the logistic solver.
+
+    Returns:
+        An unfitted logistic or ridge regression; neither accepts missing
+        values, so the features must be imputed and scaled.
+    """
+    if classify:
+        return linear_model.LogisticRegression(max_iter=1000, random_state=seed)
+    return linear_model.Ridge()
+
+
+KINDS: Mapping[str, Callable[[bool, int], Any]] = {
+    "boosting": booster,
+    "linear": linear,
+}
+"""Outcome-model families a learner can be built on, by name."""
+
+
+def model(kind: str, classify: bool, seed: int) -> Any:
+    """A fresh outcome model of the named family.
+
+    Args:
+        kind: A key of `KINDS`.
+        classify: True for a 0/1 label outcome, False for a numeric one.
+        seed: Random seed of the model.
+
+    Returns:
+        The unfitted model.
+
+    Raises:
+        ConfigError: If `kind` names no family.
+    """
+    if kind not in KINDS:
+        raise errors.ConfigError(
+            f"unknown outcome model kind {kind!r}; choose from {sorted(KINDS)}"
+        )
+    return KINDS[kind](classify, seed)
+
+
+def train(
+    kind: str, classify: bool, seed: int, features: Any, values: Any
+) -> Any:
+    """Fits an outcome model, or a constant when a label has one class.
+
+    Args:
+        kind: A key of `KINDS`.
+        classify: Whether the outcome is a 0/1 label.
+        seed: Random seed of the model.
+        features: Training matrix.
+        values: Outcome of each row.
+
+    Returns:
+        The fitted model; a prior classifier when the labels hold one class,
+        which a logistic regression cannot fit.
+
+    Raises:
+        ConfigError: If `kind` names no family.
+    """
+    fresh = model(kind, classify, seed)
+    if classify and len(numpy.unique(numpy.asarray(values))) < 2:  # noqa: PLR2004 -- two classes make a label
+        fresh = dummy.DummyClassifier(strategy="prior")
+    return fresh.fit(features, values)
 
 
 def expected(model: Any, features: Any, classify: bool) -> numpy.ndarray:
@@ -82,17 +159,25 @@ class TLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships 
     Attributes:
         classify: Whether the outcome is a 0/1 label.
         random_state: Seed.
+        kind: Outcome-model family, a key of `KINDS`.
     """
 
-    def __init__(self, classify: bool = True, random_state: int = 0) -> None:
+    def __init__(
+        self,
+        classify: bool = True,
+        random_state: int = 0,
+        kind: str = "boosting",
+    ) -> None:
         """Stores the settings (scikit-learn convention).
 
         Args:
             classify: Whether the outcome is a 0/1 label.
             random_state: Seed.
+            kind: Outcome-model family, a key of `KINDS`.
         """
         self.classify = classify
         self.random_state = random_state
+        self.kind = kind
 
     def fit(self, features: Any, outcome: Any, treatment: Any = None) -> Self:
         """Fits the treated and control outcome models.
@@ -112,11 +197,17 @@ class TLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships 
             numpy.zeros(len(outcome)) if treatment is None else treatment
         )
         values = numpy.asarray(outcome)
-        self.treated_ = booster(self.classify, self.random_state).fit(
+        self.treated_ = train(
+            self.kind,
+            self.classify,
+            self.random_state,
             features[treated] if treated.any() else features,
             values[treated] if treated.any() else values,
         )
-        self.control_ = booster(self.classify, self.random_state).fit(
+        self.control_ = train(
+            self.kind,
+            self.classify,
+            self.random_state,
             features[control] if control.any() else features,
             values[control] if control.any() else values,
         )
@@ -141,20 +232,32 @@ class TLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships 
 class SingleModelLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """S-learner: one outcome model with the treatment as a feature.
 
+    With `kind="linear"` the treatment enters as one additive coefficient,
+    so the effect is homogeneous: the same for every row on the link scale
+    (and, for a ridge outcome, on the outcome scale).
+
     Attributes:
         classify: Whether the outcome is a 0/1 label.
         random_state: Seed.
+        kind: Outcome-model family, a key of `KINDS`.
     """
 
-    def __init__(self, classify: bool = True, random_state: int = 0) -> None:
+    def __init__(
+        self,
+        classify: bool = True,
+        random_state: int = 0,
+        kind: str = "boosting",
+    ) -> None:
         """Stores the settings.
 
         Args:
             classify: Whether the outcome is a 0/1 label.
             random_state: Seed.
+            kind: Outcome-model family, a key of `KINDS`.
         """
         self.classify = classify
         self.random_state = random_state
+        self.kind = kind
 
     @staticmethod
     def stacked(features: Any, flag: float) -> numpy.ndarray:
@@ -183,7 +286,10 @@ class SingleModelLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-le
             This fitted learner.
         """
         flag = numpy.zeros(len(outcome)) if treatment is None else treatment
-        self.model_ = booster(self.classify, self.random_state).fit(
+        self.model_ = train(
+            self.kind,
+            self.classify,
+            self.random_state,
             numpy.column_stack([numpy.asarray(features), numpy.asarray(flag)]),
             numpy.asarray(outcome),
         )
@@ -216,17 +322,25 @@ class CrossLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn sh
     Attributes:
         classify: Whether the outcome is a 0/1 label.
         random_state: Seed.
+        kind: Outcome-model family, a key of `KINDS`.
     """
 
-    def __init__(self, classify: bool = True, random_state: int = 0) -> None:
+    def __init__(
+        self,
+        classify: bool = True,
+        random_state: int = 0,
+        kind: str = "boosting",
+    ) -> None:
         """Stores the settings.
 
         Args:
             classify: Whether the outcome is a 0/1 label.
             random_state: Seed.
+            kind: Outcome-model family, a key of `KINDS`.
         """
         self.classify = classify
         self.random_state = random_state
+        self.kind = kind
 
     def fit(self, features: Any, outcome: Any, treatment: Any = None) -> Self:
         """Fits the per-arm outcome models, then one effect model per arm.
@@ -252,7 +366,7 @@ class CrossLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn sh
         self.degenerate_ = not (treated.any() and control.any())
         if self.degenerate_:
             return self  # One arm only: no effect can be estimated.
-        first = TLearner(self.classify, self.random_state).fit(
+        first = TLearner(self.classify, self.random_state, self.kind).fit(
             matrix, values, treated.astype(int)
         )
         treated_gain = values[treated] - expected(
@@ -262,11 +376,11 @@ class CrossLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn sh
             expected(first.treated_, matrix[control], self.classify)
             - values[control]
         )
-        self.treated_effect_ = ensemble.HistGradientBoostingRegressor(
-            random_state=self.random_state
+        self.treated_effect_ = model(
+            self.kind, classify=False, seed=self.random_state
         ).fit(matrix[treated], treated_gain)
-        self.control_effect_ = ensemble.HistGradientBoostingRegressor(
-            random_state=self.random_state
+        self.control_effect_ = model(
+            self.kind, classify=False, seed=self.random_state
         ).fit(matrix[control], control_gain)
         self.share_ = float(treated.mean())
         return self

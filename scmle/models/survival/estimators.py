@@ -35,14 +35,10 @@ def kaplan_meier(
     """
     time = numpy.asarray(duration, dtype=float)
     seen = numpy.asarray(event, dtype=bool)
-    moments = numpy.unique(time[seen])
-    survival = numpy.empty(len(moments))
-    level = 1.0
-    for position, moment in enumerate(moments):
-        at_risk = (time >= moment).sum()
-        happened = (seen & (time == moment)).sum()
-        level *= 1.0 - happened / at_risk
-        survival[position] = level
+    moments, happened = numpy.unique(time[seen], return_counts=True)
+    ordered = numpy.sort(time)
+    at_risk = len(ordered) - numpy.searchsorted(ordered, moments, "left")
+    survival: numpy.ndarray = numpy.cumprod(1.0 - happened / at_risk)
     return moments, survival
 
 
