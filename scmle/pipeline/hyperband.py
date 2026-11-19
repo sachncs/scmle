@@ -13,8 +13,8 @@ from scmle.contracts import experiments
 from scmle.contracts import metrics
 from scmle.contracts import tasks
 from scmle.optimization import optimizers
+from scmle.pipeline import engine
 from scmle.pipeline import trials
-import scmle.pipeline.context
 
 MIN_BATCH = 2
 MIN_FOLDS = 2
@@ -24,13 +24,13 @@ class Hyperband:
     """The Hyperband schedule of a tuner, and the recording of its trials.
 
     Attributes:
-        context: Run context.
+        board: Run board.
         runner: Trial runner used for every evaluation.
         search: The effective search specification.
         metric: The metric being optimized.
     """
 
-    context: scmle.pipeline.context.Context
+    board: engine.Board
     runner: trials.Runner
     search: tasks.Search
     metric: metrics.Metric
@@ -81,13 +81,13 @@ class Hyperband:
         for index, rungs in enumerate(brackets):
             if remaining <= 0:
                 return
-            reason = self.context.services.governor.skip_reason(first=False)
+            reason = self.board.services.governor.skip_reason(first=False)
             if reason:
-                self.context.journal.forgo(
+                self.board.journal.forgo(
                     f"tuning {name}: {remaining} configurations", reason
                 )
                 return
-            self.context.services.check()
+            self.board.services.check()
             share = max(
                 MIN_BATCH,
                 round(self.search.configs_per_model * weights[index] / total),
@@ -116,7 +116,7 @@ class Hyperband:
         proposals = list(
             map(operator.call, itertools.repeat(optimizer.ask, size))
         )
-        ids = self.context.journal.allocate(len(proposals))
+        ids = self.board.journal.allocate(len(proposals))
         current = self.runner.run_many(
             [
                 trials.Job(trial_id, name, params, rungs[0], strategy)
@@ -156,7 +156,7 @@ class Hyperband:
             if trial.status is experiments.Termination.OK:
                 self.complete(trial, optimizer)
             else:
-                self.context.journal.transcribe(trial)
+                self.board.journal.transcribe(trial)
 
     def complete(
         self, trial: experiments.Trial, optimizer: optimizers.Optimizer
@@ -174,4 +174,4 @@ class Hyperband:
             experiments.Termination.PRUNED,
         ):
             optimizer.tell(trial.params, trial.score_mean)
-        self.context.journal.transcribe(trial)
+        self.board.journal.transcribe(trial)

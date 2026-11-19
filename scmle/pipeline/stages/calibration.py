@@ -14,9 +14,10 @@ from scmle.contracts import tasks
 import scmle.contracts.models
 from scmle.evaluation import conformal
 from scmle.evaluation import cv_plus
-import scmle.pipeline.context
+from scmle.pipeline import engine
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import documentation
+from scmle.pipeline.stages import profiling
 from scmle.preparation import strategies
 
 MARGINLESS = (
@@ -38,16 +39,14 @@ class Calibration(documentation.Documentation):
     abstract, never run on its own.
     """
 
-    def waive(
-        self, context: scmle.pipeline.context.Context, reason: str
-    ) -> None:
+    def waive(self, board: engine.Board, reason: str) -> None:
         """Records why the bundle will have no prediction intervals or sets.
 
         Args:
-            context: The run context that receives the event.
+            board: The run's board that receives the event.
             reason: Why calibration was skipped.
         """
-        context.journal.emit(
+        board.journal.emit(
             "conformal.skipped",
             f"conformal calibration skipped: {reason}",
             data={"reason": reason},
@@ -55,7 +54,7 @@ class Calibration(documentation.Documentation):
 
     def conformalise(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         selected: experiments.Trial,
         bundle: scmle.artifacts.bundle.Bundle,
     ) -> conformal.ConformalCalibrator | None:
@@ -68,7 +67,7 @@ class Calibration(documentation.Documentation):
         per entity is kept instead, and no fold models are kept.
 
         Args:
-            context: The run context, holding the split, budget and charter.
+            board: The run's board, holding the split, budget and charter.
             selected: The selected trial, used to build the fold models.
             bundle: The model bundle; the fold models are kept on it when the
                 CV+ rule applies.
@@ -77,30 +76,30 @@ class Calibration(documentation.Documentation):
             The calibrator, or None when the task has no conformal margin, the
             time budget is spent or too few held-out rows exist.
         """
-        task = scmle.pipeline.context.require(context.task, "task")
+        task = board.get(profiling.Partition).task
         if task in MARGINLESS:
             return None
-        reason = cost.halt(context, selected, "conformal calibration")
+        reason = cost.halt(board, selected, "conformal calibration")
         if reason:
-            self.waive(context, reason)
+            self.waive(board, reason)
             return None
         classes = list(bundle.classes or ())
-        entity_column = self.grouping(context)
-        held = self.holdout(context, selected, classes, entity_column)
+        entity_column = self.grouping(board)
+        held = self.holdout(board, selected, classes, entity_column)
         if held is None:
             return None
         held_labels, held_scores, held_entities, fold_models = held
         if entity_column is not None:
             chosen = conformal.representatives(
                 held_entities,
-                context.services.random.generator(
-                    context.services.spec.validation.seed, "conformal.entity", 0
+                board.services.random.generator(
+                    board.services.spec.validation.seed, "conformal.entity", 0
                 ),
             )
             held_labels = [held_labels[i] for i in chosen]
             held_scores = [held_scores[i] for i in chosen]
             fold_models = []
-            context.journal.emit(
+            board.journal.emit(
                 "conformal.entity_wise",
                 f"calibrated on one score for each of {len(chosen)} "
                 "entities (unit_of_prediction: new_entity)",
@@ -108,7 +107,7 @@ class Calibration(documentation.Documentation):
             )
         if len(held_labels) < conformal.MIN_CALIBRATION_ROWS:
             self.waive(
-                context,
+                board,
                 f"only {len(held_labels)} "
                 f"{'entities' if entity_column else 'held-out rows'}; need "
                 f"{conformal.MIN_CALIBRATION_ROWS}",
@@ -116,7 +115,7 @@ class Calibration(documentation.Documentation):
             return None
         if task is tasks.Task.REGRESSION:
             self.retain(
-                context,
+                board,
                 bundle,
                 fold_models,
                 numpy.asarray(held_labels, dtype=float),
@@ -131,7 +130,7 @@ class Calibration(documentation.Documentation):
 
     def holdout(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         selected: experiments.Trial,
         classes: list[Any],
         entity_column: str | None,
@@ -139,7 +138,7 @@ class Calibration(documentation.Documentation):
         """Scores each fold's held-out rows with a model refit without them.
 
         Args:
-            context: The run context, holding the split, budget and charter.
+            board: The run's board, holding the split, budget and charter.
             selected: The selected trial, rebuilt for each fold; the budget
                 is checked before each fold.
             classes: The bundle's classes, in order (empty for regression).
@@ -155,21 +154,20 @@ class Calibration(documentation.Documentation):
         held_scores: list[Any] = []
         held_entities: list[Any] = []
         fold_models: list[Any] = []
-        task = scmle.pipeline.context.require(context.task, "task")
-        split = scmle.pipeline.context.require(context.split, "split")
+        partition = board.get(profiling.Partition)
+        task = partition.task
+        split = partition.split
         template = strategies.lookup(selected.strategy).build(
-            scmle.pipeline.context.require(
-                context.profile, "profile"
-            ).feature_plan,
-            context.services.registry.get(selected.model_name),
+            partition.profile.feature_plan,
+            board.services.registry.get(selected.model_name),
             task,
-            context.services.spec.validation.seed,
+            board.services.spec.validation.seed,
             selected.params,
         )
         for fit_positions, evaluate_positions in split.manifest.folds:
-            reason = cost.halt(context, selected, "conformal calibration")
+            reason = cost.halt(board, selected, "conformal calibration")
             if reason:
-                self.waive(context, reason)
+                self.waive(board, reason)
                 return None
             fit = numpy.asarray(fit_positions)
             evaluate = numpy.asarray(evaluate_positions)
@@ -195,7 +193,7 @@ class Calibration(documentation.Documentation):
             )
         return held_labels, held_scores, held_entities, fold_models
 
-    def grouping(self, context: scmle.pipeline.context.Context) -> str | None:
+    def grouping(self, board: engine.Board) -> str | None:
         """Returns the group column when the charter's unit is a new entity.
 
         Intervals for a new entity treat one score per entity as the
@@ -204,22 +202,22 @@ class Calibration(documentation.Documentation):
         None and row-wise calibration applies.
 
         Args:
-            context: The run context, supplying the charter path and data spec.
+            board: The run's board, supplying the charter path and data spec.
 
         Returns:
             The group column name, or None when row-wise calibration applies.
         """
-        path = context.services.spec.charter_path
+        path = board.services.spec.charter_path
         if not path:
             return None
         charter = sealing.read_verified(str(path)).charter
         if charter.purpose != contracts.NEW_ENTITY:
             return None
-        return context.services.spec.data.group_column
+        return board.services.spec.data.group_column
 
     def retain(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         bundle: scmle.artifacts.bundle.Bundle,
         models: list[Any],
         observed: numpy.ndarray,
@@ -234,28 +232,28 @@ class Calibration(documentation.Documentation):
         when no ensemble is kept.
 
         Args:
-            context: The run context, holding the split.
+            board: The run's board, holding the split.
             bundle: The model bundle that receives the ensemble.
             models: The fold models, one per cross-validation fold.
             observed: The held-out labels.
             predicted: The held-out predictions.
         """
-        split = scmle.pipeline.context.require(context.split, "split")
+        split = board.get(profiling.Partition).split
         held = [fold[1] for fold in split.manifest.folds]
         plan = cv_plus.strategize(
             held,
             len(split.dev_features),
             len(observed),
             models,
-            self.allowance(context),
+            self.allowance(board),
         )
-        context.journal.emit(
+        board.journal.emit(
             "conformal.scores",
             f"calibration scores are {plan.mode.replace('_', ' ')}",
             data={"source": plan.mode, "rows": len(observed)},
         )
         if plan.folds is None:
-            context.journal.emit(
+            board.journal.emit(
                 "cv_plus.skipped",
                 f"CV+ ensemble not stored: {plan.reason}",
                 data={"reason": plan.reason},
@@ -265,17 +263,17 @@ class Calibration(documentation.Documentation):
             tuple(models), plan.folds, numpy.abs(observed - predicted)
         )
 
-    def allowance(self, context: scmle.pipeline.context.Context) -> int:
+    def allowance(self, board: engine.Board) -> int:
         """Returns the byte cap for kept fold models (charter's, else default).
 
         Args:
-            context: The run context, supplying the charter path.
+            board: The run's board, supplying the charter path.
 
         Returns:
             The byte limit from the charter's uncertainty block, or the default
             limit if the charter sets none.
         """
-        path = context.services.spec.charter_path
+        path = board.services.spec.charter_path
         if path:
             block = sealing.read_verified(str(path)).charter.uncertainty
             if block is not None and block.limit is not None:

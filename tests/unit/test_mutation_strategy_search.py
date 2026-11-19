@@ -82,11 +82,18 @@ class Context:
 
 
 class Runner:
-    """Scores each strategy job from a table; records the jobs."""
+    """Scores each strategy job from a table; records the jobs.
 
-    def __init__(self, scores: dict[str, float]) -> None:
+    It holds the metric, task and profile of the board it runs for, as the
+    real runner holds those of the partition.
+    """
+
+    def __init__(self, scores: dict[str, float], board: Context) -> None:
         self.scores = scores
         self.jobs: list = []
+        self.metric = board.metric
+        self.task = board.task
+        self.profile = board.profile
 
     def run_many(self, jobs) -> list[experiments.Trial]:
         self.jobs.extend(jobs)
@@ -139,28 +146,28 @@ SCREENED = [
 
 def test_the_best_default_non_baseline_trials_lead(seen) -> None:
     context = Context(["w"])
-    runner = Runner({"w": 0.5})
+    runner = Runner({"w": 0.5}, context)
     strategy_search.Strategist(context, runner).search(SCREENED)
     assert [job.model_name for job in runner.jobs] == ["c", "a"]
 
 
 def test_a_lower_is_better_metric_leads_with_the_lowest(seen) -> None:
     context = Context(["w"], better=False)
-    runner = Runner({"w": 0.5})
+    runner = Runner({"w": 0.5}, context)
     strategy_search.Strategist(context, runner).search(SCREENED)
     assert [job.model_name for job in runner.jobs] == ["b", "a"]
 
 
 def test_no_strategies_or_no_leaders_search_nothing(seen) -> None:
     for context in (Context([]), Context(["w"], top=0)):
-        runner = Runner({"w": 0.5})
+        runner = Runner({"w": 0.5}, context)
         strategy_search.Strategist(context, runner).search(SCREENED)
         assert runner.jobs == [] and context.entries == []
 
 
 def test_a_skipped_leader_is_forgone_and_the_next_still_runs(seen) -> None:
     context = Context(["w"], reasons=["trial window closed"])
-    runner = Runner({"w": 0.5})
+    runner = Runner({"w": 0.5}, context)
     strategy_search.Strategist(context, runner).search(SCREENED)
     assert context.forgone == [("strategy search for c", "trial window closed")]
     assert [job.model_name for job in runner.jobs] == ["a"]
@@ -168,7 +175,7 @@ def test_a_skipped_leader_is_forgone_and_the_next_still_runs(seen) -> None:
 
 def test_an_inapplicable_strategy_is_rejected_and_not_run(seen) -> None:
     context = Context(["w", "x", "y"], top=1)
-    runner = Runner({"w": 0.95, "y": 0.85})
+    runner = Runner({"w": 0.95, "y": 0.85}, context)
     strategy_search.Strategist(context, runner).search(SCREENED)
     adapter = context.services.registry.adapters["c"]
     assert seen == [
@@ -206,7 +213,7 @@ def test_an_inapplicable_strategy_is_rejected_and_not_run(seen) -> None:
 
 def test_a_lower_score_is_a_gain_when_lower_is_better(seen) -> None:
     context = Context(["w"], better=False)
-    strategist = strategy_search.Strategist(context, Runner({}))
+    strategist = strategy_search.Strategist(context, Runner({}, context))
     spread = [0.0, 0.02, -0.02, 0.01, -0.01]
     default = trial("c", 0.4, folds=[0.4 + s for s in spread])
     lower = [0.3 + s / 2 for s in spread]
@@ -244,7 +251,7 @@ def test_a_failed_strategy_trial_is_rejected_with_its_error(seen) -> None:
         status=experiments.Termination.FAILED,
         error="boom",
     )
-    strategy_search.Strategist(context, Runner({})).judge(
+    strategy_search.Strategist(context, Runner({}, context)).judge(
         trial("c", 0.9), failed
     )
     assert context.entries == [

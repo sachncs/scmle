@@ -2,9 +2,9 @@
 
 Each stage of a charter run (exploration, qualification, identification,
 impounding) and the planning stage returns a frozen product that
-`Product.apply` sets on the context the stages not yet converted read. The
-stages run here on fake services: a real context over services with no run
-directory, and fakes for the charter, the custody and the reports.
+`Product.apply` holds on the run's board by type. The stages run here on
+fake services: a real board over services with no run directory, and fakes
+for the charter, the custody and the reports.
 """
 
 import dataclasses
@@ -21,9 +21,9 @@ from scmle.contracts import tasks
 from scmle.evaluation import metrics
 from scmle.evaluation import selection
 import scmle.models.registry
+from scmle.pipeline import engine
 from scmle.pipeline import products
 from scmle.pipeline import services
-import scmle.pipeline.context
 from scmle.pipeline.stages import exploration
 from scmle.pipeline.stages import identification
 from scmle.pipeline.stages import impounding
@@ -33,8 +33,8 @@ from scmle.pipeline.stages import qualification
 from scmle.runtime import limits
 
 
-def board(**data):
-    """A run context over fake services: no run directory, a charter path."""
+def start(**data):
+    """A run's board over fake services: no run directory, a charter path."""
     spec = tasks.Config(
         data=tasks.Dataset(uri="x.csv", target="y", **data),
         charter_path="charter.json",
@@ -46,7 +46,7 @@ def board(**data):
         selection.Averager(spec.selection),
         limits.Governor(spec.resources, 100.0),
     )
-    return scmle.pipeline.context.Context.start(given)
+    return engine.Board.start(given)
 
 
 class Vault(sealed.Vault):
@@ -104,37 +104,36 @@ def custody(monkeypatch):
 FRAME = pandas.DataFrame({"a": [1, 2, 3, 4], "y": [0, 1, 0, 1]})
 
 
-def impound(context, split):
+def impound(board, split):
     """Sequesters as the profiling stage does: applies the custody."""
     made = profiling.ProfileStage().sequester(
-        context, tasks.Task.BINARY, FRAME, split
+        board, tasks.Task.BINARY, FRAME, split
     )
-    made.apply(context)
+    made.apply(board)
     return made.outcome.split
 
 
 def test_sequester_returns_the_custody_and_leaves_the_context(custody):
-    context = board()
+    board = start()
     made = profiling.ProfileStage().sequester(
-        context, tasks.Task.BINARY, FRAME, "split"
+        board, tasks.Task.BINARY, FRAME, "split"
     )
-    assert isinstance(made, impounding.Custody)
+    assert isinstance(made, exploration.Custody)
     assert made.vault is custody[0]
     assert made.column is None
-    assert context.custody is None
-    assert context.custody_vault is None
+    assert board.find(exploration.Custody) is None
     with pytest.raises(dataclasses.FrozenInstanceError):
         made.column = "g"  # type: ignore[misc]
 
 
 def test_applied_custody_leaves_its_vault_to_the_context_close(custody):
-    context = board()
-    split = impound(context, "split")
+    board = start()
+    split = impound(board, "split")
     assert split == "restricted"
-    assert context.custody_vault is custody[0]
-    assert context.custody.manifest.sha256 == "m"
+    assert board.get(exploration.Custody).vault is custody[0]
+    assert board.get(exploration.Custody).outcome.manifest.sha256 == "m"
     assert custody[0].closed == 0
-    context.close()
+    board.close()
     assert custody[0].closed == 1
 
 
@@ -154,11 +153,11 @@ def test_the_vault_closes_when_the_carving_fails(custody, monkeypatch, failure):
     monkeypatch.setattr(
         scmle.assurance.custody.pipeline, "sequester", sequester
     )
-    context = board()
+    board = start()
     with pytest.raises(type(failure)):
-        impound(context, "split")
+        impound(board, "split")
     assert [vault.closed for vault in custody] == [1]
-    assert context.custody_vault is None
+    assert board.find(exploration.Custody) is None
 
 
 def test_the_vault_closes_when_its_records_fail(custody, monkeypatch):
@@ -166,11 +165,11 @@ def test_the_vault_closes_when_its_records_fail(custody, monkeypatch):
         raise OSError("disk full")
 
     monkeypatch.setattr(impounding.Impounding, "chronicle", chronicle)
-    context = board()
+    board = start()
     with pytest.raises(OSError, match="disk full"):
-        impound(context, "split")
+        impound(board, "split")
     assert [vault.closed for vault in custody] == [1]
-    context.close()
+    board.close()
     assert [vault.closed for vault in custody] == [1]
 
 
@@ -182,18 +181,18 @@ def test_no_vault_is_made_when_the_charter_is_refused(custody, monkeypatch):
         lambda path: types.SimpleNamespace(charter=charter, signed=True),
     )
     with pytest.raises(errors.ConfigError, match="group_column"):
-        impound(board(), "split")
+        impound(start(), "split")
     assert custody == []
 
 
 def test_a_later_failure_leaves_the_vault_to_the_context_close(custody):
-    context = board()
-    impound(context, "x")
+    board = start()
+    impound(board, "x")
     try:
         with pytest.raises(errors.BlockedError):
             raise errors.BlockedError("a later stage stops the run")
     finally:
-        context.close()
+        board.close()
     assert [vault.closed for vault in custody] == [1]
 
 
@@ -204,24 +203,24 @@ def test_a_known_entity_charter_names_the_cluster_column(custody, monkeypatch):
         "read_verified",
         lambda path: types.SimpleNamespace(charter=charter, signed=True),
     )
-    context = board(group_column="g", time_column="t")
+    board = start(group_column="g", time_column="t")
     split = types.SimpleNamespace(
         manifest=types.SimpleNamespace(strategy="temporal")
     )
     made = profiling.ProfileStage().sequester(
-        context, tasks.Task.BINARY, FRAME, split
+        board, tasks.Task.BINARY, FRAME, split
     )
     assert made.column == "g"
-    assert context.cluster_column is None
-    made.apply(context)
-    assert context.cluster_column == "g"
-    context.close()
+    assert board.find(exploration.Custody) is None
+    made.apply(board)
+    assert board.get(exploration.Custody).column == "g"
+    board.close()
 
 
 def test_the_custody_digest_depends_on_the_manifest_only():
-    first = impounding.Custody(outcome(), Vault(None), None)
-    second = impounding.Custody(outcome(), Vault(None), None)
-    other = impounding.Custody(outcome(), Vault(None), "g")
+    first = exploration.Custody(outcome(), Vault(None), None)
+    second = exploration.Custody(outcome(), Vault(None), None)
+    other = exploration.Custody(outcome(), Vault(None), "g")
     path = None
     assert first.save(path) == second.save(path)
     assert first.save(path) != other.save(path)
@@ -245,13 +244,13 @@ def escrow(coverage):
     )
 
 
-def test_claims_set_the_pending_ledger_and_digest_their_charter():
-    held = types.SimpleNamespace(pending_ledger=object())
+def test_claims_hold_the_pending_ledger_and_digest_their_charter():
+    held = types.SimpleNamespace(made={})
     pending = escrow(coverage=True)
     exploration.Claims(pending).apply(held)
-    assert held.pending_ledger is pending
+    assert held.made[exploration.Claims].pending is pending
     exploration.Claims().apply(held)
-    assert held.pending_ledger is None
+    assert held.made[exploration.Claims].pending is None
     assert exploration.Claims(pending).summary() == {
         "pending": True,
         "charter": "h",
@@ -261,28 +260,27 @@ def test_claims_set_the_pending_ledger_and_digest_their_charter():
 
 
 def test_without_custody_the_ledger_leaves_nothing_pending():
-    context = board()
-    context.pending_ledger = "stale"
-    made = profiling.ProfileStage().ledger(context, tasks.Task.BINARY)
+    board = start()
+    made = profiling.ProfileStage().ledger(board, tasks.Task.BINARY)
     assert made == exploration.Claims()
-    made.apply(context)
-    assert context.pending_ledger is None
+    made.apply(board)
+    assert board.get(exploration.Claims).pending is None
 
 
 def test_a_task_outside_the_ledger_is_skipped_with_nothing_pending():
-    context = board()
-    context.custody = "custody"
-    context.custody_vault = "vault"
-    made = profiling.ProfileStage().ledger(context, tasks.Task.SURVIVAL)
+    board = start()
+    exploration.Custody(outcome(), Vault(None)).apply(board)
+    made = profiling.ProfileStage().ledger(board, tasks.Task.SURVIVAL)
     assert made.pending is None
+    board.close()
 
 
 def test_defer_keeps_the_ledger_off_the_context():
-    context = board()
+    board = start()
     stage = profiling.ProfileStage()
-    assert stage.defer(context, escrow(coverage=True))
-    assert not stage.defer(context, escrow(coverage=False))
-    assert context.pending_ledger is None
+    assert stage.defer(board, escrow(coverage=True))
+    assert not stage.defer(board, escrow(coverage=False))
+    assert board.find(exploration.Claims) is None
 
 
 def found():
@@ -311,14 +309,13 @@ def test_assess_robustness_returns_the_verdicts(monkeypatch):
         qualification.html_report, "render", lambda *given: "<html>"
     )
     stage = types.SimpleNamespace(found=found(), note="kept", requested=True)
-    context = board()
-    made = profiling.ProfileStage().assess_robustness(context, stage)
+    board = start()
+    made = profiling.ProfileStage().assess_robustness(board, stage)
     assert made == qualification.Robustness(
         "stable", "unverifiable", "certified", "pass", ("b",)
     )
-    before = dict(vars(context))
-    made.apply(context)
-    assert vars(context) == before
+    made.apply(board)
+    assert board.get(qualification.Robustness) is made
     assert isinstance(made, products.Derived)
 
 
@@ -337,20 +334,19 @@ def test_identify_returns_the_claim_estimated_on_the_opening():
             }
         )
     )
-    context = board()
+    board = start()
     made = profiling.ProfileStage().identify(
-        context, charter, "view", run, None, "found"
+        board, charter, "view", run, None, "found"
     )
     assert made == identification.Estimand("supported", "B", estimated=True)
-    before = dict(vars(context))
-    made.apply(context)
-    assert vars(context) == before
+    made.apply(board)
+    assert board.get(identification.Estimand) is made
 
 
 def test_a_predictive_charter_identifies_nothing():
     charter = types.SimpleNamespace(estimand=types.SimpleNamespace(causal=None))
     made = profiling.ProfileStage().identify(
-        board(), charter, "view", "run", None, "found"
+        start(), charter, "view", "run", None, "found"
     )
     assert made is None
 
@@ -358,19 +354,18 @@ def test_a_predictive_charter_identifies_nothing():
 def test_planning_returns_the_blueprint_without_applying_it(monkeypatch):
     plan = types.SimpleNamespace(to_dict=dict, decisions=())
     advice = (types.SimpleNamespace(to_dict=dict),)
-    monkeypatch.setattr(planning, "observe", lambda context: None)
-    monkeypatch.setattr(planning, "devise", lambda context: plan)
-    monkeypatch.setattr(planning, "advise", lambda context: advice)
-    context = board()
-    made = planning.Planning().execute(context)
+    monkeypatch.setattr(planning, "observe", lambda board: None)
+    monkeypatch.setattr(planning, "devise", lambda board: plan)
+    monkeypatch.setattr(planning, "advise", lambda board: advice)
+    board = start()
+    made = planning.Planning().execute(board)
     assert made.plan is plan
     assert made.recommendations == advice
-    assert made.capability_registry is context.services.capability_registry
-    assert context.plan is None
-    assert context.recommendations == ()
-    returned = planning.Planning().execute(context)
+    assert made.capability_registry is board.services.capability_registry
+    assert board.find(planning.Blueprint) is None
+    returned = planning.Planning().execute(board)
     assert returned.plan is plan
-    assert context.plan is None
-    returned.apply(context)
-    assert context.plan is plan
-    assert context.recommendations == advice
+    assert board.find(planning.Blueprint) is None
+    returned.apply(board)
+    assert board.get(planning.Blueprint) is returned
+    assert board.services.capability_registry is returned.capability_registry

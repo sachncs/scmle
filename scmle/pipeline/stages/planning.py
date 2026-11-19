@@ -8,11 +8,12 @@ from scmle.contracts import capabilities
 from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.contracts import tasks
+from scmle.pipeline import engine
 from scmle.pipeline import products
 from scmle.pipeline import recommendations
 from scmle.pipeline import roster
-import scmle.pipeline.context
 import scmle.pipeline.planner
+from scmle.pipeline.stages import ingestion
 from scmle.pipeline.stages import interface
 from scmle.pipeline.stages import profiling
 import scmle.runtime.state
@@ -20,21 +21,21 @@ import scmle.runtime.state
 LOGGER = logging.getLogger(__name__)
 
 
-def observe(context: scmle.pipeline.context.Context) -> None:
+def observe(board: engine.Board) -> None:
     """Persists the runtime facts immediately before capability planning.
 
     Args:
-        context: The run context, whose services hold the facts.
+        board: The run's board, whose services hold the facts.
 
     Raises:
         ScmleError: If the services carry no resource observation.
     """
-    observation = scmle.pipeline.context.require(
-        context.services.capability_observation, "capability_observation"
+    observation = products.require(
+        board.services.capability_observation, "capability_observation"
     )
     path = "evidence/capability_resources.json"
-    context.journal.write_json(path, observation.to_dict())
-    context.journal.emit(
+    board.journal.write_json(path, observation.to_dict())
+    board.journal.emit(
         "capability.environment.observed",
         "runtime facts captured for the capability gate",
         (path,),
@@ -43,9 +44,9 @@ def observe(context: scmle.pipeline.context.Context) -> None:
 
 
 def devise(
-    context: scmle.pipeline.context.Context,
+    board: engine.Board,
 ) -> experiments.Plan:
-    """Creates and validates the experiment plan from a profiled context.
+    """Creates and validates the experiment plan from a profiled board.
 
     The planner remains responsible for adapter compatibility and search
     policy. The capability registry is the separate release boundary: every
@@ -56,7 +57,7 @@ def devise(
     are registered as extension-only instead.
 
     Args:
-        context: The run context, holding the profile, task and manifest.
+        board: The run's board, holding the profile, task and manifest.
 
     Returns:
         The validated experiment plan.
@@ -66,35 +67,36 @@ def devise(
             accepted capability declaration, or the requested fairness
             mitigation is not implemented for the task.
     """
-    approved = context.services.approved_plan
+    approved = board.services.approved_plan
     planner = scmle.pipeline.planner.Planner(
-        context.services.registry, context.services.catalog
+        board.services.registry, board.services.catalog
     )
+    partition = board.get(profiling.Partition)
     plan = planner.plan(
         scmle.pipeline.planner.Situation(
-            context.services.spec,
-            scmle.pipeline.context.require(context.profile, "profile"),
-            scmle.pipeline.context.require(context.task, "task"),
+            board.services.spec,
+            partition.profile,
+            partition.task,
             approved.candidates if approved is not None else None,
-            context.services.history,
+            board.services.history,
         )
     )
-    task = scmle.pipeline.context.require(context.task, "task")
-    manifest = scmle.pipeline.context.require(context.manifest, "manifest")
+    task = partition.task
+    manifest = board.get(ingestion.Intake).manifest
     for model_name in plan.candidates:
-        adapter = context.services.registry.get(model_name)
+        adapter = board.services.registry.get(model_name)
         model_family = adapter.capability_family or adapter.family
-        key = requisition(context, task, model_family)
+        key = requisition(board, task, model_family)
         allowed_statuses = (
             {
                 capabilities.Status.SUPPORTED,
                 capabilities.Status.EXPERIMENTAL,
             }
-            if model_name in context.services.spec.models.experimental_models
+            if model_name in board.services.spec.models.experimental_models
             else None
         )
         try:
-            context.services.capability_registry.require(
+            board.services.capability_registry.require(
                 key,
                 allowed_statuses=allowed_statuses,
                 row_count=manifest.rows,
@@ -108,11 +110,11 @@ def devise(
                 model_family,
                 error,
             )
-            if context.services.capability_registry.records.get(key) is None:
-                context.services.capability_registry.register(
+            if board.services.capability_registry.records.get(key) is None:
+                board.services.capability_registry.register(
                     roster.extension_capability(key)
                 )
-            context.services.capability_registry.require(
+            board.services.capability_registry.require(
                 key,
                 allowed_statuses={capabilities.Status.EXTENSION_ONLY},
                 row_count=manifest.rows,
@@ -121,7 +123,7 @@ def devise(
 
 
 def requisition(
-    context: scmle.pipeline.context.Context,
+    board: engine.Board,
     task: tasks.Task,
     model_family: str,
 ) -> capabilities.Coordinate:
@@ -132,7 +134,7 @@ def requisition(
     task. Fairness is `mitigation` unless the specification requests none.
 
     Args:
-        context: The run context, supplying the manifest and specification.
+        board: The run's board, supplying the manifest and specification.
         task: The resolved task.
         model_family: Family of the candidate model.
 
@@ -145,7 +147,7 @@ def requisition(
             other than binary.
         ConfigError: If the manifest's modality differs from the data spec's.
     """
-    manifest = scmle.pipeline.context.require(context.manifest, "manifest")
+    manifest = board.get(ingestion.Intake).manifest
     if manifest.modality not in {m.value for m in capabilities.Modality}:
         raise capabilities.UnsupportedError(
             "unsupported dataset modality before training",
@@ -156,15 +158,15 @@ def requisition(
             },
         )
     modality = capabilities.Modality(manifest.modality)
-    if manifest.modality != context.services.spec.data.modality:
+    if manifest.modality != board.services.spec.data.modality:
         raise errors.ConfigError(
             "dataset manifest modality does not match the project data "
             f"spec: {manifest.modality!r} != "
-            f"{context.services.spec.data.modality!r}"
+            f"{board.services.spec.data.modality!r}"
         )
     fairness = (
         capabilities.Fairness.NONE
-        if context.services.spec.fairness.mitigation == "none"
+        if board.services.spec.fairness.mitigation == "none"
         else capabilities.Fairness.MITIGATION
     )
     key = capabilities.Coordinate(
@@ -178,10 +180,10 @@ def requisition(
         inference=capabilities.Inference.LIBRARY,
     )
     if (
-        context.services.spec.fairness.mitigation == "group_thresholds"
+        board.services.spec.fairness.mitigation == "group_thresholds"
         and task is not tasks.Task.BINARY
     ):
-        context.services.capability_registry.refuse(
+        board.services.capability_registry.refuse(
             key,
             "group-threshold mitigation is implemented for binary tasks "
             "only; reweighing mitigates multiclass and regression tasks",
@@ -190,19 +192,19 @@ def requisition(
 
 
 def advise(
-    context: scmle.pipeline.context.Context,
+    board: engine.Board,
 ) -> tuple[recommendations.Recommendation, ...]:
     """Derives the recommendations for the user.
 
     Args:
-        context: A context whose profile is populated.
+        board: A board whose profile is populated.
 
     Returns:
-        The recommendations (kept on the context by `Blueprint.apply`).
+        The recommendations (kept on the board by `Blueprint.apply`).
     """
     return recommendations.recommend(
-        scmle.pipeline.context.require(context.profile, "profile"),
-        context.services.spec,
+        board.get(profiling.Partition).profile,
+        board.services.spec,
     )
 
 
@@ -221,6 +223,22 @@ class Blueprint(products.Kept):
     recommendations: tuple[recommendations.Recommendation, ...]
     capability_registry: capabilities.Registry
 
+    def apply(self, board: object) -> None:
+        """Sets the capabilities on the run's services and holds the plan.
+
+        Args:
+            board: The run's board.
+
+        Raises:
+            KindError: If `board` is not a run's board.
+        """
+        if not isinstance(board, engine.Board):
+            raise errors.KindError("a blueprint applies to a run's board")
+        board.services = dataclasses.replace(
+            board.services, capability_registry=self.capability_registry
+        )
+        super().apply(board)
+
 
 class Planning(interface.Stage):
     """Builds the experiment plan from the development-set profile."""
@@ -233,19 +251,19 @@ class Planning(interface.Stage):
 
     def describe(
         self,
-        context: scmle.pipeline.context.Context,  # noqa: ARG002 -- Stage.describe
+        board: engine.Board,  # noqa: ARG002 -- Stage.describe
     ) -> str:
         """Names the stage.
 
         Args:
-            context: The run context; not consulted.
+            board: The run's board; not consulted.
 
         Returns:
             The text "build execution plan".
         """
         return "build execution plan"
 
-    def execute(self, context: scmle.pipeline.context.Context) -> Blueprint:
+    def execute(self, board: engine.Board) -> Blueprint:
         """Builds the execution plan and the recommendations.
 
         First records the runtime resources the capability gate plans
@@ -256,28 +274,26 @@ class Planning(interface.Stage):
         `UnsupportedError`).
 
         Args:
-            context: The run context, holding the profile, task and manifest.
+            board: The run's board, holding the profile, task and manifest.
 
         Returns:
             The blueprint: the plan, the advice and the capabilities.
         """
-        observe(context)
-        plan = devise(context)
-        registry = context.services.capability_registry
-        context.journal.write_json("execution_plan.json", plan.to_dict())
-        context.journal.write_json(
-            "capability_registry.json", registry.to_dict()
-        )
-        context.journal.write_json(
+        observe(board)
+        plan = devise(board)
+        registry = board.services.capability_registry
+        board.journal.write_json("execution_plan.json", plan.to_dict())
+        board.journal.write_json("capability_registry.json", registry.to_dict())
+        board.journal.write_json(
             "diagnostics/decision_log.json",
             {"plan": [d.to_dict() for d in plan.decisions], "outcomes": []},
         )
-        advice = advise(context)
-        context.journal.write_json(
+        advice = advise(board)
+        board.journal.write_json(
             "diagnostics/recommendations.json",
             [item.to_dict() for item in advice],
         )
-        context.journal.emit(
+        board.journal.emit(
             "plan.recommendations",
             f"{len(advice)} recommendation(s) for the user",
             ("diagnostics/recommendations.json",),

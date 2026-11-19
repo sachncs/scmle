@@ -13,11 +13,15 @@ from scmle.contracts import records
 from scmle.contracts import tasks
 from scmle.evaluation import conformal
 from scmle.evaluation import quantile
-import scmle.pipeline.context
+from scmle.pipeline import engine
+from scmle.pipeline import products
+from scmle.pipeline.stages import assessment
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import diagnosis
+from scmle.pipeline.stages import examination
 from scmle.pipeline.stages import profiling
 from scmle.pipeline.stages import scoring
+from scmle.pipeline.stages import selecting
 from scmle.preparation import preprocessing
 
 
@@ -67,7 +71,7 @@ class Bracketing(diagnosis.Diagnosis):
 
     def settle(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         bundle: scmle.artifacts.bundle.Bundle,
     ) -> None:
         """Opens `C` once the bundle and its calibration are frozen.
@@ -77,25 +81,23 @@ class Bracketing(diagnosis.Diagnosis):
         others and tests everything in the one opening. If the coverage claim
         cannot be built (no registered claim hash or no conformal calibration
         on the bundle), its document is written as not evaluated. Does nothing
-        when no ledger is pending. The context's field is left as it is: no
-        stage after packaging reads it, and the context is not reused.
+        when no ledger is pending.
 
         Args:
-            context: The run context, holding the pending ledger.
+            board: The run's board, holding the selection's pending ledger.
             bundle: The frozen model bundle, whose conformal calibration the
                 coverage claim tests.
         """
-        pending = context.pending_ledger
+        pending = board.get(selecting.Choice).pending_ledger
         if pending is None:
             return
-        task = scmle.pipeline.context.require(context.task, "task")
+        task = board.get(profiling.Partition).task
+        claim = board.get(examination.Decision).claim
         runner = None
-        if context.coverage_claim_sha256 is not None:
-            runner = coverage_confirm.rig(
-                bundle, task.value, context.coverage_claim_sha256
-            )
+        if claim is not None:
+            runner = coverage_confirm.rig(bundle, task.value, claim)
         if runner is None:
-            context.journal.write_json(
+            board.journal.write_json(
                 coverage_confirm.DOCUMENT,
                 coverage_confirm.not_evaluated(
                     "the bundle holds no conformal calibration, so there is "
@@ -103,12 +105,10 @@ class Bracketing(diagnosis.Diagnosis):
                 ),
             )
         profiling.ProfileStage().conclude(
-            context, pending, pending.subject, runner
+            board, pending, pending.subject, runner
         )
 
-    def bracket(
-        self, context: scmle.pipeline.context.Context
-    ) -> quantile.QuantileIntervals | None:
+    def bracket(self, board: engine.Board) -> quantile.QuantileIntervals | None:
         """Fits and calibrates the low and high quantile models (regression).
 
         Both models are boosted trees on the standard preprocessing. Each
@@ -117,24 +117,25 @@ class Bracketing(diagnosis.Diagnosis):
         final pair is fit on all development rows.
 
         Args:
-            context: The run context, holding the split, plan and budget.
+            board: The run's board, holding the split, plan and budget.
 
         Returns:
             The intervals, or None for classification, when the time budget
             is spent or too few held-out rows exist.
         """
-        task = scmle.pipeline.context.require(context.task, "task")
+        partition = board.get(profiling.Partition)
+        task = partition.task
         if task is not tasks.Task.REGRESSION:
             return None
-        selected = scmle.pipeline.context.require(context.selected, "selected")
-        if cost.halt(context, selected, "quantile intervals"):
+        selected = products.require(
+            board.get(selecting.Choice).selected, "selected"
+        )
+        if cost.halt(board, selected, "quantile intervals"):
             return None
-        split = scmle.pipeline.context.require(context.split, "split")
-        plan = scmle.pipeline.context.require(
-            context.profile, "profile"
-        ).feature_plan
-        adapter = context.services.registry.get("hist_gradient_boosting")
-        seed = context.services.spec.validation.seed
+        split = partition.split
+        plan = partition.profile.feature_plan
+        adapter = board.services.registry.get("hist_gradient_boosting")
+        seed = board.services.spec.validation.seed
 
         def build(level: float) -> Any:
             return preprocessing.instantiate(
@@ -149,7 +150,7 @@ class Bracketing(diagnosis.Diagnosis):
         lows: list[float] = []
         highs: list[float] = []
         for fit_positions, evaluate_positions in split.manifest.folds:
-            if cost.halt(context, selected, "quantile intervals"):
+            if cost.halt(board, selected, "quantile intervals"):
                 return None
             fit = numpy.asarray(fit_positions)
             evaluate = numpy.asarray(evaluate_positions)
@@ -177,7 +178,7 @@ class Bracketing(diagnosis.Diagnosis):
 
     def gauge(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         bundle: scmle.artifacts.bundle.Bundle,
     ) -> Uncertainty:
         """Measures the coverage of the bundle's intervals on the test rows.
@@ -187,19 +188,18 @@ class Bracketing(diagnosis.Diagnosis):
         report, when one is measured, is written with its event.
 
         Args:
-            context: The run context, holding the test rows and the claim.
+            board: The run's board, holding the test rows and the claim.
             bundle: The model bundle, holding its conformal and quantile
                 evidence; read only.
 
         Returns:
             The bundle's uncertainty evidence with what was measured.
         """
-        if context.test_rows is None:
+        rows = board.get(assessment.Exam).test_rows
+        if rows is None:
             return Uncertainty(bundle.conformal, bundle.quantile)
         curve = (
-            bundle.quantile.covering(
-                *context.test_rows, scoring.COVERAGE_LEVELS
-            )
+            bundle.quantile.covering(*rows, scoring.COVERAGE_LEVELS)
             if bundle.quantile is not None
             else None
         )
@@ -207,8 +207,8 @@ class Bracketing(diagnosis.Diagnosis):
         # the test rows: a numeric column with many values is banded at
         # quantiles of the development rows, any other keeps its values as
         # text, and a column the rows lack maps to None.
-        split = scmle.pipeline.context.require(context.split, "split")
-        test_features = context.test_rows[0]
+        split = board.get(profiling.Partition).split
+        test_features = rows[0]
         slices = {
             column: (
                 coverage_slices.bucket(
@@ -217,18 +217,18 @@ class Bracketing(diagnosis.Diagnosis):
                 if column in test_features.columns
                 else None
             )
-            for column in scoring.slicers(context)
+            for column in scoring.slicers(board)
         }
         measured = coverage_run.run_report(
             bundle,
-            *context.test_rows,
+            *rows,
             scoring.COVERAGE_LEVELS,
-            claim_sha256=context.coverage_claim_sha256,
+            claim_sha256=board.get(examination.Decision).claim,
             slices=slices,
         )
         if measured is not None:
-            context.journal.write_json("coverage_report.json", measured)
-            context.journal.emit(
+            board.journal.write_json("coverage_report.json", measured)
+            board.journal.emit(
                 "coverage.reported",
                 "coverage of the stored intervals or sets was measured "
                 "on the final test rows",

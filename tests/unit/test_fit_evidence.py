@@ -17,6 +17,7 @@ from scmle.models.sklearn import classical
 from scmle.pipeline import journal
 from scmle.pipeline import rules
 from scmle.pipeline import strategy_search
+from scmle.pipeline.stages import profiling
 from scmle.pipeline.stages import selecting
 from scmle.runtime import budget
 
@@ -171,13 +172,15 @@ def test_the_odds_need_shared_folds_and_reward_consistency():
 
 
 def board(trials):
-    """A context stand-in with a metric, a journal and its trials."""
+    """A board stand-in: a partition's metric, a journal and its trials."""
     spec = types.SimpleNamespace()
     record = journal.Journal(spec, None, None, None)
     record.trials.extend(trials)
+    partition = types.SimpleNamespace(
+        metric=types.SimpleNamespace(greater_is_better=True, name="roc_auc")
+    )
     return types.SimpleNamespace(
-        metric=types.SimpleNamespace(greater_is_better=True, name="roc_auc"),
-        journal=record,
+        get={profiling.Partition: partition}.__getitem__, journal=record
     )
 
 

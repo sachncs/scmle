@@ -11,19 +11,19 @@ import scmle.contracts.data
 import scmle.contracts.metrics
 from scmle.data.splitting import splitters
 from scmle.evaluation import backtest
+from scmle.pipeline import engine
 from scmle.pipeline import kinds
 from scmle.pipeline import knowledge
 from scmle.pipeline import products
-import scmle.pipeline.context
-from scmle.pipeline.stages import bridge
 from scmle.pipeline.stages import impounding
 from scmle.pipeline.stages import ingestion
 from scmle.pipeline.stages import labelling
+from scmle.pipeline.stages import surveying
 import scmle.runtime.state
 
 
 @dataclasses.dataclass(frozen=True)
-class Partition(bridge.Bridge):
+class Partition(products.Derived):
     """The task, the split and the development profile; made again on resume.
 
     It holds the locked test set, which is never written in clear.
@@ -38,11 +38,8 @@ class Partition(bridge.Bridge):
         propensity: For an uplift task, how well the covariates predict
             treatment, else None.
         seasonal: Seasonal-naive forecasts for the locked rows of a
-            forecast with a seasonal period, else None (the context's
-            `seasonal_baseline`).
+            forecast with a seasonal period, else None.
     """
-
-    names: ClassVar[dict[str, str]] = {"seasonal": "seasonal_baseline"}
 
     task: tasks.Task
     metric: scmle.contracts.metrics.Metric
@@ -66,14 +63,9 @@ class Partition(bridge.Bridge):
             "profile": self.profile.to_dict(),
         }
 
-    def apply(self, board: object) -> None:
-        """Sets the renamed fields on the run context and holds the product.
-
-        Args:
-            board: The run context.
-        """
-        super().apply(board)
-        self.hold(board)
+    def close(self) -> None:
+        """Closes the locked test set the partition holds."""
+        self.split.locked_test.close()
 
 
 class ProfileStage(impounding.Impounding):
@@ -95,19 +87,19 @@ class ProfileStage(impounding.Impounding):
 
     def describe(
         self,
-        context: scmle.pipeline.context.Context,  # noqa: ARG002 -- Stage.describe
+        board: engine.Board,  # noqa: ARG002 -- Stage.describe
     ) -> str:
         """Names the stage.
 
         Args:
-            context: The run context; not consulted.
+            board: The run's board; not consulted.
 
         Returns:
             The text "profile dataset".
         """
         return "profile dataset"
 
-    def execute(self, context: scmle.pipeline.context.Context) -> Partition:
+    def execute(self, board: engine.Board) -> Partition:
         """Resolves the task, splits the data and profiles the development set.
 
         Writes the profile, curation report and dataset card, enforces the
@@ -116,17 +108,17 @@ class ProfileStage(impounding.Impounding):
         forecast and ordinal targets raise their own errors.
 
         The resolution, the screen and the portrait are applied to the
-        context as soon as they are made, because the claim ledger still
+        board as soon as they are made, because the claim ledger still
         reads them there; the claim ledger may amend the portrait, so the
-        partition takes the profile and curation the context holds last.
+        partition takes the profile and curation the board holds last.
         Until the partition is returned the stage owns the split: a failure
         after it closes the locked rows.
 
         The rows are the ingested ones (`ingestion.Intake`), read from the
-        product the context holds.
+        product the board holds.
 
         Args:
-            context: The run context; the partition is applied to it, so a
+            board: The run's board; the partition is applied to it, so a
                 caller that runs the stage outside the engine finds it there.
 
         Returns:
@@ -144,28 +136,28 @@ class ProfileStage(impounding.Impounding):
             DataError: If a declared group, time or weight column is missing
                 from the data.
         """
-        intake = context.get(ingestion.Intake)
-        resolution = self.infer(context, intake.frame)
-        resolution.apply(context)
-        self.vet(context.services.spec, resolution.frame)
-        screen = self.synthesize(context, resolution.frame)
-        screen.apply(context)
+        intake = board.get(ingestion.Intake)
+        resolution = self.infer(board, intake.frame)
+        resolution.apply(board)
+        self.vet(board.services.spec, resolution.frame)
+        screen = self.synthesize(board, resolution.frame)
+        screen.apply(board)
         split, rows, seasonal = self.divide(
-            context, intake.kind, resolution.task, screen.frame
+            board, intake.kind, resolution.task, screen.frame
         )
         try:
             made = self.portray(
-                context, resolution, screen.frame, split, rows, seasonal
+                board, resolution, screen.frame, split, rows, seasonal
             )
         except BaseException:
             split.locked_test.close()
             raise
-        made.apply(context)
+        made.apply(board)
         return made
 
     def portray(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         resolution: labelling.Resolution,
         frame: pandas.DataFrame,
         split: splitters.Split,
@@ -175,7 +167,7 @@ class ProfileStage(impounding.Impounding):
         """Profiles and curates the development rows, then screens them.
 
         Args:
-            context: The run context; receives the portrait.
+            board: The run's board; receives the portrait.
             resolution: The resolved task and labelled rows.
             frame: The whole data, with the synthesised features.
             split: The split just made.
@@ -185,14 +177,14 @@ class ProfileStage(impounding.Impounding):
         Returns:
             The partition.
         """
-        spec = context.services.spec  # reweighing may have set the weight
+        spec = board.services.spec  # reweighing may have set the weight
         task = resolution.task
         profile, development, propensity = self.survey(
-            context, spec, task, frame, split
+            board, spec, task, frame, split
         )
-        portrait = self.curate(context, frame, development, profile)
-        portrait.apply(context)
-        context.journal.emit(
+        portrait = self.curate(board, frame, development, profile)
+        portrait.apply(board)
+        board.journal.emit(
             "features.selected",
             "feature set and exclusions fixed from the profile",
             ("dataset_profile.json",),
@@ -202,16 +194,17 @@ class ProfileStage(impounding.Impounding):
                 "dropped": dict(profile.feature_plan.dropped),
             },
         )
-        context.journal.track(
+        board.journal.track(
             fingerprint=knowledge.fingerprint(profile, task), task=task.value
         )
         self.enforce_leakage_policy(spec, profile)
-        self.ledger(context, task).apply(context)
+        self.ledger(board, task).apply(board)
+        latest = board.get(surveying.Portrait)
         return Partition(
             task,
             resolution.metric,
-            scmle.pipeline.context.require(context.profile, "profile"),
-            context.curation,
+            latest.profile,
+            latest.curation,
             split,
             rows,
             propensity,
@@ -220,7 +213,7 @@ class ProfileStage(impounding.Impounding):
 
     def divide(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         kind: kinds.Kind,
         task: tasks.Task,
         frame: pandas.DataFrame,
@@ -232,7 +225,7 @@ class ProfileStage(impounding.Impounding):
         reweighing.
 
         Args:
-            context: The run context; receives the split's manifest.
+            board: The run's board; receives the split's manifest.
             kind: The kind of the rows, whose split constraints apply
                 (`kinds.Kind.constrain`).
             task: The resolved task.
@@ -245,8 +238,8 @@ class ProfileStage(impounding.Impounding):
             else `frame`. Last, the seasonal-naive forecasts of the locked
             rows, or None.
         """
-        split = kind.constrain(context.services.spec, task).split(frame)
-        data = context.services.spec.data
+        split = kind.constrain(board.services.spec, task).split(frame)
+        data = board.services.spec.data
         seasonal = None
         if task is tasks.Task.FORECAST and data.seasonal_period:
             # Computed now: under hard isolation the frame held afterwards has
@@ -259,26 +252,26 @@ class ProfileStage(impounding.Impounding):
                 len(data.targets),
                 data.seasonal_period,
             )
-        chartered = bool(context.services.spec.charter_path)
+        chartered = bool(board.services.spec.charter_path)
         if chartered:
-            custody = self.sequester(context, task, frame, split)
-            custody.apply(context)  # from here `Context.close` closes the vault
+            custody = self.sequester(board, task, frame, split)
+            custody.apply(board)  # from here `Board.close` closes the vault
             split = custody.outcome.split
-        self.reweigh(context, task, split)
+        self.reweigh(board, task, split)
         isolation = "in-process protocol"
         # A charter requests custody regardless of the resource-enforcement
         # mode: sealing the rows must not depend on trial supervision.
-        if context.services.governor.hard or chartered:
+        if board.services.governor.hard or chartered:
             split.locked_test = self.seal(split.locked_test)
             frame = split.dev_features.assign(
-                **{context.services.spec.data.target: split.dev_target}
+                **{board.services.spec.data.target: split.dev_target}
             )
             isolation = "separate vault process"
-        context.journal.write_json(
+        board.journal.write_json(
             "validation_manifest.json", split.manifest.to_dict()
         )
-        context.journal.track(split_fingerprint=split.manifest.fingerprint)
-        context.journal.emit(
+        board.journal.track(split_fingerprint=split.manifest.fingerprint)
+        board.journal.emit(
             "split.created",
             f"{split.manifest.strategy} split",
             ("validation_manifest.json",),

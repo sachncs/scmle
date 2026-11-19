@@ -1,1 +1,1 @@
-"""The run pipeline: context, stages, orchestrator, search, planning."""
+"""The run pipeline: board, stages, orchestrator, search, planning."""

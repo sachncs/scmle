@@ -15,8 +15,11 @@ from scmle.assurance.ledger import explore
 from scmle.contracts import errors
 from scmle.contracts import tasks
 import scmle.contracts.data
-import scmle.pipeline.context
+from scmle.pipeline import engine
+from scmle.pipeline import products
 from scmle.pipeline.stages import identification
+from scmle.pipeline.stages import labelling
+from scmle.pipeline.stages import screening
 from scmle.pipeline.stages import surveying
 
 
@@ -29,7 +32,7 @@ class Admission(identification.Identification):
 
     def baseline_runner(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         task: tasks.Task,
         charter: contracts.AnalysisCharter,
         view: Any,
@@ -49,7 +52,7 @@ class Admission(identification.Identification):
         is reported next to it as the reference.
 
         Args:
-            context: The run context, holding the profile and unlabeled rows.
+            board: The run's board, holding the profile and unlabeled rows.
             task: The resolved task.
             charter: The analysis charter, supplying the cost model.
             view: The exploration view (features and target).
@@ -70,7 +73,7 @@ class Admission(identification.Identification):
                 the rule cannot be fitted (no numeric input column, or fewer
                 than two observed outcome classes).
         """
-        data = context.services.spec.data
+        data = board.services.spec.data
         column = data.baseline_column
         if not column:
             return None
@@ -85,14 +88,12 @@ class Admission(identification.Identification):
                 f"baseline column '{column}' is not in the exploration rows"
             )
         classes = sorted(view.target.dropna().unique(), key=str)
-        rule = self.solidify(context, charter, view, structure, classes)
-        selection = select(context, view, column)
+        rule = self.solidify(board, charter, view, structure, classes)
+        selection = select(board, view, column)
         ceiling, why = scmle.assurance.framing.claim.source_ceiling(
             data.framing_draft, charter.charter_hash, model, signed=signed
         )
-        context.journal.write_json(
-            scmle.assurance.framing.claim.PROVENANCE, why
-        )
+        board.journal.write_json(scmle.assurance.framing.claim.PROVENANCE, why)
         return scmle.assurance.framing.claim.rig(
             rule=rule if subject is None else subject,
             reference=None if subject is None else rule,
@@ -108,7 +109,7 @@ class Admission(identification.Identification):
 
     def qualify_exploration(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         task: tasks.Task,
         charter: contracts.AnalysisCharter,
         view: Any,
@@ -128,7 +129,7 @@ class Admission(identification.Identification):
         the emitted event.
 
         Args:
-            context: The run context, holding the profile; the feature plan,
+            board: The run's board, holding the profile; the feature plan,
                 curation report and dataset card are amended when fields are
                 quarantined.
             task: The resolved task.
@@ -145,7 +146,8 @@ class Admission(identification.Identification):
             BlockedError: If every feature would be quarantined.
             ConfigError: If the leakage attestations file is invalid.
         """
-        spec = context.services.spec
+        spec = board.services.spec
+        ingest = board.get(screening.Screen).ingest
         given = attested(spec)
         found = qualify.run(
             view.features,
@@ -162,12 +164,11 @@ class Admission(identification.Identification):
             scope=charter.charter_hash,
             causal=charter.estimand.causal,
             dag=graph,
-            declared=() if context.ingest is None else context.ingest.records,
+            declared=() if ingest is None else ingest.records,
         )
-        written = register(context, found)
+        written = register(board, found)
         quarantined = found.quarantined
-        profile = scmle.pipeline.context.require(context.profile, "profile")
-        plan = profile.feature_plan
+        plan = board.get(surveying.Portrait).profile.feature_plan
         if quarantined:
             kept = [f for f in plan.features if f not in quarantined]
             if not kept:
@@ -176,13 +177,13 @@ class Admission(identification.Identification):
                     {"fields": sorted(quarantined)},
                 )
             plan = prune(plan, quarantined)
-            written.extend(amend(context, plan))
-        announce(context, found, tuple(written))
+            written.extend(amend(board, plan))
+        announce(board, found, tuple(written))
         return found
 
     def solidify(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         charter: contracts.AnalysisCharter,
         view: Any,
         structure: tuple[str, ...],
@@ -191,7 +192,7 @@ class Admission(identification.Identification):
         """Fits the logistic baseline rule on the exploration rows.
 
         Args:
-            context: The run context, holding the profile.
+            board: The run's board, holding the profile.
             charter: The analysis charter, supplying the cost model and seed.
             view: The exploration view (features and target).
             structure: Group, time and baseline columns, not rule inputs.
@@ -200,13 +201,11 @@ class Admission(identification.Identification):
         Returns:
             The frozen rule.
         """
-        model = scmle.pipeline.context.require(charter.costs, "cost_model")
+        model = products.require(charter.costs, "cost_model")
         outcome = explore.vectorize(
             view.target, classification=True, classes=classes
         )
-        plan = scmle.pipeline.context.require(
-            context.profile, "profile"
-        ).feature_plan
+        plan = board.get(surveying.Portrait).profile.feature_plan
         numeric = [
             c
             for c in plan.numeric
@@ -254,13 +253,11 @@ def prune(
     )
 
 
-def register(
-    context: scmle.pipeline.context.Context, found: qualify.Qualification
-) -> list[str]:
+def register(board: engine.Board, found: qualify.Qualification) -> list[str]:
     """Writes the admissibility table and the detector certificates used.
 
     Args:
-        context: The run context that receives the files.
+        board: The run's board that receives the files.
         found: The qualification.
 
     Returns:
@@ -268,25 +265,23 @@ def register(
     """
     written: list[str] = []
     if found.table is not None:
-        context.journal.write_json(
+        board.journal.write_json(
             "admissibility_table.json", found.table.to_dict()
         )
         written.append("admissibility_table.json")
     if found.f5_store is not None:
-        context.journal.write_json(
+        board.journal.write_json(
             "detector_certificates.json", found.f5_store.to_dict()
         )
         written.append("detector_certificates.json")
     return written
 
 
-def select(
-    context: scmle.pipeline.context.Context, view: Any, column: str
-) -> Any:
+def select(board: engine.Board, view: Any, column: str) -> Any:
     """Checks the selection of outcomes by the baseline's decisions.
 
     Args:
-        context: The run context, holding the rows without a target.
+        board: The run's board, holding the rows without a target.
         view: The exploration view.
         column: The baseline column.
 
@@ -296,8 +291,9 @@ def select(
     """
     decisions = view.features[column].to_numpy(dtype=float)
     seen = numpy.ones(len(decisions), dtype=bool)
-    if context.unlabeled is not None and column in context.unlabeled:
-        extra = context.unlabeled[column].to_numpy(dtype=float)
+    unlabeled = board.get(labelling.Resolution).unlabeled
+    if unlabeled is not None and column in unlabeled:
+        extra = unlabeled[column].to_numpy(dtype=float)
         decisions = numpy.concatenate([decisions, extra])
         seen = numpy.concatenate([seen, numpy.zeros(len(extra), dtype=bool)])
     return scmle.assurance.framing.baseline.selective_labels(seen, decisions)
@@ -328,24 +324,24 @@ def attested(spec: tasks.Config) -> Any:
 
 
 def amend(
-    context: scmle.pipeline.context.Context,
+    board: engine.Board,
     plan: scmle.contracts.data.Blueprint,
 ) -> list[str]:
     """Rewrites the profile, curation report and dataset card for a plan.
 
     Args:
-        context: The run context; the amended portrait is applied to it.
+        board: The run's board; the amended portrait is applied to it.
         plan: The feature plan without the quarantined fields.
 
     Returns:
         The curation report and dataset card when they were rewritten.
     """
-    profile = scmle.pipeline.context.require(context.profile, "profile")
-    profile = dataclasses.replace(profile, feature_plan=plan)
-    context.journal.write_json("dataset_profile.json", profile.to_dict())
-    curation = context.curation
+    portrait = board.get(surveying.Portrait)
+    profile = dataclasses.replace(portrait.profile, feature_plan=plan)
+    board.journal.write_json("dataset_profile.json", profile.to_dict())
+    curation = portrait.curation
     if curation is None:
-        surveying.Portrait(profile, None).apply(context)
+        surveying.Portrait(profile, None).apply(board)
         return []
     amended = dataclasses.replace(
         curation,
@@ -356,9 +352,9 @@ def amend(
         },
         dropped_columns=plan.dropped,
     )
-    surveying.Portrait(profile, amended).apply(context)
-    context.journal.write_json("curation_report.json", amended.to_dict())
-    context.journal.write_json(
+    surveying.Portrait(profile, amended).apply(board)
+    board.journal.write_json("curation_report.json", amended.to_dict())
+    board.journal.write_json(
         "dataset_card.json",
         scmle.contracts.data.Datasheet.distill(amended).to_dict(),
     )
@@ -366,18 +362,18 @@ def amend(
 
 
 def announce(
-    context: scmle.pipeline.context.Context,
+    board: engine.Board,
     found: qualify.Qualification,
     written: tuple[str, ...],
 ) -> None:
     """Emits the admissibility event with the detector outcomes.
 
     Args:
-        context: The run context that receives the event.
+        board: The run's board that receives the event.
         found: The qualification.
         written: The files written for it.
     """
-    context.journal.emit(
+    board.journal.emit(
         "admissibility.completed",
         "admissibility and detectors ran on the exploration set",
         written,

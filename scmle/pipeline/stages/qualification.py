@@ -16,16 +16,17 @@ import scmle.assurance.robustness.report
 import scmle.assurance.robustness.stability
 from scmle.contracts import tasks
 from scmle.data.readers import tabular
+from scmle.pipeline import engine
 from scmle.pipeline import products
-import scmle.pipeline.context
 from scmle.pipeline.stages import screening
+from scmle.pipeline.stages import surveying
 
 
 @dataclasses.dataclass(frozen=True)
 class Robustness(products.Derived):
     """The verdicts of the stability and shift assessment of a charter run.
 
-    Its reports are in the run directory; no context field holds it.
+    Its reports are in the run directory.
 
     Attributes:
         stability: The stability report's status.
@@ -40,14 +41,6 @@ class Robustness(products.Derived):
     gate: str
     forward: str
     fragile: tuple[str, ...] = ()
-
-    def apply(self, board: object) -> None:
-        """Sets nothing: no context field holds the assessment.
-
-        Args:
-            board: The run context; unchanged.
-        """
-        del board
 
     def summary(self) -> object:
         """What the assessment concluded.
@@ -67,7 +60,7 @@ class Qualification(screening.Screening):
 
     def publish(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         run: governed.Governance,
         runner: confirm.Docket | None,
     ) -> None:
@@ -78,7 +71,7 @@ class Qualification(screening.Screening):
         out. The emitted event lists the status of every registered claim.
 
         Args:
-            context: The run context that stores the documents.
+            board: The run's board that stores the documents.
             run: The governed run, holding the confirmation's documents.
             runner: The claim runner, or None if no claim was registered, in
                 which case nothing is written.
@@ -103,8 +96,8 @@ class Qualification(screening.Screening):
                 ],
             }
         for name, document in documents.items():
-            context.journal.write_json(name, document)
-        context.journal.emit(
+            board.journal.write_json(name, document)
+        board.journal.emit(
             "claims.registered",
             "registered claims were evaluated on the one opening of C",
             tuple(documents),
@@ -113,7 +106,7 @@ class Qualification(screening.Screening):
 
     def stress(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         task: tasks.Task,
         charter: contracts.AnalysisCharter,
         view: Any,
@@ -126,7 +119,7 @@ class Qualification(screening.Screening):
         opening of `C`, so its inputs are exploration rows only.
 
         Args:
-            context: The run context, holding the profile and specification.
+            board: The run's board, holding the profile and specification.
             task: The resolved task.
             charter: The analysis charter, supplying the stability rule, seed
                 and multiverse choices.
@@ -137,9 +130,8 @@ class Qualification(screening.Screening):
             The stability and shift assessment of the survivors, with each
             time period of the exploration rows compared with the first.
         """
-        data = context.services.spec.data
-        profile = scmle.pipeline.context.require(context.profile, "profile")
-        plan = profile.feature_plan
+        data = board.services.spec.data
+        plan = board.get(surveying.Portrait).profile.feature_plan
         candidates = [*plan.numeric, *plan.categorical]
         codes = explore.vectorize(view.target, task.is_classification)
         kind = explore.target_kind(view.target, task.is_classification)
@@ -177,7 +169,7 @@ class Qualification(screening.Screening):
 
     def assess_robustness(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         stage: prefilter.Prefilter,
     ) -> Robustness:
         """Writes the stability and shift reports and the EDA page.
@@ -193,7 +185,7 @@ class Qualification(screening.Screening):
         report says which.
 
         Args:
-            context: The run context that stores the reports.
+            board: The run's board that stores the reports.
             stage: The stability stage, holding the assessment it ran.
 
         Returns:
@@ -207,13 +199,13 @@ class Qualification(screening.Screening):
         shift_document = scmle.assurance.robustness.report.shift_report(found)
         scmle.assurance.robustness.report.conform(stability_document)
         scmle.assurance.robustness.report.validate_shift(shift_document)
-        context.journal.write_json("stability_report.json", stability_document)
-        context.journal.write_json("shift_report.json", shift_document)
-        context.journal.write_text(
+        board.journal.write_json("stability_report.json", stability_document)
+        board.journal.write_json("shift_report.json", shift_document)
+        board.journal.write_text(
             "eda_report.html",
             html_report.render(stability_document, shift_document),
         )
-        context.journal.emit(
+        board.journal.emit(
             "robustness.completed",
             "stability and shift were assessed on the exploration set",
             ("stability_report.json", "shift_report.json", "eda_report.html"),

@@ -2,16 +2,14 @@
 
 Also the parts of the final evaluation's product (`assessment.Exam`): the
 pseudo-labels, the fairness remedy, the decision and the readings of the
-test rows, each made by one of the final evaluation's mixins and returned
-rather than set on the run context.
+test rows, each made by one of the final evaluation's mixins and returned;
+the board holds each part by its type once the exam is applied.
 """
 
-from collections.abc import Mapping
 import dataclasses
 from typing import Any
 from typing import cast
-from typing import ClassVar
-from typing import Self
+from typing import TYPE_CHECKING
 
 import numpy
 import pandas
@@ -19,15 +17,19 @@ import pandas
 from scmle.contracts import experiments
 from scmle.contracts import records
 from scmle.contracts import tasks
-import scmle.contracts.models
 from scmle.data.readers import streaming
 from scmle.evaluation import fit_health
 from scmle.evaluation import mitigation
 from scmle.evaluation import replay
 from scmle.evaluation import uplift
+from scmle.pipeline import engine
 from scmle.pipeline import products
-import scmle.pipeline.context
+from scmle.pipeline.stages import ingestion
 from scmle.pipeline.stages import interface
+from scmle.pipeline.stages import profiling
+
+if TYPE_CHECKING:
+    import scmle.contracts.models
 
 DIAGNOSTIC_BUDGET_SHARE = 0.25
 
@@ -37,40 +39,7 @@ DIAGNOSTIC_MIN_SECONDS = 30.0
 
 @dataclasses.dataclass(frozen=True)
 class Part(products.Derived):
-    """A part of the final evaluation's product; never written.
-
-    Its fields have single-word names; `names` maps each field that the run
-    context still holds to the context attribute, so `apply` keeps filling
-    the context fields that readers not yet converted read.
-
-    Attributes:
-        names: Context attribute of each field the context holds, by field.
-    """
-
-    names: ClassVar[Mapping[str, str]] = {}
-
-    @classmethod
-    def capture(cls, board: object) -> Self:
-        """Reads the part from the run context's attributes.
-
-        Args:
-            board: The run context; it has an attribute per mapped field.
-
-        Returns:
-            The part; fields the context does not hold keep their defaults.
-        """
-        return cls(
-            **{field: getattr(board, name) for field, name in cls.names.items()}
-        )
-
-    def apply(self, board: object) -> None:
-        """Sets the mapped fields on the run context.
-
-        Args:
-            board: The run context.
-        """
-        for field, name in self.names.items():
-            setattr(board, name, getattr(self, field))
+    """A part of the final evaluation's product; never written."""
 
     def summary(self) -> object:
         """Every field, as recorded.
@@ -94,8 +63,6 @@ class Pseudolabels(Part):
             asked for none or had no unlabeled rows.
     """
 
-    names: ClassVar[Mapping[str, str]] = {"record": "semi_supervised"}
-
     record: records.Layout | None = None
 
 
@@ -108,8 +75,6 @@ class Remedy(Part):
             released rows once corroborated (`locked_rows`); None without
             the group-thresholds mitigation or outside binary tasks.
     """
-
-    names: ClassVar[Mapping[str, str]] = {"record": "fairness_mitigation"}
 
     record: records.Layout | None = None
 
@@ -124,11 +89,6 @@ class Readings(Part):
             bundle keeps; None before the rows are opened.
         diagnostics: The post-selection diagnostic reports by name.
     """
-
-    names: ClassVar[Mapping[str, str]] = {
-        "scores": "reference_scores",
-        "diagnostics": "diagnostics",
-    }
 
     scores: pandas.Series | None = None
     diagnostics: dict[str, dict[str, Any]] = dataclasses.field(
@@ -149,8 +109,6 @@ class Decision(Part):
             or None when the task makes no claim.
     """
 
-    names: ClassVar[Mapping[str, str]] = {"claim": "coverage_claim_sha256"}
-
     threshold: records.Layout | None = None
     benefit: records.Layout | None = None
     claim: str | None = None
@@ -164,7 +122,7 @@ class Examination(interface.Stage):
     """
 
     @staticmethod
-    def ration(context: scmle.pipeline.context.Context) -> float:
+    def ration(board: engine.Board) -> float:
         """Returns the time the post-selection diagnostics may use in total.
 
         A share (`DIAGNOSTIC_BUDGET_SHARE`) of the time budget, never less than
@@ -173,16 +131,16 @@ class Examination(interface.Stage):
         the run's end once the packaging reserve is kept.
 
         Args:
-            context: The run context, supplying the time budget.
+            board: The run's board, supplying the time budget.
 
         Returns:
             The total seconds the diagnostics may use: a fixed share of the time
             budget (never less than the minimum), capped by the time left.
         """
-        budget = context.services.spec.resources.time_budget_seconds
+        budget = board.services.spec.resources.time_budget_seconds
         share = DIAGNOSTIC_BUDGET_SHARE * budget
         allowance = max(DIAGNOSTIC_MIN_SECONDS, share)
-        governor = context.services.governor
+        governor = board.services.governor
         left = governor.left("finish") - governor.reserve.parts.get(
             "package", 0.0
         )
@@ -190,13 +148,13 @@ class Examination(interface.Stage):
 
     def diagnose(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         selected: experiments.Trial,
     ) -> dict[str, Any] | None:
         """Returns the fit-health record of the selected trial, if judgeable.
 
         Args:
-            context: The run context, holding the trials and the metric.
+            board: The run's board, holding the trials and the metric.
             selected: The selected trial.
 
         Returns:
@@ -206,37 +164,36 @@ class Examination(interface.Stage):
         """
         health = fit_health.sanity(
             selected,
-            context.journal.trials,
-            scmle.pipeline.context.require(
-                context.metric, "metric"
-            ).greater_is_better,
+            board.journal.trials,
+            board.get(profiling.Partition).metric.greater_is_better,
         )
         return None if health is None else health.to_dict()
 
     def tally(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         pipeline: Any,
     ) -> dict[str, Any] | None:
         """Scores every locked row of a streamed file, batch by batch.
 
         Args:
-            context: The run context, holding the stream and catalog.
+            board: The run's board, holding the stream and catalog.
             pipeline: The fitted final model.
 
         Returns:
             The number of locked rows, the total number of rows and the metrics
             on the locked rows, or None if the data was not streamed.
         """
-        if context.stream is None:
+        stream = board.get(ingestion.Intake).stream
+        if stream is None:
             return None
-        source, totals = context.stream
+        source, totals = stream
         data, seed = (
-            context.services.spec.data,
-            context.services.spec.validation.seed,
+            board.services.spec.data,
+            board.services.spec.validation.seed,
         )
-        fraction = context.services.spec.validation.test_fraction
-        task = scmle.pipeline.context.require(context.task, "task")
+        fraction = board.services.spec.validation.test_fraction
+        task = board.get(profiling.Partition).task
         labels, guesses, scores = [], [], []
         offset = 0
         for batch in source.batches():
@@ -266,7 +223,7 @@ class Examination(interface.Stage):
                 getattr(pipeline, "classes_", None),
             ),
         )
-        metrics = context.services.catalog.evaluate(
+        metrics = board.services.catalog.evaluate(
             stand_in, pandas.DataFrame(index=truth.index), truth, task
         )
         return {
@@ -277,7 +234,7 @@ class Examination(interface.Stage):
 
     def uplift_report(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         fitted: Any,
         features: pandas.DataFrame,
         outcome: pandas.Series,
@@ -285,7 +242,7 @@ class Examination(interface.Stage):
         """Returns treatment-effect evidence on the released rows, with caveat.
 
         Args:
-            context: The run context, supplying the task, treatment column and
+            board: The run's board, supplying the task, treatment column and
                 propensity check.
             fitted: The fitted model whose predictions are the predicted effect.
             features: The released rows, including the treatment column.
@@ -296,12 +253,10 @@ class Examination(interface.Stage):
             predicted effect and a Qini curve sampled at up to 50 points, or
             None if the task is not uplift.
         """
-        if (
-            scmle.pipeline.context.require(context.task, "task")
-            is not tasks.Task.UPLIFT
-        ):
+        partition = board.get(profiling.Partition)
+        if partition.task is not tasks.Task.UPLIFT:
             return None
-        arm = features[context.services.spec.data.treatment_column].to_numpy(
+        arm = features[board.services.spec.data.treatment_column].to_numpy(
             dtype=int
         )
         predicted = numpy.asarray(fitted.predict(features), dtype=float)
@@ -309,7 +264,7 @@ class Examination(interface.Stage):
         keep = numpy.unique(numpy.linspace(0, len(rows) - 1, 50).astype(int))
         return {
             "assumption": uplift.ASSUMPTION,
-            "propensity": context.propensity,
+            "propensity": partition.propensity,
             "average_effect": uplift.average_effect(
                 outcome.to_numpy(float), arm
             ),

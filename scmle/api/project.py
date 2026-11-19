@@ -442,12 +442,12 @@ class Project(Definition):
             The proposed experiment plan. The dataset profile is kept as
             `profile`.
         """
-        context = self.orchestrator.prepare()
+        board = self.orchestrator.prepare()
         try:
-            self.profile = context.get(profiling.Partition).profile
-            made = context.get(planning.Blueprint)
+            self.profile = board.get(profiling.Partition).profile
+            made = board.get(planning.Blueprint)
         finally:
-            context.close()
+            board.close()
         return products.require(made.plan, "plan")
 
     def recommendations(
@@ -458,11 +458,11 @@ class Project(Definition):
         Returns:
             Recommendations for the user (never applied automatically).
         """
-        context = self.orchestrator.prepare()
+        board = self.orchestrator.prepare()
         try:
-            return context.get(planning.Blueprint).recommendations
+            return board.get(planning.Blueprint).recommendations
         finally:
-            context.close()
+            board.close()
 
     def run(self, plan: experiments.Plan | None = None) -> results.Run:
         """Executes the workflow.

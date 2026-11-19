@@ -17,9 +17,9 @@ def frame(rows=200, seed=0):
 
 
 def test_a_skip_is_recorded_in_the_events_and_the_report_list():
-    context = scmle.api.project.Project(frame(), "y").orchestrator.new_context()
-    context.journal.forgo("threshold", "needs 9.0 s but 1.0 s remain")
-    assert context.journal.skipped == [
+    board = scmle.api.project.Project(frame(), "y").orchestrator.start()
+    board.journal.forgo("threshold", "needs 9.0 s but 1.0 s remain")
+    assert board.journal.skipped == [
         {"work": "threshold", "reason": "needs 9.0 s but 1.0 s remain"}
     ]
 
@@ -36,10 +36,17 @@ def timed(budget, folds=5):
     from types import SimpleNamespace
 
     from scmle.contracts import tasks
+    from scmle.pipeline.stages import profiling
     from scmle.runtime import limits
 
     recorded = []
+    partition = SimpleNamespace(
+        split=SimpleNamespace(
+            manifest=SimpleNamespace(folds=[([0], [1])] * folds)
+        )
+    )
     context = SimpleNamespace(
+        get={profiling.Partition: partition}.__getitem__,
         services=SimpleNamespace(
             governor=limits.Governor(
                 tasks.Resources(time_budget_seconds=budget)
@@ -47,9 +54,6 @@ def timed(budget, folds=5):
             spec=SimpleNamespace(
                 resources=tasks.Resources(time_budget_seconds=budget)
             ),
-        ),
-        split=SimpleNamespace(
-            manifest=SimpleNamespace(folds=[([0], [1])] * folds)
         ),
         journal=SimpleNamespace(
             forgo=lambda work, reason: recorded.append((work, reason))

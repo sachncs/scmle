@@ -1,4 +1,4 @@
-"""The run context, its journal, the planning rules and the search steps."""
+"""The run's board, its journal, the planning rules and the search steps."""
 
 import dataclasses
 import json
@@ -17,8 +17,8 @@ from scmle.contracts import tasks
 from scmle.pipeline import ensemble_search
 from scmle.pipeline import hyperband
 from scmle.pipeline import journal
+from scmle.pipeline import products
 from scmle.pipeline import rules
-import scmle.pipeline.context
 from scmle.pipeline.stages import planning
 
 
@@ -76,9 +76,9 @@ def kinds(root):
 
 
 def test_require_returns_a_value_and_names_a_missing_one():
-    assert scmle.pipeline.context.require(0, "zero") == 0
+    assert products.require(0, "zero") == 0
     with pytest.raises(errors.ScmleError) as caught:
-        scmle.pipeline.context.require(None, "split")
+        products.require(None, "split")
     assert (
         str(caught.value) == "'split' is unavailable: its stage has not run yet"
     )
@@ -153,42 +153,42 @@ def test_enter_records_a_decision():
 
 
 @pytest.fixture(scope="module")
-def context():
+def preview():
     frame = pandas.DataFrame({"a": numpy.arange(40.0), "y": [0, 1] * 20})
-    made = scmle.api.project.Project(frame, "y").orchestrator.new_context()
+    made = scmle.api.project.Project(frame, "y").orchestrator.start()
     yield made
     made.close()
 
 
-def test_a_preview_context_has_no_store_and_a_budget_deadline(context):
-    assert context.services.directory == ""
+def test_a_preview_board_has_no_store_and_a_budget_deadline(preview):
+    assert preview.services.directory == ""
     assert (
-        context.services.deadline == context.services.governor.started_at + 1800
+        preview.services.deadline == preview.services.governor.started_at + 1800
     )
     with pytest.raises(errors.ScmleError, match="'store' is unavailable"):
-        assert context.services.workspace is None
-    assert context.regulator is context.services.governor
+        assert preview.services.workspace is None
+    assert preview.regulator is preview.services.governor
 
 
-def test_cancellation_raises_with_the_run_directory(context):
-    context.services.check()
-    context.services.cancel_event.set()
+def test_cancellation_raises_with_the_run_directory(preview):
+    preview.services.check()
+    preview.services.cancel_event.set()
     try:
         with pytest.raises(errors.CancelledError) as caught:
-            context.services.check()
+            preview.services.check()
         assert caught.value.details == {"run_dir": ""}
     finally:
-        context.services.cancel_event.clear()
+        preview.services.cancel_event.clear()
 
 
-def test_observe_needs_the_capability_observation(context):
-    saved = context.services
-    context.services = dataclasses.replace(saved, capability_observation=None)
+def test_observe_needs_the_capability_observation(preview):
+    saved = preview.services
+    preview.services = dataclasses.replace(saved, capability_observation=None)
     try:
         with pytest.raises(errors.ScmleError, match="capability_observation"):
-            planning.observe(context)
+            planning.observe(preview)
     finally:
-        context.services = saved
+        preview.services = saved
 
 
 def situation(spec=None, rows=10, width=2, wide=()):
@@ -446,7 +446,7 @@ class Tuner(hyperband.Hyperband):
         self.search = types.SimpleNamespace(eta=eta, configs_per_model=configs)
         self.metric = types.SimpleNamespace(greater_is_better=True)
         self.recorded = []
-        self.context = types.SimpleNamespace(
+        self.board = types.SimpleNamespace(
             services=types.SimpleNamespace(
                 governor=types.SimpleNamespace(skip_reason=lambda first: skip),
                 check=lambda: None,
@@ -544,8 +544,8 @@ class Stacking(ensemble_search.Stacker):
         self.entered = []
         self.recorded = []
         self.objected = []
-        self.context = types.SimpleNamespace(
-            task="the task",
+        self.task = "the task"
+        self.board = types.SimpleNamespace(
             services=types.SimpleNamespace(
                 registry=types.SimpleNamespace(
                     get=lambda name: types.SimpleNamespace(
@@ -658,12 +658,11 @@ def test_search_rejects_a_combiner_its_adapter_objects_to_without_running_it():
     assert [t.model_name for t in stacker.recorded] == ["blending"]
 
 
-def test_search_without_a_task_raises_before_any_combiner_runs():
-    stacker = Stacking()
-    stacker.context.task = None
-    with pytest.raises(errors.ScmleError, match="'task' is unavailable"):
-        stacker.search([trial("1", "a", 0.8), trial("2", "b", 0.7)])
-    assert stacker.recorded == []
+def test_a_stacker_reads_the_metric_and_task_from_its_runner():
+    runner = types.SimpleNamespace(metric="the metric", task="the task")
+    stacker = ensemble_search.Stacker("the board", runner)
+    assert (stacker.board, stacker.runner) == ("the board", runner)
+    assert (stacker.metric, stacker.task) == ("the metric", "the task")
 
 
 def test_judge_rejects_a_tie_a_loss_and_a_failure():

@@ -13,6 +13,7 @@ from scmle.contracts import tasks
 import scmle.models.registry
 from scmle.pipeline import orchestrator
 import scmle.pipeline.stages
+from scmle.pipeline.stages import selecting
 
 BINARY = frozenset({tasks.Task.BINARY})
 
@@ -115,9 +116,10 @@ def test_custom_stage_sequence_is_polymorphic(binary_frame, tmp_path):
     class Recording(scmle.pipeline.stages.PackageStage):
         calls = []
 
-        def execute(self, context):
-            Recording.calls.append(context.selected.model_name)
-            return super().execute(context)
+        def execute(self, board):
+            choice = board.get(selecting.Choice)
+            Recording.calls.append(choice.selected.model_name)
+            return super().execute(board)
 
     stages = (*scmle.pipeline.stages.default_stages()[:-1], Recording())
     spec = support.make_project(binary_frame, "y").spec

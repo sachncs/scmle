@@ -8,7 +8,6 @@ from typing import Any
 import numpy
 import pandas
 
-from scmle.assurance import coverage_confirm
 from scmle.assurance.charter import contracts
 from scmle.assurance.charter import sealing
 from scmle.contracts import errors
@@ -16,8 +15,11 @@ from scmle.contracts import records
 from scmle.contracts import tasks
 from scmle.decision import netbenefit
 import scmle.decision.threshold
-import scmle.pipeline.context
+from scmle.pipeline import engine
+from scmle.pipeline import products
 from scmle.pipeline.stages import cost
+from scmle.pipeline.stages import profiling
+from scmle.pipeline.stages import selecting
 from scmle.preparation import strategies
 
 COVERAGE_LEVELS = (0.5, 0.8, 0.9, 0.95)
@@ -48,40 +50,19 @@ def reference_scores(
     return pandas.Series(predicted, name="prediction")
 
 
-def coverage_on_confirmation(
-    charter: contracts.AnalysisCharter, task: tasks.Task
-) -> bool:
-    """Returns whether the charter asks for the coverage claim on `C`.
-
-    Args:
-        charter: The analysis charter.
-        task: The resolved task.
-
-    Returns:
-        True if the charter's uncertainty block asks for it and the task
-        has a primary coverage choice.
-    """
-    block = charter.uncertainty
-    return (
-        block is not None
-        and block.confirmatory
-        and coverage_confirm.principal(task.value) is not None
-    )
-
-
 def slicers(
-    context: scmle.pipeline.context.Context,
+    board: engine.Board,
 ) -> tuple[str, ...]:
     """Returns the slice columns the charter's uncertainty block declares.
 
     Args:
-        context: The run context, supplying the charter path.
+        board: The run's board, supplying the charter path.
 
     Returns:
         The declared columns; empty if there is no charter or no
         uncertainty block.
     """
-    path = context.services.spec.charter_path
+    path = board.services.spec.charter_path
     if not path:
         return ()
     block = sealing.read_verified(str(path)).charter.uncertainty
@@ -89,18 +70,18 @@ def slicers(
 
 
 def decisional(
-    context: scmle.pipeline.context.Context,
+    board: engine.Board,
 ) -> contracts.AnalysisCharter | None:
     """Returns the charter when it declares a decision layer, else None.
 
     Args:
-        context: The run context, supplying the charter path.
+        board: The run's board, supplying the charter path.
 
     Returns:
         The charter if it declares both a decision layer and a cost model,
         else None.
     """
-    path = context.services.spec.charter_path
+    path = board.services.spec.charter_path
     if path is None:
         return None
     charter = sealing.read_verified(str(path)).charter
@@ -110,7 +91,7 @@ def decisional(
 
 
 def appraise(
-    context: scmle.pipeline.context.Context,
+    board: engine.Board,
     pipeline: Any,
     features: pandas.DataFrame,
     target: pandas.Series,
@@ -126,7 +107,7 @@ def appraise(
     `unverified`, and `unverified` otherwise.
 
     Args:
-        context: The run context, supplying the charter and split.
+        board: The run's board, supplying the charter and split.
         pipeline: The fitted classifier.
         features: The final test rows.
         target: The final test labels.
@@ -142,18 +123,18 @@ def appraise(
             `decisional` already returns None then, so this
             guards the type.
     """
-    charter = decisional(context)
+    charter = decisional(board)
     if charter is None or decision is None or "f11" not in decision:
         return None
     model = charter.costs
     if model is None:
         raise errors.ScmleError("the charter has no cost model")
     positive = pipeline.classes_[1]
-    split = scmle.pipeline.context.require(context.split, "split")
+    split = board.get(profiling.Partition).split
     clusters = (
-        features[context.services.spec.data.group_column]
+        features[board.services.spec.data.group_column]
         if split.manifest.strategy == "group"
-        and context.services.spec.data.group_column
+        and board.services.spec.data.group_column
         else None
     )
     guard = netbenefit.FinalNetBenefit(decision["f11"]["rule_hash"])
@@ -204,7 +185,7 @@ def pin(selected: Any, decision: Mapping[str, Any] | None) -> str:
 
 
 def choose_decision_threshold(
-    context: scmle.pipeline.context.Context, fitted: Any
+    board: engine.Board, fitted: Any
 ) -> tuple[Any, records.Layout | None]:
     """Optimizes the binary decision threshold on out-of-fold predictions.
 
@@ -213,7 +194,7 @@ def choose_decision_threshold(
     test set stays untouched.
 
     Args:
-        context: Run context holding the split and the selected trial.
+        board: Run board holding the split and the selected trial.
         fitted: The selected candidate, already refit on development data.
 
     Returns:
@@ -225,30 +206,31 @@ def choose_decision_threshold(
         charter's cost model takes precedence over the specification's
         objective and is always applied.
     """
-    decision = context.services.spec.decision
-    task = scmle.pipeline.context.require(context.task, "task")
-    chartered = decisional(context)
+    decision = board.services.spec.decision
+    partition = board.get(profiling.Partition)
+    task = partition.task
+    chartered = decisional(board)
     if task is not tasks.Task.BINARY or (
         decision.threshold_objective == "none" and chartered is None
     ):
         return fitted, None
-    split = scmle.pipeline.context.require(context.split, "split")
-    selected = scmle.pipeline.context.require(context.selected, "selected")
+    split = partition.split
+    selected = products.require(
+        board.get(selecting.Choice).selected, "selected"
+    )
     if chartered is None:
-        governor = context.services.governor
+        governor = board.services.governor
         reason = governor.overdue(
             cost.foldcost(selected) * len(split.manifest.folds),
             governor.reserve.parts.get("package", 0.0),
         )
         if reason is not None:
-            context.journal.forgo("decision threshold", reason)
+            board.journal.forgo("decision threshold", reason)
             return fitted, None
     strategy = strategies.lookup(selected.strategy)
-    adapter = context.services.registry.get(selected.model_name)
-    plan = scmle.pipeline.context.require(
-        context.profile, "profile"
-    ).feature_plan
-    seed = context.services.spec.validation.seed
+    adapter = board.services.registry.get(selected.model_name)
+    plan = partition.profile.feature_plan
+    seed = board.services.spec.validation.seed
     return scmle.decision.threshold.choose(
         fitted,
         lambda: strategy.build(plan, adapter, task, seed, selected.params),

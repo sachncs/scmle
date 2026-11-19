@@ -1,9 +1,9 @@
 """Stage products: what one stage made, as a resumed run needs it again.
 
-Each stage names its product (`makes`). A product is a frozen dataclass
-whose fields are the run-context attributes the stage sets: `capture` reads
-them from the context after the stage, `apply` sets them again on a resumed
-run instead of running the stage.
+Each stage names its product (`makes`) and returns it. A product is a
+frozen dataclass of what the stage made; the engine applies it to the
+run's board, which holds it by type (`apply`), whether the stage ran or a
+resumed run restored the product instead of running the stage.
 
 There are two kinds, and every product is one of them:
 
@@ -94,46 +94,31 @@ def digest(payload: bytes) -> str:
 
 @dataclasses.dataclass(frozen=True)
 class Product(abc.ABC):
-    """What one stage made; its fields are named as the context attributes."""
-
-    @classmethod
-    def capture(cls, board: object) -> Self:
-        """Reads the product from the run context after its stage ran.
-
-        Args:
-            board: The run context; it has an attribute per field.
-
-        Returns:
-            The product.
-        """
-        fields = dataclasses.fields(cls)
-        return cls(
-            **{field.name: getattr(board, field.name) for field in fields}
-        )
+    """What one stage made; the board holds it by type."""
 
     def apply(self, board: object) -> None:
-        """Sets the product's fields on the run context and holds it there.
+        """Holds the product on the board, replacing one of the same type.
 
-        Args:
-            board: The run context.
-        """
-        for field in dataclasses.fields(self):
-            setattr(board, field.name, getattr(self, field.name))
-        self.hold(board)
-
-    def hold(self, board: object) -> None:
-        """Keeps the product on a board that holds products by type.
-
-        A board that keeps a `made` mapping (the run context) holds the
+        A board that keeps a `made` mapping (`engine.Board`) holds the
         latest product of each type there, which is what a stage reading a
-        product (`get`) finds; on another board this does nothing.
+        product (`get`) finds; on another board this does nothing. A
+        product whose stage also changes the run's services or journal (the
+        governor, the capabilities, the trials) sets them in its own
+        `apply`, so a restored product changes them as the stage did.
 
         Args:
-            board: The run context.
+            board: The run's board.
         """
         made = getattr(board, "made", None)
         if isinstance(made, dict):
             made[type(self)] = self
+
+    def close(self) -> None:  # noqa: B027 -- most products hold nothing open
+        """Releases what the product holds open; most hold nothing.
+
+        The board closes every product it holds when the run ends
+        (`engine.Board.close`).
+        """
 
     @abc.abstractmethod
     def save(self, path: pathlib.Path) -> str | None:

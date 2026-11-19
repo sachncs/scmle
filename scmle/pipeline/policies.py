@@ -11,7 +11,10 @@ from collections.abc import Callable
 import dataclasses
 from typing import Any
 
-import scmle.pipeline.context
+from scmle.pipeline import engine
+from scmle.pipeline import products
+from scmle.pipeline.stages import planning
+from scmle.pipeline.stages import selecting
 from scmle.runtime import state
 
 
@@ -103,26 +106,29 @@ class Callback(Reviewer):
         return Approval(bool(verdict), "callback")
 
 
-def describe(
-    gate: state.Progress, context: scmle.pipeline.context.Context
-) -> Review:
+def describe(gate: state.Progress, board: engine.Board) -> Review:
     """Builds the review shown at `gate`.
 
     Args:
         gate: The stage that just completed.
-        context: The run context holding that stage's product.
+        board: The run's board holding that stage's product.
 
     Returns:
         A review summarizing the execution plan at the gate after planning,
         or the selected model and strategy (with its cross-validation
-        score) at any other gate. A missing stage product (no plan or no
-        selected trial in the context) fails with the context's
-        unavailable-product error.
+        score) at any other gate.
+
+    Raises:
+        OrderError: If the board holds no blueprint (after planning) or no
+            choice (at any other gate).
+        ScmleError: If the blueprint has no plan or the choice no trial.
     """
     if gate is state.Progress.PLANNING:
-        plan = scmle.pipeline.context.require(context.plan, "plan")
+        plan = products.require(board.get(planning.Blueprint).plan, "plan")
         return Review(gate, plan.summary(), plan.to_dict())
-    selected = scmle.pipeline.context.require(context.selected, "selected")
+    selected = products.require(
+        board.get(selecting.Choice).selected, "selected"
+    )
     return Review(
         gate,
         f"selected {selected.model_name}/{selected.strategy} "

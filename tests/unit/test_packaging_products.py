@@ -1,9 +1,8 @@
 """The frozen products of the packaging stage and of the parts it inherits.
 
-Each part returns what it made (`Uncertainty`, `Diagnostics`, `Verdict`)
-instead of setting run-context fields, and `PackageStage` returns one
-`Package`, whose `apply` sets the context fields the readers that have not
-converted yet still use. The context and its services are fakes.
+Each part returns what it made (`Uncertainty`, `Diagnostics`, `Verdict`),
+and `PackageStage` returns one `Package`, whose `apply` holds it on the
+run's board by type. The board and its services are fakes.
 """
 
 import dataclasses
@@ -14,11 +13,14 @@ import pytest
 from scmle.assurance import coverage_confirm
 from scmle.contracts import lineage
 from scmle.contracts import tasks
+from scmle.pipeline.stages import assessment
 from scmle.pipeline.stages import bracketing
 from scmle.pipeline.stages import diagnosis
+from scmle.pipeline.stages import examination
 from scmle.pipeline.stages import packaging
 from scmle.pipeline.stages import profiling
 from scmle.pipeline.stages import releasing
+from scmle.pipeline.stages import selecting
 
 
 class Journal:
@@ -31,16 +33,22 @@ class Journal:
         self.files[name] = document
 
 
-def blank(**fields):
-    """A fake run context with the fields a part reads."""
-    return types.SimpleNamespace(journal=Journal(), **fields)
+def blank(held=None, **fields):
+    """A fake run's board holding stand-ins for products, by product type."""
+    made = dict(held or {})
+    return types.SimpleNamespace(
+        journal=Journal(), made=made, get=made.__getitem__, **fields
+    )
 
 
 def undeclared():
-    """A fake context whose spec declares no success criteria."""
-    return blank(
+    """A fake board whose spec declares no success criteria."""
+    partition = types.SimpleNamespace(
         task=tasks.Task.BINARY,
         metric=types.SimpleNamespace(name="roc_auc", greater_is_better=True),
+    )
+    return blank(
+        {profiling.Partition: partition},
         services=types.SimpleNamespace(
             spec=types.SimpleNamespace(
                 problem=types.SimpleNamespace(success_criteria={})
@@ -115,7 +123,10 @@ def test_uncertainty_without_test_rows_measures_nothing():
     bundle = types.SimpleNamespace(
         conformal=None, quantile=None, coverage_report=None
     )
-    found = packaging.PackageStage().gauge(blank(test_rows=None), bundle)
+    exam = types.SimpleNamespace(test_rows=None)
+    found = packaging.PackageStage().gauge(
+        blank({assessment.Exam: exam}), bundle
+    )
     assert found == bracketing.Uncertainty(None, None)
     assert found.entries() == {}
     found.equip(bundle)
@@ -144,35 +155,35 @@ def test_settling_opens_the_pending_ledger_without_assigning_it(monkeypatch):
         ),
     )
     pending = types.SimpleNamespace(subject="charter")
-    context = blank(
-        pending_ledger=pending,
-        task=tasks.Task.BINARY,
-        coverage_claim_sha256=None,
+    board = blank(
+        {
+            selecting.Choice: types.SimpleNamespace(pending_ledger=pending),
+            profiling.Partition: types.SimpleNamespace(task=tasks.Task.BINARY),
+            examination.Decision: examination.Decision(),
+        }
     )
-    packaging.PackageStage().settle(context, object())
+    packaging.PackageStage().settle(board, object())
     assert concluded == [(pending, "charter", None)]
-    assert context.pending_ledger is pending
-    assert list(context.journal.files) == [coverage_confirm.DOCUMENT]
+    assert list(board.journal.files) == [coverage_confirm.DOCUMENT]
 
 
 def test_settling_without_a_pending_ledger_does_nothing():
-    context = blank(pending_ledger=None)
-    packaging.PackageStage().settle(context, object())
-    assert context.journal.files == {}
+    choice = types.SimpleNamespace(pending_ledger=None)
+    board = blank({selecting.Choice: choice})
+    packaging.PackageStage().settle(board, object())
+    assert board.journal.files == {}
 
 
-def test_a_package_applies_every_field_the_old_readers_use():
+def test_a_package_is_held_by_type():
     made = packaging.Package(
         bundle=None,
         result=None,
         evidence_graph=graph(),
         evaluation={"run_id": "r"},
     )
-    board = types.SimpleNamespace()
+    board = types.SimpleNamespace(made={})
     made.apply(board)
-    assert board.evidence_graph is made.evidence_graph
-    assert board.evaluation == {"run_id": "r"}
-    assert board.bundle is None and board.result is None
+    assert board.made == {packaging.Package: made}
     assert made.summary() == made.evidence_graph.digest()
     with pytest.raises(dataclasses.FrozenInstanceError):
         made.bundle = None  # type: ignore[misc]

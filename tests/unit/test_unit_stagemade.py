@@ -1,8 +1,8 @@
-"""The first stages return frozen products; the context is filled from them.
+"""The first stages return frozen products; the board holds them by type.
 
 Each stage runs on fake services (an in-memory frame, a fixed clock, no
-run directory), returns its product, and the product's `apply` sets the
-context fields the later, unconverted stages still read.
+run directory), returns its product, and the product's `apply` holds it on
+the run's board, where the later stages read it (`engine.Board.get`).
 """
 
 import dataclasses
@@ -20,9 +20,9 @@ from scmle.contracts import tasks
 from scmle.evaluation import metrics
 from scmle.evaluation import selection
 import scmle.models.registry
+from scmle.pipeline import engine
 from scmle.pipeline import products
 from scmle.pipeline import services
-import scmle.pipeline.context
 from scmle.pipeline.stages import admission
 from scmle.pipeline.stages import ingestion
 from scmle.pipeline.stages import labelling
@@ -73,7 +73,7 @@ def config(**data):
     )
 
 
-def board(frame=None, spec=None):
+def start(frame=None, spec=None):
     spec = spec or config()
     given = services.Services(
         spec,
@@ -84,7 +84,7 @@ def board(frame=None, spec=None):
         input_frame=rows() if frame is None else frame,
         clock=Fixed(0.5),
     )
-    return scmle.pipeline.context.Context.start(given)
+    return engine.Board.start(given)
 
 
 def digest(summary):
@@ -98,8 +98,8 @@ def digest(summary):
 
 
 def test_ingestion_returns_the_intake_and_applies_it():
-    context = board()
-    made = ingestion.IngestStage().execute(context)
+    board = start()
+    made = ingestion.IngestStage().execute(board)
     assert isinstance(made, ingestion.Intake)
     with pytest.raises(dataclasses.FrozenInstanceError):
         made.read_seconds = 0.0
@@ -108,14 +108,11 @@ def test_ingestion_returns_the_intake_and_applies_it():
     assert made.cleaning_notes == [
         "column 'b': 1 infinite value(s) treated as missing"
     ]
-    assert context.frame is made.frame
-    assert context.manifest is made.manifest
-    assert context.cleaning_notes == made.cleaning_notes
-    assert context.read_seconds == made.read_seconds
+    assert board.get(ingestion.Intake) is made
 
 
 def test_the_intake_digest_is_that_of_its_old_summary():
-    made = ingestion.IngestStage().execute(board())
+    made = ingestion.IngestStage().execute(start())
     assert made.save(None) == digest(
         {
             "digests": dict(made.manifest.digests),
@@ -126,23 +123,23 @@ def test_the_intake_digest_is_that_of_its_old_summary():
 
 
 def test_a_file_backed_modality_without_an_adapter_is_refused():
-    context = board(spec=config(modality="image"))
-    context = dataclasses.replace(
-        context,
-        services=dataclasses.replace(context.services, input_frame=None),
+    board = start(spec=config(modality="image"))
+    board = dataclasses.replace(
+        board,
+        services=dataclasses.replace(board.services, input_frame=None),
     )
     with pytest.raises(errors.ScmleError, match="ingestion adapter"):
-        ingestion.IngestStage().execute(context)
+        ingestion.IngestStage().execute(board)
 
 
 def test_the_reservation_returns_the_reserve_with_its_old_digest():
-    context = board()
-    ingestion.IngestStage().execute(context)
-    made = reservation.Reservation().execute(context)
+    board = start()
+    ingestion.IngestStage().execute(board)
+    made = reservation.Reservation().execute(board)
     assert reservation.Reservation.makes is reservation.Reserve
     assert isinstance(made, reservation.Reserve)
-    assert made.governor is context.services.governor
-    reserve = context.services.governor.reserve
+    assert made.governor is board.services.governor
+    reserve = board.services.governor.reserve
     assert reserve.shape is not None
     assert made.save(None) == digest(
         {"shape": reserve.shape, "parts": reserve.parts}
@@ -151,11 +148,11 @@ def test_the_reservation_returns_the_reserve_with_its_old_digest():
 
 def test_labelling_resolves_without_touching_the_intake_notes():
     frame = rows(missing=4)
-    context = board(frame, config(unlabeled="ignore"))
-    intake = ingestion.IngestStage().execute(context)
+    board = start(frame, config(unlabeled="ignore"))
+    intake = ingestion.IngestStage().execute(board)
     before = list(intake.cleaning_notes)
     stage = profiling.ProfileStage()
-    made = stage.infer(context, context.frame)
+    made = stage.infer(board, intake.frame)
     assert isinstance(made, labelling.Resolution)
     assert made.task is tasks.Task.BINARY
     assert made.metric is not None
@@ -169,16 +166,15 @@ def test_labelling_resolves_without_touching_the_intake_notes():
     ]
     assert intake.cleaning_notes == before
     assert made.labels is None
-    made.apply(context)
-    assert context.cleaning_notes == made.notes
-    assert context.unlabeled is made.unlabeled
+    made.apply(board)
+    assert board.get(labelling.Resolution) is made
 
 
 def test_the_unlabeled_gate_blocks_by_default():
-    context = board(rows(missing=2))
-    ingestion.IngestStage().execute(context)
+    board = start(rows(missing=2))
+    intake = ingestion.IngestStage().execute(board)
     with pytest.raises(errors.BlockedError, match="2 missing"):
-        profiling.ProfileStage().infer(context, context.frame)
+        profiling.ProfileStage().infer(board, intake.frame)
 
 
 def test_an_ordinal_target_is_resolved_to_ranks():
@@ -193,39 +189,36 @@ def test_an_ordinal_target_is_resolved_to_ranks():
         task="ordinal",
         resources=tasks.Resources(time_budget_seconds=600),
     )
-    context = board(frame, spec)
-    ingestion.IngestStage().execute(context)
-    made = profiling.ProfileStage().infer(context, context.frame)
+    board = start(frame, spec)
+    intake = ingestion.IngestStage().execute(board)
+    made = profiling.ProfileStage().infer(board, intake.frame)
     assert made.task is tasks.Task.ORDINAL
     assert made.labels == LEVELS
-    made.apply(context)
-    assert context.ordinal_labels == LEVELS
     assert set(made.frame["y"]) == {0, 1, 2}
 
 
 def test_screening_without_a_plan_keeps_the_frame():
-    context = board()
-    ingestion.IngestStage().execute(context)
-    made = profiling.ProfileStage().synthesize(context, context.frame)
+    board = start()
+    intake = ingestion.IngestStage().execute(board)
+    made = profiling.ProfileStage().synthesize(board, intake.frame)
     assert isinstance(made, screening.Screen)
-    assert made.frame is context.frame
+    assert made.frame is intake.frame
     assert made.ingest is None
 
 
 def test_the_profile_stage_returns_the_partition_and_its_parts():
-    context = board()
-    ingestion.IngestStage().execute(context)
-    made = profiling.ProfileStage().execute(context)
+    board = start()
+    ingestion.IngestStage().execute(board)
+    made = profiling.ProfileStage().execute(board)
     try:
         assert isinstance(made, profiling.Partition)
         assert made.task is tasks.Task.BINARY
-        assert context.split is made.split
-        assert context.profile is made.profile
-        assert context.curation is made.curation
-        assert context.frame is made.frame
+        assert board.get(profiling.Partition) is made
+        assert board.get(surveying.Portrait).profile is made.profile
+        assert board.get(surveying.Portrait).curation is made.curation
+        assert board.get(labelling.Resolution).task is made.task
         assert made.propensity is None
         assert made.seasonal is None
-        assert context.seasonal_baseline is None
         assert made.save(None) == digest(
             {
                 "task": made.task,
@@ -235,30 +228,28 @@ def test_the_profile_stage_returns_the_partition_and_its_parts():
             }
         )
     finally:
-        context.close()
+        board.close()
 
 
 def test_surveying_curates_into_a_portrait():
-    context = board()
-    ingestion.IngestStage().execute(context)
+    board = start()
+    ingestion.IngestStage().execute(board)
     stage = profiling.ProfileStage()
-    made = stage.execute(context)
+    made = stage.execute(board)
     try:
         development = made.split.dev_features.assign(y=made.split.dev_target)
-        portrait = stage.curate(
-            context, context.frame, development, made.profile
-        )
+        portrait = stage.curate(board, made.frame, development, made.profile)
         assert isinstance(portrait, surveying.Portrait)
         assert portrait.profile is made.profile
         assert portrait.curation.profiled_rows == len(development)
     finally:
-        context.close()
+        board.close()
 
 
 def test_a_failure_after_the_split_closes_the_locked_rows(monkeypatch):
     closed = []
-    context = board()
-    ingestion.IngestStage().execute(context)
+    board = start()
+    ingestion.IngestStage().execute(board)
     stage = profiling.ProfileStage()
     divide = stage.divide
 
@@ -276,12 +267,26 @@ def test_a_failure_after_the_split_closes_the_locked_rows(monkeypatch):
     monkeypatch.setattr(stage, "divide", spy)
     monkeypatch.setattr(stage, "enforce_leakage_policy", refuse)
     with pytest.raises(errors.BlockedError, match="refused"):
-        stage.execute(context)
+        stage.execute(board)
     assert len(closed) == 1
-    assert context.split is None
+    assert board.find(profiling.Partition) is None
 
 
-def test_a_bridge_reaches_the_renamed_context_attributes():
+def test_closing_the_board_closes_the_partitions_locked_rows(monkeypatch):
+    closed = []
+    board = start()
+    ingestion.IngestStage().execute(board)
+    made = profiling.ProfileStage().execute(board)
+
+    def shut(box):
+        closed.append(box)
+
+    monkeypatch.setattr(type(made.split.locked_test), "close", shut)
+    board.close()
+    assert closed == [made.split.locked_test]
+
+
+def test_a_resolution_is_held_by_type_with_its_own_field_names():
     made = labelling.Resolution(
         tasks.Task.BINARY,
         metrics.CATALOG.resolve(None, tasks.Task.BINARY),
@@ -290,28 +295,25 @@ def test_a_bridge_reaches_the_renamed_context_attributes():
         ("a", "b", "c"),
         ["note"],
     )
-    target = types.SimpleNamespace()
+    target = types.SimpleNamespace(made={})
     made.apply(target)
-    assert target.ordinal_labels == ("a", "b", "c")
-    assert target.cleaning_notes == ["note"]
-    assert not hasattr(target, "labels")
-    again = labelling.Resolution.capture(target)
-    assert again.frame is made.frame
-    assert (again.labels, again.notes) == (made.labels, made.notes)
+    assert target.made == {labelling.Resolution: made}
+    assert not hasattr(target, "ordinal_labels")
 
 
 def test_amend_applies_the_amended_portrait():
-    context = board()
-    ingestion.IngestStage().execute(context)
-    made = profiling.ProfileStage().execute(context)
+    board = start()
+    ingestion.IngestStage().execute(board)
+    made = profiling.ProfileStage().execute(board)
     try:
         plan = dataclasses.replace(
             made.profile.feature_plan, numeric=("a",), dropped={"b": "gone"}
         )
-        written = admission.amend(context, plan)
+        written = admission.amend(board, plan)
         assert written == ["curation_report.json", "dataset_card.json"]
-        assert context.profile.feature_plan is plan
-        assert context.curation.dropped_columns == {"b": "gone"}
+        portrait = board.get(surveying.Portrait)
+        assert portrait.profile.feature_plan is plan
+        assert portrait.curation.dropped_columns == {"b": "gone"}
         assert made.profile.feature_plan is not plan
     finally:
-        context.close()
+        board.close()

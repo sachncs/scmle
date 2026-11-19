@@ -14,6 +14,7 @@ import platform
 import time
 from typing import Any
 from typing import cast
+from typing import TYPE_CHECKING
 
 import numpy
 import pandas
@@ -27,9 +28,12 @@ from scmle.contracts import models
 from scmle.contracts import tasks
 import scmle.contracts.metrics
 from scmle.evaluation import metrics
-import scmle.pipeline.context
+from scmle.pipeline import engine
 from scmle.preparation import strategies
 from scmle.runtime import limits
+
+if TYPE_CHECKING:
+    from scmle.pipeline.stages import profiling
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -315,27 +319,30 @@ class Runner:
     """Evaluates candidate pipelines with failure isolation.
 
     Attributes:
-        context: Run context.
+        board: Run board.
         split: The data split.
         task: The resolved task.
         metric: The metric being optimized.
+        profile: The development-set profile.
         feature_plan: Feature columns by kind.
         folds: Cross-validation folds as lists of positions.
     """
 
-    def __init__(self, context: scmle.pipeline.context.Context) -> None:
-        """Initializes the runner from a context holding a split and plan.
+    def __init__(
+        self, board: engine.Board, partition: "profiling.Partition"
+    ) -> None:
+        """Initializes the runner from the run's partition.
 
         Args:
-            context: Run context with `split`, `profile`, `task` and `metric`.
+            board: Run board, holding the services and the journal.
+            partition: The partition: the split, profile, task and metric.
         """
-        self.context = context
-        self.split = scmle.pipeline.context.require(context.split, "split")
-        self.task = scmle.pipeline.context.require(context.task, "task")
-        self.metric = scmle.pipeline.context.require(context.metric, "metric")
-        self.feature_plan = scmle.pipeline.context.require(
-            context.profile, "profile"
-        ).feature_plan
+        self.board = board
+        self.split = partition.split
+        self.task = partition.task
+        self.metric = partition.metric
+        self.profile = partition.profile
+        self.feature_plan = partition.profile.feature_plan
         self.folds = [
             (list(train), list(val)) for train, val in self.split.manifest.folds
         ]
@@ -343,7 +350,7 @@ class Runner:
     @property
     def workers(self) -> int:
         """The concurrency of the execution backend."""
-        return self.context.services.backend.workers
+        return self.board.services.backend.workers
 
     def payload(self, job: Job) -> Payload:
         """Builds the self-contained payload for a job.
@@ -355,15 +362,15 @@ class Runner:
             The payload, with scoring weighted only if the selection spec asks
             for it, a weight column exists and the metric accepts weights.
         """
-        context = self.context
-        governor = context.services.governor
+        board = self.board
+        governor = board.services.governor
         return Payload(
             job=job,
-            adapter=context.services.registry.get(job.model_name),
+            adapter=board.services.registry.get(job.model_name),
             strategy=strategies.lookup(job.strategy),
             feature_plan=self.feature_plan,
             task=self.task,
-            seed=context.services.spec.validation.seed,
+            seed=board.services.spec.validation.seed,
             metric=self.metric,
             positive_label=metrics.positive_label(
                 self.split.dev_target, self.task
@@ -373,9 +380,9 @@ class Runner:
             folds=self.folds,
             threadcap=governor.threadcap,
             ceiling_seconds=governor.deadline(),
-            memory_gb=context.services.spec.resources.memory_limit_gb,
+            memory_gb=board.services.spec.resources.memory_limit_gb,
             weighted=bool(
-                context.services.spec.selection.weighted
+                board.services.spec.selection.weighted
                 and self.feature_plan.weight_column
                 and self.metric.weightable()
             ),
@@ -429,7 +436,7 @@ class Runner:
                 results[index] = cached
             else:
                 pending.append(index)
-        governor = self.context.services.governor
+        governor = self.board.services.governor
         function = supervise if governor.hard else evaluate_payload
         size = max(self.workers, 1)
         for start in range(0, len(pending), size):
@@ -439,11 +446,9 @@ class Runner:
                 for index in slots:
                     results[index] = self.forgo(jobs[index], reason)
                 continue
-            self.context.services.check()
+            self.board.services.check()
             payloads = [self.payload(jobs[index]) for index in slots]
-            outputs = self.context.services.backend.map(
-                function, payloads, lose
-            )
+            outputs = self.board.services.backend.map(function, payloads, lose)
             for index, output in zip(slots, outputs, strict=True):
                 results[index] = output
         return [r for r in results if r is not None]
@@ -462,7 +467,7 @@ class Runner:
         Returns:
             A result view with exactly the requested folds, or None.
         """
-        checkpoint = self.context.services.checkpoints.get(job.trial_id)
+        checkpoint = self.board.services.checkpoints.get(job.trial_id)
         usable = (experiments.Termination.OK, experiments.Termination.PRUNED)
         if (
             checkpoint is None

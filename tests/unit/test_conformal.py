@@ -133,16 +133,20 @@ def test_sensitivity_below_the_minimum_rows_is_skipped_not_raised():
 
     from scmle.contracts import tasks
     from scmle.pipeline import stages
+    from scmle.pipeline.stages import profiling
 
+    partition = SimpleNamespace(
+        task=tasks.Task.REGRESSION,
+        split=SimpleNamespace(dev_target=numpy.arange(10.0)),
+    )
     context = SimpleNamespace(
+        get={profiling.Partition: partition}.__getitem__,
         services=SimpleNamespace(
             spec=SimpleNamespace(
                 selection=SimpleNamespace(sensitivity_repeats=3)
             ),
             governor=SimpleNamespace(overdue=lambda seconds, keep=0.0: None),
         ),
-        task=tasks.Task.REGRESSION,
-        split=SimpleNamespace(dev_target=numpy.arange(10.0)),
     )
     selected = SimpleNamespace(fit_seconds=0.0, fold_scores=[])
 

@@ -11,9 +11,9 @@ from scmle.contracts import models
 from scmle.contracts import records
 from scmle.data.splitting import splitters
 from scmle.evaluation import resources
+from scmle.pipeline import engine
 from scmle.pipeline import products
 from scmle.pipeline import strategy_search
-import scmle.pipeline.context
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import exploration
 from scmle.pipeline.stages import interface
@@ -43,6 +43,22 @@ class Choice(products.Kept):
     outcomes: list[experiments.Decision]
     skipped: list[dict[str, str]]
 
+    def apply(self, board: object) -> None:
+        """Sets the decisions on the run's journal and holds the choice.
+
+        Args:
+            board: The run's board.
+
+        Raises:
+            KindError: If `board` is not a run's board.
+        """
+        if not isinstance(board, engine.Board):
+            raise errors.KindError("a choice applies to a run's board")
+        with board.journal.lock:
+            board.journal.outcomes = self.outcomes
+            board.journal.skipped = self.skipped
+        super().apply(board)
+
 
 @dataclasses.dataclass(frozen=True)
 class Pick:
@@ -66,32 +82,32 @@ class SelectStage(interface.Stage):
         scmle.runtime.state.Progress.SELECTING
     )
 
-    def describe(self, context: scmle.pipeline.context.Context) -> str:
+    def describe(self, board: engine.Board) -> str:
         """Names the policy.
 
         Args:
-            context: The run context, holding the selection policy.
+            board: The run's board, holding the selection policy.
 
         Returns:
             The selection policy's description.
         """
-        return context.services.policy.description
+        return board.services.policy.description
 
     def announce(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         selected: experiments.Trial,
     ) -> Pick:
         """Emits the `selection.frozen` event for the selected trial.
 
         Args:
-            context: The run context whose journal receives the event.
+            board: The run's board whose journal receives the event.
             selected: The selected trial.
 
         Returns:
             The selected trial, as picked without a front.
         """
-        context.journal.emit(
+        board.journal.emit(
             "selection.frozen",
             f"{selected.model_name}/{selected.strategy}",
             (f"trials/{selected.trial_id}.json",),
@@ -103,18 +119,16 @@ class SelectStage(interface.Stage):
         )
         return Pick(selected)
 
-    def limits(
-        self, context: scmle.pipeline.context.Context
-    ) -> resources.Constraints:
+    def limits(self, board: engine.Board) -> resources.Constraints:
         """Builds the serving limits from the specification.
 
         Args:
-            context: The run context, supplying the selection settings.
+            board: The run's board, supplying the selection settings.
 
         Returns:
             The model-size and latency limits.
         """
-        spec = context.services.spec.selection
+        spec = board.services.spec.selection
         return resources.Constraints(
             spec.max_model_mb,
             spec.max_p95_latency_ms,
@@ -123,7 +137,7 @@ class SelectStage(interface.Stage):
 
     def select_on_front(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         checked: list[experiments.Trial],
         limits: resources.Constraints,
         refits: dict[str, models.Estimator],
@@ -135,7 +149,7 @@ class SelectStage(interface.Stage):
         ties). The whole front is reported so the trade-off is visible.
 
         Args:
-            context: The run context, holding the split and the profile.
+            board: The run's board, holding the split and the profile.
             checked: The best-ranked trials to measure.
             limits: The serving limits.
             refits: Receives the chosen candidate's refit, by trial id.
@@ -147,22 +161,21 @@ class SelectStage(interface.Stage):
         Raises:
             BlockedError: If no checked candidate satisfies the limits.
         """
-        split = scmle.pipeline.context.require(context.split, "split")
-        task = scmle.pipeline.context.require(context.task, "task")
-        plan = scmle.pipeline.context.require(
-            context.profile, "profile"
-        ).feature_plan
-        metric = scmle.pipeline.context.require(context.metric, "metric")
+        partition = board.get(profiling.Partition)
+        split = partition.split
+        task = partition.task
+        plan = partition.profile.feature_plan
+        metric = partition.metric
         sign = 1.0 if metric.greater_is_better else -1.0
         rows = []
         for trial in checked:
-            if cost.late(context, trial):
+            if cost.late(board, trial):
                 continue
             candidate = strategies.lookup(trial.strategy).build(
                 plan,
-                context.services.registry.get(trial.model_name),
+                board.services.registry.get(trial.model_name),
                 task,
-                context.services.spec.validation.seed,
+                board.services.spec.validation.seed,
                 trial.params,
             )
             candidate.fit(split.dev_features, split.dev_target)
@@ -171,7 +184,7 @@ class SelectStage(interface.Stage):
                 Candidate(trial, candidate, usage, limits.violations(usage))
             )
         if not rows:
-            return self.announce(context, cost.affordable(context, checked))
+            return self.announce(board, cost.affordable(board, checked))
         feasible = [r for r in rows if not r.broken]
         if not feasible:
             raise errors.BlockedError(
@@ -183,25 +196,25 @@ class SelectStage(interface.Stage):
             r
             for r in feasible
             if best - sign * r.trial.score_mean
-            <= context.services.spec.selection.pareto_tolerance
+            <= board.services.spec.selection.pareto_tolerance
         ]
         chosen = min(
             near,
             key=lambda r: (r.usage.p95_latency_ms, r.usage.model_mb),
         )
         trial = chosen.trial
-        context.journal.enter(
+        board.journal.enter(
             f"{trial.model_name}/{trial.strategy}",
             experiments.Edict.INCLUDE,
             "fastest within "
-            f"{context.services.spec.selection.pareto_tolerance} of the "
+            f"{board.services.spec.selection.pareto_tolerance} of the "
             f"best score ({chosen.usage.p95_latency_ms:.1f} ms p95)",
         )
         refits[trial.trial_id] = chosen.candidate
-        self.announce(context, trial)
+        self.announce(board, trial)
         return Pick(trial, frontier(rows, chosen, sign))
 
-    def execute(self, context: scmle.pipeline.context.Context) -> Choice:
+    def execute(self, board: engine.Board) -> Choice:
         """Chooses the model, then opens a deferred confirmation.
 
         If the confirmation was deferred, it is completed here once the model
@@ -210,42 +223,42 @@ class SelectStage(interface.Stage):
         satisfies the constraints.
 
         Args:
-            context: The run context, holding any pending ledger.
+            board: The run's board, holding any pending ledger.
 
         Returns:
             The selected trial, the refits made on the way, the front and
             the ledger still pending.
         """
-        refits = dict(context.refits)
-        pick = self.choose(context, refits)
-        pending = context.pending_ledger
+        refits: dict[str, models.Estimator] = {}
+        pick = self.choose(board, refits)
+        pending = board.get(exploration.Claims).pending
         if pending is not None:
-            split = scmle.pipeline.context.require(context.split, "split")
-            data = context.services.spec.data
+            split = board.get(profiling.Partition).split
+            data = board.services.spec.data
             subject = None
             if (
                 data.baseline_column
                 and data.baseline_subject == "selected_model"
             ):
-                subject = codify(context, pending, pick.trial, split, refits)
+                subject = codify(board, pending, pick.trial, split, refits)
             if pending.holds_for_coverage:
                 pending = dataclasses.replace(pending, subject=subject)
             else:
-                profiling.ProfileStage().conclude(context, pending, subject)
+                profiling.ProfileStage().conclude(board, pending, subject)
                 pending = None
-        with context.journal.lock:
+        with board.journal.lock:
             return Choice(
                 pick.trial,
                 refits,
                 pick.front,
                 pending,
-                list(context.journal.outcomes),
-                list(context.journal.skipped),
+                list(board.journal.outcomes),
+                list(board.journal.skipped),
             )
 
     def choose(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         refits: dict[str, models.Estimator],
     ) -> Pick:
         """Chooses the best trial that satisfies the serving constraints.
@@ -260,7 +273,7 @@ class SelectStage(interface.Stage):
         on this machine, and the first one within every limit wins.
 
         Args:
-            context: The run context, holding the trials, split and profile.
+            board: The run's board, holding the trials, split and profile.
             refits: Receives the refit of a measured choice, by trial id.
 
         Returns:
@@ -269,29 +282,29 @@ class SelectStage(interface.Stage):
         Raises:
             BlockedError: If no checked candidate satisfies the constraints.
         """
-        metric = scmle.pipeline.context.require(context.metric, "metric")
-        earned = earn(context, list(context.journal.trials))
-        ranked = context.services.policy.rank(
-            earned, metric, context.services.registry
+        metric = board.get(profiling.Partition).metric
+        earned = earn(board, list(board.journal.trials))
+        ranked = board.services.policy.rank(
+            earned, metric, board.services.registry
         )
-        limits = self.limits(context)
-        spec = context.services.spec.selection
+        limits = self.limits(board)
+        spec = board.services.spec.selection
         if not limits.active and not spec.pareto:
-            return self.announce(context, cost.affordable(context, ranked))
+            return self.announce(board, cost.affordable(board, ranked))
         checked = ranked[: spec.max_candidates_checked]
         if spec.pareto:
-            return self.select_on_front(context, checked, limits, refits)
+            return self.select_on_front(board, checked, limits, refits)
         measured = 0
         for trial in checked:
-            if cost.late(context, trial):
+            if cost.late(board, trial):
                 continue
             measured += 1
-            candidate = self.measure(context, trial, limits)
+            candidate = self.measure(board, trial, limits)
             if candidate is not None:
                 refits[trial.trial_id] = candidate
-                return self.announce(context, trial)
+                return self.announce(board, trial)
         if not measured:
-            return self.announce(context, cost.affordable(context, checked))
+            return self.announce(board, cost.affordable(board, checked))
         raise errors.BlockedError(
             f"none of the top {len(checked)} candidates satisfies the "
             "serving constraints; relax the limits or allow more candidates"
@@ -299,7 +312,7 @@ class SelectStage(interface.Stage):
 
     def measure(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         trial: experiments.Trial,
         limits: resources.Constraints,
     ) -> models.Estimator | None:
@@ -309,23 +322,22 @@ class SelectStage(interface.Stage):
         size and latency, or rejected with the limits it broke.
 
         Args:
-            context: The run context, holding the split, task and profile.
+            board: The run's board, holding the split, task and profile.
             trial: The candidate's trial.
             limits: The serving limits.
 
         Returns:
             The refit when it is within every limit, else None.
         """
-        split = scmle.pipeline.context.require(context.split, "split")
-        task = scmle.pipeline.context.require(context.task, "task")
-        plan = scmle.pipeline.context.require(
-            context.profile, "profile"
-        ).feature_plan
+        partition = board.get(profiling.Partition)
+        split = partition.split
+        task = partition.task
+        plan = partition.profile.feature_plan
         candidate = strategies.lookup(trial.strategy).build(
             plan,
-            context.services.registry.get(trial.model_name),
+            board.services.registry.get(trial.model_name),
             task,
-            context.services.spec.validation.seed,
+            board.services.spec.validation.seed,
             trial.params,
         )
         candidate.fit(split.dev_features, split.dev_target)
@@ -333,11 +345,11 @@ class SelectStage(interface.Stage):
         broken = limits.violations(usage)
         label = f"{trial.model_name}/{trial.strategy}"
         if broken:
-            context.journal.enter(
+            board.journal.enter(
                 label, experiments.Edict.REJECT, "; ".join(broken)
             )
             return None
-        context.journal.enter(
+        board.journal.enter(
             label,
             experiments.Edict.INCLUDE,
             f"within serving limits ({usage.model_mb:.2f} MB, p95 "
@@ -347,7 +359,7 @@ class SelectStage(interface.Stage):
 
 
 def earn(
-    context: scmle.pipeline.context.Context,
+    board: engine.Board,
     trials: list[experiments.Trial],
 ) -> list[experiments.Trial]:
     """Keeps the default pipelines and the variants that beat theirs.
@@ -359,14 +371,14 @@ def earn(
     Each one dropped is rejected on record.
 
     Args:
-        context: The run context, holding the metric and the journal.
+        board: The run's board, holding the metric and the journal.
         trials: Every trial of the run.
 
     Returns:
         The trials that compete, in their order; all of them when there is
         no successful default pipeline or no successful variant.
     """
-    metric = scmle.pipeline.context.require(context.metric, "metric")
+    metric = board.get(profiling.Partition).metric
     sign = 1 if metric.greater_is_better else -1
     ok = [t for t in trials if t.status is experiments.Termination.OK]
     defaults = {t.model_name: t for t in ok if strategy_search.plain(t)}
@@ -386,7 +398,7 @@ def earn(
         if chance >= needed:
             kept.append(trial)
             continue
-        context.journal.enter(
+        board.journal.enter(
             f"{trial.model_name}/{trial.strategy}",
             experiments.Edict.REJECT,
             f"{trial.trial_id}: cv {metric.name} {trial.score_mean:.4f} vs "
@@ -414,7 +426,7 @@ class Candidate:
 
 
 def codify(
-    context: scmle.pipeline.context.Context,
+    board: engine.Board,
     pending: "exploration.Escrow",
     selected: experiments.Trial,
     split: splitters.Split,
@@ -423,7 +435,7 @@ def codify(
     """Returns the selected model as the rule the baseline claim is about.
 
     Args:
-        context: The run context, holding the profile and services.
+        board: The run's board, holding the profile and services.
         pending: The deferred ledger, supplying the view and charter.
         selected: The selected trial.
         split: The split whose development rows the model is refit on if
@@ -436,19 +448,18 @@ def codify(
         it was fitted.
     """
     pipeline = refits.get(selected.trial_id)
+    partition = board.get(profiling.Partition)
     if pipeline is None:
         pipeline = strategies.lookup(selected.strategy).build(
-            scmle.pipeline.context.require(
-                context.profile, "profile"
-            ).feature_plan,
-            context.services.registry.get(selected.model_name),
-            scmle.pipeline.context.require(context.task, "task"),
-            context.services.spec.validation.seed,
+            partition.profile.feature_plan,
+            board.services.registry.get(selected.model_name),
+            partition.task,
+            board.services.spec.validation.seed,
             selected.params,
         )
         pipeline.fit(split.dev_features, split.dev_target)
         refits[selected.trial_id] = pipeline
-    model = scmle.pipeline.context.require(pending.charter.costs, "cost_model")
+    model = products.require(pending.charter.costs, "cost_model")
     classes = sorted(pending.view.target.dropna().unique(), key=str)
     return scmle.assurance.framing.claim.Selection(
         pipeline,
@@ -460,7 +471,7 @@ def codify(
             "params": selected.params,
             "trial_id": selected.trial_id,
             "split": split.manifest.fingerprint,
-            "seed": context.services.spec.validation.seed,
+            "seed": board.services.spec.validation.seed,
         },
     )
 

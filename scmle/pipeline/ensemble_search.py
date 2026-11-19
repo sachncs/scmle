@@ -8,8 +8,8 @@ beats its best member.
 
 from scmle.contracts import experiments
 from scmle.models import ensembles
+from scmle.pipeline import engine
 from scmle.pipeline import trials
-import scmle.pipeline.context
 
 COMBINERS = (ensembles.Stacking.name, ensembles.Blending.name)
 
@@ -18,23 +18,24 @@ class Stacker:
     """Assembles and evaluates a stacking candidate.
 
     Attributes:
-        context: Run context.
+        board: Run board.
         runner: Trial runner used for the evaluation.
         metric: The metric being optimized.
+        task: The resolved task.
     """
 
-    def __init__(
-        self, context: scmle.pipeline.context.Context, runner: trials.Runner
-    ) -> None:
+    def __init__(self, board: engine.Board, runner: trials.Runner) -> None:
         """Initializes the search.
 
         Args:
-            context: Run context (spec, registry, metric, deadline).
-            runner: Trial runner used for the evaluation.
+            board: Run board (spec, registry, deadline).
+            runner: Trial runner used for the evaluation, holding the
+                metric and task.
         """
-        self.context = context
+        self.board = board
         self.runner = runner
-        self.metric = scmle.pipeline.context.require(context.metric, "metric")
+        self.metric = runner.metric
+        self.task = runner.task
 
     def members(
         self, evaluated: list[experiments.Trial], size: int
@@ -56,7 +57,7 @@ class Stacker:
             if t.status is experiments.Termination.OK
             and t.strategy == experiments.DEFAULT_STRATEGY
             and t.model_name not in COMBINERS
-            and self.context.services.registry.get(t.model_name).family
+            and self.board.services.registry.get(t.model_name).family
             != "baseline"
         ]
         best: dict[str, experiments.Trial] = {}
@@ -78,16 +79,16 @@ class Stacker:
         Args:
             evaluated: All trials produced before the ensemble step.
         """
-        size = self.context.services.spec.ensemble.size
+        size = self.board.services.spec.ensemble.size
         if (
             size < ensembles.MIN_MEMBERS
-            or self.context.services.governor.skip_reason(first=False)
+            or self.board.services.governor.skip_reason(first=False)
         ):
             return
         members = self.members(evaluated, size)
         if len(members) < ensembles.MIN_MEMBERS:
             for combiner in COMBINERS:
-                self.context.journal.enter(
+                self.board.journal.enter(
                     combiner,
                     experiments.Edict.REJECT,
                     "fewer than two eligible distinct models",
@@ -99,22 +100,20 @@ class Stacker:
                 for t in members
             ]
         }
-        task = scmle.pipeline.context.require(self.context.task, "task")
+        task = self.task
         for combiner in COMBINERS:
-            if self.context.services.governor.skip_reason(first=False):
+            if self.board.services.governor.skip_reason(first=False):
                 return
-            reason = self.context.services.registry.get(combiner).objection(
-                task
-            )
+            reason = self.board.services.registry.get(combiner).objection(task)
             if reason is not None:
-                self.context.journal.enter(
+                self.board.journal.enter(
                     combiner, experiments.Edict.REJECT, reason
                 )
                 continue
-            self.context.services.check()
-            trial_id = self.context.journal.allocate(1)[0]
+            self.board.services.check()
+            trial_id = self.board.journal.allocate(1)[0]
             outcome = self.runner.run(trial_id, combiner, params)
-            self.context.journal.transcribe(outcome)
+            self.board.journal.transcribe(outcome)
             self.judge(
                 combiner,
                 members[0],
@@ -141,7 +140,7 @@ class Stacker:
             names: Model names of the members, for the explanation.
         """
         if outcome.status is not experiments.Termination.OK:
-            self.context.journal.enter(
+            self.board.journal.enter(
                 combiner,
                 experiments.Edict.REJECT,
                 f"trial {outcome.status}: {outcome.error}",
@@ -149,7 +148,7 @@ class Stacker:
             return
         sign = 1 if self.metric.greater_is_better else -1
         gain = sign * (outcome.score_mean - leader.score_mean)
-        self.context.journal.enter(
+        self.board.journal.enter(
             combiner,
             experiments.Edict.INCLUDE if gain > 0 else experiments.Edict.REJECT,
             f"{combiner} of {', '.join(names)}: cv {self.metric.name} "

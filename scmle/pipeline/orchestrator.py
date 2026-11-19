@@ -32,9 +32,10 @@ import scmle.models.registry
 from scmle.pipeline import archive
 from scmle.pipeline import engine
 from scmle.pipeline import policies
+from scmle.pipeline import products
 from scmle.pipeline import services
-import scmle.pipeline.context
 import scmle.pipeline.stages
+from scmle.pipeline.stages import packaging
 from scmle.runtime import logs
 from scmle.runtime import state
 import scmle.runtime.engine
@@ -107,14 +108,14 @@ class Orchestrator:
         """Requests cooperative cancellation of a running workflow."""
         self.cancel_event.set()
 
-    def new_context(
+    def start(
         self,
         store: scmle.artifacts.store.Workspace | None = None,
         log: events.Log | None = None,
         approved_plan: experiments.Plan | None = None,
         **fields: Any,
-    ) -> scmle.pipeline.context.Context:
-        """Creates a run context wired with this orchestrator's services.
+    ) -> engine.Board:
+        """Creates a run's board wired with this orchestrator's services.
 
         Args:
             store: Run directory, or None for a side-effect-free preview.
@@ -123,9 +124,9 @@ class Orchestrator:
             **fields: Further services (`services.start`), such as `started`.
 
         Returns:
-            A fresh context.
+            A fresh board.
         """
-        return scmle.pipeline.context.Context.start(
+        return engine.Board.start(
             services.start(
                 self.spec,
                 self.registry,
@@ -140,9 +141,7 @@ class Orchestrator:
             )
         )
 
-    def prepare(
-        self, approved: experiments.Plan | None = None
-    ) -> scmle.pipeline.context.Context:
+    def prepare(self, approved: experiments.Plan | None = None) -> engine.Board:
         """Ingests, profiles and plans without training or writing files.
 
         Runs the planning stage and the stages it needs, with no state
@@ -154,15 +153,15 @@ class Orchestrator:
         Applies `approved` to the specification first (see `bind`).
 
         Returns:
-            A context, with no run store or log, whose `profile` and `plan`
-            are populated.
+            A board, with no run store or log, holding the partition
+            (`profiling.Partition`) and the blueprint (`planning.Blueprint`).
         """
         self.spec = bind(self.spec, approved)
         history = recall(self.tracker, self.tracking_path)
-        context = self.new_context(approved_plan=approved, history=history)
+        board = self.start(approved_plan=approved, history=history)
         self.pipeline = engine.Pipeline(self.stages)
-        self.pipeline.advance(context, until=scmle.pipeline.stages.Planning)
-        return context
+        self.pipeline.advance(board, until=scmle.pipeline.stages.Planning)
+        return board
 
     def run(
         self,
@@ -250,13 +249,13 @@ class Orchestrator:
         return cls(archive.saved(store.directory), **kwargs)
 
     def consult_checkpoints(
-        self, gate: state.Progress, context: scmle.pipeline.context.Context
+        self, gate: state.Progress, board: engine.Board
     ) -> None:
         """Asks every checkpoint registered for `gate` and audits the verdicts.
 
         Args:
             gate: The state of the stage that just completed.
-            context: The run context, used to build each review and to record
+            board: The run's board, used to build each review and to record
                 the verdict.
 
         A gate the run's custody journal records as rejected stays rejected
@@ -268,7 +267,7 @@ class Orchestrator:
             BlockedError: If any checkpoint rejects, or the gate was rejected
                 before and no checkpoint here reviews it.
         """
-        record = journal.Journal.locate(context.services.workspace.directory)
+        record = journal.Journal.locate(board.services.workspace.directory)
         reviewers = [c for c in self.checkpoints if gate in c.gates]
         earlier = record.rejected().get(gate.value)
         if earlier is not None and not reviewers:
@@ -277,8 +276,8 @@ class Orchestrator:
                 "checkpoint that reviews it"
             )
         for checkpoint in reviewers:
-            verdict = checkpoint.review(policies.describe(gate, context))
-            context.journal.emit(
+            verdict = checkpoint.review(policies.describe(gate, board))
+            board.journal.emit(
                 f"policy.{'approved' if verdict.approved else 'rejected'}",
                 verdict.reason,
                 data={"gate": gate.value, "reviewer": verdict.reviewer},
@@ -327,7 +326,7 @@ class Orchestrator:
         machine = state.Tracker(
             store.run_id, log, self.spec.config_hash(), reason
         )
-        context = self.new_context(
+        board = self.start(
             store=store,
             log=log,
             approved_plan=approved,
@@ -337,11 +336,11 @@ class Orchestrator:
             started=docket.started,
         )
         for name, failure in self.registry.plugin_failures.items():
-            context.journal.emit("plugin.rejected", f"{name}: {failure}")
+            board.journal.emit("plugin.rejected", f"{name}: {failure}")
         self.pipeline = engine.Pipeline(self.stages, docket)
         try:
             self.pipeline.run(
-                context,
+                board,
                 machine,
                 self.consult_checkpoints,
                 lambda: {
@@ -350,9 +349,11 @@ class Orchestrator:
                 },
                 ("model/", "evaluation.json"),
             )
-            return scmle.pipeline.context.require(context.result, "result")
+            return products.require(
+                board.get(packaging.Package).result, "result"
+            )
         finally:
-            context.close()
+            board.close()
 
 
 def enlist(
@@ -412,7 +413,7 @@ def bind(spec: tasks.Config, approved: experiments.Plan | None) -> tasks.Config:
     contradicts the specification, for example group validation without a
     group column, fails that validation with a `ValidationError`. The
     candidate models and task of the plan are not applied here; the stages
-    read them from the context's approved plan.
+    read them from the board's approved plan.
 
     Args:
         spec: The specification.

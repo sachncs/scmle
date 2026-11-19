@@ -4,6 +4,7 @@ import types
 
 from scmle.contracts import tasks
 from scmle.pipeline import stages
+from scmle.pipeline.stages import profiling
 
 
 class Store:
@@ -21,9 +22,12 @@ def test_no_success_criteria_blocks_the_release_and_invents_none():
 
     Also enforces website/src/learn/decisions.html:82.
     """
-    context = types.SimpleNamespace(
+    partition = types.SimpleNamespace(
         task=tasks.Task.BINARY,
         metric=types.SimpleNamespace(name="roc_auc", greater_is_better=True),
+    )
+    context = types.SimpleNamespace(
+        get={profiling.Partition: partition}.__getitem__,
         services=types.SimpleNamespace(
             spec=types.SimpleNamespace(
                 problem=types.SimpleNamespace(success_criteria={})

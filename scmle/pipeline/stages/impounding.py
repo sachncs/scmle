@@ -1,6 +1,5 @@
 """Sealing and impounding the locked test rows."""
 
-import dataclasses
 import hashlib
 from typing import Any
 
@@ -16,60 +15,9 @@ from scmle.contracts import experiments
 from scmle.contracts import tasks
 from scmle.data.splitting import splitters
 from scmle.evaluation import reweighing
-from scmle.pipeline import products
-import scmle.pipeline.context
+from scmle.pipeline import engine
 from scmle.pipeline.stages import exploration
-
-
-@dataclasses.dataclass(frozen=True)
-class Custody(products.Derived):
-    """The confirmation set of a charter run, carved out and sealed.
-
-    Derived: the vault holds rows that are never written beside the stage
-    record. Whoever holds the custody holds the vault: `Context.close`
-    closes it once the custody is applied, and `Impounding.sequester`
-    closes it on every failure before that.
-
-    Attributes:
-        outcome: The custody outcome: the split restricted to `X`, the
-            exploration view, the manifest and the feasibility verdict.
-        vault: The vault holding the sealed confirmation set.
-        column: The entity column whose rows are not independent, when the
-            charter predicts known entities' future rows, else None.
-    """
-
-    outcome: scmle.assurance.custody.pipeline.Outcome
-    vault: scmle.assurance.custody.sealed.Vault
-    column: str | None = None
-
-    def apply(self, board: object) -> None:
-        """Sets the context fields the later stages read.
-
-        Args:
-            board: The run context; its `custody`, `custody_vault` and, for
-                a known-entity charter, `cluster_column` are set.
-        """
-        setattr(board, "custody", self.outcome)  # noqa: B010 -- the context fields keep their names until context.py goes (1.E)
-        setattr(board, "custody_vault", self.vault)  # noqa: B010 -- as above
-        if self.column is not None:
-            setattr(board, "cluster_column", self.column)  # noqa: B010 -- as above
-
-    def summary(self) -> object:
-        """What the custody was derived from.
-
-        Returns:
-            The manifest's hash and scope, the set sizes and the entity
-            column.
-        """
-        manifest = self.outcome.manifest
-        return {
-            "manifest": manifest.sha256,
-            "scope": manifest.scope,
-            "exploration": len(manifest.sets.exploration),
-            "confirmation": len(manifest.sets.confirmation),
-            "embargo": len(manifest.sets.embargo),
-            "column": self.column,
-        }
+from scmle.pipeline.stages import ingestion
 
 
 class Impounding(exploration.Exploration):
@@ -98,7 +46,7 @@ class Impounding(exploration.Exploration):
 
     def reweigh(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         task: tasks.Task,
         split: splitters.Split,
     ) -> None:
@@ -113,16 +61,16 @@ class Impounding(exploration.Exploration):
         first sensitive column if none is set.
 
         Args:
-            context: The run context; its specification gains the weight column.
+            board: The run's board; its specification gains the weight column.
             task: The resolved task.
             split: The split whose development features receive the weights
                 (the weight column is added to them in place).
         """
-        fairness = context.services.spec.fairness
+        fairness = board.services.spec.fairness
         if fairness.mitigation != "reweighing":
             return
         column = (
-            fairness.column or context.services.spec.data.sensitive_columns[0]
+            fairness.column or board.services.spec.data.sensitive_columns[0]
         )
         label = f"fairness:{column}"
         if task not in (
@@ -130,7 +78,7 @@ class Impounding(exploration.Exploration):
             tasks.Task.MULTICLASS,
             tasks.Task.REGRESSION,
         ):
-            context.journal.enter(
+            board.journal.enter(
                 label,
                 experiments.Edict.REJECT,
                 "reweighing applies to binary, multiclass and regression "
@@ -146,16 +94,16 @@ class Impounding(exploration.Exploration):
             split.dev_features[column].astype(str), levels
         )
         split.dev_features[tasks.FAIRNESS_WEIGHT] = weights
-        context.amend(
-            context.services.spec.model_copy(
+        board.amend(
+            board.services.spec.model_copy(
                 update={
-                    "data": context.services.spec.data.model_copy(
+                    "data": board.services.spec.data.model_copy(
                         update={"weight_column": tasks.FAIRNESS_WEIGHT}
                     )
                 }
             )
         )
-        context.journal.enter(
+        board.journal.enter(
             label,
             experiments.Edict.INCLUDE,
             "development rows reweighted so group and label are independent "
@@ -164,11 +112,11 @@ class Impounding(exploration.Exploration):
 
     def sequester(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         task: tasks.Task,
         frame: pandas.DataFrame,
         split: splitters.Split,
-    ) -> Custody:
+    ) -> exploration.Custody:
         """Carves and seals the confirmation set under the charter.
 
         The charter is verified (hash, and signature when a key is
@@ -184,7 +132,7 @@ class Impounding(exploration.Exploration):
         or the original file still holds every row.
 
         Args:
-            context: The run context, supplying the specification and the
+            board: The run's board, supplying the specification and the
                 manifest; receives the files that describe the custody.
             task: The resolved task.
             frame: The full data before partitioning.
@@ -197,27 +145,28 @@ class Impounding(exploration.Exploration):
             ConfigError: If the charter's unit of prediction is `new_entity`
                 and the data spec has no group column.
         """
-        path = str(context.services.spec.charter_path)
+        path = str(board.services.spec.charter_path)
         verified = sealing.read_verified(path)
         charter = verified.charter
         if (
             charter.purpose == contracts.NEW_ENTITY
-            and not context.services.spec.data.group_column
+            and not board.services.spec.data.group_column
         ):
             raise errors.ConfigError(
                 "the charter's unit_of_prediction is new_entity, which needs "
                 "data.group_column so that entities are split and calibrated "
                 "as units"
             )
-        column = self.check_known_entity(context, charter, split)
+        column = self.check_known_entity(board, charter, split)
         log = scmle.assurance.custody.sealed.Journal(
-            context.services.store.directory / "custody_log.jsonl"
-            if context.services.store is not None
+            board.services.store.directory / "custody_log.jsonl"
+            if board.services.store is not None
             else None
         )
+        intake = board.find(ingestion.Intake)
         data_hash = (
-            context.manifest.digests["data"]
-            if context.manifest is not None
+            intake.manifest.digests["data"]
+            if intake is not None
             else hashlib.sha256(
                 pandas.util.hash_pandas_object(frame).to_numpy().tobytes()
             ).hexdigest()
@@ -228,21 +177,21 @@ class Impounding(exploration.Exploration):
                 charter=charter,
                 split=split,
                 frame=frame,
-                spec=context.services.spec,
+                spec=board.services.spec,
                 task=task,
                 data_hash=data_hash,
                 vault=held,
             )
-            self.chronicle(context, path, verified, outcome)
+            self.chronicle(board, path, verified, outcome)
         except BaseException:
             # handled: the vault is closed and the error re-raised
             held.close()
             raise
-        return Custody(outcome, held, column)
+        return exploration.Custody(outcome, held, column)
 
     def chronicle(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         path: str,
         verified: Any,
         outcome: Any,
@@ -250,24 +199,24 @@ class Impounding(exploration.Exploration):
         """Writes the charter, error budget, feasibility and split manifest.
 
         Args:
-            context: The run context that receives the files and the event.
+            board: The run's board that receives the files and the event.
             path: The charter file.
             verified: The verified charter and whether it is signed.
             outcome: The custody outcome of the sealing.
         """
-        context.journal.write_json(
+        board.journal.write_json(
             "analysis_charter.json", contracts.deserialize(path)
         )
-        context.journal.write_json(
+        board.journal.write_json(
             "error_budget.json", verified.charter.budget.to_dict()
         )
-        context.journal.write_json(
+        board.journal.write_json(
             "feasibility.json", outcome.feasibility.to_dict()
         )
-        context.journal.write_json(
+        board.journal.write_json(
             "split_manifest.json", outcome.manifest.to_dict()
         )
-        context.journal.emit(
+        board.journal.emit(
             "custody.sealed",
             outcome.feasibility.reason,
             (
@@ -290,7 +239,7 @@ class Impounding(exploration.Exploration):
 
     def check_known_entity(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         charter: contracts.AnalysisCharter,
         split: splitters.Split,
     ) -> str | None:
@@ -300,10 +249,10 @@ class Impounding(exploration.Exploration):
         entity column and the time column must be named and validation must
         be time-ordered: an entity-disjoint split would test the wrong unit
         (that is `new_entity`). The entity column becomes the run's cluster
-        column (`Custody.column`).
+        column (`exploration.Custody.column`).
 
         Args:
-            context: The run context, supplying the data spec.
+            board: The run's board, supplying the data spec.
             charter: The analysis charter; nothing is checked unless its unit
                 of prediction is `known_entity_future`.
             split: The split, whose strategy must be time-ordered.
@@ -318,7 +267,7 @@ class Impounding(exploration.Exploration):
         """
         if charter.purpose != contracts.KNOWN_ENTITY_FUTURE:
             return None
-        data = context.services.spec.data
+        data = board.services.spec.data
         for role, column in (
             ("group_column", data.group_column),
             ("time_column", data.time_column),
@@ -338,7 +287,7 @@ class Impounding(exploration.Exploration):
                 f"'{split.manifest.strategy}': an entity-disjoint split tests "
                 "new entities"
             )
-        context.journal.emit(
+        board.journal.emit(
             "unit.known_entity_future",
             "entities are not split units: their rows sit on both sides, "
             "the confirmation rows are time blocks with an embargo and the "

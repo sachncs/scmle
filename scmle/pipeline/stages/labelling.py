@@ -1,7 +1,6 @@
 """Task resolution, the first part of the profile stage."""
 
 import dataclasses
-from typing import ClassVar
 
 import pandas
 
@@ -9,13 +8,14 @@ from scmle.contracts import errors
 from scmle.contracts import tasks
 import scmle.contracts.metrics
 import scmle.data.validation.target
-import scmle.pipeline.context
-from scmle.pipeline.stages import bridge
+from scmle.pipeline import engine
+from scmle.pipeline import products
+from scmle.pipeline.stages import ingestion
 from scmle.pipeline.stages import interface
 
 
 @dataclasses.dataclass(frozen=True)
-class Resolution(bridge.Bridge):
+class Resolution(products.Derived):
     """The resolved task and the labelled rows it is learned from.
 
     Attributes:
@@ -25,15 +25,9 @@ class Resolution(bridge.Bridge):
         unlabeled: Rows without a target set aside by the `unlabeled`
             policy, or None when every row has one.
         labels: For an ordinal task, the labels from lowest to highest,
-            else None (the context's `ordinal_labels`).
-        notes: The intake's repairs, and the rows set aside (the context's
-            `cleaning_notes`).
+            else None.
+        notes: The intake's repairs, and the rows set aside.
     """
-
-    names: ClassVar[dict[str, str]] = {
-        "labels": "ordinal_labels",
-        "notes": "cleaning_notes",
-    }
 
     task: tasks.Task
     metric: scmle.contracts.metrics.Metric
@@ -67,12 +61,12 @@ class Labelling(interface.Stage):
     """
 
     def set_aside_unlabeled(
-        self, context: scmle.pipeline.context.Context, frame: pandas.DataFrame
+        self, board: engine.Board, frame: pandas.DataFrame
     ) -> tuple[pandas.DataFrame, pandas.DataFrame]:
         """Applies the `unlabeled` policy to rows with a missing target.
 
         Args:
-            context: The run context, holding the data specification.
+            board: The run's board, holding the data specification.
             frame: The data, some of whose target values are missing.
 
         Returns:
@@ -82,7 +76,7 @@ class Labelling(interface.Stage):
         Raises:
             BlockedError: Under the default `block` policy.
         """
-        data = context.services.spec.data
+        data = board.services.spec.data
         missing = frame[data.target].isna()
         if data.unlabeled == "block":
             raise errors.BlockedError(
@@ -95,13 +89,11 @@ class Labelling(interface.Stage):
             rows[data.weight_column] = rows[data.weight_column].fillna(1.0)
         return frame[~missing].reset_index(drop=True), rows
 
-    def infer(
-        self, context: scmle.pipeline.context.Context, frame: pandas.DataFrame
-    ) -> Resolution:
+    def infer(self, board: engine.Board, frame: pandas.DataFrame) -> Resolution:
         """Resolves the task and validates the target columns it needs.
 
         Args:
-            context: The run context, holding the intake's repairs.
+            board: The run's board, holding the intake's repairs.
             frame: The loaded data.
 
         Returns:
@@ -115,11 +107,11 @@ class Labelling(interface.Stage):
                 resolves to, or a success criterion names a metric that is not
                 reported.
         """
-        spec = context.services.spec
-        notes = list(context.cleaning_notes)
+        spec = board.services.spec
+        notes = list(board.get(ingestion.Intake).cleaning_notes)
         unlabeled = None
         if frame[spec.data.target].isna().any():
-            frame, unlabeled = self.set_aside_unlabeled(context, frame)
+            frame, unlabeled = self.set_aside_unlabeled(board, frame)
             notes.append(
                 f"{len(unlabeled)} row(s) without a target were set aside "
                 f"(policy '{spec.data.unlabeled}')"
@@ -135,7 +127,7 @@ class Labelling(interface.Stage):
             raise errors.ConfigError(
                 "unlabeled='pseudo_label' supports classification only"
             )
-        approved = context.services.approved_plan
+        approved = board.services.approved_plan
         if approved is not None and approved.task != task.value:
             raise errors.ConfigError(
                 f"the approved plan is for {approved.task} but the data "
@@ -150,16 +142,16 @@ class Labelling(interface.Stage):
             frame[spec.data.target] = (
                 frame[spec.data.target].map(ranks).astype(int)
             )
-        metric = context.services.catalog.resolve(spec.primary_metric, task)
+        metric = board.services.catalog.resolve(spec.primary_metric, task)
         unknown = sorted(
             set(spec.problem.success_criteria)
-            - set(context.services.catalog.report_names[task])
+            - set(board.services.catalog.report_names[task])
         )
         if unknown:
             raise errors.ConfigError(
                 f"success criteria name unreported metrics {unknown}; "
                 "available: "
-                f"{sorted(context.services.catalog.report_names[task])}"
+                f"{sorted(board.services.catalog.report_names[task])}"
             )
         return Resolution(task, metric, frame, unlabeled, labels, notes)
 

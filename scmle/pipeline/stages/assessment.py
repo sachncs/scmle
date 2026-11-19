@@ -3,7 +3,6 @@
 import dataclasses
 from typing import Any
 from typing import ClassVar
-from typing import Self
 
 import numpy
 import pandas
@@ -14,10 +13,13 @@ from scmle.contracts import models
 from scmle.contracts import records
 from scmle.contracts import tasks
 from scmle.models import thresholds
+from scmle.pipeline import engine
 from scmle.pipeline import products
-import scmle.pipeline.context
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import examination
+from scmle.pipeline.stages import ingestion
+from scmle.pipeline.stages import labelling
+from scmle.pipeline.stages import profiling
 from scmle.pipeline.stages import scoring
 from scmle.pipeline.stages import selecting
 from scmle.pipeline.stages import summary
@@ -63,40 +65,20 @@ class Exam(products.Derived):
         default_factory=examination.Readings
     )
 
-    @classmethod
-    def capture(cls, board: object) -> Self:
-        """Reads the exam from the run context; each part reads its own.
-
-        Args:
-            board: The run context.
-
-        Returns:
-            The exam.
-        """
-        plain = {
-            name: getattr(board, name)
-            for name in ("evaluation", "final_pipeline", "shipped", "test_rows")
-        }
-        return cls(
-            **plain,
-            pseudolabels=examination.Pseudolabels.capture(board),
-            remedy=examination.Remedy.capture(board),
-            decision=examination.Decision.capture(board),
-            readings=examination.Readings.capture(board),
-        )
-
     def apply(self, board: object) -> None:
-        """Sets the exam's fields on the run context; each part sets its own.
+        """Holds the exam and each of its parts on the board.
 
         Args:
-            board: The run context.
+            board: The run's board.
         """
-        for field in dataclasses.fields(self):
-            value = getattr(self, field.name)
-            if isinstance(value, products.Product):
-                value.apply(board)
-            else:
-                setattr(board, field.name, value)
+        for part in (
+            self.pseudolabels,
+            self.remedy,
+            self.decision,
+            self.readings,
+        ):
+            part.apply(board)
+        super().apply(board)
 
     def summary(self) -> object:
         """The evaluation record and whether the test rows were opened.
@@ -116,19 +98,21 @@ class FinalEvaluationStage(summary.Summary):
         scmle.runtime.state.Progress.TESTING
     )
 
-    def describe(self, context: scmle.pipeline.context.Context) -> str:
+    def describe(self, board: engine.Board) -> str:
         """Names the selected model.
 
         Args:
-            context: The run context, holding the selected trial.
+            board: The run's board, holding the selected trial.
 
         Returns:
             The text "final one-time test evaluation of" and the model name.
         """
-        selected = scmle.pipeline.context.require(context.selected, "selected")
+        selected = products.require(
+            board.get(selecting.Choice).selected, "selected"
+        )
         return f"final one-time test evaluation of {selected.model_name}"
 
-    def execute(self, context: scmle.pipeline.context.Context) -> Exam:
+    def execute(self, board: engine.Board) -> Exam:
         """Refits on all development data and evaluates on the test set.
 
         Reuses the refit made during selection if there is one. Applies
@@ -140,42 +124,43 @@ class FinalEvaluationStage(summary.Summary):
         journal (`journal.Custodian`).
 
         Args:
-            context: The run context; its journal records events and files.
+            board: The run's board; its journal records events and files.
 
         Returns:
             The final model, the test rows and the evaluation, with the
             pseudo-labels, the remedy, the decision and the readings.
         """
-        context.services.check()
-        split = scmle.pipeline.context.require(context.split, "split")
+        board.services.check()
+        partition = board.get(profiling.Partition)
+        split = partition.split
         if not isinstance(split.locked_test, journal.Custodian):
             split.locked_test = journal.Custodian(
                 split.locked_test,
-                journal.Journal.locate(context.services.workspace.directory),
+                journal.Journal.locate(board.services.workspace.directory),
             )
-        selected = scmle.pipeline.context.require(context.selected, "selected")
-        task = scmle.pipeline.context.require(context.task, "task")
-        pipeline = self.refit(context, selected, task)
-        pipeline, pseudolabels = self.pseudolabel(context, selected, pipeline)
-        pipeline = self.relearn(context, pipeline)
-        pipeline, threshold = scoring.choose_decision_threshold(
-            context, pipeline
+        selected = products.require(
+            board.get(selecting.Choice).selected, "selected"
         )
+        task = partition.task
+        pipeline = self.refit(board, selected, task)
+        pipeline, pseudolabels = self.pseudolabel(board, selected, pipeline)
+        pipeline = self.relearn(board, pipeline)
+        pipeline, threshold = scoring.choose_decision_threshold(board, pipeline)
         unmitigated = pipeline
-        pipeline, remedy = self.mitigate(context, selected, pipeline, threshold)
-        claim = self.pledge(context)
+        pipeline, remedy = self.mitigate(board, selected, pipeline, threshold)
+        claim = self.pledge(board)
         locked = split.locked_test
-        rows = self.unlock(context, threshold)
+        rows = self.unlock(board, threshold)
         remedy = self.corroborate(remedy, unmitigated, pipeline, *rows)
-        usage = cost.meter(context, pipeline, split.dev_features)
-        test_metrics = self.measure(context, pipeline, *rows)
-        shipped, refit = self.ship(context, pipeline, rows, pseudolabels)
-        readings = self.examine(context, pipeline, *rows)
-        benefit = scoring.appraise(context, pipeline, *rows, threshold)
+        usage = cost.meter(board, pipeline, split.dev_features)
+        test_metrics = self.measure(board, pipeline, *rows)
+        shipped, refit = self.ship(board, pipeline, rows, pseudolabels)
+        readings = self.examine(board, pipeline, *rows)
+        benefit = scoring.appraise(board, pipeline, *rows, threshold)
         decision = examination.Decision(threshold, benefit, claim)
-        self.decide(context, pipeline, *rows, decision)
+        self.decide(board, pipeline, *rows, decision)
         evaluation = self.document(
-            context,
+            board,
             pipeline,
             rows,
             test_metrics,
@@ -183,12 +168,12 @@ class FinalEvaluationStage(summary.Summary):
             {"decision": threshold, "net_benefit": benefit},
         ) | {
             "resources": usage.to_dict(),
-            "resource_limits": context.services.governor.report(),
-            "skipped_for_time": context.journal.skipped,
+            "resource_limits": board.services.governor.report(),
+            "skipped_for_time": board.journal.skipped,
             "test_set_opened": locked.opened,
             "shipped": refit,
             "diagnostics": sorted(readings.diagnostics),
-            "elapsed_seconds": context.services.elapsed(),
+            "elapsed_seconds": board.services.elapsed(),
             "reproducibility": (
                 "same seed/data/environment replays; threaded backends may "
                 "differ"
@@ -207,30 +192,29 @@ class FinalEvaluationStage(summary.Summary):
 
     def refit(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         selected: experiments.Trial,
         task: tasks.Task,
     ) -> Any:
         """The selected pipeline fitted on all development data.
 
         Args:
-            context: The run context.
+            board: The run's board.
             selected: The selected trial.
             task: The resolved task.
 
         Returns:
             The refit made during selection if there is one, else a new fit.
         """
-        pipeline = context.refits.get(selected.trial_id)
+        pipeline = board.get(selecting.Choice).refits.get(selected.trial_id)
+        partition = board.get(profiling.Partition)
         if pipeline is None:
-            split = scmle.pipeline.context.require(context.split, "split")
+            split = partition.split
             pipeline = strategies.lookup(selected.strategy).build(
-                scmle.pipeline.context.require(
-                    context.profile, "profile"
-                ).feature_plan,
-                context.services.registry.get(selected.model_name),
+                partition.profile.feature_plan,
+                board.services.registry.get(selected.model_name),
                 task,
-                context.services.spec.validation.seed,
+                board.services.spec.validation.seed,
                 selected.params,
             )
             pipeline.fit(split.dev_features, split.dev_target)
@@ -238,7 +222,7 @@ class FinalEvaluationStage(summary.Summary):
 
     def ship(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         evaluated: Any,
         rows: tuple[pandas.DataFrame, pandas.Series],
         pseudolabels: examination.Pseudolabels,
@@ -258,7 +242,7 @@ class FinalEvaluationStage(summary.Summary):
         or when it would not end before the packaging reserve.
 
         Args:
-            context: The run context, holding the split and the selection.
+            board: The run's board, holding the split and the selection.
             evaluated: The evaluated model, wrapped as it was scored.
             rows: The opened test rows and labels.
             pseudolabels: The final fit's self-training judgement; the
@@ -268,38 +252,39 @@ class FinalEvaluationStage(summary.Summary):
             The model to serve and the record of the refit (`refit`, the
             `rows` it was fitted on and the `reason` it was skipped).
         """
-        split = scmle.pipeline.context.require(context.split, "split")
-        selected = scmle.pipeline.context.require(context.selected, "selected")
-        reason = self.hold(context, len(rows[0]))
+        partition = board.get(profiling.Partition)
+        split = partition.split
+        selected = products.require(
+            board.get(selecting.Choice).selected, "selected"
+        )
+        reason = self.hold(board, len(rows[0]))
         if reason:
-            context.journal.forgo("refit on every row", reason)
+            board.journal.forgo("refit on every row", reason)
             return evaluated, {
                 "refit": False,
                 "rows": len(split.dev_features),
                 "reason": reason,
             }
         features, target = pool(split, rows)
-        task = scmle.pipeline.context.require(context.task, "task")
+        task = partition.task
         fitted = strategies.lookup(selected.strategy).build(
-            scmle.pipeline.context.require(
-                context.profile, "profile"
-            ).feature_plan,
-            context.services.registry.get(selected.model_name),
+            partition.profile.feature_plan,
+            board.services.registry.get(selected.model_name),
             task,
-            context.services.spec.validation.seed,
+            board.services.spec.validation.seed,
             selected.params,
         )
         fitted.fit(features, target)
-        unlabeled = context.unlabeled
+        unlabeled = board.get(labelling.Resolution).unlabeled
         if (pseudolabels.record or {}).get("used") and unlabeled is not None:
             fitted = pseudo_labeling.selftrain(
                 fitted,
                 features,
                 target,
                 unlabeled,
-                context.services.spec.data.pseudo_label_confidence,
+                board.services.spec.data.pseudo_label_confidence,
             )[0]
-        context.journal.emit(
+        board.journal.emit(
             "model.shipped",
             f"selected model refit on all {len(features)} rows to serve",
             data={"rows": len(features)},
@@ -310,13 +295,11 @@ class FinalEvaluationStage(summary.Summary):
             "reason": "",
         }
 
-    def hold(
-        self, context: scmle.pipeline.context.Context, tested: int
-    ) -> str | None:
+    def hold(self, board: engine.Board, tested: int) -> str | None:
         """Why the selected model must not be refit on every row, or None.
 
         Args:
-            context: The run context, holding the split, selection and
+            board: The run's board, holding the split, selection and
                 governor.
             tested: Number of test rows the refit would add.
 
@@ -324,26 +307,26 @@ class FinalEvaluationStage(summary.Summary):
             The reason: a charter governs the run, training was streamed, or
             the refit would not end before the packaging reserve.
         """
-        if context.services.spec.charter_path is not None:
+        if board.services.spec.charter_path is not None:
             return "a charter governs the run"
         if (
-            context.stream is not None
-            and context.services.spec.data.training == "stream"
+            board.get(ingestion.Intake).stream is not None
+            and board.services.spec.data.training == "stream"
         ):
             return "training was streamed"
-        split = scmle.pipeline.context.require(context.split, "split")
-        selected = scmle.pipeline.context.require(context.selected, "selected")
+        split = board.get(profiling.Partition).split
+        selected = products.require(
+            board.get(selecting.Choice).selected, "selected"
+        )
         developed = max(len(split.dev_features), 1)
-        return context.services.governor.overdue(
-            cost.refitcost(context, selected)
-            * (developed + tested)
-            / developed,
-            context.services.governor.reserve.parts.get("package", 0.0),
+        return board.services.governor.overdue(
+            cost.refitcost(board, selected) * (developed + tested) / developed,
+            board.services.governor.reserve.parts.get("package", 0.0),
         )
 
     def unlock(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         decision: records.Layout | None,
     ) -> tuple[pandas.DataFrame, pandas.Series]:
         """Opens the locked rows once, bound to the frozen selection.
@@ -352,26 +335,28 @@ class FinalEvaluationStage(summary.Summary):
         fingerprint.
 
         Args:
-            context: The run context, holding the split and the selection.
+            board: The run's board, holding the split and the selection.
             decision: The decision threshold the selection is frozen with.
 
         Returns:
             The test features and labels.
         """
-        split = scmle.pipeline.context.require(context.split, "split")
-        selected = scmle.pipeline.context.require(context.selected, "selected")
+        split = board.get(profiling.Partition).split
+        selected = products.require(
+            board.get(selecting.Choice).selected, "selected"
+        )
         locked = split.locked_test
         binding = scoring.pin(selected, decision)
         locked.bind(binding)
         features, target = locked.open(locked.mint(), binding)
         if (
-            context.services.spec.data.weight_column == tasks.FAIRNESS_WEIGHT
+            board.services.spec.data.weight_column == tasks.FAIRNESS_WEIGHT
             and tasks.FAIRNESS_WEIGHT not in features
         ):
             # Reweighing weights development rows only; locked rows carry a
             # neutral weight so the pipeline finds the column it expects.
             features = features.assign(**{tasks.FAIRNESS_WEIGHT: 1.0})
-        context.journal.emit(
+        board.journal.emit(
             "test.opened",
             "locked test set released once, after selection was frozen",
             data={

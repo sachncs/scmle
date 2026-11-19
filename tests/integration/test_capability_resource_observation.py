@@ -153,7 +153,7 @@ def test_bound_observation_is_used_by_the_capability_gate(monkeypatch):
         registry=scmle.models.registry.Catalog((classical.Dummy(),)),
         capability_registry=registry,
     )
-    context = project.new_context()
+    context = project.start()
     stages.IngestStage().execute(context)
     stages.ProfileStage().execute(context)
 

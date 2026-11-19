@@ -1,9 +1,10 @@
 """Workflow stages.
 
 Each `Stage` subclass owns one state of the run lifecycle and implements
-`execute`; the orchestrator treats them uniformly. Because stages only read
-and write a `Context`, the ingest/profile prefix is reused for the
-side-effect-free plan preview.
+`execute`; the orchestrator treats them uniformly. Because stages read
+their inputs from the run's board (`engine.Board`) and return their
+products, the ingest/profile prefix is reused for the side-effect-free plan
+preview.
 """
 
 import logging
@@ -21,6 +22,7 @@ from scmle.pipeline.stages.cost import TAIL_SECONDS
 from scmle.pipeline.stages.defaults import default_stages
 from scmle.pipeline.stages.examination import DIAGNOSTIC_BUDGET_SHARE
 from scmle.pipeline.stages.examination import DIAGNOSTIC_MIN_SECONDS
+from scmle.pipeline.stages.exploration import coverage_on_confirmation
 from scmle.pipeline.stages.exploration import Escrow
 from scmle.pipeline.stages.exploration import governing
 from scmle.pipeline.stages.ingestion import IngestStage
@@ -35,7 +37,6 @@ from scmle.pipeline.stages.profiling import ProfileStage
 from scmle.pipeline.stages.scoring import appraise
 from scmle.pipeline.stages.scoring import choose_decision_threshold
 from scmle.pipeline.stages.scoring import COVERAGE_LEVELS
-from scmle.pipeline.stages.scoring import coverage_on_confirmation
 from scmle.pipeline.stages.scoring import decisional
 from scmle.pipeline.stages.scoring import MATRIX_DIMENSIONS
 from scmle.pipeline.stages.scoring import pin

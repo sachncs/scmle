@@ -14,6 +14,8 @@ from scmle.artifacts import claims_audit
 from scmle.contracts import tasks
 from scmle.monitoring import abtest
 from scmle.monitoring import events
+from scmle.pipeline.stages import examination
+from scmle.pipeline.stages import profiling
 
 
 def arm(seed):
@@ -204,15 +206,21 @@ def test_a_failed_attestation_check_keeps_its_reason(monkeypatch, caplog):
     monkeypatch.setattr(release, "faults", lambda outcome, plan: outcome)
     monkeypatch.setattr(release, "certify", lambda outcome, *args: outcome)
     monkeypatch.setattr(release, "countersign", lambda outcome, *args: outcome)
-    context = types.SimpleNamespace(
+    partition = types.SimpleNamespace(
         task=tasks.Task.REGRESSION,
         metric=types.SimpleNamespace(name="rmse", greater_is_better=False),
+    )
+    held = {
+        profiling.Partition: partition,
+        examination.Readings: examination.Readings(),
+    }
+    context = types.SimpleNamespace(
+        get=held.__getitem__,
         services=types.SimpleNamespace(
             spec=types.SimpleNamespace(
                 problem=types.SimpleNamespace(success_criteria={"rmse": 1.0})
             )
         ),
-        diagnostics={},
     )
     store = types.SimpleNamespace(write_json=lambda name, document: None)
     evaluation = {"test_metrics": {}}

@@ -12,9 +12,10 @@ import operator
 
 from scmle.contracts import experiments
 from scmle.optimization import optimizers
+from scmle.pipeline import engine
 from scmle.pipeline import hyperband
+from scmle.pipeline import products
 from scmle.pipeline import trials
-import scmle.pipeline.context
 
 
 class Tuner(hyperband.Hyperband):
@@ -24,25 +25,24 @@ class Tuner(hyperband.Hyperband):
     `hyperband.Hyperband`'s.
 
     Attributes:
-        context: Run context.
+        board: Run board.
         runner: Trial runner used for every evaluation.
         search: The effective search specification.
         metric: The metric being optimized.
     """
 
-    def __init__(
-        self, context: scmle.pipeline.context.Context, runner: trials.Runner
-    ) -> None:
+    def __init__(self, board: engine.Board, runner: trials.Runner) -> None:
         """Initializes the tuner.
 
         Args:
-            context: Run context (spec, registry, metric, deadline).
-            runner: Trial runner used for every evaluation.
+            board: Run board (spec, registry, deadline).
+            runner: Trial runner used for every evaluation, holding the
+                metric.
         """
-        self.context = context
+        self.board = board
         self.runner = runner
-        self.search = context.services.spec.budgeted()
-        self.metric = scmle.pipeline.context.require(context.metric, "metric")
+        self.search = board.services.spec.budgeted()
+        self.metric = runner.metric
 
     def shortlist(
         self, screened: list[experiments.Trial]
@@ -63,7 +63,7 @@ class Tuner(hyperband.Hyperband):
         sign = 1 if self.metric.greater_is_better else -1
         adopted = {
             d.technique
-            for d in self.context.journal.outcomes
+            for d in self.board.journal.outcomes
             if d.action is experiments.Edict.INCLUDE
         }
         ok = [
@@ -77,7 +77,7 @@ class Tuner(hyperband.Hyperband):
             )
         ]
         ranked = sorted(ok, key=lambda t: -sign * t.score_mean)
-        registry = self.context.services.registry
+        registry = self.board.services.registry
         chosen: dict[str, str] = {}
         for trial in ranked:
             tunable = registry.get(trial.model_name).search_space is not None
@@ -86,7 +86,7 @@ class Tuner(hyperband.Hyperband):
         return list(chosen.items())[: self.search.top_models]
 
     def tune(self, screened: list[experiments.Trial]) -> None:
-        """Searches the most promising candidates; results go to the context.
+        """Searches the most promising candidates; results go to the board.
 
         Args:
             screened: Default-configuration trials from earlier steps.
@@ -105,15 +105,15 @@ class Tuner(hyperband.Hyperband):
             index: Position of the model among those tuned; offsets the
                 optimizer seed.
         """
-        context, search = self.context, self.search
-        space = scmle.pipeline.context.require(
-            context.services.registry.get(name).search_space,
+        board, search = self.board, self.search
+        space = products.require(
+            board.services.registry.get(name).search_space,
             f"{name}.search_space",
         )
         optimizer = optimizers.instantiate(
             search.optimizer,
             space,
-            context.services.spec.validation.seed + index,
+            board.services.spec.validation.seed + index,
             self.metric.greater_is_better,
         )
         if search.pruning == "hyperband":
@@ -124,13 +124,13 @@ class Tuner(hyperband.Hyperband):
         )
         remaining = search.configs_per_model
         while remaining > 0:
-            reason = context.services.governor.skip_reason(first=False)
+            reason = board.services.governor.skip_reason(first=False)
             if reason:
-                context.journal.forgo(
+                board.journal.forgo(
                     f"tuning {name}: {remaining} configurations", reason
                 )
                 return
-            context.services.check()
+            board.services.check()
             size = min(batch_size, remaining)
             remaining -= size
             self.run_batch(name, strategy, optimizer, size)
@@ -158,7 +158,7 @@ class Tuner(hyperband.Hyperband):
         proposals = list(
             map(operator.call, itertools.repeat(optimizer.ask, size))
         )
-        ids = self.context.journal.allocate(len(proposals))
+        ids = self.board.journal.allocate(len(proposals))
         first_rung = self.runner.run_many(
             [
                 trials.Job(trial_id, name, params, rung_folds, strategy)
@@ -182,7 +182,7 @@ class Tuner(hyperband.Hyperband):
             }
         for trial in first_rung:
             if trial.status is not experiments.Termination.OK:
-                self.context.journal.transcribe(trial)
+                self.board.journal.transcribe(trial)
             elif survivors is None:
                 self.complete(trial, optimizer)
             elif trial.trial_id in finished:

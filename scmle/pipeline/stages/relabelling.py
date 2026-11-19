@@ -5,9 +5,11 @@ from typing import Any
 from scmle.contracts import experiments
 from scmle.contracts import records
 import scmle.evaluation.metrics
-import scmle.pipeline.context
+from scmle.pipeline import engine
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import examination
+from scmle.pipeline.stages import labelling
+from scmle.pipeline.stages import profiling
 from scmle.pipeline.stages import remedy
 from scmle.preparation import pseudo_labeling
 from scmle.preparation import strategies
@@ -22,7 +24,7 @@ class Relabelling(remedy.Remedy):
 
     def pseudolabel(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         selected: experiments.Trial,
         pipeline: Any,
     ) -> tuple[Any, examination.Pseudolabels]:
@@ -33,7 +35,7 @@ class Relabelling(remedy.Remedy):
         asks for pseudo-labeling and unlabeled rows exist.
 
         Args:
-            context: The run context, holding the unlabeled rows and split.
+            board: The run's board, holding the unlabeled rows and split.
             selected: The selected trial, used to build the template model.
             pipeline: The fitted final model.
 
@@ -44,20 +46,19 @@ class Relabelling(remedy.Remedy):
             confident rows); and the judgement's record
             (`examination.Pseudolabels`), empty when none was made.
         """
-        data = context.services.spec.data
-        unlabeled = context.unlabeled
+        data = board.services.spec.data
+        unlabeled = board.get(labelling.Resolution).unlabeled
         if data.unlabeled != "pseudo_label" or unlabeled is None:
             return pipeline, examination.Pseudolabels()
-        split = scmle.pipeline.context.require(context.split, "split")
-        task = scmle.pipeline.context.require(context.task, "task")
-        metric = scmle.pipeline.context.require(context.metric, "metric")
+        partition = board.get(profiling.Partition)
+        split = partition.split
+        task = partition.task
+        metric = partition.metric
         template = strategies.lookup(selected.strategy).build(
-            scmle.pipeline.context.require(
-                context.profile, "profile"
-            ).feature_plan,
-            context.services.registry.get(selected.model_name),
+            partition.profile.feature_plan,
+            board.services.registry.get(selected.model_name),
             task,
-            context.services.spec.validation.seed,
+            board.services.spec.validation.seed,
             selected.params,
         )
         outcome = pseudo_labeling.judge(
@@ -71,9 +72,9 @@ class Relabelling(remedy.Remedy):
             ),
             data.pseudo_label_confidence,
             lambda: bool(
-                context.services.governor.overdue(
+                board.services.governor.overdue(
                     cost.foldcost(selected),
-                    context.services.governor.reserve.parts.get("package", 0.0),
+                    board.services.governor.reserve.parts.get("package", 0.0),
                 )
             ),
         )

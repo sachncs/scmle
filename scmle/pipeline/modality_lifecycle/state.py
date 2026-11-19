@@ -102,23 +102,6 @@ class Proof(products.Derived):
         """The stage's evidence, which the checkpoint digests."""
         return self.evidence
 
-    @classmethod
-    def capture(cls, board: object) -> Proof:
-        """Reads the product from the board after its stage ran.
-
-        Args:
-            board: The lifecycle `Board`.
-
-        Returns:
-            The product.
-
-        Raises:
-            KindError: If `board` is not a lifecycle board.
-        """
-        if not isinstance(board, Board):
-            raise errors.KindError("a lifecycle product is read from a Board")
-        return board.get(cls)
-
     def apply(self, board: object) -> None:
         """Adds the product to the lifecycle board.
 

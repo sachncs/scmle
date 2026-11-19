@@ -61,7 +61,7 @@ def runner(monkeypatch, budget, reserve):
         )
     )
     built = trials.Runner.__new__(trials.Runner)
-    built.context = context
+    built.board = context
     built.folds = [([0], [1])]
     built.metric = SimpleNamespace(name="accuracy")
     monkeypatch.setattr(
@@ -96,7 +96,7 @@ def test_a_strategy_search_the_window_cannot_hold_is_skipped_on_record():
         tasks.Resources(time_budget_seconds=10), started_at=0.0
     )
     recorded = []
-    context = SimpleNamespace(
+    board = SimpleNamespace(
         services=SimpleNamespace(
             spec=SimpleNamespace(
                 effective=lambda: SimpleNamespace(names=["smote"], top_models=1)
@@ -104,16 +104,18 @@ def test_a_strategy_search_the_window_cannot_hold_is_skipped_on_record():
             registry=SimpleNamespace(adapters={}),
             governor=governor,
         ),
-        metric=SimpleNamespace(greater_is_better=True),
-        task=tasks.Task.BINARY,
-        profile=object(),
         journal=SimpleNamespace(
             forgo=lambda work, reason: recorded.append((work, reason))
         ),
     )
+    runner = SimpleNamespace(
+        metric=SimpleNamespace(greater_is_better=True),
+        task=tasks.Task.BINARY,
+        profile=object(),
+    )
     leader = experiments.Trial(
         "t1", "knn", experiments.Termination.OK, "accuracy", 0.9, 0.0, [0.9]
     )
-    strategy_search.Strategist(context, None).search([leader])
+    strategy_search.Strategist(board, runner).search([leader])
     assert recorded and recorded[0][0] == "strategy search for knn"
     assert "trial window" in recorded[0][1]

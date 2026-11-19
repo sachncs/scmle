@@ -5,6 +5,7 @@ import types
 
 import pytest
 
+from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.pipeline import products
 from scmle.pipeline.stages import ingestion
@@ -27,7 +28,7 @@ def search():
     )
 
 
-def test_a_kept_product_loads_back_equal_and_applies_to_a_board(
+def test_a_kept_product_loads_back_equal_and_applies_only_to_a_run(
     keyed, tmp_path
 ):
     path = tmp_path / "04-trainstage.product"
@@ -35,10 +36,8 @@ def test_a_kept_product_loads_back_equal_and_applies_to_a_board(
     digest = made.save(path)
     loaded = training.Search.load(path, digest)
     assert loaded == made
-    board = types.SimpleNamespace()
-    loaded.apply(board)
-    assert board.trial_counter == 1
-    assert training.Search.capture(board) == made
+    with pytest.raises(errors.KindError, match="run's board"):
+        loaded.apply(types.SimpleNamespace(made={}))
 
 
 def test_an_unsigned_product_is_never_unpickled(monkeypatch, tmp_path):

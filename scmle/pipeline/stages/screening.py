@@ -10,9 +10,9 @@ from scmle.assurance.charter import ingest
 from scmle.assurance.charter import sealing
 from scmle.contracts import errors
 from scmle.contracts import tasks
+from scmle.pipeline import engine
 from scmle.pipeline import ingest_stage
 from scmle.pipeline import products
-import scmle.pipeline.context
 from scmle.pipeline.stages import surveying
 
 LOGGER = logging.getLogger(__name__)
@@ -100,7 +100,7 @@ class Screening(surveying.Surveying):
             )
 
     def synthesize(
-        self, context: scmle.pipeline.context.Context, frame: pandas.DataFrame
+        self, board: engine.Board, frame: pandas.DataFrame
     ) -> Screen:
         """Adds the synthesized features before the data are split.
 
@@ -112,7 +112,7 @@ class Screening(surveying.Surveying):
         totals, block the run (the ingest stage raises `BlockedError`).
 
         Args:
-            context: The run context, holding the specification and run store.
+            board: The run's board, holding the specification and run store.
             frame: The loaded data.
 
         Returns:
@@ -124,8 +124,8 @@ class Screening(surveying.Surveying):
             ConfigError: If only one of the ingest plan and the charter block
                 is set, or a synthesized name collides with a column.
         """
-        data = context.services.spec.data
-        path = context.services.spec.charter_path
+        data = board.services.spec.data
+        path = board.services.spec.charter_path
         block = (
             sealing.read_verified(str(path)).charter.ingest if path else None
         )
@@ -144,8 +144,8 @@ class Screening(surveying.Surveying):
             ingest_stage.recipe(data.ingest_plan),
             block,
             frame,
-            context.services.store.directory
-            if context.services.store is not None
+            board.services.store.directory
+            if board.services.store is not None
             else None,
         )
         clash = sorted(set(result.features.columns) & set(frame.columns))
@@ -157,10 +157,10 @@ class Screening(surveying.Surveying):
             [frame.reset_index(drop=True), result.features], axis=1
         )
         if block.entity is not None:
-            merged = self.regroup(context, block.entity, merged)
+            merged = self.regroup(board, block.entity, merged)
         for name, document in result.documents.items():
-            context.journal.write_json(name, document)
-        context.journal.emit(
+            board.journal.write_json(name, document)
+        board.journal.emit(
             "ingest.completed",
             f"{result.declared} features synthesized through the as-of views",
             (ingest_stage.MANIFEST, ingest_stage.PROVENANCE),
@@ -170,14 +170,14 @@ class Screening(surveying.Surveying):
 
     def regroup(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         entity: ingest.Entity,
         frame: pandas.DataFrame,
     ) -> pandas.DataFrame:
         """Makes the resolved entity the split's group column.
 
         Args:
-            context: The run context; its specification gains the group column.
+            board: The run's board; its specification gains the group column.
             entity: The charter's entity block.
             frame: The data with the synthesized features.
 
@@ -188,7 +188,7 @@ class Screening(surveying.Surveying):
             ConfigError: If the data spec names a group column, or the
                 resolved column collides with a column of the table.
         """
-        data = context.services.spec.data
+        data = board.services.spec.data
         if data.group_column:
             raise errors.ConfigError(
                 f"data.group_column {data.group_column!r} conflicts with the "
@@ -202,8 +202,8 @@ class Screening(surveying.Surveying):
             )
         groups, document = ingest_stage.resolve_entities(frame, entity)
         frame = frame.assign(**{entity.column: groups})
-        context.amend(
-            context.services.spec.model_copy(
+        board.amend(
+            board.services.spec.model_copy(
                 update={
                     "data": data.model_copy(
                         update={"group_column": entity.column}
@@ -211,8 +211,8 @@ class Screening(surveying.Surveying):
                 }
             )
         )
-        context.journal.write_json("entity_resolution.json", document)
-        context.journal.emit(
+        board.journal.write_json("entity_resolution.json", document)
+        board.journal.emit(
             "ingest.entities",
             f"{document['records']} rows resolved to {document['groups']} "
             f"entities; the split groups by {entity.column!r}",

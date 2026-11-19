@@ -10,8 +10,8 @@ from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import governed
 from scmle.causal import claim
 import scmle.causal.identification.run
+from scmle.pipeline import engine
 from scmle.pipeline import products
-import scmle.pipeline.context
 from scmle.pipeline.stages import qualification
 
 
@@ -19,7 +19,7 @@ from scmle.pipeline.stages import qualification
 class Estimand(products.Derived):
     """The identified causal claim of a charter run.
 
-    Its documents are in the run directory; no context field holds it.
+    Its documents are in the run directory.
 
     Attributes:
         status: The claim's status (`causal_claims.json`).
@@ -31,14 +31,6 @@ class Estimand(products.Derived):
     status: str
     tier: str
     estimated: bool
-
-    def apply(self, board: object) -> None:
-        """Sets nothing: no context field holds the claim.
-
-        Args:
-            board: The run context; unchanged.
-        """
-        del board
 
     def summary(self) -> object:
         """What the identification concluded.
@@ -58,7 +50,7 @@ class Identification(qualification.Qualification):
 
     def ground(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         charter: contracts.AnalysisCharter,
         view: Any,
     ) -> None:
@@ -70,16 +62,16 @@ class Identification(qualification.Qualification):
         nothing in the run is gated on it.
 
         Args:
-            context: The run context that stores the report.
+            board: The run's board that stores the report.
             charter: The analysis charter whose target, moment and unit are
                 matched.
             view: The exploration view, supplying the column names.
         """
-        data = context.services.spec.data
+        data = board.services.spec.data
         columns = [*view.features.columns, data.target]
         document = draft.linkage(charter, columns)
-        context.journal.write_json("framing_link.json", document)
-        context.journal.emit(
+        board.journal.write_json("framing_link.json", document)
+        board.journal.emit(
             "framing.completed",
             "the charter's target, moment and unit were matched to columns",
             ("framing_link.json",),
@@ -88,7 +80,7 @@ class Identification(qualification.Qualification):
 
     def hypothesise(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         charter: contracts.AnalysisCharter,
         view: Any,
         graph: Any,
@@ -103,7 +95,7 @@ class Identification(qualification.Qualification):
         family; nothing opens `C` for them.
 
         Args:
-            context: The run context, supplying the target name.
+            board: The run's board, supplying the target name.
             charter: The analysis charter, with its causal block and budget.
             view: The exploration view (features and target).
             graph: The declared DAG, or None.
@@ -118,11 +110,11 @@ class Identification(qualification.Qualification):
         if block is None:
             return None
         frame = view.features.copy()
-        frame[context.services.spec.data.target] = view.target
+        frame[board.services.spec.data.target] = view.target
         return claim.rig(
             block,
             frame,
-            context.services.spec.data.target,
+            board.services.spec.data.target,
             charter.budget,
             dag=graph,
             seed=charter.seed,
@@ -132,7 +124,7 @@ class Identification(qualification.Qualification):
 
     def identify(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         charter: contracts.AnalysisCharter,
         view: Any,
         run: governed.Governance,
@@ -151,7 +143,7 @@ class Identification(qualification.Qualification):
         is `unverified` or `not_identified` with no estimate.
 
         Args:
-            context: The run context that stores the documents.
+            board: The run's board that stores the documents.
             charter: The analysis charter.
             view: The exploration view (features and target).
             run: The governed run, holding the confirmation's documents.
@@ -167,7 +159,7 @@ class Identification(qualification.Qualification):
         documents = run.confirmation.documents
         if claim.CLAIM_FILE in documents:
             claims = documents[claim.CLAIM_FILE]
-            context.journal.emit(
+            board.journal.emit(
                 "identification.completed",
                 f"causal claim status {claims['status']}, tier {claims['tier']}"
                 " (estimated on the single opening of C)",
@@ -180,7 +172,7 @@ class Identification(qualification.Qualification):
             )
             return Estimand(claims["status"], claims["tier"], estimated=True)
         frame = view.features.copy()
-        frame[context.services.spec.data.target] = view.target
+        frame[board.services.spec.data.target] = view.target
         outcome = scmle.causal.identification.run.design_only(
             block,
             frame,
@@ -190,9 +182,9 @@ class Identification(qualification.Qualification):
             dag_checks=found.dag,
         )
         for name, document in outcome.documents.items():
-            context.journal.write_json(name, document)
+            board.journal.write_json(name, document)
         claims = outcome.documents["causal_claims.json"]
-        context.journal.emit(
+        board.journal.emit(
             "identification.completed",
             f"causal claim status {claims['status']}, tier {claims['tier']}",
             tuple(outcome.documents),

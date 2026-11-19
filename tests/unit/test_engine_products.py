@@ -12,6 +12,7 @@ import dataclasses
 
 import pytest
 
+from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.pipeline import archive
 from scmle.pipeline import engine
@@ -40,10 +41,13 @@ class Regulator:
 class Board:
     def __init__(self, origin):
         self.origin = origin
-        self.seed = None
-        self.count = None
+        self.made = {}
         self.ran = []
         self.regulator = Regulator()
+
+    @property
+    def count(self):
+        return self.made[Tally].count
 
     def check_cancelled(self):
         pass
@@ -59,7 +63,7 @@ class First:
 
     def execute(self, context):
         context.ran.append("First")
-        context.seed = context.origin
+        return Source(context.origin)
 
 
 class Second:
@@ -72,7 +76,7 @@ class Second:
 
     def execute(self, context):
         context.ran.append("Second")
-        context.count = context.seed * 10
+        return Tally(context.made[Source].seed * 10)
 
 
 @pytest.fixture(autouse=True)
@@ -126,3 +130,13 @@ def test_a_product_file_that_changed_is_not_loaded(tmp_path):
     board, pipeline = attempt(tmp_path, 2)
     assert board.ran == ["First", "Second"]
     assert pipeline.restored == []
+
+
+class Silent(First):
+    def execute(self, context):
+        context.ran.append("Silent")
+
+
+def test_a_stage_that_returns_no_declared_product_is_refused():
+    with pytest.raises(errors.KindError, match="Silent returned NoneType"):
+        engine.Pipeline((Silent(),)).advance(Board(1))

@@ -12,8 +12,10 @@ from scmle.contracts import records
 from scmle.contracts import tasks
 from scmle.decision import reports
 from scmle.evaluation import coverage
-import scmle.pipeline.context
+from scmle.pipeline import engine
 from scmle.pipeline.stages import examination
+from scmle.pipeline.stages import exploration
+from scmle.pipeline.stages import profiling
 from scmle.pipeline.stages import relabelling
 from scmle.pipeline.stages import scoring
 
@@ -25,7 +27,7 @@ class Reporting(relabelling.Relabelling):
     abstract, never run on its own.
     """
 
-    def pledge(self, context: scmle.pipeline.context.Context) -> str | None:
+    def pledge(self, board: engine.Board) -> str | None:
         """Fixes and hashes the coverage claim before the final rows open.
 
         Written to `coverage_claim.json`, announced by a `coverage.registered`
@@ -33,39 +35,40 @@ class Reporting(relabelling.Relabelling):
         stores no interval or set has no claim, and nothing is written.
 
         Args:
-            context: The run context whose journal stores the claim.
+            board: The run's board whose journal stores the claim.
 
         Returns:
             The claim's hash (`examination.Decision.claim`), or None when the
             task makes no claim.
         """
-        split = scmle.pipeline.context.require(context.split, "split")
+        partition = board.get(profiling.Partition)
+        split = partition.split
         charter_hash = None
-        if context.services.spec.charter_path:
+        if board.services.spec.charter_path:
             charter_hash = sealing.read_verified(
-                str(context.services.spec.charter_path)
+                str(board.services.spec.charter_path)
             ).charter_hash
         claim = coverage_run.claim_document(
-            task=scmle.pipeline.context.require(context.task, "task").value,
+            task=partition.task.value,
             levels=scoring.COVERAGE_LEVELS,
             tolerance=coverage.DEFAULT_TOLERANCE,
             split_fingerprint=split.manifest.fingerprint,
             charter_hash=charter_hash,
-            slice_columns=scoring.slicers(context),
+            slice_columns=scoring.slicers(board),
         )
         if claim is None:
             return None
         sha = scmle.assurance.ledger.ledger.digest(claim)
-        context.journal.write_json(coverage_run.CLAIM_FILE, claim)
-        vault = context.custody_vault
-        if vault is not None:
-            vault.log.append(
+        board.journal.write_json(coverage_run.CLAIM_FILE, claim)
+        custody = board.find(exploration.Custody)
+        if custody is not None:
+            custody.vault.log.append(
                 "final_test",
                 coverage_run.REGISTRATION_EVENT,
                 "scmle.coverage",
                 {"sha256": sha},
             )
-        context.journal.emit(
+        board.journal.emit(
             "coverage.registered",
             "coverage claim fixed before the final test rows are released",
             (coverage_run.CLAIM_FILE,),
@@ -73,28 +76,28 @@ class Reporting(relabelling.Relabelling):
         )
         return sha
 
-    def notarize(self, context: scmle.pipeline.context.Context) -> None:
+    def notarize(self, board: engine.Board) -> None:
         """Appends the hashes of the four decision files to the custody log.
 
         A file that does not exist is logged with a null hash. Does nothing
         without a custody vault or a stored run.
 
         Args:
-            context: The run context, holding the vault and the run directory.
+            board: The run's board, holding the vault and the run directory.
         """
-        vault = context.custody_vault
-        if vault is None or context.services.store is None:
+        custody = board.find(exploration.Custody)
+        if custody is None or board.services.store is None:
             return
-        vault.log.append(
+        custody.vault.log.append(
             "final_test",
             reports.REGISTRATION_EVENT,
             "scmle.decision",
-            {"files": reports.hashsums(context.services.store.directory)},
+            {"files": reports.hashsums(board.services.store.directory)},
         )
 
     def decide(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         pipeline: Any,
         features: pandas.DataFrame,
         target: pandas.Series,
@@ -110,22 +113,19 @@ class Reporting(relabelling.Relabelling):
         then logs the hashes of the decision files and emits an event.
 
         Args:
-            context: The run context that stores the reports.
+            board: The run's board that stores the reports.
             pipeline: The fitted final model.
             features: The released rows.
             target: The labels of the released rows.
             decision: The chartered threshold and its net-benefit report.
         """
-        charter = scoring.decisional(context)
+        charter = scoring.decisional(board)
         if charter is None or charter.decision is None:
             return
-        if (
-            scmle.pipeline.context.require(context.task, "task")
-            is not tasks.Task.BINARY
-        ):
+        if board.get(profiling.Partition).task is not tasks.Task.BINARY:
             return
         layer = charter.decision
-        data = context.services.spec.data
+        data = board.services.spec.data
         positive = pipeline.classes_[1]
         outcome = (target == positive).to_numpy(dtype=float)
         actions = (
@@ -155,11 +155,11 @@ class Reporting(relabelling.Relabelling):
             None if built is None else built[0],
         )
         written = self.deposit(
-            context, value, decision.threshold, decision.benefit, built
+            board, value, decision.threshold, decision.benefit, built
         )
-        context.journal.write_json("decision_report.json", report)
-        self.notarize(context)
-        context.journal.emit(
+        board.journal.write_json("decision_report.json", report)
+        self.notarize(board)
+        board.journal.emit(
             "decision.reported",
             "policy value, fairness satisfaction and rollout design written",
             tuple(written),
@@ -186,7 +186,7 @@ class Reporting(relabelling.Relabelling):
 
     def deposit(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         value: records.Layout,
         decision: records.Layout | None,
         net_benefit: records.Layout | None,
@@ -195,7 +195,7 @@ class Reporting(relabelling.Relabelling):
         """Writes the policy value, threshold, net-benefit and rollout files.
 
         Args:
-            context: The run context that stores the files.
+            board: The run's board that stores the files.
             value: The policy value.
             decision: The chartered threshold description, or None.
             net_benefit: The net-benefit report, or None.
@@ -205,20 +205,20 @@ class Reporting(relabelling.Relabelling):
             The decision files, with `decision_report.json` (written later)
             first.
         """
-        context.journal.write_json(reports.POLICY_FILE, value)
+        board.journal.write_json(reports.POLICY_FILE, value)
         written = ["decision_report.json", reports.POLICY_FILE]
         if decision is not None:
-            context.journal.write_json(reports.THRESHOLD_FILE, decision)
+            board.journal.write_json(reports.THRESHOLD_FILE, decision)
             written.append(reports.THRESHOLD_FILE)
         if net_benefit is not None:
-            context.journal.write_json(reports.NET_BENEFIT_FILE, net_benefit)
+            board.journal.write_json(reports.NET_BENEFIT_FILE, net_benefit)
             written.append(reports.NET_BENEFIT_FILE)
         if built is not None:
             design, log = built
-            context.journal.write_json("rollout_design.json", design)
-            if context.services.store is not None:
+            board.journal.write_json("rollout_design.json", design)
+            if board.services.store is not None:
                 log.write(
-                    context.services.store.directory / "rollout_decisions.jsonl"
+                    board.services.store.directory / "rollout_decisions.jsonl"
                 )
             written += ["rollout_design.json", "rollout_decisions.jsonl"]
         return written

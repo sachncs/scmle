@@ -12,9 +12,9 @@ from scmle.data import feature_graph
 from scmle.data.readers import streaming
 from scmle.data.readers import tabular
 import scmle.data.readers.registry
+from scmle.pipeline import engine
 from scmle.pipeline import kinds
 from scmle.pipeline import products
-import scmle.pipeline.context
 from scmle.pipeline.stages import interface
 from scmle.preparation import forecasting
 import scmle.runtime.state
@@ -64,19 +64,19 @@ class IngestStage(interface.Stage):
 
     def describe(
         self,
-        context: scmle.pipeline.context.Context,  # noqa: ARG002 -- Stage.describe
+        board: engine.Board,  # noqa: ARG002 -- Stage.describe
     ) -> str:
         """Names the stage.
 
         Args:
-            context: The run context; not consulted.
+            board: The run's board; not consulted.
 
         Returns:
             The text "ingest dataset".
         """
         return "ingest dataset"
 
-    def execute(self, context: scmle.pipeline.context.Context) -> Intake:
+    def execute(self, board: engine.Board) -> Intake:
         """Loads the data, records its manifest and applies the feature graph.
 
         An in-memory input frame is copied; otherwise the data's kind reads
@@ -88,7 +88,7 @@ class IngestStage(interface.Stage):
         raise `ConfigError` (through `enrol` and `forbid`).
 
         Args:
-            context: The run context; the intake is applied to it, so a
+            board: The run's board; the intake is applied to it, so a
                 caller that runs the stage outside the engine finds it there.
 
         Returns:
@@ -98,23 +98,23 @@ class IngestStage(interface.Stage):
             UnsupportedError: If no in-memory frame was supplied and no kind
                 is registered for the declared modality (`kinds.pick`).
         """
-        spec = context.services.spec
+        spec = board.services.spec
         data = spec.data
-        started = context.services.clock.monotonic()
+        started = board.services.clock.monotonic()
         stream = None
         kind: kinds.Kind = kinds.TABULAR
-        if context.services.input_frame is not None:
-            frame = context.services.input_frame.copy(deep=False)
+        if board.services.input_frame is not None:
+            frame = board.services.input_frame.copy(deep=False)
         else:
             kind = kinds.pick(data)
             frame, stream = kind.read(spec)
         if data.horizon:
             frame = forecasting.augment(frame, data)
-        seconds = context.services.clock.monotonic() - started
+        seconds = board.services.clock.monotonic() - started
         manifest = tabular.manifested(
             frame, data.target, data.uri, data.modality
         )
-        self.enrol(context, manifest, frame)
+        self.enrol(board, manifest, frame)
         frame, infinite = tabular.sanitize(frame)
         notes = [
             f"column '{name}': {count} infinite value(s) treated as missing"
@@ -126,32 +126,30 @@ class IngestStage(interface.Stage):
                 f"streamed {totals.rows} rows; {totals.development_sample} "
                 f"development rows kept in memory, {totals.locked} rows locked"
             )
-        frame = self.graph(context, frame)
-        self.forbid(context, manifest)
-        context.journal.write_json("dataset_manifest.json", manifest.to_dict())
-        context.journal.track(
+        frame = self.graph(board, frame)
+        self.forbid(board, manifest)
+        board.journal.write_json("dataset_manifest.json", manifest.to_dict())
+        board.journal.track(
             dataset_id=manifest.identifier, data_hash=manifest.digests["data"]
         )
         made = Intake(frame, manifest, notes, seconds, stream, kind)
-        made.apply(context)
+        made.apply(board)
         return made
 
     @staticmethod
-    def graph(
-        context: scmle.pipeline.context.Context, frame: pandas.DataFrame
-    ) -> pandas.DataFrame:
+    def graph(board: engine.Board, frame: pandas.DataFrame) -> pandas.DataFrame:
         """Applies the ordered nodes of the specification's feature graph.
 
         Args:
-            context: The run context, holding the specification.
+            board: The run's board, holding the specification.
             frame: The sanitised rows.
 
         Returns:
             The rows with the ordered graph columns, or `frame` itself when
             the graph has no nodes.
         """
-        data = context.services.spec.data
-        graph = context.services.spec.feature_graph
+        data = board.services.spec.data
+        graph = board.services.spec.feature_graph
         if not graph.nodes:
             return frame
         feature_graph.validate_graph(graph, set(frame.columns), data)
@@ -159,7 +157,7 @@ class IngestStage(interface.Stage):
         frame = feature_graph.Temporal(
             ordered, data.group_column, data.time_column
         ).apply(frame)
-        context.journal.emit(
+        board.journal.emit(
             "features.graph",
             f"feature graph v{graph.version} {graph.fingerprint()}",
             data={
@@ -171,7 +169,7 @@ class IngestStage(interface.Stage):
 
     def enrol(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         manifest: provenance.DatasetManifest,
         frame: pandas.DataFrame,
     ) -> None:
@@ -181,7 +179,7 @@ class IngestStage(interface.Stage):
         `source.snapshot` event.
 
         Args:
-            context: The run context, holding the run store.
+            board: The run's board, holding the run store.
             manifest: The dataset's identity.
             frame: The loaded data, whose column names and dtypes are recorded.
 
@@ -195,11 +193,11 @@ class IngestStage(interface.Stage):
                 str(name): str(dtype)
                 for name, dtype in zip(frame.columns, frame.dtypes, strict=True)
             },
-            context.services.clock.now().isoformat(),
+            board.services.clock.now().isoformat(),
         )
         registry = scmle.data.readers.registry.Sources()
-        if context.services.store is not None:
-            saved = context.services.store.path("source_registry.json")
+        if board.services.store is not None:
+            saved = board.services.store.path("source_registry.json")
             if saved.exists():
                 registry = scmle.data.readers.registry.Sources.from_json(
                     saved.read_text(encoding="utf-8")
@@ -217,8 +215,8 @@ class IngestStage(interface.Stage):
         record = registry.to_dict()
         record["current_snapshot_id"] = snapshot.snapshot
         record["schema_compatibility"] = compatibility.to_dict()
-        context.journal.write_json("source_registry.json", record)
-        context.journal.emit(
+        board.journal.write_json("source_registry.json", record)
+        board.journal.emit(
             "source.snapshot",
             "source identity and schema evolution recorded",
             ("source_registry.json",),
@@ -231,22 +229,22 @@ class IngestStage(interface.Stage):
 
     def forbid(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         manifest: provenance.DatasetManifest,
     ) -> None:
         """Rejects resuming trials computed on different data.
 
         Args:
-            context: The run context, holding the checkpoints.
+            board: The run's board, holding the checkpoints.
             manifest: The identity of the data just read.
 
         Raises:
             ConfigError: If the run has checkpoints and the data hash differs
                 from the one recorded when they were computed.
         """
-        if context.services.store is None or not context.services.checkpoints:
+        if board.services.store is None or not board.services.checkpoints:
             return
-        saved = context.services.store.path("dataset_manifest.json")
+        saved = board.services.store.path("dataset_manifest.json")
         if not saved.exists():
             return
         previous = provenance.DatasetManifest.from_dict(

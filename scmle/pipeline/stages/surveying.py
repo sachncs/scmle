@@ -12,9 +12,10 @@ from scmle.data.profiling import label_noise
 from scmle.data.profiling import representativeness
 from scmle.data.readers import tabular
 from scmle.evaluation import uplift
+from scmle.pipeline import engine
 from scmle.pipeline import products
 from scmle.pipeline import profiler
-import scmle.pipeline.context
+from scmle.pipeline.stages import ingestion
 from scmle.pipeline.stages import labelling
 
 
@@ -53,7 +54,7 @@ class Surveying(labelling.Labelling):
 
     def survey(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         spec: tasks.Config,
         task: tasks.Task,
         frame: pandas.DataFrame,
@@ -66,7 +67,7 @@ class Surveying(labelling.Labelling):
         """Profiles the development rows of a split.
 
         Args:
-            context: The run context, holding the manifest and cleaning notes.
+            board: The run's board, holding the intake and the resolution.
             spec: The project specification.
             task: The resolved task.
             frame: The whole loaded data.
@@ -81,19 +82,20 @@ class Surveying(labelling.Labelling):
         development = split.dev_features.assign(
             **{spec.data.target: split.dev_target}
         )
+        intake = board.get(ingestion.Intake)
+        notes = board.get(labelling.Resolution).notes
         profile = profiler.Profiler(spec).profile(
             development,
-            scmle.pipeline.context.require(context.manifest, "manifest"),
+            intake.manifest,
             task,
-            context.read_seconds,
+            intake.read_seconds,
             total_rows=len(frame),
         )
         profile = graft(spec, profile)
-        if context.cleaning_notes:
+        if notes:
             profile = dataclasses.replace(
                 profile,
-                quality_findings=profile.quality_findings
-                + tuple(context.cleaning_notes),
+                quality_findings=profile.quality_findings + tuple(notes),
             )
         profile = self.annotate(spec, task, development, profile)
         if task is not tasks.Task.UPLIFT:
@@ -114,7 +116,7 @@ class Surveying(labelling.Labelling):
 
     def curate(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         frame: pandas.DataFrame,
         development: pandas.DataFrame,
         profile: scmle.contracts.data.Portrait,
@@ -127,7 +129,7 @@ class Surveying(labelling.Labelling):
         because every observation is recorded as non-blocking (GATE-1).
 
         Args:
-            context: The run context, holding the intake; receives the
+            board: The run's board, holding the intake; receives the
                 artifacts written.
             frame: The whole loaded data.
             development: The development rows that were profiled.
@@ -136,18 +138,17 @@ class Surveying(labelling.Labelling):
         Returns:
             The portrait: the profile and its curation report.
         """
+        intake = board.get(ingestion.Intake)
         source_rows = (
-            context.stream[1].rows if context.stream is not None else len(frame)
+            intake.stream[1].rows if intake.stream is not None else len(frame)
         )
         curation = scmle.contracts.data.Curation(
-            manifest=scmle.pipeline.context.require(
-                context.manifest, "manifest"
-            ),
+            manifest=intake.manifest,
             source_rows=source_rows,
             profiled_rows=len(development),
-            read_seconds=context.read_seconds,
-            streamed=context.stream is not None,
-            cleaning_notes=tuple(context.cleaning_notes),
+            read_seconds=intake.read_seconds,
+            streamed=intake.stream is not None,
+            cleaning_notes=tuple(board.get(labelling.Resolution).notes),
             quality_findings=tuple(
                 scmle.contracts.data.Finding.glean(finding, "quality")
                 for finding in profile.quality_findings
@@ -164,10 +165,10 @@ class Surveying(labelling.Labelling):
             dropped_columns=profile.feature_plan.dropped,
         )
         card = scmle.contracts.data.Datasheet.distill(curation)
-        context.journal.write_json("dataset_profile.json", profile.to_dict())
-        context.journal.write_json("curation_report.json", curation.to_dict())
-        context.journal.write_json("dataset_card.json", card.to_dict())
-        context.journal.emit(
+        board.journal.write_json("dataset_profile.json", profile.to_dict())
+        board.journal.write_json("curation_report.json", curation.to_dict())
+        board.journal.write_json("dataset_card.json", card.to_dict())
+        board.journal.emit(
             "curation.completed",
             "dataset curation findings and feature decisions recorded",
             (

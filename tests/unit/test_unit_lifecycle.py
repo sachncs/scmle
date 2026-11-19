@@ -315,10 +315,7 @@ def test_a_board_hands_out_only_finished_products():
     made = state.Intake({"sample_count": 1})
     made.apply(board)
     assert board.get(state.Intake) is made
-    assert state.Intake.capture(board) is made
     assert made.summary() == {"sample_count": 1}
-    with pytest.raises(errors.KindError, match="read from a Board"):
-        state.Intake.capture(object())
     with pytest.raises(errors.KindError, match="applies to a Board"):
         made.apply(object())
     assert board.replaying(modalities.Phase.INGESTION) is False

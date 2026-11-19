@@ -11,10 +11,11 @@ the run's terminal state. With an archive it writes each stage's product and
 record once the stage and its review are done, and the completion marker
 after the completed state; on a resumed run a stage whose product the
 archive restores is not run again, its product is applied instead
-(`Archive.restore`). A stage that returns its product has it applied to the
+(`Archive.restore`). A stage returns its product, which is applied to the
 board (`Product.apply`), the one path by which a product enters the board
-whether the stage ran or was restored; a board that keeps products holds
-each one by type (`Product.hold`), and later stages read it from there.
+whether the stage ran or was restored; a stage that declares a product
+(`makes`) and returns another is refused. The tabular run's `Board` holds
+each product by type and later stages read it from there (`Board.get`).
 `Pipeline.advance(until=...)` runs only the stages a given stage needs,
 which is the side-effect-free plan preview. The tabular run and the
 modality lifecycle are two boards and two archives on this one engine: the
@@ -33,17 +34,21 @@ from typing import Any
 from typing import ClassVar
 from typing import Generic
 from typing import Protocol
+from typing import Self
 from typing import TypeVar
 
 from scmle.contracts import errors
 from scmle.contracts import records
+from scmle.contracts import tasks
 from scmle.pipeline import products
+import scmle.pipeline.journal
+import scmle.pipeline.services
 from scmle.runtime import engine
 from scmle.runtime import limits
 from scmle.runtime import state
 from scmle.runtime import tracing
 
-ContextT = TypeVar("ContextT", contravariant=True)  # noqa: PLC0105 -- no underscores (naming rule)
+BoardT = TypeVar("BoardT", contravariant=True)  # noqa: PLC0105 -- no underscores (naming rule)
 MadeT = TypeVar("MadeT")
 
 
@@ -55,11 +60,11 @@ class Regulator(Protocol):
         ...
 
 
-class Board(Protocol):
-    """What the engine needs of a run context: cancellation and a thread cap.
+class Holder(Protocol):
+    """What the engine needs of a run's state: cancellation and a thread cap.
 
-    The tabular run's context and the modality lifecycle's board
-    (`modality_lifecycle.state.Board`) are both boards.
+    The tabular run's `Board` and the modality lifecycle's board
+    (`modality_lifecycle.state.Board`) are both holders.
     """
 
     @property
@@ -72,7 +77,112 @@ class Board(Protocol):
         ...
 
 
-BoardT = TypeVar("BoardT", bound=Board)
+HolderT = TypeVar("HolderT", bound=Holder)
+ProductT = TypeVar("ProductT", bound=products.Product)
+
+
+@dataclasses.dataclass
+class Board:
+    """The state of a tabular run: its services, journal and products.
+
+    A stage reads its fixed inputs from `services`, records through
+    `journal`, and reads what the stages before it made with `get`; it
+    returns its own product, which the engine applies (`Product.apply`).
+    No stage sets an attribute on the board.
+
+    Attributes:
+        services: The run's fixed inputs and collaborators.
+        journal: Where the run's files, events, trials and decisions go.
+        made: The latest product of each type applied to the board.
+    """
+
+    services: scmle.pipeline.services.Services
+    journal: scmle.pipeline.journal.Journal
+    made: dict[type[products.Product], products.Product] = dataclasses.field(
+        default_factory=dict
+    )
+
+    @classmethod
+    def start(cls, given: scmle.pipeline.services.Services) -> Self:
+        """Starts the board of a run with an empty journal.
+
+        Args:
+            given: The run's services.
+
+        Returns:
+            A board with no products yet.
+        """
+        return cls(
+            given,
+            scmle.pipeline.journal.Journal(
+                given.spec, given.store, given.log, given.tracker
+            ),
+        )
+
+    def get(self, kind: type[ProductT]) -> ProductT:
+        """The latest product of a type, as its stage made or restored it.
+
+        Args:
+            kind: The product type.
+
+        Returns:
+            The product.
+
+        Raises:
+            OrderError: If no product of the type was applied yet.
+        """
+        found = self.find(kind)
+        if found is None:
+            raise errors.OrderError(f"{kind.__name__} is not made yet")
+        return found
+
+    def find(self, kind: type[ProductT]) -> ProductT | None:
+        """The latest product of a type, or None when none was applied.
+
+        Args:
+            kind: The product type.
+
+        Returns:
+            The product, or None.
+        """
+        found = self.made.get(kind)
+        return found if isinstance(found, kind) else None
+
+    @property
+    def regulator(self) -> limits.Governor:
+        """The governor, which caps the threads while a stage runs."""
+        return self.services.governor
+
+    def check_cancelled(self) -> None:
+        """Raises if cancellation was requested (`Services.check`).
+
+        Raises:
+            CancelledError: Carrying the run directory in its details.
+        """
+        self.services.check()
+
+    def amend(self, spec: tasks.Config) -> None:
+        """Replaces the specification the later stages read and events carry.
+
+        The charter's entity block and fairness reweighing amend the data
+        block this way.
+
+        Args:
+            spec: The amended specification.
+        """
+        self.services = dataclasses.replace(self.services, spec=spec)
+        self.journal.spec = spec
+
+    def close(self) -> None:
+        """Releases what the products hold, latest first (`Product.close`).
+
+        A preview still creates a locked test-set boundary during profiling.
+        The board owns that boundary until the caller has opened it or the
+        preview is finished, so every public path can close it
+        deterministically instead of relying on process garbage collection.
+        """
+        for product in reversed(list(self.made.values())):
+            product.close()
 
 
 class Archive(Protocol[MadeT]):
@@ -134,38 +244,38 @@ class Archive(Protocol[MadeT]):
         ...
 
 
-class Node(Protocol[ContextT]):
+class Node(Protocol[BoardT]):
     """The structural contract of a stage the engine can order and run.
 
     The engine depends on this protocol, not on the stage hierarchy, so a
-    replacement stage needs no base class. It is generic over the context
-    the stage reads and writes.
+    replacement stage needs no base class. It is generic over the board
+    the stage reads.
     """
 
     state: ClassVar[state.Progress]
     requires: ClassVar[tuple[type, ...]]
     makes: ClassVar[type[products.Product] | None]
 
-    def describe(self, context: ContextT) -> str:
+    def describe(self, board: BoardT) -> str:
         """Returns the reason recorded on entering the stage's state.
 
         Args:
-            context: The run context.
+            board: The run's board.
 
         Returns:
             The reason text attached to the state transition.
         """
         ...
 
-    def execute(self, context: ContextT) -> products.Product | None:
-        """Performs the stage, reading the context.
+    def execute(self, board: BoardT) -> products.Product | None:
+        """Performs the stage, reading the board.
 
         Args:
-            context: The run context.
+            board: The run's board.
 
         Returns:
-            The stage's product, which the engine applies to the context,
-            or None for a stage that sets the context itself.
+            The stage's product, which the engine applies to the board,
+            or None for a stage that declares none (`makes`).
         """
 
 
@@ -182,11 +292,11 @@ class Lap:
     memory: float
 
 
-Review = Callable[[state.Progress, BoardT], None]
+Review = Callable[[state.Progress, HolderT], None]
 """Consults the approval gates of a state once its last stage has run."""
 
 
-class Pipeline(Generic[BoardT]):
+class Pipeline(Generic[HolderT]):
     """Runs an ordered stage sequence under one state machine.
 
     Attributes:
@@ -205,7 +315,7 @@ class Pipeline(Generic[BoardT]):
 
     def __init__(
         self,
-        stages: Sequence[Node[BoardT]],
+        stages: Sequence[Node[HolderT]],
         records: Archive[products.Product] | None = None,
         dependency: engine.Dependency[Any] = engine.CLASSES,
     ) -> None:
@@ -223,7 +333,7 @@ class Pipeline(Generic[BoardT]):
         self.digests: dict[str, str | None] = {}
         self.restored: list[str] = []
 
-    def select(self, until: Hashable) -> tuple[Node[BoardT], ...]:
+    def select(self, until: Hashable) -> tuple[Node[HolderT], ...]:
         """Returns the stages meeting `until` and every stage they need.
 
         Args:
@@ -249,7 +359,7 @@ class Pipeline(Generic[BoardT]):
                 needed.append(stage)
         return tuple(stage for stage in self.stages if stage in needed)
 
-    def ancestry(self, stage: Node[BoardT]) -> dict[str, str | None]:
+    def ancestry(self, stage: Node[HolderT]) -> dict[str, str | None]:
         """The product digests of every stage `stage` needs, directly or not.
 
         Args:
@@ -268,19 +378,19 @@ class Pipeline(Generic[BoardT]):
 
     def advance(
         self,
-        context: BoardT,
+        board: HolderT,
         machine: state.Machine[state.Progress] | None = None,
-        review: Review[BoardT] | None = None,
+        review: Review[HolderT] | None = None,
         until: Hashable | None = None,
     ) -> None:
         """Runs the stages, or those `until` needs, without ending the run.
 
         With records, a stage whose product they restore is not executed:
-        its product is applied to the context, its state still entered and
+        its product is applied to the board, its state still entered and
         its review still consulted, and its record is kept as it is.
 
         Args:
-            context: The run context every stage reads and writes.
+            board: The run's board every stage reads and writes.
             machine: The run's state machine, or None for a preview.
             review: Approval gates, consulted after the last stage of each
                 state, or None.
@@ -288,18 +398,18 @@ class Pipeline(Generic[BoardT]):
         """
         stages = self.stages if until is None else self.select(until)
         for index, stage in enumerate(stages):
-            context.check_cancelled()
+            board.check_cancelled()
             name = self.dependency.title(stage)
             restored = self.restore(stage)
             if machine is not None and stage.state is not machine.state:
-                reason = stage.describe(context)
+                reason = stage.describe(board)
                 if restored is not None:
                     reason = f"{reason} (restored from its record)"
                 machine.transition(stage.state, reason)
             lap = Lap(0.0, 0.0)
             made: products.Product | None = None
             if restored is not None:
-                restored.apply(context)
+                restored.apply(board)
                 self.restored.append(name)
             else:
                 started = time.perf_counter()
@@ -307,11 +417,18 @@ class Pipeline(Generic[BoardT]):
                     tracing.TRACING.span(
                         f"stage {name}", {"scmle.stage": name}
                     ),
-                    context.regulator.cap(),
+                    board.regulator.cap(),
                 ):
-                    made = stage.execute(context)
+                    made = stage.execute(board)
+                if stage.makes is not None and not isinstance(
+                    made, stage.makes
+                ):
+                    raise errors.KindError(
+                        f"{name} returned {type(made).__name__}, not the "
+                        f"{stage.makes.__name__} it makes"
+                    )
                 if made is not None:
-                    made.apply(context)
+                    made.apply(board)
                 lap = Lap(
                     time.perf_counter() - started, limits.peak_memory_gb()
                 )
@@ -320,12 +437,7 @@ class Pipeline(Generic[BoardT]):
             if review is not None and (
                 following is None or following.state is not stage.state
             ):
-                review(stage.state, context)
-            if made is None and restored is None and stage.makes is not None:
-                # A stage that sets the context itself: its product is read
-                # back and held, so the stages after it read it as a product.
-                made = stage.makes.capture(context)
-                made.hold(context)
+                review(stage.state, board)
             if self.records is not None and restored is None:
                 needs = self.ancestry(stage)
                 record = self.records.record(
@@ -338,7 +450,7 @@ class Pipeline(Generic[BoardT]):
                 )
                 self.digests[name] = record["product"]
 
-    def restore(self, stage: Node[BoardT]) -> products.Product | None:
+    def restore(self, stage: Node[HolderT]) -> products.Product | None:
         """The product of a finished stage a resumed run need not run again.
 
         Args:
@@ -361,9 +473,9 @@ class Pipeline(Generic[BoardT]):
 
     def run(
         self,
-        context: BoardT,
+        board: HolderT,
         machine: state.Machine[state.Progress],
-        review: Review[BoardT],
+        review: Review[HolderT],
         details: Callable[[], dict[str, str | list[str]]],
         artifacts: tuple[str, ...] = (),
     ) -> None:
@@ -374,7 +486,7 @@ class Pipeline(Generic[BoardT]):
         has; a keyboard interrupt gets only `run_dir`).
 
         Args:
-            context: The run context every stage reads and writes.
+            board: The run's board every stage reads and writes.
             machine: The run's state machine.
             review: Approval gates, consulted after the last stage of each
                 state.
@@ -388,7 +500,7 @@ class Pipeline(Generic[BoardT]):
             ScmleError: If a stage fails; any other exception is wrapped in it.
         """
         try:
-            self.advance(context, machine, review)
+            self.advance(board, machine, review)
             machine.transition(
                 state.Progress.COMPLETED, "run complete", artifacts
             )

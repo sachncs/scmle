@@ -30,21 +30,32 @@ ESTIMATOR_MAX_LEAF_NODES = 31
 MAX_ROWS = 5000
 NOTE_RATE = 0.05
 BINARY_CLASSES = 2
-# Cost model of `contradict` (seconds, one thread), fitted 2026-11-17 on the
-# evidence tables (OMP_NUM_THREADS=1, two runs at a time):
-#   seconds = BASE + CLASS x C' + CELL x rows x columns,
-# C' the classes above two, else 1. The largest measured to predicted ratio
-# was 1.99 (a 1600-row, 30-column binary table, 0.36 s against 0.18 s), so
-# MARGIN = 2.0 makes the prediction an upper bound on every measured table.
-# A larger thread cap only finishes sooner.
+# Cost model of `contradict` (seconds, one thread):
+#   seconds = BASE + CLASS x C' + CELL x rows x columns x C',
+# C' the classes above two, else 1: the boosted model grows one tree per
+# class above two in every round, so the cell term grows with C' too.
+# BASE and CLASS were fitted 2026-11-17 on narrow evidence tables, where
+# the fixed cost dominates. CELL was fitted on narrow tables too (1.5e-7)
+# and so priced wide ones at a twentieth of their cost (gina: 8.8 s on
+# 2,522 x 970 cells, predicted 1.1 s). Remeasured 2026-11-19
+# (OMP_NUM_THREADS=1, CPU seconds, at most 4,000 rows) the seconds above
+# the fixed cost were 1.3e-6 to 3.14e-6 per cell and class way on wilt,
+# qsar-biodeg, APSFailure, Bioresponse, christine, mfeat-factors and
+# semeion (3.2e-6 by least squares on the profiler's runs, which bound at
+# 3.6e-6: `scmle.pipeline.profiler.NOISE_CELL`), so CELL is 3.6e-6. The
+# largest measured to predicted ratio is then 1.06 (the 1,600-row,
+# 30-column binary table, 0.36 s against 0.34 s), so MARGIN = 1.25 keeps
+# the prediction an upper bound on every measured table. A larger thread
+# cap only finishes sooner.
 BASE_SECONDS = 0.05
 CLASS_SECONDS = 0.12
-CELL_SECONDS = 1.5e-7
-MARGIN = 2.0
-# Share of the time budget the check may take. The costliest measured table
-# (1132 rows, 111 columns, 8 classes: 1.16 s) is predicted at 2.06 s, inside
-# the 3 s this share gives a 60 s budget, so every measured table is checked
-# on all its rows at B = 60 and a shorter budget checks a subsample.
+CELL_SECONDS = 3.6e-6
+MARGIN = 1.25
+# Share of the time budget the check may take. The costliest table of the
+# 2026-11-17 fit (1132 rows, 111 columns, 8 classes: 1.16 s) is predicted
+# at 5.8 s, past the 3 s this share gives a 60 s budget, so B = 60 checks
+# 434 of its rows; a shorter budget checks fewer, and a wide table below
+# `MIN_ROWS` affordable rows is skipped on record.
 SHARE = 0.05
 
 
@@ -158,12 +169,12 @@ def cost(rows: int, columns: int, classes: int) -> float:
         classes: Classes of the target.
 
     Returns:
-        `MARGIN x (BASE + CLASS x C' + CELL x rows x columns)`.
+        `MARGIN x (BASE + CLASS x C' + CELL x rows x columns x C')`.
     """
     return MARGIN * (
         BASE_SECONDS
         + CLASS_SECONDS * ways(classes)
-        + CELL_SECONDS * rows * columns
+        + CELL_SECONDS * rows * columns * ways(classes)
     )
 
 
@@ -183,7 +194,8 @@ def affordable(columns: int, classes: int, allowance: float) -> int:
         return 0
     # The relative nudge keeps an allowance computed by `cost` for some rows
     # from losing one row to rounding.
-    return int(spare / (CELL_SECONDS * max(columns, 1)) * (1 + 1e-9))
+    per = CELL_SECONDS * max(columns, 1) * ways(classes)
+    return int(spare / per * (1 + 1e-9))
 
 
 def contradict(

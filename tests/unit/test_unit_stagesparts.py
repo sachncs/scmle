@@ -1,7 +1,8 @@
 """The helper functions of the pipeline stages, one module at a time.
 
-The stages read a run context; each test stands one in with only the fields
-the helper reads, and a governor whose clock is a fixed number of seconds.
+The stages read a run's board; each test stands one in holding stand-ins for
+only the products the helper reads, and a governor whose clock is a fixed
+number of seconds.
 """
 
 import dataclasses
@@ -24,6 +25,8 @@ from scmle.pipeline.stages import admission
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import examination
 from scmle.pipeline.stages import exploration
+from scmle.pipeline.stages import labelling
+from scmle.pipeline.stages import profiling
 from scmle.pipeline.stages import reporting
 from scmle.pipeline.stages import scoring
 from scmle.pipeline.stages import selecting
@@ -62,19 +65,33 @@ class Governor:
         return None
 
 
+def holding(made, **fields):
+    """A board stand-in: products (or stand-ins) by type, and `fields`."""
+
+    def get(kind):
+        if kind not in made:
+            raise errors.OrderError(f"{kind.__name__} is not made yet")
+        return made[kind]
+
+    return types.SimpleNamespace(made=made, get=get, find=made.get, **fields)
+
+
 def context(seconds=100.0, folds=5, package=0.0, budget=60):
     recorded = []
     entered = []
-    return types.SimpleNamespace(
+    partition = types.SimpleNamespace(
+        split=types.SimpleNamespace(
+            manifest=types.SimpleNamespace(folds=[([0], [1])] * folds)
+        )
+    )
+    return holding(
+        {profiling.Partition: partition},
         services=types.SimpleNamespace(
             governor=Governor(seconds, package),
             spec=types.SimpleNamespace(
                 resources=types.SimpleNamespace(time_budget_seconds=budget)
             ),
             clock=services.Clock(),
-        ),
-        split=types.SimpleNamespace(
-            manifest=types.SimpleNamespace(folds=[([0], [1])] * folds)
         ),
         journal=types.SimpleNamespace(
             forgo=lambda work, reason: recorded.append((work, reason)),
@@ -97,8 +114,8 @@ def test_a_refit_scales_a_fold_by_k_over_k_minus_one():
     assert cost.refitcost(context(folds=2), trial()) == pytest.approx(6.0)
     assert cost.refitcost(context(folds=1), trial()) == pytest.approx(3.0)
     missing = context()
-    missing.split = None
-    with pytest.raises(errors.ScmleError, match="'split' is unavailable"):
+    missing.made.clear()
+    with pytest.raises(errors.OrderError, match="Partition"):
         cost.refitcost(missing, trial())
 
 
@@ -215,18 +232,11 @@ def test_dimensions_count_labelled_rows_features_and_classes():
     frame = pandas.DataFrame(
         {"a": [1, 2, 3, 4], "b": [1, 1, 1, 1], "y": [0, 1, None, 2], "z": 1}
     )
-    board = types.SimpleNamespace(
-        frame=frame,
-        services=types.SimpleNamespace(
-            spec=types.SimpleNamespace(
-                data=types.SimpleNamespace(target="y", targets=["z"])
-            )
-        ),
-        task=tasks.Task.MULTICLASS,
+    spec = types.SimpleNamespace(
+        data=types.SimpleNamespace(target="y", targets=["z"])
     )
-    assert cost.dimensions(board) == (3, 2, 3)
-    board.task = tasks.Task.REGRESSION
-    assert cost.dimensions(board) == (3, 2, 0)
+    assert cost.dimensions(spec, frame, tasks.Task.MULTICLASS) == (3, 2, 3)
+    assert cost.dimensions(spec, frame, tasks.Task.REGRESSION) == (3, 2, 0)
 
 
 def test_the_diagnostics_get_a_share_of_the_budget_capped_by_time_left():
@@ -293,18 +303,20 @@ def test_coverage_on_confirmation_needs_a_confirmatory_block():
 
     confirmatory = types.SimpleNamespace(confirmatory=True)
     assert (
-        scoring.coverage_on_confirmation(charter(None), tasks.Task.REGRESSION)
+        exploration.coverage_on_confirmation(
+            charter(None), tasks.Task.REGRESSION
+        )
         is False
     )
     assert (
-        scoring.coverage_on_confirmation(
+        exploration.coverage_on_confirmation(
             charter(types.SimpleNamespace(confirmatory=False)),
             tasks.Task.REGRESSION,
         )
         is False
     )
     assert (
-        scoring.coverage_on_confirmation(
+        exploration.coverage_on_confirmation(
             charter(confirmatory), tasks.Task.REGRESSION
         )
         is True
@@ -330,18 +342,19 @@ def test_freeze_needs_a_decision_layer():
 
 
 def test_no_threshold_is_chosen_outside_binary_tasks():
-    board = types.SimpleNamespace(
+    partition = types.SimpleNamespace(task=tasks.Task.REGRESSION)
+    board = holding(
+        {profiling.Partition: partition},
         services=types.SimpleNamespace(
             spec=types.SimpleNamespace(
                 decision=types.SimpleNamespace(threshold_objective="f1"),
                 charter_path=None,
             )
         ),
-        task=tasks.Task.REGRESSION,
     )
     fitted = object()
     assert scoring.choose_decision_threshold(board, fitted) == (fitted, None)
-    board.task = tasks.Task.BINARY
+    partition.task = tasks.Task.BINARY
     board.services.spec.decision.threshold_objective = "none"
     assert scoring.choose_decision_threshold(board, fitted) == (fitted, None)
 
@@ -352,8 +365,10 @@ def test_the_threshold_search_is_skipped_on_record_when_late():
         decision=types.SimpleNamespace(threshold_objective="f1"),
         charter_path=None,
     )
-    board.task = tasks.Task.BINARY
-    board.selected = trial(seconds=10.0)
+    board.made[profiling.Partition].task = tasks.Task.BINARY
+    board.made[selecting.Choice] = types.SimpleNamespace(
+        selected=trial(seconds=10.0)
+    )
     fitted = object()
     assert scoring.choose_decision_threshold(board, fitted) == (fitted, None)
     assert board.recorded == [("decision threshold", "needs 15.0 s of 0.5 s")]
@@ -401,7 +416,11 @@ def test_a_charter_run_hands_its_reuse_session_to_the_confirmation(
         causal=None,
         explored="explored",
     )
-    context = types.SimpleNamespace(
+    custody = types.SimpleNamespace(
+        vault=types.SimpleNamespace(sets={"C": "C"})
+    )
+    board = holding(
+        {exploration.Custody: custody},
         services=types.SimpleNamespace(
             spec=types.SimpleNamespace(
                 confirmation_rule="by",
@@ -409,13 +428,12 @@ def test_a_charter_run_hands_its_reuse_session_to_the_confirmation(
             ),
             store=None,
         ),
-        custody_vault=types.SimpleNamespace(sets={"C": "C"}),
     )
     # The stage is abstract; `conclude` reads nothing of its own before the
     # confirmation when no subject is given.
     with pytest.raises(ConcludedError) as caught:
         exploration.Exploration.conclude(
-            types.SimpleNamespace(), context, pending
+            types.SimpleNamespace(), board, pending
         )
     given = caught.value.args[0]
     assert given["policy"] == failure
@@ -493,13 +511,14 @@ def test_select_adds_the_rows_set_aside_as_unseen(monkeypatch):
         ),
     )
     view = types.SimpleNamespace(features=pandas.DataFrame({"b": [1, 0]}))
-    board = types.SimpleNamespace(unlabeled=pandas.DataFrame({"b": [1.0]}))
+    resolution = types.SimpleNamespace(unlabeled=pandas.DataFrame({"b": [1.0]}))
+    board = holding({labelling.Resolution: resolution})
     admission.select(board, view, "b")
     assert seen_calls[-1] == ([True, True, False], [1.0, 0.0, 1.0])
-    board.unlabeled = pandas.DataFrame({"other": [1.0]})
+    resolution.unlabeled = pandas.DataFrame({"other": [1.0]})
     admission.select(board, view, "b")
     assert seen_calls[-1] == ([True, True], [1.0, 0.0])
-    board.unlabeled = None
+    resolution.unlabeled = None
     admission.select(board, view, "b")
     assert seen_calls[-1] == ([True, True], [1.0, 0.0])
 
@@ -530,18 +549,19 @@ class Profile:
 
 def test_amend_replaces_the_profile_without_a_curation():
     written = {}
-    board = types.SimpleNamespace(
-        profile=Profile(None),
-        curation=None,
+    board = holding(
+        {surveying.Portrait: surveying.Portrait(Profile(None), None)},
         journal=types.SimpleNamespace(
             write_json=lambda path, body: written.update({path: body})
         ),
     )
     assert admission.amend(board, plan()) == []
-    assert board.profile == Profile(plan())
+    assert board.get(surveying.Portrait) == surveying.Portrait(
+        Profile(plan()), None
+    )
     assert written == {"dataset_profile.json": {"plan": ("a", "b")}}
-    board.profile = None
-    with pytest.raises(errors.ScmleError, match="'profile' is unavailable"):
+    board.made.clear()
+    with pytest.raises(errors.OrderError, match="Portrait"):
         admission.amend(board, plan())
 
 

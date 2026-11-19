@@ -9,7 +9,10 @@ from scmle.contracts import explanations
 from scmle.contracts import reliability
 import scmle.explainability.suite
 from scmle.governance import sbom
-import scmle.pipeline.context
+from scmle.pipeline import engine
+from scmle.pipeline.stages import examination
+from scmle.pipeline.stages import ingestion
+from scmle.pipeline.stages import profiling
 from scmle.pipeline.stages import releasing
 
 
@@ -22,7 +25,7 @@ class Documentation(releasing.Releasing):
 
     def explanation_evidence(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         store: Any,
     ) -> dict[str, dict[str, Any]]:
         """Persists portable evidence for explanations produced by the run.
@@ -31,7 +34,7 @@ class Documentation(releasing.Releasing):
         `explanations/`.
 
         Args:
-            context: The run context, holding the diagnostics, manifest and
+            board: The run's board, holding the diagnostics, manifest and
                 split.
             store: The run store; the evidence is written under `explanations/`.
 
@@ -39,7 +42,7 @@ class Documentation(releasing.Releasing):
             A mapping from diagnostic name to its evidence record, for each
             explanation diagnostic that ran without error and has a report.
         """
-        manifest = scmle.pipeline.context.require(context.manifest, "manifest")
+        manifest = board.get(ingestion.Intake).manifest
         model_manifest = store.path(
             f"model/{scmle.artifacts.bundle.MANIFEST_FILE}"
         )
@@ -50,8 +53,8 @@ class Documentation(releasing.Releasing):
             digest=manifest.digests["data"],
         )
         feature_graph = explanations.Lineage(
-            version=context.services.spec.feature_graph.version,
-            fingerprint=context.services.spec.feature_graph.fingerprint(),
+            version=board.services.spec.feature_graph.version,
+            fingerprint=board.services.spec.feature_graph.fingerprint(),
         )
         diagnostics_by_name = {
             diagnostic.name: diagnostic
@@ -59,7 +62,7 @@ class Documentation(releasing.Releasing):
         }
         evidence: dict[str, dict[str, Any]] = {}
         for name, diagnostic in diagnostics_by_name.items():
-            result = context.diagnostics.get(name)
+            result = board.get(examination.Readings).diagnostics.get(name)
             if (
                 result is None
                 or "error" in result
@@ -70,7 +73,7 @@ class Documentation(releasing.Releasing):
             if not report_path.exists():
                 continue
             record = self.substantiate(
-                context,
+                board,
                 diagnostic,
                 (report_path, bundle_digest),
                 snapshot,
@@ -88,7 +91,7 @@ class Documentation(releasing.Releasing):
 
     def substantiate(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         diagnostic: Any,
         report: tuple[Any, str],
         snapshot: explanations.Snapshot,
@@ -97,7 +100,7 @@ class Documentation(releasing.Releasing):
         """Builds the evidence record of one explanation diagnostic.
 
         Args:
-            context: The run context, holding the diagnostics and split.
+            board: The run's board, holding the diagnostics and split.
             diagnostic: The explanation diagnostic.
             report: The path of its report and the digest of the bundle
                 manifest.
@@ -107,8 +110,8 @@ class Documentation(releasing.Releasing):
         Returns:
             The evidence record.
         """
-        split = scmle.pipeline.context.require(context.split, "split")
-        result = context.diagnostics[diagnostic.name]
+        split = board.get(profiling.Partition).split
+        result = board.get(examination.Readings).diagnostics[diagnostic.name]
         report_path, bundle_digest = report
         limitations = [
             "associational evidence is not causal evidence",
@@ -124,8 +127,8 @@ class Documentation(releasing.Releasing):
             input_fingerprint=split.manifest.fingerprint,
             dataset_snapshot=snapshot,
             feature_graph=feature_graph,
-            method_parameters={"seed": context.services.spec.validation.seed},
-            timestamp=context.services.clock.now(),
+            method_parameters={"seed": board.services.spec.validation.seed},
+            timestamp=board.services.clock.now(),
             software_version=scmle.__version__,
             uncertainty={
                 "status": "not_estimated",
@@ -158,7 +161,7 @@ class Documentation(releasing.Releasing):
 
     def notarise(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         store: Any,
         bundle: scmle.artifacts.bundle.Bundle,
     ) -> dict[str, Any]:
@@ -167,7 +170,7 @@ class Documentation(releasing.Releasing):
         The record is also written to `provenance.json`.
 
         Args:
-            context: The run context, supplying the manifest and configuration.
+            board: The run's board, supplying the manifest and configuration.
             store: The run store, supplying the run id and model manifest.
             bundle: The packaged model bundle, supplying the model and
                 environment information.
@@ -177,7 +180,7 @@ class Documentation(releasing.Releasing):
             hash, dataset, model manifest digest, environment and signature
             presence.
         """
-        manifest = scmle.pipeline.context.require(context.manifest, "manifest")
+        manifest = board.get(ingestion.Intake).manifest
         model_manifest = store.path(
             f"model/{scmle.artifacts.bundle.MANIFEST_FILE}"
         )
@@ -185,7 +188,7 @@ class Documentation(releasing.Releasing):
             "schema_version": 1,
             "run_id": store.run_id,
             "software_version": scmle.__version__,
-            "config_hash": context.services.spec.config_hash(),
+            "config_hash": board.services.spec.config_hash(),
             "dataset": {
                 "snapshot_id": manifest.snapshot or manifest.digests["data"],
                 "dataset_id": manifest.identifier,
@@ -242,13 +245,13 @@ class Documentation(releasing.Releasing):
 
     def persist(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         store: Any,
     ) -> dict[str, Any]:
         """Persists the production fault-injection plan, marked as not run.
 
         Args:
-            context: The run context; not consulted.
+            board: The run's board; not consulted.
             store: The run store receiving `fault_injection_plan.json`.
 
         Returns:
@@ -256,7 +259,7 @@ class Documentation(releasing.Releasing):
             executed with the release blocked, since the fault plan declares
             required evidence and does not claim that the scenarios ran.
         """
-        del context
+        del board
         record = reliability.Registry.prerelease().to_dict()
         record["execution_status"] = "planned"
         record["release_blocked"] = True

@@ -13,10 +13,10 @@ from scmle.data.splitting import splitters
 from scmle.evaluation import metrics
 from scmle.evaluation import selection
 import scmle.models.registry
+from scmle.pipeline import engine
 from scmle.pipeline import kinds
 from scmle.pipeline import products
 from scmle.pipeline import profiler
-import scmle.pipeline.context
 import scmle.pipeline.services
 from scmle.pipeline.stages import ingestion
 from scmle.runtime import limits
@@ -139,15 +139,17 @@ def provide(spec):
 
 
 def test_a_board_holds_each_applied_product_by_type():
-    context = scmle.pipeline.context.Context.start(provide(config()))
+    board = engine.Board.start(provide(config()))
     with pytest.raises(errors.OrderError, match="Intake"):
-        context.get(ingestion.Intake)
-    made = ingestion.IngestStage().execute(context)
-    assert context.get(ingestion.Intake) is made
-    assert context.frame is made.frame
+        board.get(ingestion.Intake)
+    assert board.find(ingestion.Intake) is None
+    made = ingestion.IngestStage().execute(board)
+    assert board.get(ingestion.Intake) is made
+    assert board.find(ingestion.Intake) is made
+    assert made.kind is kinds.TABULAR
 
 
-def test_a_product_applied_to_a_plain_board_still_sets_its_fields():
+def test_a_product_applied_to_a_board_without_products_changes_nothing():
     class Board:
         pass
 
@@ -160,5 +162,5 @@ def test_a_product_applied_to_a_plain_board_still_sets_its_fields():
         None,
     )
     made.apply(target)
-    assert target.frame is made.frame
+    assert vars(target) == {}
     assert isinstance(made, products.Derived)

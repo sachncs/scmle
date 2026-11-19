@@ -5,8 +5,12 @@ from typing import Any
 
 import scmle.artifacts.bundle
 from scmle.contracts import lineage
-import scmle.pipeline.context
+from scmle.pipeline import engine
+from scmle.pipeline import products
 from scmle.pipeline.stages import bracketing
+from scmle.pipeline.stages import ingestion
+from scmle.pipeline.stages import profiling
+from scmle.pipeline.stages import selecting
 
 
 class Tracing(bracketing.Bracketing):
@@ -18,7 +22,7 @@ class Tracing(bracketing.Bracketing):
 
     def trace(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         store: Any,
     ) -> lineage.Graph:
         """Builds the content-linked graph for one completed package.
@@ -26,7 +30,7 @@ class Tracing(bracketing.Bracketing):
         The graph is validated; the package (`packaging.Package`) keeps it.
 
         Args:
-            context: The run context, supplying the manifest, split and trial.
+            board: The run's board, supplying the manifest, split and trial.
             store: The run store holding the artifacts that are hashed; the
                 curation report, pipeline, evaluation and bundle manifest
                 must exist.
@@ -36,11 +40,13 @@ class Tracing(bracketing.Bracketing):
             optional feature graph, split, model and evaluation to the bundle,
             with an explanations node when explanation files exist.
         """
-        split = scmle.pipeline.context.require(context.split, "split")
-        selected = scmle.pipeline.context.require(context.selected, "selected")
+        split = board.get(profiling.Partition).split
+        selected = products.require(
+            board.get(selecting.Choice).selected, "selected"
+        )
         graph = lineage.Graph()
 
-        split_parent = self.originate(context, store, graph)
+        split_parent = self.originate(board, store, graph)
 
         graph.add_node(
             lineage.Node(
@@ -94,14 +100,14 @@ class Tracing(bracketing.Bracketing):
 
     def originate(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         store: Any,
         graph: lineage.Graph,
     ) -> str:
         """Adds the source, snapshot, curation and feature-graph nodes.
 
         Args:
-            context: The run context, supplying the manifest.
+            board: The run's board, supplying the manifest.
             store: The run store holding the curation report.
             graph: The graph being built.
 
@@ -109,7 +115,7 @@ class Tracing(bracketing.Bracketing):
             The node the split descends from: the feature graph when the
             project declares one, else the curation.
         """
-        manifest = scmle.pipeline.context.require(context.manifest, "manifest")
+        manifest = board.get(ingestion.Intake).manifest
         raw_digest = manifest.lineage.digests.get(
             "raw-source", manifest.digests["data"]
         )
@@ -142,17 +148,13 @@ class Tracing(bracketing.Bracketing):
         )
         graph.connect(lineage.Edge("snapshot", "curation", "curated"))
 
-        if context.services.spec.feature_graph.nodes:
+        if board.services.spec.feature_graph.nodes:
             graph.add_node(
                 lineage.Node(
                     "feature-graph",
                     lineage.Kind.FEATURE_GRAPH,
-                    context.services.spec.feature_graph.fingerprint(),
-                    {
-                        "version": str(
-                            context.services.spec.feature_graph.version
-                        )
-                    },
+                    board.services.spec.feature_graph.fingerprint(),
+                    {"version": str(board.services.spec.feature_graph.version)},
                 )
             )
             graph.connect(

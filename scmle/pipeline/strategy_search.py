@@ -11,8 +11,8 @@ import math
 
 from scmle.contracts import experiments
 from scmle.evaluation import comparison
+from scmle.pipeline import engine
 from scmle.pipeline import trials
-import scmle.pipeline.context
 from scmle.preparation import strategies
 
 # A variant of a model's default pipeline (a data strategy, tuned
@@ -74,40 +74,37 @@ class Strategist:
     """Evaluates data strategies for the most promising screened models.
 
     Attributes:
-        context: Run context.
+        board: Run board.
         runner: Trial runner used for every evaluation.
         metric: The metric being optimized.
         task: The resolved task.
         profile: The data profile.
     """
 
-    def __init__(
-        self, context: scmle.pipeline.context.Context, runner: trials.Runner
-    ) -> None:
+    def __init__(self, board: engine.Board, runner: trials.Runner) -> None:
         """Initializes the search.
 
         Args:
-            context: Run context (spec, registry, profile, deadline).
-            runner: Trial runner used for every evaluation.
+            board: Run board (spec, registry, deadline).
+            runner: Trial runner used for every evaluation, holding the
+                metric, task and profile.
         """
-        self.context = context
+        self.board = board
         self.runner = runner
-        self.metric = scmle.pipeline.context.require(context.metric, "metric")
-        self.task = scmle.pipeline.context.require(context.task, "task")
-        self.profile = scmle.pipeline.context.require(
-            context.profile, "profile"
-        )
+        self.metric = runner.metric
+        self.task = runner.task
+        self.profile = runner.profile
 
     def search(self, screened: list[experiments.Trial]) -> None:
-        """Runs the search; results and verdicts go to the context.
+        """Runs the search; results and verdicts go to the board.
 
         Args:
             screened: Default-configuration trials from the screening step.
         """
-        spec = self.context.services.spec.effective()
+        spec = self.board.services.spec.effective()
         if not spec.names or spec.top_models == 0:
             return
-        registry = self.context.services.registry
+        registry = self.board.services.registry
         baselines = frozenset(
             name
             for name, adapter in registry.adapters.items()
@@ -126,13 +123,13 @@ class Strategist:
             : spec.top_models
         ]
         for leader in leaders:
-            reason = self.context.services.governor.skip_reason(first=False)
+            reason = self.board.services.governor.skip_reason(first=False)
             if reason:
-                self.context.journal.forgo(
+                self.board.journal.forgo(
                     f"strategy search for {leader.model_name}", reason
                 )
                 continue
-            self.context.services.check()
+            self.board.services.check()
             self.tune(leader, spec.names)
 
     def tune(self, leader: experiments.Trial, names: list[str]) -> None:
@@ -147,7 +144,7 @@ class Strategist:
             leader: The model's default-pipeline trial.
             names: Names of the strategies to try.
         """
-        adapter = self.context.services.registry.get(leader.model_name)
+        adapter = self.board.services.registry.get(leader.model_name)
         chosen: list[str] = []
         for name in names:
             strategy = strategies.lookup(name)
@@ -155,18 +152,18 @@ class Strategist:
             if reason is None:
                 chosen.append(name)
             else:
-                self.context.journal.enter(
+                self.board.journal.enter(
                     f"{name}@{leader.model_name}",
                     experiments.Edict.REJECT,
                     f"not applicable: {reason}",
                 )
-        ids = self.context.journal.allocate(len(chosen))
+        ids = self.board.journal.allocate(len(chosen))
         jobs = [
             trials.Job(trial_id, leader.model_name, {}, None, name)
             for trial_id, name in zip(ids, chosen, strict=True)
         ]
         for outcome in self.runner.run_many(jobs):
-            self.context.journal.transcribe(outcome)
+            self.board.journal.transcribe(outcome)
             self.judge(leader, outcome)
 
     def judge(
@@ -184,7 +181,7 @@ class Strategist:
         """
         technique = f"{outcome.strategy}@{outcome.model_name}"
         if outcome.status is not experiments.Termination.OK:
-            self.context.journal.enter(
+            self.board.journal.enter(
                 technique,
                 experiments.Edict.REJECT,
                 f"trial {outcome.status}: {outcome.error}",
@@ -198,7 +195,7 @@ class Strategist:
             if chance >= CONFIDENCE
             else experiments.Edict.REJECT
         )
-        self.context.journal.enter(
+        self.board.journal.enter(
             technique,
             verdict,
             f"cv {self.metric.name} {outcome.score_mean:.4f} vs default "

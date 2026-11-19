@@ -81,7 +81,7 @@ def test_transformer_and_jepa_are_explicit_opt_in_candidates(monkeypatch):
         {"feature": numpy.arange(120.0), "y": numpy.arange(120) % 2}
     )
     project = orchestrator.Orchestrator(spec, frame, registry=registry)
-    context = project.new_context()
+    context = project.start()
     context.services.capability_registry.bind(
         capabilities.Environment(
             available_extras=frozenset({"core", "deeplearning"}),

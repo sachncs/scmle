@@ -15,11 +15,15 @@ from scmle.governance import attestation
 from scmle.governance import ledger
 from scmle.governance import model_card
 from scmle.inference import novelty
+from scmle.pipeline import engine
 from scmle.pipeline import products
-import scmle.pipeline.context
 from scmle.pipeline.stages import assessment
+from scmle.pipeline.stages import examination
 from scmle.pipeline.stages import ingestion
+from scmle.pipeline.stages import labelling
 from scmle.pipeline.stages import planning
+from scmle.pipeline.stages import profiling
+from scmle.pipeline.stages import selecting
 from scmle.pipeline.stages import tracing
 import scmle.runtime.state
 
@@ -29,8 +33,6 @@ PARITY_ROWS = 200
 @dataclasses.dataclass(frozen=True)
 class Package(products.Derived):
     """The signed bundle and the run's result; the run is then complete.
-
-    Its fields are named as the run-context fields `apply` sets.
 
     Attributes:
         bundle: The packaged model.
@@ -64,19 +66,19 @@ class PackageStage(tracing.Tracing):
 
     def describe(
         self,
-        context: scmle.pipeline.context.Context,  # noqa: ARG002 -- Stage.describe
+        board: engine.Board,  # noqa: ARG002 -- Stage.describe
     ) -> str:
         """Names the stage.
 
         Args:
-            context: The run context; not consulted.
+            board: The run's board; not consulted.
 
         Returns:
             The text "write bundle and reports".
         """
         return "write bundle and reports"
 
-    def execute(self, context: scmle.pipeline.context.Context) -> Package:
+    def execute(self, board: engine.Board) -> Package:
         """Packages artifacts and assembles the `RunResult`.
 
         Builds the model bundle with its conformal, quantile and coverage
@@ -85,52 +87,52 @@ class PackageStage(tracing.Tracing):
         record in its version-1 layout; it is moved to the current layout
         (`results.evaluation`) just before `evaluation.json` is written, and
         the result carries that layout. The plan is the product
-        `planning.Blueprint` the context holds.
+        `planning.Blueprint` the board holds.
 
         Args:
-            context: The run context; read only (`Package.apply` sets it).
+            board: The run's board; read only (`Package.apply` sets it).
 
         Returns:
             The bundle, result, evidence graph and evaluation record.
         """
-        store = context.services.workspace
-        split = scmle.pipeline.context.require(context.split, "split")
-        selected = scmle.pipeline.context.require(context.selected, "selected")
-        evaluation = scmle.pipeline.context.require(
-            context.evaluation, "evaluation"
+        store = board.services.workspace
+        partition = board.get(profiling.Partition)
+        split = partition.split
+        selected = products.require(
+            board.get(selecting.Choice).selected, "selected"
         )
-        profile = scmle.pipeline.context.require(context.profile, "profile")
-        bundle = self.assemble(context)
-        evaluation.update(self.probe(context, selected).entries())
-        bundle.conformal = self.conformalise(context, selected, bundle)
-        bundle.quantile = self.bracket(context)
-        self.settle(context, bundle)
-        if (
-            scmle.pipeline.context.require(context.task, "task")
-            is tasks.Task.FORECAST
-        ):
+        evaluation = products.require(
+            board.get(assessment.Exam).evaluation, "evaluation"
+        )
+        profile = partition.profile
+        bundle = self.assemble(board)
+        evaluation.update(self.probe(board, selected).entries())
+        bundle.conformal = self.conformalise(board, selected, bundle)
+        bundle.quantile = self.bracket(board)
+        self.settle(board, bundle)
+        if partition.task is tasks.Task.FORECAST:
             evaluation["forecast_backtest"] = self.forecast_backtest(
-                context, selected
+                board, selected
             )
-            context.journal.write_json(
+            board.journal.write_json(
                 "diagnostics/forecast_backtest.json",
                 evaluation["forecast_backtest"],
             )
-        uncertainty = self.gauge(context, bundle)
+        uncertainty = self.gauge(board, bundle)
         uncertainty.equip(bundle)
         evaluation.update(uncertainty.entries())
         bundle.novelty = novelty.Strangeness.fit(
             split.dev_features,
             bundle.schema.numeric,
             bundle.schema.categorical,
-            context.services.spec.validation.seed,
+            board.services.spec.validation.seed,
         )
         bundle.save(store.path("model"))
-        self.certify(context, bundle, evaluation)
-        self.release_evaluation(context, store, evaluation)
+        self.certify(board, bundle, evaluation)
+        self.release_evaluation(board, store, evaluation)
         evaluation = results.evaluation(evaluation)
         store.write_json("evaluation.json", evaluation)
-        evidence_graph = self.trace(context, store)
+        evidence_graph = self.trace(board, store)
         graph_record = evidence_graph.to_dict()
         graph_record["graph_digest"] = evidence_graph.digest()
         store.write_json("evidence_graph.json", graph_record)
@@ -138,80 +140,78 @@ class PackageStage(tracing.Tracing):
             run_id=store.run_id,
             run_dir=store.directory,
             state=scmle.runtime.state.Progress.COMPLETED.value,
-            plan=scmle.pipeline.context.require(
-                context.get(planning.Blueprint).plan, "plan"
-            ),
+            plan=products.require(board.get(planning.Blueprint).plan, "plan"),
             profile=profile,
-            trials=context.journal.trials,
+            trials=board.journal.trials,
             selected_model=selected.model_name,
             evaluation=evaluation,
             bundle=bundle,
-            diagnostics=context.diagnostics,
+            diagnostics=board.get(examination.Readings).diagnostics,
         )
-        context.journal.track(artifacts=self.lineage(store))
-        board = result.leaderboard()
-        board.to_parquet(store.path("leaderboard.parquet"), index=False)
+        board.journal.track(artifacts=self.lineage(store))
+        ranking = result.leaderboard()
+        ranking.to_parquet(store.path("leaderboard.parquet"), index=False)
         store.write_text(
             "report.html",
-            report.Renderer().render(result, board),
+            report.Renderer().render(result, ranking),
         )
         return Package(bundle, result, evidence_graph, evaluation)
 
-    def assemble(
-        self, context: scmle.pipeline.context.Context
-    ) -> scmle.artifacts.bundle.Bundle:
+    def assemble(self, board: engine.Board) -> scmle.artifacts.bundle.Bundle:
         """Builds the model bundle of the final pipeline.
 
         The labels the model's outputs decode to are the kind's
         (`kinds.Kind.decode`).
 
         Args:
-            context: The run context, holding the model to serve, the
+            board: The run's board, holding the model to serve, the
                 split, the selection and the evaluation, and the intake.
 
         Returns:
             The bundle, before its conformal, quantile and novelty evidence.
         """
-        split = scmle.pipeline.context.require(context.split, "split")
-        selected = scmle.pipeline.context.require(context.selected, "selected")
-        evaluation = scmle.pipeline.context.require(
-            context.evaluation, "evaluation"
+        partition = board.get(profiling.Partition)
+        split = partition.split
+        selected = products.require(
+            board.get(selecting.Choice).selected, "selected"
         )
-        profile = scmle.pipeline.context.require(context.profile, "profile")
-        intake = context.get(ingestion.Intake)
+        exam = board.get(assessment.Exam)
+        evaluation = products.require(exam.evaluation, "evaluation")
+        profile = partition.profile
+        intake = board.get(ingestion.Intake)
+        readings = board.get(examination.Readings)
         return scmle.artifacts.bundle.Bundle.create(
-            context.shipped
-            if context.shipped is not None
-            else context.final_pipeline,
+            exam.shipped if exam.shipped is not None else exam.final_pipeline,
             profile.feature_plan,
             split.dev_features,
-            context.services.spec.data.target,
-            scmle.pipeline.context.require(context.task, "task").value,
-            scmle.pipeline.context.require(context.metric, "metric").name,
+            board.services.spec.data.target,
+            partition.task.value,
+            partition.metric.name,
             selected.model_name,
             model_params=selected.params,
             strategy=selected.strategy,
             decision_threshold=(evaluation["decision"] or {}).get("threshold"),
-            graph_fingerprint=context.services.spec.feature_graph.fingerprint()
-            if context.services.spec.feature_graph.nodes
+            graph_fingerprint=board.services.spec.feature_graph.fingerprint()
+            if board.services.spec.feature_graph.nodes
             else "",
-            group_column=context.services.spec.data.group_column,
-            time_column=context.services.spec.data.time_column,
-            history_source=context.frame,
-            class_labels=intake.kind.decode(context.ordinal_labels),
-            seed=context.services.spec.validation.seed,
-            configuration=context.services.spec.config_hash(),
+            group_column=board.services.spec.data.group_column,
+            time_column=board.services.spec.data.time_column,
+            history_source=partition.frame,
+            class_labels=intake.kind.decode(
+                board.get(labelling.Resolution).labels
+            ),
+            seed=board.services.spec.validation.seed,
+            configuration=board.services.spec.config_hash(),
             dataset=intake.manifest.digests["data"],
             split=split.manifest.fingerprint,
             reference=scmle.data.reference.Baseline.build(
                 split.dev_features,
                 profile.feature_plan,
-                scmle.pipeline.context.require(
-                    context.reference_scores, "reference_scores"
-                ),
+                products.require(readings.scores, "reference_scores"),
                 str(
-                    scmle.pipeline.context.require(
-                        context.reference_scores, "reference_scores"
+                    products.require(
+                        readings.scores,
+                        "reference_scores",
                     ).name
                 ),
                 evaluation["test_metrics"],
@@ -220,25 +220,28 @@ class PackageStage(tracing.Tracing):
 
     def certify(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         bundle: scmle.artifacts.bundle.Bundle,
         evaluation: records.Layout,
     ) -> None:
         """Writes the model card, attestation and access records of a bundle.
 
         Args:
-            context: The run context.
+            board: The run's board.
             bundle: The saved bundle.
             evaluation: The evaluation record; gains the card, reliability
                 plan, SBOM, provenance, attestation, explanation evidence and
                 round-trip check.
         """
-        store = context.services.workspace
-        split = scmle.pipeline.context.require(context.split, "split")
-        selected = scmle.pipeline.context.require(context.selected, "selected")
-        profile = scmle.pipeline.context.require(context.profile, "profile")
+        store = board.services.workspace
+        partition = board.get(profiling.Partition)
+        split = partition.split
+        selected = products.require(
+            board.get(selecting.Choice).selected, "selected"
+        )
+        profile = partition.profile
         card = model_card.Card.from_run(
-            context.get(ingestion.Intake).manifest,
+            board.get(ingestion.Intake).manifest,
             profile,
             bundle,
             evaluation,
@@ -248,9 +251,9 @@ class PackageStage(tracing.Tracing):
         )
         evaluation["model_card"] = card.to_dict()
         store.write_json("model_card.json", card.to_dict())
-        evaluation["reliability_plan"] = self.persist(context, store)
+        evaluation["reliability_plan"] = self.persist(board, store)
         evaluation["sbom"] = self.inventory(store, bundle)
-        evaluation["provenance"] = self.notarise(context, store, bundle)
+        evaluation["provenance"] = self.notarise(board, store, bundle)
         release_attestation = attestation.Attestation.from_records(
             evaluation["provenance"],
             evaluation["sbom"],
@@ -259,7 +262,7 @@ class PackageStage(tracing.Tracing):
         evaluation["release_attestation"] = release_attestation
         store.write_json("release_attestation.json", release_attestation)
         evaluation["explanation_evidence"] = self.explanation_evidence(
-            context, store
+            board, store
         )
         evaluation["artifact_verification"] = bundle.roundtrip(
             store.path("model"), split.dev_features.head(PARITY_ROWS)
@@ -268,7 +271,7 @@ class PackageStage(tracing.Tracing):
             "diagnostics/data_access.json",
             ledger.compose(
                 split,
-                context.journal.trials,
+                board.journal.trials,
                 int(split.locked_test.opened),
                 evaluation["decision"] is not None,
             ),
@@ -278,16 +281,16 @@ class PackageStage(tracing.Tracing):
             {
                 "plan": [
                     d.to_dict()
-                    for d in scmle.pipeline.context.require(
-                        context.get(planning.Blueprint).plan, "plan"
+                    for d in products.require(
+                        board.get(planning.Blueprint).plan, "plan"
                     ).decisions
                 ],
-                "outcomes": [d.to_dict() for d in context.journal.outcomes],
+                "outcomes": [d.to_dict() for d in board.journal.outcomes],
                 "selection": {
                     "model": selected.model_name,
                     "strategy": selected.strategy,
                     "params": selected.params,
-                    "policy": context.services.policy.description,
+                    "policy": board.services.policy.description,
                 },
             },
         )

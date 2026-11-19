@@ -3,10 +3,9 @@
 Dunder names (`__init__`, `__all__`, ...) are language protocol and exempt.
 Everything else, in the package and in the tests, must be a public name.
 
-The run context (`scmle/pipeline/context.py`) is on its way out: stages
-read the products the board holds instead of its fields. `CONTEXTUAL` lists
-the package modules that still import it; the list may only shrink, and
-the context is deleted when it is empty.
+The run context (`scmle/pipeline/context.py`) is deleted: stages read the
+products the run's board (`engine.Board`) holds by type. `CONTEXTUAL`, the
+modules still allowed to import it, is empty and stays so.
 """
 
 import ast
@@ -173,52 +172,7 @@ def test_checker_detects_violations():
 
 
 CONTEXT = "scmle.pipeline.context"
-CONTEXTUAL = frozenset(
-    {
-        "scmle/pipeline/ensemble_search.py",
-        "scmle/pipeline/hyperband.py",
-        "scmle/pipeline/orchestrator.py",
-        "scmle/pipeline/policies.py",
-        "scmle/pipeline/strategy_search.py",
-        "scmle/pipeline/trials.py",
-        "scmle/pipeline/tuning.py",
-        *(
-            f"scmle/pipeline/stages/{name}.py"
-            for name in (
-                "admission",
-                "assessment",
-                "bracketing",
-                "calibration",
-                "cost",
-                "diagnosis",
-                "documentation",
-                "examination",
-                "exploration",
-                "identification",
-                "impounding",
-                "ingestion",
-                "interface",
-                "labelling",
-                "packaging",
-                "planning",
-                "profiling",
-                "qualification",
-                "relabelling",
-                "releasing",
-                "remedy",
-                "reporting",
-                "reservation",
-                "scoring",
-                "screening",
-                "selecting",
-                "summary",
-                "surveying",
-                "tracing",
-                "training",
-            )
-        ),
-    }
-)
+CONTEXTUAL = frozenset()
 
 
 def imported(tree):
@@ -233,12 +187,14 @@ def imported(tree):
     return found
 
 
-def test_only_the_recorded_modules_still_import_the_run_context():
+def test_no_module_imports_the_deleted_run_context():
+    assert not (ROOT / "scmle" / "pipeline" / "context.py").exists()
     importers = {
         path.relative_to(ROOT).as_posix()
-        for path in (ROOT / "scmle").rglob("*.py")
+        for root in ("scmle", "tests", "benchmarks", "scripts")
+        for path in (ROOT / root).rglob("*.py")
         if CONTEXT in imported(ast.parse(path.read_text(encoding="utf-8")))
-    } - {"scmle/pipeline/context.py"}
+    }
     assert importers <= CONTEXTUAL, sorted(importers - CONTEXTUAL)
 
 

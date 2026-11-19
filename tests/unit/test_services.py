@@ -1,9 +1,10 @@
-"""The run's frozen services, its locked journal and the context bridging them."""
+"""The run's frozen services, its locked journal and the board holding them."""
 
 import dataclasses
 import datetime
 import json
 import threading
+import types
 
 import pandas
 import pytest
@@ -18,9 +19,9 @@ from scmle.evaluation import metrics
 from scmle.evaluation import resources
 from scmle.evaluation import selection
 import scmle.models.registry
+from scmle.pipeline import engine
 from scmle.pipeline import journal
 from scmle.pipeline import services
-import scmle.pipeline.context
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import reservation
 from scmle.pipeline.stages import training
@@ -58,9 +59,7 @@ def board(root=None, **fields):
         root.mkdir()
         store = scmle.artifacts.store.Workspace("r1", root)
         log = events.Log(root / "events.jsonl")
-    return scmle.pipeline.context.Context.start(
-        provide(store=store, log=log, **fields)
-    )
+    return engine.Board.start(provide(store=store, log=log, **fields))
 
 
 def trial(trial_id):
@@ -126,12 +125,12 @@ def test_a_preview_has_no_workspace_and_an_empty_directory():
 
 
 def test_start_gives_the_journal_the_services_records(tmp_path):
-    context = board(tmp_path / "run")
-    assert context.journal.spec is context.services.spec
-    assert context.journal.store is context.services.store
-    assert context.journal.log is context.services.log
-    assert context.journal.tracker is context.services.tracker
-    assert context.journal.trials == []
+    held = board(tmp_path / "run")
+    assert held.journal.spec is held.services.spec
+    assert held.journal.store is held.services.store
+    assert held.journal.log is held.services.log
+    assert held.journal.tracker is held.services.tracker
+    assert held.journal.trials == []
 
 
 def test_services_start_observes_and_binds_the_resources(tmp_path):
@@ -183,24 +182,24 @@ def test_the_random_streams_are_the_keyed_streams():
 
 
 def test_a_stage_times_with_the_services_clock():
-    context = board(clock=Fixed(10_000.0))
+    held = board(clock=Fixed(10_000.0))
     frame = pandas.DataFrame({"a": [0.0, 1.0, 2.0, 3.0]})
     model = dummy.DummyClassifier().fit(frame, [0, 1, 0, 1])
-    cost.meter(context, model, frame)
-    assert context.services.clock.reads == 2
-    assert [entry["work"] for entry in context.journal.skipped] == [
+    cost.meter(held, model, frame)
+    assert held.services.clock.reads == 2
+    assert [entry["work"] for entry in held.journal.skipped] == [
         "serving measurement"
     ]
     single = cost.FIT_MARGIN * 10_000.0
-    assert context.journal.skipped[0]["reason"].startswith(
+    assert held.journal.skipped[0]["reason"].startswith(
         f"timed 1 of {resources.LATENCY_ROWS} rows: one prediction takes "
         f"about {single:.2f} s and "
     )
 
 
 def test_the_journal_records_eight_threads_without_loss(tmp_path):
-    context = board(tmp_path / "run")
-    record = context.journal
+    held = board(tmp_path / "run")
+    record = held.journal
 
     def work():
         for repeat in range(EACH):
@@ -226,9 +225,9 @@ def test_the_journal_records_eight_threads_without_loss(tmp_path):
 
 
 def test_forgo_keeps_the_record_and_announces_it(tmp_path):
-    context = board(tmp_path / "run")
-    context.journal.forgo("conformal", "needs 9 s")
-    assert context.journal.skipped == [
+    held = board(tmp_path / "run")
+    held.journal.forgo("conformal", "needs 9 s")
+    assert held.journal.skipped == [
         {"work": "conformal", "reason": "needs 9 s"}
     ]
     (event,) = lines(tmp_path / "run")
@@ -248,11 +247,11 @@ def test_a_preview_journal_keeps_records_but_writes_nothing():
     assert record.skipped == [{"work": "x", "reason": "y"}]
 
 
-def test_products_reach_the_journal_through_the_context():
-    context = board()
-    context.journal.transcribe(trial("trial_001"))
-    context.journal.allocate(1)
-    made = training.Search.capture(context)
+def test_a_search_reaches_the_journal_when_applied():
+    held = board()
+    held.journal.transcribe(trial("trial_001"))
+    held.journal.allocate(1)
+    made = training.Search.copy(held.journal)
     assert made.trials == [trial("trial_001")]
     assert made.trial_counter == 1
     fresh = board()
@@ -260,40 +259,48 @@ def test_products_reach_the_journal_through_the_context():
     assert fresh.journal.trials == [trial("trial_001")]
     assert fresh.journal.trial_counter == 1
     assert fresh.journal.allocate(1) == ["trial_002"]
+    assert fresh.get(training.Search) is made
 
 
 def test_a_product_governor_replaces_the_frozen_services():
-    context = board()
-    before = context.services
-    governor = limits.Governor(context.services.spec.resources, 5.0)
-    reservation.Reserve(governor).apply(context)
-    assert context.services.governor is governor
-    assert context.services is not before
-    assert context.services.registry is before.registry
-    assert context.regulator is governor
+    held = board()
+    before = held.services
+    governor = limits.Governor(held.services.spec.resources, 5.0)
+    reservation.Reserve(governor).apply(held)
+    assert held.services.governor is governor
+    assert held.services is not before
+    assert held.services.registry is before.registry
+    assert held.regulator is governor
+    assert held.get(reservation.Reserve).governor is governor
+
+
+def test_a_product_that_changes_the_services_needs_a_run_board():
+    governor = limits.Governor(config().resources, 5.0)
+    with pytest.raises(errors.KindError, match="run's board"):
+        reservation.Reserve(governor).apply(types.SimpleNamespace(made={}))
 
 
 def test_an_unknown_attribute_is_still_an_attribute_error():
     with pytest.raises(AttributeError):
-        board().nothing  # noqa: B018 -- the lookup raises
+        board().nothing  # type: ignore[attr-defined] # noqa: B018 -- raises
 
 
 def test_amend_restamps_the_later_events(tmp_path):
-    context = board(tmp_path / "run")
-    context.journal.emit("before")
+    held = board(tmp_path / "run")
+    held.journal.emit("before")
     amended = config(60)
-    context.amend(amended)
-    context.journal.emit("after")
-    assert context.services.spec is amended
+    held.amend(amended)
+    held.journal.emit("after")
+    assert held.services.spec is amended
     first, second = lines(tmp_path / "run")
     assert first["config_hash"] == config().config_hash()
     assert second["config_hash"] == amended.config_hash()
 
 
-def test_the_context_is_an_engine_board(tmp_path):
-    context = board()
-    context.check_cancelled()
-    context.services.cancel_event.set()
+def test_the_board_checks_cancellation_and_caps_threads(tmp_path):
+    held = board()
+    held.check_cancelled()
+    held.services.cancel_event.set()
     with pytest.raises(errors.CancelledError):
-        context.check_cancelled()
-    assert context.regulator is context.services.governor
+        held.check_cancelled()
+    assert held.regulator is held.services.governor

@@ -3,10 +3,13 @@
 import dataclasses
 from typing import Any
 
+from scmle.assurance import coverage_confirm
 from scmle.assurance.admissibility import qualify
 from scmle.assurance.charter import contracts
 from scmle.assurance.charter import sealing
 import scmle.assurance.charter.rules
+import scmle.assurance.custody.pipeline
+import scmle.assurance.custody.sealed
 import scmle.assurance.framing.claim
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import governed
@@ -15,10 +18,30 @@ from scmle.assurance.robustness import prefilter
 from scmle.causal import claim
 from scmle.contracts import errors
 from scmle.contracts import tasks
+from scmle.pipeline import engine
 from scmle.pipeline import products
-import scmle.pipeline.context
 from scmle.pipeline.stages import admission
-from scmle.pipeline.stages import scoring
+
+
+def coverage_on_confirmation(
+    charter: contracts.AnalysisCharter, task: tasks.Task
+) -> bool:
+    """Returns whether the charter asks for the coverage claim on `C`.
+
+    Args:
+        charter: The analysis charter.
+        task: The resolved task.
+
+    Returns:
+        True if the charter's uncertainty block asks for it and the task
+        has a primary coverage choice.
+    """
+    block = charter.uncertainty
+    return (
+        block is not None
+        and block.confirmatory
+        and coverage_confirm.principal(task.value) is not None
+    )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -59,6 +82,49 @@ class Escrow:
 
 
 @dataclasses.dataclass(frozen=True)
+class Custody(products.Derived):
+    """The confirmation set of a charter run, carved out and sealed.
+
+    Derived: the vault holds rows that are never written beside the stage
+    record. Whoever holds the custody holds the vault: `engine.Board.close`
+    closes it once the custody is applied, and `Impounding.sequester`
+    closes it on every failure before that.
+
+    Attributes:
+        outcome: The custody outcome: the split restricted to `X`, the
+            exploration view, the manifest and the feasibility verdict.
+        vault: The vault holding the sealed confirmation set.
+        column: The entity column whose rows are not independent, when the
+            charter predicts known entities' future rows, else None.
+    """
+
+    outcome: scmle.assurance.custody.pipeline.Outcome
+    vault: scmle.assurance.custody.sealed.Vault
+    column: str | None = None
+
+    def summary(self) -> object:
+        """What the custody was derived from.
+
+        Returns:
+            The manifest's hash and scope, the set sizes and the entity
+            column.
+        """
+        manifest = self.outcome.manifest
+        return {
+            "manifest": manifest.sha256,
+            "scope": manifest.scope,
+            "exploration": len(manifest.sets.exploration),
+            "confirmation": len(manifest.sets.confirmation),
+            "embargo": len(manifest.sets.embargo),
+            "column": self.column,
+        }
+
+    def close(self) -> None:
+        """Closes the vault holding the confirmation set."""
+        self.vault.close()
+
+
+@dataclasses.dataclass(frozen=True)
 class Claims(products.Derived):
     """What the claim ledger left for the later stages.
 
@@ -72,14 +138,6 @@ class Claims(products.Derived):
     """
 
     pending: Escrow | None = None
-
-    def apply(self, board: object) -> None:
-        """Sets the context field the selection and bracketing stages read.
-
-        Args:
-            board: The run context; its `pending_ledger` is set.
-        """
-        setattr(board, "pending_ledger", self.pending)  # noqa: B010 -- the context field keeps its name until context.py goes (1.E)
 
     def summary(self) -> object:
         """What the claims were derived from.
@@ -103,9 +161,7 @@ class Exploration(admission.Admission):
     abstract, never run on its own.
     """
 
-    def ledger(
-        self, context: scmle.pipeline.context.Context, task: tasks.Task
-    ) -> Claims:
+    def ledger(self, board: engine.Board, task: tasks.Task) -> Claims:
         """Explores `X` under the ledger and confirms on `C`, now or later.
 
         Runs only for a charter run. Exploration reads the exploration view; the
@@ -118,24 +174,24 @@ class Exploration(admission.Admission):
         frozen (the pending ledger is the product).
 
         Args:
-            context: The run context, holding the custody outcome and vault.
+            board: The run's board, holding the custody outcome and vault.
             task: The resolved task.
 
         Returns:
             The claims, pending only when the confirmation waits.
         """
-        outcome = context.custody
-        vault = context.custody_vault
-        if outcome is None or vault is None:
+        custody = board.find(Custody)
+        if custody is None:
             return Claims()
+        outcome = custody.outcome
         if task not in tasks.STANDARD_TASKS:
-            context.journal.emit(
+            board.journal.emit(
                 "ledger.skipped",
                 f"the claim ledger does not cover {task.value} tasks; "
                 "findings stay unconfirmed",
             )
             return Claims()
-        spec = context.services.spec
+        spec = board.services.spec
         verified = sealing.read_verified(str(spec.charter_path))
         charter = verified.charter
         data = spec.data
@@ -148,23 +204,21 @@ class Exploration(admission.Admission):
         block = charter.estimand.causal
         graph = claim.unseal(block.dag) if block is not None else None
         found = self.qualify_exploration(
-            context, task, charter, view, structure, graph
+            board, task, charter, view, structure, graph
         )
         rules = charter.rules
         stage = prefilter.Prefilter(
-            lambda columns: self.stress(context, task, charter, view, columns),
+            lambda columns: self.stress(board, task, charter, view, columns),
             requested=bool(rules and rules.stability),
             rows=len(view.features),
             seed=charter.seed,
         )
         # Declarations are validated before the expensive exploration.
         baseline = self.baseline_runner(
-            context, task, charter, view, structure, signed=verified.signed
+            board, task, charter, view, structure, signed=verified.signed
         )
-        causal = self.hypothesise(context, charter, view, graph, found)
-        explored = self.explore(
-            context, task, charter, (structure, found, stage)
-        )
+        causal = self.hypothesise(board, charter, view, graph, found)
+        explored = self.explore(board, task, charter, (structure, found, stage))
         pending = Escrow(
             explored,
             task,
@@ -177,16 +231,16 @@ class Exploration(admission.Admission):
             verified.signed,
             baseline,
             causal,
-            holds_for_coverage=scoring.coverage_on_confirmation(charter, task),
+            holds_for_coverage=coverage_on_confirmation(charter, task),
         )
-        if self.defer(context, pending):
+        if self.defer(board, pending):
             return Claims(pending)
-        self.conclude(context, pending)
+        self.conclude(board, pending)
         return Claims()
 
     def explore(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         task: tasks.Task,
         charter: Any,
         setting: tuple[tuple[str, ...], Any, prefilter.Prefilter],
@@ -194,7 +248,7 @@ class Exploration(admission.Admission):
         """Explores the exploration view under the charter's claim ledger.
 
         Args:
-            context: The run context, holding the custody outcome.
+            board: The run's board, holding the custody outcome.
             task: The resolved task.
             charter: The verified charter.
             setting: The structure columns, the qualification findings (its
@@ -205,17 +259,17 @@ class Exploration(admission.Admission):
             The exploration, its ledger and its survivors.
         """
         structure, found, stage = setting
-        spec = context.services.spec
+        spec = board.services.spec
         data = spec.data
-        view = scmle.pipeline.context.require(context.custody, "custody").view
+        view = board.get(Custody).outcome.view
         rules = charter.rules
         return governed.scout(
             charter=charter,
             features=view.features,
             target=view.target,
             classification=task.is_classification,
-            run_dir=context.services.store.directory
-            if context.services.store is not None
+            run_dir=board.services.store.directory
+            if board.services.store is not None
             else None,
             exclude=structure + tuple(found.quarantined),
             strata=governed.strata_labels(
@@ -237,25 +291,23 @@ class Exploration(admission.Admission):
             second_stage=stage,
         )
 
-    def defer(
-        self, context: scmle.pipeline.context.Context, pending: "Escrow"
-    ) -> bool:
+    def defer(self, board: engine.Board, pending: "Escrow") -> bool:
         """Keeps the confirmation sealed until the model is frozen, if needed.
 
         Args:
-            context: The run context, supplying the data spec and journal.
+            board: The run's board, supplying the data spec and journal.
             pending: The explored ledger awaiting confirmation.
 
         Returns:
             Whether the confirmation waits: the baseline claim is about the
             selected model, or the coverage claim needs the calibrated model.
         """
-        data = context.services.spec.data
+        data = board.services.spec.data
         selected = bool(
             data.baseline_column and data.baseline_subject == "selected_model"
         )
         if selected or pending.holds_for_coverage:
-            context.journal.emit(
+            board.journal.emit(
                 "ledger.deferred",
                 "the confirmation set stays sealed until "
                 + (
@@ -271,7 +323,7 @@ class Exploration(admission.Admission):
 
     def conclude(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         pending: "Escrow",
         subject: scmle.assurance.framing.claim.Rule | None = None,
         extra: confirm.Docket | None = None,
@@ -282,7 +334,7 @@ class Exploration(admission.Admission):
         also runs the reuse session `governed.replication` builds from `X`.
 
         Args:
-            context: The run context, holding the custody vault whose set `C`
+            board: The run's board, holding the custody vault whose set `C`
                 is opened.
             pending: The exploration, finished on `X` alone.
             subject: The rule the baseline claim is about, when it is not
@@ -296,7 +348,7 @@ class Exploration(admission.Admission):
         baseline = pending.baseline
         if subject is not None:
             baseline = self.baseline_runner(
-                context,
+                board,
                 pending.task,
                 charter,
                 view,
@@ -305,10 +357,8 @@ class Exploration(admission.Admission):
                 subject=subject,
             )
         runner = confirm.merge(baseline, pending.causal, extra)
-        vault = scmle.pipeline.context.require(
-            context.custody_vault, "custody vault"
-        )
-        policy, correction = govern(context, rules)
+        vault = board.get(Custody).vault
+        policy, correction = govern(board, rules)
         # A charter that pre-registers `thresholdout` gets its reuse session:
         # the survivors' agreement asked again on the same opening of C.
         reuse = (
@@ -327,11 +377,11 @@ class Exploration(admission.Admission):
             # directories, so a second run of the same charter on the same
             # data is refused before it reopens C (C8 charter_rerun).
             registry=None
-            if context.services.store is None
-            else context.services.store.directory.parent,
+            if board.services.store is None
+            else board.services.store.directory.parent,
         )
-        self.publish(context, run, runner)
-        context.journal.emit(
+        self.publish(board, run, runner)
+        board.journal.emit(
             "ledger.completed",
             run.confirmation.reason,
             (
@@ -344,19 +394,19 @@ class Exploration(admission.Admission):
                 "rules": "chartered" if rules else "not chartered",
             },
         )
-        self.assess_robustness(context, pending.stage)
-        self.ground(context, charter, view)
-        self.identify(context, charter, view, run, pending.graph, pending.found)
+        self.assess_robustness(board, pending.stage)
+        self.ground(board, charter, view)
+        self.identify(board, charter, view, run, pending.graph, pending.found)
 
 
 def govern(
-    context: scmle.pipeline.context.Context,
+    board: engine.Board,
     rules: scmle.assurance.charter.rules.Procedure | None,
 ) -> tuple[str, scmle.assurance.ledger.budget.Correction]:
     """Reads the failure policy and the confirmation rule of the run.
 
     Args:
-        context: The run context, whose spec may set either.
+        board: The run's board, whose spec may set either.
         rules: The charter's pre-registered rules, or None.
 
     Returns:
@@ -365,14 +415,14 @@ def govern(
     """
     policy = governing(
         "failure_policy",
-        context.services.spec.confirmation_failure_policy,
+        board.services.spec.confirmation_failure_policy,
         None if rules is None else rules.failure,
         "unconfirmed",
     )
     correction = scmle.assurance.ledger.budget.Correction(
         governing(
             "confirmation_rule",
-            context.services.spec.confirmation_rule,
+            board.services.spec.confirmation_rule,
             None if rules is None else rules.confirmation,
             "by",
         )

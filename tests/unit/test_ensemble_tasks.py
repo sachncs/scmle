@@ -35,8 +35,8 @@ class Search(ensemble_search.Stacker):
     def __init__(self, task):
         self.entered = []
         self.ran = []
-        self.context = types.SimpleNamespace(
-            task=task,
+        self.task = task
+        self.board = types.SimpleNamespace(
             services=types.SimpleNamespace(
                 registry=registry.Catalog.stock(include_user=False),
                 spec=types.SimpleNamespace(

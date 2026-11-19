@@ -12,8 +12,11 @@ import scmle.contracts.evidence
 from scmle.evaluation import policies
 from scmle.evaluation import release
 from scmle.governance import attestation
-import scmle.pipeline.context
+from scmle.pipeline import engine
+from scmle.pipeline.stages import examination
+from scmle.pipeline.stages import ingestion
 from scmle.pipeline.stages import interface
+from scmle.pipeline.stages import profiling
 
 LOGGER = logging.getLogger(__name__)
 
@@ -55,7 +58,7 @@ class Releasing(interface.Stage):
 
     def evidence_index(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         store: Any,
         policy: scmle.contracts.evaluation.Criteria,
     ) -> scmle.contracts.evidence.Index:
@@ -67,7 +70,7 @@ class Releasing(interface.Stage):
         not represented by this automated run.
 
         Args:
-            context: The run context, supplying the manifest, task and
+            board: The run's board, supplying the manifest, task and
                 configuration hash.
             store: The run store holding the artifacts.
             policy: The evaluation policy, naming the evidence references that
@@ -77,10 +80,10 @@ class Releasing(interface.Stage):
             An index with one accepted record for each required reference whose
             artifact exists; missing artifacts are omitted.
         """
-        manifest = scmle.pipeline.context.require(context.manifest, "manifest")
+        manifest = board.get(ingestion.Intake).manifest
         raw_inputs = {
             "snapshot_id": manifest.snapshot or manifest.digests["data"],
-            "config_hash": context.services.spec.config_hash(),
+            "config_hash": board.services.spec.config_hash(),
         }
         records: list[scmle.contracts.evidence.Record] = []
         for reference in release.citations(policy):
@@ -94,9 +97,7 @@ class Releasing(interface.Stage):
                         f"artifact exists and matches run output: {reference}"
                     ),
                     scope={
-                        "task": scmle.pipeline.context.require(
-                            context.task, "task"
-                        ).value,
+                        "task": board.get(profiling.Partition).task.value,
                         "modality": manifest.modality,
                     },
                     inputs=raw_inputs,
@@ -107,7 +108,7 @@ class Releasing(interface.Stage):
                     },
                     result=scmle.contracts.evidence.Outcome.PASS,
                     reviewer="scmle.automation",
-                    observed=context.services.clock.now().isoformat(),
+                    observed=board.services.clock.now().isoformat(),
                     limitations=(
                         (
                             "automated artifact-presence and digest check; "
@@ -121,24 +122,24 @@ class Releasing(interface.Stage):
 
     def release_evaluation(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         store: Any,
         evaluation: records.Layout,
     ) -> None:
         """Records the release verdict (`judge`) in the evaluation document.
 
         Args:
-            context: The run context, holding the task, metric and diagnostics.
+            board: The run's board, holding the task, metric and diagnostics.
             store: The run store receiving the files.
             evaluation: The evaluation document, which must already hold the
                 test metrics; the release policy, evaluation and evidence
                 entries are added to it.
         """
-        evaluation.update(self.judge(context, store, evaluation).entries())
+        evaluation.update(self.judge(board, store, evaluation).entries())
 
     def judge(
         self,
-        context: scmle.pipeline.context.Context,
+        board: engine.Board,
         store: Any,
         evaluation: records.Layout,
     ) -> Verdict:
@@ -153,7 +154,7 @@ class Releasing(interface.Stage):
         signing key is configured.
 
         Args:
-            context: The run context, holding the task, metric and diagnostics.
+            board: The run's board, holding the task, metric and diagnostics.
             store: The run store receiving the files.
             evaluation: The evaluation document, read only; it must already
                 hold the test metrics.
@@ -161,18 +162,19 @@ class Releasing(interface.Stage):
         Returns:
             The verdict.
         """
-        task = scmle.pipeline.context.require(context.task, "task")
-        metric = scmle.pipeline.context.require(context.metric, "metric")
+        partition = board.get(profiling.Partition)
+        task = partition.task
+        metric = partition.metric
         policy = policies.derive(
             task,
             metric.name,
             metric.greater_is_better,
-            context.services.spec.problem.success_criteria,
+            board.services.spec.problem.success_criteria,
         )
         if policy is None:
             return self.abstain(store)
 
-        evidence_index = self.evidence_index(context, store, policy)
+        evidence_index = self.evidence_index(board, store, policy)
         signing_key = signing.keying(None)
         if signing_key is not None:
             evidence_index.sign(signing_key)
@@ -182,11 +184,12 @@ class Releasing(interface.Stage):
             for name, value in evaluation["test_metrics"].items()
             if name in declared_metrics
         }
+        readings = board.get(examination.Readings)
         outcome = release.assess(
             policy,
             release_metrics,
-            context.diagnostics,
-            {"fairness": context.diagnostics.get("fairness", {})},
+            readings.diagnostics,
+            {"fairness": readings.diagnostics.get("fairness", {})},
             evidence_index,
         )
         outcome = release.faults(outcome, evaluation.get("reliability_plan"))

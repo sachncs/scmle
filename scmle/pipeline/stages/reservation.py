@@ -3,9 +3,10 @@
 import dataclasses
 from typing import ClassVar
 
+from scmle.contracts import errors
+from scmle.pipeline import engine
 from scmle.pipeline import products
 from scmle.pipeline import profiler
-import scmle.pipeline.context
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import ingestion
 from scmle.pipeline.stages import interface
@@ -24,6 +25,22 @@ class Reserve(products.Derived):
     """
 
     governor: limits.Governor
+
+    def apply(self, board: object) -> None:
+        """Sets the governor on the run's services and holds the reserve.
+
+        Args:
+            board: The run's board.
+
+        Raises:
+            KindError: If `board` is not a run's board.
+        """
+        if not isinstance(board, engine.Board):
+            raise errors.KindError("a reserve applies to a run's board")
+        board.services = dataclasses.replace(
+            board.services, governor=self.governor
+        )
+        super().apply(board)
 
     def summary(self) -> object:
         """The table shape and the seconds held back by part.
@@ -52,23 +69,23 @@ class Reservation(interface.Stage):
 
     def describe(
         self,
-        context: scmle.pipeline.context.Context,  # noqa: ARG002 -- Stage.describe
+        board: engine.Board,  # noqa: ARG002 -- Stage.describe
     ) -> str:
         """Names the stage.
 
         Args:
-            context: The run context; not consulted.
+            board: The run's board; not consulted.
 
         Returns:
             The text "reserve time for the final steps".
         """
         return "reserve time for the final steps"
 
-    def execute(self, context: scmle.pipeline.context.Context) -> Reserve:
+    def execute(self, board: engine.Board) -> Reserve:
         """Provisions the reserve, records it and admits the run.
 
         Args:
-            context: The run context, holding the ingested frame.
+            board: The run's board, holding the ingested frame.
 
         Returns:
             The reserve held for the final refit, diagnostics and packaging.
@@ -77,14 +94,18 @@ class Reservation(interface.Stage):
             BlockedError: If preparation, one cheapest trial and the reserve
                 cannot fit in the time budget (`budget.Reserve.admit`).
         """
-        reserve = context.services.governor.reserve
-        parts = reserve.provision(*cost.dimensions(context), profiler.estimate)
-        context.journal.emit(
+        reserve = board.services.governor.reserve
+        frame = board.get(ingestion.Intake).frame
+        parts = reserve.provision(
+            *cost.dimensions(board.services.spec, frame, None),
+            profiler.estimate,
+        )
+        board.journal.emit(
             "budget.reserved",
             f"{reserve.total:.1f} s of the "
-            f"{context.services.spec.resources.time_budget_seconds} s budget "
+            f"{board.services.spec.resources.time_budget_seconds} s budget "
             "held for the final refit, diagnostics and packaging",
             data={"reserve_seconds": parts},
         )
         reserve.admit()
-        return Reserve(context.services.governor)
+        return Reserve(board.services.governor)
