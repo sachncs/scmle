@@ -5,7 +5,7 @@
       "code_hash": "9911277df2c11f82a128ccd554696441ecebdc090e344bd13f30b1c68f61aee3",
       "passed": true,
       "replicates": 200,
-      "seconds": 18.2,
+      "seconds": 11.7,
       "seeds": [
         0,
         200
@@ -74,7 +74,7 @@
         "1.6": 1.0
       },
       "replicates": 2000,
-      "seconds": 6.7,
+      "seconds": 5.5,
       "seeds": [
         0,
         2000
@@ -88,7 +88,7 @@
       "passed": true,
       "replicates": 200,
       "se": 0.00019469819851509966,
-      "seconds": 0.3,
+      "seconds": 0.2,
       "seeds": [
         0,
         200
@@ -97,10 +97,10 @@
     },
     "A3": {
       "bootstraps": 400,
-      "code_hash": "976e2d578919afb5696c9ceaf1cf7d6d882b8bfbfa96081f63a8c83ba0d9b753",
+      "code_hash": "443127494d610c361fd71354fba5807c41bd902bd264a6210bf71b6ac615abba",
       "passed": false,
       "replicates": 2000,
-      "seconds": 175.4,
+      "seconds": 195.1,
       "seeds": [
         0,
         2000
@@ -157,24 +157,50 @@
       }
     },
     "A4": {
-      "bound": 0.059746794344808965,
-      "code_hash": "5447ea98ffe604165c408af70ecc64a95cc32a2ea5658d557cfd00797dbbdbd8",
+      "alpha": 0.05,
+      "bound": 0.0845,
+      "boundary": {
+        "treat_all": [
+          0.16666666666666669,
+          0.7,
+          0.1
+        ],
+        "treat_none": [
+          0.4736842105263158,
+          0.4,
+          0.02
+        ]
+      },
+      "code_hash": "a2bdeed6509f18dd1940ce654c9e626adb4eb92383705c0f0cbd3ae99a52ee58",
+      "minimum": 34,
       "null": {
-        "2000": {
-          "interval": [
-            0.0,
-            0.001917047281252934
-          ],
+        "treat_all/2000": {
           "meets_floor": true,
-          "useful_rate": 0.0
+          "runs": 2000,
+          "upper": 0.0403511053353128,
+          "useful": 66,
+          "useful_rate": 0.033
         },
-        "20000": {
-          "interval": [
-            0.0,
-            0.001917047281252934
-          ],
+        "treat_all/20000": {
           "meets_floor": true,
-          "useful_rate": 0.0
+          "runs": 2000,
+          "upper": 0.030982795325379116,
+          "useful": 49,
+          "useful_rate": 0.0245
+        },
+        "treat_none/2000": {
+          "meets_floor": true,
+          "runs": 2000,
+          "upper": 0.02426653037719772,
+          "useful": 37,
+          "useful_rate": 0.0185
+        },
+        "treat_none/20000": {
+          "meets_floor": true,
+          "runs": 2000,
+          "upper": 0.019718299888409774,
+          "useful": 29,
+          "useful_rate": 0.0145
         }
       },
       "passed": true,
@@ -185,7 +211,7 @@
         "1.5": 0.9133333333333333
       },
       "replicates": 2000,
-      "seconds": 48.3,
+      "seconds": 81.5,
       "seeds": [
         0,
         2000
@@ -283,7 +309,7 @@
         }
       },
       "replicates": 2000,
-      "seconds": 3.1,
+      "seconds": 11.7,
       "seeds": [
         0,
         2000
@@ -371,7 +397,7 @@
       },
       "passed": true,
       "replicates": 2000,
-      "seconds": 14.7,
+      "seconds": 45.7,
       "seeds": [
         0,
         2000
@@ -390,7 +416,7 @@
         "q95": 0.004483527626684906
       },
       "replicates": 20,
-      "seconds": 71.3,
+      "seconds": 150.0,
       "seeds": [
         0,
         20
@@ -408,7 +434,7 @@
         "equalized_odds/predictive_parity": 100
       },
       "runs_each": 100,
-      "seconds": 0.1,
+      "seconds": 0.2,
       "seeds": [
         0,
         100
@@ -440,7 +466,7 @@
       "passed": true,
       "rate": 0.0037,
       "replicates": 10000,
-      "seconds": 189.8,
+      "seconds": 420.8,
       "seeds": [
         0,
         10000
@@ -448,7 +474,7 @@
     },
     "B10": {
       "code_hash": "962bbfbef0f94d375bf059ce25dd7ab159869bc4501383636718c95164fe6b98",
-      "digest": "bc035de9a4a818426c06d342b36196663d37798a8e15e611d2fe6e3fb1b0c289",
+      "digest": "d244198b78209f08ee1776175b2015c15bee684596e20ccb07f74ccde26cc780",
       "forbidden_imports": [],
       "interpreters_measured": [
         "3.14.7"
@@ -473,7 +499,7 @@
       "promotions": 6,
       "rate": 0.0012,
       "replicates": 5000,
-      "seconds": 12.0,
+      "seconds": 13.1,
       "seeds": [
         0,
         5000
@@ -502,7 +528,7 @@
       "floor": "none: reported",
       "passed": true,
       "replicates": 500,
-      "seconds": 4.2,
+      "seconds": 4.6,
       "seeds": [
         0,
         500
@@ -531,7 +557,7 @@
       "passed": true,
       "rate": 0.0019,
       "replicates": 10000,
-      "seconds": 15.8,
+      "seconds": 16.5,
       "seeds": [
         0,
         10000
@@ -566,7 +592,7 @@
         ]
       },
       "replicates": 1000,
-      "seconds": 6.0,
+      "seconds": 6.3,
       "seeds": [
         0,
         1000
@@ -606,47 +632,48 @@
       ]
     },
     "B9": {
+      "alpha": 0.05,
       "below_delta_min": {
         "false_promotions": 2,
         "hold_final_share": 0.999,
-        "interval": [
-          0.0002742789176520342,
-          0.003638934269038394
-        ],
-        "rate": 0.001
+        "rate": 0.001,
+        "upper": 0.0031445178378896837
       },
-      "code_hash": "48a534f1875427b9a743d0bcde0b354980fd228f30e7cb41a501a38c965b14fb",
+      "code_hash": "892b86f34d6a8915d271706387c3bd8ad351d3d9fdb45f05e4e5c6fe82098932",
       "false_rollback": {
-        "interval": [
-          8.826773070546787e-05,
-          0.0028268625032662133
-        ],
         "rate": 0.0005,
-        "rollbacks": 1
+        "rollbacks": 1,
+        "upper": 0.002369713367656843
+      },
+      "hook_agreement": {
+        "agree": 199,
+        "alpha": 0.05,
+        "deciding": 199,
+        "floor": 0.95,
+        "lower": 0.9850588129411048,
+        "minimum": 59,
+        "passed": true
       },
       "hook_agrees": true,
       "no_effect": {
         "false_promotions": 3,
         "hold_final_share": 0.9985,
-        "interval": [
-          0.0005102635836384819,
-          0.004401032555770693
-        ],
-        "rate": 0.0015
+        "rate": 0.0015,
+        "upper": 0.003872223150157523
       },
       "passed": true,
-      "promote_bound": 0.026260990336999412,
+      "promote_bound": 0.0338,
       "replicates": 2000,
-      "rollback_bound": 0.014449719092257398,
-      "seconds": 69.1,
+      "rollback_bound": 0.0169,
+      "seconds": 101.2,
       "seeds": [
         0,
         2000
       ],
       "through_hook": {
         "below_delta_min": {
-          "agree": 100,
-          "decided": 100,
+          "agree": 0,
+          "deciding": 0,
           "hold_invalid": 0,
           "hook_decisions": 0,
           "interval": [
@@ -654,11 +681,41 @@
             0.03699349820698568
           ],
           "rate": 0.0,
+          "valid": 100,
+          "vector_decisions": 0,
+          "worlds": 100
+        },
+        "clear_gain": {
+          "agree": 99,
+          "deciding": 99,
+          "hold_invalid": 0,
+          "hook_decisions": 99,
+          "interval": [
+            0.9455138038212946,
+            0.9982325679358593
+          ],
+          "rate": 0.99,
+          "valid": 100,
+          "vector_decisions": 99,
+          "worlds": 100
+        },
+        "clear_loss": {
+          "agree": 100,
+          "deciding": 100,
+          "hold_invalid": 0,
+          "hook_decisions": 100,
+          "interval": [
+            0.9630065017930143,
+            1.0
+          ],
+          "rate": 1.0,
+          "valid": 100,
+          "vector_decisions": 100,
           "worlds": 100
         },
         "false_rollback": {
-          "agree": 100,
-          "decided": 100,
+          "agree": 0,
+          "deciding": 0,
           "hold_invalid": 0,
           "hook_decisions": 0,
           "interval": [
@@ -666,11 +723,13 @@
             0.03699349820698568
           ],
           "rate": 0.0,
+          "valid": 100,
+          "vector_decisions": 0,
           "worlds": 100
         },
         "no_effect": {
-          "agree": 100,
-          "decided": 100,
+          "agree": 0,
+          "deciding": 0,
           "hold_invalid": 0,
           "hook_decisions": 0,
           "interval": [
@@ -678,11 +737,13 @@
             0.03699349820698568
           ],
           "rate": 0.0,
+          "valid": 100,
+          "vector_decisions": 0,
           "worlds": 100
         },
         "true_loss_rollback": {
-          "agree": 100,
-          "decided": 100,
+          "agree": 0,
+          "deciding": 0,
           "hold_invalid": 0,
           "hook_decisions": 0,
           "interval": [
@@ -690,6 +751,8 @@
             0.03699349820698568
           ],
           "rate": 0.0,
+          "valid": 100,
+          "vector_decisions": 0,
           "worlds": 100
         }
       },

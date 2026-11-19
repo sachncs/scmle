@@ -55,7 +55,10 @@ def surfaces():
 
 
 def test_the_deployment_contract_is_pinned_and_every_change_is_reported():
-    """Enforces docs/API_STABILITY.md:198."""
+    """Enforces docs/API_STABILITY.md:201.
+
+    Also enforces website/src/pages/docs/api-stability.astro:34.
+    """
     pinned = surfaces()["scmle.deploy.contract"]
     for name in CONTRACT:
         assert pinned[name]["signature_sha256"], name
@@ -73,7 +76,7 @@ def test_the_deployment_contract_is_pinned_and_every_change_is_reported():
 
 @pytest.mark.parametrize("module", sorted(SECURITY))
 def test_the_security_names_are_pinned_in_the_snapshot(module):
-    """Enforces docs/API_STABILITY.md:205."""
+    """Enforces docs/API_STABILITY.md:208."""
     pinned = surfaces()[module]
     for name in SECURITY[module]:
         assert pinned[name]["signature_sha256"], name
@@ -81,14 +84,17 @@ def test_the_security_names_are_pinned_in_the_snapshot(module):
 
 @pytest.mark.parametrize("module", GOVERNED)
 def test_the_governed_data_modules_are_pinned_in_the_snapshot(module):
-    """Enforces docs/API_STABILITY.md:217."""
+    """Enforces docs/API_STABILITY.md:220."""
     pinned = surfaces()[module]
     assert pinned
     assert all(entry["signature_sha256"] for entry in pinned.values())
 
 
 def test_a_portrait_has_an_empty_leakage_field_and_writes_its_key():
-    """Enforces docs/API_STABILITY.md:51."""
+    """Enforces docs/API_STABILITY.md:54.
+
+    Also enforces website/src/pages/docs/api-stability.astro:62.
+    """
     portrait = data.Portrait(
         manifest=data.DatasetManifest(
             "ds", {"schema": "schema", "data": "data"}, 3, 1, "y"
@@ -105,10 +111,13 @@ def test_a_portrait_has_an_empty_leakage_field_and_writes_its_key():
 
 
 def test_a_multiclass_copy_of_the_target_blocks_in_a_run_screen():
-    """Enforces docs/API_STABILITY.md:51 and docs/ARTIFACTS.md:32.
+    """Enforces docs/API_STABILITY.md:54 and docs/ARTIFACTS.md:32.
 
     The screen a run uses lets every mechanism gate, so a suspect blocks for
     a three-class target too, not only for a binary one.
+
+    Also enforces website/src/pages/docs/api-stability.astro:64.
+    Also enforces website/src/pages/docs/artifacts.astro:15.
     """
     rng = numpy.random.default_rng(0)
     frame = pandas.DataFrame({f"x{i}": rng.normal(size=300) for i in range(3)})

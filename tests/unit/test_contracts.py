@@ -74,5 +74,6 @@ def test_adapter_rejection_reasons():
 
 
 def test_abstract_adapter_cannot_be_instantiated():
+    # Enforces website/src/pages/docs/extensions.astro:76.
     with pytest.raises(TypeError):
         models.Model()

@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping
 import dataclasses
+import math
 from typing import Any
 
 import numpy
@@ -22,6 +23,9 @@ class Est:
         high: Upper interval limit.
         n: Rows used.
         detail: Strategy-specific extras for the report.
+        df: Degrees of freedom of the t reference of the interval; infinite
+            when it is normal. A Wald test of the estimate uses the same
+            reference.
     """
 
     estimate: float
@@ -30,6 +34,7 @@ class Est:
     high: float
     n: int
     detail: Mapping[str, Any] = dataclasses.field(default_factory=dict)
+    df: float = math.inf
 
     def conclusive(self) -> bool:
         """Tests whether the interval excludes zero.
@@ -54,7 +59,7 @@ def waldify(est: Est, name: str, kind: str) -> battery.Test | None:
     """
     if not numpy.isfinite(est.se) or est.se <= 0:
         return None
-    return battery.wald(name, kind, est.estimate, est.se)
+    return battery.wald(name, kind, est.estimate, est.se, est.df)
 
 
 class Estimator:

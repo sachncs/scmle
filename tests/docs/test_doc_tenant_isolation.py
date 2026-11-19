@@ -88,6 +88,9 @@ def test_the_tenant_comes_from_the_token_not_the_request(service, reference):
     A token of another tenant stays forbidden whether the request names this
     deployment's tenant in the path, the query or the body; a token of this
     tenant cannot move to another tenant by naming it either.
+
+    Also enforces website/src/pages/docs/tenant-isolation.astro:24.
+    Also enforces website/src/pages/docs/tenant-isolation.astro:22.
     """
     adapter, gate, clock = service
     payload = {"records": records(reference)}
@@ -119,7 +122,10 @@ def test_the_tenant_comes_from_the_token_not_the_request(service, reference):
 def test_the_probes_disclose_only_liveness_readiness_and_identity(
     service, reference
 ):
-    """Enforces docs/TENANT_ISOLATION.md:23 (what the public paths say)."""
+    """Enforces docs/TENANT_ISOLATION.md:23 (what the public paths say).
+
+    Also enforces website/src/pages/docs/tenant-isolation.astro:29.
+    """
     adapter = service[0]
     status, alive = call(adapter.address, "/livez")
     assert status == 200
@@ -165,6 +171,8 @@ def test_refusals_use_three_fixed_messages(reference):
 
     A missing scope and a foreign tenant give the same 403 body, so the body
     tells neither which check failed nor whether the other tenant exists.
+
+    Also enforces website/src/pages/docs/tenant-isolation.astro:35.
     """
     clock = support_identity.Clock()
     ticks = support_identity.Clock(0.0)
@@ -204,7 +212,10 @@ def test_refusals_use_three_fixed_messages(reference):
 
 
 def test_audit_rows_carry_the_request_id_and_never_a_body(reference, tmp_path):
-    """Enforces docs/TENANT_ISOLATION.md:49."""
+    """Enforces docs/TENANT_ISOLATION.md:49.
+
+    Also enforces website/src/pages/docs/tenant-isolation.astro:36.
+    """
     clock = support_identity.Clock()
     path = tmp_path / "audit.jsonl"
     gate = gateway(clock, audit.Log.open(path, clock=clock))
@@ -240,7 +251,10 @@ def admin_rows(path, count):
 def test_the_chain_catches_edits_gaps_and_reordering_but_not_a_cut_tail(
     tmp_path,
 ):
-    """Enforces docs/TENANT_ISOLATION.md:69."""
+    """Enforces docs/TENANT_ISOLATION.md:69.
+
+    Also enforces website/src/pages/docs/tenant-isolation.astro:45.
+    """
     path = tmp_path / "a.jsonl"
     lines = admin_rows(path, 4)
     gap = [lines[0], *lines[2:]]
@@ -257,7 +271,11 @@ def test_the_chain_catches_edits_gaps_and_reordering_but_not_a_cut_tail(
 def test_the_revocation_file_named_by_the_environment_is_read_per_request(
     tmp_path,
 ):
-    """Enforces docs/TENANT_ISOLATION.md:84 and docs/TENANT_ISOLATION.md:66."""
+    """Enforces docs/TENANT_ISOLATION.md:84 and docs/TENANT_ISOLATION.md:66.
+
+    Also enforces website/src/pages/docs/tenant-isolation.astro:10.
+    Also enforces website/src/pages/docs/tenant-isolation.astro:44.
+    """
     revoked = tmp_path / "revoked.json"
     revoked.write_text(json.dumps({"tokens": [], "subjects": []}))
     gate = access.gateway_from_environment(
@@ -292,7 +310,10 @@ def test_the_revocation_file_named_by_the_environment_is_read_per_request(
 
 
 def test_serving_and_training_roles_keep_to_their_prefixes(tmp_path):
-    """Enforces docs/TENANT_ISOLATION.md:41."""
+    """Enforces docs/TENANT_ISOLATION.md:41.
+
+    Also enforces website/src/pages/docs/tenant-isolation.astro:34.
+    """
     inner = objectstore.LocalObjectStore(str(tmp_path / "store"))
     inner.put("bundles/model/v1/manifest.json", b"{}")
     serving_store = roles.RoleStore(inner, roles.SERVING_ROLE)

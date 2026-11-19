@@ -6,6 +6,7 @@ from scmle.governance import sbom
 
 
 def test_sbom_has_deterministic_component_identity():
+    # Enforces website/src/pages/docs/operations.astro:34.
     packages = {"Pandas": "2.2.0", "scikit_learn": "1.6.0"}
     first = sbom.build(
         packages,

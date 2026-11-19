@@ -1,12 +1,17 @@
 """Commands that build a project from a data file: plan, run and resume."""
 
 import argparse
+from collections.abc import Mapping
 import logging
+import pathlib
+from typing import Any
 
+from scmle.api import estimation
 from scmle.api import project
 from scmle.cli import command
 from scmle.contracts import errors
 from scmle.contracts import tasks
+from scmle.evaluation import parameter_estimation
 from scmle.optimization import optimizers
 from scmle.runtime import config
 
@@ -45,6 +50,13 @@ def constrain(parser: argparse.ArgumentParser) -> None:
         nargs="*",
         default=[],
         help="columns whose groups the fairness report compares",
+    )
+    parser.add_argument(
+        "--mitigation",
+        choices=["none", "reweighing", "group_thresholds"],
+        default="none",
+        help="close the gap of the first sensitive column: `reweighing` "
+        "(binary, multiclass, regression) or `group_thresholds` (binary)",
     )
     command.option(
         parser,
@@ -125,6 +137,11 @@ def govern(parser: argparse.ArgumentParser) -> None:
         "`ensemble`, `feature_graph`, `selection` and `decision` "
         "(same fields as the specification classes)",
     )
+    parser.add_argument(
+        "--estimation",
+        help="JSON file declaring a parameter estimate (`estimand` and "
+        "`policy`), made beside model selection and kept in the run",
+    )
 
 
 def roles(parser: argparse.ArgumentParser) -> None:
@@ -157,6 +174,27 @@ def roles(parser: argparse.ArgumentParser) -> None:
     command.option(
         parser, "--identifiers", "--id-columns", nargs="*", default=[]
     )
+
+
+def declarations(args: argparse.Namespace) -> Mapping[str, Any]:
+    """Reads the fairness mitigation and the `--estimation` file.
+
+    Args:
+        args: The parsed command-line arguments.
+
+    Returns:
+        `fairness` when a mitigation is requested, and `estimand` and
+        `estimation_policy` when a declaration file is given.
+    """
+    fairness = (
+        {}
+        if args.mitigation == "none"
+        else {"fairness": tasks.Parity(mitigation=args.mitigation)}
+    )
+    if args.estimation is None:
+        return fairness
+    estimand, policy = estimation.load(args.estimation)
+    return {**fairness, "estimand": estimand, "estimation_policy": policy}
 
 
 class ProjectCommand(command.Command):
@@ -238,7 +276,7 @@ class ProjectCommand(command.Command):
             The project; search, model and strategy settings given on the
             command line are used unless the config file sets that section.
         """
-        sections = config.overlay(args.config)
+        sections = {**declarations(args), **config.overlay(args.config)}
         sections.setdefault(
             "search",
             tasks.Search(
@@ -343,7 +381,90 @@ class Run(ProjectCommand):
         """
         result = self.scaffold(args).run()
         LOGGER.info("%s", result.summary())
+        if result.estimation is not None:
+            announce(result.estimation)
         LOGGER.info("artifacts: %s", result.run_dir)
+        return command.EXIT_OK
+
+
+def announce(found: parameter_estimation.Estimation) -> None:
+    """Logs each estimated parameter with its interval.
+
+    Args:
+        found: The verified estimation report.
+    """
+    level = found.policy.confidence_level
+    for item in found.parameters:
+        LOGGER.info(
+            "%s %s = %.6g, %g%% interval [%.6g, %.6g], p = %.3g",
+            found.estimand.name,
+            item.name,
+            item.estimate,
+            100 * level,
+            item.interval[0],
+            item.interval[1],
+            item.p_value,
+        )
+
+
+class Estimation(command.Command):
+    """Estimates a declared parameter without training a model."""
+
+    name = "estimate"
+    help = "estimate a declared parameter with its interval, or say why not"
+
+    def configure(self, parser: argparse.ArgumentParser) -> None:
+        """Adds the data, declaration and output options.
+
+        Args:
+            parser: The argument parser of this command.
+        """
+        parser.add_argument("data", help="CSV or Parquet file")
+        parser.add_argument(
+            "--estimation",
+            required=True,
+            help="JSON file declaring the parameter (`estimand` and `policy`)",
+        )
+        command.option(parser, "--treatment", "--treatment-column")
+        parser.add_argument(
+            "--output-dir",
+            default="estimates",
+            help="where parameter_estimation.json, or "
+            "parameter_estimation_refusal.json with why, is written",
+        )
+
+    def execute(self, args: argparse.Namespace) -> int:
+        """Writes the estimate and logs each parameter with its interval.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+
+        Raises:
+            BlockedError: If the estimate is refused; the reasons are in
+                `parameter_estimation_refusal.json` in `--output-dir`.
+        """
+        estimand, policy = estimation.load(args.estimation)
+        declared = project.Project(
+            args.data,
+            estimand.outcome,
+            treatment_column=args.treatment,
+            estimand=estimand,
+            estimation_policy=policy,
+            output_dir=args.output_dir,
+        )
+        folder = pathlib.Path(args.output_dir)
+        try:
+            found = declared.estimate_parameters(folder)
+        except estimation.REFUSALS as error:
+            raise errors.BlockedError(
+                f"parameter estimation refused: {error}",
+                {"record": str(folder / estimation.REFUSAL)},
+            ) from error
+        announce(found)
+        LOGGER.info("estimate: %s", folder / estimation.REPORT)
         return command.EXIT_OK
 
 

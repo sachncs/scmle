@@ -267,6 +267,7 @@ def test_a_capability_keeps_its_declaration_order_and_dumps():
     ],
 )
 def test_a_capability_refuses_incomplete_declarations(changes, error, message):
+    # Enforces website/src/pages/docs/capabilities.astro:82.
     with pytest.raises(error, match=message):
         capability(**changes)
 

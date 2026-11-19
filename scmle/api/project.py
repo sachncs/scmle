@@ -11,6 +11,8 @@ from scmle.api.curator import Curator
 from scmle.api.estimation import declare
 from scmle.api.estimation import estimate
 from scmle.api.estimation import persist
+from scmle.api.estimation import REFUSALS
+from scmle.api.estimation import refuse
 from scmle.api.estimation import restore
 from scmle.api.non_tabular import vet
 from scmle.artifacts import reproducibility
@@ -86,6 +88,9 @@ class Definition:
         id_columns: Identifier columns excluded from features.
         group_column: Entity column that must not straddle splits.
         time_column: Column ordering rows in time.
+        cutoff: The prediction time, ISO 8601 text such as `2020-01-01`:
+            a date column with values after it was not known when the
+            prediction is made, and the leakage screen blocks it.
         time_as_feature: Also let the model use the time column as a feature
             (off by default; models must extrapolate in time).
         excluded_columns: Other columns to ignore.
@@ -136,6 +141,10 @@ class Definition:
         horizon_rows: Rolling validation: rows in each validation window.
         window_rows: Rolling validation: rows in each training window (all
             earlier rows when omitted).
+        entities: Temporal and rolling validation with `group_column`:
+            `known` (default) forecasts the entities trained on, so an
+            entity's past trains and its future is held out; `unseen`
+            predicts new entities and keeps each on one side of every split.
         validation: Split strategy or `auto`.
         folds: Cross-validation folds.
         test_fraction: Share of rows locked away for the final test.
@@ -209,6 +218,7 @@ class Definition:
     id_columns: list[str] | None = None
     group_column: str | None = None
     time_column: str | None = None
+    cutoff: str | None = None
     time_as_feature: bool = False
     excluded_columns: list[str] | None = None
     unavailable_at_prediction: list[str] | None = None
@@ -235,6 +245,7 @@ class Definition:
     embargo_rows: int = 0
     horizon_rows: int | None = None
     window_rows: int | None = None
+    entities: Literal["known", "unseen"] = "known"
     validation: ValidationStrategy = "auto"
     folds: int = 5
     test_fraction: float = 0.2
@@ -287,6 +298,7 @@ def describe(
         id_columns=definition.id_columns or [],
         group_column=definition.group_column,
         time_column=definition.time_column,
+        cutoff=definition.cutoff,
         time_as_feature=definition.time_as_feature,
         excluded_columns=definition.excluded_columns or [],
         unavailable_at_prediction=definition.unavailable_at_prediction or [],
@@ -346,6 +358,7 @@ def configure(
             embargo_rows=definition.embargo_rows,
             horizon_rows=definition.horizon_rows,
             window_rows=definition.window_rows,
+            entities=definition.entities,
             folds=definition.folds,
             test_fraction=definition.test_fraction,
             seed=definition.seed,
@@ -449,16 +462,33 @@ class Project(Definition):
 
         If an estimand and policy were declared, the parameter estimation runs
         before the workflow and its evidence is bound to the result after it.
+        A refused estimate stops the run before anything is trained, and
+        why it was refused is written to
+        `output_dir/parameter_estimation_refusal.json`.
 
         Args:
             plan: An approved or modified plan restricting candidates.
 
         Returns:
             The completed run.
+
+        Raises:
+            ConfigError: If the declared estimate is refused for its
+                configuration (see `estimate_parameters`).
+            DataError: If it is refused for the data.
         """
         estimation = None
-        if self.estimand is not None or self.estimation_policy is not None:
-            estimation = self.estimate_parameters()
+        if self.estimand is not None and self.estimation_policy is not None:
+            try:
+                estimation = self.estimate_parameters()
+            except REFUSALS as error:
+                refuse(
+                    self.output_dir,
+                    self.estimand,
+                    self.estimation_policy,
+                    error,
+                )
+                raise
         declaration = declare(self.estimand, self.estimation_policy)
         result = self.orchestrator.run(
             self.output_dir,
@@ -480,7 +510,8 @@ class Project(Definition):
 
         Args:
             artifact_directory: Optional directory in which to write
-                ``parameter_estimation.json``.
+                ``parameter_estimation.json``, or, when the estimate is
+                refused, ``parameter_estimation_refusal.json`` with why.
 
         Returns:
             The declared parameter estimates and uncertainty evidence.
@@ -496,12 +527,22 @@ class Project(Definition):
                 "parameter estimation is disabled: declare both estimand "
                 "and estimation_policy explicitly"
             )
-        return estimate(
-            self.orchestrator,
-            self.estimand,
-            self.estimation_policy,
-            artifact_directory,
-        )
+        try:
+            return estimate(
+                self.orchestrator,
+                self.estimand,
+                self.estimation_policy,
+                artifact_directory,
+            )
+        except REFUSALS as error:
+            if artifact_directory is not None:
+                refuse(
+                    artifact_directory,
+                    self.estimand,
+                    self.estimation_policy,
+                    error,
+                )
+            raise
 
     @classmethod
     def resume(

@@ -36,15 +36,30 @@ Procedure, for every candidate column `j` (the family has `m` members):
    so a legitimate predictor on its own scale raises no hypothesis; it finds
    a field recorded after the outcome (the label with a tenth garbled, the
    number plus noise) whose skill stays under the skill ceiling.
-3. Multiplicity. All `m` p-values (skill, echo and missingness tests) form one
-   family adjusted by Benjamini and Yekutieli (2001, Ann. Statist. 29:1165)
-   at level `alpha`, exactly (`scmle.assurance.ledger.multiplicity`).
+2c. Records (`records`), with analytic p-values. Target mean: a numeric
+   column on the target's scale, grouped by its own levels and by its runs
+   along the most telling other column's order, tested by the lower tail of
+   `F(G, nu)` for being a more precise group mean of the target than that
+   mean's sampling noise allows a column that never read the outcomes.
+   Duplication: every row (not the subsample) is counted, and the records
+   seen twice are tested against the most a sample from any population
+   holds given those seen once and three times (`E[f2]^2 <= 1.5 E[f1]
+   E[f3]`), so a table's natural duplicates set its own allowance. Both
+   ceilings are that honest limit (`NATURAL`).
+3. Multiplicity. All `m` p-values (skill, echo, missingness and record
+   tests) form one family adjusted by Benjamini and Yekutieli (2001, Ann.
+   Statist. 29:1165) at level `alpha`, exactly
+   (`scmle.assurance.ledger.multiplicity`).
    The number of permutations is raised until the smallest reachable p-value
    `1 / (B + 1)` can pass the rank-1 threshold `alpha / (m * H_m)`; if that
    needs more than `MAX_PERMUTATIONS` the screen says so and flags nothing.
    A column whose p-value can no longer fall below the largest threshold
    `alpha / H_m` stops early; the step-up decisions are identical to those of
    the full run, because such a p-value can never be rejected and sorts last.
+   A hypothesis whose observed statistic is not above its ceiling cannot be
+   a suspect (step 4), so it draws no permutations and enters the step with
+   p = 1 (`sift`): a larger p-value is still valid, so the control below is
+   kept, and a wide table without a strong column needs no permutation work.
 4. Suspect. A column is a *suspect* only when its test is rejected by step 3
    AND the one-sided lower confidence bound of its effect size is above the
    pre-registered ceiling (`skill_ceiling` or `association_ceiling`). The
@@ -116,6 +131,8 @@ from scmle.assurance.admissibility.screen.fitting import basis
 from scmle.assurance.admissibility.screen.fitting import concordance
 from scmle.assurance.admissibility.screen.fitting import crossfit
 from scmle.assurance.admissibility.screen.fitting import encode
+from scmle.assurance.admissibility.screen.fitting import enough
+from scmle.assurance.admissibility.screen.fitting import margin
 from scmle.assurance.admissibility.screen.fitting import oof_fit
 from scmle.assurance.admissibility.screen.fitting import pair
 from scmle.assurance.admissibility.screen.fitting import pairs
@@ -136,6 +153,7 @@ from scmle.assurance.admissibility.screen.hypotheses import hypothesize
 from scmle.assurance.admissibility.screen.hypotheses import Pending
 from scmle.assurance.admissibility.screen.hypotheses import propose
 from scmle.assurance.admissibility.screen.hypotheses import reflect
+from scmle.assurance.admissibility.screen.hypotheses import sift
 from scmle.assurance.admissibility.screen.hypotheses import spell
 from scmle.assurance.admissibility.screen.hypotheses import tested
 from scmle.assurance.admissibility.screen.permutation import draw_permutations
@@ -147,6 +165,9 @@ from scmle.assurance.admissibility.screen.planning import Demand
 from scmle.assurance.admissibility.screen.planning import disclose
 from scmle.assurance.admissibility.screen.planning import load_store
 from scmle.assurance.admissibility.screen.planning import subsample
+from scmle.assurance.admissibility.screen.records import dated
+from scmle.assurance.admissibility.screen.records import duplication
+from scmle.assurance.admissibility.screen.records import encodings
 from scmle.assurance.admissibility.screen.report import abstain
 from scmle.assurance.admissibility.screen.report import conclude
 from scmle.assurance.admissibility.screen.report import exceed
@@ -159,22 +180,31 @@ from scmle.assurance.admissibility.screen.settings import allowance
 from scmle.assurance.admissibility.screen.settings import BATCH
 from scmle.assurance.admissibility.screen.settings import BINARY_CLASSES
 from scmle.assurance.admissibility.screen.settings import cost
+from scmle.assurance.admissibility.screen.settings import DATED
+from scmle.assurance.admissibility.screen.settings import DATED_DEFECT
+from scmle.assurance.admissibility.screen.settings import DATED_ID
 from scmle.assurance.admissibility.screen.settings import DETECTOR_ID
 from scmle.assurance.admissibility.screen.settings import DETECTORS
+from scmle.assurance.admissibility.screen.settings import DUPLICATION
 from scmle.assurance.admissibility.screen.settings import ECHO
+from scmle.assurance.admissibility.screen.settings import ENCODING
 from scmle.assurance.admissibility.screen.settings import family
 from scmle.assurance.admissibility.screen.settings import FIT_SECONDS
 from scmle.assurance.admissibility.screen.settings import FITS_PER_SECOND
+from scmle.assurance.admissibility.screen.settings import HELD
 from scmle.assurance.admissibility.screen.settings import HYPOTHESES
 from scmle.assurance.admissibility.screen.settings import KNOTS
+from scmle.assurance.admissibility.screen.settings import LATE
 from scmle.assurance.admissibility.screen.settings import MAX_CERTIFIED_CLASSES
 from scmle.assurance.admissibility.screen.settings import MAX_ROWS
 from scmle.assurance.admissibility.screen.settings import MECHANISM_DEFECTS
 from scmle.assurance.admissibility.screen.settings import MIN_CLASSES
 from scmle.assurance.admissibility.screen.settings import MISSING
+from scmle.assurance.admissibility.screen.settings import NATURAL
 from scmle.assurance.admissibility.screen.settings import PAIR_LEVELS
 from scmle.assurance.admissibility.screen.settings import PURITY
 from scmle.assurance.admissibility.screen.settings import RIDGE
+from scmle.assurance.admissibility.screen.settings import ROWS
 from scmle.assurance.admissibility.screen.settings import SCAN_SECONDS
 from scmle.assurance.admissibility.screen.settings import SCREEN_SHARE
 from scmle.assurance.admissibility.screen.settings import share
@@ -193,21 +223,30 @@ from scmle.contracts import errors
 __all__ = [
     "BATCH",
     "BINARY_CLASSES",
+    "DATED",
+    "DATED_DEFECT",
+    "DATED_ID",
     "DETECTORS",
     "DETECTOR_ID",
+    "DUPLICATION",
     "ECHO",
+    "ENCODING",
     "FITS_PER_SECOND",
     "FIT_SECONDS",
+    "HELD",
     "HYPOTHESES",
     "KNOTS",
+    "LATE",
     "MAX_CERTIFIED_CLASSES",
     "MAX_ROWS",
     "MECHANISM_DEFECTS",
     "MIN_CLASSES",
     "MISSING",
+    "NATURAL",
     "PAIR_LEVELS",
     "PURITY",
     "RIDGE",
+    "ROWS",
     "SCAN_SECONDS",
     "SCREEN_SHARE",
     "SKILL",
@@ -235,11 +274,15 @@ __all__ = [
     "cost",
     "cramer",
     "crossfit",
+    "dated",
     "decline",
     "disclose",
     "dominance",
     "draw_permutations",
+    "duplication",
     "encode",
+    "encodings",
+    "enough",
     "exceed",
     "family",
     "floor",
@@ -249,6 +292,7 @@ __all__ = [
     "hedge",
     "hypothesize",
     "load_store",
+    "margin",
     "oof_fit",
     "pair",
     "pairs",
@@ -261,6 +305,7 @@ __all__ = [
     "resample",
     "resamples",
     "share",
+    "sift",
     "skill_bound",
     "skill_statistic",
     "spell",
@@ -298,7 +343,7 @@ def bound(rows: int, columns: int, classes: int) -> float:
     for width in (columns, columns + len(plants.DEFECTS)):
         draws = max(
             leakage.CERTIFIED.permutations,
-            resamples(HYPOTHESES * width, alpha),
+            resamples(HYPOTHESES * width + 1, alpha),
         )
         work = min(draws, MAX_PERMUTATIONS) * width * ways
         total += cost(task, seen, work)
@@ -347,7 +392,7 @@ def measure(
     except errors.InputError:
         # handled: the scan abstains on the same error before drawing
         return None
-    if not leakage.sufficient(problem.y, task, cfg):
+    if not enough(problem.y, task, cfg):
         return None
     classes = leakage.bucket(sample[target], task)
     codes = pandas.factorize(classes, sort=True)[0].astype("int64")
@@ -363,12 +408,16 @@ def measure(
         totals,
         structured=structured,
     )[0]
-    skill = sum(1 for h in pending if h.mechanism == SKILL)
+    pending += encodings(sample, names, problem, cfg)
+    copied = duplication(frame, names, target, cfg) if pending else None
+    pending += [] if copied is None else [copied]
+    live = sift(pending, cfg)
+    skill = sum(1 for h in pending if h.mechanism == SKILL and h.active)
     family = len(pending)
     columns = tested(pending, names)
     alpha = budget.exact(cfg.alpha, "alpha")
     total = max(cfg.permutations, resamples(family, alpha))
-    if family == 0 or total > MAX_PERMUTATIONS:
+    if family == 0 or (live and total > MAX_PERMUTATIONS):
         return None
     ways = problem.classes if problem.classes > BINARY_CLASSES else 1
     work = total * skill * ways
@@ -385,12 +434,15 @@ def screen_table(
     group_column: str | None = None,
     time_column: str | None = None,
     time_budget_seconds: float | None = None,
+    cutoff: str | None = None,
 ) -> Screen:
     """Screens training data with the certified settings.
 
     Groups and a time column structure the rows as `arrange` describes.
     Every suspect may block; `probe` records what a clean result means on
-    these rows (see the module docstring).
+    these rows (see the module docstring). With a declared prediction time,
+    every date column with values after it is late (`records.dated`); that
+    reading needs no budget and runs even when the scan is declined.
 
     Args:
         frame: Training rows including the target and any structure columns.
@@ -406,6 +458,7 @@ def screen_table(
             scan and the probe together may take `share` of it by `cost`,
             and a scan predicted not to fit is declined. None means no cap
             beyond `MAX_PERMUTATIONS`.
+        cutoff: The declared prediction time (`Dataset.cutoff`), or None.
 
     Returns:
         The report, using `CERTIFIED` settings with `seed`. A screen that was
@@ -414,6 +467,7 @@ def screen_table(
         `screen`.
     """
     cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=seed)
+    late = dated(frame, [c for c in features if c in frame.columns], cutoff)
     rows, grouping, block_size = arrange(frame, group_column, time_column)
     limit = share(time_budget_seconds)
     demand = None
@@ -430,7 +484,7 @@ def screen_table(
         and demand.seconds > limit
     ):
         report = decline(cfg, demand, limit, time_budget_seconds)
-        return dataclasses.replace(
+        report = dataclasses.replace(
             report,
             notes=(
                 *report.notes,
@@ -438,6 +492,7 @@ def screen_table(
                 "probe not run: the screen itself did not run",
             ),
         )
+        return stamp(report, late, cutoff)
     report = screen(
         rows,
         target,
@@ -455,7 +510,53 @@ def screen_table(
     found = probe(
         rows, target, task, list(features), cfg, grouping, block_size, left
     )
-    return disclose(report, found, evidence(task, classes), left, limit)
+    report = disclose(report, found, evidence(task, classes), left, limit)
+    return stamp(report, late, cutoff)
+
+
+def stamp(
+    report: Screen, late: Sequence[Finding], cutoff: str | None
+) -> Screen:
+    """Adds the dated findings of a declared prediction time to a report.
+
+    Args:
+        report: The screen's report.
+        late: The findings of `records.dated`.
+        cutoff: The declared prediction time, or None.
+
+    Returns:
+        The report unchanged without a cutoff; otherwise with the late
+        columns' findings, the dated mechanism gating at ceiling `LATE`, and
+        a note on how many date columns were read and the certificate.
+    """
+    if cutoff is None:
+        return report
+    store = bundled()
+    state = (
+        "missing"
+        if store is None
+        else store.state(DATED_ID, dated_digest()).value
+    )
+    note = (
+        f"prediction time {cutoff} declared: {len(late)} date column(s) hold "
+        f"values after it; published certificate for dated columns: {state}"
+    )
+    return dataclasses.replace(
+        report,
+        findings=(*report.findings, *late),
+        gates={**report.gates, DATED: certificates.Authority.GATING},
+        ceilings={**report.ceilings, DATED: LATE},
+        notes=(*report.notes, note),
+    )
+
+
+def dated_digest() -> str:
+    """Hash of the code the dated check depends on, its certificate's key.
+
+    Returns:
+        The traced hash of `records.dated`.
+    """
+    return trace.digest(dated)
 
 
 def probe(
@@ -500,14 +601,28 @@ def probe(
         demand = measure(planted, target, task, cfg, names, groups, block_size)
         if demand is not None and demand.seconds > limit:
             return {}
-    report = screen(planted, target, task, cfg, names, groups, block_size, None)
+    report = screen(
+        planted,
+        target,
+        task,
+        cfg,
+        names,
+        groups,
+        block_size,
+        None,
+        apart=tuple(plants.DEFECTS),
+        counted=plants.copy(planted, cfg.run_seed),
+    )
     owner = {d: m for m, ds in MECHANISM_DEFECTS.items() for d in ds}
+    where = {**{d: d for d in plants.DEFECTS}, plants.DUPLICATES: ROWS}
     return {
         defect: any(
-            f.suspect and f.feature == defect and f.mechanism == owner[defect]
+            f.suspect
+            and f.feature == where[defect]
+            and f.mechanism == owner[defect]
             for f in report.findings
         )
-        for defect in plants.DEFECTS
+        for defect in plants.KINDS
     }
 
 
@@ -559,6 +674,8 @@ def scan(
     block_size: int | None,
     gates: Mapping[str, certificates.Authority],
     time_budget_seconds: float | None = None,
+    apart: Sequence[Hashable] = (),
+    extra: Sequence[Pending] = (),
 ) -> Screen:
     """Runs the screen on rows that are already chosen.
 
@@ -571,15 +688,15 @@ def scan(
         groups: Group label per row, or None.
         block_size: Consecutive rows per time block, or None.
         gates: Gate status per mechanism.
-        time_budget_seconds: Declared time budget, or None for no cap
-            beyond `MAX_PERMUTATIONS`.
+        time_budget_seconds: Declared time budget; None for no cap.
+        apart: Columns left out of every other column's rest (`rival`).
+        extra: Hypotheses formed on all rows (duplication), joined to a
+            family that is not empty.
 
     Returns:
-        The report. It has no findings, with the reason in its notes, when
-        the outcome is invalid, there are too few rows, no column could be
-        tested, or the permutations or work needed exceed the limits; in
-        every one of these cases the candidate columns are listed in
-        `unchecked`.
+        The report; when the outcome is invalid, rows are too few, no column
+        could be tested or the work exceeds the limits, it has no findings,
+        says why and lists the candidates in `unchecked`.
     """
     n = len(frame)
     try:
@@ -587,24 +704,20 @@ def scan(
     except ValueError as error:
         # handled: returned as failed finding/problem/refusal with error text
         return abstain(cfg, gates, n, f"screen not run: {error}", names)
-    if not leakage.sufficient(problem.y, task, cfg):
+    if not enough(problem.y, task, cfg):
         return abstain(
             cfg, gates, n, "screen not run: too few rows (low power)", names
         )
     alpha = budget.exact(cfg.alpha, "alpha")
-    strata = stratify(n, groups, block_size)
-    class_codes, totals = tally(frame[target], task)
-    pending, notes = propose(
-        frame,
-        target,
-        names,
-        problem,
-        cfg,
-        class_codes,
-        totals,
-        structured=groups is not None or block_size is not None,
+    labels = tally(frame[target], task)
+    class_codes = labels[0]
+    structured = groups is not None or block_size is not None
+    found = propose(
+        frame, target, names, problem, cfg, *labels, structured=structured
     )
-    family = len(pending)
+    pending = found[0] + encodings(frame, names, problem, cfg)
+    pending += list(extra) if pending else []
+    family, notes = len(pending), found[1]
     if family == 0:
         return abstain(
             cfg, gates, n, "screen not run: no column could be tested", names
@@ -612,19 +725,20 @@ def scan(
     total = max(cfg.permutations, resamples(family, alpha))
     declined = tested(pending, names)
     size = (n, family, total)
-    if total > MAX_PERMUTATIONS:
+    if sift(pending, cfg) and total > MAX_PERMUTATIONS:
         return exceed(cfg, gates, size, MAX_PERMUTATIONS, declined)
     overrun = throttle(
         cfg, gates, size, pending, problem, declined, time_budget_seconds
     )
     if overrun is not None:
         return overrun
+    strata = stratify(n, groups, block_size)
     draw_permutations(
         pending, problem.y, class_codes, strata, total, alpha, cfg.run_seed
     )
-    labels = (class_codes, totals)
+    plan = (total, alpha)
     findings = conclude(
-        pending, (total, alpha), problem, frame, labels, cfg, groups, gates
+        pending, plan, problem, frame, labels, cfg, groups, gates, apart
     )
     return Screen(
         tuple(findings), n, family, total, cfg.alpha, gates, caps(cfg), notes
@@ -641,6 +755,8 @@ def screen(
     block_size: int | None = None,
     gates: Mapping[str, certificates.Authority] | None = None,
     time_budget_seconds: float | None = None,
+    apart: Sequence[Hashable] = (),
+    counted: pandas.DataFrame | None = None,
 ) -> Screen:
     """Screens the candidate columns of training data for leakage suspicion.
 
@@ -659,6 +775,10 @@ def screen(
             descriptive. `screen_table` sets it from the probe.
         time_budget_seconds: Declared time budget; bounds the work through
             `allowance`. None means no cap beyond `MAX_PERMUTATIONS`.
+        apart: Columns never counted in another column's rest (`rival`):
+            the probe's plants, each judged against the real columns only.
+        counted: The rows the duplication test counts, with the same
+            columns; None counts `frame` (the probe passes its copied rows).
 
     Returns:
         The report. Nothing is raised for a degenerate target or too few
@@ -686,6 +806,9 @@ def screen(
     rows, blocks = subsample(len(frame), group_values, block_size, cfg.run_seed)
     sample = frame.iloc[rows].reset_index(drop=True)
     sample_groups = None if group_values is None else group_values[rows]
+    copied = duplication(
+        frame if counted is None else counted, chosen, target, cfg
+    )
     return scan(
         sample,
         target,
@@ -696,4 +819,6 @@ def screen(
         blocks,
         chosen_gates,
         time_budget_seconds,
+        apart,
+        () if copied is None else (copied,),
     )

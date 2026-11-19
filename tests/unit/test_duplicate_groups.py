@@ -1,4 +1,4 @@
-"""Copies of one record never straddle a split."""
+"""Repeated records are exchangeable draws: counted, not moved."""
 
 import numpy
 import pandas
@@ -45,24 +45,28 @@ def test_numbers_are_compared_to_six_decimals():
     assert groups[2] == duplicates.NOT_DUPLICATED
 
 
-def test_no_duplicate_group_straddles_the_holdout_or_any_fold():
+def test_repeats_are_exchangeable_draws_and_are_counted():
     frame = frame_with_copies()
+    manager = splitters.Splitter(spec(), tasks.Task.BINARY)
+    plain = splitters.STRATEGIES[manager.strategy_name](
+        spec(), tasks.Task.BINARY
+    ).partition(frame)
     groups = duplicates.duplicate_groups(frame, ["a", "b"])
 
-    split = splitters.Splitter(spec(), tasks.Task.BINARY).split(frame)
+    split = manager.split(frame)
 
-    dev = set(split.manifest.train_ids)
-    test = set(split.manifest.test_ids)
-    for group in set(groups) - {duplicates.NOT_DUPLICATED}:
-        rows = set(numpy.flatnonzero(groups == group).tolist())
-        assert rows <= dev or rows <= test
-    dev_rows = numpy.array(split.manifest.train_ids)
-    for fit, held in split.manifest.folds:
-        fit_groups = set(groups[dev_rows[list(fit)]])
-        held_groups = set(groups[dev_rows[list(held)]])
-        shared = (fit_groups & held_groups) - {duplicates.NOT_DUPLICATED}
-        assert not shared
-    assert any("duplicate rows" in note for note in split.manifest.notes)
+    assert split.manifest.train_ids == tuple(int(i) for i in plain.dev_ids)
+    assert split.manifest.test_ids == tuple(int(i) for i in plain.test_ids)
+    seen = set(groups[list(split.manifest.train_ids)])
+    repeated = sum(
+        groups[row] != duplicates.NOT_DUPLICATED and groups[row] in seen
+        for row in split.manifest.test_ids
+    )
+    assert repeated > 0
+    assert (
+        f"{repeated} of {len(split.manifest.test_ids)} test rows repeat a "
+        "development record" in " ".join(split.manifest.notes)
+    )
 
 
 def test_data_without_copies_keeps_the_plain_split():

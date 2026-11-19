@@ -25,6 +25,7 @@ def records() -> tuple[dict[str, object], dict[str, object]]:
 
 
 def test_attestation_binds_model_provenance_and_sbom_digests():
+    # Enforces website/src/pages/docs/operations.astro:34.
     provenance, sbom = records()
 
     record = attestation.Attestation.from_records(provenance, sbom)
@@ -69,6 +70,7 @@ def test_attestation_signature_binds_all_release_subjects():
 
 
 def test_attestation_signature_rejects_tampered_persisted_record():
+    # Enforces website/src/pages/docs/operations.astro:34.
     provenance, sbom = records()
     record = attestation.Attestation.from_records(
         provenance, sbom, signing_key="release-key"
@@ -94,6 +96,7 @@ def test_an_empty_bytes_signing_key_is_rejected():
 
 def test_an_unusable_configured_key_is_refused_and_named(tmp_path):
     # Enforces docs/SERVICE_SLO.md:123.
+    # Enforces website/src/pages/docs/service.astro:83.
     with pytest.raises(errors.ConfigError, match="set but empty"):
         signing.lookup({signing.SIGNING_KEY_ENV: ""})
     with pytest.raises(errors.ConfigError, match="set but empty"):

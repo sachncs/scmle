@@ -97,7 +97,10 @@ def test_plain_text_reader_infers_path_format(tmp_path):
 
 
 def test_reader_accepts_an_explicit_layout_extractor_contract():
-    """Optional layout extraction receives raw bytes and format identity."""
+    """Optional layout extraction receives raw bytes and format identity.
+
+    Also enforces website/src/pages/docs/api.astro:149.
+    """
     observed: dict[str, object] = {}
 
     def layout_reader(
@@ -155,7 +158,10 @@ def test_reader_accepts_an_explicit_layout_extractor_contract():
     ],
 )
 def test_layout_extractor_failures_are_structured(reader, expected_error, code):
-    """Optional extraction failures never become silent metadata loss."""
+    """Optional extraction failures never become silent metadata loss.
+
+    Also enforces website/src/pages/docs/api.astro:149.
+    """
     with pytest.raises(expected_error) as caught:
         reader.load(b"content", document_id="doc-1")
 
@@ -365,7 +371,10 @@ def test_shifted_fixture_splits_by_document_id_without_leakage(shifted_dataset):
 
 
 def test_pdf_without_optional_reader_has_structured_dependency_error():
-    """PDF support fails explicitly when the optional reader is absent."""
+    """PDF support fails explicitly when the optional reader is absent.
+
+    Also enforces website/src/pages/docs/api.astro:149.
+    """
     with pytest.raises(document.DependencyError) as caught:
         document.Reader().load(
             b"%PDF-1.7", document_id="pdf", document_format="pdf"
@@ -435,7 +444,10 @@ def test_curation_reports_composition_duplicates_and_bounded_profiles(
 
 
 def test_curation_blocks_identical_content_with_conflicting_labels():
-    """Duplicate content with different labels is a supervised-data risk."""
+    """Duplicate content with different labels is a supervised-data risk.
+
+    Also enforces website/src/pages/docs/api.astro:112.
+    """
     dataset = document.Dataset(
         (
             document.Sample("positive", "same text", label="yes"),

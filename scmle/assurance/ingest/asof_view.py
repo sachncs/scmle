@@ -59,8 +59,8 @@ def to_days(values: pandas.Series) -> numpy.ndarray:
     """Converts times to float days.
 
     Datetimes are measured from the Unix epoch, numbers are taken as given,
-    and strings are parsed as timestamps (timezone-aware values are converted
-    to UTC). Missing values become NaN.
+    and strings are parsed as timestamps by `stamp` (timezone-aware values
+    are converted to UTC). Missing values become NaN.
 
     Args:
         values: The column of times.
@@ -75,11 +75,35 @@ def to_days(values: pandas.Series) -> numpy.ndarray:
     ):
         return values.to_numpy(dtype="float64")
     else:
-        stamps = pandas.to_datetime(values, errors="raise", utc=True)
+        stamps = stamp(values)
     if getattr(stamps.dt, "tz", None) is not None:
         stamps = stamps.dt.tz_convert("UTC").dt.tz_localize(None)
     seconds = (stamps - EPOCH).dt.total_seconds()
     return seconds.to_numpy(dtype="float64") / SECONDS_PER_DAY
+
+
+def stamp(values: pandas.Series) -> pandas.Series:
+    """Parses text times as UTC timestamps.
+
+    ISO 8601 is read per value, so one column may mix precisions ("2016-07-04"
+    beside "2023-08-29 09:23:46", as real databases hold); any other text
+    must share one format, which pandas infers.
+
+    Args:
+        values: The column of text times.
+
+    Returns:
+        Timezone-aware UTC timestamps; missing values stay missing.
+
+    Raises:
+        ValueError: If the text is not ISO 8601 and has no single format.
+    """
+    iso = pandas.to_datetime(
+        values, format="ISO8601", utc=True, errors="coerce"
+    )
+    if bool((iso.isna() & values.notna()).any()):
+        return pandas.to_datetime(values, errors="raise", utc=True)
+    return iso
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

@@ -148,7 +148,11 @@ def test_release_evaluation_passes_and_serializes_deterministically():
 
 
 def test_release_evidence_gate_requires_a_verified_signature():
-    """A passing policy cannot bypass an unsigned evidence index."""
+    """A passing policy cannot bypass an unsigned evidence index.
+
+    Also enforces website/src/pages/docs/evidence.astro:77.
+    Also enforces website/src/pages/docs/operating-loop.astro:18.
+    """
     policy = make_policy()
     outcome = release.assess(
         policy,
@@ -171,7 +175,10 @@ def test_release_evidence_gate_requires_a_verified_signature():
 
 
 def test_metric_failure_and_missing_evidence_block_release():
-    """A failed metric and an absent required record are blocking findings."""
+    """A failed metric and an absent required record are blocking findings.
+
+    Also enforces website/src/pages/docs/evidence.astro:70.
+    """
     policy = make_policy()
     result = release.assess(
         policy,
@@ -192,7 +199,10 @@ def test_metric_failure_and_missing_evidence_block_release():
 
 
 def test_warning_diagnostic_failure_is_visible_but_not_blocking():
-    """A declared warning remains a failed finding without blocking release."""
+    """A declared warning remains a failed finding without blocking release.
+
+    Also enforces website/src/pages/docs/evidence.astro:78.
+    """
     policy = make_policy(diagnostic_action=evaluation.Remedy.WARN)
     result = release.assess(
         policy,
@@ -335,7 +345,11 @@ def test_explanation_quality_release_gate_passes_with_valid_evidence():
 
 
 def test_release_is_blocked_when_fault_plan_is_unexecuted():
-    """Statistical success does not override an unverified fault plan."""
+    """Statistical success does not override an unverified fault plan.
+
+    Also enforces website/src/pages/docs/evidence.astro:82.
+    Also enforces website/src/pages/docs/operations.astro:34.
+    """
     outcome = release.assess(
         make_policy(),
         {"roc_auc": 0.81},
@@ -432,7 +446,10 @@ def test_readiness_summary_counts_findings_and_serializes_deterministically():
 
 
 def test_blocked_readiness_summary_distinguishes_blocking_failures():
-    """A failed blocking finding produces an explicit blocked status."""
+    """A failed blocking finding produces an explicit blocked status.
+
+    Also enforces website/src/pages/docs/evidence.astro:78.
+    """
     policy = make_policy()
     result = release.assess(
         policy,
@@ -496,7 +513,11 @@ def test_readiness_summary_rejects_inconsistent_values(
 
 
 def test_attestation_gate_requires_a_signed_release_record():
-    """A release record without an HMAC signature fails closed."""
+    """A release record without an HMAC signature fails closed.
+
+    Also enforces website/src/pages/docs/evidence.astro:77.
+    Also enforces website/src/pages/docs/operations.astro:34.
+    """
     outcome = release.Verdict(
         task="classification",
         policy_schema_version=1,
@@ -529,7 +550,10 @@ def test_attestation_gate_requires_a_signed_release_record():
 
 
 def test_attestation_gate_rejects_a_tampered_signature():
-    """A present signature is insufficient when verification fails."""
+    """A present signature is insufficient when verification fails.
+
+    Also enforces website/src/pages/docs/operations.astro:34.
+    """
     outcome = release.Verdict(
         task="classification",
         policy_schema_version=1,

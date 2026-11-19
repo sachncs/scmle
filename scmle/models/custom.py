@@ -17,6 +17,7 @@ from scmle.contracts import search
 from scmle.contracts import tasks
 from scmle.models import conformance
 from scmle.models.sklearn import classical
+from scmle.runtime import plugins
 
 
 @dataclasses.dataclass(frozen=True)
@@ -130,7 +131,9 @@ def register_estimator(
         )
     if name in registry.builtin_names():
         raise errors.ConfigError(f"'{name}' is a built-in model name")
-    if name in registry.extensions() and not replace:
+    if name in plugins.REGISTRY.entries(plugins.Kind.ESTIMATORS) and not (
+        replace
+    ):
         raise errors.ConfigError(f"model '{name}' is already registered")
     adapter = rebuild(
         Registration(
@@ -146,7 +149,9 @@ def register_estimator(
         )
     )
     conformance.comply(adapter)
-    registry.adopt(adapter, replace)  # Authoritative, atomic check.
+    plugins.REGISTRY.enrol(  # Authoritative, atomic check.
+        plugins.Kind.ESTIMATORS, adapter.name, adapter, replace
+    )
     return adapter
 
 
@@ -156,6 +161,4 @@ def unregister_estimator(name: str) -> None:
     Args:
         name: Public model name given to `register_estimator`.
     """
-    from scmle.models import registry  # noqa: PLC0415 -- circular: registry imports this module
-
-    registry.deregister(name)
+    plugins.REGISTRY.withdraw(plugins.Kind.ESTIMATORS, name)

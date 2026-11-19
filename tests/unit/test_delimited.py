@@ -66,10 +66,17 @@ def test_long_integer_with_gap_stays_exact(tmp_path):
     assert pandas.isna(frame["v"].iloc[1])
 
 
-def test_long_integer_beside_float_is_refused(tmp_path):
-    path = write(tmp_path, "d.csv", f"v\n{BIG}\n1.5\n")
-    with pytest.raises(errors.InputError, match="2\\*\\*53"):
-        tabular.read_table(path)
+def test_long_integer_beside_float_stays_exact(tmp_path):
+    path = write(tmp_path, "d.csv", f"k,v\n1,{BIG}\n2,1.5\n3,\n")
+    cells = tabular.read_table(path)["v"].tolist()
+    assert type(cells[0]) is int and cells[0] == BIG
+    assert type(cells[1]) is float and cells[1] == 1.5
+    assert pandas.isna(cells[2])
+
+
+def test_long_integer_beside_decimal_comma_stays_exact(tmp_path):
+    path = write(tmp_path, "d.csv", f"k;v\n1;{BIG}\n2;1,5\n")
+    assert tabular.read_table(path)["v"].tolist() == [BIG, 1.5]
 
 
 def test_ordinary_integers_with_gap_stay_float(tmp_path):

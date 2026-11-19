@@ -35,7 +35,21 @@ Offline
 * False usefulness (gate A4 `gate_a4`). Score independent of the label,
   prevalence 0.2, rule acts on 20 percent, `R = 2000` at `n = 2000` and
   `20000`. Pass: share called `useful` `<= 0.05 + tol(0.05, R)`. Power by
-  effect size is filed.
+  effect size is filed. Amendment of 2026-11-19 (audit item 6): that null
+  sat far from the decision boundary (the rule's net benefit at `t = 0.4`
+  is about -0.07), so it passed by construction. It is replaced by the
+  least favourable nulls `BOUNDARY`, where the smallest true difference
+  over the grid and both baselines is exactly zero (`treat_none`: precision
+  0.4, rate 0.02 among rows left alone; `treat_all`: precision 0.7, rate
+  0.1 among rows left alone; prevalence 0.2), each at `n = 2000` and
+  `20000`, `R = 2000`. Pass, per setting: the one-sided Clopper-Pearson
+  upper bound at `alpha` on the share called `useful` is at most
+  `false_useful_max` (acceptance.toml). Amendment 2026-11-19 (second): that
+  ceiling was the band's level 0.05 itself, which a correctly sized band
+  fails most of the time on these least favourable nulls; the gate is a size
+  gate and its ceiling is now `0.05 (1 + size_margin)` (0.0845,
+  `acceptance.sized`), the rule of every size gate; worlds, counts and
+  seeds are unchanged.
 * Off-policy evaluation (gate A5 `gate_a5`). `n = 2000`, `R = 2000`, propensity
   floor 0.05, sharpness 1 (`ESS/n` is filed). Estimators: IPW, SNIPS, DR with
   an outcome model fitted on a separate log of 3000 (with the step feature, and
@@ -125,7 +139,32 @@ Online (level `alpha_promote = 1/50` for one experiment, `alpha_rollback =
   promotion and false rollback counts are filed with Wilson intervals and are
   not gated (100 worlds cannot bound a rate of 0.01). A world in which the hook
   stops on the sample-ratio check (`hold_invalid`) is counted separately and
-  not as a disagreement.
+  not as a disagreement. Amendment of 2026-11-19 (audit item 6): a world in
+  which neither the hook nor the e-process acts says nothing about
+  agreement, and the hook acted in none of the 400, so `agree == worlds`
+  was vacuous. Agreement is now counted only over deciding worlds (the
+  hook or the e-process promotes or rolls back), pooled over the four
+  scenarios (`agreement`): pass when every deciding world agrees and the
+  one-sided Clopper-Pearson lower bound at `alpha` on the agreeing share is
+  at least `hook_agreement_min` (acceptance.toml), which needs at least 59
+  deciding worlds. Amendment of 2026-11-19 (second): the four scenarios
+  are null or near-null worlds where the right decision is to hold, so the
+  e-process itself decided in at most a handful of the 400 and the 59
+  deciding worlds could never arise; the world design, not the hook, was
+  wrong. Two hook-only scenarios are added where the e-process should act,
+  `clear_gain` (a constant gain of `CLEAR_FACTOR = 4` times `delta_min`,
+  promotion) and `clear_loss` (a constant loss of 4 times the tolerance,
+  rollback after a real promotion, as gate B4's 4 tau), `HOOK_WORLDS` each
+  from their own streams; their counts join the pooled agreement and their
+  rates are filed, not gated. The vectorised rates of (a) to (c) are now
+  decided by their one-sided exact (Clopper-Pearson) upper bound at
+  `alpha` of acceptance.toml against the size ceiling of the e-process
+  level (`ALPHA_PROMOTE`, `ALPHA_ROLLBACK`) instead of `level + tol`; the
+  `hold_final` share of (b) is the complement of its false promotions and
+  is decided with them. Amendment of 2026-11-19 (third): the ceiling was
+  the level itself, which a correctly sized test fails most of the time;
+  it is now `level (1 + size_margin)` (`acceptance.sized`), the rule of
+  every size gate.
 * Determinism (gate B10 `gate_b10`): two runs of a fixed battery give the same
   SHA-256 of the report, and no module of `scmle.decision` imports custody,
   vault or ledger code. The check ran on one interpreter (the one that
@@ -159,6 +198,7 @@ import pandas
 from scipy import stats
 import scipy.stats
 
+from benchmarks import acceptance
 from benchmarks.qualification import f11_generators
 from scmle.artifacts import bundle
 from scmle.assurance.charter import feasibility
@@ -176,6 +216,7 @@ from scmle.decision import netbenefit
 from scmle.decision import ope
 from scmle.decision import rollout
 from scmle.decision import threshold
+from scmle.evaluation import coverage
 from scmle.governance import deployment_ledger
 import scmle.governance.registry
 import scmle.models.registry
@@ -571,41 +612,88 @@ def gate_a3(runs: int, base: int = 0) -> dict[str, Any]:
     }
 
 
-def gate_a4(runs: int, base: int = 0) -> dict[str, Any]:
-    """False usefulness with a score independent of the label.
+def boundary(precision: float, rest: float) -> tuple[float, float, float]:
+    """A rule with the given outcome rates at the overall `PREVALENCE`.
 
     Args:
-        runs: Number of worlds per size.
+        precision: Outcome rate among the rows the rule acts on.
+        rest: Outcome rate among the rows it leaves alone.
+
+    Returns:
+        The share acted on, the precision and the rest rate.
+    """
+    return (PREVALENCE - rest) / (precision - rest), precision, rest
+
+
+# gate A4: least favourable null worlds. In each, the smallest true
+# difference over the grid and both baselines is exactly zero, so the rule
+# is not useful, yet every other difference is positive. `treat_none`: the
+# precision equals the top of the range, so the rule's own net benefit is
+# zero at `t = 0.4`. `treat_all`: the outcome rate among the rows left alone
+# equals the bottom of the range, so the gain over treating everyone is zero
+# at `t = 0.1`.
+BOUNDARY = {
+    "treat_none": boundary(RANGE[1], 0.02),
+    "treat_all": boundary(0.7, RANGE[0]),
+}
+# gate A4: one-sided level of the net-benefit band, and the size ceiling
+# whose exact bound decides the gate
+A4_LEVEL = 0.05
+FALSE_USEFUL = acceptance.sized(A4_LEVEL)
+# gate B9: the acceptance.toml variable deciding hook agreement
+HOOK_AGREEMENT = "hook_agreement_min"
+
+
+def gate_a4(runs: int, base: int = 0) -> dict[str, Any]:
+    """False usefulness in worlds on the decision boundary.
+
+    Each `BOUNDARY` world is run at two sizes. A setting passes when the
+    one-sided Clopper-Pearson upper bound at `alpha` on its share called
+    `useful` is at most the size ceiling `FALSE_USEFUL`.
+
+    Args:
+        runs: Number of worlds per setting.
         base: Seed offset (0 for certification).
 
     Returns:
-        The share called `useful` at each size with its interval, the bound,
-        the power at four effect sizes (300 worlds each) and `passed`.
+        Per setting the worlds called `useful`, the worlds run, the exact
+        upper bound and whether it meets the ceiling; the ceiling, `alpha`,
+        the fewest worlds that can pass, the power at four effect sizes
+        (300 worlds each) and `passed`.
     """
+    variables = acceptance.load()
+    alpha = variables["alpha"].value
+    rule = FALSE_USEFUL
     result: dict[str, Any] = {"null": {}}
-    bound = 0.05 + tol(0.05, runs)
     passed = True
-    for n in (2000, 20000):
-        hits = 0
-        for index in range(runs):
-            rng = rng_for(base, f"a4.{n}", index)
-            y = (rng.random(n) < PREVALENCE).astype(float)
-            acts = (rng.random(n) < PREVALENCE).astype(float)
-            report = netbenefit.lowerband(
-                y,
-                acts,
-                RANGE,
-                replicates=BOOTSTRAPS,
-                seed=base + index,
-            )
-            hits += int(report.claim == netbenefit.USEFUL)
-        meets = hits / runs <= bound
-        passed = passed and meets
-        result["null"][str(n)] = {
-            "useful_rate": hits / runs,
-            "interval": wilson(hits, runs),
-            "meets_floor": meets,
-        }
+    for name, (share, precision, rest) in BOUNDARY.items():
+        for n in (2000, 20000):
+            hits = 0
+            for index in range(runs):
+                y, acts = f11_generators.acted_world(
+                    rng_for(base, f"a4.{name}.{n}", index),
+                    n,
+                    share,
+                    precision,
+                    rest,
+                )
+                report = netbenefit.lowerband(
+                    y,
+                    acts,
+                    RANGE,
+                    replicates=BOOTSTRAPS,
+                    seed=base + index,
+                )
+                hits += int(report.claim == netbenefit.USEFUL)
+            meets = rule.passes(hits, runs, alpha)
+            passed = passed and meets
+            result["null"][f"{name}/{n}"] = {
+                "useful": hits,
+                "runs": runs,
+                "useful_rate": hits / runs,
+                "upper": coverage.clopper_pearson(hits, runs, 1 - 2 * alpha)[1],
+                "meets_floor": meets,
+            }
     power = {}
     for delta in (0.25, 0.5, 1.0, 1.5):
         hits = 0
@@ -627,7 +715,10 @@ def gate_a4(runs: int, base: int = 0) -> dict[str, Any]:
         power[str(delta)] = hits / 300
     result.update(
         {
-            "bound": bound,
+            "bound": rule.bound,
+            "alpha": alpha,
+            "minimum": rule.minimum(alpha),
+            "boundary": {k: list(v) for k, v in BOUNDARY.items()},
             "power_n2000": power,
             "passed": passed,
             "replicates": runs,
@@ -1705,6 +1796,10 @@ def gate_b6(runs: int, base: int = 0) -> dict[str, Any]:
 
 HOOK_WORLDS = 100
 HOOK_BATCH = 500
+# gate B9: the planted gain and loss of the two deciding hook scenarios, in
+# multiples of `delta_min` and of the rollback tolerance (gate B4's 4 tau);
+# the vectorised e-process acts in nearly every such world at 6000 units
+CLEAR_FACTOR = 4
 HOOK_KEY = "f11-b9-approval-key"
 
 
@@ -1820,9 +1915,13 @@ def hook_promotes(hook: rollout_hook.Hook, record: Any, seed: int) -> None:
 
 
 def hook_path(base: int = 0) -> dict[str, Any]:
-    """The four lifecycle scenarios run through `Hook` on a registry.
+    """The lifecycle scenarios run through `Hook` on a registry.
 
-    Each of the first `HOOK_WORLDS` worlds of a scenario is fed to the hook in
+    The four scenarios of the vectorised gate are null or near-null worlds,
+    where the right decision is to hold, so they hardly ever decide; two
+    more plant a clear gain and a clear loss (`CLEAR_FACTOR` times
+    `delta_min` and the tolerance), where the e-process should act. Each of
+    the first `HOOK_WORLDS` worlds of a scenario is fed to the hook in
     batches; the hook's decision is compared with the vectorised e-process on
     the same world at the level the hook itself assigned.
 
@@ -1830,23 +1929,29 @@ def hook_path(base: int = 0) -> dict[str, Any]:
         base: Seed offset.
 
     Returns:
-        Per scenario the worlds, the worlds decided, those held for an
-        invalid sample ratio, the hook's decisions, the agreements with the
-        vectorised path and the rate with its interval.
+        Per scenario the worlds, those not held for an invalid sample ratio
+        (`valid`) and those held, the hook's decisions, the vectorised
+        path's decisions, the worlds where either acts (`deciding`), the
+        agreements among those and the hook's rate with its interval.
     """
     n = 6000
     plan = plan_for(delta_min=0.02, n_max=n)
+    clear = CLEAR_FACTOR * plan.delta
     scenarios = {
         "no_effect": ("promotion", 0.0, 0.0),
         "below_delta_min": ("promotion", 0.01, 0.01),
         "false_rollback": ("rollback", 0.0, -0.015),
         "true_loss_rollback": ("rollback", 0.0, -0.06),
+        "clear_gain": ("promotion", clear, clear),
+        "clear_loss": ("rollback", -clear, -clear),
     }
     stream_names = {
         "no_effect": "b9.no_effect",
         "below_delta_min": "b9.below_delta_min",
         "false_rollback": "b9.rollback",
         "true_loss_rollback": "b9.harm",
+        "clear_gain": "b9.clear_gain",
+        "clear_loss": "b9.clear_loss",
     }
     out: dict[str, Any] = {}
     with tempfile.TemporaryDirectory() as scratch:
@@ -1860,7 +1965,7 @@ def hook_path(base: int = 0) -> dict[str, Any]:
                 start,
                 end,
             )
-            hits = agree = invalid = 0
+            hits = agree = invalid = vector = deciding = 0
             for world in range(HOOK_WORLDS):
                 hook = hook_in(manager, plan)
                 if kind == "promotion":
@@ -1904,18 +2009,63 @@ def hook_path(base: int = 0) -> dict[str, Any]:
                     invalid += 1
                     continue
                 hits += int(won)
-                agree += int(won == expected)
-            decided = HOOK_WORLDS - invalid
+                vector += int(expected)
+                if won or expected:
+                    deciding += 1
+                    agree += int(won == expected)
+            valid = HOOK_WORLDS - invalid
             out[label] = {
                 "worlds": HOOK_WORLDS,
-                "decided": decided,
+                "valid": valid,
                 "hold_invalid": invalid,
                 "hook_decisions": hits,
+                "vector_decisions": vector,
+                "deciding": deciding,
                 "agree": agree,
-                "rate": hits / max(1, decided),
-                "interval": wilson(hits, max(1, decided)),
+                "rate": hits / max(1, valid),
+                "interval": wilson(hits, max(1, valid)),
             }
     return out
+
+
+def agreement(through: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """Decides whether the hook agrees with the e-process where it decides.
+
+    A world counts only when the hook or the vectorised e-process acts in
+    it (promotes or rolls back); a world where both hold says nothing about
+    agreement. The deciding worlds of all scenarios are pooled. The row
+    passes when every deciding world agrees and the one-sided
+    Clopper-Pearson lower bound at `alpha` on the agreeing share is at
+    least `hook_agreement_min`, which needs at least `minimum` deciding
+    worlds.
+
+    Args:
+        through: Per scenario, `deciding` and `agree` counts as filed by
+            `hook_path`.
+
+    Returns:
+        The deciding worlds, the agreements, the exact lower bound, the
+        floor, `alpha`, the fewest deciding worlds that can pass and
+        `passed`.
+    """
+    variables = acceptance.load()
+    alpha = variables["alpha"].value
+    rule = variables[HOOK_AGREEMENT].rule
+    assert isinstance(rule, acceptance.Floor)
+    deciding = sum(int(v["deciding"]) for v in through.values())
+    agree = sum(int(v["agree"]) for v in through.values())
+    lower = coverage.clopper_pearson(agree, deciding, 1 - 2 * alpha)[0]
+    return {
+        "deciding": deciding,
+        "agree": agree,
+        "lower": lower,
+        "floor": rule.bound,
+        "alpha": alpha,
+        "minimum": rule.minimum(alpha),
+        "passed": bool(
+            agree == deciding and rule.passes(agree, deciding, alpha)
+        ),
+    }
 
 
 def gate_b9(runs: int, base: int = 0) -> dict[str, Any]:
@@ -1934,6 +2084,9 @@ def gate_b9(runs: int, base: int = 0) -> dict[str, Any]:
     n = 6000
     plan = plan_for(delta_min=0.02, n_max=n)
     target_p, target_r = -math.log(ALPHA_PROMOTE), -math.log(ALPHA_ROLLBACK)
+    alpha = acceptance.load()["alpha"].value
+    promote = acceptance.sized(ALPHA_PROMOTE)
+    rollback = acceptance.sized(ALPHA_ROLLBACK)
     result: dict[str, Any] = {}
 
     def promoted(arm: numpy.ndarray, y: numpy.ndarray) -> numpy.ndarray:
@@ -1968,7 +2121,7 @@ def gate_b9(runs: int, base: int = 0) -> dict[str, Any]:
             "false_promotions": hits,
             "rate": hits / runs,
             "hold_final_share": 1 - hits / runs,
-            "interval": wilson(hits, runs),
+            "upper": promote.limit(hits, runs, alpha),
         }
     hits = 0
     for chunk in range(0, runs, 500):
@@ -1986,7 +2139,7 @@ def gate_b9(runs: int, base: int = 0) -> dict[str, Any]:
     result["false_rollback"] = {
         "rollbacks": hits,
         "rate": hits / runs,
-        "interval": wilson(hits, runs),
+        "upper": rollback.limit(hits, runs, alpha),
     }
     caught = 0
     harm_runs = runs // 2
@@ -2004,22 +2157,21 @@ def gate_b9(runs: int, base: int = 0) -> dict[str, Any]:
         )
     result["true_loss_rollback_share"] = caught / harm_runs
     result["through_hook"] = hook_path(base)
-    hook_agrees = all(
-        v["agree"] == v["decided"] for v in result["through_hook"].values()
-    )
-    promote_bound = ALPHA_PROMOTE + tol(ALPHA_PROMOTE, runs)
-    rollback_bound = ALPHA_ROLLBACK + tol(ALPHA_ROLLBACK, runs)
+    result["hook_agreement"] = agreement(result["through_hook"])
+    hook_agrees = result["hook_agreement"]["passed"]
     meets = (
         hook_agrees
-        and result["no_effect"]["rate"] <= promote_bound
-        and result["below_delta_min"]["rate"] <= promote_bound
-        and result["below_delta_min"]["hold_final_share"] >= 1 - promote_bound
-        and result["false_rollback"]["rate"] <= rollback_bound
+        and promote.passes(result["no_effect"]["false_promotions"], runs, alpha)
+        and promote.passes(
+            result["below_delta_min"]["false_promotions"], runs, alpha
+        )
+        and rollback.passes(result["false_rollback"]["rollbacks"], runs, alpha)
     )
     result.update(
         {
-            "promote_bound": promote_bound,
-            "rollback_bound": rollback_bound,
+            "alpha": alpha,
+            "promote_bound": promote.bound,
+            "rollback_bound": rollback.bound,
             "hook_agrees": hook_agrees,
             "passed": bool(meets),
             "replicates": runs,
@@ -2166,7 +2318,14 @@ def sources() -> dict[str, list[Any]]:
             f11_generators.binormal,
             f11_generators.binormal_differences,
         ],
-        "A4": [netbenefit.lowerband, netbenefit.redraw, gate_a4],
+        "A4": [
+            netbenefit.lowerband,
+            netbenefit.redraw,
+            boundary,
+            gate_a4,
+            f11_generators.acted_world,
+            f11_generators.binormal,
+        ],
         "A5": [
             ope.evaluate,
             ope.terms,
@@ -2274,6 +2433,7 @@ def sources() -> dict[str, list[Any]]:
             hook_in,
             hook_promotes,
             hook_path,
+            agreement,
             gate_b9,
         ],
         "B10": [battery_digest, forbidden_imports, gate_b10],
@@ -2289,12 +2449,15 @@ def current_digests() -> dict[str, str]:
     return {k: certificates.code_hash(*v) for k, v in sources().items()}
 
 
-def certify_all(base: int = 0, scale: float = 1.0) -> dict[str, Any]:
+def certify_all(
+    base: int = 0, scale: float = 1.0, only: tuple[str, ...] = ()
+) -> dict[str, Any]:
     """Runs every gate; `scale` shrinks replicate counts for dev looks.
 
     Args:
         base: Seed offset (0 for certification, `DEV_SEED_BASE` for looks).
         scale: Fraction of each gate's replicates to run (at least 2).
+        only: Names of the gates to run; all when empty.
 
     Returns:
         The certificate document: version, development seed base, what was
@@ -2309,6 +2472,8 @@ def certify_all(base: int = 0, scale: float = 1.0) -> dict[str, Any]:
     }
     digests = current_digests()
     for name, (runner, runs) in RUNNERS.items():
+        if only and name not in only:
+            continue
         started = time.monotonic()
         count = max(2, int(runs * scale)) if runs > MINIMUM_RUNS else runs
         measured = runner(count, base)
@@ -2408,13 +2573,18 @@ def main(arguments: list[str] | None = None) -> int:
     mode.add_argument("--check", action="store_true")
     mode.add_argument("--dev", action="store_true")
     parser.add_argument("--scale", type=float, default=0.05)
+    parser.add_argument("--only", nargs="*", default=[])
     options = parser.parse_args(arguments)
     if options.dev:
         document = certify_all(DEV_SEED_BASE, options.scale)
         print(json.dumps(document, indent=2, sort_keys=True, default=float))
         return 0
     if options.write:
-        document = certify_all()
+        document = certify_all(only=tuple(options.only))
+        if options.only and STORE_PATH.exists():
+            merged = json.loads(STORE_PATH.read_text(encoding="utf-8"))
+            merged["gates"].update(document["gates"])
+            document = merged
         STORE_PATH.write_text(
             json.dumps(document, indent=2, sort_keys=True, default=float)
             + "\n",

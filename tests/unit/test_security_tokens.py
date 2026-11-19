@@ -85,6 +85,7 @@ def test_a_tampered_payload_is_refused():
 
 
 def test_the_none_algorithm_and_confusion_attacks_are_refused():
+    # Enforces website/src/pages/docs/threat-model.astro:20.
     clock = support_identity.Clock()
     check = verifier(
         clock,
@@ -116,6 +117,7 @@ def test_malformed_tokens_are_refused(token):
 
 
 def test_expired_and_future_tokens_are_refused():
+    # Enforces website/src/pages/docs/threat-model.astro:20.
     clock = support_identity.Clock()
     check = verifier(clock, support_identity.hs_jwk("hs-1"), leeway_seconds=0)
     old = hs_token(clock, exp=int(clock.now) - 1)
@@ -136,6 +138,7 @@ def test_the_leeway_is_bounded():
 
 
 def test_wrong_issuer_audience_and_missing_claims_are_refused():
+    # Enforces website/src/pages/docs/threat-model.astro:20.
     clock = support_identity.Clock()
     check = verifier(clock, support_identity.hs_jwk("hs-1"))
     assert refused(check, hs_token(clock, iss="https://evil")) == (
@@ -151,6 +154,7 @@ def test_wrong_issuer_audience_and_missing_claims_are_refused():
 
 
 def test_revoked_tokens_subjects_and_keys_are_refused():
+    # Enforces website/src/pages/docs/threat-model.astro:20.
     clock = support_identity.Clock()
     revocations = tokens.RevocationList(
         tokens=["tok-bad"], subjects=["mallory"], key_ids=["hs-old"]
@@ -171,6 +175,8 @@ def test_revoked_tokens_subjects_and_keys_are_refused():
 
 def test_the_revocation_file_is_read_on_every_check_and_fails_closed(tmp_path):
     # Enforces docs/TENANT_ISOLATION.md:66 and docs/TENANT_ISOLATION.md:84.
+    # Enforces website/src/pages/docs/tenant-isolation.astro:10.
+    # Enforces website/src/pages/docs/tenant-isolation.astro:44.
     clock = support_identity.Clock()
     path = tmp_path / "revoked.json"
     path.write_text(json.dumps({"tokens": []}))

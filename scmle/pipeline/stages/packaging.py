@@ -154,8 +154,8 @@ class PackageStage(tracing.Tracing):
         """Builds the model bundle of the final pipeline.
 
         Args:
-            context: The run context, holding the final pipeline, the split,
-                the selection and the evaluation.
+            context: The run context, holding the model to serve, the
+                split, the selection and the evaluation.
 
         Returns:
             The bundle, before its conformal, quantile and novelty evidence.
@@ -167,7 +167,9 @@ class PackageStage(tracing.Tracing):
         )
         profile = scmle.pipeline.context.require(context.profile, "profile")
         return scmle.artifacts.bundle.Bundle.create(
-            context.final_pipeline,
+            context.shipped
+            if context.shipped is not None
+            else context.final_pipeline,
             profile.feature_plan,
             split.dev_features,
             context.spec.data.target,

@@ -372,7 +372,10 @@ def test_decoded_raster_lifecycle_emits_pixel_occlusion_evidence(
 
 
 def test_metadata_only_raster_explanation_is_explicitly_unavailable():
-    """Metadata-only raster packages never imply pixel evidence."""
+    """Metadata-only raster packages never imply pixel evidence.
+
+    Also enforces website/src/pages/docs/extensions.astro:40.
+    """
     adapter = raster_adapter()
     result = adapter.elucidate(
         adapter.samples[0],
@@ -551,7 +554,10 @@ def test_package_signature_rejects_a_wrong_key(tmp_path: Path):
 def test_lifecycle_report_rejects_a_signed_incomplete_stage_record(
     tmp_path: Path,
 ):
-    """A valid HMAC cannot promote a partial lifecycle into a full report."""
+    """A valid HMAC cannot promote a partial lifecycle into a full report.
+
+    Also enforces website/src/pages/docs/evidence.astro:32.
+    """
     report_path = tmp_path / "report.json"
     report = modality_lifecycle.Lifecycle().run(
         document_adapter(),
@@ -1077,7 +1083,10 @@ def test_graph_lifecycle_emits_one_hop_context_evidence(tmp_path: Path):
 
 
 def test_graph_subgraph_context_is_bounded_and_deterministic():
-    """Topology evidence has explicit node and edge limits."""
+    """Topology evidence has explicit node and edge limits.
+
+    Also enforces website/src/pages/docs/capabilities.astro:22.
+    """
     nodes = tuple(graph.Node(f"node-{index}") for index in range(5))
     edges = tuple(graph.Edge("center", f"node-{index}") for index in range(5))
     adapter = modality_lifecycle.GraphPreparer(
@@ -1137,7 +1146,11 @@ def test_geospatial_lifecycle_emits_crs_bound_explanation(tmp_path: Path):
 
 
 def test_geospatial_curation_records_boundary_leakage_warning():
-    """The adapter carries envelope-crossing evidence into curation."""
+    """The adapter carries envelope-crossing evidence into curation.
+
+    Also enforces website/src/pages/docs/api.astro:259.
+    Also enforces website/src/pages/docs/data.astro:173.
+    """
     adapter = modality_lifecycle.GeospatialPreparer(
         geospatial.Dataset(
             (
@@ -1427,7 +1440,16 @@ def test_lifecycle_compares_against_a_repeated_performance_baseline(
 
 def test_blocking_geospatial_curation_stops_before_packaging(tmp_path: Path):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:156-160.
-    """Missing CRS evidence blocks before a model or package is created."""
+    """Missing CRS evidence blocks before a model or package is created.
+
+    Also enforces website/src/learn/when-things-go-wrong.html:78.
+    Also enforces website/src/pages/docs/cards.astro:32.
+    Also enforces website/src/pages/docs/data.astro:118.
+    Also enforces website/src/pages/docs/modalities.astro:105.
+    Also enforces website/src/pages/docs/operations.astro:113.
+    Also enforces website/src/pages/docs/modeling.astro:19.
+    Also enforces website/src/pages/docs/operating-loop.astro:18.
+    """
     features = tuple(
         geospatial.Placemark(
             feature_id=f"feature-{index}",

@@ -10,6 +10,9 @@ The pinned names, by module, are:
 * `scmle.api.project.Project`, `scmle.artifacts.results.Run` and
   `scmle.artifacts.bundle.Bundle` for lifecycle and artifacts;
 * `scmle.api.predict.load_model` and `scmle.api.predict.predict` for inference;
+* `scmle.api.clustering` (`Segmentation`, `cluster`, `evaluate`) for
+  clustering, and `scmle.api.erasure` (`Forgetting`, `Retirement`,
+  `Deletion`, `Subject`, `Receipt`, `RetiredError`) for erasure;
 * `register_estimator`, `unregister_estimator` and `register_metric` in the
   modules that define them, for extension.
 
@@ -30,9 +33,9 @@ and are extension surfaces until promoted: `scmle.contracts.qualification`
 `scmle.assurance.ledger.budget` (`ErrorBudget` and the budget functions) and
 `scmle.runtime.randomness` (keyed random streams). Rule: new qualification names
 are added without touching any entry in `tests/fixtures/public_api.json`, and
-a name is pinned only deliberately, with a changelog
-entry and a regenerated snapshot (`scripts/check_api_compatibility.py
---write`). `tests/unit/test_qualification_api_rule.py` enforces both halves.
+a name is pinned only deliberately, with a changelog entry (a review rule) and
+a regenerated snapshot (`scripts/check_api_compatibility.py --write`).
+`tests/unit/test_qualification_api_rule.py::test_no_previously_pinned_name_changed` enforces the first half, and `tests/unit/test_qualification_api_rule.py::test_new_types_are_not_package_root_names` that no qualification name is pinned at the package root.
 
 One deliberate change to the pinned surface: `Project` gained the optional
 keyword `charter` (default `None`, so every existing call is unchanged) and the

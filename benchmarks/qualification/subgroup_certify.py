@@ -23,24 +23,42 @@ probability 1/2) on `C` with a declared column `g` of `LEVELS = 8` levels
 `base = 0` and seeds `0 .. replicates - 1`, development looks use
 `DEV_SEED_BASE`, which never overlaps.
 
-Gates (`R` replicates):
+Gates (`R` replicates). Every rate is decided by its one-sided exact
+(Clopper-Pearson) bound at `alpha` of `acceptance.toml`, against a variable
+of that file: an error rate passes when its upper bound is at most the
+size ceiling of Holm's level 0.05, `0.05 (1 + size_margin)` (0.0845,
+`acceptance.sized`), a power when its lower bound is at least
+`causal_power_min` (0.80).
 
 * Null world: `tau_g = 0` for all eight levels, `rows_per_level = 200`,
-  `R = 2000`. Family-wise error rate (any level rejected) `<= 0.05 + 2 sqrt(
-  0.05 * 0.95 / R)`.
+  `R = NULL_REPLICATES = 2000`. Family-wise error rate (any level rejected)
+  within the ceiling.
 * Partial null: `tau_g0 = tau_g1 = 0.5`, the other six zero,
   `rows_per_level = 200`, `R = 2000`. Probability that any of the six true
-  nulls is rejected `<= 0.05 + 2 sqrt(0.05 * 0.95 / R)`.
+  nulls is rejected within the ceiling.
 * Power: one planted effect `tau_g0 = 0.5` (half the outcome standard
-  deviation), `rows_per_level` in 100, 200, 400, `R = 500` each. Power is the
-  share of replicates in which `g0` is rejected. Power is certified from the
-  smallest tested size whose Wilson 95 percent lower bound is `>= 0.80`;
-  `min_certified_rows` is that size. Other effect sizes (0.3, 0.8) are filed
-  and not gated.
-* Pass: both error rates within their bounds and at least one size
+  deviation), `rows_per_level` in 100, 200, 400, `R = POWER_REPLICATES =
+  500` each. Power is the share of replicates in which `g0` is rejected.
+  Power is certified from the smallest tested size whose lower bound
+  reaches the floor; `min_certified_rows` is that size. Other effect sizes
+  (0.3, 0.8) are filed and not gated.
+* Pass: both error rates within the ceiling and at least one size
   certified. A report calls the family `gating` only when `passed`; a
   subgroup with fewer than `min_certified_rows` rows is described as below
   the certified size.
+
+Amendment 2026-11-19. The first certificate passed on a point estimate
+within `0.05 + 2 sqrt(0.05 * 0.95 / R)`, a looser rule than the plan's: its
+null-world rate 111 of 2000 (0.0555) is above 0.05 itself. The rule is now
+the exact bound above, the counts and seeds are unchanged, and the result
+is filed whichever way it falls. A Holm family whose true family-wise rate
+equals its level cannot pass a ceiling at that level.
+
+Amendment 2026-11-19 (second). The ceiling was the level 0.05 itself, which
+a correctly sized family fails most of the time. Every size gate now uses
+`level (1 + size_margin)`, the margin derived in `acceptance.toml` so that a
+correctly sized test passes with chance `power` at the gate's replicate
+count; the counts and seeds are unchanged.
 
 Worlds are simulated with independent homoscedastic normal noise and equal
 level sizes; real subgroups are unequal, correlated with covariates and not
@@ -55,7 +73,6 @@ and data of a real trial.
 
 import argparse
 import json
-import math
 import sys
 import time
 from typing import Any
@@ -63,23 +80,30 @@ from typing import Any
 import numpy
 import pandas
 
+from benchmarks import acceptance
 from scmle.assurance.charter import causal
 from scmle.assurance.detectors import certificates
 from scmle.causal.identification import certified
 from scmle.causal.identification import run
 import scmle.certificates
+from scmle.evaluation import coverage
 
 STORE_PATH = scmle.certificates.DIRECTORY / "subgroup_certificates.json"
 DEV_SEED_BASE = 10_000
 LEVELS = 8
 # share of rows treated
 TREATED_SHARE = 0.5
+# confidence of the per-level Wald test; Holm runs at one minus it
 LEVEL = 0.95
-ALPHA = 1.0 - LEVEL
+VARIABLES = acceptance.load()
+# one-sided error rate of every verdict below
+ALPHA = VARIABLES["alpha"].value
+# ceiling on a family-wise error rate (a size gate at Holm's level)
+FAMILYWISE = acceptance.sized(1 - LEVEL, VARIABLES)
+POWER = acceptance.floor("causal_power_min", VARIABLES)
 NULL_REPLICATES = 2000
 POWER_REPLICATES = 500
 EFFECT = 0.5
-POWER_FLOOR = 0.80
 POWER_SIZES = (100, 200, 400)
 FILED_EFFECTS = (0.3, 0.8)
 NOT_MEASURED = (
@@ -173,53 +197,83 @@ def rejected_levels(
 
 
 def rate(hits: int, n: int) -> dict[str, Any]:
-    """A proportion with its Wilson 95 percent interval.
+    """A proportion with its one-sided exact bounds at `ALPHA`.
 
     Args:
         hits: Number of successes.
         n: Number of trials.
 
     Returns:
-        The counts, their ratio under `rate` and the interval as
-        `[low, high]` under `wilson`.
+        The counts, their ratio under `rate` and, under `exact`, the
+        one-sided Clopper-Pearson lower and upper bounds at `ALPHA` (the
+        two-sided interval at `1 - 2 ALPHA`).
     """
-    low, high = certificates.wilson_interval(hits, n, 0.95)
+    low, high = coverage.clopper_pearson(hits, n, 1 - 2 * ALPHA)
     return {
         "hits": int(hits),
         "n": int(n),
         "rate": hits / n,
-        "wilson": [low, high],
+        "exact": [low, high],
     }
 
 
-def bound_for(replicates: int) -> float:
-    """The pre-registered family-wise bound at this replicate count.
+def controlled(row: dict[str, Any]) -> bool:
+    """Whether an error rate is within the size ceiling `FAMILYWISE`.
 
     Args:
-        replicates: Number of replicates in the gate.
+        row: A row from `rate`.
 
     Returns:
-        `0.05 + 2 sqrt(0.05 * 0.95 / replicates)`.
+        True when the exact upper bound at `ALPHA` is at most the ceiling.
     """
-    return ALPHA + 2 * math.sqrt(ALPHA * (1 - ALPHA) / replicates)
+    return FAMILYWISE.passes(row["hits"], row["n"], ALPHA)
 
 
-def gate_subgroup_holm(replicates: int, base: int = 0) -> dict[str, Any]:
+def powered(row: dict[str, Any]) -> bool:
+    """Whether a power reaches `causal_power_min`.
+
+    Args:
+        row: A row from `rate`.
+
+    Returns:
+        True when the exact lower bound at `ALPHA` is at least the floor.
+    """
+    return POWER.passes(row["hits"], row["n"], ALPHA)
+
+
+def terms() -> dict[str, Any]:
+    """The rule and replicate counts a certificate is measured under.
+
+    Returns:
+        `alpha`, the ceiling, the floor and both replicate counts.
+    """
+    return {
+        "alpha": ALPHA,
+        "size_margin": VARIABLES["size_margin"].value,
+        "familywise_ceiling": FAMILYWISE.bound,
+        "causal_power_min": POWER.bound,
+        "replicates": NULL_REPLICATES,
+        "power_replicates": POWER_REPLICATES,
+    }
+
+
+def gate_subgroup_holm(
+    replicates: int, runs: int, base: int = 0
+) -> dict[str, Any]:
     """Family-wise error under two nulls and power by subgroup size.
 
     Args:
-        replicates: Replicates for the two error-rate designs; the power
-            designs use a quarter of them, at least 100.
+        replicates: Replicates for the two error-rate designs.
+        runs: Replicates for each power design.
         base: Seed offset (0 for certification).
 
     Returns:
-        The measured rates with Wilson intervals, the bound, the power by
-        subgroup size, the effects filed without gating, the smallest size
-        whose power lower bound reaches the floor (None if none does), and
-        whether the gate passed.
+        The measured rates with their exact bounds, the ceiling, the power
+        by subgroup size, the effects filed without gating, the smallest
+        size whose power lower bound reaches the floor (None if none does),
+        and whether the gate passed.
     """
     adapter = adapter_for()
-    bound = bound_for(replicates)
     null_hits = sum(
         bool(rejected_levels(world(stream(base, i), 200, {}), adapter))
         for i in range(replicates)
@@ -233,7 +287,6 @@ def gate_subgroup_holm(replicates: int, base: int = 0) -> dict[str, Any]:
         )
         for i in range(replicates)
     )
-    runs = max(replicates // 4, 100)
     power: dict[str, Any] = {}
     for size in POWER_SIZES:
         hits = sum(
@@ -260,20 +313,21 @@ def gate_subgroup_holm(replicates: int, base: int = 0) -> dict[str, Any]:
             )
             for size in POWER_SIZES
         }
-    sizes = [int(k) for k, v in power.items() if v["wilson"][0] >= POWER_FLOOR]
-    null_ok = null_hits / replicates <= bound
-    partial_ok = partial_hits / replicates <= bound
+    sizes = [int(k) for k, v in power.items() if powered(v)]
+    null = rate(null_hits, replicates)
+    partial_null = rate(partial_hits, replicates)
     return {
         "replicates": replicates,
         "power_replicates": runs,
         "alpha": ALPHA,
-        "familywise_error_null": rate(null_hits, replicates),
-        "familywise_error_partial_null": rate(partial_hits, replicates),
-        "familywise_bound": bound,
+        "familywise_error_null": null,
+        "familywise_error_partial_null": partial_null,
+        "familywise_ceiling": FAMILYWISE.bound,
+        "power_floor": POWER.bound,
         "power_at_effect_half_sd": power,
         "power_other_effects_filed": filed,
         "min_certified_rows": min(sizes) if sizes else None,
-        "passed": bool(null_ok and partial_ok and sizes),
+        "passed": bool(controlled(null) and controlled(partial_null) and sizes),
     }
 
 
@@ -286,12 +340,30 @@ def current_method_hash() -> str:
     return certified.fingerprint(run.stratify)
 
 
+def gate_hash() -> str:
+    """Hash of the harness code the verdict rests on.
+
+    Returns:
+        The code hash of the gate, its world, its helpers and its rules.
+    """
+    return certificates.code_hash(
+        gate_subgroup_holm,
+        world,
+        rejected_levels,
+        adapter_for,
+        rate,
+        controlled,
+        powered,
+    )
+
+
 def certify_all(base: int = 0, scale: float = 1.0) -> dict[str, Any]:
     """Runs the gate; `scale` shrinks replicate counts for dev looks.
 
     Args:
         base: Seed offset (0 for certification, `DEV_SEED_BASE` for looks).
-        scale: Fraction of `NULL_REPLICATES` to run, with a floor of 40.
+        scale: Fraction of `NULL_REPLICATES` and `POWER_REPLICATES` to run,
+            with floors of 40 and 10.
 
     Returns:
         The document written to the certificate file: version, development
@@ -300,11 +372,11 @@ def certify_all(base: int = 0, scale: float = 1.0) -> dict[str, Any]:
     """
     started = time.monotonic()
     count = max(40, int(NULL_REPLICATES * scale))
-    measured = gate_subgroup_holm(count, base)
+    runs = max(10, int(POWER_REPLICATES * scale))
+    measured = gate_subgroup_holm(count, runs, base)
     measured["method_hash"] = current_method_hash()
-    measured["code_hash"] = certificates.code_hash(
-        gate_subgroup_holm, world, rejected_levels, adapter_for
-    )
+    measured["code_hash"] = gate_hash()
+    measured["terms"] = terms()
     measured["seeds"] = [base, base + count]
     measured["seconds"] = round(time.monotonic() - started, 1)
     print(certified.SUBGROUP_GATE, measured["passed"], file=sys.stderr)
@@ -324,8 +396,9 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
             None.
 
     Returns:
-        Messages for a missing file or entry, a changed method hash and a
-        changed gate hash; empty when the certificate is current.
+        Messages for a missing file or entry, a changed method hash, a
+        changed gate hash and a changed rule or replicate count; empty when
+        the certificate is current.
     """
     if document is None:
         if not STORE_PATH.exists():
@@ -340,13 +413,15 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
             f"{certified.SUBGROUP_GATE}: "
             "stale (method code changed since measurement)"
         )
-    gate_hash = certificates.code_hash(
-        gate_subgroup_holm, world, rejected_levels, adapter_for
-    )
-    if entry.get("code_hash") != gate_hash:
+    if entry.get("code_hash") != gate_hash():
         found.append(
             f"{certified.SUBGROUP_GATE}: "
             "stale (gate code changed since measurement)"
+        )
+    if entry.get("terms") != terms():
+        found.append(
+            f"{certified.SUBGROUP_GATE}: "
+            "stale (rule or replicate count changed since measurement)"
         )
     return found
 

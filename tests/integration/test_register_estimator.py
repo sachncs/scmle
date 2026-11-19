@@ -79,7 +79,7 @@ def test_a_registered_regressor_gets_a_search_space(tmp_path):
 
 
 def test_an_estimator_that_breaks_the_contract_is_refused_with_the_check():
-    # Enforces docs/ARCHITECTURE.md:198.
+    # Enforces docs/ARCHITECTURE.md:217.
     with pytest.raises(errors.ConfigError, match="wrong length"):
         scmle.models.custom.register_estimator("broken", classifier=WrongLength)
 

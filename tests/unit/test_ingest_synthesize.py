@@ -46,7 +46,7 @@ def asked(cutoff, key=1):
 
 
 def test_late_arrival_is_excluded_by_recorded_time():
-    # Enforces docs/ARCHITECTURE.md:99.
+    # Enforces docs/ARCHITECTURE.md:105.
     seen = small_view().visible(asked(10.0))
     # event 5.0 is before the cutoff but was recorded at 20.0
     assert seen["val"].tolist() == [10.0, 30.0]
@@ -132,6 +132,17 @@ def test_datetime_columns_become_days_and_null_keys_never_match():
     assert asof_view.to_days(pandas.Series(["2024-01-01"]))[0] == pytest.approx(
         19_723.0
     )
+
+
+def test_iso_times_of_mixed_precision_in_one_column_are_read():
+    # Northwind's Orders.OrderDate holds both forms in one column.
+    mixed = pandas.Series(["2016-07-04", "2023-08-29 09:23:46", None])
+    days = asof_view.to_days(mixed)
+    assert days[0] == 16_986.0
+    assert days[1] == pytest.approx(
+        19_598.0 + (9 * 3600 + 23 * 60 + 46) / 86_400
+    )
+    assert numpy.isnan(days[2])
 
 
 def test_scope_boundaries_match_the_reference_on_a_small_table():
@@ -235,7 +246,7 @@ def attested_rule(kind=asof_view.EVENT_DELAY):
 
 
 def test_feature_tier_is_the_weakest_source_tier():
-    # Enforces docs/ARCHITECTURE.md:102.
+    # Enforces docs/ARCHITECTURE.md:108.
     targets = pandas.DataFrame({"cid": [1, 2, 1], "moment": [10.0, 10.0, 2.0]})
     strong = small_view(attested_rule(asof_view.TRANSACTION))
     weak = asof_view.View(
@@ -328,7 +339,7 @@ def imported_modules(path):
 
 
 def test_synthesize_has_no_raw_read_path():
-    # Enforces docs/ARCHITECTURE.md:99.
+    # Enforces docs/ARCHITECTURE.md:105.
     files = sorted((ROOT / "scmle/assurance/ingest/synthesize").glob("*.py"))
     assert files
     names = set().union(*(imported_modules(path) for path in files))

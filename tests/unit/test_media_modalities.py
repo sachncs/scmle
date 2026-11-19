@@ -158,7 +158,10 @@ def test_audio_transcript_confidence_and_timing_fail_closed():
 
 
 def test_audio_curation_blocks_conflicting_duplicate_labels():
-    """Duplicate audio bytes cannot silently carry incompatible labels."""
+    """Duplicate audio bytes cannot silently carry incompatible labels.
+
+    Also enforces website/src/pages/docs/api.astro:112.
+    """
     dataset = audio.Dataset(
         (
             audio.Sample.from_bytes(
@@ -220,7 +223,10 @@ def test_audio_feature_preparation_requires_a_wav_decoder():
 
 
 def test_audio_split_keeps_explicit_speaker_groups_together():
-    """Grouped splitting prevents speaker leakage across partitions."""
+    """Grouped splitting prevents speaker leakage across partitions.
+
+    Also enforces website/src/pages/docs/modalities.astro:42.
+    """
     samples = tuple(
         audio.Sample.from_bytes(
             wav_bytes(),
@@ -304,7 +310,12 @@ def test_video_curation_hash_matches_source_order_identity():
 
 
 def test_video_temporal_split_normalizes_time_and_records_coverage():
-    """Observation times support UTC-safe future evaluation evidence."""
+    """Observation times support UTC-safe future evaluation evidence.
+
+    Also enforces website/src/pages/docs/api.astro:235.
+    Also enforces website/src/pages/docs/data.astro:172.
+    Also enforces website/src/pages/docs/modalities.astro:42.
+    """
     metadata = video.Metadata("mp4", 2, 2, 1, 1.0, "h264")
     samples = tuple(
         video.Sample.from_bytes(
@@ -337,7 +348,12 @@ def test_video_temporal_split_normalizes_time_and_records_coverage():
 
 
 def test_video_temporal_state_fails_closed_when_incomplete():
-    """Missing observation times remain explicit before temporal splitting."""
+    """Missing observation times remain explicit before temporal splitting.
+
+    Also enforces website/src/pages/docs/api.astro:235.
+    Also enforces website/src/pages/docs/data.astro:172.
+    Also enforces website/src/pages/docs/data.astro:227.
+    """
     metadata = video.Metadata("mp4", 2, 2, 1, 1.0, "h264")
     dataset = video.Dataset(
         (
@@ -437,7 +453,10 @@ def test_video_curation_surfaces_encoding_and_dimension_drift():
 
 
 def test_video_curation_blocks_conflicting_duplicate_labels():
-    """Duplicate video bytes cannot silently carry incompatible labels."""
+    """Duplicate video bytes cannot silently carry incompatible labels.
+
+    Also enforces website/src/pages/docs/api.astro:112.
+    """
     metadata = video.Metadata("mp4", 2, 2, 1, 1.0, "h264")
     dataset = video.Dataset(
         (
@@ -460,7 +479,11 @@ def test_video_curation_blocks_conflicting_duplicate_labels():
 
 
 def test_video_metadata_features_are_numeric_and_decoder_free():
-    """Video preparation is explicit metadata evidence, not frame sampling."""
+    """Video preparation is explicit metadata evidence, not frame sampling.
+
+    Also enforces website/src/pages/docs/data.astro:172.
+    Also enforces website/src/pages/docs/data.astro:226.
+    """
     metadata = video.Metadata("mp4", 1920, 1080, 60, 30.0, "h264", 1)
     sample = video.Sample.from_bytes(
         b"video-bytes", metadata, source="sample.mp4"
@@ -523,7 +546,10 @@ def test_video_frame_features_use_a_bounded_explicit_decoder():
 
 
 def test_video_frame_features_reject_oversized_decoded_frames():
-    """A decoder cannot bypass the configured per-frame resource budget."""
+    """A decoder cannot bypass the configured per-frame resource budget.
+
+    Also enforces website/src/pages/docs/api.astro:233.
+    """
     metadata = video.Metadata("mp4", 4, 4, 1, 1.0, "h264")
     sample = video.Sample.from_bytes(
         b"video-bytes", metadata, source="sample.mp4"
@@ -600,7 +626,11 @@ def test_geospatial_feature_collection_preserves_bounds_and_crs():
 
 
 def test_geospatial_identity_binds_crs_and_ignores_feature_order():
-    """Equivalent features share identity only when their CRS also matches."""
+    """Equivalent features share identity only when their CRS also matches.
+
+    Also enforces website/src/pages/docs/api.astro:279.
+    Also enforces website/src/pages/docs/data.astro:169.
+    """
     first_feature = geospatial.Placemark(
         "first", {"type": "Point", "coordinates": [0, 0]}
     )
@@ -623,7 +653,10 @@ def test_geospatial_identity_binds_crs_and_ignores_feature_order():
 
 
 def test_geospatial_identity_binds_labels_and_properties():
-    """Feature metadata changes produce a new immutable dataset identity."""
+    """Feature metadata changes produce a new immutable dataset identity.
+
+    Also enforces website/src/pages/docs/data.astro:169.
+    """
     geometry = {"type": "Point", "coordinates": [0, 0]}
     baseline = geospatial.Dataset(
         (geospatial.Placemark("feature", geometry, {"kind": "park"}, "open"),),
@@ -653,7 +686,11 @@ def test_geospatial_identity_binds_labels_and_properties():
 
 
 def test_geospatial_spatial_join_records_bounded_same_crs_evidence():
-    """A caller predicate produces deterministic, hash-bound join evidence."""
+    """A caller predicate produces deterministic, hash-bound join evidence.
+
+    Also enforces website/src/pages/docs/capabilities.astro:22.
+    Also enforces website/src/pages/docs/data.astro:221.
+    """
     left = geospatial.Dataset(
         (
             geospatial.Placemark(
@@ -695,7 +732,11 @@ def test_geospatial_spatial_join_records_bounded_same_crs_evidence():
 
 
 def test_geospatial_spatial_join_rejects_crs_mismatch_and_unbounded_work():
-    """Joins fail closed instead of comparing incompatible or huge inputs."""
+    """Joins fail closed instead of comparing incompatible or huge inputs.
+
+    Also enforces website/src/pages/docs/data.astro:216.
+    Also enforces website/src/pages/docs/data.astro:221.
+    """
     feature = geospatial.Placemark(
         "feature", {"type": "Point", "coordinates": [0, 0]}
     )
@@ -741,7 +782,12 @@ def test_geospatial_spatial_join_rejects_invalid_predicate_output():
 
 
 def test_geospatial_reprojection_records_source_and_target_identity():
-    """An explicit transformer preserves metadata and binds both snapshots."""
+    """An explicit transformer preserves metadata and binds both snapshots.
+
+    Also enforces website/src/pages/docs/api.astro:278.
+    Also enforces website/src/pages/docs/capabilities.astro:22.
+    Also enforces website/src/pages/docs/data.astro:221.
+    """
     observation_time = datetime(2026, 1, 1, tzinfo=UTC)
     dataset = geospatial.Dataset(
         (
@@ -786,7 +832,11 @@ def test_geospatial_reprojection_records_source_and_target_identity():
 
 
 def test_geospatial_reprojection_rejects_metadata_changes():
-    """A transformer cannot silently alter labels or feature ownership."""
+    """A transformer cannot silently alter labels or feature ownership.
+
+    Also enforces website/src/pages/docs/api.astro:278.
+    Also enforces website/src/pages/docs/data.astro:221.
+    """
     feature = geospatial.Placemark(
         "feature",
         {"type": "Point", "coordinates": [0, 0]},
@@ -812,7 +862,11 @@ def test_geospatial_reprojection_rejects_metadata_changes():
 
 
 def test_geospatial_rejects_invalid_geometry():
-    """Malformed geometry is rejected before it reaches feature preparation."""
+    """Malformed geometry is rejected before it reaches feature preparation.
+
+    Also enforces website/src/pages/docs/data.astro:216.
+    Also enforces website/src/pages/docs/extensions.astro:134.
+    """
     with pytest.raises(geospatial.GeometryError):
         geospatial.Placemark(
             "broken", {"type": "Point", "coordinates": [float("nan"), 1]}
@@ -920,7 +974,14 @@ def test_spatial_autocorrelation_rejects_non_numeric_and_constant_values():
 
 
 def test_geospatial_spatial_split_keeps_blocks_together():
-    """Spatial blocks remain isolated across train and evaluation data."""
+    """Spatial blocks remain isolated across train and evaluation data.
+
+    Also enforces website/src/pages/docs/api.astro:251.
+    Also enforces website/src/pages/docs/capabilities.astro:22.
+    Also enforces website/src/pages/docs/data.astro:173.
+    Also enforces website/src/pages/docs/data.astro:220.
+    Also enforces website/src/pages/docs/modalities.astro:42.
+    """
     features = tuple(
         geospatial.Placemark(
             f"feature-{index}",
@@ -946,7 +1007,13 @@ def test_geospatial_spatial_split_keeps_blocks_together():
 
 
 def test_geospatial_boundary_leakage_reports_conservative_envelope_crossings():
-    """Bounds crossing blocks are surfaced before centroid-based splitting."""
+    """Bounds crossing blocks are surfaced before centroid-based splitting.
+
+    Also enforces website/src/pages/docs/api.astro:259.
+    Also enforces website/src/pages/docs/capabilities.astro:22.
+    Also enforces website/src/pages/docs/data.astro:173.
+    Also enforces website/src/pages/docs/modalities.astro:63.
+    """
     dataset = geospatial.Dataset(
         (
             geospatial.Placemark(
@@ -1032,7 +1099,10 @@ def test_geospatial_temporal_state_fails_closed_when_incomplete():
 
 
 def test_geospatial_feature_preparation_preserves_crs_units():
-    """Geometry envelopes are prepared only after CRS provenance exists."""
+    """Geometry envelopes are prepared only after CRS provenance exists.
+
+    Also enforces website/src/pages/docs/api.astro:263.
+    """
     dataset = geospatial.Dataset(
         (
             geospatial.Placemark(
@@ -1090,7 +1160,11 @@ def test_geospatial_raw_axis_mask_rejects_invalid_axis():
 
 
 def test_geospatial_feature_preparation_rejects_missing_crs():
-    """Coordinates cannot become model features without a reference CRS."""
+    """Coordinates cannot become model features without a reference CRS.
+
+    Also enforces website/src/pages/docs/api.astro:263.
+    Also enforces website/src/pages/docs/data.astro:216.
+    """
     dataset = geospatial.Dataset(
         (
             geospatial.Placemark(

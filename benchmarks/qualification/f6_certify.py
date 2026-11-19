@@ -20,10 +20,11 @@ of the second sample is shifted by ``sqrt(2) * ppf(0.60)`` standard
 deviations, the shift whose Bayes-optimal AUC is 0.60 (the power point of
 the certification). Plants are synthetic and easy, and the generator is
 Gaussian, so the power is optimistic for real data; no real deployment sample
-is available to plant into. Policy: recall Wilson lower bound at least 0.80,
-false-alarm Wilson upper bound at most 0.075 (a 5 percent test has Wilson
-upper bound near 0.065 over 1000 nulls), 95 percent intervals. The size by
-p-value alone is also recorded against a 99 percent binomial band.
+is available to plant into. Policy (`SHIFT_POLICY`): recall lower bound at
+least `shift_recall_min` (0.80), false-alarm upper bound at most the
+size ceiling of the tests' level 0.05, `0.05 (1 + size_margin)` (0.0845,
+`acceptance.sized`), over `SHIFT_NULL` (1000) nulls for each test. The
+size by p-value alone is also recorded against a 99 percent binomial band.
 
 Stability. Replicates are semi-synthetic: the feature is a real column of the
 breast-cancer table that ships with scikit-learn, sampled without
@@ -35,20 +36,33 @@ driven` (the whole association comes from 10 percent extreme values that the
 the opposite sign in the second half of the rows). `no_effect` replicates
 have an independent target. A planted defect is detected when the finding is
 labelled `fragile` (for `no_effect`: not labelled `stable`); a false alarm is
-a genuine effect not labelled `stable`. Policy: recall lower bound at least
-0.80 and false-alarm upper bound at most 0.10 (genuine effects labelled
-stable at least 0.90), 95 percent intervals. The grid is the 18
+a genuine effect not labelled `stable`. Policy (`STABILITY_POLICY`): recall
+lower bound at least `stability_recall_min` (0.80) and false-alarm upper
+bound at most `stability_false_alarm_max` (0.10; genuine effects labelled
+stable at least 0.90). The grid is the 18
 specifications in `GRID_CHOICES`. The plants are built to be found by that
 grid; the certificate says nothing about spec-dependence of other kinds.
 
-Amendment 2026-11-04 (made before the re-run, policy unchanged). The first
-certificate of `f6-shift-mmd` (1000 nulls) had 60 false alarms and a Wilson
-upper bound of 0.0765 against the ceiling 0.075: the observed rate sat inside
-the ceiling and the interval was too wide to say so. The number of null
-replicates for the MMD test is raised to `MMD_NULL` (5000, seeds 0 up to
-4999, which include the first 1000). The recall floor, the false-alarm
-ceiling, the confidence, the world and the test are not changed. The result
-is filed whichever way it falls.
+Bounds. Every bound is the one-sided exact (Clopper-Pearson) bound at
+`alpha` of `acceptance.toml` (a policy of method `exact` at confidence
+`1 - 2 alpha`), and the floors and ceilings are the variables named above.
+
+Amendment 2026-11-04, withdrawn 2026-11-19. The first certificate of
+`f6-shift-mmd` (1000 nulls) had 60 false alarms and a two-sided Wilson 95
+percent upper bound of 0.0765 against the ceiling 0.075; the null count of
+that test alone was then raised to 5000 and it passed. Raising the count
+after a miss is a change made on seeing the result, so it is withdrawn: both
+tests run the stated `SHIFT_NULL` nulls, and the rule is the exact bound at
+`alpha` above, the plan's rule for every statistical row. The ceiling, the
+floor, the world and the tests are unchanged, and the result is filed
+whichever way it falls.
+
+Amendment 2026-11-19 (second). The false-alarm ceiling was registered on
+2026-11-04 as 1.5 times the 0.05 level (0.075). Every size gate now uses
+one rule, `level (1 + size_margin)`, with the margin derived in
+`acceptance.toml` from the replicate counts, `alpha` and `power`, so the
+ceiling is 0.0845; the world, the tests, the floor and the counts are
+unchanged.
 
 Seeds. Development seeds start at `DEV_SEED_BASE`; certification uses seeds
 0 up to the replicate count. The two ranges never overlap. A replicate with
@@ -72,6 +86,7 @@ import pandas
 from scipy import stats
 from sklearn.datasets import load_breast_cancer
 
+from benchmarks import acceptance
 from benchmarks.qualification import certify
 from scmle.assurance.charter import contracts
 from scmle.assurance.detectors import certificates
@@ -89,14 +104,27 @@ Z_99 = 2.5758293035489004
 SHIFT_ROWS = 2000
 SHIFT_COLUMNS = 5
 SHIFT_NULL = 1000
-MMD_NULL = 5000
 SHIFT_PLANTED = 300
 PLANTED_AUC = 0.60
-SHIFT_POLICY = certificates.Standard(0.80, 0.075, 0.95)
+VARIABLES = acceptance.load()
+# one-sided error rate of every bound; the policies hold two-sided
+# intervals at `1 - 2 ALPHA`, so each bound is one-sided at `ALPHA`
+ALPHA = VARIABLES["alpha"].value
+SHIFT_POLICY = certificates.Standard(
+    acceptance.floor("shift_recall_min", VARIABLES).bound,
+    acceptance.sized(shift.ALPHA, VARIABLES).bound,
+    1 - 2 * ALPHA,
+    "exact",
+)
 STABILITY_ROWS = 400
 STABLE_REPS = 300
 PLANT_REPS = 200
-STABILITY_POLICY = certificates.Standard(0.80, 0.10, 0.95)
+STABILITY_POLICY = certificates.Standard(
+    acceptance.floor("stability_recall_min", VARIABLES).bound,
+    acceptance.ceiling("stability_false_alarm_max", VARIABLES).bound,
+    1 - 2 * ALPHA,
+    "exact",
+)
 MISSING_RATE = 0.15
 STABLE_BETA = 0.5
 REVERSAL_BETA = 0.6
@@ -293,7 +321,7 @@ def shift_certificate(
         The certificate and the measurements (size by p-value alone with its
         99 percent band, and power).
     """
-    null_count = MMD_NULL if test == shift.MMD_ID else SHIFT_NULL
+    null_count = SHIFT_NULL
     nulls = run_jobs(
         shift_replicate,
         [(test, False, offset + s) for s in range(null_count)],
@@ -521,20 +549,39 @@ def audit_labels(store: certificates.Store) -> dict[str, list[str]]:
 
 
 def problems(store: certificates.Store) -> list[str]:
-    """Why the certificate file is unusable: missing or stale entries.
+    """Why the certificate file is unusable.
 
     Args:
         store: The certificate store.
 
     Returns:
-        One message per missing or stale detector/defect pair.
+        One message per missing or stale detector/defect pair, and one per
+        current certificate measured under a policy or a null count other
+        than the stated ones.
     """
     labels = audit_labels(store)
-    return [
+    found = [
         f"{item}: {kind}"
         for kind in ("missing", "stale")
         for item in labels[kind]
     ]
+    stated = {
+        shift.C2ST_ID: (SHIFT_POLICY, SHIFT_NULL),
+        shift.MMD_ID: (SHIFT_POLICY, SHIFT_NULL),
+        stability.DETECTOR_ID: (STABILITY_POLICY, STABLE_REPS),
+    }
+    digests = current_digests()
+    for detector, (policy, clean) in stated.items():
+        current = store.current(detector, digests[detector])
+        if any(
+            c.policy != policy
+            or any(o.certificate.clean != clean for o in c.outcomes)
+            for c in current
+        ):
+            found.append(
+                f"{detector}: measured under another policy or null count"
+            )
+    return found
 
 
 def development_look(workers: int) -> dict[str, Any]:

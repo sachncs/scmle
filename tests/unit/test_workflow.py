@@ -145,6 +145,8 @@ def test_the_standard_pipeline_is_valid_and_ordered():
 
 def test_invalid_definitions_are_refused():
     # Enforces docs/ORCHESTRATION.md:14 and docs/ORCHESTRATION.md:17.
+    # Enforces website/src/pages/docs/orchestration.astro:25.
+    # Enforces website/src/pages/docs/orchestration.astro:26.
     s = definition.StepKind
     with pytest.raises(errors.ConfigError, match="cycle"):
         definition.Workflow(
@@ -248,6 +250,7 @@ def test_a_second_executor_cannot_work_on_a_run_in_flight(store):
 
 
 def test_max_concurrent_runs_is_enforced(store):
+    # Enforces website/src/pages/docs/orchestration.astro:34.
     clock = Clock()
     recorder = Recorder(clock)
     flow = pipeline()
@@ -567,6 +570,7 @@ def test_a_renewal_never_moves_the_lease_expiry_back(store):
 
 
 def test_timeouts_budgets_and_the_run_budget(store):
+    # Enforces website/src/pages/docs/orchestration.astro:34.
     clock = Clock()
     recorder = Recorder(clock)
 
@@ -686,6 +690,7 @@ def test_parallel_steps_reserve_their_declared_cost(store):
 
 
 def test_independent_steps_run_in_parallel_and_a_group_limit_holds(store):
+    # Enforces website/src/pages/docs/orchestration.astro:34.
     clock = Clock()
     s = definition.StepKind
     flow = definition.Workflow(
@@ -785,6 +790,7 @@ def test_a_crash_before_the_run_record_keeps_every_attempt_spend(tmp_path):
 
 def test_approval_rules_are_enforced(store):
     # Enforces docs/ORCHESTRATION.md:37.
+    # Enforces website/src/pages/docs/orchestration.astro:15.
     clock = Clock()
     recorder = Recorder(clock)
     executor = executor_for(store, pipeline(), recorder, clock)
@@ -827,6 +833,7 @@ def test_approval_rules_are_enforced(store):
 
 def test_a_rejection_or_an_expiry_never_reaches_the_approved_step(store):
     # Enforces docs/ORCHESTRATION.md:37.
+    # Enforces website/src/pages/docs/orchestration.astro:15.
     clock = Clock()
     recorder = Recorder(clock)
     executor = executor_for(store, pipeline(), recorder, clock)
@@ -922,6 +929,7 @@ def test_the_first_tick_does_not_backfill_and_a_second_tick_is_quiet(store):
 
 def test_a_scheduler_that_lost_its_state_does_not_repeat_finished_slots(store):
     # Enforces docs/ORCHESTRATION.md:41.
+    # Enforces website/src/pages/docs/orchestration.astro:31.
     flow = scheduled(definition.CatchUp.LATEST_ONLY)
     clock = Clock(3600.0 + 1.0)
     recorder = Recorder(clock)

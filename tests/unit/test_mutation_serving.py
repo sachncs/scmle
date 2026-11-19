@@ -153,7 +153,7 @@ def test_a_warm_up_without_a_record_is_skipped_and_ready(
     bundle, monkeypatch
 ) -> None:
     adapter = server.HttpServing(bundle)
-    monkeypatch.setattr(adapter, "synthesise", lambda: None)
+    monkeypatch.setattr(adapter, "synthesise", lambda bundle=None: None)
     adapter.warm()
     found = adapter.readiness.snapshot()
     assert found["ready"]

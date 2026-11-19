@@ -26,6 +26,7 @@ NEW_NAMES = {
 
 
 def test_no_previously_pinned_name_changed():
+    # Enforces website/src/pages/docs/api-stability.astro:37.
     pinned = json.loads(SNAPSHOT.read_text(encoding="utf-8"))["surfaces"]
     current = check_api_compatibility.current_snapshot()["surfaces"]
 
@@ -36,6 +37,7 @@ def test_no_previously_pinned_name_changed():
 
 
 def test_new_types_are_not_package_root_names():
+    # Enforces website/src/pages/docs/api-stability.astro:37.
     assert all(not hasattr(scmle, name) for name in NEW_NAMES)
 
 

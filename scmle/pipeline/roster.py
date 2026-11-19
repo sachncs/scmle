@@ -90,10 +90,14 @@ def fairnesses(task: tasks.Task) -> tuple[capabilities.Fairness, ...]:
         task: The task type.
 
     Returns:
-        No fairness constraint, plus mitigation for binary and multiclass
-        tasks.
+        No fairness constraint, plus mitigation for binary, multiclass and
+        regression tasks.
     """
-    if task in (tasks.Task.BINARY, tasks.Task.MULTICLASS):
+    if task in (
+        tasks.Task.BINARY,
+        tasks.Task.MULTICLASS,
+        tasks.Task.REGRESSION,
+    ):
         return (
             capabilities.Fairness.NONE,
             capabilities.Fairness.MITIGATION,

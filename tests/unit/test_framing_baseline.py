@@ -6,6 +6,7 @@ from benchmarks.qualification import framing_certify
 from scmle.assurance.framing import baseline
 from scmle.assurance.framing import costs
 from scmle.contracts import qualification
+from scmle.evaluation import coverage
 
 HUMAN = (costs.Basis.HUMAN,) * 4
 MODEL = costs.Tariff(0.0, 5.0, 1.0, 0.0, 0.1, 0.4, HUMAN, costs.Basis.HUMAN)
@@ -78,7 +79,12 @@ def test_intersection_union_size_in_dev_worlds():
             <= 0.05
             for s in range(runs)
         )
-        assert rejected / runs <= framing_certify.size_bound(runs)
+        # 400 dev replicates cannot certify a size; they only catch a
+        # gross excess (the exact lower bound above the level)
+        lower = coverage.clopper_pearson(
+            rejected, runs, 1 - 2 * framing_certify.RISK
+        )[0]
+        assert lower <= framing_certify.ALPHA
 
 
 def test_power_where_the_closed_form_allows_it():

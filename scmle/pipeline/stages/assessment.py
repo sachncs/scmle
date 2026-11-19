@@ -5,18 +5,21 @@ import time
 from typing import Any
 from typing import ClassVar
 
+import numpy
 import pandas
 
 from scmle.assurance.custody import journal
 from scmle.contracts import experiments
 from scmle.contracts import records
 from scmle.contracts import tasks
+from scmle.models import thresholds
 from scmle.pipeline import products
 import scmle.pipeline.context
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import scoring
 from scmle.pipeline.stages import selecting
 from scmle.pipeline.stages import summary
+from scmle.preparation import pseudo_labeling
 from scmle.preparation import strategies
 import scmle.runtime.state
 
@@ -31,11 +34,14 @@ class Exam(products.Derived):
     Attributes:
         evaluation: The evaluation record.
         final_pipeline: The model refit on the development data.
+        shipped: The model the bundle serves: the same choice refit on
+            every row, or `final_pipeline` when it was not refit.
         test_rows: The opened test rows and labels.
     """
 
     evaluation: records.Layout | None
     final_pipeline: Any
+    shipped: Any
     test_rows: tuple[pandas.DataFrame, pandas.Series] | None
 
     def summary(self) -> object:
@@ -75,7 +81,8 @@ class FinalEvaluationStage(summary.Summary):
         pseudo-labeling, streamed training, the decision threshold and the
         fairness mitigation, registers the coverage claim, then opens the
         locked rows once, after the selection is frozen. Records the test
-        metrics, diagnostics and the evaluation document in the context.
+        metrics, diagnostics and the evaluation document in the context; the
+        bundle's model is the choice refit on every row (`ship`).
         The locked rows are first wrapped so that opening them is recorded in
         the run's custody journal (`journal.Custodian`).
 
@@ -120,6 +127,7 @@ class FinalEvaluationStage(summary.Summary):
         test_metrics = self.measure(
             context, pipeline, test_features, test_target
         )
+        context.shipped, shipped = self.ship(context, pipeline)
         self.examine(context, pipeline, test_features, test_target)
         net_benefit = scoring.appraise(
             context, pipeline, test_features, test_target, decision
@@ -138,6 +146,7 @@ class FinalEvaluationStage(summary.Summary):
             "resource_limits": context.regulator.report(),
             "skipped_for_time": context.skipped,
             "test_set_opened": locked.opened,
+            "shipped": shipped,
             "diagnostics": sorted(context.diagnostics),
             "elapsed_seconds": time.monotonic() - context.started_at,
             "reproducibility": (
@@ -177,6 +186,110 @@ class FinalEvaluationStage(summary.Summary):
             pipeline.fit(split.dev_features, split.dev_target)
         return pipeline
 
+    def ship(
+        self,
+        context: scmle.pipeline.context.Context,
+        evaluated: Any,
+    ) -> tuple[Any, records.Layout]:
+        """The frozen choice refit on development and test rows, to serve.
+
+        Selection and the test score are done, so the held-out rows have no
+        further use as a judge; a model fitted on every row is expected to
+        be at least as good as the one evaluated, as a practitioner refits
+        on all data after choosing. The same configuration, pseudo-labels,
+        decision threshold and group thresholds are kept; rows keep their
+        ingested order. The reported test metrics stay those of
+        `evaluated`, which never saw the test rows, so they are a
+        conservative estimate for the served model. The refit is skipped,
+        on record, when a charter governs the run (its confirmatory claim
+        is about the evaluated model itself), when training was streamed,
+        or when it would not end before the packaging reserve.
+
+        Args:
+            context: The run context, holding the split, the selection and
+                the opened test rows.
+            evaluated: The evaluated model, wrapped as it was scored.
+
+        Returns:
+            The model to serve and the record of the refit (`refit`, the
+            `rows` it was fitted on and the `reason` it was skipped).
+        """
+        split = scmle.pipeline.context.require(context.split, "split")
+        selected = scmle.pipeline.context.require(context.selected, "selected")
+        rows = scmle.pipeline.context.require(context.test_rows, "test_rows")
+        reason = self.hold(context, len(rows[0]))
+        if reason:
+            context.forgo("refit on every row", reason)
+            return evaluated, {
+                "refit": False,
+                "rows": len(split.dev_features),
+                "reason": reason,
+            }
+        features, target = pool(split, rows)
+        task = scmle.pipeline.context.require(context.task, "task")
+        fitted = strategies.lookup(selected.strategy).build(
+            scmle.pipeline.context.require(
+                context.profile, "profile"
+            ).feature_plan,
+            context.registry.get(selected.model_name),
+            task,
+            context.spec.validation.seed,
+            selected.params,
+        )
+        fitted.fit(features, target)
+        unlabeled = context.unlabeled
+        if (context.semi_supervised or {}).get(
+            "used"
+        ) and unlabeled is not None:
+            fitted = pseudo_labeling.selftrain(
+                fitted,
+                features,
+                target,
+                unlabeled,
+                context.spec.data.pseudo_label_confidence,
+            )[0]
+        context.emit(
+            "model.shipped",
+            f"selected model refit on all {len(features)} rows to serve",
+            data={"rows": len(features)},
+        )
+        return thresholds.rewrap(evaluated, fitted), {
+            "refit": True,
+            "rows": len(features),
+            "reason": "",
+        }
+
+    def hold(
+        self, context: scmle.pipeline.context.Context, tested: int
+    ) -> str | None:
+        """Why the selected model must not be refit on every row, or None.
+
+        Args:
+            context: The run context, holding the split, selection and
+                governor.
+            tested: Number of test rows the refit would add.
+
+        Returns:
+            The reason: a charter governs the run, training was streamed, or
+            the refit would not end before the packaging reserve.
+        """
+        if context.spec.charter_path is not None:
+            return "a charter governs the run"
+        if (
+            context.stream is not None
+            and context.spec.data.training == "stream"
+        ):
+            return "training was streamed"
+        split = scmle.pipeline.context.require(context.split, "split")
+        selected = scmle.pipeline.context.require(context.selected, "selected")
+        developed = max(len(split.dev_features), 1)
+        return context.regulator.overdue(
+            cost.refitcost(context, selected)
+            * (developed + tested)
+            / developed,
+            context.regulator.reserve.parts.get("package", 0.0),
+        )
+
     def unlock(
         self,
         context: scmle.pipeline.context.Context,
@@ -205,3 +318,33 @@ class FinalEvaluationStage(summary.Summary):
             # neutral weight so the pipeline finds the column it expects.
             features = features.assign(**{tasks.FAIRNESS_WEIGHT: 1.0})
         return features, target
+
+
+def pool(
+    split: Any, rows: tuple[pandas.DataFrame, pandas.Series]
+) -> tuple[pandas.DataFrame, pandas.Series]:
+    """Development and test rows together, in their ingested order.
+
+    Args:
+        split: The split, holding the development rows and the manifest.
+        rows: The opened test features and labels.
+
+    Returns:
+        Every row's features and labels, ordered by row id.
+    """
+    order = numpy.argsort(
+        numpy.concatenate([split.manifest.train_ids, split.manifest.test_ids]),
+        kind="stable",
+    )
+    parts = [split.dev_features, rows[0], split.dev_target, rows[1]]
+    parts = [part.copy(deep=False) for part in parts]
+    for part in parts:
+        # `pandas.concat` compares the parts' `attrs`, which fails when a
+        # user's frame keeps a Series there; the pooled rows need none.
+        part.attrs = {}
+    features = pandas.concat(parts[:2], ignore_index=True)
+    target = pandas.concat(parts[2:], ignore_index=True)
+    return (
+        features.iloc[order].reset_index(drop=True),
+        target.iloc[order].reset_index(drop=True),
+    )

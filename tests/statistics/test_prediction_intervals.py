@@ -112,6 +112,7 @@ def test_one_row_per_entity_covers_a_new_entity_with_a_random_effect():
 
 
 def test_weighted_conformal_covers_under_a_known_covariate_shift():
+    # Enforces website/src/pages/docs/methods.astro:11.
     rng = numpy.random.default_rng(4)
     rows, runs = 200, 2000
     hits = 0
@@ -134,6 +135,7 @@ def test_weighted_conformal_covers_under_a_known_covariate_shift():
 
 
 def test_cv_plus_is_near_nominal_and_above_its_theoretical_bound():
+    # Enforces website/src/pages/docs/methods.astro:11.
     rng = numpy.random.default_rng(5)
     rows, folds, features, runs = 100, 10, 3, 1500
     hits = 0

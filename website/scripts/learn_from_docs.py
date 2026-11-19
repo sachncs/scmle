@@ -7,6 +7,9 @@ The site keeps its own rendered copy of this text in website/src/learn/*.html so
 page links to a markdown file. After editing a source document, run this script, rebuild
 the site and review the diff. A link to a document that has a site page is rewritten to
 that page; a link to a file with no page keeps its words and loses the link.
+
+Each paragraph, list item and table body row is written on a line of its own, so a
+test can name one site statement by its line (benchmarks/evidence/guarantees.py).
 """
 
 import html
@@ -106,7 +109,8 @@ def table(lines, label='Table'):
             + "</tr>"
         )
     out.append("</tbody></table></div>")
-    return "".join(out)
+    # One body row per line, so a test can name a row by its line.
+    return "".join(out[: n + 2]) + "\n" + "\n".join(out[n + 2 :])
 
 
 def lists(lines):
@@ -144,7 +148,8 @@ def lists(lines):
             out.append(f"</li><li>{inline(text)}")
     while stack:
         out.append("</li></" + stack.pop()[1] + ">")
-    return "".join(out)
+    # One item per line, so a test can name an item by its line.
+    return "\n".join(out)
 
 
 def convert(md, glossary=False):

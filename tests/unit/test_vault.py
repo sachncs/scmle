@@ -75,6 +75,7 @@ def test_a_vault_that_is_gone_is_reported_not_hung():
 
 
 def test_a_bound_vault_refuses_a_release_for_another_selection(sealed):
+    # Enforces website/src/pages/docs/threat-model.astro:32.
     sealed.bind("selection-a")
     token = sealed.mint()
 

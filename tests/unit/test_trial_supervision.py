@@ -40,6 +40,7 @@ def test_a_trial_within_limits_returns_its_value():
 
 def test_a_runaway_trial_is_killed_at_the_ceiling():
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:201.
+    # Enforces website/src/learn/when-things-go-wrong.html:97.
     started = time.monotonic()
     supervisor = limits.Supervisor(1.0, None)
     with pytest.raises(limits.TrialError, match="hard time ceiling"):
@@ -97,7 +98,7 @@ def test_the_cpu_limit_caps_math_threads_in_the_main_process():
 
 
 def test_governor_modes_describe_their_enforcement():
-    # Enforces docs/ARCHITECTURE.md:84.
+    # Enforces docs/ARCHITECTURE.md:90.
     hard = limits.Governor(tasks.Resources(time_budget_seconds=100))
     assert 99 <= hard.deadline() <= 100 and hard.hard
     assert "killed" in hard.report()["time_budget"]["enforcement"]

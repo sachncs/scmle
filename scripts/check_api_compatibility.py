@@ -265,9 +265,23 @@ EXTENSION_SURFACES = {
 }
 
 
-# The names the package root used to re-export, pinned by the module that
-# defines them. The package root itself exports nothing.
+# The names the package root used to re-export, and the user-facing API
+# added since, pinned by the module that defines them. The package root
+# itself exports nothing.
 ROOT_SURFACES = {
+    "scmle.api.clustering": (
+        "Segmentation",
+        "cluster",
+        "evaluate",
+    ),
+    "scmle.api.erasure": (
+        "Deletion",
+        "Forgetting",
+        "Receipt",
+        "RetiredError",
+        "Retirement",
+        "Subject",
+    ),
     "scmle.api.non_tabular": (
         "Modeler",
         "Predictor",

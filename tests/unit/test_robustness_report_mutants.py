@@ -183,6 +183,7 @@ def found_shift(**overrides):
         "coverage": (Dumped({"level": "l1"}), Dumped({"level": "l2"})),
         "forward": Dumped({"status": "skipped"}),
         "store_note": "note",
+        "drift": Dumped({"status": "unverifiable", "reason": "no time"}),
     }
     values.update(overrides)
     return types.SimpleNamespace(**values)
@@ -205,8 +206,8 @@ def test_the_shift_report_carries_each_part():
         "note": "note",
     }
     assert document["periods"] == {
-        "status": "not_run",
-        "reason": "per-period drift is not implemented",
+        "status": "unverifiable",
+        "reason": "no time",
     }
     assert set(document) == set(report.SHIFT_KEYS)
     assert document["assumptions"] == [

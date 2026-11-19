@@ -86,6 +86,7 @@ def test_tabpfn_reports_the_base_reason_first(installed) -> None:
 
 
 def test_tabpfn_is_extension_only(installed) -> None:
+    # Enforces website/src/pages/docs/modeling.astro:51.
     assert networks.TabPfn().objection(tasks.Task.BINARY, 10) == (
         "foundation model is extension-only until accepted weight license, "
         "token custody, and complete release evidence exist"

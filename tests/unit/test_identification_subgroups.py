@@ -59,6 +59,7 @@ def test_the_effective_subgroup_is_rejected_and_the_others_are_not():
 
 
 def test_holm_controls_the_family_where_unadjusted_tests_would_not():
+    # Enforces website/src/pages/docs/qualification.astro:71.
     levels = [f"g{i:02d}" for i in range(20)]
     effects = dict.fromkeys(levels, 0.0)
     unadjusted = 0
@@ -88,6 +89,8 @@ def test_a_subgroup_too_small_to_estimate_counts_in_the_family_unrejected():
 
 def test_subgroups_do_not_change_the_primary_estimate_or_the_tier():
     # Enforces docs/ARTIFACTS.md:47.
+    # Enforces website/src/pages/docs/causal-decision.astro:65.
+    # Enforces website/src/pages/docs/qualification.astro:71.
     effects = {"g1": 2.0, "g2": 0.0}
     x, c = world(1500, 5, effects), world(1500, 6, effects)
     plain = go(block(), x, c)

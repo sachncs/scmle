@@ -91,9 +91,12 @@ def read(result, name):
 
 
 def test_the_decision_files_are_written_with_a_randomized_log(tmp_path):
-    # Enforces docs/API_STABILITY.md:135.
+    # Enforces docs/API_STABILITY.md:138.
     # Enforces docs/ARTIFACTS.md:74.
     # Enforces docs/ARTIFACTS.md:77.
+    # Enforces website/src/pages/docs/api-stability.astro:47.
+    # Enforces website/src/pages/docs/artifacts.astro:35.
+    # Enforces website/src/pages/docs/cli.astro:35.
     result = run(
         tmp_path, logged_action_column="treat", propensity_column="prop"
     )
@@ -117,6 +120,7 @@ def test_without_a_log_the_value_is_not_assessable_and_no_plan_no_design(
     tmp_path,
 ):
     # Enforces docs/ARTIFACTS.md:74 and docs/ARTIFACTS.md:77.
+    # Enforces website/src/pages/docs/artifacts.astro:35.
     result = run(tmp_path, plan=False)
     folder = pathlib.Path(result.run_dir)
 
@@ -128,6 +132,7 @@ def test_without_a_log_the_value_is_not_assessable_and_no_plan_no_design(
 
 def test_the_four_decision_files_are_registered_and_verified(tmp_path):
     # Enforces docs/ARTIFACTS.md:75.
+    # Enforces website/src/pages/docs/artifacts.astro:34.
     from scmle.artifacts import claims_audit
 
     result = run(

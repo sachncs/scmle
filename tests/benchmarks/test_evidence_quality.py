@@ -57,6 +57,7 @@ def test_small_gaps_still_leave_the_row_not_measured():
 
 
 def test_a_large_gap_fails():
+    # Enforces docs/preregistration/c4.md:50.
     gaps = dict.fromkeys(quality.TASKS, [0.0] * 5)
     gaps["multiclass"] = [0.1] * 5
     assert quality.summary(document(gaps))[1] == "fail"

@@ -160,7 +160,8 @@ def requisition(
     ):
         context.capability_registry.refuse(
             key,
-            "group-threshold mitigation is implemented for binary tasks only",
+            "group-threshold mitigation is implemented for binary tasks "
+            "only; reweighing mitigates multiclass and regression tasks",
         )
     return key
 

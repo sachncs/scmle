@@ -235,6 +235,9 @@ def test_a_code_change_makes_the_certificate_stale_and_blocks_gating():
 
 def test_a_detector_without_a_certificate_cannot_be_marked_gating():
     # Enforces docs/GLOSSARY.md:425.
+    # Enforces website/src/learn/glossary.html:207.
+    # Enforces website/src/pages/docs/qualification.astro:42.
+    # Enforces website/src/pages/index.astro:449.
     store = certificates.Store()
     assert store.state("d1", HASH_A) is certificates.Freshness.MISSING
     with pytest.raises(certificates.CertificateError, match="no certificate"):
@@ -267,6 +270,12 @@ def test_add_replaces_the_entry_with_the_same_key():
 def test_descriptive_status_demotes_blocking_decisions():
     # Enforces docs/GLOSSARY.md:425-426.
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:146.
+    # Enforces website/src/learn/glossary.html:207.
+    # Enforces website/src/learn/what-scmle-cannot-do.html:33.
+    # Enforces website/src/pages/docs/causal-decision.astro:41.
+    # Enforces website/src/pages/docs/qualification.astro:106.
+    # Enforces website/src/pages/docs/qualification.astro:42.
+    # Enforces website/src/pages/index.astro:449.
     descriptive = certificates.Authority.DESCRIPTIVE
     gating = certificates.Authority.GATING
     decision = qualification.Decision
@@ -371,3 +380,45 @@ class TestCheckAll:
         assert entry.main(["--check", "all"]) == 1
         assert len(calls) == 6
         assert failing in capsys.readouterr().out
+
+
+def test_an_exact_policy_decides_by_the_clopper_pearson_bounds():
+    policy = certificates.Standard(0.8, 0.075, 0.90, "exact")
+    result = measured(planted=300, detected=300, fa=60, clean=1000)
+    outcome = certificates.Outcome.measure(result, policy)
+    upper = stats.beta.ppf(0.95, 61, 940)
+    lower = stats.beta.ppf(0.05, 300, 1)
+    assert outcome.alarms[1] == pytest.approx(upper, abs=1e-12)
+    assert outcome.recall[0] == pytest.approx(lower, abs=1e-12)
+    assert outcome.passed is bool(upper <= 0.075 and lower >= 0.8)
+    wilson = certificates.Outcome.measure(
+        result, certificates.Standard(0.8, 0.075, 0.90)
+    )
+    assert wilson.alarms != outcome.alarms
+    with pytest.raises(ValueError, match="method"):
+        certificates.Standard(0.8, 0.05, 0.95, "normal")
+
+
+def test_an_exact_policy_round_trips_and_an_old_policy_reads_as_wilson(
+    tmp_path,
+):
+    store = certificates.Store(
+        [
+            certificates.certify(
+                "d1",
+                HASH_A,
+                CORPUS,
+                (0,),
+                [measured()],
+                certificates.Standard(0.8, 0.05, 0.90, "exact"),
+            )
+        ]
+    )
+    path = tmp_path / "store.json"
+    store.save(path)
+    assert certificates.Store.load(path).certificates == store.certificates
+    old = POLICY.to_dict()
+    del old["method"]
+    old["schema_version"] = 2
+    assert certificates.Standard.from_dict(old) == POLICY
+    assert POLICY.method == "wilson"

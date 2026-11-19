@@ -114,8 +114,20 @@ class Ceiling:
         """
         if trials == 0:
             return False
-        upper = coverage.clopper_pearson(hits, trials, 1 - 2 * alpha)[1]
-        return upper <= self.bound
+        return self.limit(hits, trials, alpha) <= self.bound
+
+    def limit(self, hits: int, trials: int, alpha: float) -> float:
+        """The one-sided upper bound the row is decided by.
+
+        Args:
+            hits: Trials that showed the event.
+            trials: Trials run.
+            alpha: One-sided error rate.
+
+        Returns:
+            `BetaInv(1 - alpha; hits + 1, trials - hits)`; 1 with no trials.
+        """
+        return coverage.clopper_pearson(hits, trials, 1 - 2 * alpha)[1]
 
     def minimum(self, alpha: float) -> int:
         """Smallest number of trials that can pass, with no event at all.
@@ -187,8 +199,20 @@ class Floor:
         """
         if trials == 0:
             return False
-        lower = coverage.clopper_pearson(hits, trials, 1 - 2 * alpha)[0]
-        return lower >= self.bound
+        return self.limit(hits, trials, alpha) >= self.bound
+
+    def limit(self, hits: int, trials: int, alpha: float) -> float:
+        """The one-sided lower bound the row is decided by.
+
+        Args:
+            hits: Trials that succeeded.
+            trials: Trials run.
+            alpha: One-sided error rate.
+
+        Returns:
+            `BetaInv(alpha; hits, trials - hits + 1)`; 0 with no trials.
+        """
+        return coverage.clopper_pearson(hits, trials, 1 - 2 * alpha)[0]
 
     def minimum(self, alpha: float) -> int:
         """Smallest number of trials that can pass, with every trial a hit.
@@ -365,6 +389,86 @@ def load(path: pathlib.Path = PATH) -> dict[str, Variable]:
         if name not in found or not 0 < found[name].value < 1:
             raise ValueError(f"{name} must be present and lie in (0, 1)")
     return found
+
+
+def ceiling(name: str, variables: dict[str, Variable] | None = None) -> Ceiling:
+    """The `Ceiling` rule of one statistical variable.
+
+    Args:
+        name: The variable's key.
+        variables: As returned by `load`; read from the file when None.
+
+    Returns:
+        The rule.
+
+    Raises:
+        ValueError: If the variable has no ceiling rule.
+    """
+    found = (load() if variables is None else variables)[name].rule
+    if not isinstance(found, Ceiling):
+        raise ValueError(f"{name} must have the ceiling rule")
+    return found
+
+
+def floor(name: str, variables: dict[str, Variable] | None = None) -> Floor:
+    """The `Floor` rule of one statistical variable.
+
+    Args:
+        name: The variable's key.
+        variables: As returned by `load`; read from the file when None.
+
+    Returns:
+        The rule.
+
+    Raises:
+        ValueError: If the variable has no floor rule.
+    """
+    found = (load() if variables is None else variables)[name].rule
+    if not isinstance(found, Floor):
+        raise ValueError(f"{name} must have the floor rule")
+    return found
+
+
+def margin(level: float, trials: int, alpha: float, power: float) -> float:
+    """Smallest size margin a correctly sized test passes with `power`.
+
+    A size gate runs a test of nominal level `L` on `n` null replicates and
+    passes when the exact upper bound of its rejection rate is at most
+    `L (1 + margin)`. A test whose true size is `L` rejects
+    `Binomial(n, L)` times; it passes with chance at least `power` exactly
+    when the ceiling admits the `power` quantile `k` of that count, so the
+    smallest margin is `BetaInv(1 - alpha; k + 1, n - k) / L - 1`. A
+    ceiling of `L` itself (margin 0) fails such a test most of the time.
+
+    Args:
+        level: Nominal level of the test, `L`.
+        trials: Null replicates the gate runs, `n`.
+        alpha: One-sided error rate of the bound.
+        power: Chance of passing wanted for a correctly sized test.
+
+    Returns:
+        The margin, a share of `level`.
+    """
+    count = int(stats.binom.ppf(power, trials, level))
+    while stats.binom.cdf(count, trials, level) < power:
+        count += 1
+    return Ceiling(level).limit(count, trials, alpha) / level - 1
+
+
+def sized(
+    level: float, variables: dict[str, Variable] | None = None
+) -> Ceiling:
+    """The ceiling of a size gate: the level times one plus `size_margin`.
+
+    Args:
+        level: Nominal level of the test the gate measures.
+        variables: As returned by `load`; read from the file when None.
+
+    Returns:
+        `Ceiling(level * (1 + size_margin))`.
+    """
+    found = load() if variables is None else variables
+    return Ceiling(level * (1 + found["size_margin"].value))
 
 
 def describe(variables: dict[str, Variable]) -> list[dict[str, object]]:

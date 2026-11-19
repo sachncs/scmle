@@ -216,6 +216,7 @@ def test_a_promotion_without_a_signature_is_an_unsigned_step(folder):
 
 def test_a_promotion_with_no_approval_is_an_unapproved_step(folder):
     # Enforces docs/TRAIL.md:66.
+    # Enforces website/src/learn/trail.html:29.
     path = folder / "retained/registry/audit.jsonl"
     rows = [r for r in audit_rows(folder) if r.get("action") != "promote"]
     write_rows(path, rows)
@@ -224,6 +225,7 @@ def test_a_promotion_with_no_approval_is_an_unapproved_step(folder):
 
 def test_self_approval_is_an_unapproved_step(folder):
     # Enforces docs/TRAIL.md:66.
+    # Enforces website/src/learn/trail.html:29.
     path = folder / "retained/registry/audit.jsonl"
     rows = audit_rows(folder)
     record = promotion_row(rows)["approval_record"]
@@ -238,6 +240,7 @@ def test_self_approval_is_an_unapproved_step(folder):
 
 def test_an_approval_of_another_bundle_is_not_accepted(folder):
     # Enforces docs/TRAIL.md:66.
+    # Enforces website/src/learn/trail.html:29.
     path = folder / "retained/registry/audit.jsonl"
     rows = audit_rows(folder)
     record = promotion_row(rows)["approval_record"]

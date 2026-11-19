@@ -143,8 +143,10 @@ def read(result, name):
 
 
 def test_features_come_from_the_database_and_reach_the_ledger(tmp_path):
-    # Enforces docs/ARCHITECTURE.md:105.
+    # Enforces docs/ARCHITECTURE.md:111.
     # Enforces docs/ARTIFACTS.md:73.
+    # Enforces website/src/pages/docs/artifacts.astro:114.
+    # Enforces website/src/pages/docs/causal-decision.astro:52.
     result = run(tmp_path)
     folder = pathlib.Path(result.run_dir)
 
@@ -258,7 +260,10 @@ def test_without_the_entity_block_duplicates_straddle_the_split(tmp_path):
 
 
 def test_the_resolved_entity_keeps_duplicates_on_one_side(tmp_path):
-    # Enforces docs/ARCHITECTURE.md:105.
+    # Enforces docs/ARCHITECTURE.md:111.
+    # Enforces website/src/pages/docs/artifacts.astro:114.
+    # Enforces website/src/pages/docs/causal-decision.astro:52.
+    # Enforces website/src/pages/docs/qualification.astro:70.
     result = run_with_emails(tmp_path, entity_block())
     document = read(result, "entity_resolution.json")
     assert document["group_column"] == "entity_group"
@@ -300,6 +305,8 @@ def run_reconciled(tmp_path, rows_off):
 
 def test_the_extract_is_reconciled_to_the_declared_totals(tmp_path):
     # Enforces docs/ARTIFACTS.md:60.
+    # Enforces website/src/pages/docs/artifacts.astro:114.
+    # Enforces website/src/pages/docs/causal-decision.astro:52.
     result = run_reconciled(tmp_path, 0)
     report = read(result, "extract_reconciliation.json")
     assert report["passed"] is True
@@ -311,6 +318,9 @@ def test_the_extract_is_reconciled_to_the_declared_totals(tmp_path):
 
 
 def test_a_total_the_extract_does_not_reproduce_stops_the_run(tmp_path):
+    # Enforces website/src/pages/docs/artifacts.astro:114.
+    # Enforces website/src/pages/docs/causal-decision.astro:52.
+    # Enforces website/src/pages/docs/qualification.astro:70.
     with pytest.raises(errors.BlockedError, match=r"orders\.row_count"):
         run_reconciled(tmp_path, 1)
 
@@ -346,6 +356,8 @@ def test_a_corrupted_extract_is_named_by_the_source_queries(
 
 def test_a_faithful_extract_passes_the_source_queries(tmp_path):
     # Enforces docs/ARTIFACTS.md:60.
+    # Enforces website/src/pages/docs/artifacts.astro:114.
+    # Enforces website/src/pages/docs/causal-decision.astro:52.
     result = run_reconciled(tmp_path, 0)
     report = read(result, "extract_reconciliation.json")
     assert report["source_passed"] is True

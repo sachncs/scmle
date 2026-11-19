@@ -129,3 +129,4 @@ def test_difference_in_means_matches_welch():
 
     test = stats.ttest_ind([5, 6, 7], [1, 2, 4], equal_var=False)
     assert out.se == pytest.approx(abs(out.estimate / test.statistic))
+    assert out.df == pytest.approx(test.df)

@@ -20,7 +20,10 @@ def commands(flow):
 
 
 def test_pull_requests_enforce_75_and_the_nightly_run_85_on_core():
-    """Enforces docs/OPERATING_LOOP.md:34."""
+    """Enforces docs/OPERATING_LOOP.md:34.
+
+    Also enforces website/src/pages/docs/operating-loop.astro:42.
+    """
     ci = yaml.safe_load((FLOWS / "ci.yml").read_text(encoding="utf-8"))
     assert "pull_request" in ci[True]
     bounded = [c for c in commands(FLOWS / "ci.yml") if "--cov=scmle" in c]

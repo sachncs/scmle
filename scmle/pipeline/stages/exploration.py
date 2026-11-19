@@ -288,7 +288,6 @@ class Exploration(admission.Admission):
             else context.store.directory.parent,
         )
         self.publish(context, run, runner)
-        self.audit(context, run, pending.found)
         context.emit(
             "ledger.completed",
             run.confirmation.reason,

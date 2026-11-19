@@ -1,7 +1,7 @@
 {
   "alpha": 0.05,
   "claim": "C4",
-  "code": "7e56d51333198ca5f220400834116f3ebaad3ae2fbce06b10e8813ef20ca4b50",
+  "code": "d76ad622296db06aef7bbd040706d47468eda42d71af4a78cef4320b9e75c276",
   "data": {
     "363612": "d98c8cf8b64d81cbd43aabd76222f4b54ae02f4cb2b67d4fb1c4ee9f309509d8",
     "363621": "8e9fecb0a04af9e4c8d3c625c8cd1c173a15de655254ddaed480d77a9008d00a",
@@ -63,47 +63,47 @@
     {
       "failures": 0,
       "gaps": [
-        -0.3952714535901924,
-        -8.60104072593224e-05,
-        -0.06040629624646853,
-        0.06345970692910434,
-        0.009254807692307477
+        -0.3263753413968003,
+        0.00541912175820381,
+        0.04517468499427253,
+        0.051730187638891166,
+        0.012900641025640855
       ],
       "kind": "binary",
-      "median": -8.60104072593224e-05,
+      "median": 0.012900641025640855,
       "passed": false,
       "tasks": 5,
-      "upper": 0.06345970692910434
+      "upper": 0.051730187638891166
     },
     {
       "failures": 0,
       "gaps": [
-        0.43489490416897864,
-        -0.19563161347934965,
-        0.04513783667047123,
-        0.01768837640674645,
-        0.011430896312339215
+        -0.1027672971937998,
+        -0.05014175908001193,
+        0.035583653182830945,
+        0.025938307348146613,
+        0.009563897278294627
       ],
       "kind": "multiclass",
-      "median": 0.01768837640674645,
-      "passed": false,
+      "median": 0.009563897278294627,
+      "passed": true,
       "tasks": 5,
-      "upper": 0.43489490416897864
+      "upper": 0.035583653182830945
     },
     {
       "failures": 0,
       "gaps": [
-        -0.04922934186974018,
-        0.026748490259413914,
-        0.032103430202115604,
-        0.026703972336575333,
-        0.002952042883856788
+        -0.05201203738495666,
+        0.007267106555837224,
+        -0.0022620068061030662,
+        -0.044621205565928135,
+        -0.0148586133333396
       ],
       "kind": "regression",
-      "median": 0.026703972336575333,
-      "passed": false,
+      "median": -0.0148586133333396,
+      "passed": true,
       "tasks": 5,
-      "upper": 0.032103430202115604
+      "upper": 0.007267106555837224
     }
   ],
   "median_max": 0.02,
@@ -115,10 +115,10 @@
     "the default 1800 s budget",
     "AutoGluon-class reference systems"
   ],
-  "seconds": 443.9,
+  "seconds": 415.9,
   "tasks": [
     {
-      "gap": -0.3952714535901924,
+      "gap": -0.3263753413968003,
       "kind": "binary",
       "metric": "roc_auc",
       "name": "blood-transfusion-service-center",
@@ -129,13 +129,13 @@
         },
         "cv": 0.7049961861174675,
         "score": 0.6514473684210527,
-        "seconds": 1.3,
+        "seconds": 0.5,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 0.750438596491228,
-        "seconds": 43.1
+        "score": 0.7248245614035087,
+        "seconds": 25.7
       },
       "task": 363621,
       "test_rows": 250,
@@ -143,7 +143,7 @@
       "trivial": 0.5
     },
     {
-      "gap": -8.60104072593224e-05,
+      "gap": 0.00541912175820381,
       "kind": "binary",
       "metric": "roc_auc",
       "name": "qsar-biodeg",
@@ -154,13 +154,13 @@
         },
         "cv": 0.9249292767774712,
         "score": 0.9192844519782161,
-        "seconds": 5.7,
+        "seconds": 2.5,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 0.9193205179067334,
-        "seconds": 52.0
+        "score": 0.9170122984816244,
+        "seconds": 49.7
       },
       "task": 363696,
       "test_rows": 352,
@@ -168,7 +168,7 @@
       "trivial": 0.5
     },
     {
-      "gap": -0.06040629624646853,
+      "gap": 0.04517468499427253,
       "kind": "binary",
       "metric": "roc_auc",
       "name": "Is-this-a-good-customer",
@@ -179,13 +179,13 @@
         },
         "cv": 0.7449858457972048,
         "score": 0.7078942668333631,
-        "seconds": 4.2,
+        "seconds": 1.6,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 0.7212597487646604,
-        "seconds": 46.9
+        "score": 0.6985027088170507,
+        "seconds": 34.2
       },
       "task": 363682,
       "test_rows": 575,
@@ -193,7 +193,7 @@
       "trivial": 0.5
     },
     {
-      "gap": 0.06345970692910434,
+      "gap": 0.051730187638891166,
       "kind": "binary",
       "metric": "roc_auc",
       "name": "Marketing_Campaign",
@@ -204,13 +204,13 @@
         },
         "cv": 0.8886471009305655,
         "score": 0.9238837894498271,
-        "seconds": 5.6,
+        "seconds": 2.3,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 0.8969842483993429,
-        "seconds": 44.4
+        "score": 0.9019562014845033,
+        "seconds": 46.2
       },
       "task": 363684,
       "test_rows": 747,
@@ -218,7 +218,7 @@
       "trivial": 0.5
     },
     {
-      "gap": 0.009254807692307477,
+      "gap": 0.012900641025640855,
       "kind": "binary",
       "metric": "roc_auc",
       "name": "hazelnut-spread-contaminant-detection",
@@ -229,13 +229,13 @@
         },
         "cv": 0.9723750000000001,
         "score": 0.9679999999999999,
-        "seconds": 12.2,
+        "seconds": 6.9,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 0.96366875,
-        "seconds": 45.7
+        "score": 0.9619624999999999,
+        "seconds": 57.8
       },
       "task": 363674,
       "test_rows": 800,
@@ -243,7 +243,7 @@
       "trivial": 0.5
     },
     {
-      "gap": 0.43489490416897864,
+      "gap": -0.1027672971937998,
       "kind": "multiclass",
       "metric": "log_loss",
       "name": "maternal_health_risk",
@@ -254,13 +254,13 @@
         },
         "cv": -0.6142137520164684,
         "score": 0.48546663635244175,
-        "seconds": 4.5,
+        "seconds": 3.8,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 0.7460628561268735,
-        "seconds": 48.6
+        "score": 0.4168335336297995,
+        "seconds": 29.8
       },
       "task": 363685,
       "test_rows": 338,
@@ -268,7 +268,7 @@
       "trivial": 1.0846831764321503
     },
     {
-      "gap": -0.19563161347934965,
+      "gap": -0.05014175908001193,
       "kind": "multiclass",
       "metric": "log_loss",
       "name": "MIC",
@@ -279,13 +279,13 @@
         },
         "cv": -0.539943755367003,
         "score": 0.5720854731110299,
-        "seconds": 29.3,
+        "seconds": 23.9,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 0.5387225074699317,
-        "seconds": 57.7
+        "score": 0.5648440924841074,
+        "seconds": 59.1
       },
       "task": 363711,
       "test_rows": 567,
@@ -293,7 +293,7 @@
       "trivial": 0.7092622533102424
     },
     {
-      "gap": 0.04513783667047123,
+      "gap": 0.035583653182830945,
       "kind": "multiclass",
       "metric": "log_loss",
       "name": "splice",
@@ -304,13 +304,13 @@
         },
         "cv": -0.1352703915148558,
         "score": 0.10093897931994204,
-        "seconds": 17.8,
+        "seconds": 14.1,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 0.14269355996597444,
-        "seconds": 56.2
+        "score": 0.13385549960756465,
+        "seconds": 56.7
       },
       "task": 363702,
       "test_rows": 1064,
@@ -318,7 +318,7 @@
       "trivial": 1.0259850986291528
     },
     {
-      "gap": 0.01768837640674645,
+      "gap": 0.025938307348146613,
       "kind": "multiclass",
       "metric": "log_loss",
       "name": "students_dropout_and_academic_success",
@@ -329,13 +329,13 @@
         },
         "cv": -0.5666573100526844,
         "score": 0.5743308135422269,
-        "seconds": 9.4,
+        "seconds": 9.5,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 0.5822036911272617,
-        "seconds": 50.7
+        "score": 0.5858756333617033,
+        "seconds": 58.7
       },
       "task": 363704,
       "test_rows": 1475,
@@ -343,7 +343,7 @@
       "trivial": 1.019418446459852
     },
     {
-      "gap": 0.011430896312339215,
+      "gap": 0.009563897278294627,
       "kind": "multiclass",
       "metric": "log_loss",
       "name": "SDSS17",
@@ -354,13 +354,13 @@
         },
         "cv": -0.0770035584764098,
         "score": 0.07610715418926961,
-        "seconds": 33.1,
+        "seconds": 32.4,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 0.08595717956132004,
-        "seconds": 59.0
+        "score": 0.0843483828972228,
+        "seconds": 58.7
       },
       "task": 363699,
       "test_rows": 26018,
@@ -368,7 +368,7 @@
       "trivial": 0.9378090805218272
     },
     {
-      "gap": -0.04922934186974018,
+      "gap": -0.05201203738495666,
       "kind": "regression",
       "metric": "rmse",
       "name": "QSAR_fish_toxicity",
@@ -379,13 +379,13 @@
         },
         "cv": -0.8978487142958906,
         "score": 0.9357558317886667,
-        "seconds": 0.9,
+        "seconds": 1.0,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 0.9064343858794519,
-        "seconds": 39.5
+        "score": 0.9046860526258553,
+        "seconds": 22.3
       },
       "task": 363698,
       "test_rows": 303,
@@ -393,7 +393,7 @@
       "trivial": 1.502043524567488
     },
     {
-      "gap": 0.026748490259413914,
+      "gap": 0.007267106555837224,
       "kind": "regression",
       "metric": "rmse",
       "name": "concrete_compressive_strength",
@@ -404,13 +404,13 @@
         },
         "cv": -4.663018066392686,
         "score": 4.6274459191573,
-        "seconds": 4.3,
+        "seconds": 3.7,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 4.957829813486843,
-        "seconds": 31.3
+        "score": 4.717205563202267,
+        "seconds": 31.6
       },
       "task": 363625,
       "test_rows": 344,
@@ -418,7 +418,7 @@
       "trivial": 16.978942812080682
     },
     {
-      "gap": 0.032103430202115604,
+      "gap": -0.0022620068061030662,
       "kind": "regression",
       "metric": "rmse",
       "name": "airfoil_self_noise",
@@ -429,13 +429,13 @@
         },
         "cv": -1.9820336329797725,
         "score": 1.5941468508296328,
-        "seconds": 5.8,
+        "seconds": 5.5,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 1.7661598780749972,
-        "seconds": 37.0
+        "score": 1.5819993399245142,
+        "seconds": 34.1
       },
       "task": 363612,
       "test_rows": 501,
@@ -443,7 +443,7 @@
       "trivial": 6.952235571019688
     },
     {
-      "gap": 0.026703972336575333,
+      "gap": -0.044621205565928135,
       "kind": "regression",
       "metric": "rmse",
       "name": "wine_quality",
@@ -454,13 +454,13 @@
         },
         "cv": -0.6619192514665518,
         "score": 0.6286624702421014,
-        "seconds": 6.6,
+        "seconds": 6.3,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 0.6346562278008367,
-        "seconds": 57.5
+        "score": 0.6181793877070499,
+        "seconds": 57.8
       },
       "task": 363708,
       "test_rows": 2166,
@@ -468,7 +468,7 @@
       "trivial": 0.8531143788641726
     },
     {
-      "gap": 0.002952042883856788,
+      "gap": -0.0148586133333396,
       "kind": "regression",
       "metric": "rmse",
       "name": "miami_housing",
@@ -479,13 +479,13 @@
         },
         "cv": -93460.86943069096,
         "score": 94716.99489441738,
-        "seconds": 13.3,
+        "seconds": 14.2,
         "tried": 6
       },
       "product": {
         "error": "",
-        "score": 95389.59303734967,
-        "seconds": 49.3
+        "score": 91280.52361682753,
+        "seconds": 59.3
       },
       "task": 363686,
       "test_rows": 4592,

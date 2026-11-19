@@ -168,7 +168,8 @@ def test_health_needs_distinct_endpoints_and_sane_timing():
 
 
 def test_other_spec_formats_are_refused():
-    # Enforces docs/API_STABILITY.md:200.
+    # Enforces docs/API_STABILITY.md:203.
+    # Enforces website/src/pages/docs/api-stability.astro:36.
     record = make_spec().to_dict()
     record["format"] = 99
     with pytest.raises(errors.ConfigError, match="format"):

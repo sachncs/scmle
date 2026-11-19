@@ -6,12 +6,21 @@
       0.06775267834859033
     ],
     "classes": 2,
+    "clean_worlds": 2600,
     "family_sizes": [
-      14
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23
     ],
     "grouped_null_replicates": 200,
-    "grouped_significant_worlds": 2,
+    "grouped_significant_worlds": 0,
     "grouped_suspect_false_alarms": 0,
+    "null_false_alarms": 0,
     "null_replicates": 1000,
     "old_rule_false_alarm_wilson_95": [
       0.0,
@@ -19,6 +28,15 @@
     ],
     "old_rule_false_alarms": 0,
     "plant_replicates_per_type": 200,
+    "planted_world_false_alarms": {
+      "leak_copy": 0,
+      "leak_duplicates": 19,
+      "leak_missing_for_class": 0,
+      "leak_noisy_copy": 0,
+      "leak_rare_record": 28,
+      "leak_target_mean": 20,
+      "leak_threshold": 0
+    },
     "recall": {
       "leak_copy": {
         "detected": 200,
@@ -27,6 +45,19 @@
         "old_rule_wilson_95": [
           0.9811546736227335,
           1.0
+        ],
+        "wilson_95": [
+          0.9811546736227335,
+          1.0
+        ]
+      },
+      "leak_duplicates": {
+        "detected": 200,
+        "detected_any_mechanism": 200,
+        "old_rule_detected": 0,
+        "old_rule_wilson_95": [
+          0.0,
+          0.018845326377266575
         ],
         "wilson_95": [
           0.9811546736227335,
@@ -47,7 +78,7 @@
         ]
       },
       "leak_noisy_copy": {
-        "detected": 197,
+        "detected": 200,
         "detected_any_mechanism": 200,
         "old_rule_detected": 3,
         "old_rule_wilson_95": [
@@ -55,8 +86,8 @@
           0.04316572879269026
         ],
         "wilson_95": [
-          0.9568342712073097,
-          0.9948857622067417
+          0.9811546736227335,
+          1.0
         ]
       },
       "leak_rare_record": {
@@ -66,6 +97,19 @@
         "old_rule_wilson_95": [
           0.9811546736227335,
           1.0
+        ],
+        "wilson_95": [
+          0.9811546736227335,
+          1.0
+        ]
+      },
+      "leak_target_mean": {
+        "detected": 200,
+        "detected_any_mechanism": 200,
+        "old_rule_detected": 0,
+        "old_rule_wilson_95": [
+          0.0,
+          0.018845326377266575
         ],
         "wilson_95": [
           0.9811546736227335,
@@ -102,16 +146,37 @@
       "run_seed": 0,
       "skill_ceiling": 0.95
     },
-    "significant_rate": 0.016,
+    "significant_rate": 0.0,
     "significant_rate_within_alpha": true,
     "suspect_false_alarm_wilson_95": [
-      0.0,
-      0.0038267584855551234
+      0.02034291512814317,
+      0.032594815912948674
     ],
-    "suspect_false_alarms": 0,
+    "suspect_false_alarms": 67,
     "table": "breast_cancer",
     "table_columns": 10,
-    "worlds_with_a_significant_column": 16
+    "worlds_with_a_significant_column": 0
+  },
+  "dated": {
+    "clean_worlds": 1200,
+    "cutoff": "2020-01-01T00:00:00",
+    "detected": 600,
+    "detected_wilson_95": [
+      0.9936382989862994,
+      1.0
+    ],
+    "false_alarm_wilson_95": [
+      0.0,
+      0.003191000602734924
+    ],
+    "false_alarms": 0,
+    "planted": 600,
+    "replicates_per_table": 200,
+    "tables": [
+      "breast_cancer",
+      "digits",
+      "diabetes"
+    ]
   },
   "multiclass": {
     "alpha": 0.05,
@@ -120,14 +185,19 @@
       0.06775267834859033
     ],
     "classes": 10,
+    "clean_worlds": 2600,
     "family_sizes": [
-      14,
       15,
-      17
+      16,
+      17,
+      18,
+      19,
+      20
     ],
     "grouped_null_replicates": 200,
-    "grouped_significant_worlds": 5,
+    "grouped_significant_worlds": 0,
     "grouped_suspect_false_alarms": 0,
+    "null_false_alarms": 0,
     "null_replicates": 1000,
     "old_rule_false_alarm_wilson_95": [
       0.0,
@@ -135,6 +205,15 @@
     ],
     "old_rule_false_alarms": 0,
     "plant_replicates_per_type": 200,
+    "planted_world_false_alarms": {
+      "leak_copy": 0,
+      "leak_duplicates": 0,
+      "leak_missing_for_class": 0,
+      "leak_noisy_copy": 0,
+      "leak_rare_record": 0,
+      "leak_target_mean": 0,
+      "leak_threshold": 0
+    },
     "recall": {
       "leak_copy": {
         "detected": 200,
@@ -143,6 +222,19 @@
         "old_rule_wilson_95": [
           0.9811546736227335,
           1.0
+        ],
+        "wilson_95": [
+          0.9811546736227335,
+          1.0
+        ]
+      },
+      "leak_duplicates": {
+        "detected": 200,
+        "detected_any_mechanism": 200,
+        "old_rule_detected": 0,
+        "old_rule_wilson_95": [
+          0.0,
+          0.018845326377266575
         ],
         "wilson_95": [
           0.9811546736227335,
@@ -188,6 +280,19 @@
           1.0
         ]
       },
+      "leak_target_mean": {
+        "detected": 200,
+        "detected_any_mechanism": 200,
+        "old_rule_detected": 0,
+        "old_rule_wilson_95": [
+          0.0,
+          0.018845326377266575
+        ],
+        "wilson_95": [
+          0.9811546736227335,
+          1.0
+        ]
+      },
       "leak_threshold": {
         "detected": 200,
         "detected_any_mechanism": 200,
@@ -218,16 +323,16 @@
       "run_seed": 0,
       "skill_ceiling": 0.95
     },
-    "significant_rate": 0.016,
+    "significant_rate": 0.002,
     "significant_rate_within_alpha": true,
     "suspect_false_alarm_wilson_95": [
       0.0,
-      0.0038267584855551234
+      0.001475304422886776
     ],
     "suspect_false_alarms": 0,
     "table": "digits",
     "table_columns": 10,
-    "worlds_with_a_significant_column": 16
+    "worlds_with_a_significant_column": 2
   },
   "regression": {
     "alpha": 0.05,
@@ -236,12 +341,14 @@
       0.06775267834859033
     ],
     "classes": 0,
+    "clean_worlds": 2600,
     "family_sizes": [
-      14
+      15
     ],
     "grouped_null_replicates": 200,
-    "grouped_significant_worlds": 3,
+    "grouped_significant_worlds": 0,
     "grouped_suspect_false_alarms": 0,
+    "null_false_alarms": 0,
     "null_replicates": 1000,
     "old_rule_false_alarm_wilson_95": [
       0.0,
@@ -249,6 +356,15 @@
     ],
     "old_rule_false_alarms": 0,
     "plant_replicates_per_type": 200,
+    "planted_world_false_alarms": {
+      "leak_copy": 0,
+      "leak_duplicates": 0,
+      "leak_missing_for_class": 0,
+      "leak_noisy_copy": 0,
+      "leak_rare_record": 0,
+      "leak_target_mean": 0,
+      "leak_threshold": 0
+    },
     "recall": {
       "leak_copy": {
         "detected": 200,
@@ -257,6 +373,19 @@
         "old_rule_wilson_95": [
           0.9811546736227335,
           1.0
+        ],
+        "wilson_95": [
+          0.9811546736227335,
+          1.0
+        ]
+      },
+      "leak_duplicates": {
+        "detected": 200,
+        "detected_any_mechanism": 200,
+        "old_rule_detected": 0,
+        "old_rule_wilson_95": [
+          0.0,
+          0.018845326377266575
         ],
         "wilson_95": [
           0.9811546736227335,
@@ -302,6 +431,19 @@
           1.0
         ]
       },
+      "leak_target_mean": {
+        "detected": 200,
+        "detected_any_mechanism": 200,
+        "old_rule_detected": 0,
+        "old_rule_wilson_95": [
+          0.0,
+          0.018845326377266575
+        ],
+        "wilson_95": [
+          0.9811546736227335,
+          1.0
+        ]
+      },
       "leak_threshold": {
         "detected": 200,
         "detected_any_mechanism": 200,
@@ -332,15 +474,15 @@
       "run_seed": 0,
       "skill_ceiling": 0.95
     },
-    "significant_rate": 0.015,
+    "significant_rate": 0.001,
     "significant_rate_within_alpha": true,
     "suspect_false_alarm_wilson_95": [
       0.0,
-      0.0038267584855551234
+      0.001475304422886776
     ],
     "suspect_false_alarms": 0,
     "table": "diabetes",
     "table_columns": 10,
-    "worlds_with_a_significant_column": 15
+    "worlds_with_a_significant_column": 1
   }
 }

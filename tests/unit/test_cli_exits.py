@@ -51,6 +51,7 @@ def test_a_bad_command_line_exits_with_the_usage_code(capsys):
 def test_a_leak_exits_as_blocked(monkeypatch, caplog):
     # Enforces docs/CLI.md:15.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:22.
+    # Enforces website/src/learn/when-things-go-wrong.html:11.
     failing(monkeypatch, errors.LeakageError("test set opened twice"))
     assert run([COMMAND.name], caplog) == cli.EXIT_BLOCKED
     assert "blocked: test set opened twice" in caplog.text
@@ -80,6 +81,7 @@ def test_debug_shows_causes_details_and_traceback(monkeypatch, caplog):
 
 def test_without_debug_a_handled_failure_is_one_line(monkeypatch, caplog):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:21.
+    # Enforces website/src/learn/when-things-go-wrong.html:10.
     failing(monkeypatch, errors.DataError("cannot read", {"path": "x.csv"}))
     assert run([COMMAND.name], caplog) == cli.EXIT_FAILED
     assert "Traceback" not in caplog.text

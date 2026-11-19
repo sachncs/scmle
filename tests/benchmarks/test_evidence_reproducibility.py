@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 
+from benchmarks import sources
 from benchmarks.evidence import reproducibility
 from scmle.contracts import errors
 
@@ -108,6 +109,35 @@ def test_stale_or_malformed_documents_are_problems_not_verdicts():
     ]
 
 
+@pytest.mark.parametrize(
+    "module",
+    [
+        # Training and model code the measured project runs, not only the
+        # bundle modules: a change to either makes the result stale.
+        "scmle.pipeline.engine",
+        "scmle.models.ensembles",
+        "scmle.artifacts.bundle.seal",
+    ],
+)
+def test_a_change_to_the_code_it_runs_makes_the_result_stale(
+    monkeypatch, tmp_path, module
+):
+    current = document()
+    assert reproducibility.problems(current) == []
+    original = sources.locate(module)
+    copy = tmp_path / "copy.py"
+    copy.write_text(original.read_text() + "\nEDITED = 1\n")
+    real = sources.locate
+
+    def edited(target, root=sources.ROOT):
+        return copy if target == module else real(target, root)
+
+    monkeypatch.setattr(sources, "locate", edited)
+    assert reproducibility.problems(current) == [
+        "reproducibility: measurements are for other code"
+    ]
+
+
 def test_metric_gaps_are_relative_to_the_larger_magnitude():
     gap = reproducibility.differ({"a": 2.0, "b": 0.0}, {"a": 1.0, "b": 0.0})
     assert gap == {"absolute": 1.0, "relative": 0.5}
@@ -121,6 +151,22 @@ def test_trace_lists_the_items_a_manifest_does_not_carry():
         "configuration",
         "commit",
     ]
+
+
+def test_the_interaction_task_is_pinned_on_every_platform(tmp_path):
+    # Measured bit for bit on macOS arm64 and on x86-64; before the
+    # classification trees were grown on the symmetric criterion, x86-64
+    # gave a roc_auc of 0.867630700778643 and arm64 0.8672135706340378.
+    found = reproducibility.train("interaction", tmp_path)
+    assert found["selected"] == "random_forest"
+    assert found["metrics"] == {
+        "roc_auc": 0.8670745272525028,
+        "pr_auc": 0.8182773493133442,
+        "log_loss": 0.4343082532185374,
+        "f1": 0.8571428571428571,
+        "balanced_accuracy": 0.8492769744160178,
+        "accuracy": 0.85,
+    }
 
 
 def test_an_unknown_task_kind_is_refused():

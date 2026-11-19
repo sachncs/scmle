@@ -21,7 +21,10 @@ def folder(tmp_path):
     "change", [{"decision": "rejected"}, {"independent": False}]
 )
 def test_a_rejected_or_dependent_approval_is_an_unapproved_step(folder, change):
-    """Enforces docs/TRAIL.md:66 (rejected, not independent)."""
+    """Enforces docs/TRAIL.md:66 (rejected, not independent).
+
+    Also enforces website/src/learn/trail.html:29.
+    """
     path = folder / "retained/registry/audit.jsonl"
     rows = test_trail.audit_rows(folder)
     record = test_trail.promotion_row(rows)["approval_record"]

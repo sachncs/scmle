@@ -320,6 +320,7 @@ def test_dedupe_reports_unhashable_rows_as_not_observed():
 
 
 def test_summarize_without_a_declared_label_blocks_supervised_use():
+    # Enforces website/src/pages/docs/data.astro:57.
     label, limitations, blockers = inspection.summarize(None, None)
     assert label == evidence.Labeling("not_declared", None, 0, 0, 0, {})
     assert limitations == ("label_was_not_declared",)
@@ -378,6 +379,7 @@ def test_frame_content_lists_kind_shape_schema_and_rows():
 
 
 def test_examine_reports_missing_and_duplicate_rows_as_blockers():
+    # Enforces website/src/pages/docs/data.astro:57.
     frame = pandas.DataFrame({"a": [1, 1, None], "y": [0, 0, 1]})
     observed = inspection.examine(frame, "y", None)
     assert observed.data_kind == "pandas_dataframe"

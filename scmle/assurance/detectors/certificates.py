@@ -3,7 +3,8 @@
 A check may gate a run only if its operating characteristic has been measured
 and is on file. A `Certification` records, per defect type, how
 many planted defects a detector found and how many clean rows it flagged, with
-Wilson intervals. It is keyed by a hash of the detector's code, so a code
+Wilson intervals, or exact Clopper-Pearson intervals when the policy says
+`exact`. It is keyed by a hash of the detector's code, so a code
 change without re-certification leaves the old certificate stale, and the
 check falls back to descriptive.
 
@@ -18,27 +19,29 @@ from collections.abc import Sequence
 import dataclasses
 import enum
 import json
-import math
 from pathlib import Path
 from typing import Any
 from typing import ClassVar
 from typing import Self
 
-from scipy import stats
-
 from scmle.assurance.detectors.hashing import code_hash
 from scmle.assurance.detectors.hashing import corpus_hash
 from scmle.assurance.detectors.hashing import hash_source
 from scmle.assurance.detectors.hashing import require_digest
+from scmle.assurance.detectors.intervals import interval
+from scmle.assurance.detectors.intervals import METHODS
+from scmle.assurance.detectors.intervals import wilson_interval
 from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 from scmle.contracts import records
 
-# The hashing names live in `hashing` and stay importable from here.
+# The hashing names live in `hashing` and the interval names in `intervals`;
+# both stay importable from here.
 __all__ = [
     "DIGESTS",
     "INTERVAL_TOLERANCE",
+    "METHODS",
     "PAIR_LENGTH",
     "SCHEMA_VERSION",
     "Audit",
@@ -57,6 +60,7 @@ __all__ = [
     "demote",
     "flatten",
     "hash_source",
+    "interval",
     "nest",
     "require_digest",
     "wilson_interval",
@@ -91,36 +95,34 @@ class Freshness(enum.StrEnum):
     MISSING = "missing"
 
 
-def wilson_interval(
-    successes: int, n: int, confidence: float = qualification.DEFAULT_CONFIDENCE
-) -> tuple[float, float]:
-    """Two-sided Wilson score interval for a binomial proportion.
+def stamp(layout: records.Layout) -> records.Layout:
+    """Gives a version-2 policy the interval method it was judged by.
 
     Args:
-        successes: Observed successes, between 0 and `n`.
-        n: Trials, at least 1.
-        confidence: Level of the interval, in (0, 1).
+        layout: The policy at version 2.
 
     Returns:
-        (low, high), clipped to [0, 1].
+        The policy at version 3, with method `wilson`.
+    """
+    return {**layout, "method": "wilson"}
+
+
+def unstamp(layout: records.Layout) -> records.Layout:
+    """Removes the interval method from a policy, back to version 2.
+
+    Args:
+        layout: The policy at version 3.
+
+    Returns:
+        The policy at version 2.
 
     Raises:
-        ValueError: On a count that is not an integer in range or a
-            confidence outside (0, 1).
+        InputError: If the policy uses exact intervals, which version 2
+            cannot hold.
     """
-    qualification.count(n, "n", minimum=1)
-    qualification.count(successes, "successes")
-    if successes > n:
-        raise errors.InputError("successes must be between 0 and n")
-    if not 0.0 < confidence < 1.0:
-        raise errors.InputError("confidence must be within (0, 1)")
-    z = float(stats.norm.ppf(1.0 - (1.0 - confidence) / 2.0))
-    p = successes / n
-    scale = 1.0 + z * z / n
-    centre = (p + z * z / (2.0 * n)) / scale
-    half = z * math.sqrt(p * (1.0 - p) / n + z * z / (4.0 * n * n)) / scale
-    # The interval contains p exactly; clamp away rounding at the edges.
-    return max(0.0, min(centre - half, p)), min(1.0, max(centre + half, p))
+    if layout.get("method", "wilson") != "wilson":
+        raise errors.InputError("an exact policy has no version-2 layout")
+    return {k: v for k, v in layout.items() if k != "method"}
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -131,11 +133,13 @@ class Standard:
     it judges; a stored policy without one is version 1.
 
     Attributes:
-        recall: Minimum allowed lower Wilson bound of recall (the recall
-            floor).
-        alarms: Maximum allowed upper Wilson bound of the false-alarm rate
-            on a clean copy (the false-alarm ceiling).
-        confidence: Level of both intervals, in (0, 1).
+        recall: Minimum allowed lower bound of recall (the recall floor).
+        alarms: Maximum allowed upper bound of the false-alarm rate on a
+            clean copy (the false-alarm ceiling).
+        confidence: Level of both two-sided intervals, in (0, 1); each
+            bound is one-sided at `(1 - confidence) / 2`.
+        method: How the intervals are computed, one of `METHODS`; a stored
+            policy from before version 3 is `wilson`.
         migrations: The policy's version steps, oldest first.
     """
 
@@ -143,24 +147,29 @@ class Standard:
         records.Migration(
             renames={"recall_floor": "recall", "false_alarm_ceiling": "alarms"}
         ),
+        records.Migration(change=stamp, revert=unstamp),
     )
 
     recall: float
     alarms: float
     confidence: float = qualification.DEFAULT_CONFIDENCE
+    method: str = "wilson"
 
     def __post_init__(self) -> None:
         """Validates the thresholds.
 
         Raises:
-            ValueError: If a floor or ceiling is not a probability, or
-                `confidence` is not strictly between 0 and 1.
+            ValueError: If a floor or ceiling is not a probability,
+                `confidence` is not strictly between 0 and 1, or the method
+                is unknown.
         """
         qualification.probability(self.recall, "recall")
         qualification.probability(self.alarms, "alarms")
         confidence = qualification.finite(self.confidence, "confidence")
         if not 0.0 < confidence < 1.0:
             raise errors.InputError("confidence must be within (0, 1)")
+        if self.method not in METHODS:
+            raise errors.InputError(f"method must be one of {METHODS}")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the policy as a JSON-ready record.
@@ -197,8 +206,8 @@ class Outcome:
 
     Attributes:
         certificate: Counts of planted defects found and clean rows flagged.
-        recall: Wilson interval for recall.
-        alarms: Wilson interval for the false-alarm rate.
+        recall: Interval for recall, by the policy's method.
+        alarms: Interval for the false-alarm rate, by the policy's method.
         passed: Whether both bounds meet the policy.
         migrations: The outcome's version steps, oldest first.
     """
@@ -231,15 +240,22 @@ class Outcome:
             policy: The floors to judge against.
 
         Returns:
-            The outcome. It passes when the lower Wilson bound of recall is
-            at least the recall floor and the upper Wilson bound of the
-            false-alarm rate is at most the false-alarm ceiling.
+            The outcome. It passes when the lower bound of recall is at
+            least the recall floor and the upper bound of the false-alarm
+            rate is at most the false-alarm ceiling, both by the policy's
+            method.
         """
-        recall = wilson_interval(
-            certificate.detected, certificate.planted, policy.confidence
+        recall = interval(
+            certificate.detected,
+            certificate.planted,
+            policy.confidence,
+            policy.method,
         )
-        alarms = wilson_interval(
-            certificate.alarms, certificate.clean, policy.confidence
+        alarms = interval(
+            certificate.alarms,
+            certificate.clean,
+            policy.confidence,
+            policy.method,
         )
         passed = recall[0] >= policy.recall and alarms[1] <= policy.alarms
         return cls(certificate, recall, alarms, passed)

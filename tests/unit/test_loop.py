@@ -286,6 +286,7 @@ def test_mnar_without_an_audit_slice_never_retrains_and_halts_on_an_alarm(
     tmp_path,
 ):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:705.
+    # Enforces website/src/learn/when-things-go-wrong.html:297.
     loop = open_loop(
         tmp_path, hooks=scmle.governance.loop.Hooks(retrain=lambda: "x")
     )
@@ -361,6 +362,7 @@ def paired(advantages, seed=1):
 
 def test_a_better_challenger_yields_a_promotion_proposal_in_order(tmp_path):
     # Enforces docs/GLOSSARY.md:542.
+    # Enforces website/src/learn/glossary.html:269.
     loop = open_loop(
         tmp_path,
         make_policy(
@@ -401,6 +403,7 @@ def test_a_better_challenger_yields_a_promotion_proposal_in_order(tmp_path):
 
 def test_a_challenger_without_evidence_escalates_at_the_label_budget(tmp_path):
     # Enforces docs/GLOSSARY.md:542.
+    # Enforces website/src/learn/glossary.html:269.
     loop = open_loop(
         tmp_path,
         make_policy(
@@ -553,6 +556,7 @@ def test_rejecting_or_undecided_replies_apply_the_safe_default(tmp_path):
 )
 def test_replies_that_do_not_fit_are_refused(tmp_path, changes, message):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:692.
+    # Enforces website/src/learn/when-things-go-wrong.html:293.
     loop, esc = pending_one(tmp_path)
     with pytest.raises(scmle.governance.loop.RefusalError, match=message):
         loop.reply(esc.id, reply_to(esc, **changes))
@@ -561,6 +565,7 @@ def test_replies_that_do_not_fit_are_refused(tmp_path, changes, message):
 
 def test_signature_key_and_system_key_checks(tmp_path):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:692.
+    # Enforces website/src/learn/when-things-go-wrong.html:293.
     loop, esc = pending_one(tmp_path)
     with pytest.raises(
         scmle.governance.loop.RefusalError, match="system holds"
@@ -660,6 +665,8 @@ def test_never_list_action_without_attestation_raises_and_escalates(
     # Enforces docs/AUTONOMY.md:47.
     # Enforces docs/GLOSSARY.md:559.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:709.
+    # Enforces website/src/learn/glossary.html:277.
+    # Enforces website/src/learn/when-things-go-wrong.html:301.
     loop = attested_loop(tmp_path)
     calls = []
     before = len(rows(loop, deployment_ledger.ESCALATION))
@@ -690,6 +697,8 @@ def test_high_impact_answer_is_blocked_in_routing_and_guarded_as_an_action(
 def test_the_system_cannot_attest_for_itself(tmp_path):
     # Enforces docs/AUTONOMY.md:47.
     # Enforces docs/GLOSSARY.md:383.
+    # Enforces website/src/learn/glossary.html:191.
+    # Enforces website/src/pages/docs/qualification.astro:118.
     loop, esc = pending_one(tmp_path)
     assert not hasattr(loop, "sign") and not hasattr(loop, "attest")
     with pytest.raises(scmle.governance.loop.RefusalError):
@@ -771,6 +780,7 @@ def single_use_loop(tmp_path):
 
 
 def test_a_single_use_attestation_allows_one_action_and_is_ledgered(tmp_path):
+    # Enforces website/src/pages/docs/operating-loop.astro:49.
     loop = single_use_loop(tmp_path)
     registry = types.SimpleNamespace(promote=lambda *a, **k: "moved")
     with pytest.raises(never_list.AttestationRequired):

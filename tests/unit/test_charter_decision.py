@@ -156,6 +156,8 @@ def layer():
 
 
 def test_a_charter_without_the_layer_keeps_its_hash_and_format():
+    # Enforces website/src/pages/docs/api-stability.astro:51.
+    # Enforces website/src/pages/docs/qualification.astro:67.
     from tests.unit.test_charter_contracts import make_charter
     from tests.unit.test_charter_rules import FROZEN_HASH
 
@@ -167,6 +169,8 @@ def test_a_charter_without_the_layer_keeps_its_hash_and_format():
 
 
 def test_the_layer_changes_the_hash_round_trips_and_needs_format_five():
+    # Enforces website/src/pages/docs/api-stability.astro:75.
+    # Enforces website/src/pages/docs/causal-decision.astro:69.
     import json
 
     from scmle.assurance.charter import contracts
@@ -198,6 +202,7 @@ def test_a_layer_without_a_cost_model_is_refused():
 
 
 def test_a_layer_in_an_older_format_is_refused(tmp_path):
+    # Enforces website/src/pages/docs/api-stability.astro:51.
     import json
 
     from scmle.assurance.charter import sealing

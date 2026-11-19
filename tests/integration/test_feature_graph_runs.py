@@ -131,24 +131,34 @@ def test_bundle_with_a_graph_roundtrips_and_records_its_fingerprint(tmp_path):
     assert len(graph_events[0]["data"]["nodes"]) == 5
 
 
-def test_fitted_nodes_are_learned_from_training_rows_only(tmp_path):
+def test_fitted_nodes_are_learned_from_the_rows_the_model_was_fitted_on(
+    tmp_path,
+):
+    # The served model is the choice refit on the development and test rows
+    # once the test is scored (`evaluation.json` `shipped`); the scored fit
+    # never sees the test rows (test_unit_stagesrun).
     frame = graph_frame()
     result = run(frame, tmp_path)
     manifest = json.loads(
         (result.run_dir / "validation_manifest.json").read_text()
     )
-    development = frame.iloc[manifest["training"]]
+    shipped = result.evaluation["shipped"]
+    rows = list(manifest["training"])
+    if shipped["refit"]:
+        rows += list(manifest["test"])
+    assert shipped["rows"] == len(rows)
+    fitted = frame.iloc[rows]
     final = result.bundle.pipeline
     while not hasattr(final, "named_steps") and hasattr(final, "estimator_"):
         final = final.estimator_
     if not hasattr(final, "named_steps") or "graph" not in final.named_steps:
         pytest.skip("final estimator hides the graph step")
     states = final.named_steps["graph"].states_
-    low, high = numpy.quantile(development["price"], [0.02, 0.98])
+    low, high = numpy.quantile(fitted["price"], [0.02, 0.98])
     assert states["price_clip"] == pytest.approx((low, high))
-    assert not numpy.allclose(
-        states["price_clip"], numpy.quantile(frame["price"], [0.02, 0.98])
-    )
+    development = frame.iloc[manifest["training"]]
+    learned = numpy.quantile(development["price"], [0.02, 0.98])
+    assert shipped["refit"] != numpy.allclose(states["price_clip"], learned)
 
 
 def test_a_different_graph_is_a_different_configuration(tmp_path):

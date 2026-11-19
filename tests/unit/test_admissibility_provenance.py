@@ -60,6 +60,7 @@ def make_field(
 
 
 def test_undeclared_field_is_unverified_with_everything_unknown():
+    # Enforces website/src/pages/docs/qualification.astro:43.
     record = provenance.undeclared("x")
     assert record.tier() is Tier.UNVERIFIED
     assert record.lead == provenance.Lead.unknown()
@@ -67,6 +68,7 @@ def test_undeclared_field_is_unverified_with_everything_unknown():
 
 
 def test_attested_field_is_attested_not_confirmed():
+    # Enforces website/src/pages/docs/qualification.astro:91.
     assert make_field().tier(DAY) is Tier.ATTESTED
 
 
@@ -248,6 +250,7 @@ def test_table_rejects_duplicate_names():
 
 
 def test_no_field_is_confirmed_without_a_log():
+    # Enforces website/src/pages/docs/qualification.astro:91.
     for source in (provenance.Provenance.ATTESTED, provenance.Provenance.NONE):
         assert make_field(source=source).tier(DAY) is not Tier.CONFIRMED
 

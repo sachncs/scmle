@@ -27,6 +27,7 @@ def run(tmp_path, **kwargs):
 
 def test_the_time_column_is_split_only_by_default(tmp_path):
     # Enforces docs/BENCHMARKS.md:97.
+    # Enforces website/src/pages/docs/benchmarks.astro:793.
     assert "t" not in run(tmp_path).bundle.features
 
 

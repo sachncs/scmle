@@ -19,7 +19,7 @@ itself; a script of your own that reads the JSON directly should use
 | --- | --- |
 | `report.html` | Human-readable summary: leaderboard, test result, diagnostics. |
 | `leaderboard.parquet` | Every candidate with status and cross-validation score. |
-| `evaluation.json` | The one-time locked-test result and confidence intervals. |
+| `evaluation.json` | The one-time locked-test result and confidence intervals. `shipped` says whether the served model was refit on development and test rows together after the test (`refit`, `rows`, `reason` when it was not); the test metrics are those of the fit that never saw the test rows. |
 | `diagnostics/decision_log.json` | The evidence behind each choice (what was included, rejected, deferred). |
 | `events.jsonl` | Append-only state transitions and audit events (`split.created`, `selection.frozen`, `test.opened`, `policy.*`). |
 
@@ -40,7 +40,7 @@ itself; a script of your own that reads the JSON directly should use
 | `detector_certificates.json` | With `--charter`: the F5 certificate store the run used, copied from `scmle/certificates/`, which ships with the package; when absent, every detector is descriptive and the `admissibility.completed` event says so. |
 | `stability_report.json` | With `--charter`: each exploration survivor re-run over the grid the charter declared (imputation, outlier rule, inclusion; other choices are listed as not run). Per finding: the specification curve (effect and bootstrap interval per specification), the verdict (`stable`, `fragile` or `not_evaluable`) with the numbers behind it, a permutation test of the whole curve, and which choice moves the estimate. Stability is relative to the declared set. A fragile verdict is a warning unless a current passing certificate for the chartered thresholds lets it gate. Only when the charter's `rules.stability_filter` is true and it can gate are fragile survivors withdrawn from the family tested on `C` (second stage; accounting under `second` in `confirmed_claims.json` and under `stage_two` in the confirmation row of the ledger). The stability and shift results, including per-column shift p-values, are also written as wealth-free diagnostic rows of the ledger. |
 | `eda_report.html` | With `--charter`: one static page written from `stability_report.json` and `shift_report.json` (status, counts, a specification curve per finding, the shift and forward-check rows). It has no script and no network reference and adds no number that is not in the two reports. |
-| `shift_report.json` | With `--charter`: the exploration set against the deployment sample named by `reference`. Status is `pass` (no shift detected), `fail` or `unverifiable`; without a deployment sample it is `unverifiable`, never `pass`. Holds the classifier and kernel two-sample tests (permutation p-values), per-feature KS or chi-square under Benjamini-Hochberg, subgroup coverage for `sensitive_columns`, and the forward check, which a run reports as skipped because the final-test set is opened only by the final evaluation. Per-period drift is not implemented. |
+| `shift_report.json` | With `--charter`: the exploration set against the deployment sample named by `reference`. Status is `pass` (no shift detected), `fail` or `unverifiable`; without a deployment sample it is `unverifiable`, never `pass`. Holds the classifier and kernel two-sample tests (permutation p-values), per-feature KS or chi-square under Benjamini-Hochberg, subgroup coverage for `sensitive_columns`, and the forward check, which a run reports as skipped because the final-test set is opened only by the final evaluation. With a time column, `periods` holds per-period drift: the exploration rows cut into contiguous periods of equal size (at least 50 rows, at most ten periods), each later period compared with the first per feature (KS or chi-square) under one Benjamini-Hochberg adjustment over every period and column, with status `pass`, `fail` or `unverifiable` (no time column; `not_run` in reports written before it existed). |
 
 | `evaluation.json` (decision keys) | With `--charter` whose charter has a decision block and a binary task: `decision` holds `objective` `chartered_cost`, the cut on the raw probability, the cost model hash and `f11` (calibration check, the path that ran: `bayes`, `recalibrated` or `grid`, rule hash, tier, expected cost with a bootstrap interval, the span of cost ratios on which the rule beats treat all and treat none on development data). `benefit` holds the simultaneous band on the locked test set, computed once, with the claim `useful` or `not_useful_in_range`. Costs are inputs: the tier is `attested` only if every cost came from a person. |
 | `framing_link.json` | With `--charter`: whether the charter's target, prediction moment and unit name real columns (`resolved`) or not (`unresolved`). Names are matched to column names only; free text that matches nothing is reported, never rejected, and nothing is gated on it. Reads column names, never values. |
@@ -149,7 +149,45 @@ transparency log, and they do not prove the build host was honest.
 | File | Contents |
 | --- | --- |
 | `<output>.manifest.json` (from `scmle batch`) | Schema version, model version, artifact digest (SHA-256 of the canonical bundle manifest), schema digest, row count, rows with nulls and with unseen categories, and the output file's digest. |
+| `<output>.partial`, `<output>.progress.json` (from `scmle batch`) | While a batch runs: the chunks scored so far, and a journal of the rows and bytes written that lets an interrupted run of the same input, bundle and policies resume. The finished file replaces `<output>` and the journal is removed. |
 | `deploy/local/golden/` | The hand-written reference model, golden records, closed-form expected outputs and the declared tolerances ([`SERVICE_SLO.md`](SERVICE_SLO.md)). |
+
+## Parameter estimation (`scmle estimate`, `scmle run --estimation`)
+
+| File | Contents |
+| --- | --- |
+| `parameter_estimation.json` | Each declared parameter's estimate, interval and p-value with the estimand and policy, read back through a digest-checking reader. Written to `--output-dir` by `estimate`, and into the run directory by `run --estimation`. |
+| `parameter_estimation_refusal.json` | When the declaration cannot be estimated on the data: `status` `refused`, the `reason`, its `category` and `details`, the estimand and the policy. Writing it removes a `parameter_estimation.json` left in the same folder, so the folder never holds both. |
+
+## Clustering bundle (`scmle cluster`)
+
+`--output` holds a bundle of task `clustering` (the same files as `model/`
+above; `scmle predict` returns cluster labels) and `clustering.json`: every
+candidate tried (method, cluster count, silhouette, Davies-Bouldin,
+Calinski-Harabasz, bootstrap stability), the chosen one, whether it is
+stable and the size of each cluster (`sizes`), the feature `columns`, the `rows` labelled, the chosen candidate's
+`metrics`, and `agreement` (adjusted Rand index and normalized mutual
+information against `--truth`; empty without it). Infinite indices are
+written as null. The folder is written beside it under a `.partial` name and
+renamed into place.
+
+## Erasure (`scmle forget`, `retire`, `delete`)
+
+| Path | Contents |
+| --- | --- |
+| `<receipts>/<id>/plan.json` | The request (with a subject's identifiers as SHA-256 hashes), the reason, the start time and every planned step, written once. A rerun reads it instead of searching again. |
+| `<receipts>/<id>/journal.jsonl` | One line per finished step, appended and synced; a rerun skips the steps it lists. |
+| `<receipts>/<id>.json` | The receipt, written after the last step: `identifier`, `kind` (`forget`, `retire` or `delete`), `reason`, `request`, each step's action (`purge`, `retrain`, `remove`, `keep`, `retire`, `unlist`), target, planned evidence and result, `started`, `finished`, `format` and an HMAC-SHA256 `signature` over the rest. `scmle forget verify` checks it. |
+| `<bundle>/retired.json` | The retirement mark (`reason`, `retired`). It is not a checksummed member, so the bundle's content address is unchanged; `Bundle.load` refuses the directory with `RetiredError`, and a mark that cannot be parsed still retires it. |
+
+The run records an erasure keeps (`keep`), each listed in the receipt with
+its digest: `provenance.json`, `release_attestation.json`,
+`evidence_graph.json`, `dataset_manifest.json`, `events.jsonl`,
+`complete.json`, `analysis_charter.json`, `hypothesis_ledger.jsonl`,
+`confirmed_claims.json` and `custody_log.jsonl`, and the run's custody
+journal (`custody/<run>.jsonl` beside the run). They hold digests, ids,
+signatures and the run's decisions, never row values. A run's trial and run rows in
+the `experiments.sqlite` beside it are deleted (`unlist`).
 
 ## Cleanup
 

@@ -71,7 +71,10 @@ def test_enums_define_all_required_modalities_and_lifecycle_stages():
 
 
 def test_extension_modality_has_stable_namespaced_identity():
-    """Caller-defined families serialize without colliding with built-ins."""
+    """Caller-defined families serialize without colliding with built-ins.
+
+    Also enforces website/src/pages/docs/extensions.astro:31.
+    """
     identity = modalities.Bespoke("acme/point-cloud")
 
     assert identity.value == "extension:acme/point-cloud"

@@ -170,6 +170,7 @@
      "baseline": "NoneType",
      "comparator": "str",
      "confidence": "float",
+     "cutoff": "NoneType",
      "delays": {},
      "draft": "NoneType",
      "embedder": "str",
@@ -295,6 +296,7 @@
     "task": "str",
     "validation": {
      "embargo": "int",
+     "entities": "str",
      "folds": "int",
      "rolling": {
       "horizon": "NoneType",
@@ -993,27 +995,19 @@
      "alpha": "float",
      "blocking": [],
      "ceilings": {
+      "duplication": "float",
       "echo": "float",
+      "encoding": "float",
       "missingness": "float",
       "record_purity": "float",
       "skill": "float"
      },
      "family": "int",
-     "findings": [
-      {
-       "adjusted_p": "float",
-       "complete": "bool",
-       "feature": "str",
-       "lower_bound": "float",
-       "mechanism": "str",
-       "p_value": "float",
-       "significant": "bool",
-       "statistic": "float",
-       "suspect": "bool"
-      }
-     ],
+     "findings": [],
      "gates": {
+      "duplication": "str",
       "echo": "str",
+      "encoding": "str",
       "missingness": "str",
       "record_purity": "str",
       "skill": "str"
@@ -1025,9 +1019,11 @@
      "permutations": "int",
      "probe": {
       "leak_copy": "bool",
+      "leak_duplicates": "bool",
       "leak_missing_for_class": "bool",
       "leak_noisy_copy": "bool",
       "leak_rare_record": "bool",
+      "leak_target_mean": "bool",
       "leak_threshold": "bool"
      },
      "rows": "int",
@@ -1933,6 +1929,11 @@
      "trial": "str"
     },
     "sensitivity": "NoneType",
+    "shipped": {
+     "reason": "str",
+     "refit": "bool",
+     "rows": "int"
+    },
     "skipped": [],
     "streamed": "NoneType",
     "task": "str",
@@ -2034,6 +2035,10 @@
       "source": "str"
      },
      "tabpfn": {
+      "available": "bool",
+      "source": "str"
+     },
+     "tracing": {
       "available": "bool",
       "source": "str"
      },
@@ -3659,6 +3664,7 @@
      "baseline": "NoneType",
      "comparator": "str",
      "confidence": "float",
+     "cutoff": "NoneType",
      "delays": {},
      "draft": "NoneType",
      "embedder": "str",
@@ -3784,6 +3790,7 @@
     "task": "str",
     "validation": {
      "embargo": "int",
+     "entities": "str",
      "folds": "int",
      "rolling": {
       "horizon": "NoneType",
@@ -4578,27 +4585,19 @@
      "alpha": "float",
      "blocking": [],
      "ceilings": {
+      "duplication": "float",
       "echo": "float",
+      "encoding": "float",
       "missingness": "float",
       "record_purity": "float",
       "skill": "float"
      },
      "family": "int",
-     "findings": [
-      {
-       "adjusted_p": "float",
-       "complete": "bool",
-       "feature": "str",
-       "lower_bound": "float",
-       "mechanism": "str",
-       "p_value": "float",
-       "significant": "bool",
-       "statistic": "float",
-       "suspect": "bool"
-      }
-     ],
+     "findings": [],
      "gates": {
+      "duplication": "str",
       "echo": "str",
+      "encoding": "str",
       "missingness": "str",
       "record_purity": "str",
       "skill": "str"
@@ -4610,9 +4609,11 @@
      "permutations": "int",
      "probe": {
       "leak_copy": "bool",
+      "leak_duplicates": "bool",
       "leak_missing_for_class": "bool",
       "leak_noisy_copy": "bool",
       "leak_rare_record": "bool",
+      "leak_target_mean": "bool",
       "leak_threshold": "bool"
      },
      "rows": "int",
@@ -5420,6 +5421,11 @@
      "trial": "str"
     },
     "sensitivity": "NoneType",
+    "shipped": {
+     "reason": "str",
+     "refit": "bool",
+     "rows": "int"
+    },
     "skipped": [],
     "streamed": "NoneType",
     "task": "str",
@@ -5521,6 +5527,10 @@
       "source": "str"
      },
      "tabpfn": {
+      "available": "bool",
+      "source": "str"
+     },
+     "tracing": {
       "available": "bool",
       "source": "str"
      },
@@ -7174,6 +7184,7 @@
      "baseline": "NoneType",
      "comparator": "str",
      "confidence": "float",
+     "cutoff": "NoneType",
      "delays": {},
      "draft": "NoneType",
      "embedder": "str",
@@ -7299,6 +7310,7 @@
     "task": "str",
     "validation": {
      "embargo": "int",
+     "entities": "str",
      "folds": "int",
      "rolling": {
       "horizon": "NoneType",
@@ -7820,27 +7832,19 @@
      "alpha": "float",
      "blocking": [],
      "ceilings": {
+      "duplication": "float",
       "echo": "float",
+      "encoding": "float",
       "missingness": "float",
       "record_purity": "float",
       "skill": "float"
      },
      "family": "int",
-     "findings": [
-      {
-       "adjusted_p": "float",
-       "complete": "bool",
-       "feature": "str",
-       "lower_bound": "float",
-       "mechanism": "str",
-       "p_value": "float",
-       "significant": "bool",
-       "statistic": "float",
-       "suspect": "bool"
-      }
-     ],
+     "findings": [],
      "gates": {
+      "duplication": "str",
       "echo": "str",
+      "encoding": "str",
       "missingness": "str",
       "record_purity": "str",
       "skill": "str"
@@ -7852,9 +7856,11 @@
      "permutations": "int",
      "probe": {
       "leak_copy": "bool",
+      "leak_duplicates": "bool",
       "leak_missing_for_class": "bool",
       "leak_noisy_copy": "bool",
       "leak_rare_record": "bool",
+      "leak_target_mean": "bool",
       "leak_threshold": "bool"
      },
      "rows": "int",
@@ -8775,6 +8781,11 @@
      "trial": "str"
     },
     "sensitivity": "NoneType",
+    "shipped": {
+     "reason": "str",
+     "refit": "bool",
+     "rows": "int"
+    },
     "skipped": [],
     "streamed": "NoneType",
     "task": "str",
@@ -8876,6 +8887,10 @@
       "source": "str"
      },
      "tabpfn": {
+      "available": "bool",
+      "source": "str"
+     },
+     "tracing": {
       "available": "bool",
       "source": "str"
      },

@@ -274,6 +274,7 @@ def outputs(store):
 
 def test_incremental_runs_process_each_object_once_and_deduplicate(store):
     # Enforces docs/GOVERNED_DATA.md:63.
+    # Enforces website/src/pages/docs/governed-data.astro:36.
     seed(store)
     first = processor(store).run()
     assert first.processed == ("input/a.csv", "input/b.csv")
@@ -316,6 +317,7 @@ def test_a_crash_between_output_and_checkpoint_recovers_without_duplicates(
     tmp_path,
 ):
     # Enforces docs/GOVERNED_DATA.md:63.
+    # Enforces website/src/pages/docs/governed-data.astro:36.
     seed(store)
 
     class Crash(BaseException):
@@ -352,6 +354,7 @@ def test_a_crash_between_output_and_checkpoint_recovers_without_duplicates(
 
 def test_transient_failures_are_retried_with_backoff(store):
     # Enforces docs/GOVERNED_DATA.md:63.
+    # Enforces website/src/pages/docs/governed-data.astro:36.
     seed(store)
     calls = {"n": 0}
 
@@ -481,6 +484,7 @@ def test_a_checkpoint_that_is_not_an_object_is_reported_as_corrupt(stored):
 
 def test_a_second_run_cannot_share_the_checkpoint(store):
     # Enforces docs/GOVERNED_DATA.md:63.
+    # Enforces website/src/pages/docs/governed-data.astro:36.
     seed(store)
     store.put("state/lock", b"someone")
     with pytest.raises(processing.LockError):

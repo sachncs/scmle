@@ -12,17 +12,22 @@ import numpy
 import pandas
 
 from scmle.assurance.admissibility import leakage
+from scmle.assurance.admissibility.screen.fitting import margin
 from scmle.assurance.admissibility.screen.fitting import Problem
 from scmle.assurance.admissibility.screen.hypotheses import caps
 from scmle.assurance.admissibility.screen.hypotheses import floor
 from scmle.assurance.admissibility.screen.hypotheses import Pending
+from scmle.assurance.admissibility.screen.hypotheses import reading
+from scmle.assurance.admissibility.screen.hypotheses import rival
 from scmle.assurance.admissibility.screen.settings import allowance
 from scmle.assurance.admissibility.screen.settings import BINARY_CLASSES
+from scmle.assurance.admissibility.screen.settings import DATED
 from scmle.assurance.admissibility.screen.settings import SKILL
 from scmle.assurance.admissibility.screen.settings import WORDS
 from scmle.assurance.detectors import certificates
 from scmle.assurance.ledger import multiplicity
 import scmle.assurance.ledger.budget
+from scmle.runtime import randomness
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -38,9 +43,10 @@ class Finding:
         p_value: Permutation (or analytic) p-value. When `complete` is False
             the run stopped early and this is the estimate from the
             permutations drawn so far, which lies above the largest
-            threshold.
+            threshold; it is 1 when no permutation was drawn because the
+            observed statistic is not above the ceiling (`sift`).
         adjusted_p: Benjamini-Yekutieli adjusted p-value (1.0 when stopped
-            early).
+            early or never drawn).
         significant: Rejected by the Benjamini-Yekutieli step.
         lower_bound: One-sided lower confidence bound of the effect size,
             computed for significant columns only.
@@ -78,6 +84,15 @@ class Finding:
             and stating that it is a suspicion and not proof.
         """
         what = WORDS[self.mechanism]
+        if self.mechanism == DATED:
+            return (
+                f"feature '{self.feature}' is dated after the declared "
+                f"prediction time: {what} {self.statistic:.3f} (the honest "
+                f"share is {ceiling:.0f}; certified, may block). Its values "
+                "were not known when the prediction is made; declare it "
+                "unavailable at prediction (a date scheduled in advance, such "
+                "as a due date, reads the same: give it as a lead time)"
+            )
         bound = "n/a" if self.lower_bound is None else f"{self.lower_bound:.3f}"
         status = (
             "certified, may block"
@@ -200,7 +215,9 @@ class Screen:
                 {
                     "feature": f.feature,
                     "mechanism": f.mechanism,
-                    "statistic": f.statistic,
+                    "statistic": (
+                        f.statistic if math.isfinite(f.statistic) else None
+                    ),
                     "p_value": f.p_value,
                     "adjusted_p": f.adjusted_p,
                     "significant": f.significant,
@@ -375,7 +392,9 @@ def throttle(
     """
     n, family, total = size
     skill_columns = sum(
-        1 for h in pending if h.mechanism == SKILL and h.statistic is not None
+        1
+        for h in pending
+        if h.mechanism == SKILL and h.statistic is not None and h.active
     )
     work = (
         total
@@ -411,8 +430,14 @@ def conclude(
     cfg: leakage.Config,
     groups: numpy.ndarray | None,
     gates: Mapping[str, certificates.Authority],
+    apart: Sequence[Hashable] = (),
 ) -> list[Finding]:
     """Adjusts the drawn p-values together and bounds the significant ones.
+
+    A significant hypothesis is a suspect when its bound passes its
+    ceiling; a skill hypothesis must also outrun the other columns
+    (`rival`): the lower confidence bound of its paired skill difference
+    over theirs (`margin`) must be at least zero, so a tie counts.
 
     Args:
         pending: The hypotheses, after their permutations were drawn.
@@ -425,6 +450,7 @@ def conclude(
         cfg: Settings.
         groups: Group label per row, or None.
         gates: Gate status per mechanism.
+        apart: Columns left out of every other column's rest.
 
     Returns:
         One finding per hypothesis, in order. A hypothesis that stopped
@@ -450,6 +476,14 @@ def conclude(
         if significant:
             bound = floor(h, problem, frame, class_codes, totals, cfg, groups)
             suspect = bound > ceilings[h.mechanism]
+            rest = None
+            if suspect and h.mechanism == SKILL and h.data is not None:
+                rest = rival(h, pending, problem, apart)
+            if rest is not None and h.data is not None:
+                path = f"leakage.screen.margin.{h.feature}"
+                rng = randomness.component_rng(cfg.run_seed, path, 0)
+                mine = reading(h, h.data, frame, problem)
+                suspect = margin(problem, mine, rest, cfg, groups, rng) >= 0
         findings.append(
             Finding(
                 h.feature,

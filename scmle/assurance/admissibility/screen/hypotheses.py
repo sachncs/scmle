@@ -18,15 +18,23 @@ from scmle.assurance.admissibility.screen.association import cramer
 from scmle.assurance.admissibility.screen.association import dominance
 from scmle.assurance.admissibility.screen.association import purity_statistic
 from scmle.assurance.admissibility.screen.association import resample
+from scmle.assurance.admissibility.screen.fitting import aucs
 from scmle.assurance.admissibility.screen.fitting import basis
+from scmle.assurance.admissibility.screen.fitting import line
+from scmle.assurance.admissibility.screen.fitting import oof_fit
 from scmle.assurance.admissibility.screen.fitting import pair
 from scmle.assurance.admissibility.screen.fitting import pairs
+from scmle.assurance.admissibility.screen.fitting import predict
 from scmle.assurance.admissibility.screen.fitting import Problem
 from scmle.assurance.admissibility.screen.fitting import skill_bound
 from scmle.assurance.admissibility.screen.fitting import skill_statistic
+from scmle.assurance.admissibility.screen.settings import BINARY_CLASSES
+from scmle.assurance.admissibility.screen.settings import DUPLICATION
 from scmle.assurance.admissibility.screen.settings import ECHO
+from scmle.assurance.admissibility.screen.settings import ENCODING
 from scmle.assurance.admissibility.screen.settings import MIN_CLASSES
 from scmle.assurance.admissibility.screen.settings import MISSING
+from scmle.assurance.admissibility.screen.settings import NATURAL
 from scmle.assurance.admissibility.screen.settings import PURITY
 from scmle.assurance.admissibility.screen.settings import SKILL
 from scmle.assurance.admissibility.screen.settings import Statistic
@@ -51,6 +59,10 @@ class Pending:
         data: What the effect bound reads: the column's basis for a skill
             hypothesis, the column as the target (`forecast`) for an echo;
             None otherwise.
+        columns: The columns a skill hypothesis reads: one, or the two of
+            a pair; empty otherwise.
+        bound: The lower confidence bound of an analytic hypothesis whose
+            bound comes with its test (`records`); None otherwise.
     """
 
     feature: str
@@ -63,6 +75,8 @@ class Pending:
     drawn: int = 0
     active: bool = True
     data: numpy.ndarray | None = None
+    columns: tuple[str, ...] = ()
+    bound: float | None = None
 
 
 def spell(values: pandas.Series) -> pandas.Series:
@@ -222,13 +236,19 @@ def hedge(
     return float(numpy.quantile(values, 1.0 - cfg.confidence))
 
 
-def gauge(name: str, phi: numpy.ndarray, problem: Problem) -> list[Pending]:
+def gauge(
+    name: str,
+    phi: numpy.ndarray,
+    problem: Problem,
+    columns: tuple[str, ...] = (),
+) -> list[Pending]:
     """Builds the skill hypothesis of one design, when it can carry any.
 
     Args:
         name: Column or pair name.
         phi: The design.
         problem: The encoded target.
+        columns: The columns the design reads; `(name,)` when empty.
 
     Returns:
         The hypothesis with its observed skill, or nothing for a design of
@@ -239,7 +259,15 @@ def gauge(name: str, phi: numpy.ndarray, problem: Problem) -> list[Pending]:
     statistic = skill_statistic(problem, phi)
     observed = float(statistic(problem.y[None, :])[0])
     return [
-        Pending(name, SKILL, observed, statistic, uses_binned=False, data=phi)
+        Pending(
+            name,
+            SKILL,
+            observed,
+            statistic,
+            uses_binned=False,
+            data=phi,
+            columns=columns or (name,),
+        )
     ]
 
 
@@ -315,10 +343,157 @@ def propose(
         return pending, (note,)
     for first, second in found:
         joint = frame[first].astype(str) + " & " + frame[second].astype(str)
-        pending.extend(
-            gauge(pair(str(first), str(second)), basis(joint), problem)
-        )
+        both = (str(first), str(second))
+        pending.extend(gauge(pair(*both), basis(joint), problem, both))
     return pending, ()
+
+
+def sift(pending: Sequence[Pending], cfg: leakage.Config) -> int:
+    """Stops, before any permutation, each hypothesis that cannot be a suspect.
+
+    A suspect needs a lower confidence bound above its mechanism's ceiling,
+    and the bound (a low bootstrap quantile) lies below the observed
+    statistic, so a hypothesis whose observed statistic is at or below the
+    ceiling draws no permutations: it keeps no permutation count, and the
+    step-up rule reads its p-value as 1. Raising p-values to 1 keeps every
+    p-value valid (`p' >= p` is super-uniform under its null), so the
+    Benjamini-Yekutieli control holds under arbitrary dependence, and the
+    step-up rule can only reject fewer of the others. Permutations are then
+    spent only where a suspect is possible, which keeps a wide table with
+    no strong column inside the time budget instead of declining it.
+
+    Args:
+        pending: The hypotheses of the family; changed in place.
+        cfg: Settings holding the ceilings.
+
+    Returns:
+        How many hypotheses with a permutation statistic stay active.
+    """
+    ceilings = caps(cfg)
+    left = 0
+    for h in pending:
+        if h.statistic is None:
+            continue
+        h.active = h.observed > ceilings[h.mechanism]
+        left += h.active
+    return left
+
+
+def rival(
+    h: Pending,
+    pending: Sequence[Pending],
+    problem: Problem,
+    apart: Sequence[Hashable] = (),
+) -> list[numpy.ndarray] | None:
+    """Predictions of the other columns, which a skill suspect must outrun.
+
+    A column above the skill ceiling is a suspect only when it also outruns
+    the rest of its table (`report.conclude` bounds the paired difference,
+    `margin`). The rest is the better, by observed skill, of a cross-fitted
+    linear stack of the other columns' single-column smoothers (each
+    column's out-of-fold prediction from its skill design, one per class,
+    with the same folds) and the best other column alone: a model of the
+    rest can always pick one of its members, and on a small table the
+    stack's weights cost more than they gain (iris: the stack of the three
+    other columns scores about 0.975, petal length alone about 0.99).
+    Stacking keeps one weight per column, so a wide table is not judged by a
+    fit with more terms than rows. A legitimate measurement of the case has
+    company: real tables whose single columns pass the ceiling (breast
+    cancer radius, perimeter and area, mushroom odor, cell size and shape
+    uniformity, iris petal width and length) are predicted about as well by
+    their other columns. A leak reads the outcome, which the measurements of
+    the case together do not match. A tie counts, so leaks that each predict
+    the target perfectly do not hide one another. Requiring this only
+    removes suspects, so the false-alarm control of the significant list is
+    kept. Not guaranteed: an imperfect leak written into two columns is
+    matched by its twin (the echo still sees a copy on the target's scale).
+
+    Args:
+        h: A skill hypothesis.
+        pending: The family.
+        problem: The encoded outcome with its folds.
+        apart: Columns never counted in another column's rest (the
+            probe's plants, each judged against the real columns only).
+
+    Returns:
+        One array of out-of-fold predictions per scored outcome, as
+        `predict` returns; None when no other column has a skill design.
+    """
+    left = {str(c) for c in apart} | set(h.columns)
+    others = [
+        (p.observed, p.data)
+        for p in pending
+        if p.mechanism == SKILL
+        and p.data is not None
+        and len(p.columns) == 1
+        and p.columns[0] not in left
+    ]
+    if not others:
+        return None
+    if problem.task == "regression":
+        targets = [problem.y.astype("float64")]
+    else:
+        wanted = (
+            [1] if problem.classes == BINARY_CLASSES else range(problem.classes)
+        )
+        targets = [(problem.y == k).astype("float64") for k in wanted]
+    tests = [split[1] for split in problem.splits]
+    stacked = []
+    scores = []
+    for outcome in targets:
+        row = outcome[None, :]
+        stack = numpy.column_stack(
+            [oof_fit(row, part[1], problem.splits)[0] for part in others]
+        )
+        fitted = oof_fit(row, stack, problem.splits)
+        stacked.append(fitted[0])
+        if problem.task == "regression":
+            squares = float(((outcome - fitted[0]) ** 2).sum())
+            scores.append(1.0 - squares / problem.total_squares)
+        else:
+            scores.append(float(aucs(fitted, row > 0, tests)[0]))
+    skill, design = max(others, key=lambda part: part[0])
+    if skill > float(numpy.mean(scores)):
+        return predict(problem, design)
+    return stacked
+
+
+def reading(
+    h: Pending, phi: numpy.ndarray, frame: pandas.DataFrame, problem: Problem
+) -> list[numpy.ndarray]:
+    """Predictions of a skill suspect, which its rest must not match.
+
+    The better, by observed skill, of the column's smoother and its linear
+    reading (`line`), as the rest is the better of a stack and its best
+    column (`rival`): a model of one ordered column can always rank by the
+    value, and the smoother's ten knots cost a nearly perfect column part of
+    its edge. A noisy class code (the binary threshold plant) scores about
+    0.993 AUC through its smoother and 0.997 by its rank, which is what
+    separates it from a stack of the nine other breast cancer columns
+    (about 0.99): read through the smoother, 12 of 200 certificate worlds
+    tied with the stack. Both readings are cross-fitted on the same folds,
+    so neither reads its own held-out rows. A pair, or a column with few
+    values, has the smoother only.
+
+    Args:
+        h: A skill hypothesis.
+        phi: Its smoother's design (`h.data`).
+        frame: The chosen rows.
+        problem: The encoded outcome with its folds.
+
+    Returns:
+        One array of out-of-fold predictions per scored outcome, as
+        `predict` returns.
+    """
+    smooth = predict(problem, phi)
+    named = {str(c): c for c in frame.columns}
+    design = None
+    if len(h.columns) == 1 and h.columns[0] in named:
+        design = line(frame[named[h.columns[0]]])
+    if design is None:
+        return smooth
+    score = float(skill_statistic(problem, design)(problem.y[None, :])[0])
+    return predict(problem, design) if score > h.observed else smooth
 
 
 def tested(
@@ -350,7 +525,8 @@ def caps(cfg: leakage.Config) -> dict[str, float]:
 
     Returns:
         A dict from mechanism to ceiling; missingness and record purity
-        share the association ceiling.
+        share the association ceiling, and the record mechanisms have the
+        honest limit `NATURAL`.
     """
     # Echo is an association of the column with the target read without any
     # fit (agreement, or unfitted R^2), so it shares the association
@@ -360,6 +536,8 @@ def caps(cfg: leakage.Config) -> dict[str, float]:
         MISSING: cfg.association_ceiling,
         PURITY: cfg.association_ceiling,
         ECHO: cfg.association_ceiling,
+        ENCODING: NATURAL,
+        DUPLICATION: NATURAL,
     }
 
 
@@ -451,6 +629,8 @@ def floor(
     Returns:
         The lower confidence bound of the statistic the mechanism measures.
     """
+    if h.bound is not None:
+        return h.bound
     path = f"leakage.screen.{h.mechanism}.{h.feature}"
     rng = randomness.component_rng(cfg.run_seed, path, 0)
     if h.mechanism == SKILL and h.data is not None:

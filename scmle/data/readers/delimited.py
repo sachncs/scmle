@@ -239,8 +239,9 @@ def parse(text: str, delimiter: str) -> pandas.DataFrame:
     """Parses checked text, keeping every value exact.
 
     A ";" file reads "1,5" as 1.5. A numeric column keeps its text when a
-    value is zero-padded, and becomes nullable Int64 when an integer beyond
-    2**53 shares it with a gap.
+    value is zero-padded, becomes nullable Int64 when an integer beyond
+    2**53 shares it with a gap, and holds Python ints and floats when such
+    an integer shares it with a float.
 
     Args:
         text: Decoded text that passed `check`.
@@ -270,24 +271,30 @@ def parse(text: str, delimiter: str) -> pandas.DataFrame:
     )
     for position, name in zip(numeric, raw.columns, strict=True):
         frame.isetitem(
-            position, settle(frame.iloc[:, position], raw[name]).array
+            position,
+            settle(frame.iloc[:, position], raw[name], decimal).array,
         )
     return frame
 
 
-def settle(column: pandas.Series, raw: pandas.Series) -> pandas.Series:
+def settle(
+    column: pandas.Series, raw: pandas.Series, decimal: str = "."
+) -> pandas.Series:
     """Chooses the exact form of one numeric column.
 
     Args:
         column: The column as pandas typed it.
         raw: The same column as text.
+        decimal: Decimal mark of the file.
 
     Returns:
-        `column`, its text, or its nullable Int64 form.
+        `column`, its text, its nullable Int64 form, or, when an integer
+        beyond 2**53 shares it with a float, an object column of Python
+        ints and floats (float64 cannot keep such an integer exact).
 
     Raises:
         InputError: If its decimal commas could be thousands separators, or
-            an integer beyond 2**53 shares it with a float.
+            integers beyond int64 share it with a gap.
     """
     tokens = raw.dropna()
     if tokens.str.fullmatch(PADDED).any():
@@ -305,10 +312,15 @@ def settle(column: pandas.Series, raw: pandas.Series) -> pandas.Series:
     if not any(abs(int(token)) > EXACT for token in integral):
         return column
     if len(integral) < len(tokens):
-        raise errors.InputError(
-            f"column '{column.name}' holds integers beyond 2**53 beside "
-            "floats; float64 cannot keep them exact"
-        )
+        mixed = [
+            None
+            if pandas.isna(token)
+            else int(token)
+            if INTEGER.fullmatch(token)
+            else float(token.replace(decimal, "."))
+            for token in raw
+        ]
+        return pandas.Series(mixed, index=column.index, dtype=object)
     values = [None if pandas.isna(token) else int(token) for token in raw]
     try:
         return pandas.Series(values, index=column.index, dtype="Int64")

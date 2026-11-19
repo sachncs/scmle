@@ -41,6 +41,7 @@ def test_the_extract_matches_the_hash_in_the_manifest():
 
 def test_the_extract_has_the_recording_structure(frame):
     # Enforces README.md:180.
+    # Enforces website/src/pages/docs/benchmarks.astro:773.
     assert len(frame) == 1309
     assert frame["boat"].isna().mean() == pytest.approx(0.629, abs=0.001)
     assert frame["body"].isna().mean() == pytest.approx(0.908, abs=0.001)
@@ -51,6 +52,7 @@ def test_the_extract_has_the_recording_structure(frame):
 
 def test_the_certified_screen_blocks_boat_and_body(report):
     # Enforces README.md:180.
+    # Enforces website/src/pages/docs/benchmarks.astro:773.
     assert {f.feature for f in report.blocking} >= {"boat", "body"}
     mechanisms = {f.mechanism for f in report.blocking if f.feature == "body"}
     assert mechanisms == {"record_purity"}

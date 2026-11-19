@@ -140,7 +140,7 @@ Each is exit code 2 and appears as `blocked: <message>`.
 | `target ... looks like an identifier or free text, not a class label; choose another target` | Almost every row has a unique value | Choose the right column |
 | `... classification vs regression is ambiguous; set task= explicitly` | A small whole number could be a class or a count | Pass `--task` |
 | `binary_classification requested but target has N classes` | `--task` does not match the data | Fix `--task` |
-| `a class has fewer than 2 examples: cannot stratify` / `insufficient minority-class examples after test split` | A class is too rare to split | Get more rows of the rare class, or change the validation |
+| `a class has fewer than 2 examples: cannot stratify` / `insufficient minority-class examples after test split` / `the test rows hold fewer than 5 rows of class(es) ...` | A class is too rare to split, or to score on the test rows | Get more rows of the rare class (7 let the stratified split keep 5 for the test), or raise `--test` under another validation |
 | `need at least N groups for group validation` | Too few groups for the number of folds | Lower `--folds` or add groups |
 | `group column '<c>' has missing values` | Rows with no group | Fill the group column |
 | `no group-disjoint split keeps every class in every fold; the classes are concentrated in too few groups` | A class lives in few groups | More groups, or fewer folds |

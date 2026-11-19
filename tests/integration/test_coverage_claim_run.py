@@ -69,6 +69,7 @@ def test_a_run_without_a_charter_writes_the_claim_too(tmp_path):
 
 def test_declared_slices_are_in_the_claim_and_flagged_by_the_margin(tmp_path):
     # Enforces docs/ARTIFACTS.md:76.
+    # Enforces website/src/pages/docs/artifacts.astro:61.
     from scmle.assurance.charter import uncertainty
 
     result = run(
@@ -119,6 +120,9 @@ def test_the_coverage_claim_is_tested_once_on_c_after_the_model_is_frozen(
     tmp_path,
 ):
     # Enforces docs/ARTIFACTS.md:76.
+    # Enforces website/src/pages/docs/artifacts.astro:62.
+    # Enforces website/src/pages/docs/causal-decision.astro:76.
+    # Enforces website/src/pages/docs/qualification.astro:72.
     result = confirmation_run(tmp_path)
     folder = pathlib.Path(result.run_dir)
 

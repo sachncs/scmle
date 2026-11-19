@@ -153,6 +153,8 @@ def test_a_declared_dag_is_loaded_checked_and_lifts_the_adjustment_cap(
     tmp_path,
 ):
     # Enforces docs/ARTIFACTS.md:47.
+    # Enforces website/src/pages/docs/artifacts.astro:30.
+    # Enforces website/src/pages/docs/causal-decision.astro:57.
     graph = scmle.assurance.admissibility.dag.Dag(
         ("t", "x1", "x2", "y"),
         (("t", "y"), ("x1", "t"), ("x1", "y"), ("x2", "y")),
@@ -211,6 +213,9 @@ def test_a_charter_no_strategy_identifies_is_refused_without_an_estimate(
     tmp_path,
 ):
     # Enforces docs/ARTIFACTS.md:47.
+    # Enforces website/src/pages/docs/artifacts.astro:30.
+    # Enforces website/src/pages/docs/causal-decision.astro:40.
+    # Enforces website/src/pages/docs/causal-decision.astro:55.
     result = run(tmp_path, ("positivity",))
     claims = read(result, "causal_claims.json")
     report = read(result, "identification_report.json")
@@ -310,6 +315,7 @@ def test_a_forged_or_missing_attestation_leaves_the_claim_unverified(
     tmp_path, monkeypatch
 ):
     # Enforces docs/ARTIFACTS.md:47.
+    # Enforces website/src/pages/docs/artifacts.astro:30.
     forged = attested_run(tmp_path / "forged", monkeypatch, key="forger")
     claims = read(forged, "causal_claims.json")
     assert claims["tier"] == "unverified"

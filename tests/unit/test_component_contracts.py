@@ -78,6 +78,7 @@ def concrete_subclasses(base, *modules):
 def test_every_concrete_component_implements_its_abstract_interface(
     base, modules
 ):
+    # Enforces website/src/pages/docs/extensions.astro:76.
     implementations = concrete_subclasses(base, *modules)
     assert implementations, f"no implementations of {base.__name__} found"
     concrete = [cls for cls in implementations if not inspect.isabstract(cls)]
@@ -180,7 +181,7 @@ def test_a_model_is_imported_only_when_it_is_built():
 
 def test_the_workflow_is_a_compiled_dag_of_declared_dependencies():
     from scmle.contracts import errors
-    from scmle.pipeline import engine
+    from scmle.runtime import engine
 
     default = stages.default_stages()
     kinds = [type(s) for s in default]
@@ -204,7 +205,7 @@ def test_the_workflow_is_a_compiled_dag_of_declared_dependencies():
 
 
 def test_a_replacement_stage_subclass_satisfies_dependencies():
-    from scmle.pipeline import engine
+    from scmle.runtime import engine
 
     class Custom(stages.TrainStage):
         pass

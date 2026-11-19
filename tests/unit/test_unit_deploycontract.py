@@ -344,6 +344,7 @@ def test_production_needs_a_signed_untrusted_bundle():
 
 
 def test_a_newer_spec_format_is_refused():
+    # Enforces website/src/pages/docs/api-stability.astro:36.
     record = spec().to_dict()
     record["format"] = 3
     with pytest.raises(

@@ -36,6 +36,7 @@ metrics than each task's default, other model families, real data.
 import argparse
 from concurrent import futures
 import functools
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -48,6 +49,7 @@ import pandas
 import sklearn
 
 from benchmarks import acceptance
+from benchmarks import evidence
 from scmle.assurance.detectors import certificates
 from scmle.contracts import data
 from scmle.contracts import errors
@@ -60,16 +62,33 @@ from scmle.models import registry
 from scmle.preparation import preprocessing
 
 PATH = Path(__file__).with_suffix(".json")
+PACKAGE = Path(__file__).resolve().parents[2] / "scmle"
+# The product packages a trial runs: the training pipeline that
+# `preprocessing.instantiate` builds (`preparation`), the model families
+# (`models`), the interval, metrics and diagnostics (`evaluation`) and the
+# plan and task types they read (`contracts`). A change to any file in them
+# can move an interval or the truth, so the stored result goes stale.
+PRODUCT = ("contracts", "evaluation", "models", "preparation")
 VARIABLE = "interval_coverage_min"
+# The acceptance.toml variables the sample is planned with: the joint chance
+# wanted and the true coverage assumed.
+POWER = "coverage_power"
+ASSUMED = "coverage_assumed"
 # Trials per family. The floor 0.93 at alpha 0.05 can pass at all only from
-# ceil(ln(0.05) / ln(0.93)) = 42 trials, every one a hit. When the interval
-# is exactly nominal (true coverage 0.95), the smallest n whose exact chance
-# of passing reaches power 0.80 is `Floor(0.93).plan(0.95, 0.05, 0.80)` =
-# 882. The worst family decides, so every family runs that many;
+# ceil(ln(0.05) / ln(0.93)) = 42 trials, every one a hit. The row passes
+# only when all three families pass, so with intervals at the assumed true
+# coverage `coverage_assumed` (0.95, the nominal level) its chance is the
+# product of the three families' independent chances. For that product to
+# reach `coverage_power` (0.90), each family needs 0.90 ** (1 / 3) = 0.9655,
+# and the smallest n whose exact chance reaches it is `Floor(0.93).plan(0.95,
+# 0.05, 0.9655)` = 1,678 (exact joint chance 0.9008). History: 882 trials
+# gave each family 0.80 and the row 0.51 (regression_rows 827/882 on seeds
+# 0..881 against 4,744/5,000, 0.9488, on seeds 100,000..104,999); 1,369, for
+# joint power 0.80, passed with regression_rows at 1,289/1,369, lower bound
+# 0.93004 against the floor 0.93: a nominal interval would fail one time in
+# five, so a pass that close was decided by noise.
 # `problems` recomputes both numbers from acceptance.toml and refuses fewer.
-TRIALS = 882
-# Assumed true coverage for the planned sample: the nominal level.
-NOMINAL = 0.95
+TRIALS = 1678
 TRAIN_ROWS = 400
 TEST_ROWS = 300
 # Rows behind the truth. Its standard error (about 0.0015 for an AUC near
@@ -245,22 +264,27 @@ def required() -> tuple[int, int]:
     The exact power search takes seconds, so it runs once per process.
 
     Returns:
-        The smallest count that can pass at all, and the planned count for
-        `power` when the true coverage is `NOMINAL`.
+        The smallest count that can pass at all, and the planned count
+        for which every family passes together with chance
+        `coverage_power` when the true coverage is `coverage_assumed`.
     """
     variables = acceptance.load()
-    alpha, power = variables["alpha"].value, variables["power"].value
+    alpha, power = variables["alpha"].value, variables[POWER].value
     floor = rule()
-    return floor.minimum(alpha), floor.plan(NOMINAL, alpha, power)
+    each = power ** (1 / len(FAMILIES))
+    return floor.minimum(alpha), floor.plan(
+        variables[ASSUMED].value, alpha, each
+    )
 
 
 def digest() -> str:
     """Hash of the code measured and the code measuring it.
 
     Returns:
-        The `code_hash` of the product's interval and this module's trial.
+        The combined hash of the product's interval, this module's trial
+        and every file of the `PRODUCT` packages the trial runs.
     """
-    return certificates.code_hash(
+    own = certificates.code_hash(
         bootstrap.Uncertainty,
         bootstrap.redraw,
         bootstrap.Cache,
@@ -269,6 +293,8 @@ def digest() -> str:
         run,
         tally,
     )
+    product = evidence.source(PRODUCT, PACKAGE)
+    return hashlib.sha256(f"{own}{product}".encode()).hexdigest()
 
 
 def prepare() -> None:
@@ -313,7 +339,8 @@ def measure(trials: int = TRIALS, workers: int | None = None) -> dict[str, Any]:
         "variable": VARIABLE,
         "floor": variables[VARIABLE].value,
         "alpha": alpha,
-        "power": variables["power"].value,
+        "power": variables[POWER].value,
+        "assumed": variables[ASSUMED].value,
         "level": bootstrap.Uncertainty.confidence / 100,
         "minimum_trials": least,
         "planned_trials": planned,

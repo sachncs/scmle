@@ -7,6 +7,7 @@ from scmle.contracts import qualification
 
 def test_unsigned_llm_field_caps_the_claim_and_a_signature_lifts_it():
     # Enforces docs/ARTIFACTS.md:82.
+    # Enforces website/src/pages/docs/causal-decision.astro:46.
     sources = [provenance.Filling.TEMPLATE, provenance.Filling.LLM]
     assert (
         provenance.grade(qualification.Tier.CONFIRMED, sources, signed=False)

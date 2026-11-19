@@ -4,7 +4,19 @@ Every floor below is fixed in this file before the first run and is not
 retuned: a gate that misses is filed as measured and `passed` is false, so
 that method is descriptive and cannot count toward a `confirmed` claim.
 Certification seeds are `0 .. replicates - 1`; development looks use seeds
-from `DEV_SEED_BASE`, which never overlap. Intervals are Wilson 95 percent.
+from `DEV_SEED_BASE`, which never overlap.
+
+Every rate is decided by its one-sided exact (Clopper-Pearson) bound at
+`alpha` of `acceptance.toml`, against a variable of that file: a coverage
+passes when its lower bound is at least `interval_coverage_min` (0.93); a
+power or a flag recall when its lower bound is at least `causal_power_min`
+(0.80); a selection rate when its lower bound is at least
+`causal_selection_min` (0.98); a size, false flag, false refusal or false
+confirmation when its upper bound is at most `causal_false_alarm_max`
+(0.05); a falsification false alarm when its upper bound is at most
+`falsification_alarm_max` (0.01, the battery's own level). Below, "lower"
+and "upper" are these bounds, and `R` is the replicate count each gate
+runs (`RUNNERS`), which is also its recorded seed range.
 
 All worlds are simulated (`f10_generators`), including their covariates;
 real-covariate worlds, the NSW and STAR gold standards, the frozen
@@ -15,44 +27,58 @@ outside-party replication need data or tools this repository does not have
 Gates (`R` is the replicate count):
 
 * selector: 200 charters with no eligible strategy are all refused and 200
-  eligible charters are none refused; Wilson lower bound of each `>= 0.98`.
+  eligible charters are none refused; lower bound of each `>= 0.98`.
 * coverage_aipw: 95 percent interval for ATE and ATT (linear learners, `R =
-  2000`) and ATE with boosted learners on a nonlinear surface (`R = 500`);
-  Wilson lower bound of coverage `>= 0.93` and mean (estimate - truth) / se
-  within `0.1` of zero, in every world.
+  2000`) and ATE with boosted learners on a nonlinear surface
+  (`BOOSTED_REPLICATES = 500`); lower bound of coverage `>= 0.93` and mean
+  (estimate - truth) / se within `0.1` of zero, in every world.
 * coverage_randomized, coverage_did (one group and staggered), coverage_rd:
-  Wilson lower bound `>= 0.93` (`R = 2000`, staggered DiD `R = 1000`); the
-  mean standardised error within `0.1` for DiD and RD.
-* coverage_iv: headline set coverage `>= 0.93` (Wilson lower) with a strong
+  lower bound `>= 0.93` (`R = 2000`, staggered DiD `STAGGERED_REPLICATES =
+  1000`); the mean standardised error within `0.1` for DiD and RD.
+* coverage_iv: headline set coverage lower bound `>= 0.93` with a strong
   instrument (`R = 2000`); the standardised-error criterion does not apply
   to IV.
-* iv_strength: in a weak-instrument world the headline set (Anderson-Rubin
-  when `F < 10`) has Wilson lower coverage `>= 0.93`, the weak flag has
-  recall (Wilson lower) `>= 0.8`, and in a strong world the flag's false
-  rate is `<= 0.05`.
-* size_synth: with no effect, placebo-in-space rejects at `p <= 0.05` no more
-  often than `0.05 + 2 sqrt(0.05 * 0.95 / R)` (`R = 500`).
+* iv_strength: in a weak-instrument world (`R = 2000`) the headline set
+  (Anderson-Rubin when `F < 10`) has coverage lower bound `>= 0.93`, the
+  weak flag has recall lower bound `>= 0.8`, and in a strong world the
+  flag's false rate has upper bound `<= 0.05`.
+* size_synth: with no effect, the share of placebo-in-space rejections at
+  `p <= 0.05` has upper bound `<= 0.05` (`R = 500`); power at an effect of 3
+  is filed over `SYNTH_POWER_REPLICATES = 60` runs.
 * overlap: the overlap gate (`aipw.propensities`) refuses valid overlap
-  (minimum propensity 0.5 and 0.1) in `<= 0.05` of replicates and flags the
-  two worst settings (0.02 and 0.005) with recall (Wilson lower) `>= 0.8`;
-  coverage and effective sample size are reported as curves, not gated.
+  (minimum propensity 0.5 and 0.1) with upper bound `<= 0.05` in each
+  setting and flags the two worst settings (0.02 and 0.005) with recall
+  lower bound `>= 0.8` (`R = 2000` per setting); coverage and effective
+  sample size are reported as curves, not gated.
 * battery_nco, battery_pretrend, density_rd, battery_rd: false-alarm rate
-  with no violation `<= alpha_falsify + 2 sqrt(alpha_falsify (1 -
-  alpha_falsify) / R)` with `alpha_falsify = 0.01`; and a smallest planted
-  violation `delta_min` with power (Wilson lower) `>= 0.8` exists in the
-  tested grid. The full power curve is stored.
+  with no violation (`R = 2000`) has upper bound `<= 0.01`; and a smallest
+  planted violation `delta_min` with power lower bound `>= 0.8` exists in
+  the tested grid (`POWER_REPLICATES = 500` per size). The full power curve
+  is stored. A battery whose false-alarm rate equals its level 0.01 cannot
+  meet this ceiling.
 * sensitivity_bound: a hidden confounder planted at half the strength of the
   strongest observed covariate (inside the benchmark) is covered by the
-  benchmarked interval with Wilson lower `>= 0.93` (`R = 1000`); the same at
+  benchmarked interval with lower bound `>= 0.93` (`R = 1000`); the same at
   the boundary and at twice the benchmark are reported, not gated.
 * sensitivity_did: with a linear differential trend, the relative-magnitudes
-  interval at `M = 1` covers the truth with Wilson lower `>= 0.93` (`R =
+  interval at `M = 1` covers the truth with lower bound `>= 0.93` (`R =
   500`); `M = 0` is reported.
 * false_confirm: through `run.identify` with every gate marked certified and
   a declared DAG, the share of runs that reach `confirmed` when a hidden
-  confounder is shared with the negative control (`R = 300`) is `<= 0.05` with
-  Wilson upper `<= 0.08`. The unshared-confounder blind spot and the clean
-  world are reported, not gated.
+  confounder is shared with the negative control (`R = 300`) has upper
+  bound `<= 0.05`. The unshared-confounder blind spot and the clean world
+  are reported, not gated.
+
+Amendment 2026-11-19. The first certificates compared point estimates
+with `level + 2 sqrt(level (1 - level) / R)` (size_synth, the four alarm
+gates), compared point estimates with 0.05 (iv_strength, overlap,
+false_confirm) or used two-sided Wilson 95 percent bounds, and several
+gates ran fewer replicates than stated here and recorded the stated range
+(size_synth 125 of 500, battery_rd 1000 of 2000, sensitivity_bound 500 of
+1000, sensitivity_did 125 of 500, false_confirm 300 recorded as 1800). The
+rules are now the exact bounds above and every gate runs and records `R`;
+the worlds, floors, ceilings and seeds are unchanged, and each result is
+filed whichever way it falls.
 
     python -m benchmarks.qualification.f10_certify --write
     python -m benchmarks.qualification.f10_certify --check
@@ -67,6 +93,7 @@ from typing import Any
 import numpy
 import pandas
 
+from benchmarks import acceptance
 from benchmarks.qualification import f10_generators
 import scmle.assurance.admissibility.dag
 from scmle.assurance.charter import causal
@@ -83,26 +110,36 @@ from scmle.causal.identification import select
 from scmle.causal.identification import sensitivity
 from scmle.causal.identification import synth
 import scmle.certificates
+from scmle.evaluation import coverage
 
 STORE_PATH = scmle.certificates.DIRECTORY / "f10_certificates.json"
 DEV_SEED_BASE = 10_000
+# level of the falsification battery the alarm gates run
 ALPHA_FALSIFY = 0.01
 LEVEL = 0.95
-COVERAGE_FLOOR = 0.93
+VARIABLES = acceptance.load()
+# one-sided error rate of every verdict below
+ALPHA = VARIABLES["alpha"].value
+COVERAGE = acceptance.floor("interval_coverage_min", VARIABLES)
+# power at the smallest planted violation, and a flag's recall
+POWER = acceptance.floor("causal_power_min", VARIABLES)
+SELECTION = acceptance.floor("causal_selection_min", VARIABLES)
+# false flags, false refusals and false confirmations
+FALSE_ALARM = acceptance.ceiling("causal_false_alarm_max", VARIABLES)
+# false alarms of the falsification battery with no violation (a size gate)
+FALSIFY = acceptance.sized(ALPHA_FALSIFY, VARIABLES)
 # largest mean standardised error that still counts as centred
 MEAN_Z_TOLERANCE = 0.1
-# floor on the Wilson lower bound of the power at the smallest planted violation
-POWER_FLOOR = 0.8
-# floor on the Wilson lower bound of a flag recall
-RECALL_FLOOR = 0.8
-# floor on the Wilson lower bound of the strategy selection rates
-SELECTION_FLOOR = 0.98
-# largest false-alarm or false-confirmation rate allowed
-FALSE_ALARM_CEILING = 0.05
-# largest Wilson upper bound of the false-confirmation rate
-FALSE_CONFIRM_UPPER_CEILING = 0.08
 # level of the placebo-in-space test of the synthetic control
 SYNTH_LEVEL = 0.05
+# size of the placebo-in-space test (a size gate)
+SYNTH_SIZE = acceptance.sized(SYNTH_LEVEL, VARIABLES)
+# replicates of the boosted AIPW world, the staggered DiD world, each
+# planted size of an alarm gate and the filed synthetic-control power
+BOOSTED_REPLICATES = 500
+STAGGERED_REPLICATES = 1000
+POWER_REPLICATES = 500
+SYNTH_POWER_REPLICATES = 60
 # effect planted in the backdoor and randomized worlds
 AIPW_TRUE_EFFECT = 2.0
 # effect planted in the panel worlds
@@ -125,6 +162,10 @@ GATES = (
     "sensitivity_did",
     "false_confirm",
 )
+ALARM_GATES = ("battery_nco", "battery_pretrend", "density_rd", "battery_rd")
+# minimum propensities where overlap is valid, and where it is poor
+VALID_OVERLAP = ("0.5", "0.1")
+POOR_OVERLAP = ("0.02", "0.005")
 NOT_MEASURED = (
     "real-covariate worlds (plan A3: planted effect on real X)",
     "NSW with CPS/PSID comparison groups and Tennessee STAR",
@@ -152,23 +193,39 @@ def stream(base: int, index: int, which: int = 0) -> numpy.random.Generator:
 
 
 def rate(hits: int, n: int) -> dict[str, Any]:
-    """A proportion with its Wilson 95 percent interval.
+    """A proportion with its one-sided exact bounds at `ALPHA`.
 
     Args:
         hits: Number of successes.
         n: Number of trials.
 
     Returns:
-        The counts, their ratio under `rate` and the interval as
-        `[low, high]` under `wilson`.
+        The counts, their ratio under `rate` and, under `exact`, the
+        one-sided Clopper-Pearson lower and upper bounds at `ALPHA` (the
+        two-sided interval at `1 - 2 ALPHA`).
     """
-    low, high = certificates.wilson_interval(hits, n, 0.95)
+    low, high = coverage.clopper_pearson(hits, n, 1 - 2 * ALPHA)
     return {
         "hits": int(hits),
         "n": int(n),
         "rate": hits / n,
-        "wilson": [low, high],
+        "exact": [low, high],
     }
+
+
+def meets(
+    rule: acceptance.Ceiling | acceptance.Floor, row: dict[str, Any]
+) -> bool:
+    """Whether a rate row meets a rule at `ALPHA`.
+
+    Args:
+        rule: The ceiling or floor.
+        row: A row from `rate`.
+
+    Returns:
+        True when the row's exact bound at `ALPHA` is on the passing side.
+    """
+    return rule.passes(row["hits"], row["n"], ALPHA)
 
 
 def coverage_row(
@@ -182,12 +239,12 @@ def coverage_row(
             or None when it does not apply; non-finite values are skipped.
 
     Returns:
-        The `rate` row plus `meets_floor` (Wilson lower bound at least
-        `COVERAGE_FLOOR`) and, when `z` is given, `mean_z` and whether it is
+        The `rate` row plus `meets_floor` (lower bound at least the
+        `COVERAGE` floor) and, when `z` is given, `mean_z` and whether it is
         within 0.1 of zero.
     """
     row = rate(sum(covered), len(covered))
-    row["meets_floor"] = row["wilson"][0] >= COVERAGE_FLOOR
+    row["meets_floor"] = meets(COVERAGE, row)
     if z is not None:
         arr = numpy.array([v for v in z if math.isfinite(v)])
         row["mean_z"] = float(arr.mean())
@@ -202,29 +259,17 @@ def passes(row: dict[str, Any]) -> bool:
         row: A row from `coverage_row`.
 
     Returns:
-        True if the coverage floor is met and, when present, the mean
-        standardised error is within 0.1.
+        True if the coverage floor is met by the row's counts and, when
+        present, the mean standardised error is within 0.1.
     """
-    return bool(row["meets_floor"] and row.get("z_within_0.1", True))
-
-
-def alarm_bound(alpha: float, replicates: int) -> float:
-    """Largest false-alarm rate accepted for `alpha` at `replicates`.
-
-    Args:
-        alpha: Nominal false-alarm level.
-        replicates: Number of replicates the rate is observed over.
-
-    Returns:
-        ``alpha + 2 * sqrt(alpha * (1 - alpha) / replicates)``.
-    """
-    return alpha + 2 * math.sqrt(alpha * (1 - alpha) / replicates)
+    centred = "mean_z" not in row or abs(row["mean_z"]) <= MEAN_Z_TOLERANCE
+    return bool(meets(COVERAGE, row) and centred)
 
 
 def power_curve(
     grid: list[float], hits: dict[float, tuple[int, int]]
 ) -> dict[str, Any]:
-    """Power by planted size and the smallest size with Wilson lower >= 0.8.
+    """Power by planted size and the smallest size meeting the power floor.
 
     Args:
         grid: Planted sizes; 0 is the no-violation world.
@@ -232,7 +277,7 @@ def power_curve(
 
     Returns:
         The curve (a `rate` row per size) and `delta_min`, the smallest
-        positive size whose Wilson lower bound is at least 0.8 (None if
+        positive size whose lower bound meets the `POWER` floor (None if
         none).
     """
     curve = {}
@@ -241,7 +286,7 @@ def power_curve(
         h, n = hits[delta]
         row = rate(h, n)
         curve[str(delta)] = row
-        if delta > 0 and delta_min is None and row["wilson"][0] >= POWER_FLOOR:
+        if delta > 0 and delta_min is None and meets(POWER, row):
             delta_min = delta
     return {"curve": curve, "delta_min": delta_min}
 
@@ -257,33 +302,50 @@ def alarm_gate(
         detect: The detector, called with the planted size and two
             generators (exploration and confirmation).
         grid: Planted sizes, including 0.
-        replicates: Replicates at size 0; other sizes use a quarter (at
-            least 100).
+        replicates: Replicates at size 0; other sizes use
+            `POWER_REPLICATES` (at most `replicates`).
         base: Seed offset.
 
     Returns:
-        The false-alarm level, rate and bound, the power curve, `delta_min`
-        and `passed` (false alarms within the bound and some size reaching
-        power 0.8).
+        The battery level, the false-alarm rate and its ceiling, the power
+        curve, `delta_min` and `passed` (false alarms within the ceiling and
+        some size reaching the power floor).
     """
     hits: dict[float, tuple[int, int]] = {}
     for delta in grid:
-        runs = replicates if delta == 0 else max(replicates // 4, 100)
+        runs = replicates if delta == 0 else min(POWER_REPLICATES, replicates)
         flagged = sum(
             bool(detect(delta, stream(base, i, 0), stream(base, i, 1)))
             for i in range(runs)
         )
         hits[delta] = (flagged, runs)
-    curve = power_curve(grid, hits)
-    false_alarm = hits[0.0][0] / hits[0.0][1]
-    bound = alarm_bound(ALPHA_FALSIFY, hits[0.0][1])
-    return {
+    result = {
         "alpha_falsify": ALPHA_FALSIFY,
         "false_alarm": rate(*hits[0.0]),
-        "false_alarm_bound": bound,
-        **curve,
-        "passed": bool(false_alarm <= bound and curve["delta_min"] is not None),
+        "false_alarm_ceiling": FALSIFY.bound,
+        **power_curve(grid, hits),
     }
+    result["passed"] = alarm_verdict(result)
+    return result
+
+
+def alarm_verdict(result: dict[str, Any]) -> bool:
+    """Whether an alarm gate passes, from its stored counts.
+
+    Args:
+        result: An `alarm_gate` result.
+
+    Returns:
+        True when the false-alarm rate meets `FALSIFY` and some planted size
+        meets the `POWER` floor.
+    """
+    curve = result["curve"]
+    reached = [
+        float(k)
+        for k, row in curve.items()
+        if float(k) > 0 and meets(POWER, row)
+    ]
+    return bool(meets(FALSIFY, result["false_alarm"]) and reached)
 
 
 # ---------------------------------------------------------------- selector
@@ -355,16 +417,13 @@ def gate_selector(replicates: int, base: int = 0) -> dict[str, Any]:
         == select.IDENTIFIED
         for i in range(replicates)
     )
-    refusal, acceptance = rate(refused, replicates), rate(kept_ok, replicates)
-    return {
+    result: dict[str, Any] = {
         "replicates": replicates,
-        "refuses_when_none_eligible": refusal,
-        "accepts_when_eligible": acceptance,
-        "passed": bool(
-            refusal["wilson"][0] >= SELECTION_FLOOR
-            and acceptance["wilson"][0] >= SELECTION_FLOOR
-        ),
+        "refuses_when_none_eligible": rate(refused, replicates),
+        "accepts_when_eligible": rate(kept_ok, replicates),
     }
+    result["passed"] = verdict("selector", result)
+    return result
 
 
 # ---------------------------------------------------------------- coverage
@@ -411,13 +470,13 @@ def gate_coverage_aipw(replicates: int, base: int = 0) -> dict[str, Any]:
 
     Args:
         replicates: Replicates for the linear worlds; the boosted world
-            uses a quarter (at least 50).
+            uses `BOOSTED_REPLICATES` (at most `replicates`).
         base: Seed offset (0 for certification).
 
     Returns:
         The coverage row of each world and `passed`.
     """
-    boosted = max(replicates // 4, 50)
+    boosted = min(BOOSTED_REPLICATES, replicates)
     rows = dict(
         [
             aipw_world(
@@ -446,10 +505,9 @@ def gate_coverage_aipw(replicates: int, base: int = 0) -> dict[str, Any]:
             ),
         ]
     )
-    return {
-        "worlds": rows,
-        "passed": bool(all(passes(r) for r in rows.values())),
-    }
+    result: dict[str, Any] = {"worlds": rows}
+    result["passed"] = verdict("coverage_aipw", result)
+    return result
 
 
 def gate_coverage_randomized(replicates: int, base: int = 0) -> dict[str, Any]:
@@ -467,8 +525,9 @@ def gate_coverage_randomized(replicates: int, base: int = 0) -> dict[str, Any]:
         frame = f10_generators.randomized(stream(base, i), 800)
         out = aipw.difference_in_means(frame, "t", "y", LEVEL)
         covered.append(out.low <= AIPW_TRUE_EFFECT <= out.high)
-    row = coverage_row(covered)
-    return {"coverage": row, "passed": passes(row)}
+    result: dict[str, Any] = {"coverage": coverage_row(covered)}
+    result["passed"] = verdict("coverage_randomized", result)
+    return result
 
 
 def gate_coverage_did(replicates: int, base: int = 0) -> dict[str, Any]:
@@ -476,7 +535,7 @@ def gate_coverage_did(replicates: int, base: int = 0) -> dict[str, Any]:
 
     Args:
         replicates: Replicates for the single-group world; the staggered
-            world uses half (at least 50).
+            world uses `STAGGERED_REPLICATES` (at most `replicates`).
         base: Seed offset (0 for certification).
 
     Returns:
@@ -485,7 +544,7 @@ def gate_coverage_did(replicates: int, base: int = 0) -> dict[str, Any]:
     rows = {}
     for name, second, runs in (
         ("single_group", False, replicates),
-        ("staggered", True, max(replicates // 2, 50)),
+        ("staggered", True, min(STAGGERED_REPLICATES, replicates)),
     ):
         covered, z = [], []
         for i in range(runs):
@@ -496,10 +555,9 @@ def gate_coverage_did(replicates: int, base: int = 0) -> dict[str, Any]:
             covered.append(out.low <= DID_TRUE_EFFECT <= out.high)
             z.append((out.estimate - DID_TRUE_EFFECT) / out.se)
         rows[name] = coverage_row(covered, z)
-    return {
-        "worlds": rows,
-        "passed": bool(all(passes(r) for r in rows.values())),
-    }
+    result: dict[str, Any] = {"worlds": rows}
+    result["passed"] = verdict("coverage_did", result)
+    return result
 
 
 def gate_coverage_iv(replicates: int, base: int = 0) -> dict[str, Any]:
@@ -520,8 +578,12 @@ def gate_coverage_iv(replicates: int, base: int = 0) -> dict[str, Any]:
         )
         covered.append(not out.excludes(2.0))
         weak += out.weak
-    row = coverage_row(covered)
-    return {"coverage": row, "weak_flags": weak, "passed": passes(row)}
+    result: dict[str, Any] = {
+        "coverage": coverage_row(covered),
+        "weak_flags": weak,
+    }
+    result["passed"] = verdict("coverage_iv", result)
+    return result
 
 
 def gate_coverage_rd(replicates: int, base: int = 0) -> dict[str, Any]:
@@ -541,8 +603,9 @@ def gate_coverage_rd(replicates: int, base: int = 0) -> dict[str, Any]:
         )
         covered.append(out.low <= 1.0 <= out.high)
         z.append((out.bias_corrected - 1.0) / out.se)
-    row = coverage_row(covered, z)
-    return {"coverage": row, "passed": passes(row)}
+    result: dict[str, Any] = {"coverage": coverage_row(covered, z)}
+    result["passed"] = verdict("coverage_rd", result)
+    return result
 
 
 def gate_iv_strength(replicates: int, base: int = 0) -> dict[str, Any]:
@@ -569,41 +632,33 @@ def gate_iv_strength(replicates: int, base: int = 0) -> dict[str, Any]:
         ).weak
         for i in range(replicates)
     )
-    cover = coverage_row(covered)
-    recall = rate(flagged, replicates)
-    false_weak = rate(strong, replicates)
-    return {
-        "weak_world_headline_coverage": cover,
-        "weak_flag_recall": recall,
-        "strong_world_false_weak": false_weak,
-        "passed": bool(
-            cover["meets_floor"]
-            and recall["wilson"][0] >= RECALL_FLOOR
-            and false_weak["rate"] <= FALSE_ALARM_CEILING
-        ),
+    result: dict[str, Any] = {
+        "weak_world_headline_coverage": coverage_row(covered),
+        "weak_flag_recall": rate(flagged, replicates),
+        "strong_world_false_weak": rate(strong, replicates),
     }
+    result["passed"] = verdict("iv_strength", result)
+    return result
 
 
 def gate_size_synth(replicates: int, base: int = 0) -> dict[str, Any]:
     """Rejection rate of placebo-in-space with no effect.
 
     Args:
-        replicates: Scales the number of replicates (a quarter, at least
-            100).
+        replicates: Number of replicates with no effect.
         base: Seed offset (0 for certification).
 
     Returns:
-        The size with its bound, the power at an effect of 3 over 60
-        replicates and `passed`.
+        The size with its ceiling, the power at an effect of 3 over
+        `SYNTH_POWER_REPLICATES` replicates and `passed`.
     """
-    runs = max(replicates // 4, 100)
+    runs = replicates
     rejected = 0
     for i in range(runs):
         frame = f10_generators.synthetic(stream(base, i), tau=0.0)
         out = synth.estimate(frame, "u", "t", "y", 0, 12)
         rejected += out.p_value <= SYNTH_LEVEL
-    bound = 0.05 + 2 * math.sqrt(0.05 * 0.95 / runs)
-    power_runs = 60
+    power_runs = min(SYNTH_POWER_REPLICATES, replicates)
     detected = sum(
         synth.estimate(
             f10_generators.synthetic(stream(base, i, 1), tau=3.0),
@@ -616,32 +671,32 @@ def gate_size_synth(replicates: int, base: int = 0) -> dict[str, Any]:
         <= SYNTH_LEVEL
         for i in range(power_runs)
     )
-    return {
+    result: dict[str, Any] = {
         "replicates": runs,
         "size": rate(int(rejected), runs),
-        "size_bound": bound,
+        "size_ceiling": SYNTH_SIZE.bound,
         "power_at_effect_3": rate(int(detected), power_runs),
-        "passed": bool(rejected / runs <= bound),
     }
+    result["passed"] = verdict("size_synth", result)
+    return result
 
 
 def gate_overlap(replicates: int, base: int = 0) -> dict[str, Any]:
     """False refusals, recall and coverage curves over planted overlap.
 
     Args:
-        replicates: Scales the number of replicates per setting (a quarter,
-            at least 100).
+        replicates: Number of replicates per setting.
         base: Seed offset (0 for certification).
 
     Returns:
         Per minimum propensity the gate-fire rate, coverage, mean estimated
         minimum propensity and effective sample size share; the worst false
-        refusal rate and worst recall bound; and `passed`.
+        refusal upper bound and worst recall lower bound; and `passed`.
     """
-    runs = max(replicates // 4, 100)
+    runs = replicates
     cols = tuple(f"x{j}" for j in range(f10_generators.COVARIATES))
     curves: dict[str, dict[str, Any]] = {}
-    for p_min in (0.5, 0.1, 0.02, 0.005):
+    for p_min in (float(k) for k in (*VALID_OVERLAP, *POOR_OVERLAP)):
         flagged, covered, ess, lowest = 0, [], [], []
         for i in range(runs):
             x = f10_generators.backdoor(stream(base, i, 0), 1000, p_min=p_min)
@@ -661,21 +716,18 @@ def gate_overlap(replicates: int, base: int = 0) -> dict[str, Any]:
             "mean_min_estimated_propensity": float(numpy.mean(lowest)),
             "mean_ess_treated_over_n": float(numpy.mean(ess)),
         }
-    valid = [curves["0.5"]["gate_fires"], curves["0.1"]["gate_fires"]]
-    bad = [curves["0.02"]["gate_fires"], curves["0.005"]["gate_fires"]]
-    false_refuse = max(v["rate"] for v in valid)
-    return {
+    valid = [curves[k]["gate_fires"] for k in VALID_OVERLAP]
+    bad = [curves[k]["gate_fires"] for k in POOR_OVERLAP]
+    result: dict[str, Any] = {
         "replicates": runs,
         "eps": aipw.OVERLAP_EPS,
         "share_gate": aipw.OVERLAP_SHARE,
         "curves": curves,
-        "false_refuse_worst": false_refuse,
-        "recall_wilson_lower_worst": min(v["wilson"][0] for v in bad),
-        "passed": bool(
-            false_refuse <= FALSE_ALARM_CEILING
-            and all(v["wilson"][0] >= RECALL_FLOOR for v in bad)
-        ),
+        "false_refuse_upper_worst": max(v["exact"][1] for v in valid),
+        "recall_lower_worst": min(v["exact"][0] for v in bad),
     }
+    result["passed"] = verdict("overlap", result)
+    return result
 
 
 # ----------------------------------------------------------------- battery
@@ -783,8 +835,7 @@ def gate_battery_rd(replicates: int, base: int = 0) -> dict[str, Any]:
     """Placebo cutoffs and covariate balance against a covariate jump.
 
     Args:
-        replicates: Scales the replicates at the no-violation size (half,
-            at least 200).
+        replicates: Replicates at the no-violation size.
         base: Seed offset (0 for certification).
 
     Returns:
@@ -819,9 +870,7 @@ def gate_battery_rd(replicates: int, base: int = 0) -> dict[str, Any]:
         ]
         return not battery.run_battery(tests, ALPHA_FALSIFY).passed
 
-    return alarm_gate(
-        detect, [0.0, 0.05, 0.1, 0.2, 0.3, 0.5], max(replicates // 2, 200), base
-    )
+    return alarm_gate(detect, [0.0, 0.05, 0.1, 0.2, 0.3, 0.5], replicates, base)
 
 
 # ------------------------------------------------------------- sensitivity
@@ -864,7 +913,7 @@ def gate_sensitivity_bound(replicates: int, base: int = 0) -> dict[str, Any]:
     """Coverage of the benchmarked interval inside, at and beyond the bound.
 
     Args:
-        replicates: Scales the replicates (half, at least 200).
+        replicates: Number of replicates in each world.
         base: Seed offset (0 for certification).
 
     Returns:
@@ -872,7 +921,7 @@ def gate_sensitivity_bound(replicates: int, base: int = 0) -> dict[str, Any]:
         coverage and the share of runs where the claim still holds, and
         `passed` (the inside-the-benchmark coverage floor).
     """
-    runs = max(replicates // 2, 200)
+    runs = replicates
     rows = {}
     for name, multiple in (
         ("inside_half", 0.5),
@@ -891,26 +940,23 @@ def gate_sensitivity_bound(replicates: int, base: int = 0) -> dict[str, Any]:
             "coverage": rate(sum(covered), runs),
             "claim_still_holds": rate(holds, runs),
         }
-    inside = rows["inside_half"]["coverage"]
-    return {
-        "replicates": runs,
-        "worlds": rows,
-        "passed": bool(inside["wilson"][0] >= COVERAGE_FLOOR),
-    }
+    result: dict[str, Any] = {"replicates": runs, "worlds": rows}
+    result["passed"] = verdict("sensitivity_bound", result)
+    return result
 
 
 def gate_sensitivity_did(replicates: int, base: int = 0) -> dict[str, Any]:
     """Coverage of the relative-magnitudes interval under a linear trend.
 
     Args:
-        replicates: Scales the replicates (a quarter, at least 100).
+        replicates: Number of replicates.
         base: Seed offset (0 for certification).
 
     Returns:
         The coverage rows of the sensitivity interval at M = 1 and of the
         plain interval, the drift and `passed`.
     """
-    runs = max(replicates // 4, 100)
+    runs = replicates
     covered_m1, covered_m0 = [], []
     for i in range(runs):
         frame = f10_generators.panel(stream(base, i), 150, 150, drift=0.1)
@@ -918,14 +964,14 @@ def gate_sensitivity_did(replicates: int, base: int = 0) -> dict[str, Any]:
         low, high = out.sensitivity(1.0)
         covered_m1.append(low <= DID_TRUE_EFFECT <= high)
         covered_m0.append(out.low <= DID_TRUE_EFFECT <= out.high)
-    m1 = coverage_row(covered_m1)
-    return {
+    result: dict[str, Any] = {
         "replicates": runs,
         "drift_per_period": 0.1,
-        "m1_coverage": m1,
+        "m1_coverage": coverage_row(covered_m1),
         "m0_coverage": rate(sum(covered_m0), runs),
-        "passed": bool(m1["meets_floor"]),
     }
+    result["passed"] = verdict("sensitivity_did", result)
+    return result
 
 
 # ------------------------------------------------------------ false confirm
@@ -1010,32 +1056,98 @@ def gate_false_confirm(replicates: int, base: int = 0) -> dict[str, Any]:
     """The tier rule end to end against shared and unshared confounding.
 
     Args:
-        replicates: Scales the runs per world (a sixth, at least 100).
+        replicates: Number of runs in each world.
         base: Seed offset (0 for certification).
 
     Returns:
         The confirmation rates in the three worlds, a note and `passed`
-        (shared-confounder confirmation within 0.05 with Wilson upper bound
-        at most 0.08).
+        (the upper bound of shared-confounder confirmation within the
+        `FALSE_ALARM` ceiling).
     """
-    runs = max(replicates // 6, 100)
+    runs = replicates
     rows = {
         kind: confirm_world(kind, runs, base)
         for kind in ("shared_confounder", "unshared_confounder", "clean")
     }
-    shared = rows["shared_confounder"]["confirmed"]
-    return {
+    result: dict[str, Any] = {
         "replicates": runs,
         "worlds": rows,
         "note": (
             "all other gates were marked certified for this run; the "
             "unshared-confounder row is the known blind spot"
         ),
-        "passed": bool(
-            shared["rate"] <= FALSE_ALARM_CEILING
-            and shared["wilson"][1] <= FALSE_CONFIRM_UPPER_CEILING
+    }
+    result["passed"] = verdict("false_confirm", result)
+    return result
+
+
+def checks() -> dict[str, tuple[tuple[Any, tuple[str, ...]], ...]]:
+    """The rules of every gate but the alarm gates, by where their rows sit.
+
+    Returns:
+        Gate name to its checks: a rule (None for a coverage row, decided
+        by `passes`) and the keys that lead from the gate's entry to the
+        row it decides.
+    """
+    aipw_worlds = ("linear_ate", "linear_att", "boosted_ate")
+    return {
+        "selector": (
+            (SELECTION, ("refuses_when_none_eligible",)),
+            (SELECTION, ("accepts_when_eligible",)),
+        ),
+        "coverage_aipw": tuple((None, ("worlds", w)) for w in aipw_worlds),
+        "coverage_randomized": ((None, ("coverage",)),),
+        "coverage_did": (
+            (None, ("worlds", "single_group")),
+            (None, ("worlds", "staggered")),
+        ),
+        "coverage_iv": ((None, ("coverage",)),),
+        "coverage_rd": ((None, ("coverage",)),),
+        "size_synth": ((SYNTH_SIZE, ("size",)),),
+        "iv_strength": (
+            (None, ("weak_world_headline_coverage",)),
+            (POWER, ("weak_flag_recall",)),
+            (FALSE_ALARM, ("strong_world_false_weak",)),
+        ),
+        "overlap": (
+            *(
+                (FALSE_ALARM, ("curves", k, "gate_fires"))
+                for k in VALID_OVERLAP
+            ),
+            *((POWER, ("curves", k, "gate_fires")) for k in POOR_OVERLAP),
+        ),
+        "sensitivity_bound": (
+            (COVERAGE, ("worlds", "inside_half", "coverage")),
+        ),
+        "sensitivity_did": ((None, ("m1_coverage",)),),
+        "false_confirm": (
+            (FALSE_ALARM, ("worlds", "shared_confounder", "confirmed")),
         ),
     }
+
+
+def verdict(name: str, entry: dict[str, Any]) -> bool:
+    """Decides one gate from its counts, as measured or as stored.
+
+    Args:
+        name: The gate.
+        entry: The gate's measurement (without or with `passed`).
+
+    Returns:
+        Whether every rule of the gate is met at `ALPHA`.
+
+    Raises:
+        KeyError: For an unknown gate or a missing row.
+    """
+    if name in ALARM_GATES:
+        return alarm_verdict(entry)
+    found = []
+    for rule, path in checks()[name]:
+        row = entry
+        for key in path:
+            row = row[key]
+        found.append(passes(row) if rule is None else meets(rule, row))
+    return all(found)
 
 
 RUNNERS = {
@@ -1054,7 +1166,7 @@ RUNNERS = {
     "battery_rd": (gate_battery_rd, 2000),
     "sensitivity_bound": (gate_sensitivity_bound, 1000),
     "sensitivity_did": (gate_sensitivity_did, 500),
-    "false_confirm": (gate_false_confirm, 1800),
+    "false_confirm": (gate_false_confirm, 300),
 }
 
 
@@ -1065,9 +1177,44 @@ def runner_objects() -> dict[str, list[Any]]:
         Mapping of gate name to the runner, the generators and the shared
         helpers.
     """
+    shared = [
+        f10_generators,
+        alarm_gate,
+        alarm_verdict,
+        power_curve,
+        coverage_row,
+        passes,
+        rate,
+        meets,
+        checks,
+        verdict,
+    ]
+    return {name: [entry[0], *shared] for name, entry in RUNNERS.items()}
+
+
+def terms() -> dict[str, Any]:
+    """The rules and replicate counts the certificates are measured under.
+
+    Returns:
+        `alpha`, every floor and ceiling, the battery level and every
+        replicate count.
+    """
     return {
-        name: [entry[0], f10_generators, alarm_gate, coverage_row, rate]
-        for name, entry in RUNNERS.items()
+        "alpha": ALPHA,
+        "interval_coverage_min": COVERAGE.bound,
+        "causal_power_min": POWER.bound,
+        "causal_selection_min": SELECTION.bound,
+        "causal_false_alarm_max": FALSE_ALARM.bound,
+        "size_margin": VARIABLES["size_margin"].value,
+        "falsification_ceiling": FALSIFY.bound,
+        "synth_size_ceiling": SYNTH_SIZE.bound,
+        "alpha_falsify": ALPHA_FALSIFY,
+        "mean_z_tolerance": MEAN_Z_TOLERANCE,
+        "replicates": {name: runs for name, (_, runs) in RUNNERS.items()},
+        "boosted_replicates": BOOSTED_REPLICATES,
+        "staggered_replicates": STAGGERED_REPLICATES,
+        "power_replicates": POWER_REPLICATES,
+        "synth_power_replicates": SYNTH_POWER_REPLICATES,
     }
 
 
@@ -1105,6 +1252,7 @@ def certify_all(only: tuple[str, ...] = ()) -> dict[str, Any]:
         "version": 1,
         "dev_seed_base": DEV_SEED_BASE,
         "not_measured": list(NOT_MEASURED),
+        "terms": terms(),
         "gates": {},
     }
     digests = current_digests()
@@ -1139,14 +1287,20 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
             None.
 
     Returns:
-        Messages for a missing file, a gate without a certificate and a
-        gate whose code hash differs from the current code.
+        Messages for a missing file, rules or replicate counts other than
+        the current ones, a gate without a certificate, a gate whose code
+        hash differs from the current code and a gate whose `passed` does
+        not follow from its stored counts.
     """
     if document is None:
         document = load()
         if document is None:
             return ["f10_certificates.json is missing"]
     found = []
+    if document.get("gates") and document.get("terms") != terms():
+        found.append(
+            "terms: rule or replicate counts changed since measurement"
+        )
     digests = current_digests()
     for name in GATES:
         entry = document.get("gates", {}).get(name)
@@ -1154,6 +1308,8 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
             found.append(f"{name}: no certificate")
         elif entry.get("code_hash") != digests[name]["code_hash"]:
             found.append(f"{name}: stale (code changed since measurement)")
+        elif entry.get("passed") is not verdict(name, entry):
+            found.append(f"{name}: passed does not follow from its counts")
     return found
 
 
@@ -1195,6 +1351,7 @@ def main(arguments: list[str] | None = None) -> int:
         if options.only and STORE_PATH.exists():
             merged = json.loads(STORE_PATH.read_text(encoding="utf-8"))
             merged["gates"].update(document["gates"])
+            merged["terms"] = document["terms"]
             document = merged
         STORE_PATH.write_text(
             json.dumps(document, indent=2, sort_keys=True) + "\n",

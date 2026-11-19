@@ -123,6 +123,8 @@ class Context(journal.Journal):
         refits: Candidates already refit on development data during
             constraint checks, by trial id (reused by the final evaluation).
         final_pipeline: Selected pipeline refit on development data.
+        shipped: The model the bundle serves: the selected pipeline refit
+            on every row after the test, or `final_pipeline`.
         test_rows: The released locked rows and labels, kept for reports
             written after the test was opened.
         stream: The chunked source and totals when the file was streamed.
@@ -204,6 +206,7 @@ class Context(journal.Journal):
     pending_ledger: Any = None
     coverage_claim_sha256: str | None = None
     final_pipeline: Any = None
+    shipped: Any = None
     test_rows: tuple[pandas.DataFrame, pandas.Series] | None = None
     stream: tuple[streaming.Feed, streaming.Totals] | None = None
     pareto_front: list[dict[str, Any]] | None = None

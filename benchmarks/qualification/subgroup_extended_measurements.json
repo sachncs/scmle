@@ -1,5 +1,5 @@
 {
-  "code_hash": "294fd6da65e78ff62d037bb05d245fe2cfb116d1bb0325a73ed188a2b213bb41",
+  "code_hash": "dfdb79809ad54eacc1bbedf80f2391fe0d0e7e10b381986ef29a49d75ff4afee",
   "not_measured": [
     "strategies other than the randomized difference in means",
     "heteroscedastic or heavy-tailed outcomes",
@@ -8,24 +8,24 @@
   ],
   "note": "description beside subgroup_certificates.json; it does not change the gate that labels a report gating or descriptive",
   "overlapping_columns": {
-    "familywise_bound": 0.059746794344809014,
+    "familywise_ceiling": 0.08450000000000008,
     "familywise_error_null": {
-      "hits": 107,
+      "exact": [
+        0.039463736993672456,
+        0.05554275685191649
+      ],
+      "hits": 94,
       "n": 2000,
-      "rate": 0.0535,
-      "wilson": [
-        0.04446618753651597,
-        0.06424573568564287
-      ]
+      "rate": 0.047
     },
     "familywise_error_true_nulls_with_effect_in_g0": {
-      "hits": 44,
+      "exact": [
+        0.015131326336606134,
+        0.025955913408187734
+      ],
+      "hits": 40,
       "n": 2000,
-      "rate": 0.022,
-      "wilson": [
-        0.0164289081143177,
-        0.0294037890865601
-      ]
+      "rate": 0.02
     },
     "levels_per_column": 4,
     "passed": true,
@@ -33,69 +33,77 @@
     "rows": 800
   },
   "registered": "2026-11-07",
-  "seconds": 21.3,
+  "seconds": 23.5,
   "seeds": [
     0,
     2000
   ],
+  "terms": {
+    "alpha": 0.05,
+    "causal_power_min": 0.8,
+    "familywise_ceiling": 0.08450000000000008,
+    "power_replicates": 500,
+    "replicates": 2000,
+    "size_margin": 0.69
+  },
   "unequal_levels": {
-    "familywise_bound": 0.059746794344809014,
+    "familywise_ceiling": 0.08450000000000008,
     "familywise_error_null": {
-      "hits": 78,
+      "exact": [
+        0.028049577656546053,
+        0.041990997524896635
+      ],
+      "hits": 69,
       "n": 2000,
-      "rate": 0.039,
-      "wilson": [
-        0.03136143254939691,
-        0.04840608504391829
-      ]
+      "rate": 0.0345
     },
     "familywise_error_partial_null": {
-      "hits": 88,
+      "exact": [
+        0.03122596354970329,
+        0.045804723916188124
+      ],
+      "hits": 76,
       "n": 2000,
-      "rate": 0.044,
-      "wilson": [
-        0.03585182041641652,
-        0.05389652670408614
-      ]
+      "rate": 0.038
     },
     "min_rows_power_80": 400,
     "passed": true,
     "power_at_effect_half_sd": {
       "100": {
-        "hits": 219,
+        "exact": [
+          0.37918361418238494,
+          0.45355761115697235
+        ],
+        "hits": 208,
         "n": 500,
-        "rate": 0.438,
-        "wilson": [
-          0.39514834408666566,
-          0.48179707413056694
-        ]
+        "rate": 0.416
       },
       "200": {
-        "hits": 379,
+        "exact": [
+          0.7181677266159525,
+          0.7835981896523172
+        ],
+        "hits": 376,
         "n": 500,
-        "rate": 0.758,
-        "wilson": [
-          0.7185836488729677,
-          0.7934821914488713
-        ]
+        "rate": 0.752
       },
       "400": {
+        "exact": [
+          0.9713163361142833,
+          0.992014164462501
+        ],
         "hits": 492,
         "n": 500,
-        "rate": 0.984,
-        "wilson": [
-          0.9687488914666058,
-          0.9918707469666117
-        ]
+        "rate": 0.984
       },
       "50": {
-        "hits": 81,
+        "exact": [
+          0.11510897212177273,
+          0.16811180579256005
+        ],
+        "hits": 70,
         "n": 500,
-        "rate": 0.162,
-        "wilson": [
-          0.13230178838983928,
-          0.19685226576217005
-        ]
+        "rate": 0.14
       }
     },
     "power_replicates": 500,

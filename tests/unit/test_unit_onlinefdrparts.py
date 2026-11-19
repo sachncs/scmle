@@ -94,6 +94,7 @@ def test_the_base_class_earns_no_credit_and_starts_empty():
 
 
 def test_lond_levels_and_wealth_follow_the_discount():
+    # Enforces website/src/pages/docs/qualification.astro:85.
     rule = rules.Lond(ALPHA)
     assert rule.level(rule.initial()) == Fraction(1, 20)
     assert rule.wealth(rule.initial()) == ALPHA

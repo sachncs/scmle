@@ -26,12 +26,24 @@ WIDE = 40
 RUN_BUDGET = 20
 
 
-def wide(seed=0, rows=300, columns=10, classes=3):
+def wide(seed=0, rows=300, columns=10, classes=3, leaky=False):
+    """A table of noise columns, or of near copies of the class code.
+
+    Only a column whose observed statistic is above its ceiling draws
+    permutations (`screen.sift`), so a table whose work exceeds a budget
+    needs strong columns: `leaky` makes every column one.
+    """
     rng = numpy.random.default_rng(seed)
+    codes = rng.integers(0, classes, rows)
+    shift = codes if leaky else numpy.zeros(rows)
+    scale = 0.05 if leaky else 1.0
     frame = pandas.DataFrame(
-        {f"x{i}": rng.normal(size=rows) for i in range(columns)}
+        {
+            f"x{i}": shift + rng.normal(scale=scale, size=rows)
+            for i in range(columns)
+        }
     )
-    frame["y"] = rng.choice([f"c{k}" for k in range(classes)], rows)
+    frame["y"] = [f"c{k}" for k in codes]
     return frame
 
 
@@ -105,13 +117,13 @@ def test_the_real_and_probe_scans_share_one_allowance():
 
 
 def test_a_declined_screen_runs_no_probe():
-    declined = run_screen(wide(), SMALL_BUDGET)
+    declined = run_screen(wide(leaky=True), SMALL_BUDGET)
     assert declined.probe == {}
     assert not any("did not find the planted" in n for n in declined.notes)
 
 
 def test_a_wide_multiclass_table_is_declined_small_and_screened_large():
-    frame = wide()
+    frame = wide(leaky=True)
     declined = run_screen(frame, SMALL_BUDGET)
     assert declined.permutations == 0 and declined.findings == ()
     assert declined.unchecked == tuple(f"x{i}" for i in range(10))
@@ -128,13 +140,26 @@ def test_a_wide_multiclass_table_is_declined_small_and_screened_large():
     assert again.to_dict() == screened.to_dict()
 
 
+def test_a_wide_table_without_a_strong_column_fits_a_small_budget():
+    # Real wide tables (216 pixel or profile columns, ten classes) were
+    # declined for work no column could use: a column below its ceiling
+    # can never be a suspect, so it draws no permutations.
+    frame = wide(columns=WIDE)
+    report = run_screen(frame, RUN_BUDGET)
+    assert report.unchecked == () and report.warning == ""
+    drawn = [f for f in report.findings if f.mechanism != screen.DUPLICATION]
+    assert all(f.p_value == 1.0 and not f.complete for f in drawn)
+    assert report.suspects == ()
+    assert run_screen(wide(columns=WIDE, leaky=True), RUN_BUDGET).unchecked
+
+
 def test_no_budget_means_no_cap_beyond_the_permutation_limit():
     assert run_screen(wide(columns=4), None).unchecked == ()
 
 
 def test_a_table_declined_for_too_many_permutations_is_loud(monkeypatch):
     monkeypatch.setattr(screen, "MAX_PERMUTATIONS", 300)
-    report = run_screen(wide(), None)
+    report = run_screen(wide(leaky=True), None)
     assert report.unchecked and "permutation limit" in report.warning
 
 
@@ -151,17 +176,21 @@ def profile_of(frame, budget):
 
 
 def test_the_profiler_passes_the_projects_budget_and_warns_first():
-    result = profile_of(wide(), SMALL_BUDGET)
+    result = profile_of(wide(leaky=True), SMALL_BUDGET)
     assert result.untested == tuple(f"x{i}" for i in range(10))
     assert result.risk_findings[0] == result.admonition
     assert result.leakage["warning"] == result.admonition
-    assert profile_of(wide(), LARGE_BUDGET).untested == ()
+    assert profile_of(wide(leaky=True), LARGE_BUDGET).untested == ()
 
 
 def test_an_incomplete_screen_is_in_summary_report_log_and_plan(tmp_path):
     # Enforces docs/LEAKAGE.md:188 and docs/LEAKAGE.md:194.
+    # Enforces website/src/learn/leakage.html:58.
     result = support.make_project(
-        wide(columns=WIDE), "y", output_dir=tmp_path, time_budget=RUN_BUDGET
+        wide(columns=WIDE, leaky=True),
+        "y",
+        output_dir=tmp_path,
+        time_budget=RUN_BUDGET,
     ).run()
     warning = result.profile.admonition
     assert warning.startswith("leakage screen NOT RUN for 40 columns")
@@ -183,11 +212,13 @@ def test_an_incomplete_screen_is_in_summary_report_log_and_plan(tmp_path):
 
 
 def test_block_refuses_an_unchecked_screen_and_warn_proceeds(tmp_path):
-    # Enforces docs/ARCHITECTURE.md:159.
+    # Enforces docs/ARCHITECTURE.md:165.
     # Enforces docs/LEAKAGE.md:194.
+    # Enforces website/src/learn/leakage.html:58.
+    # Enforces website/src/pages/index.astro:136.
     with pytest.raises(errors.BlockedError, match="NOT RUN") as raised:
         support.make_project(
-            wide(columns=WIDE),
+            wide(columns=WIDE, leaky=True),
             "y",
             output_dir=tmp_path,
             time_budget=RUN_BUDGET,

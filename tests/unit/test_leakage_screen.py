@@ -49,7 +49,7 @@ def suspects(report):
 
 @pytest.mark.parametrize("seed", range(4))
 def test_within_fold_auc_matches_sklearn_per_fold(seed):
-    # Enforces docs/ARCHITECTURE.md:137.
+    # Enforces docs/ARCHITECTURE.md:143.
     rng = numpy.random.default_rng(seed)
     n = 120
     truth = rng.integers(0, 2, n)
@@ -126,6 +126,7 @@ def test_constant_column_has_a_single_basis_column():
 
 def test_permutations_stay_inside_their_strata():
     # Enforces docs/LEAKAGE.md:231.
+    # Enforces website/src/learn/leakage.html:67-68.
     strata = numpy.repeat([0, 1, 2], [5, 7, 3])
     rng = numpy.random.default_rng(0)
     index = screen.permute(strata, 50, rng)
@@ -144,7 +145,7 @@ def test_permutations_are_global_with_one_stratum():
 
 
 def test_strata_follow_groups_blocks_or_nothing():
-    # Enforces docs/ARCHITECTURE.md:137.
+    # Enforces docs/ARCHITECTURE.md:143.
     assert screen.stratify(6, None, None).tolist() == [0] * 6
     assert screen.stratify(6, None, 2).tolist() == [0, 0, 1, 1, 2, 2]
     groups = numpy.array(["b", "a", "b", "a"])
@@ -185,7 +186,7 @@ def test_purity_bound_counts_groups_not_rows_when_grouped():
 
 
 def test_chi_square_rows_match_scipy():
-    # Enforces docs/ARCHITECTURE.md:137.
+    # Enforces docs/ARCHITECTURE.md:143.
     rng = numpy.random.default_rng(3)
     missing = rng.random(90) < 0.3
     labels = rng.integers(0, 3, 90)
@@ -211,37 +212,114 @@ def test_a_clean_table_has_no_suspect_and_a_planted_copy_has_one():
     assert found.adjusted_p <= 0.05 and found.significant
 
 
-def test_a_strong_legitimate_predictor_is_significant_but_not_a_suspect():
+def test_a_strong_legitimate_predictor_below_the_ceiling_is_not_a_suspect():
     frame = world(1, n=600)
     frame["strong"] = frame.y + numpy.random.default_rng(1).normal(
         scale=1.0, size=600
     )
     report = run(frame)
     (finding,) = [
-        f for f in report.findings if f.feature == "strong" and f.significant
+        f
+        for f in report.findings
+        if f.feature == "strong" and f.mechanism == screen.SKILL
     ]
-    assert finding.statistic < FAST.skill_ceiling
-    assert finding.significant and not finding.suspect
+    assert 0.6 < finding.statistic < FAST.skill_ceiling
+    # It cannot be a suspect, so it draws no permutations (`sift`).
+    assert finding.p_value == 1.0 and not finding.complete
+    assert not finding.significant and not finding.suspect
     assert report.suspects == ()
 
 
+def test_sift_stops_only_hypotheses_at_or_below_their_ceiling():
+    frame = world(1, n=600)
+    frame["strong"] = frame.y + numpy.random.default_rng(101).normal(
+        scale=1.0, size=600
+    )
+    frame["leak"] = frame.y * 3.0
+    report = run(frame)
+    ceilings = screen.caps(FAST)
+    analytic = (screen.ENCODING, screen.DUPLICATION)
+    for f in report.findings:
+        if f.mechanism in analytic:
+            continue
+        drawn = f.complete or f.p_value < 1.0
+        assert drawn == (f.statistic > ceilings[f.mechanism]), f
+    assert suspects(report) == {("leak", screen.SKILL)}
+
+
+def strong(seed, n=600):
+    """Two measurements of one case, each above the skill ceiling alone."""
+    frame = world(seed, n=n)
+    rng = numpy.random.default_rng(seed + 100)
+    case = frame.y * 3.2 + rng.normal(size=n)
+    frame["first"] = case + rng.normal(scale=0.2, size=n)
+    frame["second"] = case + rng.normal(scale=0.2, size=n)
+    return frame
+
+
+def test_a_strong_column_the_other_columns_match_is_not_a_suspect():
+    # Real tables (iris petals, breast cancer radius and perimeter,
+    # mushroom odor) hold legitimate columns above the ceiling; each is
+    # matched by the other columns together, which no leak is.
+    report = run(strong(3))
+    ceilings = screen.caps(FAST)
+    above = [
+        f
+        for f in report.findings
+        if f.mechanism == screen.SKILL and f.significant
+    ]
+    assert {f.feature for f in above} == {"first", "second"}
+    assert all(f.lower_bound > ceilings[screen.SKILL] for f in above)
+    assert report.suspects == ()
+
+
+def test_a_leak_beside_strong_legitimate_columns_is_the_only_suspect():
+    # A planted copy next to a strong real column: the real column is
+    # matched by the rest (the copy), the copy beats the rest.
+    frame = strong(4)
+    frame["leak"] = frame.y * 3.0
+    assert {f.feature for f in run(frame).suspects} == {"leak"}
+
+
+def test_columns_left_out_of_the_rest_cannot_match_a_leak():
+    # The probe screens its five plants together; each plant is judged
+    # against the real columns only, never against another plant.
+    frame = world(5, n=1500)
+    names = ("first", "second", "third")
+    noise = numpy.random.default_rng(105).normal(scale=0.38, size=(3, 1500))
+    for name, row in zip(names, noise, strict=True):
+        frame[name] = frame.y + row
+    assert suspects(run(frame)) == set()
+    left = screen.screen(frame, "y", CLS, FAST, apart=names)
+    assert suspects(left) == {(name, screen.SKILL) for name in names}
+
+
+def test_leaks_that_each_predict_the_target_perfectly_are_all_suspects():
+    # A tie with the rest counts: two perfect leaks do not hide each other.
+    frame = world(5, n=600)
+    frame["copy"] = frame.y * 3.0 + 0.01 * frame.x0
+    frame["twin"] = frame.y * 3.0 - 0.01 * frame.x1
+    assert {f.feature for f in run(frame).suspects} == {"copy", "twin"}
+
+
 def test_the_family_counts_every_column_and_every_mechanism():
-    # Enforces docs/ARCHITECTURE.md:137.
+    # Enforces docs/ARCHITECTURE.md:143.
     frame = world(2, columns=3)
     frame.loc[::4, "x0"] = numpy.nan
     report = run(frame)
     mechanisms = [f.mechanism for f in report.findings]
-    assert report.family == len(report.findings) == 5
+    assert report.family == len(report.findings) == 6
     assert mechanisms.count(screen.SKILL) == 3
     assert mechanisms.count(screen.MISSING) == 1
     assert mechanisms.count(screen.PURITY) == 1
+    assert mechanisms.count(screen.DUPLICATION) == 1
     assert report.permutations >= screen.resamples(
         report.family, Fraction(1, 20)
     )
 
 
 def test_by_decisions_equal_the_exact_adjustment_of_the_reported_p_values():
-    # Enforces docs/ARCHITECTURE.md:149.
+    # Enforces docs/ARCHITECTURE.md:155.
     frame = world(3).assign(leak=lambda f: f.y + 0.0)
     report = run(frame)
     ps = [f.p_value if f.complete else 1.0 for f in report.findings]
@@ -266,7 +344,10 @@ def test_early_stopping_leaves_the_decisions_unchanged(monkeypatch):
     monkeypatch.setattr(screen, "draw_permutations", never_stop)
     full = run(frame)
     assert any(not f.complete for f in early.findings)
-    assert all(f.complete for f in full.findings)
+    ceilings = screen.caps(FAST)
+    assert all(
+        f.complete for f in full.findings if f.statistic > ceilings[f.mechanism]
+    )
     assert [f.significant for f in early.findings] == [
         f.significant for f in full.findings
     ]
@@ -289,15 +370,17 @@ def test_a_noisy_copy_and_a_threshold_rule_are_suspects():
     flip = rng.random(500) < 0.02
     frame["noisy"] = numpy.where(flip, 1 - frame.y, frame.y)
     frame["threshold"] = frame.y + rng.normal(scale=0.25, size=500)
+    # Two leaks of one target match each other's skill (`rival`): the
+    # threshold rule still beats the noisy copy, and the noisy copy, read
+    # as the target, is an echo.
     assert suspects(run(frame)) == {
-        ("noisy", screen.SKILL),
         ("noisy", screen.ECHO),
         ("threshold", screen.SKILL),
     }
 
 
 def test_a_value_recorded_only_for_one_class_is_a_suspect():
-    # Enforces docs/ARCHITECTURE.md:137.
+    # Enforces docs/ARCHITECTURE.md:143.
     rng = numpy.random.default_rng(7)
     frame = world(7, n=400)
     frame["body"] = numpy.where(
@@ -348,7 +431,7 @@ def test_regression_copy_and_a_strong_but_noisy_predictor():
     report = screen.screen(frame, "y", "regression", FAST)
     assert suspects(report) == {("leak", screen.SKILL)}
     strong = next(f for f in report.findings if f.feature == "x1")
-    assert strong.significant and not strong.suspect
+    assert strong.statistic < FAST.skill_ceiling and not strong.suspect
 
 
 def test_groups_keep_entities_whole_and_still_find_a_leak():
@@ -434,8 +517,9 @@ def test_subsample_keeps_groups_whole_and_time_order():
 
 
 def test_the_global_null_is_flagged_no_more_often_than_alpha():
-    # Enforces docs/ARCHITECTURE.md:149.
+    # Enforces docs/ARCHITECTURE.md:155.
     # Enforces docs/LEAKAGE.md:231.
+    # Enforces website/src/learn/leakage.html:67-68.
     significant = 0
     worlds = 60
     for seed in range(worlds):
@@ -470,8 +554,9 @@ def test_the_shipped_certificates_are_current_for_every_kind():
 
 def test_a_table_where_every_plant_is_found_gates_every_mechanism():
     # Enforces docs/LEAKAGE.md:233.
+    # Enforces website/src/learn/leakage.html:67-68.
     report = probed(world(20))
-    assert report.probe == dict.fromkeys(plants.DEFECTS, True)
+    assert report.probe == dict.fromkeys(plants.KINDS, True)
     assert set(report.gates) == set(screen.MECHANISM_DEFECTS)
     assert set(report.gates.values()) == {certificates.Authority.GATING}
 
@@ -484,7 +569,8 @@ def test_too_few_rows_say_what_the_screen_would_miss():
 
 def test_a_missed_plant_is_reported_and_a_suspect_still_blocks(monkeypatch):
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:156.
-    found = {**dict.fromkeys(plants.DEFECTS, True), "leak_threshold": False}
+    # Enforces website/src/learn/what-scmle-cannot-do.html:36-37.
+    found = {**dict.fromkeys(plants.KINDS, True), "leak_threshold": False}
     monkeypatch.setattr(screen, "probe", lambda *a, **k: found)
     report = probed(world(20).assign(leak=lambda f: f.y + 0.0))
     assert {f.feature for f in report.blocking} == {"leak"}
@@ -493,6 +579,7 @@ def test_a_missed_plant_is_reported_and_a_suspect_still_blocks(monkeypatch):
 
 def test_a_stale_certificate_is_reported_and_does_not_decide(monkeypatch):
     # Enforces docs/LEAKAGE.md:231.
+    # Enforces website/src/learn/leakage.html:67-68.
     monkeypatch.setattr(screen, "code_digest", lambda: "0" * 64)
     report = probed(world(20))
     assert "published certificate for binary targets: stale" in report.notes
@@ -511,8 +598,9 @@ def test_a_column_named_like_a_plant_is_refused():
 
 
 def test_without_gates_a_suspect_warns_and_cannot_block():
-    # Enforces docs/ARCHITECTURE.md:166.
+    # Enforces docs/ARCHITECTURE.md:172.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:119.
+    # Enforces website/src/learn/when-things-go-wrong.html:51.
     frame = world(19).assign(leak=lambda f: f.y + 0.0)
     report = run(frame)
     found = report.suspects[0]
@@ -525,6 +613,7 @@ def test_without_gates_a_suspect_warns_and_cannot_block():
 
 def test_with_probed_gates_a_suspect_blocks():
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:119.
+    # Enforces website/src/learn/when-things-go-wrong.html:51.
     frame = world(20).assign(leak=lambda f: f.y + 0.0)
     report = probed(frame)
     assert {f.feature for f in report.blocking} == {"leak"}
@@ -560,7 +649,7 @@ def test_screen_table_orders_by_time_and_respects_groups():
 
 
 def test_r2_matches_sklearn_for_the_observed_regression_fit():
-    # Enforces docs/ARCHITECTURE.md:137.
+    # Enforces docs/ARCHITECTURE.md:143.
     rng = numpy.random.default_rng(23)
     n = 200
     x = rng.normal(size=n)
@@ -584,10 +673,14 @@ def test_a_wide_multiclass_table_is_declined_quickly_and_says_so():
     from scmle.assurance.admissibility import screen
 
     rng = numpy.random.default_rng(0)
+    codes = rng.integers(0, 10, 600)
+    # Near copies of the class: every column is above the ceiling, so every
+    # one needs permutations (`sift`) and the work exceeds the budget.
     frame = pandas.DataFrame(
-        rng.normal(size=(600, 64)), columns=[f"c{i}" for i in range(64)]
+        codes[:, None] + rng.normal(scale=0.05, size=(600, 64)),
+        columns=[f"c{i}" for i in range(64)],
     )
-    frame["y"] = rng.integers(0, 10, 600)
+    frame["y"] = codes
     started = time.monotonic()
     report = screen.screen_table(
         frame,

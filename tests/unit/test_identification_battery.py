@@ -1,7 +1,10 @@
 """Falsification battery: Holm control, false alarms and replication."""
 
+import math
+
 import numpy
 import pytest
+from scipy import stats
 
 from scmle.causal.identification import battery
 
@@ -15,6 +18,15 @@ def test_wald_tests_and_holm_rejections():
     assert report.rejected == ("b",) and not report.passed and report.ran
     clean = battery.run_battery(tests[:1], 0.05)
     assert clean.passed and clean.to_dict()["rejected"] == []
+
+
+def test_a_wald_test_with_degrees_of_freedom_uses_the_t_reference():
+    normal = battery.wald("a", "placebo", 2.5, 1.0)
+    student = battery.wald("a", "placebo", 2.5, 1.0, 20.0)
+    assert normal.p_value == pytest.approx(2 * stats.norm.sf(2.5))
+    assert student.p_value == pytest.approx(2 * stats.t.sf(2.5, 20.0))
+    assert student.p_value > normal.p_value
+    assert battery.wald("a", "placebo", 2.5, 1.0, math.inf) == normal
 
 
 def test_an_empty_battery_is_not_a_pass():

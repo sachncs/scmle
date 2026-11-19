@@ -21,6 +21,7 @@ At least two strata are required.
 """
 
 import dataclasses
+import math
 from typing import Any
 from typing import ClassVar
 
@@ -63,7 +64,9 @@ class Test:
         return dataclasses.asdict(self)
 
 
-def wald(name: str, kind: str, estimate: float, se: float) -> Test:
+def wald(
+    name: str, kind: str, estimate: float, se: float, df: float = math.inf
+) -> Test:
     """Runs a two-sided Wald test of `estimate = 0`.
 
     Args:
@@ -71,16 +74,24 @@ def wald(name: str, kind: str, estimate: float, se: float) -> Test:
         kind: `negative_outcome`, `negative_exposure` or `placebo`.
         estimate: The placebo effect.
         se: Its standard error, which must be positive.
+        df: Degrees of freedom of the t reference the estimator's own
+            interval uses (Welch for a difference in means); infinite for
+            the normal reference.
 
     Returns:
-        The test, with the normal two-sided p-value of ``estimate / se``.
+        The test, with the two-sided p-value of ``estimate / se`` under the
+        t distribution on `df` degrees of freedom (normal when infinite), so
+        the test rejects exactly when the estimator's interval at the same
+        level excludes zero.
 
     Raises:
         ValueError: If `se` is not positive.
     """
     if not se > 0:
         raise errors.InputError("a Wald test needs a positive standard error")
-    p = float(2 * stats.norm.sf(abs(estimate) / se))
+    z = abs(estimate) / se
+    tail = stats.t.sf(z, df) if math.isfinite(df) else stats.norm.sf(z)
+    p = float(2 * tail)
     return Test(name, kind, p, estimate, se)
 
 

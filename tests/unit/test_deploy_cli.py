@@ -94,6 +94,10 @@ def test_a_complete_release_is_certified_and_the_record_verifies(
     # Enforces docs/GLOSSARY.md:698.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:21.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:771.
+    # Enforces website/src/learn/glossary.html:349.
+    # Enforces website/src/learn/when-things-go-wrong.html:10.
+    # Enforces website/src/learn/when-things-go-wrong.html:323.
+    # Enforces website/src/pages/docs/cli.astro:96.
     root, ignored, digest = release
     assert gate(root, "admit") == cli.EXIT_OK
     capsys.readouterr()
@@ -135,6 +139,8 @@ def test_evidence_that_is_not_supplied_blocks_the_release(
 ):
     # Enforces docs/CLI.md:161.
     # Enforces docs/GLOSSARY.md:698-698.
+    # Enforces website/src/learn/glossary.html:349.
+    # Enforces website/src/pages/docs/cli.astro:96.
     root, manifest, ignored = release
     del manifest[drop]
     write_manifest(root, manifest)
@@ -147,6 +153,8 @@ def test_evidence_that_is_not_supplied_blocks_the_release(
 def test_an_unsigned_model_blocks_the_release(release):
     # Enforces docs/GLOSSARY.md:700.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:22.
+    # Enforces website/src/learn/glossary.html:351.
+    # Enforces website/src/learn/when-things-go-wrong.html:11.
     root = release[0]
     path = root / "registry" / "registry.json"
     index = json.loads(path.read_text())
@@ -233,6 +241,7 @@ def test_live_writes_results_and_fails_when_a_check_fails(
     release, monkeypatch, capsys
 ):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:754.
+    # Enforces website/src/learn/when-things-go-wrong.html:319.
     root, ignored, digest = release
     (root / "token").write_text("good-token\n", encoding="utf-8")
     document = support_release.recorded(digest)

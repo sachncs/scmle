@@ -330,6 +330,7 @@ def test_curation_report_accepts_explicit_safe_dispositions():
 
 
 def test_dataset_card_makes_intended_use_and_limits_explicit():
+    # Enforces website/src/pages/docs/evidence.astro:82.
     report = data.Curation(
         manifest=data.DatasetManifest(
             "ds_1",

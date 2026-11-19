@@ -39,9 +39,14 @@ def build(tmp_path, policy, frame):
 def test_block_stops_a_flagged_column_even_with_a_stale_certificate(
     monkeypatch, tmp_path
 ):
-    # Enforces docs/ARCHITECTURE.md:159.
-    # Enforces docs/API_STABILITY.md:51 and docs/ARTIFACTS.md:32.
+    # Enforces docs/ARCHITECTURE.md:165.
+    # Enforces docs/API_STABILITY.md:54 and docs/ARTIFACTS.md:32.
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:156.
+    # Enforces website/src/learn/what-scmle-cannot-do.html:36-37.
+    # Enforces website/src/pages/docs/api-stability.astro:64.
+    # Enforces website/src/pages/docs/artifacts.astro:15.
+    # Enforces website/src/pages/docs/qualification.astro:22.
+    # Enforces website/src/pages/index.astro:136.
     monkeypatch.setattr(screen, "code_digest", lambda: "0" * 64)
     with pytest.raises(errors.BlockedError, match="leak") as raised:
         build(tmp_path, "block", table(leak=True)).run()
@@ -51,14 +56,14 @@ def test_block_stops_a_flagged_column_even_with_a_stale_certificate(
 
 def test_block_runs_a_clean_table_and_records_the_probe(tmp_path):
     result = build(tmp_path, "block", table(rows=600)).run()
-    assert set(result.profile.leakage["probe"]) == set(plants.DEFECTS)
+    assert set(result.profile.leakage["probe"]) == set(plants.KINDS)
     assert set(result.profile.leakage["gates"].values()) == {"gating"}
 
 
 def test_a_missed_plant_is_said_loudly_and_does_not_refuse(
     monkeypatch, tmp_path, caplog
 ):
-    found = {**dict.fromkeys(plants.DEFECTS, True), "leak_rare_record": False}
+    found = {**dict.fromkeys(plants.KINDS, True), "leak_rare_record": False}
     monkeypatch.setattr(screen, "probe", lambda *a, **k: found)
     with caplog.at_level(logging.WARNING, logger=stages.__name__):
         result = build(tmp_path, "block", table()).run()

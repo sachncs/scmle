@@ -56,6 +56,7 @@ def test_roundtrip_prediction_equivalence(trained, tmp_path):
 
 def test_predict_from_file_with_extra_columns(trained, tmp_path):
     # Enforces docs/GLOSSARY.md:588.
+    # Enforces website/src/learn/glossary.html:294.
     bundle, features = trained
     features.assign(junk=1).to_csv(tmp_path / "n.csv", index=False)
     assert len(bundle.predict(tmp_path / "n.csv")) == len(features)
@@ -64,6 +65,7 @@ def test_predict_from_file_with_extra_columns(trained, tmp_path):
 
 def test_schema_errors_are_structured(trained):
     # Enforces docs/GLOSSARY.md:588.
+    # Enforces website/src/learn/glossary.html:294.
     bundle, features = trained
     with pytest.raises(errors.SchemaError) as caught:
         bundle.predict(features.drop(columns=["num"]))
@@ -84,6 +86,7 @@ def test_unknown_categories_and_missing_values_are_reported(trained):
 
 def test_tampering_is_detected(trained, tmp_path):
     # Enforces README.md:135.
+    # Enforces website/src/pages/index.astro:433.
     bundle = trained[0]
     directory = bundle.save(tmp_path / "m")
     with (directory / scmle.artifacts.bundle.MODEL_FILE).open("ab") as handle:
@@ -104,6 +107,8 @@ def test_schema_tampering_is_detected(trained, tmp_path):
 def test_version_mismatch_blocks_unless_allowed(trained, tmp_path):
     # Enforces docs/SECURITY.md:27.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:452.
+    # Enforces website/src/learn/when-things-go-wrong.html:187.
+    # Enforces website/src/pages/docs/threat-model.astro:8.
     bundle, features = trained
     directory = bundle.save(tmp_path / "m")
     path = directory / scmle.artifacts.bundle.MANIFEST_FILE
@@ -134,7 +139,7 @@ def test_invalid_bundles(tmp_path, trained):
 def test_a_bundle_from_before_the_class_renames_is_refused_with_a_reason(
     tmp_path, trained
 ):
-    # Enforces docs/API_STABILITY.md:276.
+    # Enforces docs/API_STABILITY.md:279.
     directory = trained[0].save(tmp_path / "earlier")
     path = directory / scmle.artifacts.bundle.MANIFEST_FILE
     manifest = json.loads(path.read_text())
@@ -151,7 +156,7 @@ def test_a_bundle_from_before_the_class_renames_is_refused_with_a_reason(
 
 
 def test_a_member_naming_a_missing_module_is_refused(tmp_path, trained):
-    # Enforces docs/API_STABILITY.md:280.
+    # Enforces docs/API_STABILITY.md:283.
     vanished = types.ModuleType("vanished")
     vanished.Thing = type("Thing", (), {"__module__": "vanished"})
     sys.modules["vanished"] = vanished
@@ -171,7 +176,9 @@ def test_a_member_naming_a_missing_module_is_refused(tmp_path, trained):
 
 
 def test_legacy_bundle_requires_opt_in_and_can_be_migrated(tmp_path, trained):
-    # Enforces docs/API_STABILITY.md:276.
+    # Enforces docs/API_STABILITY.md:279.
+    # Enforces website/src/pages/docs/api-stability.astro:83.
+    # Enforces website/src/pages/docs/api.astro:283.
     directory = trained[0].save(tmp_path / "legacy")
     manifest_path = directory / scmle.artifacts.bundle.MANIFEST_FILE
     manifest = json.loads(manifest_path.read_text())
@@ -292,6 +299,19 @@ def test_unsigned_bundles_are_refused_unless_trusted(
     # Enforces docs/ARTIFACTS.md:108.
     # Enforces README.md:135 and docs/START_HERE.md:433.
     # Enforces docs/BEGINNER_FINDINGS.md:37.
+    # Enforces website/src/learn/beginner-findings.html:22.
+    # Enforces website/src/learn/glossary.html:302.
+    # Enforces website/src/learn/start-here.html:218.
+    # Enforces website/src/pages/docs/artifacts.astro:130.
+    # Enforces website/src/pages/docs/quickstart.astro:118.
+    # Enforces website/src/pages/docs/quickstart.astro:92.
+    # Enforces website/src/pages/docs/quickstart.astro:94.
+    # Enforces website/src/pages/docs/threat-model.astro:6.
+    # Enforces website/src/pages/docs/threat-model.astro:67.
+    # Enforces website/src/pages/index.astro:223.
+    # Enforces website/src/pages/index.astro:237.
+    # Enforces website/src/pages/index.astro:433.
+    # Enforces website/src/pages/docs/cli.astro:99.
     monkeypatch.delenv(scmle.contracts.signing.SIGNING_KEY_ENV, raising=False)
     bundle, features = trained
     directory = bundle.save(tmp_path / "m")
@@ -311,6 +331,14 @@ def test_signed_bundles_load_without_trust_and_detect_tampering(
     # Enforces docs/BENCHMARKS.md:18.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:437.
     # Enforces README.md:135.
+    # Enforces website/src/learn/when-things-go-wrong.html:181.
+    # Enforces website/src/pages/docs/benchmarks.astro:719-721.
+    # Enforces website/src/pages/docs/artifacts.astro:130.
+    # Enforces website/src/pages/docs/quickstart.astro:94.
+    # Enforces website/src/pages/docs/threat-model.astro:6.
+    # Enforces website/src/pages/index.astro:223.
+    # Enforces website/src/pages/index.astro:413.
+    # Enforces website/src/pages/index.astro:433.
     monkeypatch.delenv(scmle.contracts.signing.SIGNING_KEY_ENV, raising=False)
     bundle, features = trained
     directory = bundle.save(tmp_path / "m", signing_key="s3cret")
@@ -330,6 +358,9 @@ def test_a_swapped_model_file_cannot_ride_a_valid_signature(
 ):
     # Enforces docs/BENCHMARKS.md:18.
     # Enforces README.md:135.
+    # Enforces website/src/pages/docs/benchmarks.astro:719-721.
+    # Enforces website/src/pages/index.astro:223.
+    # Enforces website/src/pages/index.astro:413.
     monkeypatch.delenv(scmle.contracts.signing.SIGNING_KEY_ENV, raising=False)
     bundle = trained[0]
     good = bundle.save(tmp_path / "good", signing_key="k")
@@ -345,10 +376,26 @@ def test_a_swapped_model_file_cannot_ride_a_valid_signature(
         scmle.artifacts.bundle.Bundle.load(evil, signing_key="k")
 
 
+def test_a_signed_bundle_with_no_key_is_refused_even_when_trusted(
+    trained, tmp_path, monkeypatch
+):
+    # Enforces website/src/pages/docs/quickstart.astro:113.
+    # Enforces website/src/pages/docs/threat-model.astro:6.
+    monkeypatch.delenv(scmle.contracts.signing.SIGNING_KEY_ENV, raising=False)
+    monkeypatch.delenv(
+        scmle.contracts.signing.SIGNING_KEY_FILE_ENV, raising=False
+    )
+    directory = trained[0].save(tmp_path / "m", signing_key="k")
+    for trusted in (False, True):
+        with pytest.raises(errors.ArtifactError, match="refusing"):
+            scmle.artifacts.bundle.Bundle.load(directory, trusted=trusted)
+
+
 def test_key_from_environment_signs_and_verifies(
     trained, tmp_path, monkeypatch
 ):
     # Enforces docs/BEGINNER_FINDINGS.md:37.
+    # Enforces website/src/learn/beginner-findings.html:22.
     bundle, features = trained
     monkeypatch.setenv(scmle.contracts.signing.SIGNING_KEY_ENV, "env-key")
     directory = bundle.save(tmp_path / "m")
@@ -390,6 +437,9 @@ def test_default_policy_requires_exact_column_names(trained):
     # Enforces docs/GLOSSARY.md:588.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:461.
     # Enforces docs/START_HERE.md:538.
+    # Enforces website/src/learn/glossary.html:294.
+    # Enforces website/src/learn/start-here.html:276.
+    # Enforces website/src/learn/when-things-go-wrong.html:189.
     bundle, features = trained
     renamed = features.rename(columns={"num": "NUM"})
     with pytest.raises(errors.SchemaError, match="missing"):
@@ -398,6 +448,7 @@ def test_default_policy_requires_exact_column_names(trained):
 
 def test_explicit_renames_map_incoming_names(trained):
     # Enforces docs/START_HERE.md:538.
+    # Enforces website/src/learn/start-here.html:276.
     bundle, features = trained
     renamed = features.rename(columns={"num": "customer_age", "cat": "segment"})
     mapping = scmle.inference.mapping.Mapper(
@@ -412,6 +463,7 @@ def test_explicit_renames_map_incoming_names(trained):
 
 def test_case_and_whitespace_insensitive_matching_is_opt_in(trained):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:461.
+    # Enforces website/src/learn/when-things-go-wrong.html:189.
     bundle, features = trained
     messy = features.rename(columns={"num": "  NUM ", "cat": "Cat"})
     with pytest.raises(errors.SchemaError):

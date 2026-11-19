@@ -136,7 +136,10 @@ class Budget(Refiner):
 
         Returns:
             All candidates if the budget is not tight; otherwise those with a
-            cost below 3 or listed in `FAST_EXCEPTIONS`.
+            cost below 3 or listed in `FAST_EXCEPTIONS`, the baselines first,
+            then the `FAST_EXCEPTIONS` and then the rest in their order, so a
+            trial window that closes early skips a weak model, not the
+            boosted learner.
         """
         if not context.spec.brief:
             return candidates
@@ -166,7 +169,9 @@ class Budget(Refiner):
                 )
             else:
                 kept.append(adapter)
-        return kept
+        first = [a for a in kept if a.family == "baseline"]
+        first += [a for a in kept if a.name in FAST_EXCEPTIONS]
+        return first + [a for a in kept if a not in first]
 
 
 class Streaming(Refiner):

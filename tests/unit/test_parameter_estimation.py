@@ -328,7 +328,10 @@ def test_logistic_estimation_has_independent_optimization_check():
 
 
 def test_bayesian_linear_estimation_reports_posterior_evidence():
-    """A declared conjugate prior produces auditable posterior evidence."""
+    """A declared conjugate prior produces auditable posterior evidence.
+
+    Also enforces website/src/pages/docs/modeling.astro:321.
+    """
     rng = numpy.random.default_rng(19)
     features = rng.normal(size=(180, 2))
     outcome = 1.25 + 1.8 * features[:, 0] - 0.6 * features[:, 1]
@@ -382,7 +385,10 @@ def test_bayesian_prior_round_trip_preserves_digest_contract(tmp_path):
 
 
 def test_bayesian_estimation_fails_closed_for_unsupported_policies():
-    """Bayesian evidence does not silently claim robust or clustered errors."""
+    """Bayesian evidence does not silently claim robust or clustered errors.
+
+    Also enforces website/src/pages/docs/modeling.astro:321.
+    """
     with pytest.raises(ValueError, match="requires an explicit prior"):
         Config(estimator="bayesian_linear")
 

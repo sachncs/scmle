@@ -4,7 +4,6 @@ import argparse
 import logging
 import os
 import pathlib
-import threading
 
 import pandas
 
@@ -13,7 +12,9 @@ from scmle.artifacts import bundle
 from scmle.cli import command
 from scmle.deploy import packaging
 import scmle.inference.mapping
+from scmle.operations import signals
 from scmle.security import access
+from scmle.serving import runtime
 from scmle.serving import server
 
 LOGGER = logging.getLogger(__name__)
@@ -86,8 +87,9 @@ class Batch(command.Command):
 
     name = "batch"
     help = (
-        "score a file with the online serving path and write a manifest "
-        "with the model version and artifact digest"
+        "score a file with the online serving path, streamed in chunks, and "
+        "write a manifest with the model version and artifact digest; an "
+        "interrupted run resumes"
     )
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
@@ -99,7 +101,18 @@ class Batch(command.Command):
         parser.add_argument("bundle", help="bundle directory")
         parser.add_argument("data", help="CSV or Parquet file")
         parser.add_argument("--output", default="predictions.csv")
-        parser.add_argument("--chunk-rows", type=int, default=10_000)
+        parser.add_argument(
+            "--chunk-rows",
+            type=int,
+            default=server.BATCH_CHUNK_ROWS,
+            help="rows read and scored at a time (bounds the memory used)",
+        )
+        parser.add_argument(
+            "--restart",
+            action="store_true",
+            help="score from the first row even if an interrupted run of the "
+            "same input, bundle and policies left a journal",
+        )
         parser.add_argument(
             "--on-null", choices=["impute", "reject"], default="impute"
         )
@@ -115,6 +128,10 @@ class Batch(command.Command):
     def execute(self, args: argparse.Namespace) -> int:
         """Writes predictions and `<output>.manifest.json`.
 
+        The input is read `--chunk-rows` rows at a time. An interrupted run
+        leaves `<output>.partial` and `<output>.progress.json`; running the
+        same command again continues after the last scored chunk.
+
         Args:
             args: The parsed command-line arguments.
 
@@ -125,19 +142,31 @@ class Batch(command.Command):
         adapter = server.Batcher(
             model, on_null=args.on_null, on_unseen=args.on_unseen
         )
-        rows = adapter.score_file(args.data, args.output, args.chunk_rows)
+        rows = adapter.score_file(
+            args.data, args.output, args.chunk_rows, resume=not args.restart
+        )
         LOGGER.info("wrote %d predictions to %s", rows, args.output)
         return command.EXIT_OK
 
 
 class Serve(command.Command):
-    """Serves a saved bundle over HTTP."""
+    """Serves a saved bundle over HTTP.
+
+    The serving loop is the packaged service's (`runtime.hold`): SIGTERM or
+    SIGINT drains the requests in flight and exits, SIGHUP reloads the
+    bundle directory without downtime, and the operations signals over the
+    last `--signals-window` seconds are written every `--signals-interval`
+    seconds, drift judged against the served bundle's training reference.
+    """
 
     name = "serve"
-    help = "serve a saved model bundle over HTTP (trusted bundles only)"
+    help = (
+        "serve a saved model bundle over HTTP (trusted bundles only); "
+        "SIGHUP reloads it, SIGTERM drains and stops"
+    )
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds bundle and binding options.
+        """Adds bundle, binding, drain and signals options.
 
         Args:
             parser: The argument parser of this command.
@@ -150,31 +179,61 @@ class Serve(command.Command):
             action="store_true",
             help="load an unsigned bundle you vouch for (pickle executes code)",
         )
+        parser.add_argument(
+            "--drain-seconds",
+            type=float,
+            help="time requests in flight get to finish on SIGTERM (default: "
+            "the longest an admitted request can take)",
+        )
+        parser.add_argument(
+            "--signals-file",
+            help="append the evaluated operations signals here as JSON lines "
+            "(default: the log)",
+        )
+        parser.add_argument(
+            "--signals-interval",
+            type=float,
+            default=runtime.INTERVAL,
+            help="seconds between two evaluations of the signals",
+        )
+        parser.add_argument(
+            "--signals-window",
+            type=float,
+            default=signals.Window().window_seconds,
+            help="seconds of traffic each evaluation of the signals covers",
+        )
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Loads the bundle and serves until interrupted.
+        """Loads the bundle and serves until SIGTERM or SIGINT.
 
         Args:
             args: The parsed command-line arguments.
 
         Returns:
-            The exit status, EXIT_OK (0), once serving has stopped.
+            The exit status, EXIT_OK (0), once serving has drained and
+            stopped.
         """
-        model = bundle.Bundle.load(args.bundle, trusted=args.trusted)
+        path = pathlib.Path(args.bundle)
+        model = bundle.Bundle.load(path, trusted=args.trusted)
+        monitor = signals.SignalMonitor(
+            signals.Window(window_seconds=args.signals_window)
+        )
         adapter = server.HttpServing(
             model,
             args.host,
             args.port,
             gateway=access.gateway_from_environment(os.environ),
+            monitor=monitor,
+            drain_seconds=args.drain_seconds,
         )
-        adapter.start()
-        LOGGER.info("serving %s on %s", model.info.model_name, adapter.address)
-        try:
-            threading.Event().wait()
-        except KeyboardInterrupt:
-            LOGGER.info("stopping")
-        finally:
-            adapter.stop()
+        LOGGER.info("serving %s", model.info.model_name)
+        runtime.hold(
+            adapter,
+            monitor,
+            args.signals_file,
+            args.signals_interval,
+            runtime.fetch(path, args.trusted),
+        )
         return command.EXIT_OK
 
 

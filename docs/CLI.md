@@ -1,10 +1,10 @@
 # Command line
 
 The `scmle` command mirrors the Python API. Global options (before the
-sub-command): `--log-level {DEBUG,INFO,WARNING,ERROR}`, `--log-json`, which
-writes the log as one JSON object per line, and `--debug`, which logs every
-failure with its traceback, its chain of causes and its details. Log lines
-carry the time, the level, the logger and the ids in scope as
+sub-command): `--log-level {DEBUG,INFO,WARNING,ERROR}`, `--log-json` (the log as
+one JSON object per line), `--trace` (OpenTelemetry spans over OTLP; see below)
+and `--debug`, which logs every failure with its traceback, chain of causes and details.
+Log lines carry the time, the level, the logger and the ids in scope as
 `[run=... request=...]` (the run id during a run, the request id in the
 server; the generated service writes JSON when `SCMLE_LOG_JSON` is set).
 
@@ -23,15 +23,15 @@ server; the generated service writes JSON when `SCMLE_LOG_JSON` is set).
 | `scmle resume RUN_DIR` | Continue a cancelled, failed or crashed run, reusing finished trials. A run whose test set was opened, or whose custody journal (`runs/custody/<run>.jsonl`, outside the run directory) is missing or edited, is refused; deleting `evaluation.json` does not change that. |
 | `scmle catalog INPUT` | Catalog a local table (or raw bytes) into a JSON artifact. |
 | `scmle predict BUNDLE DATA` | Score a file with a saved bundle. |
-| `scmle batch BUNDLE DATA` | Score a file through the same code path as the online service; writes `--output` and `<output>.manifest.json` (model version, artifact digest, row counts). `--on-null` and `--on-unseen` accept `reject`. |
-| `scmle serve BUNDLE` | Serve a bundle over HTTP: `/livez`, `/readyz`, `/predict` (see [SERVICE_SLO](SERVICE_SLO.md)). |
+| `scmle batch BUNDLE DATA` | Score a file through the same code path as the online service, `--chunk-rows` rows at a time; writes `--output` and `<output>.manifest.json` (model version, artifact digest, row counts). An interrupted run resumes when run again (`--restart` starts over). `--on-null` and `--on-unseen` accept `reject`. |
+| `scmle serve BUNDLE` | Serve a bundle over HTTP: `/livez`, `/readyz`, `/predict` (see [SERVICE_SLO](SERVICE_SLO.md)). SIGHUP reloads the bundle, SIGTERM drains and stops (see below). |
 | `scmle export-onnx BUNDLE` | Export an ONNX graph (needs the `onnx` extra). |
 | `scmle package BUNDLE` | Write a hardened service folder: pinned-base Dockerfile, locked requirements, SBOM, signed provenance, `build.sh`. Sign with `SCMLE_SIGNING_KEY`. |
 | `scmle charter init\|check\|sign PATH` | Create, validate or sign an analysis charter (see below). |
 | `scmle claims list\|show\|verify RUN_DIR` | List the claims of a charter run, show one with its hypothesis and checks, or verify the run's ledger and claims (see below). `verify` exits 1 when any step fails. |
 | `scmle frame REQUEST --source S --data X --output DIR` | Draft an unsigned charter, a cost-model record and the questions only a person can answer, from a plain request. Exit 2 when refused. See [ARTIFACTS](ARTIFACTS.md). |
 | `scmle trail build\|verify\|show` | Join the charter, framing, cost model, claim ledger, registry, release state and deployment ledger of one model into a hash-chained, signed trail; verify a trail folder against its own records; print it. `build` and `verify` exit 1 on any finding. See [TRAIL](TRAIL.md). |
-| `scmle records upgrade FOLDER [--dry-run]` | Rewrite the stored records of a folder at the current schema version, keeping a `.bak` of each file; exit 1, with every file restored, if a seal, signature or chain fails to verify (see below). |
+| `scmle records upgrade FOLDER [--dry-run]` | Rewrite the stored records of a folder at the current schema version, keeping a `.bak` of each file; exit 1, with every file restored, if a seal, signature or chain fails to verify (see below). `estimate`, `cluster`, `forget`, `retire` and `delete` are described at the end of this page. |
 
 `plan` and `run` take the same options; `scmle run --help` lists them all.
 The common ones:
@@ -212,3 +212,134 @@ again; if that fails, every file is restored from its `.bak` and it exits 1.
 `--dry-run` lists the files that would change and writes nothing.
 Hash-chained logs, `negative_control.json` (its digest is in the ledger) and
 the files of a sealed trail are left as stored.
+
+## Serving lifecycle and tracing
+
+```bash
+scmle serve model/ [--drain-seconds S] [--signals-file signals.jsonl] \
+  [--signals-interval 60] [--signals-window 300]
+kill -HUP <pid>     # reload the bundle directory; the old model serves until the new one is loaded
+kill -TERM <pid>    # stop accepting connections, drain the requests in flight, exit 0
+scmle --trace serve model/
+```
+
+`serve` runs the same loop as the packaged service. SIGTERM or SIGINT stops
+accepting connections and lets the requests in flight finish for
+`--drain-seconds` (by default the longest an admitted request can take: the
+request timeout to read it, the scoring timeout and the request timeout to
+answer). SIGHUP verifies and loads the bundle directory again and swaps it
+in without downtime; a reload that fails is logged and the previous bundle
+keeps serving. Every `--signals-interval` seconds the operations signals
+over the last `--signals-window` seconds, drift judged against the served
+bundle's training reference, are appended to `--signals-file` as one JSON
+line (`at`, `signals`), or written to the log; they are written once more
+on shutdown.
+
+`--trace`, or `SCMLE_TRACING` in the environment, exports OpenTelemetry
+spans over OTLP/HTTP, configured by the standard `OTEL_EXPORTER_OTLP_*`
+variables: `request` (one HTTP request, joined to the caller's trace by its
+`traceparent` header), `predict` (one scoring call), `batch` (one scored
+file) and `stage <name>` (one pipeline stage). It needs the `tracing` extra;
+without it the degraded path is reported and every span is a no-op.
+
+## Batch scoring
+
+```bash
+scmle batch model/ big.csv --output predictions.csv [--chunk-rows 10000] [--restart]
+```
+
+`batch` reads and scores `--chunk-rows` rows at a time (default 10,000), so
+memory holds one chunk however large the file; delimited text is read
+record by record. Each scored chunk is appended to `<output>.partial` and
+`<output>.progress.json` records the rows and bytes written. Running the
+same command on the same input, bundle and policies after an interruption
+continues after the last recorded chunk; `--restart` scores from the first
+row. The finished file replaces `<output>` atomically and the progress
+journal is removed.
+
+## Parameter estimation
+
+```bash
+scmle estimate data.csv --estimation declaration.json [--treatment COL] [--output-dir estimates]
+scmle run data.csv --target y --estimation declaration.json
+```
+
+The declaration is a JSON object with `estimand` and `policy`, in the
+layout a run stores (`schema_version` 2, the default) or the version-1
+layout; a run's own `parameter_estimation_declaration.json` is accepted as
+it is. `estimate` trains no model: it writes `parameter_estimation.json` to
+`--output-dir` (default `estimates`) and logs each parameter's estimate,
+interval and p-value. When the declaration cannot be estimated on the data
+(a missing or inconsistent column, missing values under the `reject` policy,
+a likelihood the estimator does not fit, or the estimator's own refusal) it
+writes `parameter_estimation_refusal.json` with the reason and exits 2 (gate
+`estimate.refusal`). `run --estimation` makes the same estimate beside model
+selection and keeps it in the run directory; model selection never reads it.
+
+## Fairness mitigation
+
+`plan` and `run` take `--mitigation {none,reweighing,group_thresholds}`,
+applied to the first `--sensitive` column. `reweighing` weights the
+development rows so that group and label are independent (binary,
+multiclass and regression; a regression outcome is balanced by its
+equal-count bins); `group_thresholds` sets a decision threshold per group
+(binary only). A `fairness` section in `--config` takes precedence.
+
+## Clustering
+
+```bash
+scmle cluster data.csv --output segments/ [--counts 2 3 4 5] \
+  [--methods kmeans gaussian_mixture agglomerative] [--rounds 10] [--seed 0] \
+  [--exclude customer_id] [--truth known_group]
+scmle predict segments/ new.csv --trusted
+```
+
+`cluster` uses the numeric columns, less `--exclude` (repeatable) and
+`--truth`, as features. It tries each method at each count in `--counts`
+(each at least 2; default 2 to 8), scores each candidate by silhouette,
+Davies-Bouldin and Calinski-Harabasz and by its stability over `--rounds`
+bootstrap refits, and writes a bundle of task `clustering` with
+`clustering.json` beside it into `--output`, which must be new or empty.
+`--truth` names a column of known groups to measure agreement against (it
+is never a feature). `scmle predict` and `Bundle.predict` return cluster
+labels. The bundle is signed when `SCMLE_SIGNING_KEY` is set and otherwise
+loads only with `--trusted`. Clustering is not qualified; see
+[`BREADTH.md`](BREADTH.md).
+
+## Forgetting, retiring and deleting
+
+```bash
+scmle forget dataset runs/ registry/ --data old.csv --reason "ticket 118"
+scmle forget dataset runs/ --digest <sha256> --reason "ticket 118"
+scmle forget subject runs/ --data customers.csv --column customer_id \
+  --values-file ids.txt [--earlier <digest>] [--retrain] --reason "request 2026-118"
+scmle forget verify receipts/forget-0123456789abcdef.json [--key-file key]
+scmle retire registry/ --model churn --version 3 --reason "drift"
+scmle retire model/ --reason "superseded"
+scmle delete runs/run_20261118_001 --reason "retention expired"
+```
+
+`forget dataset` searches the given folders for every run, model bundle,
+sealed trail and `scmle batch` prediction log derived from a dataset, named
+by its file (`--data`) or by any digest a run's `dataset_manifest.json`
+records (`--digest`, repeatable). It removes what was derived from the data,
+keeps each run's custody records (listing their digests) and retires the
+models. `forget subject` first purges a data subject's rows from the source
+file (CSV, TSV, Parquet or JSON Lines, rewritten atomically), matched by
+`--column` against `--value` (repeatable) or `--values-file` (one per line,
+kept off the shell); `--earlier` names digests of earlier versions of the
+source, and `--retrain` trains each affected run again on the purged
+source. Identifiers are written only as SHA-256 hashes. `retire` retires one
+bundle directory, or a registered version with `--model` and `--version`:
+the bundle is refused from then on (`RetiredError`, exit 2) and a registered
+version's release state becomes `retired`. `delete` deletes runs or project
+folders and keeps their custody records.
+
+Every action needs `--reason`. `--dry-run` prints the plan and changes
+nothing. Otherwise the plan is written under `--receipts` (default
+`receipts`), each finished step is journaled, and a signed receipt is
+written after the last step; running the same command again after an
+interruption resumes from the journal. The key is read from `--key-file` or
+`SCMLE_SIGNING_KEY`; without one nothing is changed. `forget verify` exits 1
+when a receipt's signature does not verify. See
+[`ARTIFACTS.md`](ARTIFACTS.md) for the files.

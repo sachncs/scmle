@@ -6,6 +6,8 @@ so rare that a slice of the training rows holds fewer examples of it than
 the three calibration folds ask for.
 """
 
+import pickle
+
 import numpy
 import pandas
 import pytest
@@ -67,6 +69,33 @@ def test_svm_calibration_adapts_folds_to_a_rare_class(rare):
     model.fit(frame, target)
     assert model.predict_proba(frame).shape == (len(frame), 3)
     assert model.folds_ == max(inner_cv.MIN_FOLDS, rare)
+
+
+@pytest.mark.parametrize("task", [tasks.Task.MULTICLASS, tasks.Task.REGRESSION])
+def test_hist_gradient_boosting_stops_early_like_a_practitioner(task):
+    # Without a stopping rule it runs a fixed 100 rounds: too many for a
+    # small table (log loss overfits), too few for a smooth one.
+    model = classical.HIST_GRADIENT_BOOSTING.build(task, 0)
+    assert model.get_params()["early_stopping"] is True
+    assert model.get_params()["max_iter"] == classical.ROUNDS
+    assert model.get_params()["n_iter_no_change"] == classical.PATIENCE
+
+
+def test_hist_gradient_boosting_adapter_pickles_for_the_trial_process():
+    # Trials run in a separate process, which receives the adapter pickled.
+    adapter = pickle.loads(pickle.dumps(classical.HIST_GRADIENT_BOOSTING))
+    assert adapter.fixed_params == classical.STOPPING
+
+
+@pytest.mark.parametrize("rare", [1, 2])
+def test_hist_gradient_boosting_fits_with_a_single_row_class(rare):
+    # A stratified stopping split needs two rows of every class.
+    frame, target = rare_frame(rare, rows=200)
+    model = classical.HIST_GRADIENT_BOOSTING.build(tasks.Task.MULTICLASS, 0)
+    model.fit(frame, target)
+    assert model.predict_proba(frame).shape == (len(frame), 3)
+    assert model.get_params()["early_stopping"] is True
+    assert model.stopped_ is (rare >= classical.STRATIFIED)
 
 
 def test_inner_splitter_calibration_adapts_folds():

@@ -193,39 +193,46 @@ wide data). The full tables, and where it is behind, are in
 
 | Package | Responsibility |
 | --- | --- |
-| `scmle.contracts` | Typed contracts: pydantic configuration, frozen dataclasses for data, metrics, artifacts, events, ABCs |
-| `scmle.data` | `readers` (CSV, Parquet, Arrow / Polars interchange), `profiling`, `validation` (column kinds, target and task), `curation` (fold-local preprocessing), `splitting` (leakage-safe and structure-aware strategies) |
-| `scmle.features` | Versioned, fitted feature graph (row-wise and series nodes) |
-| `scmle.sampling` | Resamplers, synthesis, and the data strategies evaluated inside folds |
-| `scmle.models` | `Model` hierarchy and registry, `sklearn` and `boosting` adapters, conformance, thresholds, stacking |
+| `scmle.contracts` | Typed contracts: pydantic configuration, frozen dataclasses for data, metrics, artifacts, events, ABCs, typed errors |
+| `scmle.certificates` | Certificate stores written by the qualification harness and read by the gates |
+| `scmle.durability`, `scmle.envelope` | Crash-safe file writes; authenticated envelopes for pickled payloads |
+| `scmle.runtime` | Randomness, retries, limits, budgets, logs, workers, the scheduler and its `Executor`s, the Ray backend |
 | `scmle.optimization` | Ask/tell optimizers (random, Optuna) |
-| `scmle.experimentation` | Trials, tuning, strategy and ensemble search, experiment stores (SQLite) |
-| `scmle.intelligence` | Dataset fingerprint, `Planner` and `Refiner`s, recommendations, meta-learning from run history |
-| `scmle.evaluation` | Metric catalog, selection policies, diagnostics, resource measurement |
-| `scmle.explainability` | Permutation importance, partial dependence, per-prediction occlusion |
-| `scmle.pipeline` | State machine, workflow compiler, `Stage` hierarchy, policy checkpoints, limits, execution backends, configuration files, orchestrator |
+| `scmle.unsupervised` | Clustering search, stability and validation, and the model behind `scmle cluster` |
+| `scmle.storage` | Object stores, store conformance, experiment stores (SQLite, MLflow) |
+| `scmle.data` | `readers` (CSV, TSV, JSON, Excel, Parquet, Feather, Arrow / Polars interchange), `profiling`, `validation`, `splitting`, `feature_graph` (versioned, fitted row-wise and series features), `catalog` |
+| `scmle.preparation` | Fold-local preprocessing, selection, resampling, synthesis and the data strategies evaluated inside folds |
+| `scmle.models` | `Model` hierarchy and registry, scikit-learn, boosting and deep-learning adapters, conformance, thresholds, stacking |
+| `scmle.evaluation` | Metric catalog, selection policies, diagnostics, conformal and bootstrap intervals, fairness, resource measurement |
+| `scmle.explainability`, `scmle.inference`, `scmle.assurance` | Explanations; column mapping, input validation and novelty; the ledger, charter, leakage detectors and custody |
+| `scmle.causal`, `scmle.decision` | Causal identification; thresholds, net benefit and rollout decisions |
 | `scmle.artifacts` | Signed model bundle, run store, report, replay verification |
-| `scmle.inference` | Column mapping, input validation, batch / HTTP serving |
-| `scmle.monitoring` | Reference profiles, drift, delayed-label performance, champion-challenger |
-| `scmle.governance` | Access ledger, content-addressed model registry, lifecycle manager, run audit |
-| `scmle.integrations` | Optional MLflow and Ray adapters |
-| `scmle.unsupervised` | Clustering model search and scoring |
-| `scmle.durability` | Atomic, crash-safe file writes used by the stores |
-| `scmle.api` | `Project`, `RunResult`, `load_model` / `predict` |
+| `scmle.monitoring`, `scmle.governance` | Drift, delayed-label performance, champion-challenger; audit ledger, model registry, lifecycle promotion |
+| `scmle.pipeline` | Run engine, stages, trials, tuning, strategy and ensemble search, dataset fingerprint, `Planner` and `Refiner`s, recommendations |
+| `scmle.deploy`, `scmle.security`, `scmle.trail` | Deployment contract and packaging; service authentication and audit; the question-to-outcome trail |
+| `scmle.api` | `Project`, `Curator`, `ModalityProject`, `load_model` / `predict`, `clustering.cluster` / `evaluate` |
+| `scmle.operations`, `scmle.runners`, `scmle.serving`, `scmle.workflow` | Operating a deployed model; portable training runners; the prediction servers; workflow definitions and a local executor |
+| `scmle.cli`, `scmle.rehearsal` | The `scmle` command (also `python -m scmle`); the demo and fault rehearsals |
 
-Extension points are polymorphic: add a `TableReader`, `Family`,
-`Partitioner`, `Strategy`, `Model`, `Optimizer`, `Refiner`,
-`Selector`, `Diagnostic`, `Reviewer`, `Executor`,
-`Store`, `Server` or `Stage` subclass; no core edits are
-needed ([`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)). Third-party adapters
-can also register via the `scmle.models` entry-point group and must pass
-`scmle.models.conformance.comply`.
+The rows run from the bottom layer to the top; each package imports only the
+layers below it (`pyproject.toml`, checked by `lint-imports`).
+
+Extension points are polymorphic: add a `Family`, `Partitioner`, `Strategy`,
+`Model`, `Optimizer`, `Refiner`, `Selector`, `Diagnostic`, `Reviewer`,
+`Executor`, `Store`, `Server` or `Stage` subclass
+([`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)). A `TableReader` subclass is
+the exception: `tabular.Loader` lists its readers in a fixed default tuple,
+and the CLI and `Project` build that default loader, so a new file format
+needs an edit to `scmle/data/readers/tabular.py` before they read it; only
+code that builds its own `Loader(readers=...)` can use it without one.
+Third-party adapters can also register via the `scmle.models` entry-point
+group and must pass `scmle.models.conformance.comply`.
 
 ## Conventions
 
 Google Python style (80 columns, Google docstrings, module imports), checked
 by `ruff` and `mypy`. No underscore-prefixed names anywhere, enforced by
-`tests/unit/test_conventions.py`.
+`tests/unit/test_conventions.py::test_no_private_names` and `tests/unit/test_conventions.py::test_no_private_file_names`.
 
 ```bash
 uv sync --extra boosting --extra optimization --extra multimodal

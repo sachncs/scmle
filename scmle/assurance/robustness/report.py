@@ -6,8 +6,10 @@ status. Specification-curve data (one effect and interval per specification)
 and the choice-to-result attribution are inside each finding.
 """
 
+from collections.abc import Mapping
 from typing import Any
 
+from scmle.assurance.robustness import periods
 from scmle.assurance.robustness import qualify
 from scmle.assurance.robustness import shift
 from scmle.assurance.robustness import stability
@@ -147,10 +149,7 @@ def shift_report(found: qualify.Robustness) -> dict[str, Any]:
         "mmd": result["mmd"],
         "features": result["features"],
         "coverage": [row.to_dict() for row in found.coverage],
-        "periods": {
-            "status": "not_run",
-            "reason": "per-period drift is not implemented",
-        },
+        "periods": found.drift.to_dict(),
         "forward": found.forward.to_dict(),
         "certificate": {"gates": gates, "note": found.store_note},
         "assumptions": [
@@ -226,3 +225,24 @@ def validate_shift(document: dict[str, Any]) -> None:
         raise errors.InputError("shift report has an unknown status")
     if status == shift.Status.PASS.value and document["c2st"] is None:
         raise errors.InputError("a pass needs a deployment sample and a test")
+    periodic(document["periods"])
+
+
+def periodic(record: Mapping[str, Any]) -> None:
+    """Checks the per-period drift record of a shift report.
+
+    Reports written before per-period drift was implemented say `not_run`,
+    which still passes.
+
+    Args:
+        record: The `periods` entry of the shift report.
+
+    Raises:
+        ValueError: On a missing `status` or `reason`, or an unknown status.
+    """
+    missing = [k for k in ("status", "reason") if k not in record]
+    if missing:
+        raise errors.InputError(f"shift report periods are missing {missing}")
+    known = {s.value for s in shift.Status} | {periods.LEGACY}
+    if record["status"] not in known:
+        raise errors.InputError("shift report has an unknown per-period status")

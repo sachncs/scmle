@@ -16,7 +16,10 @@ def store(tmp_path):
 
 
 def test_metadata_carries_a_hash_of_the_bytes_read(store):
-    """Enforces docs/GOVERNED_DATA.md:10."""
+    """Enforces docs/GOVERNED_DATA.md:10.
+
+    Also enforces website/src/pages/docs/governed-data.astro:21.
+    """
     data = b"id,amount\n1,2.0\n"
     assert store.put("a.csv", data).sha256 == hashlib.sha256(data).hexdigest()
     assert store.head("a.csv").sha256 == hashlib.sha256(data).hexdigest()
@@ -47,7 +50,10 @@ def failing(rule, frame):
 
 @pytest.mark.parametrize("rule", ["schema", "freshness", "rows", "nulls"])
 def test_a_dataset_rule_holds_the_snapshot_until_released(store, rule):
-    """Enforces docs/GOVERNED_DATA.md:53 (dataset-level rules)."""
+    """Enforces docs/GOVERNED_DATA.md:53 (dataset-level rules).
+
+    Also enforces website/src/pages/docs/governed-data.astro:10.
+    """
     hours = 9.0 if rule == "freshness" else 0.0
     frame, record = test_governed_data.prepared(store, hours=hours)
     check, bad = failing(rule, frame)
@@ -69,7 +75,10 @@ def test_a_dataset_rule_holds_the_snapshot_until_released(store, rule):
 
 
 def test_quarantined_rows_and_the_report_are_written_apart(store):
-    """Enforces docs/GOVERNED_DATA.md:53 (row-level rules)."""
+    """Enforces docs/GOVERNED_DATA.md:53 (row-level rules).
+
+    Also enforces website/src/pages/docs/governed-data.astro:10.
+    """
     frame, record = test_governed_data.prepared(
         store, test_governed_data.CSV + "4,-5.0,north\n"
     )
@@ -86,7 +95,10 @@ def test_quarantined_rows_and_the_report_are_written_apart(store):
 
 
 def test_after_a_crash_the_transform_runs_again_on_that_object(store):
-    """Enforces docs/GOVERNED_DATA.md:74."""
+    """Enforces docs/GOVERNED_DATA.md:74.
+
+    Also enforces website/src/pages/docs/governed-data.astro:37.
+    """
     test_governed_data.seed(store)
     seen = []
 

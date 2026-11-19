@@ -30,6 +30,7 @@ from scmle.assurance.detectors import certificates
 from scmle.assurance.robustness import coverage
 from scmle.assurance.robustness import forward
 from scmle.assurance.robustness import multiverse
+from scmle.assurance.robustness import periods
 from scmle.assurance.robustness import shift
 from scmle.assurance.robustness import stability
 
@@ -67,6 +68,7 @@ class Robustness:
         store_note: Why no certificate store was used, or an empty string.
         rule: The survival rule the verdicts used.
         rule_note: Why the rule is descriptive, or an empty string.
+        drift: Each time period of `X` against the first.
     """
 
     grid: multiverse.Grid | None
@@ -83,6 +85,7 @@ class Robustness:
     store_note: str
     rule: stability.Thresholds = stability.DEFAULT_RULE
     rule_note: str = ""
+    drift: periods.Periods = periods.UNTIMED
 
     @property
     def fragile(self) -> tuple[str, ...]:

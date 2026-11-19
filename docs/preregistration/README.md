@@ -22,11 +22,11 @@ Registered on 2026-11-17, against `acceptance.toml` as of commit 53790feb.
 | C3 Statistics correct and uncertainty honest | [c3.md](c3.md) | validation | `benchmarks/evidence/coverage.py` | coverage part only |
 | C4 At least a competent practitioner's quality | [c4.md](c4.md) | acceptance | `benchmarks/evidence/quality.py` | tabular, development tasks |
 | C5 Data read and joined correctly | [c5.md](c5.md) | validation | `benchmarks/evidence/reading.py` | simulated worlds and builder's corpus |
-| C6 Reproducible and traceable | [c6.md](c6.md) | validation | `benchmarks/evidence/reproducibility.py` | one platform |
+| C6 Reproducible and traceable | [c6.md](c6.md) | validation | `benchmarks/evidence/reproducibility.py`, `benchmarks/evidence/platforms.py` | one platform |
 | C7 Operates without loss or stall | [c7.md](c7.md) | validation | `benchmarks/evidence/budget.py` | budget and kill-resume only |
-| C8 Controls cannot be bypassed | [c8.md](c8.md) | stage D exercise | none | not measured |
+| C8 Controls cannot be bypassed | [c8.md](c8.md) | stage D exercise | `benchmarks/evidence/bypass.py` | automated search only, not the exercise |
 | C9 Secure, private, trustworthy supply chain | [c9.md](c9.md) | validation | none | not measured |
-| C10 Can keep changing safely | [c10.md](c10.md) | validation | `scripts/structure.py` | size budgets only |
+| C10 Can keep changing safely | [c10.md](c10.md) | validation | `scripts/structure.py`, `benchmarks/evidence/mutation.py` | size budgets and a mutation sample |
 | C11 A non-specialist uses it correctly | [c11.md](c11.md) | stage D sessions | none | not measured |
 | C12 Docs tell the truth | [c12.md](c12.md) | validation | `benchmarks/evidence/guarantees.py` | linkage only |
 | C13 Every stage on steroids | [c13.md](c13.md) | validation; study in stage D | none | not measured |

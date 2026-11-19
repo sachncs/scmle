@@ -7,8 +7,18 @@ of the local-quadratic intercepts at the same bandwidth and the
 heteroskedasticity-robust variance of that fit. This is the Calonico,
 Cattaneo and Titiunik (2014) construction with the bias bandwidth equal to
 the estimation bandwidth (their `rho = 1`), where the bias-corrected
-estimator is exactly the local quadratic intercept; the reference package
+estimator is exactly the local quadratic intercept, and the HC3
+(leverage-corrected) variance; the reference package
 `rdrobust` was not available here, so agreement with it is not claimed.
+The jump is referred to Student's t with Welch-Satterthwaite degrees of
+freedom: each side's intercept is a weighted sum of its outcomes, whose
+variance estimate has about `(sum a^2)^2 / sum a^4` degrees of freedom
+for intercept weights `a`, and the two sides combine as in Welch's test.
+The kernel concentrates the intercept on a few points near the cutoff
+(about 120 of 400 in the falsification worlds), and the normal reference
+used before rejected the falsification battery at 0.0119 against its
+level 0.01 (30000 development worlds of `gate_battery_rd`, exact lower
+bound 0.0109); with t it rejects at 0.0097 (upper bound 0.0107).
 
 Bandwidth. Chosen by one-sided leave-out cross-validation (in the manner of
 Imbens and Lemieux 2008, from memory): each of up to 40 evaluation points
@@ -31,6 +41,7 @@ beyond the diagnostics above.
 """
 
 import dataclasses
+import math
 from typing import Any
 from typing import ClassVar
 
@@ -56,13 +67,16 @@ class Fit:
 
     Attributes:
         intercept: The fitted value at the evaluation point.
-        variance: Heteroskedasticity-robust variance of the intercept.
+        variance: Leverage-corrected (HC3) robust variance of the intercept.
         n: Number of points with positive weight.
+        dof: Satterthwaite degrees of freedom of the variance,
+            `(sum a^2)^2 / sum a^4` for the intercept weights `a`.
     """
 
     intercept: float
     variance: float
     n: int
+    dof: float
 
 
 def polyfit(
@@ -77,9 +91,16 @@ def polyfit(
         order: Polynomial order (1 for linear, 2 for quadratic).
 
     Returns:
-        The intercept, its robust variance and the number of points used,
-        or None when fewer than ``order + 3`` points have positive weight
-        or the weighted Gram matrix is singular.
+        The intercept, its HC3 variance, the number of points used and the
+        Satterthwaite degrees of freedom of the variance, or
+        None when fewer than ``order + 3`` points have positive weight, the
+        weighted Gram matrix is singular or a point has leverage 1. HC3
+        divides each residual by one minus its weighted leverage: at a
+        boundary the kernel puts the most weight on the points with the
+        most leverage, and the HC1 sandwich used before (residuals scaled by
+        ``n / (n - k)``) understated the variance there, so the placebo and
+        balance tests rejected about 1.2 times their level (10000
+        development worlds of `gate_battery_rd`); with HC3 they reject at it.
     """
     weight = numpy.clip(1.0 - numpy.abs(x) / h, 0.0, None)
     keep = weight > 0
@@ -95,10 +116,14 @@ def polyfit(
         return None
     coef = bread @ (design.T @ (ws * ys))
     resid = ys - design @ coef
-    meat = (design * (ws * resid)[:, None]).T @ (design * (ws * resid)[:, None])
-    n, k = len(xs), order + 1
-    variance = float((bread @ meat @ bread)[0, 0]) * n / max(n - k, 1)
-    return Fit(float(coef[0]), variance, n)
+    leverage = ws * numpy.einsum("ij,jk,ik->i", design, bread, design)
+    if not (leverage < 1).all():
+        return None
+    score = design * (ws * resid / (1.0 - leverage))[:, None]
+    variance = float((bread @ score.T @ score @ bread)[0, 0])
+    share = (bread @ (design * ws[:, None]).T)[0] ** 2
+    dof = float(share.sum() ** 2 / (share**2).sum())
+    return Fit(float(coef[0]), variance, len(xs), dof)
 
 
 def crossvalidate(x: numpy.ndarray, y: numpy.ndarray) -> float:
@@ -219,8 +244,9 @@ def discontinuity(
         None when a side has too few points for a fit or a singular one.
         Otherwise a mapping
         with the conventional `estimate`, the `bias_corrected` jump, its
-        robust `se`, the interval limits `low` and `high` around the
-        bias-corrected jump, and the two-sided normal p-value `p` of the
+        robust `se`, its Welch-Satterthwaite degrees of freedom `dof`, the
+        Student-t interval limits `low` and `high` around the
+        bias-corrected jump, and the two-sided Student-t p-value `p` of the
         bias-corrected jump (1 when `se` is not positive).
     """
     left = x < cutoff
@@ -233,17 +259,19 @@ def discontinuity(
         pieces[name] = (linear, quadratic)
     conventional = pieces["right"][0].intercept - pieces["left"][0].intercept
     corrected = pieces["right"][1].intercept - pieces["left"][1].intercept
-    se = float(
-        numpy.sqrt(pieces["right"][1].variance + pieces["left"][1].variance)
-    )
-    z = float(stats.norm.ppf(0.5 + level / 2))
+    sides = (pieces["left"][1], pieces["right"][1])
+    se = float(numpy.sqrt(sum(f.variance for f in sides)))
+    spread = sum(f.variance**2 / f.dof for f in sides)
+    dof = float(se**4 / spread) if spread > 0 else math.inf
+    quantile = float(stats.t.ppf(0.5 + level / 2, dof))
     return {
         "estimate": float(conventional),
         "bias_corrected": float(corrected),
         "se": se,
-        "low": float(corrected - z * se),
-        "high": float(corrected + z * se),
-        "p": float(2 * stats.norm.sf(abs(corrected) / se)) if se > 0 else 1.0,
+        "dof": dof,
+        "low": float(corrected - quantile * se),
+        "high": float(corrected + quantile * se),
+        "p": float(2 * stats.t.sf(abs(corrected) / se, dof)) if se > 0 else 1.0,
     }
 
 

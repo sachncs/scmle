@@ -26,6 +26,7 @@ def adapter(count=6):
 
 
 def test_emplace_publishes_once_and_leaves_no_temporary_file(tmp_path):
+    # Enforces website/src/pages/docs/extensions.astro:94.
     path = tmp_path / "deep" / "artifact.json"
     curator.emplace(path, b"first")
     assert path.read_bytes() == b"first"
@@ -42,6 +43,7 @@ def passport(modality="document", content="h", samples=3):
 
 
 def test_conform_checks_modality_hash_and_count():
+    # Enforces website/src/pages/docs/data.astro:129.
     curator.conform(passport(), "document", "h", 3)
     with pytest.raises(errors.InputError, match="manifest modality"):
         curator.conform(passport(modality="image"), "document", "h", 3)
@@ -64,6 +66,7 @@ def test_the_curator_checks_its_inputs(tmp_path):
 
 
 def test_a_run_writes_signed_curation_evidence(tmp_path):
+    # Enforces website/src/pages/docs/extensions.astro:94.
     source = adapter()
     result = curator.Curator(source, KEY, output_dir=tmp_path).run()
     path = tmp_path / "modality_curation.json"
@@ -106,6 +109,7 @@ def test_examine_refuses_a_report_that_is_not_a_curation():
 
 
 def test_examine_refuses_another_hash_or_count():
+    # Enforces website/src/pages/docs/extensions.astro:106.
     made = curator.Curator(adapter(), KEY)
     with pytest.raises(errors.InputError, match="curation dataset_hash"):
         made.examine("document", "0" * 64, 6)

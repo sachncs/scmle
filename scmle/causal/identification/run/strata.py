@@ -120,6 +120,7 @@ def examine(
                     "subgroup",
                     est.estimate,
                     est.se,
+                    est.df,
                 )
                 p_value = test.p_value
                 row.update(
@@ -146,7 +147,9 @@ def stratify(
     The family is every declared (column, value) pair, fixed by the charter
     and registered with the primary claim before `C` is opened. Each
     hypothesis `theta_g = 0` is tested by a Wald statistic of the strategy's
-    own estimator on the rows of `C` in the subgroup, and the p-values are
+    own estimator on the rows of `C` in the subgroup, referred to the same
+    distribution as that estimator's interval (Welch's t for a difference
+    in means, normal otherwise), and the p-values are
     adjusted by Holm's step-down at the primary level `1 - level`, which
     controls the familywise error rate under any dependence. A subgroup that
     cannot be estimated (column absent, fewer than `MIN_STRATUM_ROWS` rows, no

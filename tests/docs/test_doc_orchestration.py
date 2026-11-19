@@ -16,7 +16,10 @@ def store(tmp_path):
 
 
 def test_a_transient_failure_is_retried_and_dependents_are_skipped(store):
-    """Enforces docs/ORCHESTRATION.md:31 (retries, skips, independents)."""
+    """Enforces docs/ORCHESTRATION.md:31 (retries, skips, independents).
+
+    Also enforces website/src/pages/docs/orchestration.astro:9.
+    """
     clock = test_workflow.Clock()
     recorder = test_workflow.Recorder(clock)
     executor = test_workflow.executor_for(
@@ -36,7 +39,10 @@ def test_a_transient_failure_is_retried_and_dependents_are_skipped(store):
 
 
 def test_start_never_retries_a_failed_run_and_resume_runs_the_rest(store):
-    """Enforces docs/ORCHESTRATION.md:31 (start versus resume)."""
+    """Enforces docs/ORCHESTRATION.md:31 (start versus resume).
+
+    Also enforces website/src/pages/docs/orchestration.astro:9.
+    """
     clock = test_workflow.Clock()
     recorder = test_workflow.Recorder(clock)
     executor = test_workflow.executor_for(
@@ -62,7 +68,10 @@ def test_start_never_retries_a_failed_run_and_resume_runs_the_rest(store):
 
 
 def test_a_deferred_slot_stays_due_and_runs_on_a_later_tick(store):
-    """Enforces docs/ORCHESTRATION.md:43."""
+    """Enforces docs/ORCHESTRATION.md:43.
+
+    Also enforces website/src/pages/docs/orchestration.astro:31.
+    """
     schedule = definition.Schedule(3600.0, 0.0, definition.CatchUp.LATEST_ONLY)
     base = test_workflow.pipeline()
     flow = definition.Workflow(base.name, base.version, base.steps, schedule)

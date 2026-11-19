@@ -103,16 +103,7 @@ def library(monkeypatch):
 
 
 def make(library, uri=None, experiment="scmle"):
-    original = Client.create_experiment
-
-    def create(self, name, locate=None):
-        return original(self, name, artifact_location=locate)
-
-    Client.create_experiment = create
-    try:
-        return mlflow_store.MlflowExperimentStore(uri, experiment)
-    finally:
-        Client.create_experiment = original
+    return mlflow_store.MlflowExperimentStore(uri, experiment)
 
 
 def trial(identifier="t1", status="ok", score=0.5, **kwargs):

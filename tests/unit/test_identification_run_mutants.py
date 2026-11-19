@@ -985,9 +985,14 @@ def test_the_randomized_adapter_is_the_difference_in_means():
     tests = adapter.controls(c, 0.9)
     assert tests == [
         battery.wald(
-            "negative_outcome:nco", "negative_outcome", other.estimate, other.se
+            "negative_outcome:nco",
+            "negative_outcome",
+            other.estimate,
+            other.se,
+            other.df,
         )
     ]
+    assert out.df == direct.df
     assert adapter.sensitivity(c, 0.9) == {
         "holds": True,
         "note": "randomized assignment: no unmeasured confounding to bound",

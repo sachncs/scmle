@@ -31,7 +31,7 @@ const surfaces = [
   <p>A test pins these names against a committed snapshot. Removing or changing one requires a changelog entry, a migration note, and a deliberate versioning decision. Modules below <code>scmle.pipeline</code>, <code>scmle.data</code>, <code>scmle.models</code> and the other package namespaces are extension surfaces for advanced users, but their concrete internals are not stable until they are promoted to the top level or documented as a contract. The <a href={`${base}/docs/api/`}>Python API</a> page shows the supported objects in use.</p>
 
   <h2>Extension surfaces</h2>
-  <p>These modules are pinned the same way, in a separate block of the snapshot that records the signature of each name. A change is reported as <em>extension added</em>, <em>extension removed</em> or <em>extension contract changed</em>. None of them is part of the top-level export list, so none can change the pinned exports.</p>
+  <p>These modules are pinned the same way, in a separate block of the snapshot that records the signature of each name. A change is reported as <code>surface added</code>, <code>surface removed</code> or <code>surface contract changed</code>. None of them is part of the top-level export list, so none can change the pinned exports.</p>
   <DocTable label="Extension surfaces" head={["Area", "Modules and names"]} rows={surfaces} />
   <p>Pinned signatures avoid function-valued defaults (a <code>None</code> default is resolved in the body), because a function's representation carries an address and would make the snapshot differ between runs. The deployment spec format is versioned and <code>from_dict</code> refuses any other format.</p>
   <p><strong>The rule for qualification names:</strong> new names are added without touching any entry of the pinned snapshot, and a name is promoted to the top level only deliberately, with a changelog entry and a regenerated snapshot. A test enforces both halves.</p>
@@ -61,7 +61,7 @@ const surfaces = [
   <h2>The leakage screen</h2>
   <p>The profiler's fixed leakage cutoffs are gone. <code>leakage_policy</code> keeps its values and its meaning at the top level, and the pinned <code>Project</code> signature is unchanged. What blocks is now a typed result, <code>Portrait.blockers</code>, from a permutation screen. Behaviour you may notice:</p>
   <ul>
-    <li>Blocking needs a passing certificate for the mechanism, which exists for binary classification only. Regression and multiclass targets get warnings with p-values.</li>
+    <li>In a run every suspect may block, for binary, multiclass and regression targets alike, whatever the state of the certificates, which are evidence and decide nothing. (An earlier version blocked only on a mechanism with a passing certificate, which was binary classification alone.)</li>
     <li>The screen also reports a value recorded only for some outcomes when most rows are blank.</li>
     <li><code>Portrait</code> gained the optional field <code>leakage</code> (default empty). <code>target_association</code> is still computed as a descriptive statistic with no cutoff, and <code>risk.leakage_hypotheses</code> now counts screen suspects, so stored fingerprints of data that crossed a retired cutoff can differ in that one count.</li>
     <li>In a charter run the leakage test is the same screen, so a charter run and a run without one flag the same columns.</li>

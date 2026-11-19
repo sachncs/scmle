@@ -20,8 +20,8 @@ A slice is **qualified** only when all three hold:
 
 **Partial** means some code exists and is tested but not all of that. **Not
 supported** means nothing in the repository does the job. An unsupported
-algorithm is never added to the production registry; the guard tests in
-`tests/unit/test_breadth.py` fail if one is.
+algorithm is never added to the production registry; the guard test
+`tests/unit/test_breadth.py::test_unsupported_algorithms_are_not_in_the_model_registry` fails if one is.
 
 ## Status
 
@@ -31,7 +31,7 @@ in them is unset until the owner fixes it.
 
 | Slice | Built | Qualified | What exists | What is missing |
 | --- | --- | --- | --- | --- |
-| `clustering` | `library_only` | no | `scmle.unsupervised.clustering.discover`: k-means, Gaussian mixture and agglomerative at several counts, scored by silhouette, Davies-Bouldin and Calinski-Harabasz, with bootstrap stability (mean adjusted Rand index) and `compare`; unit tests on planted blobs and uniform noise | Nothing runs it: not in `Project`, the CLI, the charter run, a bundle, serving or monitoring. No packaging, no deployment, no drift, explanation or monitoring benchmark, no declared use |
+| `clustering` | `tabular_beta_path` | no | `scmle.unsupervised.clustering.discover`: k-means, Gaussian mixture and agglomerative at several counts, scored by silhouette, Davies-Bouldin and Calinski-Harabasz, with bootstrap stability (mean adjusted Rand index) and `compare`. A user path: `scmle cluster` and `scmle.api.clustering.cluster` save a bundle of task `clustering` (signed when a key is set) with a `clustering.json` report, `scmle predict` and `Bundle.predict` assign new rows, and `clustering.evaluate` scores a saved bundle on other rows (internal indices, and agreement with known groups when named); unit tests on planted blobs and uniform noise, and an integration test from the API and the CLI to a bundle that predicts | Not in `Project`, the charter run or monitoring, and not a task type of the run. No served deployment proved, no drift, explanation or monitoring benchmark, no robustness benchmark run, no declared use |
 | `association` | `none` | no | Nothing | Everything |
 | `dimensionality_reduction` | `none` | no | Nothing as an estimator or task. The `select_features` search strategy picks columns for a supervised model; it is not an unsupervised representation | Everything |
 | `forecasting` | `tabular_beta_path` | no | `Task.FORECAST`, forecasting estimators, the feature graph's lag and rolling operations, a rolling validation strategy; the tabular-beta capability registry lists baseline, linear, tree and boosting paths as supported with library inference only and no portable explanation or uncertainty contract; `benchmarks/real_tasks.py` compares one real series with last-value and seasonal-naive | Robustness, drift, explanation and monitoring benchmarks; a declared horizon and decision; deployment of a forecaster; an independent replication |

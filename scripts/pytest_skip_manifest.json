@@ -47,6 +47,10 @@
     },
     {
       "category": "environment",
+      "pattern": "^SIGHUP is POSIX only$"
+    },
+    {
+      "category": "environment",
       "pattern": "^POSIX load average and slot directories$"
     },
     {

@@ -114,7 +114,10 @@ def test_signed_review_writes_atomically_and_cli_verifies_exact_commit(
 
 
 def test_review_fails_closed_for_blocked_or_failed_claims():
-    """A signature cannot turn a blocked or failed review into approval."""
+    """A signature cannot turn a blocked or failed review into approval.
+
+    Also enforces website/src/pages/docs/evidence.astro:86.
+    """
     blocked_record = {**make_review().to_dict(), "decision": "blocked"}
     blocked = review.Signoff.from_dict(blocked_record).sign("release-key")
     assert not blocked.accepted("abc1234", (review.Kind.METRIC,), "release-key")
@@ -159,7 +162,10 @@ def test_cli_requires_reliability_and_security_claims_by_default(
 
 
 def test_review_rejects_conflicted_identity_and_incomplete_evidence():
-    """Reviewer independence, timestamps, and required evidence are strict."""
+    """Reviewer independence, timestamps, and required evidence are strict.
+
+    Also enforces website/src/pages/docs/evidence.astro:86.
+    """
     with pytest.raises(ValueError, match="independent"):
         review.Signoff.from_dict(
             {

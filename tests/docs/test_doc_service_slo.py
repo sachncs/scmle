@@ -73,7 +73,10 @@ def settle(adapter, seconds=10.0):
 def test_three_timeouts_in_a_row_wedge_livez_and_leave_history_alone(
     golden, bundle, monkeypatch
 ):
-    """Enforces docs/SERVICE_SLO.md:71."""
+    """Enforces docs/SERVICE_SLO.md:71.
+
+    Also enforces website/src/pages/docs/service.astro:26.
+    """
     adapter = server.HttpServing(bundle, scoring_timeout_seconds=0.1)
     adapter.start()
     remembered = []
@@ -112,7 +115,11 @@ def test_three_timeouts_in_a_row_wedge_livez_and_leave_history_alone(
 
 
 def test_production_refuses_the_published_demo_key_unless_allowed(tmp_path):
-    """Enforces docs/SERVICE_SLO.md:128."""
+    """Enforces docs/SERVICE_SLO.md:128.
+
+    Also enforces website/src/pages/docs/service.astro:84.
+    Also enforces website/src/pages/docs/security.astro:35.
+    """
     demo = next(iter(verify.PUBLISHED_KEYS))
     production = {"SCMLE_ENV": "production", "SCMLE_SIGNING_KEY": demo}
     with pytest.raises(errors.ArtifactError, match="published demo fixture"):

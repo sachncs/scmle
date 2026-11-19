@@ -48,7 +48,11 @@ def test_local_file_connector_returns_schema_rows_and_resume_checkpoint(
 
 
 def test_local_file_checkpoint_rejects_changed_raw_snapshot(tmp_path, frame):
-    """A local resume cannot silently mix two file snapshots."""
+    """A local resume cannot silently mix two file snapshots.
+
+    Also enforces website/src/pages/docs/data.astro:12.
+    Also enforces website/src/pages/docs/recovery.astro:29.
+    """
     path = tmp_path / "source.csv"
     frame.to_csv(path, index=False)
     connector = connectors.Filesystem(path)
@@ -108,7 +112,10 @@ def test_object_store_connector_reads_bounded_tabular_objects_and_resumes(
 
 
 def test_object_store_checkpoint_rejects_changed_raw_snapshot(frame):
-    """A resumed object read cannot silently mix two raw snapshots."""
+    """A resumed object read cannot silently mix two raw snapshots.
+
+    Also enforces website/src/pages/docs/data.astro:115.
+    """
     payloads = [
         frame.to_csv(index=False).encode("utf-8"),
         frame.assign(label=["changed"] * len(frame))
@@ -134,7 +141,10 @@ def test_object_store_checkpoint_rejects_changed_raw_snapshot(frame):
 
 
 def test_object_store_connector_accepts_a_caller_owned_versioned_decoder():
-    """A custom decoder admits formats outside the built-in tabular set."""
+    """A custom decoder admits formats outside the built-in tabular set.
+
+    Also enforces website/src/pages/docs/data.astro:19.
+    """
     calls = []
 
     def decode(uri: str, payload: bytes) -> pandas.DataFrame:
@@ -159,7 +169,10 @@ def test_object_store_connector_accepts_a_caller_owned_versioned_decoder():
 
 
 def test_object_store_connector_requires_decoder_identity_for_custom_formats():
-    """Custom decoding must be bound to a reproducible source identity."""
+    """Custom decoding must be bound to a reproducible source identity.
+
+    Also enforces website/src/pages/docs/data.astro:19.
+    """
     with pytest.raises(ValueError, match="decoder_name"):
         connectors.Bucket(
             "s3://bucket/sample.custom",
@@ -199,7 +212,10 @@ def test_object_store_connector_reports_decoder_contract_failures():
 
 
 def test_object_store_connector_rejects_large_payloads_and_bad_formats():
-    """Bounded object support fails closed instead of hiding memory risk."""
+    """Bounded object support fails closed instead of hiding memory risk.
+
+    Also enforces website/src/pages/docs/data.astro:115.
+    """
     with pytest.raises(connectors.ConnectorError, match="max_bytes"):
         connectors.Bucket(
             "gs://bucket/source.csv", lambda uri: b"id\n1\n", max_bytes=1
@@ -280,7 +296,10 @@ def test_streaming_object_connector_rejects_oversized_records():
 
 
 def test_checkpoint_cannot_cross_source_boundaries(tmp_path):
-    """A checkpoint from one source cannot silently read another source."""
+    """A checkpoint from one source cannot silently read another source.
+
+    Also enforces website/src/pages/docs/data.astro:75.
+    """
     first_path = tmp_path / "first.csv"
     second_path = tmp_path / "second.csv"
     first_path.write_text("id\n1\n")
@@ -369,7 +388,10 @@ def test_warehouse_connector_reads_bounded_batches_through_injected_engine(
 
 
 def test_warehouse_connector_retries_and_rejects_invalid_callback_rows(frame):
-    """Engine failures retry, while unsafe callback results fail closed."""
+    """Engine failures retry, while unsafe callback results fail closed.
+
+    Also enforces website/src/pages/docs/api.astro:98.
+    """
     attempts = []
 
     def read_schema(query):

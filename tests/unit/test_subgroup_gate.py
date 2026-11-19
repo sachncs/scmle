@@ -26,6 +26,7 @@ def certificate(path, **entry):
 
 
 def test_without_a_certificate_the_family_is_descriptive(tmp_path):
+    # Enforces website/src/pages/docs/qualification.astro:123.
     gate = certified.subgroup_gate(run.stratify, tmp_path / "none.json")
     assert gate.status == certified.DESCRIPTIVE
     assert "no subgroup certificate" in gate.reason
@@ -40,6 +41,7 @@ def test_a_passing_current_certificate_makes_the_family_gating(tmp_path):
 
 
 def test_a_failed_or_stale_certificate_is_descriptive(tmp_path):
+    # Enforces website/src/pages/docs/causal-decision.astro:41.
     missed = certificate(tmp_path / "m.json", passed=False)
     stale = certificate(tmp_path / "s.json", method_hash="0" * 64)
     assert (
@@ -80,6 +82,8 @@ def test_naming_the_gate_among_the_certified_ones_makes_it_gating():
 
 
 def test_the_gate_never_changes_the_tier():
+    # Enforces website/src/pages/docs/causal-decision.astro:65.
+    # Enforces website/src/pages/docs/qualification.astro:123.
     spec = subgroup_spec(EFFECTS)
     x, c = world(1500, 1, EFFECTS), world(1500, 2, EFFECTS)
     plain = go(spec, x, c)

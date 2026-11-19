@@ -56,6 +56,8 @@ def test_the_doubly_robust_value_is_exact_with_a_perfect_outcome_model():
 
 
 def test_a_support_violation_is_refused_with_the_reason():
+    # Enforces website/src/pages/docs/causal-decision.astro:23.
+    # Enforces website/src/pages/docs/causal-decision.astro:40.
     log, ignored = build(3000, 2)
     behaviour = log.behaviour.copy()
     behaviour[:, 1] = 0.0
@@ -73,6 +75,7 @@ def test_a_support_violation_is_refused_with_the_reason():
 
 
 def test_a_low_effective_sample_size_is_refused_and_clipping_is_labelled():
+    # Enforces website/src/pages/docs/causal-decision.astro:23.
     log, ignored = build(4000, 3, eps=1.9, shift=-0.45)
     strict = ope.evaluate(log, "ipw", ess_floor=0.95)
     assert strict.status == ope.REFUSED
@@ -83,6 +86,7 @@ def test_a_low_effective_sample_size_is_refused_and_clipping_is_labelled():
 
 
 def test_observational_logs_are_not_confirmed():
+    # Enforces website/src/pages/docs/causal-decision.astro:23.
     log, ignored = build(2000, 4)
     observational = ope.Bandits(
         log.actions,

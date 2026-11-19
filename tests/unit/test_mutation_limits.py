@@ -179,11 +179,15 @@ def test_a_process_with_a_non_ascii_name_is_still_counted(
     entry.mkdir(parents=True)
     (entry / "stat").write_bytes("4242 (café) S 1 4242".encode())
     (entry / "statm").write_text("10 3 0 0 0 0 0", encoding="ascii")
+    # Patch the module's view of pathlib, not pathlib.Path itself: before
+    # Python 3.12, Path() checks `cls is Path` and fails once it is replaced.
     real = pathlib.Path
     monkeypatch.setattr(
-        limits.pathlib,
-        "Path",
-        lambda path: real(proc) if path == "/proc" else real(path),
+        limits,
+        "pathlib",
+        types.SimpleNamespace(
+            Path=lambda path: real(proc) if path == "/proc" else real(path)
+        ),
     )
     table = limits.tabulate()
     assert table[4242] == (1, 3 * limits.resource.getpagesize())

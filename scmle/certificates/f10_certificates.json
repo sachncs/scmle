@@ -3,75 +3,75 @@
   "gates": {
     "battery_nco": {
       "alpha_falsify": 0.01,
-      "code_hash": "3b12f78c54814091c39ed1f9f14e00ce5a0085ab4a5557a7ee0da0d02b402abc",
+      "code_hash": "13dba60e9b89780f3c9e869825d7b04d38fc00a973fd89d6119e5469669eb5ed",
       "curve": {
         "0.0": {
+          "exact": [
+            0.006636879397604511,
+            0.014498062606976633
+          ],
           "hits": 20,
           "n": 2000,
-          "rate": 0.01,
-          "wilson": [
-            0.006482767876552687,
-            0.015395938459075187
-          ]
+          "rate": 0.01
         },
         "0.1": {
+          "exact": [
+            0.0016373209819238422,
+            0.015433734876752685
+          ],
           "hits": 3,
           "n": 500,
-          "rate": 0.006,
-          "wilson": [
-            0.0020425962719602363,
-            0.01749025210405338
-          ]
+          "rate": 0.006
         },
         "0.2": {
+          "exact": [
+            0.018581564717314803,
+            0.04581964275099681
+          ],
           "hits": 15,
           "n": 500,
-          "rate": 0.03,
-          "wilson": [
-            0.018263213197913384,
-            0.04890366683594573
-          ]
+          "rate": 0.03
         },
         "0.3": {
+          "exact": [
+            0.1841461750073113,
+            0.24639437426767533
+          ],
           "hits": 107,
           "n": 500,
-          "rate": 0.214,
-          "wilson": [
-            0.18030299998759533,
-            0.2520581227564126
-          ]
+          "rate": 0.214
         },
         "0.5": {
+          "exact": [
+            0.926298380683696,
+            0.9616140451278121
+          ],
           "hits": 473,
           "n": 500,
-          "rate": 0.946,
-          "wilson": [
-            0.9225734384893529,
-            0.9626256498189425
-          ]
+          "rate": 0.946
         },
         "0.8": {
+          "exact": [
+            0.9940264484836504,
+            1.0
+          ],
           "hits": 500,
           "n": 500,
-          "rate": 1.0,
-          "wilson": [
-            0.9923756595384479,
-            1.0
-          ]
+          "rate": 1.0
         }
       },
       "delta_min": 0.5,
       "false_alarm": {
+        "exact": [
+          0.006636879397604511,
+          0.014498062606976633
+        ],
         "hits": 20,
         "n": 2000,
-        "rate": 0.01,
-        "wilson": [
-          0.006482767876552687,
-          0.015395938459075187
-        ]
+        "rate": 0.01
       },
-      "false_alarm_bound": 0.014449719092257398,
-      "method_hash": "cce9cca61fc7886301fa599e9b8bb443a6757ed501c0a116d66a98e7d3dc714c",
+      "false_alarm_ceiling": 0.0169,
+      "method_hash": "f1a5ca03d6af9190c738c0b603b64bd5e6608f3f493b62899658f8df12bd9639",
       "passed": true,
       "seeds": [
         0,
@@ -80,74 +80,74 @@
     },
     "battery_pretrend": {
       "alpha_falsify": 0.01,
-      "code_hash": "5c876a8d7c87998113fe7ef67e080b446f8a2bb02c3c823dd745ce1dcc9a5104",
+      "code_hash": "dba12d97b86d999c7a889adccf496816c6746fde7533522cb355b3ee3c56da27",
       "curve": {
         "0.0": {
+          "exact": [
+            0.00704647921734404,
+            0.015085260718575591
+          ],
           "hits": 21,
           "n": 2000,
-          "rate": 0.0105,
-          "wilson": [
-            0.006877887380873443,
-            0.015998901907473176
-          ]
+          "rate": 0.0105
         },
         "0.05": {
+          "exact": [
+            0.03499847873037864,
+            0.06913607724453699
+          ],
           "hits": 25,
           "n": 500,
-          "rate": 0.05,
-          "wilson": [
-            0.034093745243849435,
-            0.0727681611715476
-          ]
+          "rate": 0.05
         },
         "0.1": {
+          "exact": [
+            0.1447355221066049,
+            0.2021880700140795
+          ],
           "hits": 86,
           "n": 500,
-          "rate": 0.172,
-          "wilson": [
-            0.1414541198436514,
-            0.20754744749912687
-          ]
+          "rate": 0.172
         },
         "0.15": {
+          "exact": [
+            0.389022214923116,
+            0.46363069923122
+          ],
           "hits": 213,
           "n": 500,
-          "rate": 0.426,
-          "wilson": [
-            0.38338257836675194,
-            0.46974582402155785
-          ]
+          "rate": 0.426
         },
         "0.2": {
+          "exact": [
+            0.6953794337847098,
+            0.7625836109538714
+          ],
           "hits": 365,
           "n": 500,
-          "rate": 0.73,
-          "wilson": [
-            0.6894413425907917,
-            0.7670514607968943
-          ]
+          "rate": 0.73
         },
         "0.3": {
+          "exact": [
+            0.979089677057733,
+            0.9960516704108233
+          ],
           "hits": 495,
           "n": 500,
-          "rate": 0.99,
-          "wilson": [
-            0.9768069002442693,
-            0.9957212461034096
-          ]
+          "rate": 0.99
         }
       },
       "delta_min": 0.3,
       "false_alarm": {
+        "exact": [
+          0.00704647921734404,
+          0.015085260718575591
+        ],
         "hits": 21,
         "n": 2000,
-        "rate": 0.0105,
-        "wilson": [
-          0.006877887380873443,
-          0.015998901907473176
-        ]
+        "rate": 0.0105
       },
-      "false_alarm_bound": 0.014449719092257398,
+      "false_alarm_ceiling": 0.0169,
       "method_hash": "2b0b5285e6d70b97196370c818faa06814c90c37072e8e443e4fff7fd5860852",
       "passed": true,
       "seeds": [
@@ -157,75 +157,75 @@
     },
     "battery_rd": {
       "alpha_falsify": 0.01,
-      "code_hash": "af429584411c5ace9ab9fcb8e1a5d9ca45d4660f53dbbc2e2e07a1e39754a4f0",
+      "code_hash": "a8a6188dde10d5b24a15f725833e621a527b15527582ec0b8a010256d39ee0c0",
       "curve": {
         "0.0": {
-          "hits": 15,
-          "n": 1000,
-          "rate": 0.015,
-          "wilson": [
-            0.009110978804081668,
-            0.024600976926906798
-          ]
+          "exact": [
+            0.005423089474141601,
+            0.01272250976343753
+          ],
+          "hits": 17,
+          "n": 2000,
+          "rate": 0.0085
         },
         "0.05": {
-          "hits": 12,
-          "n": 250,
-          "rate": 0.048,
-          "wilson": [
-            0.02766820153069461,
-            0.08201230121318728
-          ]
+          "exact": [
+            0.015446105866904954,
+            0.041019868160438115
+          ],
+          "hits": 13,
+          "n": 500,
+          "rate": 0.026
         },
         "0.1": {
-          "hits": 35,
-          "n": 250,
-          "rate": 0.14,
-          "wilson": [
-            0.1024162573102742,
-            0.1884797183264459
-          ]
+          "exact": [
+            0.08774688259156413,
+            0.1357597661801609
+          ],
+          "hits": 55,
+          "n": 500,
+          "rate": 0.11
         },
         "0.2": {
-          "hits": 149,
-          "n": 250,
-          "rate": 0.596,
-          "wilson": [
-            0.5341653599169152,
-            0.6549290465799593
-          ]
+          "exact": [
+            0.5484588352634454,
+            0.6227822735473092
+          ],
+          "hits": 293,
+          "n": 500,
+          "rate": 0.586
         },
         "0.3": {
-          "hits": 227,
-          "n": 250,
-          "rate": 0.908,
-          "wilson": [
-            0.8657382427250239,
-            0.9379129848866933
-          ]
+          "exact": [
+            0.8555678318642119,
+            0.9050026904163355
+          ],
+          "hits": 441,
+          "n": 500,
+          "rate": 0.882
         },
         "0.5": {
-          "hits": 248,
-          "n": 250,
-          "rate": 0.992,
-          "wilson": [
-            0.9713054704167919,
-            0.9978033628796906
-          ]
+          "exact": [
+            0.9688000966265984,
+            0.9905782920145227
+          ],
+          "hits": 491,
+          "n": 500,
+          "rate": 0.982
         }
       },
       "delta_min": 0.3,
       "false_alarm": {
-        "hits": 15,
-        "n": 1000,
-        "rate": 0.015,
-        "wilson": [
-          0.009110978804081668,
-          0.024600976926906798
-        ]
+        "exact": [
+          0.005423089474141601,
+          0.01272250976343753
+        ],
+        "hits": 17,
+        "n": 2000,
+        "rate": 0.0085
       },
-      "false_alarm_bound": 0.01629285308902091,
-      "method_hash": "129ea9600016714e7d359eca502cef063dca33e4da33cb55b4e1f93a9fcb0008",
+      "false_alarm_ceiling": 0.0169,
+      "method_hash": "b011a7506f18c5eb8ad70ed175753732fa5972252703408364efadb51342822b",
       "passed": true,
       "seeds": [
         0,
@@ -233,7 +233,7 @@
       ]
     },
     "coverage_aipw": {
-      "code_hash": "3eb8a07e839b7816c392413157df395a69fce138e796af61c2dd9ce101da5acc",
+      "code_hash": "3b77cf208a4cb4418b742b6038d80fb97ed5cf1f5422ef5cf44d6d90b109d6f9",
       "method_hash": "beb55981586861870f5dae44245cdd06ae801a7bdb2e416287c8754006f2a612",
       "passed": false,
       "seeds": [
@@ -242,45 +242,45 @@
       ],
       "worlds": {
         "boosted_ate": {
+          "exact": [
+            0.9172384909511704,
+            0.954764333505874
+          ],
           "hits": 469,
           "mean_z": -0.09947458507836089,
           "meets_floor": false,
           "n": 500,
           "rate": 0.938,
-          "wilson": [
-            0.9133402868983618,
-            0.9559807908573184
-          ],
           "z_within_0.1": true
         },
         "linear_ate": {
+          "exact": [
+            0.9347976843383022,
+            0.952218825197575
+          ],
           "hits": 1888,
           "mean_z": 0.02955959015073281,
           "meets_floor": true,
           "n": 2000,
           "rate": 0.944,
-          "wilson": [
-            0.9330459959530119,
-            0.9532516660612355
-          ],
           "z_within_0.1": true
         },
         "linear_att": {
+          "exact": [
+            0.9390824169946329,
+            0.955923982779804
+          ],
           "hits": 1896,
           "mean_z": 0.037030432345826106,
           "meets_floor": true,
           "n": 2000,
           "rate": 0.948,
-          "wilson": [
-            0.9373820458455553,
-            0.956900279790442
-          ],
           "z_within_0.1": true
         }
       }
     },
     "coverage_did": {
-      "code_hash": "b8c85094935940bfd9f4a720d8750157ed7a8485c4be752b321139a5042dce19",
+      "code_hash": "acd1cc6bf4e1cfa9c6207973a07fbed599a52b80092c06a576004afaa36438cf",
       "method_hash": "5d557daac22c41a56ddc0f130abb1fedd8a5588187636b2ced978238c36c3ee7",
       "passed": true,
       "seeds": [
@@ -289,42 +289,42 @@
       ],
       "worlds": {
         "single_group": {
+          "exact": [
+            0.9347976843383022,
+            0.952218825197575
+          ],
           "hits": 1888,
           "mean_z": -0.02166048889084521,
           "meets_floor": true,
           "n": 2000,
           "rate": 0.944,
-          "wilson": [
-            0.9330459959530119,
-            0.9532516660612355
-          ],
           "z_within_0.1": true
         },
         "staggered": {
+          "exact": [
+            0.938241421171826,
+            0.9617261320734517
+          ],
           "hits": 951,
           "mean_z": -0.02926291399763592,
           "meets_floor": true,
           "n": 1000,
           "rate": 0.951,
-          "wilson": [
-            0.9358092984933898,
-            0.9627389653526394
-          ],
           "z_within_0.1": true
         }
       }
     },
     "coverage_iv": {
-      "code_hash": "eb50ae6474b1201cffa24216a48e1479b1e5d16d2815ca84e40787d4ea1a3f7b",
+      "code_hash": "204b4c9346053cacd1dd583658431380b6d04b29bed434b4d74d1b92d3f12d08",
       "coverage": {
+        "exact": [
+          0.9487742291849405,
+          0.9642087073053598
+        ],
         "hits": 1914,
         "meets_floor": true,
         "n": 2000,
-        "rate": 0.957,
-        "wilson": [
-          0.9471988913295474,
-          0.9650489274553872
-        ]
+        "rate": 0.957
       },
       "method_hash": "bb14bb8eb1c75578445c893ce8f9fa3112774628fc6b0a8996bec8f026f7f88c",
       "passed": true,
@@ -335,18 +335,18 @@
       "weak_flags": 0
     },
     "coverage_randomized": {
-      "code_hash": "cc9146ceac78650208588024960f522a5b72cb423a61214aa657e788a968d99b",
+      "code_hash": "ce453b900214e9a65008ca9e3b355fe5cef2d70153415b6dc9d4e5625d2e6cf3",
       "coverage": {
+        "exact": [
+          0.9364029871620545,
+          0.9536097501496068
+        ],
         "hits": 1891,
         "meets_floor": true,
         "n": 2000,
-        "rate": 0.9455,
-        "wilson": [
-          0.9346702670259668,
-          0.9546216438464368
-        ]
+        "rate": 0.9455
       },
-      "method_hash": "73c87993acbb4ed882ae9be4289b891103e36b76fe83d294d4dc1f596e3c85f8",
+      "method_hash": "1ede287d5086124d0e6af9f8b66eb301152211d4fb65ff721fa88493442c250d",
       "passed": true,
       "seeds": [
         0,
@@ -354,20 +354,20 @@
       ]
     },
     "coverage_rd": {
-      "code_hash": "12065c5feaced4ed1a1b2747359712ae5354e06a920f25ac74b7a2c273f1ef05",
+      "code_hash": "65b7f24956215e705069913d24820d10113524703dfb78680d6be169df5e867f",
       "coverage": {
-        "hits": 1906,
-        "mean_z": -0.01160965707746099,
+        "exact": [
+          0.9482336992011465,
+          0.9637505728465469
+        ],
+        "hits": 1913,
+        "mean_z": -0.011554237611482512,
         "meets_floor": true,
         "n": 2000,
-        "rate": 0.953,
-        "wilson": [
-          0.9428245575283534,
-          0.9614385976348314
-        ],
+        "rate": 0.9565,
         "z_within_0.1": true
       },
-      "method_hash": "8edf58af646879d30d1c10bca384d6d1392d5634872ab6d7cb4e407c4922e3d3",
+      "method_hash": "69ff92a12b16ddbdb1b78acb7f96d65af0b068c1924b3754561e4d7bde1b7981",
       "passed": true,
       "seeds": [
         0,
@@ -376,75 +376,75 @@
     },
     "density_rd": {
       "alpha_falsify": 0.01,
-      "code_hash": "83dd27730939f11c080b30de6ff8eb8eb971bcd7ce507c5f2108870b9c14d754",
+      "code_hash": "7ef6649737070aedc97a146c9b541afcf87d108c613f8aabfb9d37853ea43429",
       "curve": {
         "0.0": {
+          "exact": [
+            0.006636879397604511,
+            0.014498062606976633
+          ],
           "hits": 20,
           "n": 2000,
-          "rate": 0.01,
-          "wilson": [
-            0.006482767876552687,
-            0.015395938459075187
-          ]
+          "rate": 0.01
         },
         "0.1": {
+          "exact": [
+            0.05042950006431845,
+            0.0895023066295731
+          ],
           "hits": 34,
           "n": 500,
-          "rate": 0.068,
-          "wilson": [
-            0.04906650742490687,
-            0.0935209227338743
-          ]
+          "rate": 0.068
         },
         "0.2": {
+          "exact": [
+            0.28554410871210034,
+            0.35604721240839327
+          ],
           "hits": 160,
           "n": 500,
-          "rate": 0.32,
-          "wilson": [
-            0.28061775068949024,
-            0.3621270118766686
-          ]
+          "rate": 0.32
         },
         "0.3": {
+          "exact": [
+            0.58080624577009,
+            0.6541520105257113
+          ],
           "hits": 309,
           "n": 500,
-          "rate": 0.618,
-          "wilson": [
-            0.5746652808852669,
-            0.6595353747658067
-          ]
+          "rate": 0.618
         },
         "0.5": {
+          "exact": [
+            0.9447380805542026,
+            0.9749758448558151
+          ],
           "hits": 481,
           "n": 500,
-          "rate": 0.962,
-          "wilson": [
-            0.9414152274693561,
-            0.9755398819441696
-          ]
+          "rate": 0.962
         },
         "0.7": {
+          "exact": [
+            0.9905477177919249,
+            0.999897418673049
+          ],
           "hits": 499,
           "n": 500,
-          "rate": 0.998,
-          "wilson": [
-            0.9887592932948532,
-            0.9996468636054407
-          ]
+          "rate": 0.998
         }
       },
       "delta_min": 0.5,
       "false_alarm": {
+        "exact": [
+          0.006636879397604511,
+          0.014498062606976633
+        ],
         "hits": 20,
         "n": 2000,
-        "rate": 0.01,
-        "wilson": [
-          0.006482767876552687,
-          0.015395938459075187
-        ]
+        "rate": 0.01
       },
-      "false_alarm_bound": 0.014449719092257398,
-      "method_hash": "fdcdca3227c2b0996e8b3e7b082550f418a7472036000cd0aa63c0f59dc8b1b0",
+      "false_alarm_ceiling": 0.0169,
+      "method_hash": "6ef30211a8e27ebcc228e7a0a2c394372b9771f743f02e7580abe9d175388dcb",
       "passed": true,
       "seeds": [
         0,
@@ -452,80 +452,80 @@
       ]
     },
     "false_confirm": {
-      "code_hash": "c291706da4b9c059b2d28826b5253f5fd2d2dd0393a18b33df5518d270cf74a2",
+      "code_hash": "848bd87fd5ab4e412a7f245f9e7a27d4546803b0d3a27dcb35204210de9bcfd1",
       "method_hash": "759cfc335fa1df9db0de425a44b90aac6048023e4619a6048faa8a6931c4dace",
       "note": "all other gates were marked certified for this run; the unshared-confounder row is the known blind spot",
       "passed": true,
       "replicates": 300,
       "seeds": [
         0,
-        1800
+        300
       ],
       "worlds": {
         "clean": {
           "attested": {
+            "exact": [
+              0.006589532238975586,
+              0.03472224430129498
+            ],
             "hits": 5,
             "n": 300,
-            "rate": 0.016666666666666666,
-            "wilson": [
-              0.00713947735063333,
-              0.0384153948330945
-            ]
+            "rate": 0.016666666666666666
           },
           "confirmed": {
+            "exact": [
+              0.9482339381005,
+              0.9842620148493065
+            ],
             "hits": 291,
             "n": 300,
-            "rate": 0.97,
-            "wilson": [
-              0.9439774608583589,
-              0.9841381461905676
-            ]
+            "rate": 0.97
           }
         },
         "shared_confounder": {
           "attested": {
+            "exact": [
+              0.0,
+              0.009936081944457708
+            ],
             "hits": 0,
             "n": 300,
-            "rate": 0.0,
-            "wilson": [
-              0.0,
-              0.012642971224546034
-            ]
+            "rate": 0.0
           },
           "confirmed": {
+            "exact": [
+              0.0,
+              0.009936081944457708
+            ],
             "hits": 0,
             "n": 300,
-            "rate": 0.0,
-            "wilson": [
-              0.0,
-              0.012642971224546034
-            ]
+            "rate": 0.0
           }
         },
         "unshared_confounder": {
           "attested": {
+            "exact": [
+              0.006589532238975586,
+              0.03472224430129498
+            ],
             "hits": 5,
             "n": 300,
-            "rate": 0.016666666666666666,
-            "wilson": [
-              0.00713947735063333,
-              0.0384153948330945
-            ]
+            "rate": 0.016666666666666666
           },
           "confirmed": {
+            "exact": [
+              0.9566213243569963,
+              0.9889989363689421
+            ],
             "hits": 293,
             "n": 300,
-            "rate": 0.9766666666666667,
-            "wilson": [
-              0.9526280277317246,
-              0.9886523397008747
-            ]
+            "rate": 0.9766666666666667
           }
         }
       }
     },
     "iv_strength": {
-      "code_hash": "2cc74343f4bdc7983f2047180ab53641caecd82b8f3faa2aaa181155a9018140",
+      "code_hash": "5019ea9278c8a15d80a99836710c45bf0126fe8004348cd50b0ab679d15b8a3a",
       "method_hash": "70ae3a372beaab6b4aad87cf48e596edcde3335ee1ebe0706378de6dd217216d",
       "passed": true,
       "seeds": [
@@ -533,132 +533,132 @@
         2000
       ],
       "strong_world_false_weak": {
+        "exact": [
+          0.0,
+          0.0014967448951882837
+        ],
         "hits": 0,
         "n": 2000,
-        "rate": 0.0,
-        "wilson": [
-          0.0,
-          0.001917047281252934
-        ]
+        "rate": 0.0
       },
       "weak_flag_recall": {
+        "exact": [
+          0.9762983758178491,
+          0.9866066170383299
+        ],
         "hits": 1964,
         "n": 2000,
-        "rate": 0.982,
-        "wilson": [
-          0.9751819578651543,
-          0.9869700085557177
-        ]
+        "rate": 0.982
       },
       "weak_world_headline_coverage": {
+        "exact": [
+          0.9406925467786242,
+          0.957310017492611
+        ],
         "hits": 1899,
         "meets_floor": true,
         "n": 2000,
-        "rate": 0.9495,
-        "wilson": [
-          0.9390120477558316,
-          0.958264526738322
-        ]
+        "rate": 0.9495
       }
     },
     "overlap": {
-      "code_hash": "8e7319650869374d00ad5a241ddcd1e185a714cac5bfad31ba19cb1616e7bd28",
+      "code_hash": "c110e028a8e69e95f5074ae7e05647bed10f45e51105519f1917030dec0ab92f",
       "curves": {
         "0.005": {
           "coverage_when_untrimmed": {
-            "hits": 479,
-            "n": 500,
-            "rate": 0.958,
-            "wilson": [
-              0.9366484142456699,
-              0.9723676898915483
-            ]
+            "exact": [
+              0.9569176147807359,
+              0.9710446696529234
+            ],
+            "hits": 1929,
+            "n": 2000,
+            "rate": 0.9645
           },
           "gate_fires": {
-            "hits": 500,
-            "n": 500,
-            "rate": 1.0,
-            "wilson": [
-              0.9923756595384479,
+            "exact": [
+              0.9985032551048117,
               1.0
-            ]
+            ],
+            "hits": 2000,
+            "n": 2000,
+            "rate": 1.0
           },
-          "mean_ess_treated_over_n": 0.10730889174357656,
-          "mean_min_estimated_propensity": 0.00022146567005298012
+          "mean_ess_treated_over_n": 0.10798305844296001,
+          "mean_min_estimated_propensity": 0.0002127155830455234
         },
         "0.02": {
           "coverage_when_untrimmed": {
-            "hits": 477,
-            "n": 500,
-            "rate": 0.954,
-            "wilson": [
-              0.9319222072317267,
-              0.9691548916291838
-            ]
+            "exact": [
+              0.9509391133370054,
+              0.9660384350543764
+            ],
+            "hits": 1918,
+            "n": 2000,
+            "rate": 0.959
           },
           "gate_fires": {
-            "hits": 500,
-            "n": 500,
-            "rate": 1.0,
-            "wilson": [
-              0.9923756595384479,
+            "exact": [
+              0.9985032551048117,
               1.0
-            ]
+            ],
+            "hits": 2000,
+            "n": 2000,
+            "rate": 1.0
           },
-          "mean_ess_treated_over_n": 0.1479399901697862,
-          "mean_min_estimated_propensity": 0.001769525893675179
+          "mean_ess_treated_over_n": 0.15185302986995142,
+          "mean_min_estimated_propensity": 0.0017134793208051372
         },
         "0.1": {
           "coverage_when_untrimmed": {
-            "hits": 474,
-            "n": 500,
-            "rate": 0.948,
-            "wilson": [
-              0.9248988560621544,
-              0.9642697348842947
-            ]
+            "exact": [
+              0.9347976843383022,
+              0.952218825197575
+            ],
+            "hits": 1888,
+            "n": 2000,
+            "rate": 0.944
           },
           "gate_fires": {
-            "hits": 3,
-            "n": 500,
-            "rate": 0.006,
-            "wilson": [
-              0.0020425962719602363,
-              0.01749025210405338
-            ]
+            "exact": [
+              0.0030874640617556126,
+              0.009087352469332526
+            ],
+            "hits": 11,
+            "n": 2000,
+            "rate": 0.0055
           },
-          "mean_ess_treated_over_n": 0.30721015844589544,
-          "mean_min_estimated_propensity": 0.02169470878378835
+          "mean_ess_treated_over_n": 0.3055020584791709,
+          "mean_min_estimated_propensity": 0.021662492801721746
         },
         "0.5": {
           "coverage_when_untrimmed": {
-            "hits": 475,
-            "n": 500,
-            "rate": 0.95,
-            "wilson": [
-              0.9272318388284524,
-              0.9659062547561506
-            ]
+            "exact": [
+              0.9369384738202463,
+              0.9540730011871068
+            ],
+            "hits": 1892,
+            "n": 2000,
+            "rate": 0.946
           },
           "gate_fires": {
-            "hits": 0,
-            "n": 500,
-            "rate": 0.0,
-            "wilson": [
+            "exact": [
               0.0,
-              0.007624340461552241
-            ]
+              0.0014967448951882837
+            ],
+            "hits": 0,
+            "n": 2000,
+            "rate": 0.0
           },
-          "mean_ess_treated_over_n": 0.4849000083155769,
-          "mean_min_estimated_propensity": 0.25882151055548114
+          "mean_ess_treated_over_n": 0.48605476614965787,
+          "mean_min_estimated_propensity": 0.25837957101506276
         }
       },
       "eps": 0.05,
-      "false_refuse_worst": 0.006,
+      "false_refuse_upper_worst": 0.009087352469332526,
       "method_hash": "8d9ffb893f78ada82d9676877b88c323bafc2ec2ded70f77b6a5993e202bdc59",
       "passed": true,
-      "recall_wilson_lower_worst": 0.9923756595384479,
-      "replicates": 500,
+      "recall_lower_worst": 0.9985032551048117,
+      "replicates": 2000,
       "seeds": [
         0,
         2000
@@ -667,25 +667,25 @@
     },
     "selector": {
       "accepts_when_eligible": {
+        "exact": [
+          0.9851329607687279,
+          1.0
+        ],
         "hits": 200,
         "n": 200,
-        "rate": 1.0,
-        "wilson": [
-          0.9811546736227335,
-          1.0
-        ]
+        "rate": 1.0
       },
-      "code_hash": "9f82cc7bc642badcaeef6694387874390eea8e92d8c9c80350306a2594e728b5",
+      "code_hash": "b4b503c27859fa61ba9e204f73d32701edbf5e8d9d09ce5756657c22d86ecac0",
       "method_hash": "2fb64659e309ba534af01a849a140b3d8c94bd00390c2c8be4d4939d74e92215",
       "passed": true,
       "refuses_when_none_eligible": {
+        "exact": [
+          0.9851329607687279,
+          1.0
+        ],
         "hits": 200,
         "n": 200,
-        "rate": 1.0,
-        "wilson": [
-          0.9811546736227335,
-          1.0
-        ]
+        "rate": 1.0
       },
       "replicates": 200,
       "seeds": [
@@ -694,10 +694,10 @@
       ]
     },
     "sensitivity_bound": {
-      "code_hash": "2a140396839a405ac44678a224fefb0d03ad99de95667b7dd618ce3f4bacfb33",
+      "code_hash": "e8546d3e2442b607af6bd6b496be9cc5ff3b351a69b50b0c2d3dc9a19b7777c6",
       "method_hash": "3786b78ac258ef05093d30bcd998f730fadd59535f75ec5605bf7587ffb1a58b",
       "passed": true,
-      "replicates": 500,
+      "replicates": 1000,
       "seeds": [
         0,
         1000
@@ -705,124 +705,124 @@
       "worlds": {
         "beyond_2x": {
           "claim_still_holds": {
-            "hits": 500,
-            "n": 500,
-            "rate": 1.0,
-            "wilson": [
-              0.9923756595384479,
+            "exact": [
+              0.9970087504549047,
               1.0
-            ]
+            ],
+            "hits": 1000,
+            "n": 1000,
+            "rate": 1.0
           },
           "coverage": {
-            "hits": 0,
-            "n": 500,
-            "rate": 0.0,
-            "wilson": [
+            "exact": [
               0.0,
-              0.007624340461552241
-            ]
+              0.002991249545095295
+            ],
+            "hits": 0,
+            "n": 1000,
+            "rate": 0.0
           }
         },
         "boundary": {
           "claim_still_holds": {
-            "hits": 500,
-            "n": 500,
-            "rate": 1.0,
-            "wilson": [
-              0.9923756595384479,
+            "exact": [
+              0.9970087504549047,
               1.0
-            ]
+            ],
+            "hits": 1000,
+            "n": 1000,
+            "rate": 1.0
           },
           "coverage": {
-            "hits": 400,
-            "n": 500,
-            "rate": 0.8,
-            "wilson": [
-              0.7627108946948261,
-              0.8327145010282427
-            ]
+            "exact": [
+              0.7884257417997471,
+              0.8302100349688244
+            ],
+            "hits": 810,
+            "n": 1000,
+            "rate": 0.81
           }
         },
         "inside_half": {
           "claim_still_holds": {
-            "hits": 376,
-            "n": 500,
-            "rate": 0.752,
-            "wilson": [
-              0.7123215407533253,
-              0.7878357916540525
-            ]
+            "exact": [
+              0.7141246419554172,
+              0.7608313383836043
+            ],
+            "hits": 738,
+            "n": 1000,
+            "rate": 0.738
           },
           "coverage": {
-            "hits": 500,
-            "n": 500,
-            "rate": 1.0,
-            "wilson": [
-              0.9923756595384479,
+            "exact": [
+              0.9970087504549047,
               1.0
-            ]
+            ],
+            "hits": 1000,
+            "n": 1000,
+            "rate": 1.0
           }
         }
       }
     },
     "sensitivity_did": {
-      "code_hash": "491b6fba850bfb94af71ac2f69a164885ad2c75372bd7b8bd849979ecea833b1",
+      "code_hash": "df72921d578a27183fbc0874f9df7159a4de27e5c6b785bc71eee93855e08dbd",
       "drift_per_period": 0.1,
       "m0_coverage": {
-        "hits": 56,
-        "n": 125,
-        "rate": 0.448,
-        "wilson": [
-          0.36366890453732625,
-          0.5354318964083398
-        ]
+        "exact": [
+          0.37721772645269086,
+          0.45154116473655465
+        ],
+        "hits": 207,
+        "n": 500,
+        "rate": 0.414
       },
       "m1_coverage": {
-        "hits": 122,
+        "exact": [
+          0.9424044378844489,
+          0.9733361469448867
+        ],
+        "hits": 480,
         "meets_floor": true,
-        "n": 125,
-        "rate": 0.976,
-        "wilson": [
-          0.9318110017162228,
-          0.9918047434734504
-        ]
+        "n": 500,
+        "rate": 0.96
       },
       "method_hash": "42931936499549e883062a8ea460d69618a9c042b30e868d39f8f87173bb1bcf",
       "passed": true,
-      "replicates": 125,
+      "replicates": 500,
       "seeds": [
         0,
         500
       ]
     },
     "size_synth": {
-      "code_hash": "3fbe336f57ba4eb1efe2f87c2519ae99c2df59b5624d68789324747c54fd0ad6",
+      "code_hash": "ea7c625bc04c902086a40cf71369cb9f3c9a320465f48d523364c529592f6ff5",
       "method_hash": "bd372dfe3ee52e4dd85a86132a954093f53cdd807c059eb81e4c5149e7657cc4",
       "passed": true,
       "power_at_effect_3": {
+        "exact": [
+          0.9512970866899025,
+          1.0
+        ],
         "hits": 60,
         "n": 60,
-        "rate": 1.0,
-        "wilson": [
-          0.93982814785791,
-          1.0
-        ]
+        "rate": 1.0
       },
-      "replicates": 125,
+      "replicates": 500,
       "seeds": [
         0,
         500
       ],
       "size": {
-        "hits": 5,
-        "n": 125,
-        "rate": 0.04,
-        "wilson": [
-          0.017204609071915906,
-          0.09022555313974442
-        ]
+        "exact": [
+          0.018581564717314803,
+          0.04581964275099681
+        ],
+        "hits": 15,
+        "n": 500,
+        "rate": 0.03
       },
-      "size_bound": 0.08898717737923587
+      "size_ceiling": 0.0845
     }
   },
   "not_measured": [
@@ -835,5 +835,39 @@
     "battery_synth: placebo-in-space is the inference itself",
     "bit-identical reports on Python 3.11 and 3.14"
   ],
+  "terms": {
+    "alpha": 0.05,
+    "alpha_falsify": 0.01,
+    "boosted_replicates": 500,
+    "causal_false_alarm_max": 0.05,
+    "causal_power_min": 0.8,
+    "causal_selection_min": 0.98,
+    "falsification_ceiling": 0.0169,
+    "interval_coverage_min": 0.93,
+    "mean_z_tolerance": 0.1,
+    "power_replicates": 500,
+    "replicates": {
+      "battery_nco": 2000,
+      "battery_pretrend": 2000,
+      "battery_rd": 2000,
+      "coverage_aipw": 2000,
+      "coverage_did": 2000,
+      "coverage_iv": 2000,
+      "coverage_randomized": 2000,
+      "coverage_rd": 2000,
+      "density_rd": 2000,
+      "false_confirm": 300,
+      "iv_strength": 2000,
+      "overlap": 2000,
+      "selector": 200,
+      "sensitivity_bound": 1000,
+      "sensitivity_did": 500,
+      "size_synth": 500
+    },
+    "size_margin": 0.69,
+    "staggered_replicates": 1000,
+    "synth_power_replicates": 60,
+    "synth_size_ceiling": 0.0845
+  },
   "version": 1
 }

@@ -18,6 +18,7 @@ def test_score_from_set_sizes_and_novelty():
 
 
 def test_binomial_p_value_is_the_exact_lower_tail():
+    # Enforces website/src/pages/docs/methods.astro:9.
     assert escalation.binomial_p_value(0, 10, 0.5) == pytest.approx(0.5**10)
     assert escalation.binomial_p_value(10, 10, 0.5) == pytest.approx(1.0)
     assert escalation.binomial_p_value(0, 0, 0.5) == 1.0
@@ -36,6 +37,7 @@ def test_threshold_stops_at_the_first_non_rejection():
 
 
 def test_validity_over_replicates_and_the_naive_cut_violates():
+    # Enforces website/src/pages/docs/methods.astro:9.
     delta, r_star, replicates = 0.1, 0.05, 300
     wrong, naive_wrong = 0, 0
     for seed in range(replicates):
@@ -96,6 +98,7 @@ def test_risk_coverage_curve_and_area():
 
 
 def test_chow_check_reports_disagreement():
+    # Enforces website/src/pages/docs/methods.astro:10.
     confidence = numpy.linspace(0.5, 1.0, 1000)
     score = confidence
     same = escalation.adjudicate(confidence, score, 0.8, 1.0, 5.0)

@@ -57,7 +57,10 @@ def test_unavailable_explicit_experimental_model_fails_closed(monkeypatch):
 
 
 def test_transformer_and_jepa_are_explicit_opt_in_candidates(monkeypatch):
-    """Both experimental adapters enter planning only after opt-in."""
+    """Both experimental adapters enter planning only after opt-in.
+
+    Also enforces website/src/pages/docs/modeling.astro:95.
+    """
     transformer = networks.FT_TRANSFORMER
     representation = networks.Jepa()
     monkeypatch.setattr(transformer, "is_available", lambda: True)

@@ -14,8 +14,13 @@ beyond it. The method, the world generator and the replicate streams are the
 same ones (`numpy.random.default_rng([base + i, which])`, certification
 `base = 0`, development `DEV_SEED_BASE`).
 
-Designs (`R = 2000` replicates unless stated; `bound = 0.05 + 2 sqrt(0.05 *
-0.95 / R)`, the family-wise bound of the equal-level gate):
+Designs (`R = NULL_REPLICATES = 2000` replicates unless stated). Every rate
+is decided as in the equal-level gate: by its one-sided exact
+(Clopper-Pearson) bound at `alpha` of `acceptance.toml`; an error rate is
+within `bound` when its upper bound is at most the size ceiling of Holm's
+level 0.05, `0.05 (1 + size_margin)` (0.0845, `acceptance.sized`), a power
+reaches the floor when its lower bound is at least `causal_power_min`
+(0.80).
 
 * Unequal null: eight levels of one column with `UNEQUAL_SIZES = (20, 30, 50,
   80, 120, 200, 300, 500)` rows, no effect anywhere. Probability that any
@@ -23,11 +28,11 @@ Designs (`R = 2000` replicates unless stated; `bound = 0.05 + 2 sqrt(0.05 *
 * Unequal partial null: `tau = 0.5` in the levels with 200 and 500 rows, zero
   elsewhere. Probability that any of the six true nulls is rejected `<=
   bound`.
-* Unequal power (`R = 500` each): one planted effect of 0.5 in a level of
-  `n` rows, `n` in 50, 100, 200, 400, the other seven levels keeping the sizes
-  `UNEQUAL_SIZES[:7]`. Filed with Wilson intervals; the smallest `n` whose
-  Wilson lower bound is `>= 0.80` is reported as `min_rows_power_80`, and it
-  does not gate.
+* Unequal power (`R = POWER_REPLICATES = 500` each): one planted effect of
+  0.5 in a level of `n` rows, `n` in 50, 100, 200, 400, the other seven
+  levels keeping the sizes `UNEQUAL_SIZES[:7]`. Filed with exact bounds;
+  the smallest `n` whose lower bound reaches the floor is reported as
+  `min_rows_power_80`, and it does not gate.
 * Overlapping null: two declared columns `g` and `h` of four levels each,
   every row carrying one level of each drawn independently and uniformly,
   800 rows per replicate, one Holm family of the eight hypotheses, no effect.
@@ -40,7 +45,17 @@ Designs (`R = 2000` replicates unless stated; `bound = 0.05 + 2 sqrt(0.05 *
 
 Pass: all four error rates within `bound`. Holm controls the family-wise
 error rate under any dependence, so the overlapping designs are expected to
-pass; the measurement says whether the implementation does.
+pass; the measurement says whether the implementation does. A family whose
+true rate equals its level cannot pass a ceiling at that level.
+
+Amendment 2026-11-19. The first measurement compared point estimates with
+`0.05 + 2 sqrt(0.05 * 0.95 / R)`, a looser rule than the plan's (the
+overlapping null passed at 107 of 2000, 0.0535). The rule is now the exact
+bound above; the designs, counts and seeds are unchanged.
+
+Amendment 2026-11-19 (second). The ceiling was the level 0.05 itself; it is
+now the size ceiling of every size gate, `level (1 + size_margin)` (see
+`subgroup_certify.py`); the designs, counts and seeds are unchanged.
 
 NOT measured: strategies other than the randomized difference in means,
 heteroscedastic or heavy-tailed outcomes, non-randomized assignment, and the
@@ -75,7 +90,6 @@ TREATED_SHARE = 0.5
 OVERLAP_LEVELS = 4
 OVERLAP_ROWS = 800
 EFFECT = 0.5
-POWER_FLOOR = 0.80
 NULL_REPLICATES = 2000
 POWER_REPLICATES = 500
 
@@ -185,23 +199,35 @@ def any_rejected(
     return bool(pairs if among is None else pairs & among)
 
 
-def gate_unequal(replicates: int, base: int) -> dict[str, Any]:
+def terms() -> dict[str, Any]:
+    """The rule and replicate counts the measurements are taken under.
+
+    Returns:
+        `alpha`, the ceiling, the floor and both replicate counts.
+    """
+    return {
+        **subgroup_certify.terms(),
+        "replicates": NULL_REPLICATES,
+        "power_replicates": POWER_REPLICATES,
+    }
+
+
+def gate_unequal(replicates: int, runs: int, base: int) -> dict[str, Any]:
     """Family-wise error and power with unequal level sizes.
 
     Args:
-        replicates: Replicates for the error-rate designs; the power design
-            uses a quarter of them, at least 100.
+        replicates: Replicates for the error-rate designs.
+        runs: Replicates for each power design.
         base: Seed offset.
 
     Returns:
-        The sizes used, the two family-wise rates with Wilson intervals, the
-        bound, the power by planted level size, the smallest size whose
-        lower bound reaches the floor (None if none) and whether both error
-        rates are within the bound.
+        The sizes used, the two family-wise rates with their exact bounds,
+        the ceiling, the power by planted level size, the smallest size
+        whose lower bound reaches the floor (None if none) and whether both
+        error rates are within the ceiling.
     """
     adapter = subgroup_certify.adapter_for()
     groups = (causal.Subgroup("g", subgroup_certify.names()),)
-    bound = subgroup_certify.bound_for(replicates)
     sizes = UNEQUAL_SIZES
     null_hits = sum(
         bool(
@@ -231,7 +257,6 @@ def gate_unequal(replicates: int, base: int) -> dict[str, Any]:
         )
         for i in range(replicates)
     )
-    runs = max(replicates // 4, 100)
     power: dict[str, Any] = {}
     for rows in POWER_SIZES:
         layout = (rows, *sizes[:7])
@@ -247,21 +272,21 @@ def gate_unequal(replicates: int, base: int) -> dict[str, Any]:
             for i in range(runs)
         )
         power[str(rows)] = subgroup_certify.rate(hits, runs)
-    enough = [int(k) for k, v in power.items() if v["wilson"][0] >= POWER_FLOOR]
+    enough = [int(k) for k, v in power.items() if subgroup_certify.powered(v)]
+    null = subgroup_certify.rate(null_hits, replicates)
+    partial_null = subgroup_certify.rate(partial_hits, replicates)
     return {
         "sizes": list(sizes),
         "replicates": replicates,
         "power_replicates": runs,
-        "familywise_error_null": subgroup_certify.rate(null_hits, replicates),
-        "familywise_error_partial_null": subgroup_certify.rate(
-            partial_hits, replicates
-        ),
-        "familywise_bound": bound,
+        "familywise_error_null": null,
+        "familywise_error_partial_null": partial_null,
+        "familywise_ceiling": subgroup_certify.FAMILYWISE.bound,
         "power_at_effect_half_sd": power,
         "min_rows_power_80": min(enough) if enough else None,
         "passed": bool(
-            null_hits / replicates <= bound
-            and partial_hits / replicates <= bound
+            subgroup_certify.controlled(null)
+            and subgroup_certify.controlled(partial_null)
         ),
     }
 
@@ -274,15 +299,14 @@ def gate_overlap(replicates: int, base: int) -> dict[str, Any]:
         base: Seed offset.
 
     Returns:
-        The two family-wise rates with Wilson intervals, the bound, the
-        design sizes and whether both rates are within the bound.
+        The two family-wise rates with their exact bounds, the ceiling, the
+        design sizes and whether both rates are within the ceiling.
     """
     adapter = subgroup_certify.adapter_for()
     groups = (
         causal.Subgroup("g", overlap_names("g")),
         causal.Subgroup("h", overlap_names("h")),
     )
-    bound = subgroup_certify.bound_for(replicates)
     null_hits = sum(
         bool(
             rejected(
@@ -305,18 +329,18 @@ def gate_overlap(replicates: int, base: int) -> dict[str, Any]:
         )
         for i in range(replicates)
     )
+    null = subgroup_certify.rate(null_hits, replicates)
+    partial_null = subgroup_certify.rate(partial_hits, replicates)
     return {
         "rows": OVERLAP_ROWS,
         "levels_per_column": OVERLAP_LEVELS,
         "replicates": replicates,
-        "familywise_error_null": subgroup_certify.rate(null_hits, replicates),
-        "familywise_error_true_nulls_with_effect_in_g0": subgroup_certify.rate(
-            partial_hits, replicates
-        ),
-        "familywise_bound": bound,
+        "familywise_error_null": null,
+        "familywise_error_true_nulls_with_effect_in_g0": partial_null,
+        "familywise_ceiling": subgroup_certify.FAMILYWISE.bound,
         "passed": bool(
-            null_hits / replicates <= bound
-            and partial_hits / replicates <= bound
+            subgroup_certify.controlled(null)
+            and subgroup_certify.controlled(partial_null)
         ),
     }
 
@@ -326,21 +350,23 @@ def measure_all(base: int = 0, scale: float = 1.0) -> dict[str, Any]:
 
     Args:
         base: Seed offset (0 for the filed measurement).
-        scale: Fraction of `NULL_REPLICATES` to run, with a floor of 40.
+        scale: Fraction of `NULL_REPLICATES` and `POWER_REPLICATES` to run,
+            with floors of 40 and 10.
 
     Returns:
         The document written to the measurements file: both designs, what was
-        not measured, the code hash and the duration.
+        not measured, the rule and counts, the code hash and the duration.
     """
     started = time.monotonic()
     count = max(40, int(NULL_REPLICATES * scale))
+    runs = max(10, int(POWER_REPLICATES * scale))
     document = {
         "version": 1,
         "registered": "2026-11-07",
         "note": "description beside subgroup_certificates.json; it does not "
         "change the gate that labels a report gating or descriptive",
         "seeds": [base, base + count],
-        "unequal_levels": gate_unequal(count, base),
+        "unequal_levels": gate_unequal(count, runs, base),
         "overlapping_columns": gate_overlap(count, base),
         "not_measured": [
             "strategies other than the randomized difference in means",
@@ -349,16 +375,29 @@ def measure_all(base: int = 0, scale: float = 1.0) -> dict[str, Any]:
             "a real trial's subgroups",
         ],
     }
-    document["code_hash"] = certificates.code_hash(
+    document["code_hash"] = code()
+    document["terms"] = terms()
+    document["seconds"] = round(time.monotonic() - started, 1)
+    print("subgroup_extended", file=sys.stderr)
+    return document
+
+
+def code() -> str:
+    """Hash of the harness code the measurements rest on.
+
+    Returns:
+        The code hash of the designs, their worlds and the rules they use.
+    """
+    return certificates.code_hash(
         gate_unequal,
         gate_overlap,
         unequal_world,
         overlap_world,
         rejected,
+        subgroup_certify.rate,
+        subgroup_certify.controlled,
+        subgroup_certify.powered,
     )
-    document["seconds"] = round(time.monotonic() - started, 1)
-    print("subgroup_extended", file=sys.stderr)
-    return document
 
 
 def problems(document: dict[str, Any] | None = None) -> list[str]:
@@ -369,22 +408,20 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
             when None.
 
     Returns:
-        A message for a missing file or a code hash that differs from the
-        current code; empty when current.
+        A message for a missing file, a code hash that differs from the
+        current code or a changed rule or replicate count; empty when
+        current.
     """
     if document is None:
         if not MEASUREMENTS_PATH.exists():
             return ["subgroup_extended_measurements.json is missing"]
         document = json.loads(MEASUREMENTS_PATH.read_text(encoding="utf-8"))
-    current = certificates.code_hash(
-        gate_unequal,
-        gate_overlap,
-        unequal_world,
-        overlap_world,
-        rejected,
-    )
-    if document.get("code_hash") != current:
+    if document.get("code_hash") != code():
         return ["subgroup_extended: measurements are for other code"]
+    if document.get("terms") != terms():
+        return [
+            "subgroup_extended: measured under another rule or replicate count"
+        ]
     return []
 
 

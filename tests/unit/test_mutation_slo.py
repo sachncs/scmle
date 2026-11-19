@@ -97,6 +97,7 @@ def test_too_few_samples_keep_the_evaluation_time() -> None:
 
 
 def test_a_future_sample_invalidates_the_window() -> None:
+    # Enforces website/src/pages/docs/operations.astro:38.
     found = slo.evaluate(
         target(),
         (metric(100.0, EARLIER), metric(100.0, "2026-10-21T12:00:00+00:00")),

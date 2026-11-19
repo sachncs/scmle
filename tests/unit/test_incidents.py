@@ -43,6 +43,7 @@ def open_incident(workflow: incidents.Incidents) -> incidents.Incident:
 
 
 def test_workflow_is_idempotent_and_preserves_runbook_and_rollback(tmp_path):
+    # Enforces website/src/pages/docs/operations.astro:72.
     workflow = incidents.Incidents(tmp_path / "incidents.jsonl")
     first = open_incident(workflow)
     second = open_incident(workflow)
@@ -98,6 +99,7 @@ def test_workflow_requires_acknowledgement_before_evidence_backed_resolution(
 
 
 def test_tampered_or_reordered_journal_fails_closed(tmp_path):
+    # Enforces website/src/pages/docs/operations.astro:72.
     path = tmp_path / "incidents.jsonl"
     workflow = incidents.Incidents(path)
     open_incident(workflow)

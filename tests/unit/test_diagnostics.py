@@ -217,7 +217,7 @@ def make_clustered_inputs(clusters=40, per_cluster=15, seed=0, grouped=True):
 
 
 def test_uncertainty_reports_an_interval_around_the_estimate():
-    # Enforces docs/ARCHITECTURE.md:122.
+    # Enforces docs/ARCHITECTURE.md:128.
     report = bootstrap.Uncertainty().compute(make_inputs(tasks.Task.BINARY))
     low, high = report["ci_95"]
     assert low <= report["estimate"] <= high and high - low < 0.2
@@ -226,7 +226,7 @@ def test_uncertainty_reports_an_interval_around_the_estimate():
 
 
 def test_group_bootstrap_is_wider_than_a_naive_row_bootstrap():
-    # Enforces docs/ARCHITECTURE.md:122.
+    # Enforces docs/ARCHITECTURE.md:128.
     clustered = bootstrap.Uncertainty().compute(make_clustered_inputs())
     naive = bootstrap.Uncertainty().compute(
         make_clustered_inputs(grouped=False)
@@ -241,7 +241,7 @@ def test_group_bootstrap_is_wider_than_a_naive_row_bootstrap():
 
 
 def test_temporal_inputs_use_contiguous_blocks():
-    # Enforces docs/ARCHITECTURE.md:122.
+    # Enforces docs/ARCHITECTURE.md:128.
     inputs = make_inputs(tasks.Task.BINARY)
     temporal = diagnostics.DiagnosticInput(
         inputs.estimator,

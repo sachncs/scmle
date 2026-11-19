@@ -41,6 +41,8 @@ def test_publishing_waits_for_every_check_and_the_evidence():
     PyPI upload is reachable only after the tag check, the platform tests and
     the preflight have passed, and only after the full suite, the skip check,
     the benchmark regression gate and the artifact checks in its own job.
+
+    Also enforces website/src/pages/docs/releasing.astro:9.
     """
     found = jobs()
     assert needs(found["publish"]) == {"test", "release-checks"}

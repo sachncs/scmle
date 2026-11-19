@@ -17,7 +17,10 @@ class Store:
 
 
 def test_no_success_criteria_blocks_the_release_and_invents_none():
-    """Enforces docs/DECISIONS.md:221."""
+    """Enforces docs/DECISIONS.md:221.
+
+    Also enforces website/src/learn/decisions.html:82.
+    """
     context = types.SimpleNamespace(
         task=tasks.Task.BINARY,
         metric=types.SimpleNamespace(name="roc_auc", greater_is_better=True),

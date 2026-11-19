@@ -50,6 +50,12 @@ dummy baseline   : 0.5
   not say which is better.
 * **Baseline**: the dummy model scores 0.5. Check that you beat it by a margin
   that matters to you.
+* **Served model** (`shipped`): after the exam, the winner is refit on every
+  row, learning and exam, and that refit is what the bundle serves. The exam
+  score stays that of the fit that never saw the exam rows, so it is a
+  slightly cautious preview of the served model. `shipped.refit` is false,
+  with the `reason`, when a charter governs the run, training was streamed,
+  or the refit would not finish in time.
 
 A trustworthy gap between practice and exam is small, and the exam is often a
 little lower. If the exam is much lower than practice, the model memorised.
@@ -207,9 +213,12 @@ The run also told us:
 
 It means the exam score of 0.885 may be a little high, because a copy of an
 exam row might sit among the learning rows. Cure: remove duplicates, or name a
-group column if copies belong to one entity. In a charter run, SCMLE keeps
-copies on the same side of the split automatically (the run logged
-`110 groups of duplicate rows (339 rows) kept on one side of every split`).
+group column if copies belong to one entity. Otherwise SCMLE treats rows as
+exchangeable draws, as scikit-learn's k-fold and OpenML's splits do: a
+future case may repeat a past one, so repeats may fall on both sides, and
+the split notes count them (for example `68 of 203 test rows repeat a
+development record`). In a charter run, SCMLE keeps copies of one record on
+the same side of the split automatically.
 
 ## Reading calibration and thresholds
 

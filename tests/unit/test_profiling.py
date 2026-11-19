@@ -63,6 +63,8 @@ def test_task_resolution(classification_frame):
 
 def test_ambiguous_integer_target_blocks(classification_frame):
     # Enforces README.md:132.
+    # Enforces website/src/pages/index.astro:313.
+    # Enforces website/src/pages/docs/architecture.astro:48.
     ambiguous = classification_frame.assign(
         y=numpy.arange(len(classification_frame)) % 5
     )
@@ -110,6 +112,7 @@ def test_missing_configured_column(classification_frame):
 
 def test_leaky_feature_flagged(classification_frame):
     # Enforces docs/ARTIFACTS.md:32.
+    # Enforces website/src/pages/docs/artifacts.astro:15.
     leaky = classification_frame.assign(leak=classification_frame["y"] * 10 + 1)
     result = profile(leaky)[1]
     assert any("'leak'" in finding for finding in result.risk_findings)

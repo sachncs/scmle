@@ -13,7 +13,21 @@ without the network, at most `refusal.ROWS` rows):
 
 * `clean`: tables as published, with the task a practitioner would declare
   and the documented leak columns of four tables removed. A block is a
-  false block; any other refusal or a crash also counts against the row.
+  false block; any other refusal or a crash also counts against the row,
+  as docs/preregistration/c2.md words it ("does not reach a plan for any
+  reason"): a table the split gate refuses (a class too rare for the test
+  rows) is a false block of the row, though not of the screen, and the
+  row's `outcomes` count the two apart (`refused`, `blocked`). The first 78
+  tables
+  were chosen by hand. The rest follow a rule fixed before any of them was
+  screened: every real table of the C14 catalog (`refusal.EXTRA`, then
+  `refusal.SUITE`: four published OpenML suites and the tables cached
+  before them) not already here, with the task C14 declares, except a
+  table that is one already here under another source (`SAME`). None of
+  them has a documented leak (C14 excludes copies, and its one documented
+  leak, NYC green taxi `total_amount`, is already here with the column
+  removed). The rule adds 89 tables, so the 86 clean tables the first Holm
+  step needs are reached.
 * `leak`: two provenances, stated on every case.
   `documented real leak`: the real leaked dataset itself (Titanic `boat`
   and `body`, recorded after the sinking; bank marketing `V12`, the call
@@ -26,13 +40,21 @@ without the network, at most `refusal.ROWS` rows):
   noise), `duplicates` (three in ten rows copied, so copies straddle the
   split) or `future_timestamp` (a closing date that falls later for the
   positive class or a larger target). A leak is caught only when the
-  screen blocks the run.
+  screen blocks the run. A closing date is screened as its user would run
+  it: that user scores records as of a known moment, the snapshot the
+  closing dates fall after (`START`), and declares it (`cutoff`); without
+  that declaration a closing date cannot be told from a legitimate trend.
 
 Rows decided (`acceptance.toml`): recall, the one-sided Clopper-Pearson
 lower bound of caught over leak cases, at least `leak_recall_min` (Floor);
 false blocks, the upper bound over clean cases, at most `false_block_max`
-(Ceiling). Both must pass. A row with fewer cases than its rule's minimum
-cannot pass.
+(Ceiling). Both must pass. Each bound is taken at its Holm-adjusted `alpha`
+(`holm`) over the `FAMILY` stage-D rows of docs/preregistration/c2.md (C2
+recall and false blocks, C14 refusal rate and precision); the C14 rows are
+decided elsewhere and enter here as not rejected, which can only lower
+the C2 levels. A row with fewer cases than its rule's minimum at the first
+Holm step cannot pass. A case whose table cannot be loaded counts against
+its row (a miss, or a false block), never out of it.
 
 NOT measured: entity-level leaks, leaks labelled by people not working on
 the screen, a sealed corpus, tables over `refusal.ROWS` rows, task kinds
@@ -58,6 +80,7 @@ import warnings
 
 import numpy
 import pandas
+from scipy import stats
 
 from benchmarks import acceptance
 from benchmarks.evidence import refusal
@@ -67,6 +90,7 @@ import scmle.assurance.admissibility.screen.fitting
 import scmle.assurance.admissibility.screen.hypotheses
 import scmle.assurance.admissibility.screen.permutation
 import scmle.assurance.admissibility.screen.planning
+import scmle.assurance.admissibility.screen.records
 import scmle.assurance.admissibility.screen.report
 import scmle.assurance.admissibility.screen.settings
 from scmle.assurance.detectors import certificates
@@ -99,6 +123,11 @@ COPIES = 0.3
 SHIFT = 30
 JITTER = 5.0
 START = pandas.Timestamp("2020-01-01")
+# Rows in the stage-D Holm family (docs/preregistration/c2.md, c14.md).
+FAMILY = 4
+# C14 tables that are a clean table here under another source: OpenML id to
+# the source used here.
+SAME = {61: "load_iris"}
 NOT_MEASURED = (
     "entity-level leaks",
     "a corpus labelled by people not working on the screen",
@@ -139,6 +168,8 @@ class Case:
             documented case, or empty for a clean case.
         provenance: `REAL`, `PLANTED` or `clean real data`.
         column: The leaking column, empty for duplicates and clean cases.
+        cutoff: The prediction time its user declares (`Dataset.cutoff`),
+            empty for none.
     """
 
     name: str
@@ -147,6 +178,7 @@ class Case:
     kind: str = ""
     provenance: str = "clean real data"
     column: str = ""
+    cutoff: str = ""
 
 
 def clean() -> list[Table]:
@@ -193,6 +225,15 @@ def clean() -> list[Table]:
         Table("titanic", 40945, "survived", CLASSIFY, ("boat", "body")),
         Table("green_taxi", 42729, "tip_amount", REGRESS, ("total_amount",)),
     ]
+    have = {t.source for t in found}
+    found += [
+        Table(f"openml_{source}", source, target, task)
+        for source, (_, _, target, task) in {
+            **refusal.EXTRA,
+            **refusal.SUITE,
+        }.items()
+        if source not in have and source not in SAME
+    ]
     return found
 
 
@@ -234,6 +275,7 @@ def catalog() -> dict[str, Case]:
     for base in BASES:
         for kind in KINDS:
             column = "" if kind == "duplicates" else name(kind)
+            moment = START.isoformat() if kind == "future_timestamp" else ""
             cases.append(
                 Case(
                     f"leak/{base}/{kind}",
@@ -242,6 +284,7 @@ def catalog() -> dict[str, Case]:
                     kind,
                     PLANTED,
                     column,
+                    moment,
                 )
             )
     return {c.name: c for c in cases}
@@ -415,6 +458,7 @@ def attempt(case: Case) -> dict[str, Any]:
                 case.table.target,
                 task=case.table.task,  # type: ignore[arg-type]
                 leakage_policy="block",
+                cutoff=case.cutoff or None,
                 output_dir=folder,
             )
             project.plan()
@@ -456,20 +500,27 @@ def screened(name: str) -> dict[str, Any]:
 
 
 def tally(
-    records: list[dict[str, Any]], corpus: str, counted: Callable[..., bool]
+    records: list[dict[str, Any]],
+    corpus: str,
+    counted: Callable[..., bool],
+    level: float | None = None,
 ) -> dict[str, Any]:
-    """Counts one corpus and decides its row.
+    """Counts one corpus and decides its row at one level.
 
-    Cases whose table is missing are left out of the count (and reported
-    by `problems`).
+    A case whose table is missing counts against the row: a leak it hid is
+    not caught (`caught`), and a clean table it held did not reach a plan
+    (`blocked`).
 
     Args:
         records: Every case's record.
         corpus: `clean` or `leak`.
         counted: Whether a record counts as a hit (a catch, or a block).
+        level: The one-sided level of the bound; None is `alpha` over
+            `FAMILY` (the first Holm step; `decide` sets each row's own).
 
     Returns:
-        Hits, trials, the outcome counts, the bound and whether it passes.
+        Hits, trials, the outcome counts, the level, the minimum cases at
+        the first Holm step, the bound and whether it passes.
     """
     variables = acceptance.load()
     alpha = variables["alpha"].value
@@ -477,15 +528,12 @@ def tally(
     rule = variables[variable].rule
     if rule is None:
         raise errors.InputError(f"{variable} must have a rule")
-    chosen = [
-        r
-        for r in records
-        if r["corpus"] == corpus and r["outcome"] != "missing"
-    ]
+    chosen = [r for r in records if r["corpus"] == corpus]
     hits = sum(counted(r) for r in chosen)
     outcomes: dict[str, int] = {}
     for r in chosen:
         outcomes[r["outcome"]] = outcomes.get(r["outcome"], 0) + 1
+    used = alpha / FAMILY if level is None else level
     return {
         "variable": variable,
         "threshold": variables[variable].value,
@@ -493,10 +541,84 @@ def tally(
         "trials": len(chosen),
         "rate": hits / len(chosen) if chosen else None,
         "outcomes": dict(sorted(outcomes.items())),
-        "minimum": rule.minimum(alpha),
-        "bound": bound(hits, len(chosen), alpha, corpus == "leak"),
-        "passed": rule.passes(hits, len(chosen), alpha),
+        "level": used,
+        "minimum": rule.minimum(alpha / FAMILY),
+        "bound": bound(hits, len(chosen), used, corpus == "leak"),
+        "passed": rule.passes(hits, len(chosen), used),
     }
+
+
+def chance(row: dict[str, Any]) -> float:
+    """The exact one-sided p-value of a row against its threshold.
+
+    The Clopper-Pearson bound passes at level `a` exactly when this is at
+    most `a`, so Holm can order the rows by it.
+
+    Args:
+        row: A row from `tally`.
+
+    Returns:
+        `P(X >= hits)` under `Binomial(trials, threshold)` for recall (a
+        floor), `P(X <= hits)` for false blocks (a ceiling); 1 with no
+        trials.
+    """
+    if row["trials"] == 0:
+        return 1.0
+    if row["variable"] == RECALL:
+        tail = stats.binom.sf(row["hits"] - 1, row["trials"], row["threshold"])
+    else:
+        tail = stats.binom.cdf(row["hits"], row["trials"], row["threshold"])
+    return float(tail)
+
+
+def holm(chances: list[float], alpha: float) -> list[tuple[float, bool]]:
+    """Holm's step-down levels for the rows measured here.
+
+    The family has `FAMILY` rows; those not measured here (the C14 rows)
+    enter as not rejected (p = 1), which only lowers these levels. The row
+    of rank `i` (0 first, by p-value) is decided at `alpha / (FAMILY - i)`,
+    and only when every row ranked before it passed.
+
+    Args:
+        chances: The p-value of each row, from `chance`.
+        alpha: The family-wise level.
+
+    Returns:
+        Per row, in the given order: its level, and whether every row
+        ranked before it passed.
+    """
+    found = [(0.0, False)] * len(chances)
+    reached = True
+    order = sorted(range(len(chances)), key=chances.__getitem__)
+    for rank, index in enumerate(order):
+        level = alpha / (FAMILY - rank)
+        found[index] = (level, reached)
+        reached = reached and chances[index] <= level
+    return found
+
+
+def decide(
+    records: list[dict[str, Any]],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Both rows, each at its Holm-adjusted level.
+
+    Args:
+        records: Every case's record.
+
+    Returns:
+        The recall row and the false-block row; a row passes only when its
+        own bound passes and every row Holm ranks before it passed.
+    """
+    alpha = acceptance.load()["alpha"].value
+    plan = (("leak", caught), ("clean", blocked))
+    first = [tally(records, corpus, counted) for corpus, counted in plan]
+    steps = holm([chance(r) for r in first], alpha)
+    rows = []
+    for (corpus, counted), (level, reached) in zip(plan, steps, strict=True):
+        row = tally(records, corpus, counted, level)
+        row["passed"] = bool(row["passed"] and reached)
+        rows.append(row)
+    return rows[0], rows[1]
 
 
 def bound(hits: int, trials: int, alpha: float, lower: bool) -> float | None:
@@ -520,7 +642,7 @@ def bound(hits: int, trials: int, alpha: float, lower: bool) -> float | None:
 
 
 def caught(record: dict[str, Any]) -> bool:
-    """Whether the screen blocked a leaking case."""
+    """Whether the screen blocked a leaking case; a missing table is not."""
     return bool(record["outcome"] == "blocked")
 
 
@@ -540,7 +662,7 @@ def breakdown(records: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
     """
     groups: dict[str, dict[str, int]] = {}
     for r in records:
-        if r["corpus"] != "leak" or r["outcome"] == "missing":
+        if r["corpus"] != "leak":
             continue
         label = r["kind"] if r["provenance"] == PLANTED else "documented"
         for key in (label, r["provenance"]):
@@ -567,6 +689,7 @@ def digest() -> str:
         scmle.assurance.admissibility.screen.hypotheses,
         scmle.assurance.admissibility.screen.permutation,
         scmle.assurance.admissibility.screen.planning,
+        scmle.assurance.admissibility.screen.records,
         scmle.assurance.admissibility.screen.report,
         scmle.assurance.admissibility.screen.settings,
         profiler.Profiler.leakage_screen,
@@ -582,6 +705,9 @@ def digest() -> str:
         build,
         attempt,
         tally,
+        chance,
+        holm,
+        decide,
         caught,
         blocked,
     )
@@ -603,6 +729,7 @@ def measure(workers: int = WORKERS) -> dict[str, Any]:
     with futures.ProcessPoolExecutor(workers) as pool:
         records = list(pool.map(screened, names))
     variables = acceptance.load()
+    recall, blocks = decide(records)
     return {
         "claim": "C2",
         "alpha": variables["alpha"].value,
@@ -610,8 +737,8 @@ def measure(workers: int = WORKERS) -> dict[str, Any]:
             "Project(leakage_policy='block').plan(): ingest, split, profile "
             "the development rows, enforce the leakage policy; default seed"
         ),
-        "recall": tally(records, "leak", caught),
-        "false_blocks": tally(records, "clean", blocked),
+        "recall": recall,
+        "false_blocks": blocks,
         "kinds": breakdown(records),
         "cases": records,
         "not_measured": list(NOT_MEASURED),
@@ -645,8 +772,9 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
 
     Returns:
         Messages for a missing file, code that changed, a threshold other
-        than acceptance.toml's, a case whose table was missing, or a row
-        with fewer cases than its rule's minimum; empty when it decides.
+        than acceptance.toml's, or a row with fewer cases than its rule's
+        minimum at the first Holm step; empty when it decides. A missing
+        table does not stop the decision: it counts against its row.
     """
     found = read(document)
     if found is None:
@@ -667,17 +795,12 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
                 f"leakage: {variable} {row.get('threshold')} is not "
                 f"{variables[variable].value}"
             )
-        least = rule.minimum(alpha)
+        least = rule.minimum(alpha / FAMILY)
         if row.get("trials", 0) < least:
             issues.append(
                 f"leakage: {key} has {row.get('trials', 0)} cases; none can "
                 f"pass below {least}"
             )
-    missing = [
-        c["name"] for c in found.get("cases", []) if c["outcome"] == "missing"
-    ]
-    if missing:
-        issues.append(f"leakage: data missing for {', '.join(missing)}")
     return issues
 
 

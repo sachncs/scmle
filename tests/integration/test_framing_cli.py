@@ -64,6 +64,9 @@ def run(tmp_path, *extra):
 def test_frame_writes_artifacts_and_an_unsigned_charter(tmp_path):
     # Enforces docs/CLI.md:32.
     # Enforces docs/ARTIFACTS.md:69.
+    # Enforces website/src/pages/docs/artifacts.astro:46.
+    # Enforces website/src/pages/docs/causal-decision.astro:44.
+    # Enforces website/src/pages/docs/cli.astro:17.
     inputs(tmp_path)
     assert run(tmp_path, "--cost-model", str(tmp_path / "cost.json")) == 0
     out = tmp_path / "out"
@@ -85,6 +88,11 @@ def test_frame_refuses_a_request_naming_a_missing_column(tmp_path):
     # Enforces docs/CLI.md:32.
     # Enforces docs/ARTIFACTS.md:69.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:22.
+    # Enforces website/src/learn/when-things-go-wrong.html:11.
+    # Enforces website/src/pages/docs/artifacts.astro:46.
+    # Enforces website/src/pages/docs/causal-decision.astro:33.
+    # Enforces website/src/pages/docs/causal-decision.astro:40.
+    # Enforces website/src/pages/docs/cli.astro:17.
     inputs(tmp_path)
     (tmp_path / "request.txt").write_text("Predict `churn_flag`.")
     assert run(tmp_path) == 2
@@ -99,6 +107,10 @@ def test_frame_replay_without_tau_is_refused(tmp_path):
     # Enforces docs/ARTIFACTS.md:82.
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:266.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:335.
+    # Enforces website/src/learn/what-scmle-cannot-do.html:70-71.
+    # Enforces website/src/learn/when-things-go-wrong.html:147.
+    # Enforces website/src/pages/docs/artifacts.astro:119.
+    # Enforces website/src/pages/docs/causal-decision.astro:46.
     inputs(tmp_path)
     sample = {
         "target": "churn",

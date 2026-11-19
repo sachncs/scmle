@@ -1,41 +1,48 @@
 {
   "certificates": [
     {
-      "code_hash": "57d42dcb0dae15c932820dcb63d22c81ab5e0a19a87a99ec86fbef187683e284",
-      "corpus_hash": "46c881a55f36c49c885d1407c0403ca2eb999f1064bac49e7642304f9130390a",
       "created": null,
-      "detector_id": "framing-selective-labels",
+      "detector": "framing-selective-labels",
+      "digests": {
+        "code": "57d42dcb0dae15c932820dcb63d22c81ab5e0a19a87a99ec86fbef187683e284",
+        "corpus": "46c881a55f36c49c885d1407c0403ca2eb999f1064bac49e7642304f9130390a"
+      },
       "outcomes": [
         {
+          "alarms": [
+            0.0,
+            0.005973551516349557
+          ],
           "certificate": {
-            "clean_rows": 500,
-            "defect_type": "selective_labels",
+            "alarms": 0,
+            "clean": 500,
+            "defect": "selective_labels",
             "detected": 500,
-            "detector_id": "framing-selective-labels",
-            "false_alarms": 0,
+            "detector": "framing-selective-labels",
             "planted": 500,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "framing.certify.labels",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0,
-            0.007624340461552241
-          ],
           "passed": true,
-          "recall_interval": [
-            0.9923756595384479,
+          "recall": [
+            0.9940264484836504,
             1.0
-          ]
+          ],
+          "schema_version": 2
         }
       ],
       "policy": {
-        "confidence": 0.95,
-        "false_alarm_ceiling": 0.05,
-        "recall_floor": 0.95
+        "alarms": 0.05,
+        "confidence": 0.9,
+        "method": "exact",
+        "recall": 0.95,
+        "schema_version": 3
       },
+      "schema_version": 2,
       "seeds": [
         0
       ]

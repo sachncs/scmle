@@ -90,6 +90,29 @@ def test_the_ceiling_bound_is_the_beta_quantile():
     assert not rule.passes(0, 0, ALPHA)
 
 
+def test_the_limit_is_the_one_sided_bound_each_rule_compares():
+    ceiling, floor = acceptance.Ceiling(0.01), acceptance.Floor(0.80)
+    upper = stats.beta.ppf(1 - ALPHA, 16, 985)
+    assert ceiling.limit(15, 1000, ALPHA) == pytest.approx(upper)
+    assert not ceiling.passes(15, 1000, ALPHA)
+    lower = stats.beta.ppf(ALPHA, 382, 119)
+    assert floor.limit(382, 500, ALPHA) == pytest.approx(lower)
+    assert floor.passes(382, 500, ALPHA) == (lower >= 0.80)
+    assert ceiling.limit(0, 0, ALPHA) == 1.0
+    assert floor.limit(0, 0, ALPHA) == 0.0
+
+
+def test_a_named_rule_is_read_with_its_kind_checked():
+    assert acceptance.ceiling("false_block_max") == acceptance.Ceiling(0.05)
+    assert acceptance.floor("leak_recall_min", VARIABLES) == acceptance.Floor(
+        0.90
+    )
+    with pytest.raises(ValueError, match="ceiling"):
+        acceptance.ceiling("leak_recall_min", VARIABLES)
+    with pytest.raises(ValueError, match="floor"):
+        acceptance.floor("alpha", VARIABLES)
+
+
 def test_the_floor_bound_is_the_beta_quantile():
     rule = acceptance.Floor(0.90)
     hits, trials = 95, 100
@@ -199,6 +222,41 @@ def test_a_file_without_alpha_is_refused(tmp_path):
     )
     with pytest.raises(ValueError, match="alpha"):
         acceptance.load(path)
+
+
+def test_a_ceiling_at_the_level_fails_most_correctly_sized_tests():
+    """The old size rule: a test whose true size is its level rarely passes."""
+    assert power(acceptance.Ceiling(0.01), 0.01, 2000, ALPHA) < 0.1
+    assert power(acceptance.Ceiling(0.05), 0.05, 2000, ALPHA) < 0.1
+
+
+@pytest.mark.parametrize(
+    ("level", "trials"), [(0.01, 2000), (0.05, 500), (0.05, 1000), (0.05, 2000)]
+)
+def test_the_margin_is_the_smallest_that_passes_a_sized_test_with_power(
+    level, trials
+):
+    found = acceptance.margin(level, trials, ALPHA, 0.8)
+    assert found > 0
+    exact = acceptance.Ceiling(level * (1 + found))
+    assert power(exact, level, trials, ALPHA) >= 0.8
+    short = acceptance.Ceiling(level * (1 + found) - 1e-9)
+    assert power(short, level, trials, ALPHA) < 0.8
+
+
+def test_a_size_ceiling_is_the_level_times_one_plus_the_margin():
+    margin = VARIABLES["size_margin"].value
+    assert acceptance.sized(0.01, VARIABLES).bound == pytest.approx(
+        0.01 * (1 + margin)
+    )
+    assert acceptance.sized(0.05).bound == pytest.approx(0.05 * (1 + margin))
+
+
+def test_a_size_ceiling_still_fails_a_test_of_twice_its_level():
+    rule = acceptance.sized(0.01, VARIABLES)
+    assert rule.passes(24, 2000, ALPHA)
+    assert not rule.passes(25, 2000, ALPHA)
+    assert power(rule, 0.02, 2000, ALPHA) < 0.01
 
 
 def test_the_table_lists_the_minimum_of_statistical_rows():

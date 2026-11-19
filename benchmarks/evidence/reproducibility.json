@@ -1,6 +1,6 @@
 {
   "claim": "C6",
-  "code": "0541e70bed12ea3237d52290af1f70f0e3737cbd79b6feaf11603f15ccb2efef",
+  "code": "cf0c8c357ff4083035a393de6d27b599ffd3da14e8f5982c7ca54d30df9ec49d",
   "not_measured": [
     "platforms other than those recorded here",
     "a clean-runner rebuild from the lock file",
@@ -27,7 +27,7 @@
         }
       },
       "rows": 600,
-      "seconds": 40.0,
+      "seconds": 431.1,
       "seed": 7,
       "tasks": {
         "binary": {
@@ -39,12 +39,12 @@
           "hashes": {
             "conformal.json": "0acdda4b2b8c5dbe0edd17b67714f67870510c27b6aa4b098e905a1ef2cbf5b4",
             "coverage_report.json": "f9bed89f1d321a3592f3d0dd6c7bf7098cbf8b4760552fd66b676194033b1e3b",
-            "model_manifest.json": "86db41c2adba922b1c38fb90819c3fadbd042d43b57b1a95b999e72a018392bd",
+            "model_manifest.json": "3405cbb00b4541f8f6a24f9b67538ffcbbecab5ed935109acd5375b97f5af571",
             "novelty.joblib": "9064537f33db4f61ea6aec6caa8949613d712c7d86338820fc2c81e15f5d9ffc",
             "pipeline.joblib": "25c6a38f56b6b844980d4c4249a0f3087cccfba417bcb956411d1c8e9f02f8a8",
             "reference.json": "f3a2b0a07b368a3db9d76bc84632627fa2e06ccfc5159d5d4cc54cd521e91b61",
             "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
-            "signature.json": "f02626e025477e8674603190823f74f0edf1698fe79d68c73f917c57d16f97f8"
+            "signature.json": "3693af0e88573bdbc66816fbeaa9714ecf6fec8d5876c6f88cac17dcf394e06a"
           },
           "members": 8,
           "metrics": {
@@ -56,8 +56,8 @@
             "roc_auc": 0.9598997493734336
           },
           "seconds": [
-            2.8,
-            2.6
+            90.8,
+            71.2
           ],
           "selected": [
             "logistic_regression",
@@ -66,7 +66,7 @@
           "threads": [
             {
               "internal_api": "openmp",
-              "num_threads": 1,
+              "num_threads": 12,
               "version": null
             }
           ],
@@ -85,12 +85,12 @@
           "hashes": {
             "conformal.json": "c53e56dc776e7d91b89229f5d1e56fff73a83958ac28e8749622fca806b1682f",
             "coverage_report.json": "55c021183fefafdc785e94307e24357426835fdde481bf6afa0d8d2cf80bf626",
-            "model_manifest.json": "613a03450526808d7655fb60398eccf444cf7dbae300508f4b97f757cd4871cd",
+            "model_manifest.json": "b98f5de61d168979a5808f93b5273e6ab016400f102d7ba895bf118ba6658eb4",
             "novelty.joblib": "72bb57854c0eb134a0a5841141e9a9fba807580b0e004a6e011ddb93387fd8c5",
             "pipeline.joblib": "cd71db618141ea12d9303539a7690952599fa87864c4d1a7f78a4951b1eeb175",
             "reference.json": "f29412558b3106cc485aec7a6205161133b031f43ccc0c4171a66969946a88d3",
             "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
-            "signature.json": "a533330025055eeead19f63375e20ae4cd11dfe2335879f132bd67163dce5332"
+            "signature.json": "4f3d02baadb89bd2fd11c7cce9050444bb2dac70b73fbdaf5d2853a21f590e3e"
           },
           "members": 8,
           "metrics": {
@@ -102,8 +102,8 @@
             "roc_auc": 0.8672135706340378
           },
           "seconds": [
-            3.2,
-            3.2
+            10.8,
+            17.0
           ],
           "selected": [
             "random_forest",
@@ -112,7 +112,7 @@
           "threads": [
             {
               "internal_api": "openmp",
-              "num_threads": 1,
+              "num_threads": 12,
               "version": null
             }
           ],
@@ -131,12 +131,12 @@
           "hashes": {
             "conformal.json": "fd926007ec8e2278e82be3604bf8682a74f60ddef350ff31a9e20e3377a6f383",
             "coverage_report.json": "b962ed592bbe565cdd5f0f077845291d96ee79798a9ae931849d5300a6eecdfe",
-            "model_manifest.json": "1d8a6f84f85aa2702216916a2e1dbebce86a1616fb406f77877577afb3f82d9e",
+            "model_manifest.json": "c7d6d7afdcd26e5b8188f98acb206afe51899cade1f7dd0c74080632075d373e",
             "novelty.joblib": "54146f7d822f6789680d2c004377f2e6997f4ee654b926cd59694542afbf9ad5",
             "pipeline.joblib": "546d3b2c6b395a50e948d8721059e4debf844f63c3b43ed8bf74c7e780603d9b",
             "reference.json": "09bb8ca652ed2976ce402c34ee1e2f2654b787e23e762cf06680eb54569a354e",
             "schema.json": "9328b9e7e7899e6e6b1d43ca3a12e7f80488bcaa10e8c94828b369f9bf5b8af0",
-            "signature.json": "c843b1612767de377cd4373e1136fae2d9a0118ddda212aa44a25225859a5ce5"
+            "signature.json": "ac69afa110185008ef5a2ec40c1addea26c18d9b087cabbc3d37bd42b117f4db"
           },
           "members": 8,
           "metrics": {
@@ -146,8 +146,8 @@
             "log_loss": 0.6388598548604971
           },
           "seconds": [
-            6.4,
-            6.5
+            110.3,
+            80.4
           ],
           "selected": [
             "logistic_regression",
@@ -156,7 +156,7 @@
           "threads": [
             {
               "internal_api": "openmp",
-              "num_threads": 1,
+              "num_threads": 12,
               "version": null
             }
           ],
@@ -174,15 +174,15 @@
           },
           "hashes": {
             "conformal.json": "8fb2722c2938e9ae4ae988f90d1cc883e82fb68af215402e43a6379b757a6e65",
-            "coverage_report.json": "5746ebe9f1977517097a44780d1848a2aa38848533b6cefc4a846549344e9d5b",
+            "coverage_report.json": "f604902133c14be33cfe73a4accc206187de8048258ab0020f7a269da4ac7a2d",
             "cv_plus.joblib": "5af87ecc7e65ebd6628eb6cb433fed95d124ab70977d640e464ef13d9aec755f",
-            "model_manifest.json": "39f5abfdd132d495c96e7518850ad2b49f60c1fda9fc9425ae6b1f7fe465aed5",
+            "model_manifest.json": "28f25cf432e2f957ba1827d7c9bb8ca67871bd1c52fd126b181ce85c0aa19680",
             "novelty.joblib": "73b4418b09c0fe119f7d1511ba86a24231b4a831d15cd245bafbb61a40214616",
             "pipeline.joblib": "317b000b380bc7a615582d023de6d24ce9412569eb1d779cd48d37c253e96174",
-            "quantile.joblib": "b089c6326f85845b73bfb3cc867fdb699f9fbbeee4cdc17ed380ab8c04071dbe",
+            "quantile.joblib": "6cb3e30bbc1fc6c492b0d4fbf2386468b23fffdcd15111246088d86ee745145f",
             "reference.json": "df3913ce339ff0d93403e28f4a9a3080dd5083de297d1ee92ee039ad2647df93",
             "schema.json": "26fb7bc1a1560ce271d432aedc31d2dfcb678bbb14221244681825785972337f",
-            "signature.json": "9bd9960afbb790354509a87b59c69e2d4e75a02cafc70bbc4732d1d213775933"
+            "signature.json": "df08ffc366e1a8de64d04c93153418a32a7757410c66b635231652fdce9d7239"
           },
           "members": 10,
           "metrics": {
@@ -191,8 +191,8 @@
             "rmse": 0.929535482795817
           },
           "seconds": [
-            2.4,
-            2.4
+            18.9,
+            16.5
           ],
           "selected": [
             "ridge",
@@ -201,7 +201,7 @@
           "threads": [
             {
               "internal_api": "openmp",
-              "num_threads": 1,
+              "num_threads": 12,
               "version": null
             }
           ],

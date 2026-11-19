@@ -57,8 +57,10 @@ def test_tampering_with_any_byte_fails_verification(tmp_path, offset):
 
 
 def test_editing_a_field_without_resigning_fails(tmp_path):
-    # Enforces docs/READING_RESULTS.md:247.
+    # Enforces docs/READING_RESULTS.md:256.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:378.
+    # Enforces website/src/learn/reading-results.html:133.
+    # Enforces website/src/learn/when-things-go-wrong.html:164.
     path = tmp_path / "analysis_charter.json"
     sealing.inscribe(path, make_charter(), signing_key=KEY)
     record = json.loads(path.read_text())
@@ -70,6 +72,7 @@ def test_editing_a_field_without_resigning_fails(tmp_path):
 
 def test_an_amendment_may_only_tighten_the_budget():
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:388.
+    # Enforces website/src/learn/when-things-go-wrong.html:168-169.
     base = make_charter()
     tighter = make_charter(quota=5)
     looser = make_charter(quota=20)

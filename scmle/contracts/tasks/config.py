@@ -27,6 +27,14 @@ FAST_SEARCH_CONFIGS = 3
 MIN_ORDINAL_LEVELS = 3
 MIN_TARGETS = 2
 
+# Fields added after version 1, per section, with the value the version-1
+# layout meant by their absence. A configuration at that value anchors
+# without the field, so its hash is the one it had before the field existed.
+ADDED: dict[str, dict[str, Any]] = {
+    "data": {"cutoff": None},
+    "validation": {"entities": "known"},
+}
+
 FAIRNESS_WEIGHT = "fairness_weight"
 """Weight column the reweighing mitigation adds to development rows."""
 
@@ -288,12 +296,17 @@ class Config(sections.Section):
         """Returns the configuration in its version-1 layout (field names).
 
         Returns:
-            The JSON dump with every section moved back to its field names,
-            the layout `config_hash` is taken on.
+            The JSON dump with every section moved back to its field names
+            and each field of `ADDED` left out at its implied value, the
+            layout `config_hash` is taken on.
         """
         layout = self.spelling.downgrade(self.model_dump(mode="json"))
         for name, kind in parts().items():
             layout[name] = kind.spelling.downgrade(layout[name])
+        for name, fields in ADDED.items():
+            for field, implied in fields.items():
+                if layout[name].get(field) == implied:
+                    del layout[name][field]
         return layout
 
     def config_hash(self) -> str:
@@ -378,6 +391,10 @@ def validate(config: Config) -> None:
     ) and validation.strategy not in ("rolling", "auto"):
         raise errors.InputError(
             "horizon_rows and window_rows apply to the rolling strategy"
+        )
+    if validation.entities == "unseen" and not data.group_column:
+        raise errors.InputError(
+            "validation.entities 'unseen' requires data.group_column"
         )
     if data.feature_delays and not data.time_column:
         raise errors.InputError("data.feature_delays requires data.time_column")

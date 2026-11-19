@@ -54,21 +54,9 @@ import threadpoolctl
 
 from benchmarks import acceptance
 from benchmarks import reliability
+from benchmarks import sources
 import scmle
-import scmle.api.project
 from scmle.artifacts import bundle
-import scmle.artifacts.bundle.archive
-import scmle.artifacts.bundle.core
-import scmle.artifacts.bundle.environment
-import scmle.artifacts.bundle.explanation
-import scmle.artifacts.bundle.intervals
-import scmle.artifacts.bundle.layout
-import scmle.artifacts.bundle.model
-import scmle.artifacts.bundle.outputs
-import scmle.artifacts.bundle.provenance
-import scmle.artifacts.bundle.seal
-import scmle.artifacts.results
-from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
 
 PATH = pathlib.Path(__file__).with_suffix(".json")
@@ -350,27 +338,16 @@ def describe() -> dict[str, Any]:
 
 
 def fingerprint() -> str:
-    """Hash of the code whose behaviour the measurement depends on.
+    """Hash of all the code and locked libraries the measurement runs.
 
     Returns:
-        The `certificates.code_hash` of every bundle module, the project
-        and results modules, the quick project and data builders of
-        `benchmarks.reliability` and the measuring functions here.
+        The `sources.digest` of the measuring functions here and the quick
+        project and data builders of `benchmarks.reliability`, which covers
+        every product module they load (training, search, models,
+        evaluation, bundle), followed by the hash of `uv.lock`, which fixes
+        the library versions the training uses.
     """
-    return certificates.code_hash(
-        bundle,
-        scmle.artifacts.bundle.archive,
-        scmle.artifacts.bundle.core,
-        scmle.artifacts.bundle.environment,
-        scmle.artifacts.bundle.explanation,
-        scmle.artifacts.bundle.intervals,
-        scmle.artifacts.bundle.layout,
-        scmle.artifacts.bundle.model,
-        scmle.artifacts.bundle.outputs,
-        scmle.artifacts.bundle.provenance,
-        scmle.artifacts.bundle.seal,
-        scmle.api.project,
-        scmle.artifacts.results,
+    code = sources.digest(
         reliability.fast_project,
         reliability.binary_data,
         reliability.regression_data,
@@ -381,7 +358,13 @@ def fingerprint() -> str:
         differ,
         trace,
         compare,
+        root=ROOT,
     )
+    lock = ROOT / "uv.lock"
+    locked = (
+        hashlib.sha256(lock.read_bytes()).hexdigest() if lock.exists() else ""
+    )
+    return hashlib.sha256(f"{code}\n{locked}".encode("ascii")).hexdigest()
 
 
 def tolerance() -> float:

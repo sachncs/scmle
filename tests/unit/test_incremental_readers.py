@@ -138,7 +138,10 @@ def test_event_stream_source_polls_bounded_batches_with_retry_and_checkpoint():
 
 
 def test_event_stream_source_fails_closed_for_unbounded_or_oversized_reads():
-    """Transport callbacks cannot bypass the bounded event contract."""
+    """Transport callbacks cannot bypass the bounded event contract.
+
+    Also enforces website/src/pages/docs/data.astro:17.
+    """
     source = incremental.Stream(
         "pulsar://cluster/topic",
         lambda uri, checkpoint, limit: (
@@ -200,6 +203,7 @@ def test_incremental_state_rejects_cross_source_reads_and_commits(tmp_path):
 def test_idempotent_sink_commit_filters_duplicates_and_persists_receipt(
     tmp_path,
 ):
+    # Enforces website/src/pages/docs/data.astro:90.
     source = incremental.SequenceEventSource(
         "memory://events", [event("a", 1, 0), event("b", 2, 1)]
     )

@@ -35,6 +35,33 @@ def test_the_trial_count_is_the_planned_sample_from_acceptance():
     assert coverage.TRIALS >= planned >= least
 
 
+def test_the_worst_of_all_families_has_the_planned_power():
+    # Every family must pass, so a nominal interval passes the row with the
+    # product of the families' chances; that product, not each factor,
+    # must reach `coverage_power`.
+    variables = acceptance.load()
+    alpha = variables["alpha"].value
+    power = variables[coverage.POWER].value
+    truth = variables[coverage.ASSUMED].value
+    planned = coverage.required()[1]
+    each = coverage.rule().chance(truth, planned, alpha)
+    assert each ** len(coverage.FAMILIES) >= power
+    fewer = coverage.rule().chance(truth, planned - 1, alpha)
+    assert fewer ** len(coverage.FAMILIES) < power
+    assert planned == coverage.TRIALS
+
+
+def test_the_row_is_planned_for_joint_power_of_at_least_ninety_percent():
+    # A verdict within noise of the floor is decided by chance; the row is
+    # planned so a nominal interval passes all three families together at
+    # least nine times in ten.
+    variables = acceptance.load()
+    assert variables[coverage.POWER].value >= 0.90
+    assert variables[coverage.ASSUMED].value == 0.95
+    assert variables[coverage.POWER].kind == "policy"
+    assert coverage.TRIALS == 1678
+
+
 def test_a_current_document_with_enough_hits_passes():
     text, verdict = coverage.summary(document())
     assert coverage.problems(document()) == []
@@ -112,3 +139,29 @@ def test_the_stored_coverage_is_for_the_current_code():
     assert stored["code"] == coverage.digest()
     assert coverage.problems() == []
     assert coverage.summary()[1] in {"pass", "fail"}
+
+
+def test_a_change_to_training_or_model_code_makes_check_stale(
+    tmp_path, monkeypatch, capsys
+):
+    for name in coverage.PRODUCT:
+        folder = tmp_path / "scmle" / name
+        folder.mkdir(parents=True)
+        (folder / "unit.py").write_text("x = 1\n", encoding="utf-8")
+    monkeypatch.setattr(coverage, "PACKAGE", tmp_path / "scmle")
+    monkeypatch.setattr(coverage, "PATH", tmp_path / "coverage.json")
+    coverage.PATH.write_text(json.dumps(document()), encoding="utf-8")
+    assert coverage.main(["--check"]) == 0
+    for name in ("preparation", "models"):
+        changed = tmp_path / "scmle" / name / "unit.py"
+        changed.write_text("x = 2\n", encoding="utf-8")
+        assert coverage.main(["--check"]) == 1
+        assert "measured with other code" in capsys.readouterr().out
+        changed.write_text("x = 1\n", encoding="utf-8")
+    assert coverage.main(["--check"]) == 0
+
+
+def test_the_fingerprint_covers_the_training_and_model_packages():
+    assert {"preparation", "models", "evaluation"} <= set(coverage.PRODUCT)
+    for name in coverage.PRODUCT:
+        assert (coverage.PACKAGE / name).is_dir()

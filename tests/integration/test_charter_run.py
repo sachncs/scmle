@@ -45,6 +45,7 @@ def event(run_dir, kind):
 
 
 def test_a_charter_run_seals_c_even_in_cooperative_mode(binary_frame, tmp_path):
+    # Enforces website/src/pages/docs/threat-model.astro:24.
     result = run(binary_frame, tmp_path, inscribe(tmp_path))
 
     custody = event(result.run_dir, "custody.sealed")["data"]
@@ -204,6 +205,7 @@ def test_a_charter_run_writes_the_admissibility_artifacts(
     binary_frame, tmp_path
 ):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:248.
+    # Enforces website/src/learn/when-things-go-wrong.html:110.
     result = run(binary_frame, tmp_path, inscribe(tmp_path))
     folder = pathlib.Path(result.run_dir)
 
@@ -280,6 +282,7 @@ def test_a_valid_attestation_keeps_a_certified_suspect_and_is_ledgered(
     binary_frame, tmp_path
 ):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:297.
+    # Enforces website/src/learn/when-things-go-wrong.html:135.
     attestation = {
         "column": "echo",
         "lead_seconds": 60.0,
@@ -368,6 +371,7 @@ def test_a_charter_run_writes_valid_stability_and_shift_reports(
     binary_frame, tmp_path
 ):
     # Enforces docs/ARTIFACTS.md:43.
+    # Enforces website/src/pages/docs/artifacts.astro:27.
     import scmle.assurance.robustness.report
 
     result = run(binary_frame, tmp_path, inscribe(tmp_path))
@@ -418,6 +422,7 @@ def test_a_reference_sample_gives_a_pass_or_fail_never_unverifiable(
     binary_frame, tmp_path
 ):
     # Enforces docs/ARTIFACTS.md:43.
+    # Enforces website/src/pages/docs/artifacts.astro:27.
     reference = tmp_path / "reference.csv"
     binary_frame.drop(columns="y").head(200).to_csv(reference, index=False)
     result = run(
@@ -434,7 +439,36 @@ def test_a_reference_sample_gives_a_pass_or_fail_never_unverifiable(
     assert shifted["c2st"]["identifier"] == "f6-shift-c2st"
     assert shifted["mmd"]["subset"] == "X"
     assert {row["column"] for row in shifted["coverage"]} == {"c"}
-    assert shifted["periods"]["status"] == "not_run"
+    assert shifted["periods"] == {
+        "status": "unverifiable",
+        "reason": "the data have no time column",
+        "column": None,
+        "periods": [],
+    }
+
+
+def test_a_timed_charter_run_reports_drift_by_period(binary_frame, tmp_path):
+    timed = binary_frame.assign(t=range(len(binary_frame)))
+    timed.loc[timed.t >= 300, "b"] += 3.0
+
+    result = run(
+        timed,
+        tmp_path,
+        inscribe(tmp_path),
+        time_column="t",
+        validation="temporal",
+    )
+    shifted = json.loads(
+        (pathlib.Path(result.run_dir) / "shift_report.json").read_text()
+    )
+
+    periods = shifted["periods"]
+    assert periods["status"] == "fail"
+    assert periods["column"] == "t"
+    assert periods["periods"][0]["index"] == 0
+    assert periods["periods"][0]["start"] == "0"
+    assert sum(p["rows"] for p in periods["periods"]) < len(timed)
+    assert "b" in periods["periods"][-1]["rejected"]
 
 
 def test_a_run_without_a_charter_has_no_robustness_reports(
@@ -497,6 +531,7 @@ def test_a_charter_without_rules_is_reported_as_not_chartered(
 
 def test_a_specification_that_contradicts_the_chartered_rule_is_refused():
     # Enforces docs/CLI.md:85.
+    # Enforces website/src/pages/docs/cli.astro:68.
     from scmle.pipeline import stages
 
     assert stages.governing("x", "by", None, "by") == "by"
@@ -510,6 +545,7 @@ def test_the_summary_and_report_put_leaks_and_findings_first(
     binary_frame, tmp_path
 ):
     # Enforces docs/BEGINNER_FINDINGS.md:28.
+    # Enforces website/src/learn/beginner-findings.html:13.
     result = run(leaky_frame(binary_frame), tmp_path, leakage_policy="warn")
 
     assert "PROVISIONAL: 1 flagged column(s) not attested: echo" in (

@@ -22,6 +22,7 @@ from scmle import durability
 from scmle.contracts import errors
 from scmle.data.validation import columns
 from scmle.models.boosting import early_stopping
+from scmle.models.sklearn import trees
 from scmle.preparation import resampling
 from scmle.preparation import weighting
 from scmle.preparation import wrappers
@@ -254,7 +255,8 @@ def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
     while isinstance(model_step, MODEL_WRAPPERS):
         encoded = encoded or hasattr(model_step, "encoder_")
         model_step = model_step.estimator_
-    fitted.steps[-1] = (fitted.steps[-1][0], model_step)
+    # The converter looks estimators up by exact type.
+    fitted.steps[-1] = (fitted.steps[-1][0], trees.stock(model_step))
     options = (
         {id(fitted.steps[-1][1]): {"zipmap": False}}
         if bundle.classes is not None

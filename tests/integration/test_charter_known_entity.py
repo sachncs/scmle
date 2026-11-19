@@ -91,6 +91,7 @@ def test_without_the_field_whole_entities_are_the_units(tmp_path):
 
 
 def test_a_known_entity_charter_needs_the_entity_and_time_columns(tmp_path):
+    # Enforces website/src/pages/docs/qualification.astro:74.
     path = charter_file(tmp_path)
     with pytest.raises(errors.ConfigError, match="time_column"):
         run(tmp_path, path, time_column=None)
@@ -99,6 +100,7 @@ def test_a_known_entity_charter_needs_the_entity_and_time_columns(tmp_path):
 
 
 def test_a_known_entity_charter_refuses_an_entity_disjoint_validation(tmp_path):
+    # Enforces website/src/pages/docs/qualification.astro:74.
     path = charter_file(tmp_path)
     with pytest.raises(errors.ConfigError, match="time-ordered"):
         run(tmp_path, path, validation="group")

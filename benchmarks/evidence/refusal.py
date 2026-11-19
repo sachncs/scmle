@@ -25,7 +25,33 @@ The tasks are of three groups:
   bundled sets and the OpenML cache, extended by the `EXTRA` tables listed in
   `data/refusal/README.md`), each with the task a practitioner would
   declare. No real survival, ranking, forecast or uplift table is cached, so
-  those kinds are simulated only.
+  those kinds are simulated only. Every OpenML table is pinned: `fetch`
+  refuses one whose ARFF file, as OpenML serves it, does not have the
+  SHA-256 of `PINS`.
+
+Selection rule for the tables added in the second round (fixed before any
+of them was run, so the set is not chosen by the product's results): every
+dataset of four published OpenML suites, in this order, OpenML-CC18 (study
+99) and the AutoML benchmark's classification suite (study 271) declared
+`classification`, OpenML-CTR23 (study 353) and the AutoML benchmark's
+regression suite (study 269) declared `regression`, each with OpenML's
+default target, except a dataset that
+
+1. is already in the catalog (by data id);
+2. is a copy of a table already used by an evidence set (refusal, leakage
+   or quality) under another id, or another feature view of the same
+   objects: `COPIES` names each with the table it repeats;
+3. has more than `CELLS` cells (rows times features), the memory bound
+   below;
+4. states no licence on OpenML (`colleges`, 42727, says "NA").
+
+The suites hold binary, multiclass and regression tables and the awkward
+cases with them: wide (Bioresponse, Internet-Advertisements, arcene),
+imbalanced (APSFailure, shuttle, KDDCup09_appetency), many categories
+(Amazon_employee_access, black_friday, Click_prediction_small), missing
+values (sick, okcupid-stem, house_prices_nominal) and dates turned into
+numbers (nyc-taxi-green-dec-2016, kick). None of them stores a date as a
+calendar value, so a date column is not covered by real tables.
 * `simulated`: clean generated tasks of every kind, several sizes and shapes
   (plain, mixed types with missing values, wide with noise columns).
 * `planted`: tasks built to be refused (a constant or identifier target,
@@ -33,9 +59,13 @@ The tasks are of three groups:
   `leakage_policy="block"`, malformed event, treatment or label columns, too
   few queries). Each names the gates that may refuse it.
 
-Rate: in-envelope trials are the `real` and `simulated` runs that finished;
-a refusal is a hit. The plan's criterion is about real datasets, so only the
-`real` count decides the row; the simulated count is reported beside it.
+Rate: the plan's criterion is about real datasets, so only `real` runs of
+tasks that `benchmarks.evidence.custody` places in the `validation` split
+decide the row (acceptance items are sealed for stage D, development items
+decide nothing); every other run, and the simulated group, is reported
+beside it. Each such run is a trial, and every trial that did not return a
+model is a hit: a refusal, a crash and a run past `TIMEOUT` all count
+against the claim, never as a refusal-free trial.
 Precision is computed with an automated rubric (a refusal is justified when
 its task was planted and its gate is one the task names); the plan asks for
 a validator's review against a written rubric on the acceptance split, so it
@@ -57,6 +87,8 @@ import concurrent.futures
 import contextlib
 import dataclasses
 import functools
+import gzip
+import hashlib
 import json
 import logging
 import os
@@ -82,16 +114,29 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 GATES = ROOT / "gates.toml"
 # Policy: seconds of training budget per run; short, as a quick first look.
 BUDGET = 30
-# Policy: wall clock for the whole measurement, about ten minutes.
-SECONDS = 600
+# Policy: wall clock for the whole measurement. Every validation task must
+# run for the rate to be decided; about 190 tasks at some 30 s each,
+# `PARALLEL` at a time, take about 25 minutes on an idle laptop, and twice
+# that allows a loaded one.
+SECONDS = 3000
 # Policy: a run is killed past this; 12 times the budget allows a loaded
 # laptop (one run at a 60 s budget took 514 s with load average 60).
 TIMEOUT = 360
 PARALLEL = 4
 GROUPS = ("real", "simulated", "planted")
+# The custody record of `benchmarks.evidence.custody`, read as data because
+# that module imports this one.
+CUSTODY = PATH.with_name("custody.json")
+# The split whose items decide a row before the sealed acceptance run.
+DECIDING = "validation"
 DEAD = "http://127.0.0.1:9"
 # Rows kept of a large real table, so a run fits the short budget.
 ROWS = 4000
+# Largest table, in rows times features, the selection rule admits. Each of
+# the `PARALLEL` runs holds the whole table as float64 before keeping `ROWS`
+# rows: 20 million cells are 160 MB, about 640 MB for four runs and some
+# 2 GB with pandas' copies, an eighth of a 16 GB laptop.
+CELLS = 20_000_000
 # Share of missing values in a mixed simulated table.
 MISSING = 0.05
 # Documents per query of a simulated ranking task.
@@ -406,6 +451,33 @@ def cached(identifier: int) -> bool:
     return (folder / f"{identifier}.gz").exists()
 
 
+def pinned(identifier: int) -> str:
+    """SHA-256 of a cached OpenML table's ARFF file as OpenML serves it.
+
+    scikit-learn stores the file gzipped, compressing it itself when the
+    server did not, so the digest is taken on the decompressed bytes.
+
+    Args:
+        identifier: The OpenML data id; its description and file must be
+            cached.
+
+    Returns:
+        The hexadecimal digest.
+
+    Raises:
+        InputError: If the cache does not hold exactly one data file.
+    """
+    home = pathlib.Path(datasets.get_data_home()) / "openml" / "openml.org"
+    description = home / "api" / "v1" / "json" / "data" / f"{identifier}.gz"
+    found = json.loads(gzip.decompress(description.read_bytes()))
+    number = found["data_set_description"]["file_id"]
+    folder = home / "data" / "v1" / "download" / str(number)
+    files = sorted(folder.iterdir()) if folder.is_dir() else []
+    if len(files) != 1:
+        raise errors.InputError(f"OpenML {identifier}: no single cached file")
+    return hashlib.sha256(gzip.decompress(files[0].read_bytes())).hexdigest()
+
+
 def fetch(identifier: int | str, rows: int = ROWS) -> pandas.DataFrame:
     """A real table from the local caches, without the network.
 
@@ -418,7 +490,8 @@ def fetch(identifier: int | str, rows: int = ROWS) -> pandas.DataFrame:
         The table, with categorical columns as text.
 
     Raises:
-        InputError: If an OpenML table is not cached.
+        InputError: If an OpenML table is not cached, or its file is not the
+            one `PINS` names.
     """
     if isinstance(identifier, str):
         bunch = getattr(datasets, identifier)(as_frame=True)
@@ -426,10 +499,22 @@ def fetch(identifier: int | str, rows: int = ROWS) -> pandas.DataFrame:
     else:
         if not cached(identifier):
             raise errors.InputError(f"OpenML {identifier} is not cached")
+        if pinned(identifier) != PINS.get(identifier):
+            raise errors.InputError(
+                f"OpenML {identifier}: cached file differs from its pin"
+            )
         bunch = datasets.fetch_openml(
-            data_id=identifier, as_frame=True, parser="auto"
+            data_id=identifier, as_frame="auto", parser="auto"
         )
-        frame = bunch.frame.copy()
+        loaded: pandas.DataFrame | None = bunch.frame
+        frame = loaded if loaded is not None else pandas.DataFrame()
+        if loaded is None:
+            # A sparse ARFF file arrives as a matrix; it is made dense.
+            frame = pandas.DataFrame(
+                bunch.data.toarray(), columns=bunch.feature_names
+            )
+            frame[bunch.target_names[0]] = numpy.asarray(bunch.target)
+        frame = frame.copy()
     for column in frame.select_dtypes("category").columns:
         frame[column] = frame[column].astype(object)
     if len(frame) > rows:
@@ -595,7 +680,194 @@ EXTRA: dict[int, tuple[str, str, str, str]] = {
     41021: ("moneyball", "regression", "RS", "regression"),
     560: ("bodyfat", "regression", "class", "regression"),
 }
-# OpenML name, version and licence of each `EXTRA` table, as fetched.
+# The tables the selection rule of the module docstring chose, in suite
+# order, in the same layout as `EXTRA`.
+SUITE: dict[int, tuple[str, str, str, str]] = {
+    12: ("mfeat_factors", "multiclass", "class", "classification"),
+    32: ("pendigits", "multiclass", "class", "classification"),
+    182: ("satimage", "multiclass", "class", "classification"),
+    38: ("sick", "binary", "Class", "classification"),
+    300: ("isolet", "multiclass", "class", "classification"),
+    458: ("analcatdata_authorship", "multiclass", "Author", "classification"),
+    469: ("analcatdata_dmft", "multiclass", "Prevention", "classification"),
+    1050: ("pc3", "binary", "c", "classification"),
+    1053: ("jm1", "binary", "defects", "classification"),
+    4134: ("bioresponse", "binary", "target", "classification"),
+    1497: ("wall_robot_navigation", "multiclass", "Class", "classification"),
+    1501: ("semeion", "multiclass", "Class", "classification"),
+    1485: ("madelon", "binary", "Class", "classification"),
+    1486: ("nomao", "binary", "Class", "classification"),
+    1468: ("cnae_9", "multiclass", "Class", "classification"),
+    1475: (
+        "first_order_theorem_proving",
+        "multiclass",
+        "Class",
+        "classification",
+    ),
+    4534: ("phishingwebsites", "binary", "Result", "classification"),
+    6332: ("cylinder_bands", "binary", "band_type", "classification"),
+    4538: (
+        "gesturephasesegmentationprocessed",
+        "multiclass",
+        "Phase",
+        "classification",
+    ),
+    1478: ("har", "multiclass", "Class", "classification"),
+    23381: ("dresses_sales", "binary", "Class", "classification"),
+    40499: ("texture", "multiclass", "Class", "classification"),
+    40668: ("connect_4", "multiclass", "class", "classification"),
+    40966: ("miceprotein", "multiclass", "class", "classification"),
+    41027: (
+        "jungle_chess_2pcs_raw_endgame_complete",
+        "multiclass",
+        "class",
+        "classification",
+    ),
+    23517: ("numerai28_6", "binary", "attribute_21", "classification"),
+    40978: ("internet_advertisements", "binary", "class", "classification"),
+    44958: (
+        "auction_verification",
+        "regression",
+        "verification.time",
+        "regression",
+    ),
+    44963: ("physiochemical_protein", "regression", "RMSD", "regression"),
+    44964: ("superconductivity", "regression", "critical_temp", "regression"),
+    44965: (
+        "geographical_origin_of_music",
+        "regression",
+        "latitude",
+        "regression",
+    ),
+    44966: ("solar_flare", "regression", "c_class_flares", "regression"),
+    44969: (
+        "naval_propulsion_plant",
+        "regression",
+        "gt_compressor_decay_state_coefficient",
+        "regression",
+    ),
+    44973: ("grid_stability", "regression", "stab", "regression"),
+    44974: ("video_transcoding", "regression", "utime", "regression"),
+    44975: ("wave_energy", "regression", "energy_total", "regression"),
+    44976: ("sarcos", "regression", "V22", "regression"),
+    44981: ("pumadyn32nh", "regression", "thetadd6", "regression"),
+    44984: ("cps88wages", "regression", "wage", "regression"),
+    44987: (
+        "socmob",
+        "regression",
+        "counts_for_sons_current_occupation",
+        "regression",
+    ),
+    44990: ("brazilian_houses", "regression", "total", "regression"),
+    44992: ("fps_benchmark", "regression", "FPS", "regression"),
+    44993: ("health_insurance", "regression", "whrswk", "regression"),
+    45012: ("fifa", "regression", "wage_eur", "regression"),
+    44962: ("forest_fires", "regression", "area", "regression"),
+    44967: ("student_performance_por", "regression", "G3", "regression"),
+    44994: ("cars", "regression", "Price", "regression"),
+    181: (
+        "yeast",
+        "multiclass",
+        "class_protein_localization",
+        "classification",
+    ),
+    1111: ("kddcup09_appetency", "binary", "APPETENCY", "classification"),
+    1457: ("amazon_commerce_reviews", "multiclass", "Class", "classification"),
+    41138: ("apsfailure", "binary", "class", "classification"),
+    41164: ("fabert", "multiclass", "class", "classification"),
+    41143: ("jasmine", "binary", "class", "classification"),
+    1169: ("airlines", "binary", "Delay", "classification"),
+    41158: ("gina", "binary", "class", "classification"),
+    41144: ("madeline", "binary", "class", "classification"),
+    41145: ("philippine", "binary", "class", "classification"),
+    41156: ("ada", "binary", "class", "classification"),
+    41157: ("arcene", "binary", "class", "classification"),
+    41168: ("jannis", "multiclass", "class", "classification"),
+    4541: ("diabetes130us", "multiclass", "readmitted", "classification"),
+    1515: ("micro_mass", "multiclass", "Class", "classification"),
+    41146: ("sylvine", "binary", "class", "classification"),
+    41142: ("christine", "binary", "class", "classification"),
+    4135: ("amazon_employee_access", "binary", "target", "classification"),
+    41169: ("helena", "multiclass", "class", "classification"),
+    41166: ("volkert", "multiclass", "class", "classification"),
+    40685: ("shuttle", "multiclass", "class", "classification"),
+    41150: ("miniboone", "binary", "signal", "classification"),
+    41162: ("kick", "binary", "IsBadBuy", "classification"),
+    42733: ("click_prediction_small", "binary", "click", "classification"),
+    42734: ("okcupid_stem", "multiclass", "job", "classification"),
+    42732: ("sf_police_incidents", "binary", "ViolentCrime", "classification"),
+    42570: (
+        "mercedes_benz_greener_manufacturing",
+        "regression",
+        "y",
+        "regression",
+    ),
+    550: ("quake", "regression", "col_4", "regression"),
+    546: ("sensory", "regression", "Score", "regression"),
+    505: ("tecator", "regression", "fat", "regression"),
+    41540: ("black_friday", "regression", "Purchase", "regression"),
+    422: ("topo_2_1", "regression", "oz267", "regression"),
+    416: ("yprop_4_1", "regression", "oz252", "regression"),
+    42724: ("onlinenewspopularity", "regression", "shares", "regression"),
+    42729: (
+        "nyc_taxi_green_dec_2016",
+        "regression",
+        "tip_amount",
+        "regression",
+    ),
+    201: ("pol", "regression", "foo", "regression"),
+    41980: (
+        "sat11_hand_runtime_regression",
+        "regression",
+        "runtime",
+        "regression",
+    ),
+    531: ("boston", "regression", "MEDV", "regression"),
+    42563: ("house_prices_nominal", "regression", "SalePrice", "regression"),
+    574: ("house_16h", "regression", "price", "regression"),
+    3050: ("qsar_tid_11", "regression", "MEDIAN_PXC50", "regression"),
+    3277: ("qsar_tid_10980", "regression", "MEDIAN_PXC50", "regression"),
+    43071: ("mip_2016_regression", "regression", "PAR10", "regression"),
+}
+# Suite datasets the selection rule drops as copies (rule 2): id -> the
+# table already used that it repeats.
+COPIES: dict[int, str] = {
+    14: "mfeat-factors (12): another feature view of the same numerals",
+    16: "mfeat-factors (12): another feature view of the same numerals",
+    18: "mfeat-factors (12): another feature view of the same numerals",
+    22: "mfeat-factors (12): another feature view of the same numerals",
+    40979: "mfeat-factors (12): another feature view of the same numerals",
+    28: "load_digits, the UCI optdigits test set",
+    1590: "adult (179)",
+    1510: "load_breast_cancer, the UCI wdbc table",
+    40975: "car (991)",
+    40984: "segment (36)",
+    46: "quality task 363702 (splice)",
+    40670: "quality task 363702 (splice), recoded",
+    44956: "abalone (183)",
+    42726: "abalone (183)",
+    44957: "quality task 363612 (airfoil_self_noise)",
+    44959: "quality task 363625 (concrete_compressive_strength)",
+    44970: "quality task 363698 (QSAR_fish_toxicity)",
+    44983: "quality task 363686 (miami_housing)",
+    44960: "energy loads (1472)",
+    44971: "wine_quality (287), white wines",
+    44972: "wine_quality (287) and wine_red_quality (40691)",
+    40498: "wine_quality (287), white wines",
+    44977: "california_housing (43939)",
+    44978: "cpu_act (197)",
+    44979: "diamonds (42225)",
+    44980: "kin8nm (189)",
+    44989: "house_sales (42731)",
+    45402: "space_ga (507)",
+    42730: "us_crime (315)",
+    40981: "credit_approval (29), recoded as Statlog Australian",
+    40900: "satimage (182), relabelled for anomaly detection",
+    541: "socmob (44987), taken earlier from OpenML-CTR23",
+    42688: "brazilian_houses (44990), taken earlier from OpenML-CTR23",
+}
+# OpenML name, version and licence of each `EXTRA` and `SUITE` table, as
+# fetched.
 SOURCES: dict[int, tuple[str, int, str]] = {
     3: ("kr-vs-kp", 1, "Public"),
     11: ("balance-scale", 1, "Public"),
@@ -628,6 +900,266 @@ SOURCES: dict[int, tuple[str, int, str]] = {
     315: ("us_crime", 1, "Public"),
     41021: ("Moneyball", 2, "Public"),
     560: ("bodyfat", 1, "Public"),
+    12: ("mfeat-factors", 1, "Public"),
+    32: ("pendigits", 1, "Public"),
+    182: ("satimage", 1, "Public"),
+    38: ("sick", 1, "Public"),
+    300: ("isolet", 1, "Public"),
+    458: ("analcatdata_authorship", 1, "Public"),
+    469: ("analcatdata_dmft", 1, "Public"),
+    1050: ("pc3", 1, "Public"),
+    1053: ("jm1", 1, "Public"),
+    4134: ("Bioresponse", 1, "Public"),
+    1497: ("wall-robot-navigation", 1, "Public"),
+    1501: ("semeion", 1, "Public"),
+    1485: ("madelon", 1, "Public"),
+    1486: ("nomao", 1, "Public"),
+    1468: ("cnae-9", 1, "Public"),
+    1475: ("first-order-theorem-proving", 1, "Public"),
+    4534: ("PhishingWebsites", 1, "Public"),
+    6332: ("cylinder-bands", 2, "Public"),
+    4538: ("GesturePhaseSegmentationProcessed", 1, "Public"),
+    1478: ("har", 1, "Public"),
+    23381: ("dresses-sales", 2, "Public"),
+    40499: ("texture", 1, "Public"),
+    40668: ("connect-4", 2, "public"),
+    40966: ("MiceProtein", 4, "Public"),
+    41027: ("jungle_chess_2pcs_raw_endgame_complete", 1, "Public"),
+    23517: ("numerai28.6", 2, "Public"),
+    40978: ("Internet-Advertisements", 2, "Public"),
+    44958: ("auction_verification", 7, "CC BY 4.0"),
+    44963: ("physiochemical_protein", 7, "CC BY 4.0"),
+    44964: ("superconductivity", 7, "CC BY 4.0"),
+    44965: ("geographical_origin_of_music", 7, "CC BY 4.0"),
+    44966: ("solar_flare", 7, "CC BY 4.0"),
+    44969: ("naval_propulsion_plant", 7, "CC BY 4.0"),
+    44973: ("grid_stability", 7, "CC BY 4.0"),
+    44974: ("video_transcoding", 6, "CC BY 4.0"),
+    44975: ("wave_energy", 6, "CC BY 4.0"),
+    44976: ("sarcos", 9, "Public"),
+    44981: ("pumadyn32nh", 2, "Public"),
+    44984: ("cps88wages", 2, "Public"),
+    44987: ("socmob", 4, "Non-commercial scholarly and teaching purposes."),
+    44990: ("brazilian_houses", 16, "CC 0: Public Domain"),
+    44992: ("fps_benchmark", 2, "CC BY"),
+    44993: ("health_insurance", 3, "GPL (>= 2)"),
+    45012: ("fifa", 19, "CC0: Public Domain"),
+    44962: ("forest_fires", 9, "CC BY 4.0"),
+    44967: ("student_performance_por", 8, "CC BY 4.0"),
+    44994: ("cars", 4, "Public"),
+    181: ("yeast", 1, "Public"),
+    1111: ("KDDCup09_appetency", 1, "Public"),
+    1457: ("amazon-commerce-reviews", 1, "Public"),
+    41138: ("APSFailure", 1, "CC0"),
+    41164: ("fabert", 1, "Public"),
+    41143: ("jasmine", 1, "Public"),
+    1169: ("airlines", 1, "Public"),
+    41158: ("gina", 1, "Public"),
+    41144: ("madeline", 1, "Public"),
+    41145: ("philippine", 1, "Public"),
+    41156: ("ada", 1, "Public"),
+    41157: ("arcene", 2, "Public"),
+    41168: ("jannis", 1, "Public"),
+    4541: ("Diabetes130US", 1, "Public"),
+    1515: ("micro-mass", 2, "Public"),
+    41146: ("sylvine", 1, "Public"),
+    41142: ("christine", 1, "Public"),
+    4135: ("Amazon_employee_access", 1, "Public"),
+    41169: ("helena", 1, "Public"),
+    41166: ("volkert", 1, "Public"),
+    40685: ("shuttle", 1, "public"),
+    41150: ("MiniBooNE", 1, "CC0"),
+    41162: ("kick", 1, "CC0"),
+    42733: ("Click_prediction_small", 10, "Public"),
+    42734: ("okcupid-stem", 3, "Public"),
+    42732: ("sf-police-incidents", 6, "CC0"),
+    42570: ("Mercedes_Benz_Greener_Manufacturing", 2, "Public"),
+    550: ("quake", 2, "Public"),
+    546: ("sensory", 1, "Public"),
+    505: ("tecator", 1, "Public"),
+    41540: ("black_friday", 1, "GPL-1"),
+    422: ("topo_2_1", 1, "Public"),
+    416: ("yprop_4_1", 1, "Public"),
+    42724: ("OnlineNewsPopularity", 2, "Public"),
+    42729: ("nyc-taxi-green-dec-2016", 3, "Public"),
+    201: ("pol", 1, "Public"),
+    41980: ("SAT11-HAND-runtime-regression", 1, "Public"),
+    531: ("boston", 1, "Public"),
+    42563: ("house_prices_nominal", 1, "Public"),
+    574: ("house_16H", 1, "Public"),
+    3050: ("QSAR-TID-11", 1, "Public"),
+    3277: ("QSAR-TID-10980", 1, "Public"),
+    43071: ("MIP-2016-regression", 3, "Public"),
+}
+# SHA-256 of each OpenML table's ARFF file as OpenML serves it (`pinned`):
+# every table read through `fetch`, the leakage set's (C2) among them.
+PINS: dict[int, str] = {
+    14: "bc5dd56b0cf2ee0ced33c0cc17d82b855c3eef43e1644b3969e9b44d2b2e3933",
+    16: "1f9c621a9ee7435e84dfcaf02740e498815b3b626dda54a1d8faa41897c9ea80",
+    18: "0ad5a3afe6ad0a4851d2888980ce099b69c76030801bafab1e0e7e2e284837ea",
+    22: "24e10bd4fcec1559b0e9db31a96a3b2cdf0832b2345d00d0c383e459fc6b7db9",
+    28: "e86f102c957f41c7022b187766b0f9949a54ae8cedc492de1cc29765f060358a",
+    46: "4b22fd2fc0564f0b5af59a5a40ee0dd77476835ba48b717960d85d095be53036",
+    150: "c9db5c4c8abe3231778f431a932700f11fbc3bbb53c044e93a2789910a6a5bbb",
+    195: "9120e9b75b5a8a38ada475833170048cd5826f8afa2b7e9a426f0a6f9bda1ac0",
+    537: "d9747476bff8fcce7d3531190bb3b638413bf5cbf05d4175a229760946dd3a27",
+    1510: "e850cb4cc32dacf29d3fa639d0029cb45582d4838a62322e7b3fbac1b8452f1d",
+    1597: "fdaf12730dc1fc426f318b71349f24f5c5fd00aa1152940be7e7509ae3d89d2a",
+    4532: "89c9a6b5de12e0fc1050eebf545adfd3fefde94b0b480f000e8eb03a459d0fc1",
+    40498: "c7fe675c2f0f2c1a092f2e919ec2296970676ca9ade7e10b7a5d2863e83a4d47",
+    40670: "bcd958ef5021e769e73dce7e629878a56338213a18bc108fef638c78b5b6941c",
+    41700: "58896d520b079bfb3879655154f096ddbbf07f48af86ae3c8adb8e21aa170be6",
+    3: "b22a8a12bd40648400b000bad0545683b8ecd33ac84f2c265dd5c309c832fd69",
+    6: "a31f2d9ad119a53e182e7371d48981982dbb2b0a5e9f0aa7b73f373857b64e2e",
+    11: "87d3943cea423bb376be52b5dfec17f79c63108dddcf40e0a46e5ba7196a5c24",
+    12: "609d8f01dbf3f34a953617cc3586ddbb897d98013eba4ef4a4bf73791205ae5c",
+    15: "cb44e7f62f4a962881147264e5f985eacc13256712e7a4b9d1731ced05f3ee9b",
+    23: "9d8694d39e05d9d2963fccbe4f71e2af04c72c13de45f5dcbe775a586f214567",
+    24: "7b653776e56943dfff0296b5e103159893646cc46ced112f72ff23e9b7ba595d",
+    27: "4d609f1611113bec1a2b67f30115f0054945b0e123260f0cfcaa7b6325eb1841",
+    29: "ae8e5eadb70e187885ddc6defb7f3e4afa726aa472ac63ebf5e387f0a8467891",
+    31: "768be84ef749110d5fcac109a6541f2df190e8c6987e1dc432c0a4f29d0642f5",
+    32: "5be0ce5f618a248a15e953bb63bd2c6bd99c1b9cdcd59c0a6abf06ae58758bca",
+    36: "f54038600f6b8ab6cb6edf58887ba98c891781250b4140f5edeb74296e466854",
+    37: "4eddd5b2b64679e8888348e306520a393d6a28e1ddc9643cfb76fc5d912d6d40",
+    38: "85c39615380ca4c05c17a53c3faad9523924958d1e9bc5af0dcbefc6339e7800",
+    44: "f0f6ccd8e8c6b1feeb09c0565ac691d7906cca5373959981512b9934ab4112a6",
+    50: "09cb4ceb7d410dc7663a5ae8a4d9da6d82270468bdfa5d73a4161204cbb90133",
+    53: "e16082cc6158f29be2e7b081953cd6edf342760d135bccdb64e191d0834d6300",
+    54: "727ab4eb1bf76c0f01adccea696a07c690b5f1e25e15b3defc68c015360edf36",
+    59: "bcbf8c656fe9a44a87df76003b9b2b6b36bfc52c01f0e316014cebbce9ccb701",
+    61: "38110f3fd3cef003ca4909038a4d6b235f36a85d036dc7eedeff67c5925e826c",
+    151: "2d86fbc74c69a5c04bcde0119bce280dd6d8efa0115987edc75b77ccf024d7f2",
+    179: "d32d87c2dd406870351f1d49acb4ddca358dad6708c453b7adf0d81841fce4fc",
+    181: "ae97eccd3ad5f9a998efec8acb2026f1748df6c8a392a5b2b0f321c2ef053933",
+    182: "85a02ca850ecd8a005f746fa4d4dfe543250d8da51ef90590ba9db0f31546850",
+    183: "a75351597c04719e793dd5fc9bee926bae0f06e413fe77591f01e4688154988e",
+    188: "59a2fe2cb13540ea64a01faba34048209e096bb75a105b9c053950df4f6d678c",
+    189: "698fb5297abde73c001b07f8fb2fe31626366cf179678aed0990737cc0689c79",
+    196: "fe7e942c14f790bc7a350b030244519d0d96453ebf1b1c743b368fa3500bc05f",
+    197: "16ada2bd7088e92ac1cdc2c5285275a0bfd72dcafa7095ac3870f9943423c507",
+    201: "0f5f397fb144dfb7269a03e4eccc84a413a48982ceef0a91b142c9917b39675e",
+    216: "dbf7a8f4531b11a3b295a5f0e84503032c66a64986d74dd673112a0da5cd41f2",
+    218: "99e8d7e69102d6b57423eff5bf63445876d17e09ed89c763b7dbc99bd77c2d07",
+    227: "bd183e8f4310187838d4fad6a5ed64e07371c21cff45fb8db75400ffbd29a951",
+    230: "a07e9467e9daec5cb93a73eb791b9703795c2c4b920a4f16677d79976e323ede",
+    287: "a06ffbd99a40aaf09315f914a3a681f7d6d757a614c5d414410a4877f5709093",
+    300: "b18b12257017ab9fac7015f93cfefaee0291b28c6bcbdc11520c0ac2aa1a9ee2",
+    307: "a0526fad8f69a04a9b8844b756046ab0dca5a97954e14b5af08d0c85e74e7e72",
+    315: "a641e86073daa9d9f79eae19cefbc293540851d4d95eb40e59a2ff0022c883db",
+    333: "87e0569e25818d0ed9ce935e9c12217b56471138370d878008ea85ef0a76f7b1",
+    416: "13bf426f16a95f257f345800152806178c1cfc25e5e1a399c8a4973519cf497b",
+    422: "79021c5bf78310c1c941db24944559eb11526607354f605b98f31bdea2711617",
+    458: "8674a81705440cfcb458e481300185293c1fe75576c2d86d426b0be8148d4506",
+    469: "d1fce1e52ef3e29c3cb8af6fc8215dd2982f829c0bfcd18a8be39269db4df501",
+    503: "b821c83919b428787553318679c9c21be4bdaa186ae3b15451e5d18bf70c5b69",
+    505: "47044ff39e813ee22441f718f33cca130686ac130bbf79756f8f7c5e9c2c05f5",
+    507: "2ec8a4ea375118b249f592e440d99cfde435a67fae1574db6328ef3f7eccbea3",
+    531: "2826ddb8cbce925e98114491f4774544b17d70ff0b7b1eede2af0a2ffd85a4f0",
+    546: "158968b205cce12fa1b58da519aece8a1e396a633ce5fbf6a960be4413b93d56",
+    550: "73b599c906cc2b6ff39c99513679db5f6a9d3802b4a5da1dfabac4386b77ee92",
+    560: "6cb62e841e7036c63bd73bf5be53404f0e06c0a778d85040934b111111d9187f",
+    574: "c9d4c46cb5f598fd9e3e1993a1ff06d85c662e50a9fe1fef9c1dc7d067d3b311",
+    991: "74e9c6962376fbfbdea0c4daced642fa4e9e4be68725473ec19baec1ef89de86",
+    1049: "a257bbf9d05df9b6a12675e5a74da2b138c59591f24bc3866c68f8abc67624c1",
+    1050: "2ef1d5e4712544e44213a23532cf5fd8e8515ad22fa428b9f3443e4190a8e57e",
+    1053: "8f3795e84e8755f1b21b4820c9f3286e60843d3f0a9751c595e0c47e786a7b52",
+    1063: "832b27ed0b34faddd8d4b3c23cdc65e5118bd7694f016b449f3d0b70c8575fd5",
+    1067: "fe0ea9ab3977bf3d2411dc72eefed2462ef4bf750a77668bdcf2acbb351c521d",
+    1068: "a22470def91454aa442e54104e2856c53725e8c9108bdfaac867504982483f97",
+    1111: "201abbcfec1177badbc60bd67433186edde5d01374977183a2f49ffa9d863eca",
+    1120: "ff35972a47140925b0b698b3f0de8471d3d2f0ede19a553b2d3c58ba7caa19ee",
+    1169: "c7683a90b40c2cabb1ddc950413da8efa231c058327b8c95511c40af13516c14",
+    1457: "b5388cae01347259e7f8801c4220022f0d1349d88dd3e8ff9d0c21d2e3c23438",
+    1461: "7381f5eec0cfcd20b70e70988ead1cff758fa1e9402e1f800ee8a4b59529e4b2",
+    1462: "ba23e986caffafbdce29c651278bb0455cdae5c2274e86afe4716c47a4fb278d",
+    1464: "ee1304cac4a650ac31afe7395a100536a165f935bbe718a4643757c1a842316a",
+    1468: "5bff41d9dc6ab5a11059d4c9fbb09564739d2f98f836b6b90005ab8c7e45b420",
+    1472: "8e2ca7aabe95e1f29deb432ff8c52f27c23a090172859fafad535e18ecd82fa4",
+    1475: "8ada14230e4df0a3eb12aafd9af2bff99ee83bbb539c97d4fef169d981ca8c51",
+    1478: "16e55052cbf8a3f9d7bc769501e4cb1c7909f50fd3947b8457f5a8c1f75fef4b",
+    1480: "62b65e434ad612e1fa4cbd34888811f5f89d39e3f2744de5bd2a6a77b9926ddd",
+    1485: "ac33b79e8849b0e2e0417c62c50a421237b3dd522c2b344f8da3c0f72a80ad7c",
+    1486: "94b4e6229e434d04fb61f081e547c95ec0bfa99e9ea9e880acd5276d13b972e6",
+    1487: "2d5cd15a541f72a46ececf2332e611944752cce78a79d1a3311bec8fbb51d10e",
+    1489: "8dcd1c5236cea66cdc4e75cb84fbb4da7a4b1e8b1fe5ad5cd3fd825a1ae4c48b",
+    1494: "959bdf9d436405525d63b01c85d8d5f6f9d5f8ff90f9b1d163ef8b5d7255722c",
+    1497: "a7facd7720353055e1ef0af024448e002c551d0fd5defe0fc651661b7c187b3b",
+    1501: "3a0bfdb44b8a11647d9ada08ceadac8523b220d880aff266d7321e605576246e",
+    1515: "b4109c3ac28c6d248993fb1936df6137414c9d90efb46179880948e4cb46aa9f",
+    3050: "177dd4c56df846ffff3f266b8384333f47c50150bfa94290fc27d41fc669444d",
+    3277: "54d22f442cb7cc1cdd54ea60d549d68faab9da1e78bea3784b68ec47056252a7",
+    4134: "b8fbe587f40c8f48d1f30003b0b40f085cd32997f7167898228178c5a0919d92",
+    4135: "4f33c09f3612b5de1294ca664eec7fd1bb56a94b05d0352219794a37e4acc8cc",
+    4534: "3bcf93b1612306537ee2737751f1bac185b2a77886ab376644c3bf0c7f7cb3e6",
+    4538: "939a5a0dda808213908be1f2385fc1bbb13e9df68ca7d64d1466f2da3f9824e2",
+    4541: "0174efd57528ad19a289909e2eecb9079583106baad5d8e3b9a88af056870c05",
+    6332: "6e792f09b2d59d0500a2ba9a5975b31b5eef9534b98f5bf87ab8047452e4c45e",
+    23381: "44057bb677eb4a144d01816262fc164f923a46fdda019a026e83e0c44b58ee95",
+    23517: "df837470119d913b9291342efe4b19abcb302c80bb86b5e372ededc4591b9d14",
+    40499: "9143690415c61a8d9c33ededf947126fa71cced8f91d50642f06621f84e3e9bd",
+    40589: "fb692f6e76b2c8941e90f01999eb8788bb1ab8307967583741f851d21ff286b8",
+    40668: "430cc660591a281550b4270886776a7c0a7f8047bbdbbcc6ee428f223369e219",
+    40685: "d0e47eb009fe0b77e67ec16a21d64efb69073dfb5f405936b7a51fc1dc22c9fd",
+    40691: "f1179c9abed3a09cf4202caa08306f8b78c7e401bf37d31440fdeac003796314",
+    40701: "6245b866e90138c5cdda040d2295c12c03fce552e881043ad0f6eed5feb63335",
+    40945: "c56e3785c96cd8aceac85f11bff21c2bf72841426f50903a6f27be8f334a7d03",
+    40966: "f48ced98ecfe8ff056d8ea3507e067258c82f29199a1af2261b516010827cc4d",
+    40978: "853b895fb12183ee665de29559d8aab1dc77abcf24602e4c3132b23b035b9a09",
+    40982: "635644c094456648c14501b2b565df6eb4bf436f63145ce7bf0421ee2b7f9531",
+    40983: "e29d2b9c08fbd21fe7104df37f16eed8fd0d3a9c782cbb8efada0cf7ebb8d6bb",
+    40994: "5be0901079f4d3317631ad9e955cd5e45d5eb8c753565b197e49e461524085b8",
+    41021: "1ef7013b57ff2ce89a0b8b25dc643ce7eca4b24d6b93785c2945983b2e8364e2",
+    41027: "647f9cded1b34558bd4587106bfabcb908e706194e78d3014fea6d594e909d75",
+    41138: "e95128fc82ef5d5bc5a732b0bc63dea0f6e285cc60f31290c81f82ea13429c4f",
+    41142: "307099164edf07b914eeb2b968b0ef8e0393dedb7bfe0c04937aea49d9f949cd",
+    41143: "08142863cfdf0754752dd67bfb3ee7d9e29030c9b7fca6c85d69927000858ae2",
+    41144: "8562d10a1b945172055dcd11852525962f952587eeee173790779c90af4f5ae4",
+    41145: "819470adb79ea428c9f7c1cd9e58ceb8ab77c4d2a3249f22393318c4d0d0484d",
+    41146: "cbd39adc5849eb951434e7194090e2611ff8a34033dbb0a78dd7c4249791cf48",
+    41150: "907fae4b0de2f61e88f6cda799f53a9f7e39ee6876aa971a9211f5802d89a79d",
+    41156: "9f487bfee74bcf72538fcdc1a1336931e4437824843eef090fdf71506602a290",
+    41157: "c58c70465382108be4261cd6828b01c54e49fa53282e88d1417928c5f29ad66f",
+    41158: "2511d829e62d473e1a9ee833770bfac65bdf9df321268a77e15db680afcd6a49",
+    41162: "918b922249d410f9274557850e0f494d51a450a97c4755ce0c6889b82811d0ff",
+    41164: "3afd98b3ff70400e7096ba55257947127abca4d3fb9f11bb9e465aafbc5329ed",
+    41166: "0b782b59f04b71397da65a05d1117095944d35450ec4d54c423eda6809122d29",
+    41168: "ffc0530b7f98207096b603b33c5cb33d1f92bc8b4f2a62acbeb5fe70e4107d4c",
+    41169: "351c371c164b5ceacd9a87697d9efde170daf51ce4b3ce3819f25b7912e1042a",
+    41540: "784e88ab33be4b7aae60a85ec8e1cad53ab3d27ef3350ada00fc93038d06b751",
+    41980: "1ab43811428dfbd685e41edd34fd63222d4da768ab5060c8ee820268740a848b",
+    42225: "0bbef7a24061e5cc4e8591eea59417948a2d2286401675b57163a555e1849b40",
+    42563: "1e83c38ec2f33615fc3308a641e6f3a1fe4a7b4fbb8dd54913c6082799602bdc",
+    42570: "44cb0065e346847de80f8a2a0fdfa9f38cfff90275129f3419cffb420d690910",
+    42712: "24c7f663c80a0f0820f92b00fbc76d63c66aac4a133164ce51513a6a8bbb8cd6",
+    42724: "bb6f42580b1a79c755c8d7652e13b8033b881d09c1c82ac8d721e5007b9cd84a",
+    42729: "d5a584ef08e6dc02bf46cf20d2021f93fd687716b984e5a1b86a66d339814ba6",
+    42731: "86508fd41de8e54786c8bb61527ddd8163a740390dbc9028fc104ca2e52f9928",
+    42732: "f6415889d9952c71226edceaba74f4f105416eb77977b632307d4a787e50d9bb",
+    42733: "add9a17b955be5ee4a89c3dc2c52544eb1f05098b404c99183d209caca4dbc39",
+    42734: "1af41ae7bd750443ea535b324b91e830799c13b9bc2c2f64ea4fff29634c024d",
+    43071: "8b80c61c8c093f4c336b92552afb0d51c6ccdd7b49bb75b763e992391da297a1",
+    43939: "c4d895f661384b4030fb560ad031bb82f3e826af3c64907217bb633c0db65386",
+    44958: "f0dcaf7165b3235a6031395f2068bb7833bfbeb32c263713cf8834bd679a4d97",
+    44962: "25672c7dd97b7af4c00b5d5812c17f6fde8a9e422835e3610c730117c8d6e2b5",
+    44963: "2b1ff847f0eafa74cd582f789273bdca9c43decf8c46910d6e2a2f51ffddb9fc",
+    44964: "fdd7d82630afd1b35718bcd1772403db6068d85ec4a1cd8b8dc3b9ca0e0440c8",
+    44965: "56fda911ab67dbccc093345d5e8e112ee40186899c20a8dc8f29bd15b063adb8",
+    44966: "34f377d0c949b0a35e7b6ce5fd9854f4154842dd03e46d24cfcebe2d5c267794",
+    44967: "ab4db935dca19424413e68129cab61609d6340d83194f185bb4e74e2268e4bd6",
+    44969: "566a503cb6bcd1166f79346cadef9101a4be46573471b80158a6419fd0deea58",
+    44973: "3e3e746b09ed94fac41732fe72912302c0b0a7b9ac683abf0db721299007d6a4",
+    44974: "4842dde3ca6ad962c613e02b7b2627ba70e6cdd078a8be885b52d6ce8e3d49de",
+    44975: "e16a2d7bb0b8d1594816aa44474cd1a6c4750498afe3ebe29d51fa5744144410",
+    44976: "737ec889f0b6622917746d05f9737fad1c3cfb239114994ec65f718d79774d52",
+    44981: "0756f4da4500b61e2025862e2b550ee83fc8684616b1a77cebf6dccd5e13d705",
+    44984: "2bbaec07b4fc663edfbe3c3a0ef0b300516043195f36f5d1f69c38a8e9733306",
+    44987: "299f17112726f2f67e3802ec99a3847930ff4e1c1cc6150736afbcbda406f8ac",
+    44990: "094759fa443ddbcf885910e4a0fe291fdda5f226d30bc67df29840bef8781619",
+    44992: "0a4488f0e01971e5a3bf8eaf07848da90b9acc555ddd7278c111ce4150017e38",
+    44993: "f97193f812b47d30dc3ae87cd30fab5c468ef04893e7792933df873340514605",
+    44994: "98a42023fa9701a1266dcea95b0808807f33b1f346d24b5503d89048656ae48c",
+    45012: "00b905455c0717e88a08e3e2021437889fd6a91d869b936cb1f46fc66f6e8297",
 }
 
 
@@ -825,7 +1357,7 @@ def catalog() -> dict[str, Task]:
     ]
     real.extend(
         Task(name, kind, "real", table(identifier, target, task))
-        for identifier, (name, kind, target, task) in EXTRA.items()
+        for identifier, (name, kind, target, task) in (EXTRA | SUITE).items()
     )
     layouts = (
         ("binary", 500, "plain"),
@@ -1122,10 +1654,14 @@ def tally(
 
     Returns:
         Per group: runs, models, refusals, failures, unfinished and refusals
-        by gate; and the precision counts: refusals, and those justified (a
+        by gate, and `deciding`: the runs of the group's `DECIDING`-split
+        items and their hits, every run that did not return a model (a
+        refusal, a crash or a run past the timeout all count against the
+        claim); and the precision counts: refusals, and those justified (a
         planted task refused by one of the gates it names).
     """
     counts: dict[str, Any] = {}
+    placed = splits()
     for group in GROUPS:
         mine = [r for r in records if tasks[r["name"]].group == group]
         gates: dict[str, int] = {}
@@ -1133,6 +1669,7 @@ def tally(
             if record["outcome"] == "refused":
                 gates[record["gate"]] = gates.get(record["gate"], 0) + 1
         finished = [r for r in mine if r["outcome"] != "unfinished"]
+        held = [r for r in mine if placed.get(r["name"]) == DECIDING]
         counts[group] = {
             "trials": len(finished),
             "models": sum(r["outcome"] == "model" for r in mine),
@@ -1140,6 +1677,10 @@ def tally(
             "failures": sum(r["outcome"] == "failed" for r in mine),
             "unfinished": len(mine) - len(finished),
             "gates": dict(sorted(gates.items())),
+            "deciding": {
+                "trials": len(held),
+                "hits": sum(r["outcome"] != "model" for r in held),
+            },
         }
     refused = [r for r in records if r["outcome"] == "refused"]
     counts["precision"] = {
@@ -1151,6 +1692,22 @@ def tally(
         "refusing gate is one the task names; not validator-reviewed",
     }
     return counts
+
+
+def splits() -> dict[str, str]:
+    """The custody split of each refusal task.
+
+    Returns:
+        Task name to split, from `CUSTODY`; empty when it is missing, so no
+        task decides the rate.
+    """
+    if not CUSTODY.exists():
+        return {}
+    document = json.loads(CUSTODY.read_text(encoding="utf-8"))
+    for each in document["sets"]:
+        if each["name"] == "refusal":
+            return dict(each["items"])
+    return {}
 
 
 def fingerprint() -> str:
@@ -1165,6 +1722,7 @@ def fingerprint() -> str:
         *LABELERS.values(),
         forecast,
         fetch,
+        pinned,
         table,
         spoil,
         plant,
@@ -1172,6 +1730,7 @@ def fingerprint() -> str:
         locate,
         attempt,
         tally,
+        splits,
     )
 
 
@@ -1297,13 +1856,44 @@ def needed(
     return total - trials
 
 
+def decide(
+    rate: acceptance.Ceiling, deciding: dict[str, int], alpha: float
+) -> tuple[str, str]:
+    """The verdict and text of the refusal rate.
+
+    Args:
+        rate: The ceiling of `refusal_rate_max`.
+        deciding: The `DECIDING`-split trials and their hits, every run
+            without a model (a refusal, a crash or a timeout) being a hit.
+        alpha: One-sided error rate.
+
+    Returns:
+        `pass` or `fail` from at least the rule's minimum trials, otherwise
+        `not measured`; and the text, with the further trials needed.
+    """
+    hits, trials = deciding["hits"], deciding["trials"]
+    held = f"{DECIDING} split: {hits}/{trials} without a model"
+    if trials >= rate.minimum(alpha):
+        passed = rate.passes(hits, trials, alpha)
+        return (
+            "pass" if passed else "fail",
+            f"rate {'passes' if passed else 'fails'} ({held})",
+        )
+    more = needed(rate, hits, trials, alpha)
+    return "not measured", (
+        f"rate not measured ({held}): {more} more real {DECIDING} trials "
+        f"that return a model needed (minimum {rate.minimum(alpha)})"
+    )
+
+
 def summary(document: dict[str, Any] | None = None) -> tuple[str, str]:
     """The scorecard value and verdict of claim C14.
 
-    The rate is decided on the real in-envelope trials only; the simulated
-    ones are reported beside it. The verdict is `pass` only when the rate
-    and the precision both pass on at least their rules' minimum samples,
-    `fail` when either is decided and fails, and `not measured` otherwise.
+    The rate is decided on the real validation-split trials only (`decide`);
+    the others are reported beside it. The verdict is `pass` only when the
+    rate and the precision both pass on at least their rules' minimum
+    samples, `fail` when either is decided and fails, and `not measured`
+    otherwise.
 
     Args:
         document: The stored document; read from `PATH` when None.
@@ -1312,7 +1902,7 @@ def summary(document: dict[str, Any] | None = None) -> tuple[str, str]:
         The value text and the verdict.
 
     Raises:
-        InputError: If the document lacks the counts.
+        InputError: If the document lacks the counts or the deciding counts.
     """
     if document is None:
         if not PATH.exists():
@@ -1335,17 +1925,10 @@ def summary(document: dict[str, Any] | None = None) -> tuple[str, str]:
     real, simulated = counts["real"], counts["simulated"]
     precision = counts["precision"]
     verdicts = []
-    if real["trials"] >= rate.minimum(alpha):
-        passed = rate.passes(real["refusals"], real["trials"], alpha)
-        verdicts.append("pass" if passed else "fail")
-        rate_text = f"rate {'passes' if passed else 'fails'}"
-    else:
-        more = needed(rate, real["refusals"], real["trials"], alpha)
-        verdicts.append("not measured")
-        rate_text = (
-            f"rate not measured: {more} more refusal-free real trials "
-            f"needed (minimum {rate.minimum(alpha)})"
-        )
+    if "deciding" not in real:
+        raise errors.InputError("refusal document has no deciding counts")
+    verdict, rate_text = decide(rate, real["deciding"], alpha)
+    verdicts.append(verdict)
     if precision["refusals"] >= floor.minimum(alpha):
         passed = floor.passes(
             precision["justified"], precision["refusals"], alpha

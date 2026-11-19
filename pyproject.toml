@@ -64,8 +64,14 @@ benchmarks = ["huggingface_hub>=0.25"]
 sota = ["openml>=0.15"]
 distributed = ["ray>=2.40"]
 multimodal = ["pillow>=13.0"]
+# OpenTelemetry spans for requests, scoring and pipeline stages, exported
+# over OTLP/HTTP when `scmle --trace` or SCMLE_TRACING asks for them.
+tracing = [
+    "opentelemetry-sdk>=1.27",
+    "opentelemetry-exporter-otlp-proto-http>=1.27",
+]
 all = [
-    "scmle[boosting,catboost,deeplearning,optimization,sampling,polars,spreadsheets,tracking,distributed,benchmarks,multimodal]",
+    "scmle[boosting,catboost,deeplearning,optimization,sampling,polars,spreadsheets,tracking,distributed,benchmarks,multimodal,tracing]",
 ]
 
 [project.urls]
@@ -174,6 +180,9 @@ packages = ["scmle"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# `soak` runs `scmle serve` for minutes under load (tests/integration/
+# test_serve_soak.py); CI selects it with `-m soak`.
+markers = ["soak: minutes-long serving soak, selected with -m soak"]
 filterwarnings = ["ignore::UserWarning", "ignore::FutureWarning"]
 
 [tool.ruff]
@@ -298,6 +307,7 @@ type = "layers"
 containers = ["scmle"]
 exhaustive = true
 layers = [
+    "__main__",
     "cli | rehearsal",
     "serving | workflow",
     "operations | runners",

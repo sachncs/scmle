@@ -5,10 +5,17 @@ no download), runs each detector on the planted copies and on the clean
 data, and files the counts as certificates in
 `detector_certificates.json`.
 
-Pre-declared policy, fixed before any measurement and not tuned to results:
-recall lower Wilson bound at least 0.80 and false-alarm upper Wilson bound
-at most 0.05, 95 percent intervals. Development used seeds
-100 and above; certification uses the seeds listed below, which are disjoint.
+Policy, the plan's rule for planted defects (plan section 7, exploratory
+analysis): recall lower bound at least `profile_recall_min` (0.90) and
+false-alarm upper bound at most `profile_false_max` (0.05), both read from
+`acceptance.toml`, each the one-sided exact (Clopper-Pearson) bound at
+`alpha` of that file (the two-sided interval at level 1 - 2 `alpha`), the
+rule every other certificate uses. An earlier version used a 0.80 recall
+floor, looser than the plan, and then two-sided Wilson intervals at level
+1 - `alpha`; Wilson is not exact and can fall below the nominal coverage
+near 0 and 1, where these rates sit.
+Development used seeds 100 and above; certification uses the seeds listed
+below, which are disjoint.
 
 Units. Row detectors (sentinels, duplicates, label noise, outlier error
 class) are judged per row: planted rows found over planted rows, flagged
@@ -36,6 +43,7 @@ import dataclasses
 
 import pandas
 
+from benchmarks import acceptance
 from benchmarks.qualification import certify
 from benchmarks.qualification import inject
 from benchmarks.qualification import standins
@@ -51,7 +59,13 @@ from scmle.contracts import qualification
 from scmle.runtime import randomness
 
 CERT_PATH = scmle.certificates.DIRECTORY / "detector_certificates.json"
-POLICY = certificates.Standard(recall=0.80, alarms=0.05, confidence=0.95)
+VARIABLES = acceptance.load()
+POLICY = certificates.Standard(
+    recall=VARIABLES["profile_recall_min"].value,
+    alarms=VARIABLES["profile_false_max"].value,
+    confidence=1.0 - 2 * VARIABLES["alpha"].value,
+    method="exact",
+)
 ROW_SEEDS = (0, 1, 2, 3, 4)
 MISSING_SEEDS = tuple(range(200))
 MISSING_COLUMNS = 6
@@ -290,15 +304,16 @@ def select_cut(
             are used.
 
     Returns:
-        The largest cut in `CUT_GRID` whose upper Wilson bound on clean
-        rows flagged is within the ceiling; the smallest cut when none is.
+        The largest cut in `CUT_GRID` whose upper bound on clean rows
+        flagged, by the policy's interval method, is within the ceiling; the
+        smallest cut when none is.
     """
     best = CUT_GRID[0]
     columns = list(frame.columns)
     for cut in CUT_GRID:
         flagged = int(duplicates.near_flags(frame, columns, cut).sum())
-        upper = certificates.wilson_interval(
-            flagged, len(frame), policy.confidence
+        upper = certificates.interval(
+            flagged, len(frame), policy.confidence, policy.method
         )[1]
         if upper <= policy.alarms:
             best = cut

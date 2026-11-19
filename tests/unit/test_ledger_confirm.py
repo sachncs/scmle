@@ -70,6 +70,7 @@ def c_rows(effect=0.6, seed=2):
 
 
 def test_the_full_flow_confirms_true_effects_and_only_those():
+    # Enforces website/src/pages/docs/qualification.astro:85.
     ledger = explored()
     source = source_with(*c_rows())
     result = confirm.confirm(ledger, source, alpha_confirm=ALPHA)
@@ -112,6 +113,7 @@ def test_by_is_the_default_and_the_statistics_are_those_on_c():
 
 
 def test_selection_is_frozen_and_logged_before_c_opens():
+    # Enforces website/src/pages/docs/qualification.astro:85.
     ledger = explored()
     source = source_with(*c_rows())
     result = confirm.confirm(ledger, source, alpha_confirm=ALPHA)
@@ -158,6 +160,7 @@ def test_a_second_confirmation_raises_and_is_logged():
 
 
 def test_c_itself_refuses_a_second_open_after_the_stage():
+    # Enforces website/src/pages/docs/qualification.astro:85.
     ledger = explored()
     source = source_with(*c_rows())
     confirm.confirm(ledger, source, alpha_confirm=ALPHA)
@@ -166,6 +169,7 @@ def test_c_itself_refuses_a_second_open_after_the_stage():
 
 
 def test_unrejected_survivors_stay_unverified_with_their_adjusted_p():
+    # Enforces website/src/pages/docs/qualification.astro:43.
     ledger = explored(effect=0.6)
     # C has no effect for any feature: nothing should confirm.
     features, target = c_rows(effect=0.0)
@@ -179,6 +183,7 @@ def test_unrejected_survivors_stay_unverified_with_their_adjusted_p():
 
 
 def test_no_survivors_means_c_is_never_opened():
+    # Enforces website/src/pages/docs/qualification.astro:85.
     x, y = world(300, 1, effect=0.0)
     ledger = scmle.assurance.ledger.ledger.Ledger.create(
         None,
@@ -227,6 +232,7 @@ def test_a_missing_control_blocks_promotion_unless_waived():
 
 
 def test_without_a_confirmation_set_claims_are_unverified():
+    # Enforces website/src/pages/docs/qualification.astro:43.
     ledger = explored()
     result = confirm.confirm(ledger, None, alpha_confirm=ALPHA)
     assert result.outcome == confirm.NO_CONFIRMATION_SET
@@ -282,6 +288,7 @@ def test_thresholdout_is_refused_before_anything_happens():
 
 
 def test_rules_change_the_family_adjustment():
+    # Enforces website/src/pages/docs/qualification.astro:85.
     results = {}
     for rule in (
         budget.Correction.BH,

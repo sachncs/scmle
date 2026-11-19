@@ -16,7 +16,10 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 def test_a_python_version_mismatch_is_refused_unless_allowed(tmp_path):
     """Enforces docs/SECURITY.md:27 (the Python half; scikit-learn is in
-    tests/unit/test_bundle.py)."""
+    tests/unit/test_bundle.py).
+
+    Also enforces website/src/pages/docs/threat-model.astro:8.
+    """
     golden = parity.goldens(ROOT / "deploy" / "local" / "golden")
     directory = parity.handwrite(golden.spec).save(tmp_path / "m")
     path = directory / bundle.MANIFEST_FILE

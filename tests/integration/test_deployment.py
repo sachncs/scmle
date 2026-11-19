@@ -262,10 +262,24 @@ def test_batch_serving_scores_files(trained, tmp_path, monkeypatch):
         writes.append((path, content))
         return real_write(path, content)
 
+    swaps = []
+    real_swap = server.durability.swap
+
+    def record_swap(staged, path):
+        swaps.append((staged, path))
+        return real_swap(staged, path)
+
     monkeypatch.setattr(server.durability, "write_atomically", record_write)
+    monkeypatch.setattr(server.durability, "swap", record_swap)
     destination = tmp_path / "out.csv"
     assert adapter.score_file(source, destination) == 40
-    assert writes and writes[0][0] == destination
+    # The scored rows are staged beside the destination and swapped in whole;
+    # the progress journal and the manifest are written atomically.
+    placed = [staged for staged, path in swaps if path == destination]
+    assert placed == [tmp_path / "out.csv.partial"]
+    assert not (tmp_path / "out.csv.partial").exists()
+    assert writes[-1][0] == tmp_path / "out.csv.manifest.json"
+    assert not (tmp_path / "out.csv.progress.json").exists()
     out = pandas.read_csv(destination)
     assert {"prediction", "proba_0", "proba_1"} <= set(out.columns)
 

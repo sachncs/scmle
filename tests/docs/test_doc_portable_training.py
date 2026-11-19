@@ -7,7 +7,10 @@ from scmle.runners import roles
 
 
 def test_check_separation_refuses_each_overlap_on_its_own():
-    """Enforces docs/PORTABLE_TRAINING.md:42."""
+    """Enforces docs/PORTABLE_TRAINING.md:42.
+
+    Also enforces website/src/pages/docs/portable-training.astro:27.
+    """
     roles.check_separation(roles.TRAINING_ROLE, roles.SERVING_ROLE)
     cases = (
         (

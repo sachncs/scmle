@@ -66,6 +66,7 @@ def brute_force_cv_plus(
 
 
 def test_cv_plus_matches_the_definition() -> None:
+    # Enforces website/src/pages/docs/methods.astro:11.
     rng = numpy.random.default_rng(2)
     n, k = 40, 4
     folds = rng.permutation(n) % k

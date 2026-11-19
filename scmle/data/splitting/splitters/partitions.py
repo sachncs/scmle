@@ -3,6 +3,7 @@
 import abc
 import dataclasses
 import hashlib
+import math
 from typing import Any
 from typing import ClassVar
 
@@ -17,6 +18,18 @@ from scmle.data.splitting.splitters.lockbox import Lockbox
 MIN_STRATUM_ROWS = 2
 
 
+# One-sided error rate at which a class's test rows must carry evidence.
+EVIDENCE_ALPHA = 0.05
+# Fewest test rows of each class a classification split may hold. With all
+# `m` test rows of a class predicted right, the one-sided exact upper bound
+# at `EVIDENCE_ALPHA` of the error rate on that class is
+# `1 - EVIDENCE_ALPHA ** (1 / m)`; it falls below one half, a coin, only
+# from `m >= ln(EVIDENCE_ALPHA) / ln(1 / 2)` on, so 5. With fewer, even a
+# perfect score on the class cannot be told from guessing; with none, ROC
+# AUC is undefined and F1 scores a single class.
+MIN_TEST_CLASS_ROWS = math.ceil(math.log(EVIDENCE_ALPHA) / math.log(0.5))
+
+
 MIN_FOLDS = 2
 
 
@@ -26,6 +39,8 @@ Fold = tuple[numpy.ndarray, numpy.ndarray]
 MIN_ROLLING_TRAIN = 10
 
 
+# Strategies that draw rows as exchangeable; the splitter counts the test
+# rows that repeat a development record (`Splitter.disclose`).
 DUPLICATE_AWARE = frozenset({"random", "stratified", "stratified_events"})
 
 
@@ -44,6 +59,8 @@ class Manifest:
         folds: Cross-validation folds as positions within the development
             partition.
         notes: Adjustments made while splitting (for example fewer folds).
+        entities: For a temporal or rolling split, the declared
+            `validation.entities` (`known` or `unseen`); None otherwise.
     """
 
     strategy: str
@@ -52,6 +69,7 @@ class Manifest:
     test_ids: tuple[int, ...]
     folds: tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]
     notes: tuple[str, ...] = ()
+    entities: str | None = None
 
     KEYS: ClassVar[records.Migration] = records.Migration(
         renames={"train_ids": "training", "test_ids": "test"}
@@ -82,11 +100,14 @@ class Manifest:
         Returns:
             A dict with the strategy, seed, fingerprint, row counts, the train
             and test ids as lists under `training` and `test`, the folds as
-            `{"train": ..., "val": ...}` dicts of positions, and the notes as
-            a list.
+            `{"train": ..., "val": ...}` dicts of positions, the notes as a
+            list and, for a temporal or rolling split, the declared
+            `entities`.
         """
+        declared = {} if self.entities is None else {"entities": self.entities}
         return self.KEYS.upgrade(
-            {
+            declared
+            | {
                 "strategy": self.strategy,
                 "seed": self.seed,
                 "fingerprint": self.fingerprint,

@@ -36,9 +36,9 @@ def test_class_plants_are_derived_from_the_target():
     plant = plants.plant
     assert plant(target, "leak_copy", 0, False).equals(codes)
     noisy = plant(target, "leak_noisy_copy", 0, False)
-    moved = (noisy != codes).mean()
+    moved = (noisy != target).mean()
     assert 0 < moved < 0.06
-    assert set(noisy.unique()) <= set(codes.unique())
+    assert set(noisy.unique()) <= set(target.unique())
     assert plant(target, "leak_threshold", 0, False).corr(codes) > 0.9
     first = target == target.iloc[0]
     gated = plant(target, "leak_missing_for_class", 0, False)
@@ -49,12 +49,14 @@ def test_class_plants_are_derived_from_the_target():
 
 
 def test_a_two_class_noisy_copy_moves_labels_to_the_other_class():
+    # The label written again with errors spells the target's own labels,
+    # so the screen's echo reads it as the target whatever the class order.
     target = classes(count=2)
-    codes = pandas.Series(pandas.factorize(target)[0].astype(float))
     noisy = plants.plant(target, "leak_noisy_copy", 0, False)
-    changed = noisy != codes
+    changed = noisy != target
     assert changed.any()
-    assert ((noisy[changed] + codes[changed]) == 1).all()
+    assert set(noisy.unique()) == {"a", "b"}
+    assert (noisy[changed] != target[changed]).all()
 
 
 def test_plants_are_reproducible_and_seeded():
@@ -77,3 +79,21 @@ def test_unknown_types_and_name_clashes_are_refused():
     frame = pandas.DataFrame({"y": numbers(20), "leak_copy": 0.0})
     with pytest.raises(ValueError, match="named as plants"):
         plants.table(frame, "y", 0, True)
+
+
+def test_a_target_mean_holds_each_rows_own_outcome():
+    target = numbers(20)
+    mean = plants.plant(target, "leak_target_mean", 0, True)
+    first = target.iloc[: plants.LEVEL].mean()
+    assert mean.iloc[: plants.LEVEL].tolist() == [first] * plants.LEVEL
+    share = plants.plant(classes(20), "leak_target_mean", 0, False)
+    assert share.between(0, 1).all() and share.min() < share.max()
+
+
+def test_copies_repeat_a_share_of_the_rows_once():
+    frame = pandas.DataFrame({"x": range(100), "y": numbers(100)})
+    copied = plants.copy(frame, 0)
+    assert len(copied) == 100 + round(100 * plants.COPIES)
+    counts = copied["x"].value_counts()
+    assert set(counts) == {1, 2} and (counts == 2).sum() == 30
+    assert (*plants.DEFECTS, plants.DUPLICATES) == plants.KINDS

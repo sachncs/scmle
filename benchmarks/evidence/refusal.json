@@ -1,8 +1,12 @@
 {
   "claim": "C14",
-  "code_hash": "df9dd207d7fd29da2fc6581285b442b81d4951bae482bf1e0a849d9245eee9a7",
+  "code_hash": "5c8ed60419b9999a297e0690ba0dcabb8f386cb08d19c96987ebafedbbf4de5b",
   "counts": {
     "planted": {
+      "deciding": {
+        "hits": 0,
+        "trials": 0
+      },
       "failures": 0,
       "gates": {
         "data.unlabeled": 1,
@@ -23,18 +27,31 @@
     },
     "precision": {
       "justified": 12,
-      "refusals": 12,
+      "refusals": 28,
       "rubric": "automated: justified when the task was planted and the refusing gate is one the task names; not validator-reviewed"
     },
     "real": {
+      "deciding": {
+        "hits": 5,
+        "trials": 59
+      },
       "failures": 1,
-      "gates": {},
-      "models": 64,
-      "refusals": 0,
-      "trials": 65,
+      "gates": {
+        "budget.minimum_run": 11,
+        "split.stratified.stratify": 1,
+        "split.test_support": 2,
+        "train.first_trial": 2
+      },
+      "models": 138,
+      "refusals": 16,
+      "trials": 155,
       "unfinished": 0
     },
     "simulated": {
+      "deciding": {
+        "hits": 0,
+        "trials": 0
+      },
       "failures": 0,
       "gates": {},
       "models": 22,
@@ -57,7 +74,7 @@
       "name": "breast_cancer",
       "outcome": "model",
       "rows": 569,
-      "seconds": 39.4
+      "seconds": 28.0
     },
     {
       "group": "simulated",
@@ -66,7 +83,7 @@
       "name": "sim_binary_500_plain",
       "outcome": "model",
       "rows": 500,
-      "seconds": 22.0
+      "seconds": 19.3
     },
     {
       "error": "BlockedError",
@@ -83,11 +100,11 @@
     {
       "group": "real",
       "kind": "multiclass",
-      "model": "logistic_regression",
+      "model": "hist_gradient_boosting",
       "name": "wine",
       "outcome": "model",
       "rows": 178,
-      "seconds": 26.9
+      "seconds": 23.8
     },
     {
       "group": "simulated",
@@ -96,7 +113,7 @@
       "name": "sim_regression_300_mixed",
       "outcome": "model",
       "rows": 300,
-      "seconds": 17.4
+      "seconds": 15.7
     },
     {
       "error": "BlockedError",
@@ -108,16 +125,16 @@
       "outcome": "refused",
       "rows": 400,
       "seconds": 0.1,
-      "site": "scmle.pipeline.stages:ProfileStage.set_aside_unlabeled"
+      "site": "scmle.pipeline.stages.labelling:Labelling.set_aside_unlabeled"
     },
     {
       "group": "real",
       "kind": "regression",
-      "model": "elastic_net",
+      "model": "blending",
       "name": "diabetes_progression",
       "outcome": "model",
       "rows": 442,
-      "seconds": 17.3
+      "seconds": 19.4
     },
     {
       "group": "simulated",
@@ -126,7 +143,7 @@
       "name": "sim_multiclass_1500_plain",
       "outcome": "model",
       "rows": 1500,
-      "seconds": 36.0
+      "seconds": 23.1
     },
     {
       "error": "BlockedError",
@@ -143,11 +160,11 @@
     {
       "group": "real",
       "kind": "binary",
-      "model": "stacking",
+      "model": "logistic_regression",
       "name": "credit_g",
       "outcome": "model",
       "rows": 1000,
-      "seconds": 39.0
+      "seconds": 20.6
     },
     {
       "group": "simulated",
@@ -168,7 +185,7 @@
       "outcome": "refused",
       "rows": 400,
       "seconds": 0.1,
-      "site": "scmle.data.splitting.splitters:StratifiedSplit.stratifier"
+      "site": "scmle.data.splitting.splitters.splits:Stratified.stratifier"
     },
     {
       "group": "real",
@@ -177,7 +194,7 @@
       "name": "pima_diabetes",
       "outcome": "model",
       "rows": 768,
-      "seconds": 24.3
+      "seconds": 19.4
     },
     {
       "group": "simulated",
@@ -186,7 +203,7 @@
       "name": "sim_ordinal_1200_mixed",
       "outcome": "model",
       "rows": 1200,
-      "seconds": 22.6
+      "seconds": 12.4
     },
     {
       "error": "BlockedError",
@@ -197,17 +214,17 @@
       "name": "planted_leak_binary_600",
       "outcome": "refused",
       "rows": 600,
-      "seconds": 2.8,
-      "site": "scmle.pipeline.stages:ProfileStage.enforce_leakage_policy"
+      "seconds": 3.0,
+      "site": "scmle.pipeline.stages.screening:Screening.enforce_leakage_policy"
     },
     {
       "group": "real",
       "kind": "regression",
-      "model": "stacking",
+      "model": "hist_gradient_boosting",
       "name": "abalone",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 31.6
+      "seconds": 25.4
     },
     {
       "group": "simulated",
@@ -216,7 +233,7 @@
       "name": "sim_ranking_1500_plain",
       "outcome": "model",
       "rows": 1500,
-      "seconds": 10.7
+      "seconds": 10.2
     },
     {
       "error": "BlockedError",
@@ -237,7 +254,7 @@
       "name": "vehicle",
       "outcome": "model",
       "rows": 846,
-      "seconds": 38.1
+      "seconds": 25.8
     },
     {
       "group": "simulated",
@@ -246,7 +263,7 @@
       "name": "sim_multilabel_1000_plain",
       "outcome": "model",
       "rows": 1000,
-      "seconds": 11.8
+      "seconds": 9.3
     },
     {
       "error": "BlockedError",
@@ -267,7 +284,7 @@
       "name": "energy_loads",
       "outcome": "model",
       "rows": 768,
-      "seconds": 15.6
+      "seconds": 12.3
     },
     {
       "group": "simulated",
@@ -276,7 +293,7 @@
       "name": "sim_multioutput_600_plain",
       "outcome": "model",
       "rows": 600,
-      "seconds": 11.8
+      "seconds": 8.6
     },
     {
       "error": "BlockedError",
@@ -291,15 +308,13 @@
       "site": "scmle.data.validation.target:check_treatment"
     },
     {
-      "category": "artifact",
-      "error": "ArtifactError",
       "group": "real",
       "kind": "ordinal",
-      "message": "this model does not provide probabilities",
+      "model": "ordinal_hist_gradient_boosting",
       "name": "wine_red_quality",
-      "outcome": "failed",
+      "outcome": "model",
       "rows": 1599,
-      "seconds": 31.5
+      "seconds": 23.3
     },
     {
       "group": "simulated",
@@ -308,7 +323,7 @@
       "name": "sim_forecast_400_plain",
       "outcome": "model",
       "rows": 400,
-      "seconds": 14.4
+      "seconds": 10.5
     },
     {
       "error": "BlockedError",
@@ -320,7 +335,7 @@
       "outcome": "refused",
       "rows": 300,
       "seconds": 0.1,
-      "site": "scmle.data.splitting.splitters:GroupSplit.partition"
+      "site": "scmle.data.splitting.splitters.splits:Group.partition"
     },
     {
       "group": "real",
@@ -329,7 +344,7 @@
       "name": "emotions",
       "outcome": "model",
       "rows": 593,
-      "seconds": 33.3
+      "seconds": 25.8
     },
     {
       "group": "simulated",
@@ -338,7 +353,7 @@
       "name": "sim_uplift_3000_plain",
       "outcome": "model",
       "rows": 3000,
-      "seconds": 8.4
+      "seconds": 8.2
     },
     {
       "error": "BlockedError",
@@ -355,20 +370,20 @@
     {
       "group": "real",
       "kind": "binary",
-      "model": "bagged_logistic_regression",
+      "model": "logistic_regression",
       "name": "blood_transfusion",
       "outcome": "model",
       "rows": 748,
-      "seconds": 22.1
+      "seconds": 17.4
     },
     {
       "group": "simulated",
       "kind": "binary",
-      "model": "stacking",
+      "model": "bagged_logistic_regression",
       "name": "sim_binary_2000_wide",
       "outcome": "model",
       "rows": 2000,
-      "seconds": 48.5
+      "seconds": 22.9
     },
     {
       "error": "BlockedError",
@@ -385,20 +400,20 @@
     {
       "group": "real",
       "kind": "regression",
-      "model": "stacking",
+      "model": "knn",
       "name": "kin8nm",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 30.9
+      "seconds": 24.7
     },
     {
       "group": "simulated",
       "kind": "regression",
-      "model": "stacking",
+      "model": "ridge",
       "name": "sim_regression_2000_wide",
       "outcome": "model",
       "rows": 2000,
-      "seconds": 38.2
+      "seconds": 28.5
     },
     {
       "error": "BlockedError",
@@ -410,7 +425,7 @@
       "outcome": "refused",
       "rows": 12,
       "seconds": 0.1,
-      "site": "scmle.data.splitting.splitters:StratifiedSplit.stratifier"
+      "site": "scmle.data.splitting.splitters.splits:Stratified.stratifier"
     },
     {
       "group": "real",
@@ -419,7 +434,7 @@
       "name": "titanic",
       "outcome": "model",
       "rows": 1309,
-      "seconds": 38.7
+      "seconds": 26.9
     },
     {
       "group": "simulated",
@@ -428,7 +443,7 @@
       "name": "sim_multiclass_600_mixed",
       "outcome": "model",
       "rows": 600,
-      "seconds": 28.5
+      "seconds": 23.6
     },
     {
       "group": "real",
@@ -437,7 +452,7 @@
       "name": "credit_approval",
       "outcome": "model",
       "rows": 690,
-      "seconds": 33.3
+      "seconds": 23.5
     },
     {
       "group": "simulated",
@@ -446,7 +461,7 @@
       "name": "sim_survival_2000_mixed",
       "outcome": "model",
       "rows": 2000,
-      "seconds": 10.0
+      "seconds": 9.4
     },
     {
       "group": "real",
@@ -455,7 +470,7 @@
       "name": "segment",
       "outcome": "model",
       "rows": 2310,
-      "seconds": 49.1
+      "seconds": 28.7
     },
     {
       "group": "simulated",
@@ -464,16 +479,16 @@
       "name": "sim_forecast_1000_plain",
       "outcome": "model",
       "rows": 1000,
-      "seconds": 13.7
+      "seconds": 10.4
     },
     {
       "group": "real",
       "kind": "regression",
-      "model": "stacking",
+      "model": "hist_gradient_boosting",
       "name": "cpu_small",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 35.5
+      "seconds": 28.5
     },
     {
       "group": "simulated",
@@ -482,16 +497,16 @@
       "name": "sim_uplift_1500_mixed",
       "outcome": "model",
       "rows": 1500,
-      "seconds": 7.2
+      "seconds": 7.0
     },
     {
       "group": "real",
       "kind": "binary",
-      "model": "bagged_logistic_regression",
+      "model": "logistic_regression",
       "name": "kc1_defects",
       "outcome": "model",
       "rows": 2109,
-      "seconds": 40.5
+      "seconds": 19.9
     },
     {
       "group": "simulated",
@@ -500,7 +515,7 @@
       "name": "sim_binary_1000_mixed",
       "outcome": "model",
       "rows": 1000,
-      "seconds": 23.3
+      "seconds": 20.5
     },
     {
       "group": "real",
@@ -509,7 +524,7 @@
       "name": "car",
       "outcome": "model",
       "rows": 1728,
-      "seconds": 24.7
+      "seconds": 21.2
     },
     {
       "group": "simulated",
@@ -518,16 +533,16 @@
       "name": "sim_ordinal_400_plain",
       "outcome": "model",
       "rows": 400,
-      "seconds": 13.0
+      "seconds": 9.8
     },
     {
       "group": "real",
       "kind": "multiclass",
-      "model": "hist_gradient_boosting",
+      "model": "logistic_regression",
       "name": "digits",
       "outcome": "model",
       "rows": 1797,
-      "seconds": 59.5
+      "seconds": 24.5
     },
     {
       "group": "simulated",
@@ -536,16 +551,16 @@
       "name": "sim_multilabel_2000_wide",
       "outcome": "model",
       "rows": 2000,
-      "seconds": 14.0
+      "seconds": 14.2
     },
     {
       "group": "real",
       "kind": "regression",
-      "model": "hist_gradient_boosting",
+      "model": "bagged_decision_tree",
       "name": "wine_quality",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 29.7
+      "seconds": 28.8
     },
     {
       "group": "simulated",
@@ -554,16 +569,16 @@
       "name": "sim_multioutput_2000_mixed",
       "outcome": "model",
       "rows": 2000,
-      "seconds": 11.8
+      "seconds": 10.2
     },
     {
       "group": "real",
       "kind": "binary",
-      "model": "hist_gradient_boosting",
+      "model": "bagged_decision_tree",
       "name": "colic",
       "outcome": "model",
       "rows": 368,
-      "seconds": 25.1
+      "seconds": 27.7
     },
     {
       "group": "simulated",
@@ -572,7 +587,7 @@
       "name": "sim_ranking_600_mixed",
       "outcome": "model",
       "rows": 600,
-      "seconds": 8.0
+      "seconds": 8.4
     },
     {
       "group": "real",
@@ -581,7 +596,7 @@
       "name": "phoneme",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 30.3
+      "seconds": 21.2
     },
     {
       "group": "simulated",
@@ -590,16 +605,16 @@
       "name": "sim_regression_800_plain",
       "outcome": "model",
       "rows": 800,
-      "seconds": 13.9
+      "seconds": 14.6
     },
     {
       "group": "real",
       "kind": "regression",
-      "model": "stacking",
+      "model": "hist_gradient_boosting",
       "name": "california_housing",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 31.3
+      "seconds": 26.6
     },
     {
       "group": "real",
@@ -608,7 +623,7 @@
       "name": "spambase",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 45.1
+      "seconds": 27.0
     },
     {
       "group": "real",
@@ -617,7 +632,7 @@
       "name": "churn",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 36.4
+      "seconds": 21.5
     },
     {
       "group": "real",
@@ -626,7 +641,7 @@
       "name": "diamonds",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 31.8
+      "seconds": 29.7
     },
     {
       "group": "real",
@@ -635,25 +650,25 @@
       "name": "adult",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 37.3
+      "seconds": 17.5
     },
     {
       "group": "real",
       "kind": "multiclass",
-      "model": "hist_gradient_boosting",
+      "model": "dummy",
       "name": "letter",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 66.2
+      "seconds": 20.0
     },
     {
       "group": "real",
       "kind": "regression",
-      "model": "stacking",
+      "model": "hist_gradient_boosting",
       "name": "bike_sharing",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 31.4
+      "seconds": 30.7
     },
     {
       "group": "real",
@@ -662,7 +677,7 @@
       "name": "bank_marketing",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 38.3
+      "seconds": 20.7
     },
     {
       "group": "real",
@@ -671,7 +686,7 @@
       "name": "magic_telescope",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 41.1
+      "seconds": 24.0
     },
     {
       "group": "real",
@@ -680,7 +695,7 @@
       "name": "house_sales",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 36.8
+      "seconds": 29.0
     },
     {
       "group": "real",
@@ -689,16 +704,16 @@
       "name": "mushroom",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 35.2
+      "seconds": 18.5
     },
     {
       "group": "real",
       "kind": "binary",
-      "model": "stacking",
+      "model": "hist_gradient_boosting",
       "name": "electricity",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 40.7
+      "seconds": 20.6
     },
     {
       "group": "real",
@@ -707,7 +722,7 @@
       "name": "kr_vs_kp",
       "outcome": "model",
       "rows": 3196,
-      "seconds": 43.7
+      "seconds": 26.1
     },
     {
       "group": "real",
@@ -716,25 +731,25 @@
       "name": "balance_scale",
       "outcome": "model",
       "rows": 625,
-      "seconds": 22.2
+      "seconds": 22.8
     },
     {
       "group": "real",
       "kind": "binary",
-      "model": "logistic_regression",
+      "model": "bagged_logistic_regression",
       "name": "breast_w",
       "outcome": "model",
       "rows": 699,
-      "seconds": 20.1
+      "seconds": 19.9
     },
     {
       "group": "real",
       "kind": "multiclass",
-      "model": "logistic_regression",
+      "model": "bagged_logistic_regression",
       "name": "cmc",
       "outcome": "model",
       "rows": 1473,
-      "seconds": 36.4
+      "seconds": 24.2
     },
     {
       "group": "real",
@@ -743,34 +758,34 @@
       "name": "tic_tac_toe",
       "outcome": "model",
       "rows": 958,
-      "seconds": 21.3
-    },
-    {
-      "group": "real",
-      "kind": "binary",
-      "model": "bagged_logistic_regression",
-      "name": "heart_statlog",
-      "outcome": "model",
-      "rows": 270,
       "seconds": 20.6
     },
     {
       "group": "real",
       "kind": "binary",
-      "model": "hist_gradient_boosting",
+      "model": "stacking",
+      "name": "heart_statlog",
+      "outcome": "model",
+      "rows": 270,
+      "seconds": 24.2
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "bagged_decision_tree",
       "name": "ionosphere",
       "outcome": "model",
       "rows": 351,
-      "seconds": 25.5
+      "seconds": 23.0
     },
     {
       "group": "real",
       "kind": "multiclass",
-      "model": "blending",
+      "model": "bagged_decision_tree",
       "name": "iris",
       "outcome": "model",
       "rows": 150,
-      "seconds": 17.4
+      "seconds": 19.8
     },
     {
       "group": "real",
@@ -779,7 +794,7 @@
       "name": "eucalyptus",
       "outcome": "model",
       "rows": 736,
-      "seconds": 37.9
+      "seconds": 25.1
     },
     {
       "group": "real",
@@ -788,7 +803,7 @@
       "name": "vowel",
       "outcome": "model",
       "rows": 990,
-      "seconds": 46.7
+      "seconds": 29.2
     },
     {
       "group": "real",
@@ -797,25 +812,25 @@
       "name": "monks_1",
       "outcome": "model",
       "rows": 556,
-      "seconds": 17.1
+      "seconds": 19.3
     },
     {
       "group": "real",
       "kind": "binary",
-      "model": "blending",
+      "model": "hist_gradient_boosting",
       "name": "banknote",
       "outcome": "model",
       "rows": 1372,
-      "seconds": 22.4
+      "seconds": 20.7
     },
     {
       "group": "real",
       "kind": "binary",
-      "model": "bagged_logistic_regression",
+      "model": "logistic_regression",
       "name": "ilpd",
       "outcome": "model",
       "rows": 583,
-      "seconds": 24.4
+      "seconds": 19.1
     },
     {
       "group": "real",
@@ -824,7 +839,7 @@
       "name": "qsar_biodeg",
       "outcome": "model",
       "rows": 1055,
-      "seconds": 32.6
+      "seconds": 28.6
     },
     {
       "group": "real",
@@ -833,34 +848,34 @@
       "name": "pc4",
       "outcome": "model",
       "rows": 1458,
-      "seconds": 38.1
+      "seconds": 25.4
     },
     {
       "group": "real",
       "kind": "binary",
-      "model": "logistic_regression",
+      "model": "bagged_logistic_regression",
       "name": "kc2",
       "outcome": "model",
       "rows": 522,
-      "seconds": 24.6
+      "seconds": 21.7
     },
     {
       "group": "real",
       "kind": "binary",
-      "model": "stacking",
+      "model": "hist_gradient_boosting",
       "name": "pc1",
       "outcome": "model",
       "rows": 1109,
-      "seconds": 37.2
+      "seconds": 23.2
     },
     {
       "group": "real",
       "kind": "multiclass",
-      "model": "bagged_logistic_regression",
+      "model": "hist_gradient_boosting",
       "name": "steel_plates",
       "outcome": "model",
       "rows": 1941,
-      "seconds": 46.5
+      "seconds": 28.3
     },
     {
       "group": "real",
@@ -869,7 +884,7 @@
       "name": "wilt",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 30.3
+      "seconds": 22.3
     },
     {
       "group": "real",
@@ -878,16 +893,16 @@
       "name": "climate_crashes",
       "outcome": "model",
       "rows": 540,
-      "seconds": 24.0
+      "seconds": 20.9
     },
     {
       "group": "real",
       "kind": "binary",
-      "model": "hist_gradient_boosting",
+      "model": "bagged_logistic_regression",
       "name": "ozone",
       "outcome": "model",
       "rows": 2534,
-      "seconds": 40.7
+      "seconds": 25.8
     },
     {
       "group": "real",
@@ -896,25 +911,25 @@
       "name": "cpu_act",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 36.0
+      "seconds": 30.1
     },
     {
       "group": "real",
       "kind": "regression",
-      "model": "blending",
+      "model": "hist_gradient_boosting",
       "name": "elevators",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 32.4
+      "seconds": 25.9
     },
     {
       "group": "real",
       "kind": "regression",
-      "model": "stacking",
+      "model": "hist_gradient_boosting",
       "name": "house_8l",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 31.5
+      "seconds": 24.9
     },
     {
       "group": "real",
@@ -923,16 +938,16 @@
       "name": "space_ga",
       "outcome": "model",
       "rows": 3107,
-      "seconds": 28.1
+      "seconds": 26.8
     },
     {
       "group": "real",
       "kind": "regression",
-      "model": "blending",
+      "model": "hist_gradient_boosting",
       "name": "wind",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 34.0
+      "seconds": 29.1
     },
     {
       "group": "real",
@@ -941,7 +956,7 @@
       "name": "auto_mpg",
       "outcome": "model",
       "rows": 398,
-      "seconds": 15.4
+      "seconds": 15.7
     },
     {
       "group": "real",
@@ -950,16 +965,16 @@
       "name": "machine_cpu",
       "outcome": "model",
       "rows": 209,
-      "seconds": 15.7
+      "seconds": 15.9
     },
     {
       "group": "real",
       "kind": "regression",
-      "model": "bagged_decision_tree",
+      "model": "hist_gradient_boosting",
       "name": "us_crime",
       "outcome": "model",
       "rows": 1994,
-      "seconds": 48.9
+      "seconds": 28.9
     },
     {
       "group": "real",
@@ -968,7 +983,7 @@
       "name": "moneyball",
       "outcome": "model",
       "rows": 1232,
-      "seconds": 27.9
+      "seconds": 28.9
     },
     {
       "group": "real",
@@ -977,22 +992,892 @@
       "name": "bodyfat",
       "outcome": "model",
       "rows": 252,
-      "seconds": 13.8
+      "seconds": 14.9
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "dummy",
+      "name": "mfeat_factors",
+      "outcome": "model",
+      "rows": 2000,
+      "seconds": 26.5
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "hist_gradient_boosting",
+      "name": "pendigits",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 28.2
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "hist_gradient_boosting",
+      "name": "satimage",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 28.6
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "sick",
+      "outcome": "model",
+      "rows": 3772,
+      "seconds": 23.0
+    },
+    {
+      "error": "BlockedError",
+      "gate": "budget.minimum_run",
+      "group": "real",
+      "kind": "multiclass",
+      "message": "the 30 s time budget cannot fit the minimum run (preparation, one cheapest trial and 23.1 s reserved for the final refit, diagnostics and packaging), estimated at 33.3 s; the smallest budget that fits is about 37 s",
+      "name": "isolet",
+      "outcome": "refused",
+      "rows": 4000,
+      "seconds": 0.7,
+      "site": "scmle.runtime.budget:Reserve.admit"
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "logistic_regression",
+      "name": "analcatdata_authorship",
+      "outcome": "model",
+      "rows": 841,
+      "seconds": 26.2
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "logistic_regression",
+      "name": "analcatdata_dmft",
+      "outcome": "model",
+      "rows": 797,
+      "seconds": 22.1
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "bagged_decision_tree",
+      "name": "pc3",
+      "outcome": "model",
+      "rows": 1563,
+      "seconds": 22.0
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "jm1",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 19.0
+    },
+    {
+      "error": "BlockedError",
+      "gate": "budget.minimum_run",
+      "group": "real",
+      "kind": "binary",
+      "message": "the 30 s time budget cannot fit the minimum run (preparation, one cheapest trial and 40.5 s reserved for the final refit, diagnostics and packaging), estimated at 50.7 s; the smallest budget that fits is about 70 s",
+      "name": "bioresponse",
+      "outcome": "refused",
+      "rows": 3751,
+      "seconds": 2.1,
+      "site": "scmle.runtime.budget:Reserve.admit"
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "hist_gradient_boosting",
+      "name": "wall_robot_navigation",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 28.7
+    },
+    {
+      "category": "internal",
+      "error": "ScmleError",
+      "group": "real",
+      "kind": "multiclass",
+      "message": "all trials failed",
+      "name": "semeion",
+      "outcome": "failed",
+      "rows": 1593,
+      "seconds": 15.0
+    },
+    {
+      "error": "BlockedError",
+      "gate": "train.first_trial",
+      "group": "real",
+      "kind": "binary",
+      "message": "preparation took 11.7 s and left no time for a first trial (trial window closed: 0.0 s left before the 20.2 s reserved for the final refit, diagnostics and packaging); the smallest budget that fits is about 34 s",
+      "name": "madelon",
+      "outcome": "refused",
+      "rows": 2600,
+      "seconds": 12.1,
+      "site": "scmle.pipeline.stages.training:TrainStage.execute"
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "nomao",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 28.7
+    },
+    {
+      "error": "BlockedError",
+      "gate": "budget.minimum_run",
+      "group": "real",
+      "kind": "multiclass",
+      "message": "the 30 s time budget cannot fit the minimum run (preparation, one cheapest trial and 24.5 s reserved for the final refit, diagnostics and packaging), estimated at 34.5 s; the smallest budget that fits is about 40 s",
+      "name": "cnae_9",
+      "outcome": "refused",
+      "rows": 1080,
+      "seconds": 0.5,
+      "site": "scmle.runtime.budget:Reserve.admit"
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "hist_gradient_boosting",
+      "name": "first_order_theorem_proving",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 28.3
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "phishingwebsites",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 25.2
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "cylinder_bands",
+      "outcome": "model",
+      "rows": 540,
+      "seconds": 25.9
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "hist_gradient_boosting",
+      "name": "gesturephasesegmentationprocessed",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 28.4
+    },
+    {
+      "error": "BlockedError",
+      "gate": "budget.minimum_run",
+      "group": "real",
+      "kind": "multiclass",
+      "message": "the 30 s time budget cannot fit the minimum run (preparation, one cheapest trial and 22.2 s reserved for the final refit, diagnostics and packaging), estimated at 32.5 s; the smallest budget that fits is about 35 s",
+      "name": "har",
+      "outcome": "refused",
+      "rows": 4000,
+      "seconds": 0.8,
+      "site": "scmle.runtime.budget:Reserve.admit"
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "dresses_sales",
+      "outcome": "model",
+      "rows": 500,
+      "seconds": 20.7
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "hist_gradient_boosting",
+      "name": "texture",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 29.1
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "hist_gradient_boosting",
+      "name": "connect_4",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 27.8
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "dummy",
+      "name": "miceprotein",
+      "outcome": "model",
+      "rows": 1080,
+      "seconds": 27.3
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "hist_gradient_boosting",
+      "name": "jungle_chess_2pcs_raw_endgame_complete",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 25.1
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "knn",
+      "name": "numerai28_6",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 19.5
+    },
+    {
+      "error": "BlockedError",
+      "gate": "budget.minimum_run",
+      "group": "real",
+      "kind": "binary",
+      "message": "the 30 s time budget cannot fit the minimum run (preparation, one cheapest trial and 36.8 s reserved for the final refit, diagnostics and packaging), estimated at 47.0 s; the smallest budget that fits is about 62 s",
+      "name": "internet_advertisements",
+      "outcome": "refused",
+      "rows": 3279,
+      "seconds": 3.1,
+      "site": "scmle.runtime.budget:Reserve.admit"
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "decision_tree",
+      "name": "auction_verification",
+      "outcome": "model",
+      "rows": 2043,
+      "seconds": 27.8
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "bagged_decision_tree",
+      "name": "physiochemical_protein",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 25.6
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "superconductivity",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 28.8
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "knn",
+      "name": "geographical_origin_of_music",
+      "outcome": "model",
+      "rows": 1059,
+      "seconds": 30.4
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "ridge",
+      "name": "solar_flare",
+      "outcome": "model",
+      "rows": 1066,
+      "seconds": 15.5
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "naval_propulsion_plant",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 29.8
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "grid_stability",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 28.4
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "video_transcoding",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 29.8
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "ridge",
+      "name": "wave_energy",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 33.7
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "sarcos",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 27.9
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "pumadyn32nh",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 29.9
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "stacking",
+      "name": "cps88wages",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 26.2
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "bagged_decision_tree",
+      "name": "socmob",
+      "outcome": "model",
+      "rows": 1156,
+      "seconds": 19.8
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "brazilian_houses",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 25.8
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "fps_benchmark",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 29.0
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "blending",
+      "name": "health_insurance",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 25.0
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "bagged_decision_tree",
+      "name": "fifa",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 28.7
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "forest_fires",
+      "outcome": "model",
+      "rows": 517,
+      "seconds": 16.1
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "blending",
+      "name": "student_performance_por",
+      "outcome": "model",
+      "rows": 649,
+      "seconds": 27.9
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "bagged_decision_tree",
+      "name": "cars",
+      "outcome": "model",
+      "rows": 804,
+      "seconds": 26.4
+    },
+    {
+      "error": "BlockedError",
+      "gate": "split.test_support",
+      "group": "real",
+      "kind": "multiclass",
+      "message": "the test rows hold fewer than 5 rows of class(es) ['ERL'] ({'ERL': 3}), too few to score the task's metrics on them; provide more rows of those classes, raise validation.test or use the stratified strategy (a class needs 7 rows to reach the test minimum and keep two for training)",
+      "name": "yeast",
+      "outcome": "refused",
+      "rows": 1484,
+      "seconds": 0.1,
+      "site": "scmle.data.splitting.splitters.splitter:Splitter.support"
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "logistic_regression",
+      "name": "kddcup09_appetency",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 25.8
+    },
+    {
+      "error": "BlockedError",
+      "gate": "budget.minimum_run",
+      "group": "real",
+      "kind": "multiclass",
+      "message": "the 30 s time budget cannot fit the minimum run (preparation, one cheapest trial and 163.8 s reserved for the final refit, diagnostics and packaging), estimated at 173.9 s; the smallest budget that fits is about 318 s",
+      "name": "amazon_commerce_reviews",
+      "outcome": "refused",
+      "rows": 1500,
+      "seconds": 58.1,
+      "site": "scmle.runtime.budget:Reserve.admit"
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "apsfailure",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 29.3
+    },
+    {
+      "error": "BlockedError",
+      "gate": "budget.minimum_run",
+      "group": "real",
+      "kind": "multiclass",
+      "message": "the 30 s time budget cannot fit the minimum run (preparation, one cheapest trial and 25.8 s reserved for the final refit, diagnostics and packaging), estimated at 36.1 s; the smallest budget that fits is about 43 s",
+      "name": "fabert",
+      "outcome": "refused",
+      "rows": 4000,
+      "seconds": 0.6,
+      "site": "scmle.runtime.budget:Reserve.admit"
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "jasmine",
+      "outcome": "model",
+      "rows": 2984,
+      "seconds": 28.6
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "airlines",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 21.8
+    },
+    {
+      "error": "BlockedError",
+      "gate": "budget.minimum_run",
+      "group": "real",
+      "kind": "binary",
+      "message": "the 30 s time budget cannot fit the minimum run (preparation, one cheapest trial and 27.8 s reserved for the final refit, diagnostics and packaging), estimated at 37.7 s; the smallest budget that fits is about 45 s",
+      "name": "gina",
+      "outcome": "refused",
+      "rows": 3153,
+      "seconds": 0.8,
+      "site": "scmle.runtime.budget:Reserve.admit"
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "dummy",
+      "name": "madeline",
+      "outcome": "model",
+      "rows": 3140,
+      "seconds": 23.7
+    },
+    {
+      "error": "BlockedError",
+      "gate": "train.first_trial",
+      "group": "real",
+      "kind": "binary",
+      "message": "preparation took 16.1 s and left no time for a first trial (trial window closed: 0.0 s left before the 18.4 s reserved for the final refit, diagnostics and packaging); the smallest budget that fits is about 38 s",
+      "name": "philippine",
+      "outcome": "refused",
+      "rows": 4000,
+      "seconds": 16.5,
+      "site": "scmle.pipeline.stages.training:TrainStage.execute"
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "ada",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 23.1
+    },
+    {
+      "error": "BlockedError",
+      "gate": "budget.minimum_run",
+      "group": "real",
+      "kind": "binary",
+      "message": "the 30 s time budget cannot fit the minimum run (preparation, one cheapest trial and 162.7 s reserved for the final refit, diagnostics and packaging), estimated at 171.9 s; the smallest budget that fits is about 288 s",
+      "name": "arcene",
+      "outcome": "refused",
+      "rows": 100,
+      "seconds": 57.5,
+      "site": "scmle.runtime.budget:Reserve.admit"
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "hist_gradient_boosting",
+      "name": "jannis",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 28.9
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "hist_gradient_boosting",
+      "name": "diabetes130us",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 29.1
+    },
+    {
+      "error": "BlockedError",
+      "gate": "budget.minimum_run",
+      "group": "real",
+      "kind": "multiclass",
+      "message": "the 30 s time budget cannot fit the minimum run (preparation, one cheapest trial and 30.8 s reserved for the final refit, diagnostics and packaging), estimated at 40.9 s; the smallest budget that fits is about 52 s",
+      "name": "micro_mass",
+      "outcome": "refused",
+      "rows": 571,
+      "seconds": 1.0,
+      "site": "scmle.runtime.budget:Reserve.admit"
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "sylvine",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 21.4
+    },
+    {
+      "error": "BlockedError",
+      "gate": "budget.minimum_run",
+      "group": "real",
+      "kind": "binary",
+      "message": "the 30 s time budget cannot fit the minimum run (preparation, one cheapest trial and 38.5 s reserved for the final refit, diagnostics and packaging), estimated at 48.8 s; the smallest budget that fits is about 66 s",
+      "name": "christine",
+      "outcome": "refused",
+      "rows": 4000,
+      "seconds": 2.1,
+      "site": "scmle.runtime.budget:Reserve.admit"
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "logistic_regression",
+      "name": "amazon_employee_access",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 17.8
+    },
+    {
+      "error": "BlockedError",
+      "gate": "split.test_support",
+      "group": "real",
+      "kind": "multiclass",
+      "message": "the test rows hold fewer than 5 rows of class(es) ['19', '32', '34', '53', '75', '90'] ({'19': 2, '32': 1, '34': 1, '53': 4, '75': 2, '90': 2}), too few to score the task's metrics on them; provide more rows of those classes, raise validation.test or use the stratified strategy (a class needs 7 rows to reach the test minimum and keep two for training)",
+      "name": "helena",
+      "outcome": "refused",
+      "rows": 4000,
+      "seconds": 0.3,
+      "site": "scmle.data.splitting.splitters.splitter:Splitter.support"
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "dummy",
+      "name": "volkert",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 29.0
+    },
+    {
+      "error": "BlockedError",
+      "gate": "split.stratified.stratify",
+      "group": "real",
+      "kind": "multiclass",
+      "message": "a class has fewer than 2 examples: cannot stratify",
+      "name": "shuttle",
+      "outcome": "refused",
+      "rows": 4000,
+      "seconds": 0.1,
+      "site": "scmle.data.splitting.splitters.splits:Stratified.stratifier"
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "miniboone",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 26.0
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "logistic_regression",
+      "name": "kick",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 19.8
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "bagged_logistic_regression",
+      "name": "click_prediction_small",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 25.4
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "hist_gradient_boosting",
+      "name": "okcupid_stem",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 29.2
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "sf_police_incidents",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 23.3
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "mercedes_benz_greener_manufacturing",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 29.4
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "ridge",
+      "name": "quake",
+      "outcome": "model",
+      "rows": 2178,
+      "seconds": 15.3
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "blending",
+      "name": "sensory",
+      "outcome": "model",
+      "rows": 576,
+      "seconds": 21.6
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "ridge",
+      "name": "tecator",
+      "outcome": "model",
+      "rows": 240,
+      "seconds": 30.4
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "stacking",
+      "name": "black_friday",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 28.5
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "topo_2_1",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 29.3
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "yprop_4_1",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 29.1
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "onlinenewspopularity",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 29.6
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "elastic_net",
+      "name": "nyc_taxi_green_dec_2016",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 24.7
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "pol",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 28.8
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "sat11_hand_runtime_regression",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 27.9
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "stacking",
+      "name": "boston",
+      "outcome": "model",
+      "rows": 506,
+      "seconds": 29.2
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "house_prices_nominal",
+      "outcome": "model",
+      "rows": 1460,
+      "seconds": 28.5
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "house_16h",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 25.9
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "dummy",
+      "name": "qsar_tid_11",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 31.7
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "dummy",
+      "name": "qsar_tid_10980",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 31.3
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "mip_2016_regression",
+      "outcome": "model",
+      "rows": 1090,
+      "seconds": 29.5
     }
   ],
-  "seconds": 1337.5,
+  "seconds": 1074.5,
   "settings": {
     "api": "scmle.api.project.Project(...).run(), defaults",
     "budget": 30,
     "network": "cut in each run (dead proxy); local caches only",
-    "parallel": 2,
-    "seconds": 4200.0,
+    "parallel": 4,
+    "seconds": 3000,
     "timeout": 360
   },
   "sources": {
     "1049": {
       "licence": "Public",
       "name": "pc4",
+      "version": 1
+    },
+    "1050": {
+      "licence": "Public",
+      "name": "pc3",
+      "version": 1
+    },
+    "1053": {
+      "licence": "Public",
+      "name": "jm1",
       "version": 1
     },
     "1063": {
@@ -1010,14 +1895,59 @@
       "name": "balance-scale",
       "version": 1
     },
+    "1111": {
+      "licence": "Public",
+      "name": "KDDCup09_appetency",
+      "version": 1
+    },
+    "1169": {
+      "licence": "Public",
+      "name": "airlines",
+      "version": 1
+    },
+    "12": {
+      "licence": "Public",
+      "name": "mfeat-factors",
+      "version": 1
+    },
+    "1457": {
+      "licence": "Public",
+      "name": "amazon-commerce-reviews",
+      "version": 1
+    },
     "1462": {
       "licence": "Public",
       "name": "banknote-authentication",
       "version": 1
     },
+    "1468": {
+      "licence": "Public",
+      "name": "cnae-9",
+      "version": 1
+    },
+    "1475": {
+      "licence": "Public",
+      "name": "first-order-theorem-proving",
+      "version": 1
+    },
+    "1478": {
+      "licence": "Public",
+      "name": "har",
+      "version": 1
+    },
     "1480": {
       "licence": "Public",
       "name": "ilpd",
+      "version": 1
+    },
+    "1485": {
+      "licence": "Public",
+      "name": "madelon",
+      "version": 1
+    },
+    "1486": {
+      "licence": "Public",
+      "name": "nomao",
       "version": 1
     },
     "1487": {
@@ -1030,9 +1960,34 @@
       "name": "qsar-biodeg",
       "version": 1
     },
+    "1497": {
+      "licence": "Public",
+      "name": "wall-robot-navigation",
+      "version": 1
+    },
     "15": {
       "licence": "Public",
       "name": "breast-w",
+      "version": 1
+    },
+    "1501": {
+      "licence": "Public",
+      "name": "semeion",
+      "version": 1
+    },
+    "1515": {
+      "licence": "Public",
+      "name": "micro-mass",
+      "version": 2
+    },
+    "181": {
+      "licence": "Public",
+      "name": "yeast",
+      "version": 1
+    },
+    "182": {
+      "licence": "Public",
+      "name": "satimage",
       "version": 1
     },
     "188": {
@@ -1048,6 +2003,11 @@
     "197": {
       "licence": "Public",
       "name": "cpu_act",
+      "version": 1
+    },
+    "201": {
+      "licence": "Public",
+      "name": "pol",
       "version": 1
     },
     "216": {
@@ -1070,9 +2030,29 @@
       "name": "machine_cpu",
       "version": 1
     },
+    "23381": {
+      "licence": "Public",
+      "name": "dresses-sales",
+      "version": 2
+    },
+    "23517": {
+      "licence": "Public",
+      "name": "numerai28.6",
+      "version": 2
+    },
     "3": {
       "licence": "Public",
       "name": "kr-vs-kp",
+      "version": 1
+    },
+    "300": {
+      "licence": "Public",
+      "name": "isolet",
+      "version": 1
+    },
+    "3050": {
+      "licence": "Public",
+      "name": "QSAR-TID-11",
       "version": 1
     },
     "307": {
@@ -1085,10 +2065,50 @@
       "name": "us_crime",
       "version": 1
     },
+    "32": {
+      "licence": "Public",
+      "name": "pendigits",
+      "version": 1
+    },
+    "3277": {
+      "licence": "Public",
+      "name": "QSAR-TID-10980",
+      "version": 1
+    },
     "333": {
       "licence": "Public",
       "name": "monks-problems-1",
       "version": 1
+    },
+    "38": {
+      "licence": "Public",
+      "name": "sick",
+      "version": 1
+    },
+    "40499": {
+      "licence": "Public",
+      "name": "texture",
+      "version": 1
+    },
+    "40668": {
+      "licence": "public",
+      "name": "connect-4",
+      "version": 2
+    },
+    "40685": {
+      "licence": "public",
+      "name": "shuttle",
+      "version": 1
+    },
+    "40966": {
+      "licence": "Public",
+      "name": "MiceProtein",
+      "version": 4
+    },
+    "40978": {
+      "licence": "Public",
+      "name": "Internet-Advertisements",
+      "version": 2
     },
     "40982": {
       "licence": "Public",
@@ -1110,6 +2130,281 @@
       "name": "Moneyball",
       "version": 2
     },
+    "41027": {
+      "licence": "Public",
+      "name": "jungle_chess_2pcs_raw_endgame_complete",
+      "version": 1
+    },
+    "41138": {
+      "licence": "CC0",
+      "name": "APSFailure",
+      "version": 1
+    },
+    "41142": {
+      "licence": "Public",
+      "name": "christine",
+      "version": 1
+    },
+    "41143": {
+      "licence": "Public",
+      "name": "jasmine",
+      "version": 1
+    },
+    "41144": {
+      "licence": "Public",
+      "name": "madeline",
+      "version": 1
+    },
+    "41145": {
+      "licence": "Public",
+      "name": "philippine",
+      "version": 1
+    },
+    "41146": {
+      "licence": "Public",
+      "name": "sylvine",
+      "version": 1
+    },
+    "41150": {
+      "licence": "CC0",
+      "name": "MiniBooNE",
+      "version": 1
+    },
+    "41156": {
+      "licence": "Public",
+      "name": "ada",
+      "version": 1
+    },
+    "41157": {
+      "licence": "Public",
+      "name": "arcene",
+      "version": 2
+    },
+    "41158": {
+      "licence": "Public",
+      "name": "gina",
+      "version": 1
+    },
+    "41162": {
+      "licence": "CC0",
+      "name": "kick",
+      "version": 1
+    },
+    "41164": {
+      "licence": "Public",
+      "name": "fabert",
+      "version": 1
+    },
+    "41166": {
+      "licence": "Public",
+      "name": "volkert",
+      "version": 1
+    },
+    "41168": {
+      "licence": "Public",
+      "name": "jannis",
+      "version": 1
+    },
+    "41169": {
+      "licence": "Public",
+      "name": "helena",
+      "version": 1
+    },
+    "4134": {
+      "licence": "Public",
+      "name": "Bioresponse",
+      "version": 1
+    },
+    "4135": {
+      "licence": "Public",
+      "name": "Amazon_employee_access",
+      "version": 1
+    },
+    "41540": {
+      "licence": "GPL-1",
+      "name": "black_friday",
+      "version": 1
+    },
+    "416": {
+      "licence": "Public",
+      "name": "yprop_4_1",
+      "version": 1
+    },
+    "41980": {
+      "licence": "Public",
+      "name": "SAT11-HAND-runtime-regression",
+      "version": 1
+    },
+    "422": {
+      "licence": "Public",
+      "name": "topo_2_1",
+      "version": 1
+    },
+    "42563": {
+      "licence": "Public",
+      "name": "house_prices_nominal",
+      "version": 1
+    },
+    "42570": {
+      "licence": "Public",
+      "name": "Mercedes_Benz_Greener_Manufacturing",
+      "version": 2
+    },
+    "42724": {
+      "licence": "Public",
+      "name": "OnlineNewsPopularity",
+      "version": 2
+    },
+    "42729": {
+      "licence": "Public",
+      "name": "nyc-taxi-green-dec-2016",
+      "version": 3
+    },
+    "42732": {
+      "licence": "CC0",
+      "name": "sf-police-incidents",
+      "version": 6
+    },
+    "42733": {
+      "licence": "Public",
+      "name": "Click_prediction_small",
+      "version": 10
+    },
+    "42734": {
+      "licence": "Public",
+      "name": "okcupid-stem",
+      "version": 3
+    },
+    "43071": {
+      "licence": "Public",
+      "name": "MIP-2016-regression",
+      "version": 3
+    },
+    "44958": {
+      "licence": "CC BY 4.0",
+      "name": "auction_verification",
+      "version": 7
+    },
+    "44962": {
+      "licence": "CC BY 4.0",
+      "name": "forest_fires",
+      "version": 9
+    },
+    "44963": {
+      "licence": "CC BY 4.0",
+      "name": "physiochemical_protein",
+      "version": 7
+    },
+    "44964": {
+      "licence": "CC BY 4.0",
+      "name": "superconductivity",
+      "version": 7
+    },
+    "44965": {
+      "licence": "CC BY 4.0",
+      "name": "geographical_origin_of_music",
+      "version": 7
+    },
+    "44966": {
+      "licence": "CC BY 4.0",
+      "name": "solar_flare",
+      "version": 7
+    },
+    "44967": {
+      "licence": "CC BY 4.0",
+      "name": "student_performance_por",
+      "version": 8
+    },
+    "44969": {
+      "licence": "CC BY 4.0",
+      "name": "naval_propulsion_plant",
+      "version": 7
+    },
+    "44973": {
+      "licence": "CC BY 4.0",
+      "name": "grid_stability",
+      "version": 7
+    },
+    "44974": {
+      "licence": "CC BY 4.0",
+      "name": "video_transcoding",
+      "version": 6
+    },
+    "44975": {
+      "licence": "CC BY 4.0",
+      "name": "wave_energy",
+      "version": 6
+    },
+    "44976": {
+      "licence": "Public",
+      "name": "sarcos",
+      "version": 9
+    },
+    "44981": {
+      "licence": "Public",
+      "name": "pumadyn32nh",
+      "version": 2
+    },
+    "44984": {
+      "licence": "Public",
+      "name": "cps88wages",
+      "version": 2
+    },
+    "44987": {
+      "licence": "Non-commercial scholarly and teaching purposes.",
+      "name": "socmob",
+      "version": 4
+    },
+    "44990": {
+      "licence": "CC 0: Public Domain",
+      "name": "brazilian_houses",
+      "version": 16
+    },
+    "44992": {
+      "licence": "CC BY",
+      "name": "fps_benchmark",
+      "version": 2
+    },
+    "44993": {
+      "licence": "GPL (>= 2)",
+      "name": "health_insurance",
+      "version": 3
+    },
+    "44994": {
+      "licence": "Public",
+      "name": "cars",
+      "version": 4
+    },
+    "45012": {
+      "licence": "CC0: Public Domain",
+      "name": "fifa",
+      "version": 19
+    },
+    "4534": {
+      "licence": "Public",
+      "name": "PhishingWebsites",
+      "version": 1
+    },
+    "4538": {
+      "licence": "Public",
+      "name": "GesturePhaseSegmentationProcessed",
+      "version": 1
+    },
+    "4541": {
+      "licence": "Public",
+      "name": "Diabetes130US",
+      "version": 1
+    },
+    "458": {
+      "licence": "Public",
+      "name": "analcatdata_authorship",
+      "version": 1
+    },
+    "469": {
+      "licence": "Public",
+      "name": "analcatdata_dmft",
+      "version": 1
+    },
     "50": {
       "licence": "Public",
       "name": "tic-tac-toe",
@@ -1118,6 +2413,11 @@
     "503": {
       "licence": "Public",
       "name": "wind",
+      "version": 1
+    },
+    "505": {
+      "licence": "Public",
+      "name": "tecator",
       "version": 1
     },
     "507": {
@@ -1130,9 +2430,29 @@
       "name": "heart-statlog",
       "version": 1
     },
+    "531": {
+      "licence": "Public",
+      "name": "boston",
+      "version": 1
+    },
+    "546": {
+      "licence": "Public",
+      "name": "sensory",
+      "version": 1
+    },
+    "550": {
+      "licence": "Public",
+      "name": "quake",
+      "version": 2
+    },
     "560": {
       "licence": "Public",
       "name": "bodyfat",
+      "version": 1
+    },
+    "574": {
+      "licence": "Public",
+      "name": "house_16H",
       "version": 1
     },
     "59": {
@@ -1144,6 +2464,11 @@
       "licence": "Public",
       "name": "iris",
       "version": 1
+    },
+    "6332": {
+      "licence": "Public",
+      "name": "cylinder-bands",
+      "version": 2
     }
   },
   "tasks": {
@@ -1153,11 +2478,65 @@
       "group": "real",
       "kind": "regression"
     },
+    "ada": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
     "adult": {
       "cause": "",
       "expected": [],
       "group": "real",
       "kind": "binary"
+    },
+    "airlines": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "amazon_commerce_reviews": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "amazon_employee_access": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "analcatdata_authorship": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "analcatdata_dmft": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "apsfailure": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "arcene": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "auction_verification": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
     },
     "auto_mpg": {
       "cause": "",
@@ -1189,6 +2568,18 @@
       "group": "real",
       "kind": "regression"
     },
+    "bioresponse": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "black_friday": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
     "blood_transfusion": {
       "cause": "",
       "expected": [],
@@ -1196,6 +2587,18 @@
       "kind": "binary"
     },
     "bodyfat": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "boston": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "brazilian_houses": {
       "cause": "",
       "expected": [],
       "group": "real",
@@ -1225,7 +2628,25 @@
       "group": "real",
       "kind": "binary"
     },
+    "cars": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "christine": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
     "churn": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "click_prediction_small": {
       "cause": "",
       "expected": [],
       "group": "real",
@@ -1243,11 +2664,29 @@
       "group": "real",
       "kind": "multiclass"
     },
+    "cnae_9": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
     "colic": {
       "cause": "",
       "expected": [],
       "group": "real",
       "kind": "binary"
+    },
+    "connect_4": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "cps88wages": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
     },
     "cpu_act": {
       "cause": "",
@@ -1273,6 +2712,18 @@
       "group": "real",
       "kind": "binary"
     },
+    "cylinder_bands": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "diabetes130us": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
     "diabetes_progression": {
       "cause": "",
       "expected": [],
@@ -1290,6 +2741,12 @@
       "expected": [],
       "group": "real",
       "kind": "multiclass"
+    },
+    "dresses_sales": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
     },
     "electricity": {
       "cause": "",
@@ -1321,13 +2778,97 @@
       "group": "real",
       "kind": "multiclass"
     },
+    "fabert": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "fifa": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "first_order_theorem_proving": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "forest_fires": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "fps_benchmark": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "geographical_origin_of_music": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "gesturephasesegmentationprocessed": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "gina": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "grid_stability": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "har": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "health_insurance": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
     "heart_statlog": {
       "cause": "",
       "expected": [],
       "group": "real",
       "kind": "binary"
     },
+    "helena": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "house_16h": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
     "house_8l": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "house_prices_nominal": {
       "cause": "",
       "expected": [],
       "group": "real",
@@ -1345,6 +2886,12 @@
       "group": "real",
       "kind": "binary"
     },
+    "internet_advertisements": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
     "ionosphere": {
       "cause": "",
       "expected": [],
@@ -1357,6 +2904,36 @@
       "group": "real",
       "kind": "multiclass"
     },
+    "isolet": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "jannis": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "jasmine": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "jm1": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "jungle_chess_2pcs_raw_endgame_complete": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
     "kc1_defects": {
       "cause": "",
       "expected": [],
@@ -1364,6 +2941,18 @@
       "kind": "binary"
     },
     "kc2": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "kddcup09_appetency": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "kick": {
       "cause": "",
       "expected": [],
       "group": "real",
@@ -1393,11 +2982,59 @@
       "group": "real",
       "kind": "regression"
     },
+    "madeline": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "madelon": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
     "magic_telescope": {
       "cause": "",
       "expected": [],
       "group": "real",
       "kind": "binary"
+    },
+    "mercedes_benz_greener_manufacturing": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "mfeat_factors": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "miceprotein": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "micro_mass": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "miniboone": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "mip_2016_regression": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
     },
     "moneyball": {
       "cause": "",
@@ -1417,6 +3054,42 @@
       "group": "real",
       "kind": "binary"
     },
+    "naval_propulsion_plant": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "nomao": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "numerai28_6": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "nyc_taxi_green_dec_2016": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "okcupid_stem": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "onlinenewspopularity": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
     "ozone": {
       "cause": "",
       "expected": [],
@@ -1429,7 +3102,31 @@
       "group": "real",
       "kind": "binary"
     },
+    "pc3": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
     "pc4": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "pendigits": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "philippine": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "phishingwebsites": {
       "cause": "",
       "expected": [],
       "group": "real",
@@ -1440,6 +3137,12 @@
       "expected": [],
       "group": "real",
       "kind": "binary"
+    },
+    "physiochemical_protein": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
     },
     "pima_diabetes": {
       "cause": "",
@@ -1549,17 +3252,95 @@
       "group": "planted",
       "kind": "regression"
     },
+    "pol": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "pumadyn32nh": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
     "qsar_biodeg": {
       "cause": "",
       "expected": [],
       "group": "real",
       "kind": "binary"
     },
+    "qsar_tid_10980": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "qsar_tid_11": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "quake": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "sarcos": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "sat11_hand_runtime_regression": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "satimage": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
     "segment": {
       "cause": "",
       "expected": [],
       "group": "real",
       "kind": "multiclass"
+    },
+    "semeion": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "sensory": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "sf_police_incidents": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "shuttle": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "sick": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
     },
     "sim_binary_1000_mixed": {
       "cause": "",
@@ -1693,6 +3474,18 @@
       "group": "simulated",
       "kind": "uplift"
     },
+    "socmob": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "solar_flare": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
     "space_ga": {
       "cause": "",
       "expected": [],
@@ -1711,6 +3504,36 @@
       "group": "real",
       "kind": "multiclass"
     },
+    "student_performance_por": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "superconductivity": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "sylvine": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "tecator": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "texture": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
     "tic_tac_toe": {
       "cause": "",
       "expected": [],
@@ -1722,6 +3545,12 @@
       "expected": [],
       "group": "real",
       "kind": "binary"
+    },
+    "topo_2_1": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
     },
     "us_crime": {
       "cause": "",
@@ -1735,11 +3564,35 @@
       "group": "real",
       "kind": "multiclass"
     },
+    "video_transcoding": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "volkert": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
     "vowel": {
       "cause": "",
       "expected": [],
       "group": "real",
       "kind": "multiclass"
+    },
+    "wall_robot_navigation": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "wave_energy": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
     },
     "wilt": {
       "cause": "",
@@ -1770,6 +3623,18 @@
       "expected": [],
       "group": "real",
       "kind": "ordinal"
+    },
+    "yeast": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "yprop_4_1": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
     }
   },
   "version": 1

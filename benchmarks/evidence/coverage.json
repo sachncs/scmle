@@ -1,7 +1,8 @@
 {
   "alpha": 0.05,
+  "assumed": 0.95,
   "claim": "C3",
-  "code": "7d65760d81a2f2e541f624ea6eb41e40990cac212fb3aabed1115420f1247015",
+  "code": "187a8aa6ea3aaffe27c8ba374cf1dae5872d57071b575a545fbf56a0cf936293",
   "design": {
     "fresh_rows": 100000,
     "group_rows": 5,
@@ -12,40 +13,40 @@
   },
   "families": [
     {
-      "above": 20,
-      "below": 17,
+      "above": 40,
+      "below": 30,
       "family": "binary_rows",
-      "hits": 845,
-      "lower": 0.9451797003473325,
-      "mean_width": 0.09878060244223295,
+      "hits": 1608,
+      "lower": 0.9493386155769804,
+      "mean_width": 0.09892092193379594,
       "no_interval": 0,
       "passed": true,
-      "rate": 0.9580498866213152,
-      "trials": 882
+      "rate": 0.9582836710369488,
+      "trials": 1678
     },
     {
-      "above": 31,
-      "below": 24,
+      "above": 47,
+      "below": 46,
       "family": "regression_rows",
-      "hits": 827,
-      "lower": 0.922556978988157,
-      "mean_width": 0.16276779742793276,
-      "no_interval": 0,
-      "passed": false,
-      "rate": 0.937641723356009,
-      "trials": 882
-    },
-    {
-      "above": 22,
-      "below": 24,
-      "family": "binary_groups",
-      "hits": 836,
-      "lower": 0.9338036217244945,
-      "mean_width": 0.10869179412726535,
+      "hits": 1585,
+      "lower": 0.9344972991097242,
+      "mean_width": 0.16315986723999013,
       "no_interval": 0,
       "passed": true,
-      "rate": 0.9478458049886621,
-      "trials": 882
+      "rate": 0.9445768772348033,
+      "trials": 1678
+    },
+    {
+      "above": 43,
+      "below": 41,
+      "family": "binary_groups",
+      "hits": 1594,
+      "lower": 0.9402826588946386,
+      "mean_width": 0.108693221482932,
+      "no_interval": 0,
+      "passed": true,
+      "rate": 0.9499404052443385,
+      "trials": 1678
     }
   ],
   "floor": 0.93,
@@ -58,14 +59,14 @@
     "model families other than logistic regression and ridge",
     "real datasets"
   ],
-  "planned_trials": 882,
+  "planned_trials": 1678,
   "pooled": {
-    "hits": 2508,
-    "lower": 0.940170564743724,
-    "rate": 0.9478458049886621,
-    "trials": 2646
+    "hits": 4787,
+    "lower": 0.9456291674600759,
+    "rate": 0.9509336511720302,
+    "trials": 5034
   },
-  "power": 0.8,
-  "seconds": 109.6,
+  "power": 0.9,
+  "seconds": 148.9,
   "variable": "interval_coverage_min"
 }

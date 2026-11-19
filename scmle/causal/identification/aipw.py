@@ -527,6 +527,7 @@ class Difference:
         high: Upper limit.
         level: Confidence level.
         n: Rows.
+        df: Welch degrees of freedom of the interval's t reference.
     """
 
     estimate: float
@@ -535,6 +536,7 @@ class Difference:
     high: float
     level: float
     n: int
+    df: float
 
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready record.
@@ -574,5 +576,11 @@ def difference_in_means(
     quantile = float(stats.t.ppf(0.5 + level / 2, df))
     diff = float(y1.mean() - y0.mean())
     return Difference(
-        diff, se, diff - quantile * se, diff + quantile * se, level, len(y)
+        diff,
+        se,
+        diff - quantile * se,
+        diff + quantile * se,
+        level,
+        len(y),
+        float(df),
     )

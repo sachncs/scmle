@@ -43,7 +43,9 @@ def causal_charter(**changes):
 
 
 def test_a_charter_without_the_block_keeps_its_hash():
-    # Enforces docs/API_STABILITY.md:171.
+    # Enforces docs/API_STABILITY.md:174.
+    # Enforces website/src/pages/docs/api-stability.astro:74.
+    # Enforces website/src/pages/docs/qualification.astro:67.
     charter = make_charter()
     assert charter.charter_hash == FROZEN_HASH
     assert "causal" not in charter.estimand.to_dict()
@@ -51,7 +53,8 @@ def test_a_charter_without_the_block_keeps_its_hash():
 
 
 def test_the_block_round_trips_and_needs_format_four():
-    # Enforces docs/API_STABILITY.md:171.
+    # Enforces docs/API_STABILITY.md:174.
+    # Enforces website/src/pages/docs/causal-decision.astro:55.
     charter = causal_charter()
     record = json.loads(json.dumps(charter.to_dict()))
     assert contracts.AnalysisCharter.from_dict(record) == charter
@@ -123,7 +126,7 @@ def test_a_fixed_benchmark_is_a_partial_r2():
 
 
 def test_a_causal_block_in_an_older_format_is_refused(tmp_path):
-    # Enforces docs/API_STABILITY.md:171.
+    # Enforces docs/API_STABILITY.md:174.
     path = tmp_path / "charter.json"
     wrapper = sealing.envelope(causal_charter(), KEY)
     assert wrapper["format"] == 4
@@ -156,7 +159,8 @@ def format_four_charter():
 
 
 def test_a_format_four_causal_charter_keeps_hash_and_signature():
-    # Enforces docs/API_STABILITY.md:89.
+    # Enforces docs/API_STABILITY.md:92.
+    # Enforces website/src/pages/docs/api-stability.astro:74.
     charter = format_four_charter()
     assert charter.charter_hash == FORMAT_FOUR_HASH
     assert charter.format_version == 4
@@ -172,7 +176,7 @@ SUBGROUPS = (
 
 
 def test_subgroups_need_format_nine_and_round_trip():
-    # Enforces docs/API_STABILITY.md:89.
+    # Enforces docs/API_STABILITY.md:92.
     charter = causal_charter(subgroups=SUBGROUPS)
     assert charter.format_version == 9
     assert charter.charter_hash != causal_charter().charter_hash
@@ -215,7 +219,8 @@ ATTESTORS = (
 
 
 def test_attestors_need_format_nine_and_round_trip():
-    # Enforces docs/API_STABILITY.md:89.
+    # Enforces docs/API_STABILITY.md:92.
+    # Enforces website/src/pages/docs/qualification.astro:71.
     charter = causal_charter(attestors=ATTESTORS, attestations="signed.json")
     assert charter.format_version == 9
     assert charter.charter_hash != causal_charter().charter_hash

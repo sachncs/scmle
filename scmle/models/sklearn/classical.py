@@ -19,6 +19,7 @@ import inspect
 import types
 from typing import Any
 
+import numpy
 from sklearn import dummy
 from sklearn import ensemble
 from sklearn import linear_model
@@ -35,6 +36,7 @@ from scmle.data.splitting import inner_cv
 import scmle.models.multitarget.estimators
 import scmle.models.ordinal.estimators
 import scmle.models.ranking.estimators
+from scmle.models.sklearn import trees
 import scmle.models.survival.estimators
 import scmle.models.uplift.estimators
 
@@ -43,6 +45,30 @@ REGRESSION_ONLY = frozenset({tasks.Task.REGRESSION})
 ALL_TASKS = CLASSIFICATION | REGRESSION_ONLY
 CALIBRATION_FOLDS = 3
 NO_PARAMS: Mapping[str, Any] = types.MappingProxyType({})
+# Boosting stops on a held-out tenth of the training rows (scikit-learn's own
+# `validation_fraction`) after `PATIENCE` rounds without improvement, at most
+# `ROUNDS` rounds. Patience 20 at learning rate 0.1 tolerates a plateau of
+# two shrinkage-weighted trees' worth of loss; `ROUNDS` = 500 lets a 0.05
+# rate reach the 100 rounds scikit-learn runs at 0.1, five times over.
+ROUNDS = 500
+PATIENCE = 20
+HOLDOUT = 0.1
+# The untuned learning rate. Smaller shrinkage generalises better when
+# enough rounds are allowed (Friedman 2001, "Greedy function approximation",
+# section 5); early stopping bounds the cost, and at 0.05 a fit needs about
+# twice the 100 rounds scikit-learn's 0.1 runs, inside `ROUNDS`. The search
+# still ranges over 0.02 to 0.3.
+SHRINKAGE = 0.05
+# A plain dict: trials receive the adapter pickled, and a mappingproxy is not.
+STOPPING: Mapping[str, Any] = {
+    "learning_rate": SHRINKAGE,
+    "max_iter": ROUNDS,
+    "early_stopping": True,
+    "validation_fraction": HOLDOUT,
+    "n_iter_no_change": PATIENCE,
+}
+# A stratified stopping split puts one row of each class on both sides.
+STRATIFIED = 2
 
 
 class Learner(models.Model):
@@ -208,6 +234,52 @@ class Dummy(models.Model):
         return baseline
 
 
+class Boosted(ensemble.HistGradientBoostingClassifier):  # type: ignore[misc]  # scikit-learn ships no type information, so its base class is Any
+    """Boosted classifier whose early stopping follows the rarest class.
+
+    scikit-learn draws the stopping rows stratified and refuses a class with
+    a single training row, which a small fold or learning-curve slice of a
+    real table can hold. Such a fit runs all `max_iter` rounds instead; the
+    configured `early_stopping` is left as it was, and whether this fit
+    was allowed to stop on held-out rows is recorded as `stopped_`.
+
+    Attributes:
+        stopped_: Whether the last fit was allowed to stop early.
+    """
+
+    stopped_: bool
+
+    def fit(  # pyright: ignore[reportIncompatibleMethodOverride]  # the base names these parameters X and y; scikit-learn passes them positionally
+        self,
+        features: Any,
+        labels: Any,
+        sample_weight: Any = None,
+        **params: Any,
+    ) -> "Boosted":
+        """Fits, stopping early only when every class has `STRATIFIED` rows.
+
+        Args:
+            features: Training features.
+            labels: Training labels.
+            sample_weight: Optional row weights.
+            **params: Passed to scikit-learn's `fit`.
+
+        Returns:
+            This fitted classifier.
+        """
+        configured: Any = self.get_params()["early_stopping"]
+        counts = numpy.unique(numpy.asarray(labels), return_counts=True)[1]
+        rarest = int(numpy.min(counts))
+        self.stopped_ = bool(configured) and rarest >= STRATIFIED
+        if not self.stopped_:
+            self.early_stopping = False
+        try:
+            super().fit(features, labels, sample_weight, **params)
+        finally:
+            self.early_stopping = configured
+        return self
+
+
 class HistGradientBoosting(Learner):
     """Histogram-based gradient boosting, which takes native categoricals."""
 
@@ -355,7 +427,7 @@ DECISION_TREE = Learner(
     capabilities=models.Capabilities(
         ALL_TASKS, handles_missing=True, memory_factor=2.0
     ),
-    classifier=tree.DecisionTreeClassifier,
+    classifier=trees.Tree,
     regressor=tree.DecisionTreeRegressor,
     search_space=search.Space(
         (
@@ -369,7 +441,7 @@ RANDOM_FOREST = Learner(
     name="random_forest",
     family="tree",
     capabilities=models.Capabilities(ALL_TASKS, cost=3, memory_factor=6.0),
-    classifier=ensemble.RandomForestClassifier,
+    classifier=trees.Forest,
     regressor=ensemble.RandomForestRegressor,
     search_space=TREE_ENSEMBLE_SPACE,
 )
@@ -378,7 +450,7 @@ EXTRA_TREES = Learner(
     name="extra_trees",
     family="tree",
     capabilities=models.Capabilities(ALL_TASKS, cost=3, memory_factor=6.0),
-    classifier=ensemble.ExtraTreesClassifier,
+    classifier=trees.Extra,
     regressor=ensemble.ExtraTreesRegressor,
     search_space=TREE_ENSEMBLE_SPACE,
 )
@@ -394,8 +466,9 @@ HIST_GRADIENT_BOOSTING = HistGradientBoosting(
         cost=3,
         memory_factor=3.0,
     ),
-    classifier=ensemble.HistGradientBoostingClassifier,
+    classifier=Boosted,
     regressor=ensemble.HistGradientBoostingRegressor,
+    fixed_params=STOPPING,
     monotonic_param="monotonic_cst",
     search_space=search.Space(
         (

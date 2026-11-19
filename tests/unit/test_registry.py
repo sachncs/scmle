@@ -8,17 +8,21 @@ GATES = registry.load()
 
 
 def test_the_registry_and_the_code_agree():
+    # Enforces docs/preregistration/c1.md:7.
+    # Enforces docs/preregistration/c1.md:55.
     assert registry.compare(GATES, registry.scan()) == []
     assert registry.main() == 0
 
 
 def test_every_gate_says_how_it_passes_blocks_and_is_overridden():
+    # Enforces docs/preregistration/c1.md:7.
     for gate in GATES.values():
         assert gate.passes and gate.blocks and gate.override, gate.name
         assert set(gate.claims) <= registry.CLAIMS
 
 
 def test_an_unregistered_raise_is_found(tmp_path):
+    # Enforces docs/preregistration/c1.md:7.
     package = tmp_path / "scmle"
     package.mkdir()
     (package / "planted.py").write_text(

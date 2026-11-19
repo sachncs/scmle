@@ -1,22 +1,21 @@
 """Robustness qualification of a charter run's exploration."""
 
+import dataclasses
 from typing import Any
 
-from scmle.assurance.admissibility import qualify
 from scmle.assurance.charter import contracts
 import scmle.assurance.framing.claim
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import explore
 from scmle.assurance.ledger import governed
 from scmle.assurance.robustness import html_report
+from scmle.assurance.robustness import periods
 from scmle.assurance.robustness import prefilter
 import scmle.assurance.robustness.qualify
 import scmle.assurance.robustness.report
 import scmle.assurance.robustness.stability
-from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.readers import tabular
-from scmle.pipeline import ingest_stage
 import scmle.pipeline.context
 from scmle.pipeline.stages import screening
 
@@ -27,41 +26,6 @@ class Qualification(screening.Screening):
     Part of `ProfileStage`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
-
-    def audit(
-        self,
-        context: scmle.pipeline.context.Context,
-        run: governed.Governance,
-        found: qualify.Qualification,
-    ) -> None:
-        """Requires the ledger to hold exactly the declared synthesized family.
-
-        Does nothing when the run synthesized no features. A mismatch between
-        the declared family size and the registered hypotheses blocks the run
-        (the multiplicity check raises `BlockedError`).
-
-        Args:
-            context: The run context, holding the ingest result.
-            run: The governed run whose ledger registered the hypotheses.
-            found: The exploration qualification, whose quarantined columns
-                are exempt.
-        """
-        result = context.ingest
-        if result is None:
-            return
-        columns = tuple(str(c) for c in result.features.columns)
-        registered = {
-            h.spec.column
-            for h in run.ledger.hypotheses.values()
-            if h.spec.column
-        }
-        skipped = {pair[0] for pair in run.plan.skipped}
-        ingest_stage.plurality(
-            result.declared,
-            columns,
-            registered,
-            set(found.quarantined) | skipped,
-        )
 
     def publish(
         self,
@@ -132,7 +96,8 @@ class Qualification(screening.Screening):
             survivors: Columns that survived exploration.
 
         Returns:
-            The stability and shift assessment of the survivors.
+            The stability and shift assessment of the survivors, with each
+            time period of the exploration rows compared with the first.
         """
         data = context.spec.data
         profile = scmle.pipeline.context.require(context.profile, "profile")
@@ -146,7 +111,7 @@ class Qualification(screening.Screening):
             else None
         )
         rules = charter.rules
-        return scmle.assurance.robustness.qualify.run(
+        found = scmle.assurance.robustness.qualify.run(
             view.features,
             codes,
             survivors=list(survivors),
@@ -169,6 +134,8 @@ class Qualification(screening.Screening):
                 )
             ),
         )
+        drift = periods.assess(view.features, data.time_column, candidates)
+        return dataclasses.replace(found, drift=drift)
 
     def assess_robustness(
         self,
@@ -190,14 +157,9 @@ class Qualification(screening.Screening):
         Args:
             context: The run context that stores the reports.
             stage: The stability stage, holding the assessment it ran.
-
-        Raises:
-            BlockedError: If the stability stage holds no assessment; the
-                governed exploration always runs it, so this guards the type.
         """
         found = stage.found
-        if found is None:  # pragma: no cover - run_governed always calls it
-            raise errors.BlockedError("the second stage did not run")
+        assert found is not None  # noqa: S101 -- scout always runs the stage (tests/unit/test_unreachable_gates.py) # nosec B101
         stability_document = scmle.assurance.robustness.report.stability_report(
             found, stage.note if stage.requested else None
         )

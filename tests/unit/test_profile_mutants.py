@@ -431,7 +431,7 @@ def test_the_token_is_returned_with_the_read_and_flags_it_verified():
 
 
 def test_a_changing_token_gives_a_torn_read_with_the_reason_and_attempts():
-    # Enforces docs/ARCHITECTURE.md:97.
+    # Enforces docs/ARCHITECTURE.md:103.
     ticks = iter(range(100))
     connector = Scripted(
         [

@@ -561,7 +561,7 @@ def leakedit(lab: Lab) -> Callable[[], dict[str, Any]]:
     """Resumes a refused leak run after setting the policy to warn."""
     frame = leaked("copy")
     run = refused(lambda: project(lab, frame, leakage_policy="block").run())
-    edit(run, lambda c: c.update(leakage_policy="warn"))
+    edit(run, lambda c: c.update(leakage="warn"))
     return lambda: resume(run, frame)
 
 

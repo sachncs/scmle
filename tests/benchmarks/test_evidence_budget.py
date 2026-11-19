@@ -232,6 +232,25 @@ def test_problems_flag_other_code_and_other_settings():
     ]
 
 
+def test_the_real_fingerprint_covers_the_product_code(tmp_path):
+    for name in budget.PRODUCT:
+        folder = tmp_path / name
+        folder.mkdir()
+        (folder / "unit.py").write_text("x = 1\n", encoding="utf-8")
+    before = budget.product(tmp_path)
+    for name in budget.PRODUCT:
+        (tmp_path / name / "unit.py").write_text("x = 2\n", encoding="utf-8")
+        assert budget.product(tmp_path) != before
+        (tmp_path / name / "unit.py").write_text("x = 1\n", encoding="utf-8")
+    assert budget.product(tmp_path) == before
+
+
+def test_the_product_packages_include_what_a_run_executes():
+    assert {"pipeline", "runtime", "models", "api"} <= set(budget.PRODUCT)
+    for name in budget.PRODUCT:
+        assert (budget.PACKAGE / name).is_dir()
+
+
 def test_an_unknown_child_mode_is_refused():
     with pytest.raises(errors.InputError):
         budget.child(["walk"])

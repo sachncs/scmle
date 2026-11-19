@@ -10,8 +10,8 @@
       "outcomes": [
         {
           "alarms": [
-            0.016180168466636995,
-            0.03546290561161149
+            0.01660287643451064,
+            0.033587428098608846
           ],
           "certificate": {
             "alarms": 24,
@@ -29,17 +29,18 @@
           },
           "passed": true,
           "recall": [
-            0.9032086875144784,
-            0.9590831176160847
+            0.9084514029799071,
+            0.9581335160024349
           ],
           "schema_version": 2
         }
       ],
       "policy": {
-        "alarms": 0.075,
-        "confidence": 0.95,
+        "alarms": 0.0845,
+        "confidence": 0.9,
+        "method": "exact",
         "recall": 0.8,
-        "schema_version": 2
+        "schema_version": 3
       },
       "schema_version": 2,
       "seeds": [
@@ -56,12 +57,12 @@
       "outcomes": [
         {
           "alarms": [
-            0.04599384613067904,
-            0.05829432189287018
+            0.04812436400895637,
+            0.07384914845022056
           ],
           "certificate": {
-            "alarms": 259,
-            "clean": 5000,
+            "alarms": 60,
+            "clean": 1000,
             "defect": "mean_shift_auc060",
             "detected": 300,
             "detector": "f6-shift-mmd",
@@ -75,17 +76,18 @@
           },
           "passed": true,
           "recall": [
-            0.9873570287754538,
+            0.9900639180555423,
             1.0
           ],
           "schema_version": 2
         }
       ],
       "policy": {
-        "alarms": 0.075,
-        "confidence": 0.95,
+        "alarms": 0.0845,
+        "confidence": 0.9,
+        "method": "exact",
         "recall": 0.8,
-        "schema_version": 2
+        "schema_version": 3
       },
       "schema_version": 2,
       "seeds": [
@@ -96,14 +98,14 @@
       "created": null,
       "detector": "f6-stability",
       "digests": {
-        "code": "53652ad958dd7ee41921b3d00c82fa516aa9a48391ff053561897856d7d12d00",
+        "code": "fee7fa63d17eaf80833ce121c7f86e9ed62cdd8fc6acbb3212aae528e9b29fbb",
         "corpus": "16777a18ecd00b1e2e3001461d7aabf87f71bad0c32ef8a402bef23c04f66fe0"
       },
       "outcomes": [
         {
           "alarms": [
             0.0,
-            0.012642971224546034
+            0.009936081944457708
           ],
           "certificate": {
             "alarms": 0,
@@ -121,15 +123,15 @@
           },
           "passed": true,
           "recall": [
-            0.942821659593358,
-            0.9892752803482386
+            0.9481566608797095,
+            0.9900987557828924
           ],
           "schema_version": 2
         },
         {
           "alarms": [
             0.0,
-            0.012642971224546034
+            0.009936081944457708
           ],
           "certificate": {
             "alarms": 0,
@@ -147,7 +149,7 @@
           },
           "passed": true,
           "recall": [
-            0.9811546736227335,
+            0.9851329607687279,
             1.0
           ],
           "schema_version": 2
@@ -155,7 +157,7 @@
         {
           "alarms": [
             0.0,
-            0.012642971224546034
+            0.009936081944457708
           ],
           "certificate": {
             "alarms": 0,
@@ -173,7 +175,7 @@
           },
           "passed": true,
           "recall": [
-            0.9811546736227335,
+            0.9851329607687279,
             1.0
           ],
           "schema_version": 2
@@ -181,9 +183,10 @@
       ],
       "policy": {
         "alarms": 0.1,
-        "confidence": 0.95,
+        "confidence": 0.9,
+        "method": "exact",
         "recall": 0.8,
-        "schema_version": 2
+        "schema_version": 3
       },
       "schema_version": 2,
       "seeds": [

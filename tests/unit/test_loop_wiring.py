@@ -76,6 +76,7 @@ def read_mechanism(loop):
 
 def test_feedback_cannot_be_tested_without_a_declared_bypass_slice(tmp_path):
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:170.
+    # Enforces website/src/learn/what-scmle-cannot-do.html:41-42.
     loop = test_loop.open_loop(tmp_path)
     bypass, model = feedback_groups(0.8)
     with pytest.raises(ValueError) as caught:
@@ -254,6 +255,7 @@ def test_a_rollback_needs_an_attestation_naming_the_rollback(
 def test_a_guarded_loop_move_spends_a_single_use_attestation_once(
     tmp_path, exported
 ):
+    # Enforces website/src/pages/docs/operating-loop.astro:49.
     loop = test_loop.open_loop(tmp_path, single_use_attestations=True)
     store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
     loop.intercept(store)

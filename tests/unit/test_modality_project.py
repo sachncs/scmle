@@ -59,7 +59,12 @@ def test_modality_project_runs_and_persists_all_stages(tmp_path):
 
 
 def test_built_in_modality_states_why_it_stays_experimental(tmp_path):
-    """A built-in modality off the shared engine names its parity gap."""
+    """A built-in modality off the shared engine names its parity gap.
+
+    Also enforces website/src/pages/docs/migrations.astro:25.
+    Also enforces website/src/pages/docs/modalities.astro:105.
+    Also enforces website/src/learn/breadth.html:27.
+    """
     project = scmle.api.project.ModalityProject(
         text_adapter(), "test-signing-key", output_dir=tmp_path / "run"
     )
@@ -144,7 +149,10 @@ def test_modality_project_rejects_file_output(tmp_path):
 
 
 def test_modality_project_preserves_extension_identity_and_status(tmp_path):
-    """Arbitrary dataset families use the lifecycle without support inflation."""
+    """Arbitrary dataset families use the lifecycle without support inflation.
+
+    Also enforces website/src/pages/docs/modalities.astro:105.
+    """
     project = scmle.api.project.ModalityProject(
         ExtensionTextAdapter(text_adapter().dataset),
         "test-signing-key",
@@ -166,7 +174,10 @@ def test_modality_project_preserves_extension_identity_and_status(tmp_path):
 def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
     tmp_path,
 ):
-    """Curation remains available when a classification baseline is invalid."""
+    """Curation remains available when a classification baseline is invalid.
+
+    Also enforces website/src/pages/docs/extensions.astro:94.
+    """
     samples = tuple(
         document.Sample(
             document_id=f"unlabelled-{index}",
@@ -320,7 +331,10 @@ def test_extension_curation_adapter_accepts_arbitrary_records_without_model_hook
 
 
 def test_extension_curation_adapter_rejects_detached_report():
-    """A curation callback cannot publish evidence for another snapshot."""
+    """A curation callback cannot publish evidence for another snapshot.
+
+    Also enforces website/src/pages/docs/extensions.astro:106.
+    """
     extension = modalities.Bespoke("acme/point-cloud")
     report = curation.Curation(
         modality=extension.value,
@@ -341,7 +355,10 @@ def test_extension_curation_adapter_rejects_detached_report():
 
 
 def test_extension_curation_adapter_accepts_empty_raw_snapshot(tmp_path):
-    """Empty snapshots remain valid curation evidence without modelling."""
+    """Empty snapshots remain valid curation evidence without modelling.
+
+    Also enforces website/src/pages/docs/extensions.astro:94.
+    """
     extension = modalities.Bespoke("acme/empty-stream")
     dataset_hash = hashlib.sha256(b"empty-snapshot").hexdigest()
     adapter = scmle.pipeline.modality_lifecycle.ExtensionCurator(

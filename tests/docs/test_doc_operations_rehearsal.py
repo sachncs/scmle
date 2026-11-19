@@ -11,7 +11,10 @@ def test_rotation_rejects_the_old_key_and_leaves_no_temporary_file(
     trained,  # noqa: F811 (the imported pytest fixture)
     tmp_path,
 ):
-    """Enforces docs/OPERATIONS_REHEARSAL.md:64."""
+    """Enforces docs/OPERATIONS_REHEARSAL.md:64.
+
+    Also enforces website/src/pages/docs/rehearsal.astro:35.
+    """
     bundle, features = trained
     directory = bundle.save(tmp_path / "m", signing_key="old-key")
     before = sorted(p.name for p in directory.rglob("*"))

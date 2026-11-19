@@ -11,7 +11,10 @@ from tests.unit import test_operations_telemetry
 
 
 def test_only_feature_rows_are_sampled():
-    """Enforces docs/OPERATIONS.md:29."""
+    """Enforces docs/OPERATIONS.md:29.
+
+    Also enforces website/src/learn/observability.html:14.
+    """
     watch = signals.SignalMonitor(
         signals.Window(sample_rate=0.1, seed=3), profile=support_ops.profile()
     )
@@ -34,7 +37,10 @@ def test_only_feature_rows_are_sampled():
     ],
 )
 def test_each_data_signal_alone_is_a_data_quality_fault(name):
-    """Enforces docs/OPERATIONS.md:39."""
+    """Enforces docs/OPERATIONS.md:39.
+
+    Also enforces website/src/learn/observability.html:18.
+    """
     verdict = classify.classify(
         test_operations_telemetry.window(**{name: "breach"})
     ).verdict
@@ -52,7 +58,10 @@ def test_each_data_signal_alone_is_a_data_quality_fault(name):
 def test_every_answer_says_two_periods_cannot_separate_the_model(
     changes, overall
 ):
-    """Enforces docs/OPERATIONS.md:95."""
+    """Enforces docs/OPERATIONS.md:95.
+
+    Also enforces website/src/learn/observability.html:34.
+    """
     before, after = test_continuous_evaluation.periods(**changes)
     result = continuous.post_promotion_check(
         test_continuous_evaluation.SPECS, before, after

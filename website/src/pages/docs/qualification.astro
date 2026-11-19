@@ -19,10 +19,10 @@ const certs = [
   ["Missingness", "<code>f5-missingness</code>", "same policy", "Certified on the shipped corpus"],
   ["Label noise", "<code>f5-label-noise</code>", "same policy", "Descriptive: recall misses its floor on the shipped corpus"],
   ["Sentinel values", "<code>f5-sentinel</code>", "same policy", "Passes on the shipped corpus, but flags clean rows on three other tables, so treat it as descriptive"],
-  ["Leakage permutation screen", "screen certificates", "per leak type, binary classification", "Certified for binary classification; this is what can block a run"],
+  ["Leakage permutation screen", "screen certificates", "per leak type, binary classification", "Certified for binary classification; in a run every suspect may block whatever the certificates say, because the false-alarm control holds by construction"],
   ["Earlier leakage skill scan", "<code>f4-leakage-skill</code>", "recall floor 0.9", "Descriptive; no run path calls it"],
   ["As-of reconstruction, reconciliation", "<code>f4-asof-reconstruction</code>, <code>f4-reconciliation</code>", "recall floor 0.9", "Measured and recorded"],
-  ["Distribution shift (classifier two-sample, kernel two-sample)", "<code>f6-shift-c2st</code>, <code>f6-shift-mmd</code>", "recall floor 0.8, false-alarm ceiling 0.075", "Certified; the kernel test was re-measured on 5000 null worlds"],
+  ["Distribution shift (classifier two-sample, kernel two-sample)", "<code>f6-shift-c2st</code>, <code>f6-shift-mmd</code>", "recall floor 0.8, false-alarm ceiling 0.0845 (the size rule 0.05 × 1.69)", "Certified; the kernel test was re-measured on 5000 null worlds"],
   ["Specification stability", "<code>f6-stability</code>", "recall floor 0.8, false-alarm ceiling 0.1", "Certificate on file; gates only when current and passing"],
   ["Selective labels (framing)", "<code>framing-selective-labels</code>", "recall floor 0.95", "Measured and recorded"],
   ["Ingestion reconciliation, torn read", "<code>ingest-reconcile</code>, <code>ingest-torn-read</code>", "recall floors 0.95 and 0.99", "Measured and recorded"],
@@ -88,7 +88,7 @@ const gates = [
   <p><code>scmle claims verify</code> checks ten steps in a full run. Beyond the chain, the confirmation row and the custody log, they cover the decision files (their hashes are registered in the custody log), the causal attestations, and the coverage claim, which is fixed and hashed before the final test rows are read. The coverage claim can also be tested once on the confirmation set (charter format 11), with the status recorded and re-checked by <code>claims verify</code>. The baseline claim can be about the selected model: the confirmation set then stays sealed until the selection is frozen. The custody log is tamper-evident, not adversary-proof.</p>
 
   <h2 id="admissibility">4. Admissibility and provenance</h2>
-  <p>Each feature gets one decision: <code>admit</code>, <code>admit_flagged</code> or <code>quarantine</code>, with a tier and reasons. Quarantine happens only when a leakage suspicion from the permutation screen is one a current, passing certificate lets gate, and only unless a valid per-column attestation keeps it (tier <code>attested</code>, recorded in the ledger). Because a charter carries no declared provenance per field, fields are decided in permissive mode. As-of facts, such as "this value existed at prediction time", are attestations or log-derived and tiered as such; statistics cannot prove a feature postdates nothing.</p>
+  <p>Each feature gets one decision: <code>admit</code>, <code>admit_flagged</code> or <code>quarantine</code>, with a tier and reasons. Quarantine happens only on a leakage suspicion from the permutation screen, which gates without a certificate because its false alarms are bounded by construction, and only unless a valid per-column attestation keeps it (tier <code>attested</code>, recorded in the ledger). Because a charter carries no declared provenance per field, fields are decided in permissive mode. As-of facts, such as "this value existed at prediction time", are attestations or log-derived and tiered as such; statistics cannot prove a feature postdates nothing.</p>
 
   <h2 id="tiers">5. Evidence tiers</h2>
   <p>Every claim carries one tier, shown in the command-line summary and the report header.</p>

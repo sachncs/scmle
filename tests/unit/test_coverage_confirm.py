@@ -26,6 +26,8 @@ def test_the_primary_choice_is_fixed_by_the_task():
 
 
 def test_the_p_value_is_the_exact_binomial_tail_above_the_floor():
+    # Enforces website/src/pages/docs/artifacts.astro:62.
+    # Enforces website/src/pages/docs/causal-decision.astro:76.
     decided = coverage_confirm.decide(95, 100, CHOICE)
     assert decided["floor"] == 0.88
     assert decided["p_value"] == stats.binom.sf(94, 100, 0.88)
@@ -34,6 +36,7 @@ def test_the_p_value_is_the_exact_binomial_tail_above_the_floor():
 
 
 def test_a_shortfall_is_reported_not_confirmed():
+    # Enforces website/src/pages/docs/causal-decision.astro:76.
     low = coverage_confirm.decide(60, 100, CHOICE)
     assert low["status"] == "unverified" and low["coverage"] == 0.6
 
@@ -120,6 +123,8 @@ def test_a_passed_task_type_keeps_the_status_and_records_its_gate():
 def test_a_task_type_that_has_not_passed_its_gate_is_capped_at_unverified(
     monkeypatch,
 ):
+    # Enforces website/src/pages/docs/artifacts.astro:62.
+    # Enforces website/src/pages/docs/causal-decision.astro:41.
     monkeypatch.setattr(task_gate, "status", lambda task: "no_referent")
     ran = run_band_rows()
     document = ran.documents[coverage_confirm.DOCUMENT]

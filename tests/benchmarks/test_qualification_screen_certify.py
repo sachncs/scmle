@@ -80,7 +80,7 @@ def test_measurements_agree_with_the_certificate(kind):
         c = outcome.certificate
         assert c.alarms == document["suspect_false_alarms"]
         assert c.detected == document["recall"][c.defect]["detected"]
-        assert c.clean == document["null_replicates"]
+        assert c.clean == document["clean_worlds"]
         assert c.planted == document["plant_replicates_per_type"]
     assert document["settings"]["skill_ceiling"] == (
         leakage.CERTIFIED.skill_ceiling
@@ -135,3 +135,54 @@ def test_unknown_defect_names_are_refused():
         screen_certify.plant_column(
             f4_certify.breast_cancer(), "leak_unknown", 0
         )
+
+
+def finding(feature, suspect=True):
+    return screen.Finding(
+        feature,
+        screen.SKILL,
+        0.99,
+        0.001,
+        0.01,
+        suspect,
+        0.97 if suspect else None,
+        suspect,
+        True,
+        certificates.Authority.DESCRIPTIVE,
+    )
+
+
+def test_a_suspect_legitimate_column_in_a_planted_world_is_a_false_alarm():
+    # The planted column is the only leak in a planted world; any other
+    # suspect is a real column flagged, a false alarm (audit of CERT-1).
+    found = (finding("leak_copy"), finding("worst perimeter"))
+    assert screen_certify.alarmed(found, "leak_copy") is True
+    assert screen_certify.alarmed(found[:1], "leak_copy") is False
+    quiet = (finding("leak_copy"), finding("worst area", suspect=False))
+    assert screen_certify.alarmed(quiet, "leak_copy") is False
+    # A null world has no planted column: every suspect is a false alarm.
+    assert screen_certify.alarmed(found[1:], "") is True
+
+
+def test_every_world_reports_whether_a_legitimate_column_was_flagged():
+    for defect in ("", "grouped", "leak_copy"):
+        assert isinstance(screen_certify.replicate(defect, 0)["alarm"], bool)
+
+
+@pytest.mark.parametrize("kind", screen_certify.KINDS)
+def test_false_alarms_are_counted_over_every_world(kind):
+    document = json.loads(
+        screen_certify.MEASUREMENTS_PATH.read_text(encoding="utf-8")
+    )[kind]
+    worlds = (
+        document["null_replicates"]
+        + document["grouped_null_replicates"]
+        + document["plant_replicates_per_type"] * len(screen_certify.DEFECTS)
+    )
+    assert document["clean_worlds"] == worlds
+    planted = sum(document["planted_world_false_alarms"].values())
+    assert document["suspect_false_alarms"] == (
+        document["null_false_alarms"]
+        + document["grouped_suspect_false_alarms"]
+        + planted
+    )

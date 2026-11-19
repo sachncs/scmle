@@ -31,6 +31,13 @@ def test_leaked_feature_is_flagged_and_can_block(binary_frame, tmp_path):
     # Enforces README.md:93 and README.md:180.
     # Enforces docs/BENCHMARKS.md:16 and docs/LEAKAGE.md:228.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:89.
+    # Enforces website/src/learn/leakage.html:67-68.
+    # Enforces website/src/learn/when-things-go-wrong.html:44.
+    # Enforces website/src/pages/docs/benchmarks.astro:709-711.
+    # Enforces website/src/pages/docs/benchmarks.astro:773.
+    # Enforces website/src/pages/index.astro:136.
+    # Enforces website/src/pages/docs/architecture.astro:48.
+    # Enforces website/src/pages/docs/operating-loop.astro:18.
     leaky = binary_frame.assign(leak=binary_frame.y * 3.0 + 1)
     result = support.make_project(
         leaky, "y", output_dir=tmp_path, leakage_policy="warn"
@@ -48,7 +55,7 @@ def test_leaked_feature_is_flagged_and_can_block(binary_frame, tmp_path):
 def test_a_noisy_copy_and_a_value_recorded_for_one_class_also_block(
     binary_frame, tmp_path
 ):
-    # Enforces docs/API_STABILITY.md:51.
+    # Enforces docs/API_STABILITY.md:54.
     rng = numpy.random.default_rng(8)
     flip = rng.random(len(binary_frame)) < 0.02
     noisy = binary_frame.assign(
@@ -85,7 +92,8 @@ def regression_leak():
 def test_a_regression_leak_blocks_under_block(tmp_path):
     # ERR-1: the screen is certified for regression, so the copied target
     # blocks by name; before, regression was uncertified and trained.
-    # Enforces docs/API_STABILITY.md:51.
+    # Enforces docs/API_STABILITY.md:54.
+    # Enforces website/src/pages/docs/api-stability.astro:64.
     with pytest.raises(
         errors.BlockedError, match="unresolved leakage risk"
     ) as raised:
@@ -102,6 +110,8 @@ def test_a_regression_leak_blocks_under_block(tmp_path):
 def test_a_regression_leak_warns_under_warn(tmp_path):
     # Enforces docs/LEAKAGE.md:223.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:89.
+    # Enforces website/src/learn/leakage.html:66-67.
+    # Enforces website/src/learn/when-things-go-wrong.html:44.
     result = support.make_project(
         regression_leak(),
         "y",
@@ -114,6 +124,7 @@ def test_a_regression_leak_warns_under_warn(tmp_path):
 
 
 def test_groups_never_straddle_the_test_boundary(binary_frame, tmp_path):
+    # Enforces website/src/pages/docs/architecture.astro:48.
     frame = binary_frame.assign(g=numpy.arange(len(binary_frame)) % 40)
     result = support.make_project(
         frame, "y", group_column="g", output_dir=tmp_path
@@ -129,6 +140,7 @@ def test_groups_never_straddle_the_test_boundary(binary_frame, tmp_path):
 
 def test_test_set_is_opened_exactly_once_per_run(binary_frame, tmp_path):
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:61.
+    # Enforces website/src/learn/what-scmle-cannot-do.html:16-17.
     result = support.make_project(binary_frame, "y", output_dir=tmp_path).run()
     assert result.evaluation["opened"] is True
     events = (result.run_dir / "events.jsonl").read_text().splitlines()
@@ -152,7 +164,10 @@ def run_default(frame, directory):
 def test_search_is_invariant_to_test_labels_and_test_features(
     imbalanced_frame, tmp_path
 ):
-    """Nothing the search sees may depend on the locked test partition."""
+    """Nothing the search sees may depend on the locked test partition.
+
+    Also enforces website/src/learn/what-scmle-cannot-do.html:16-17.
+    """
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:61.
     first = run_default(imbalanced_frame, tmp_path / "a")
     manifest = json.loads(

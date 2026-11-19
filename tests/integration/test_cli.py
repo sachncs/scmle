@@ -14,6 +14,8 @@ from scmle.data.catalog import Catalog
 def test_plan_run_predict_roundtrip(binary_frame, tmp_path, caplog):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:21.
     # Enforces docs/BEGINNER_FINDINGS.md:37.
+    # Enforces website/src/learn/beginner-findings.html:22.
+    # Enforces website/src/learn/when-things-go-wrong.html:10.
     caplog.set_level(logging.INFO)
     data = tmp_path / "d.csv"
     binary_frame.to_csv(data, index=False)
@@ -68,6 +70,8 @@ def test_plan_run_predict_roundtrip(binary_frame, tmp_path, caplog):
 def test_blocked_run_returns_exit_code_two(binary_frame, tmp_path, caplog):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:22.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:71.
+    # Enforces website/src/learn/when-things-go-wrong.html:11.
+    # Enforces website/src/learn/when-things-go-wrong.html:39.
     broken = binary_frame.assign(y=range(len(binary_frame)))
     broken["y"] = broken["y"] % 5
     path = tmp_path / "d.csv"
@@ -91,6 +95,7 @@ def test_commands_are_polymorphic():
         "plan",
         "run",
         "resume",
+        "estimate",
         "catalog",
         "predict",
         "batch",
@@ -106,6 +111,10 @@ def test_commands_are_polymorphic():
         "deploy",
         "trail",
         "records",
+        "cluster",
+        "forget",
+        "retire",
+        "delete",
     ]
     assert all(isinstance(c, cli.Command) for c in cli.COMMANDS)
 

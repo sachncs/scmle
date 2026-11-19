@@ -355,6 +355,7 @@ def test_reclaim_rejects_bad_staged_files(tmp_path):
 
 
 def test_an_ingestor_validates_its_configuration(tmp_path):
+    # Enforces website/src/pages/docs/data.astro:17.
     source = replay()
     book = ledger(tmp_path)
     with pytest.raises(errors.InputError, match="consumer_group"):

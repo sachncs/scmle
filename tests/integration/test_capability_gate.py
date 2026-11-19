@@ -128,7 +128,10 @@ def test_ft_transformer_uses_an_experimental_tabular_boundary():
     reason="the optional deeplearning extra is not installed",
 )
 def test_experimental_transformer_requires_explicit_model_opt_in():
-    """An experimental FT-Transformer can be selected only by declaration."""
+    """An experimental FT-Transformer can be selected only by declaration.
+
+    Also enforces website/src/pages/docs/modeling.astro:78.
+    """
     adapter = networks.FT_TRANSFORMER
     registry = scmle.models.registry.Catalog((classical.Dummy(), adapter))
     default_context = make_context(model_registry=registry)
@@ -166,7 +169,10 @@ def test_capability_family_is_used_before_training():
 def test_extension_only_foundation_adapter_cannot_break_auto_planning(
     monkeypatch,
 ):
-    """An installed extension-only model must not enter the beta plan."""
+    """An installed extension-only model must not enter the beta plan.
+
+    Also enforces website/src/pages/docs/capabilities.astro:10.
+    """
     registry = scmle.models.registry.Catalog.stock()
     adapter = registry.get("tabpfn")
     monkeypatch.setattr(adapter, "is_available", lambda: True)
@@ -177,7 +183,11 @@ def test_extension_only_foundation_adapter_cannot_break_auto_planning(
 
 
 def test_unimplemented_contract_dimensions_are_not_promoted():
-    """Missing modality, uncertainty, and explanation paths fail closed."""
+    """Missing modality, uncertainty, and explanation paths fail closed.
+
+    Also enforces website/src/pages/docs/capabilities.astro:82.
+    Also enforces website/src/pages/docs/evidence.astro:32.
+    """
     registry = roster.enrol()
     key = capabilities.Coordinate(
         modality=capabilities.Modality.TABULAR,
@@ -217,7 +227,11 @@ def test_empty_override_fails_before_model_fitting():
 
 
 def test_declared_non_tabular_modality_fails_closed_before_model_fitting():
-    """A modality declaration cannot silently inherit tabular support."""
+    """A modality declaration cannot silently inherit tabular support.
+
+    Also enforces website/src/pages/docs/api.astro:33.
+    Also enforces website/src/pages/docs/data.astro:25.
+    """
     spec = tasks.Config(
         data=tasks.Dataset(uri="<in-memory>", target="y", modality="image"),
         search=tasks.Search(top_models=0),
@@ -240,7 +254,10 @@ def test_declared_non_tabular_modality_fails_closed_before_model_fitting():
 def test_file_backed_non_tabular_modality_fails_before_tabular_reader(
     tmp_path,
 ):
-    """Unsupported file-backed data returns a structured boundary error."""
+    """Unsupported file-backed data returns a structured boundary error.
+
+    Also enforces website/src/pages/docs/data.astro:25.
+    """
     source = tmp_path / "image-list.txt"
     source.write_text("image-a.jpg\n")
     spec = tasks.Config(

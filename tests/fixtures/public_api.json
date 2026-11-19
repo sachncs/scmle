@@ -2,6 +2,46 @@
   "release": "0.1.0b1",
   "schema_version": 2,
   "surfaces": {
+    "scmle.api.clustering": {
+      "Segmentation": {
+        "kind": "class",
+        "signature_sha256": "e6ae5eaa71a04e9ed96116f7c98302d42c5af6087ae743ddebf6f66828a8f355"
+      },
+      "cluster": {
+        "kind": "callable",
+        "signature_sha256": "c2b5b36e733d2361a35980c5ccd262641edd0f8da756457b940bccf69029a9bd"
+      },
+      "evaluate": {
+        "kind": "callable",
+        "signature_sha256": "418d34135142efa874f189f9d2dae6a530a32e457b64aadf4764fe5e77285612"
+      }
+    },
+    "scmle.api.erasure": {
+      "Deletion": {
+        "kind": "class",
+        "signature_sha256": "c46c55928253e70ed320eb327883224fefa837bf9ced2adf22cf8dd4d892ade8"
+      },
+      "Forgetting": {
+        "kind": "class",
+        "signature_sha256": "059dec09d974fa62d8d0690e081b961c92fe3e5232ede80f92110d7eac2520ce"
+      },
+      "Receipt": {
+        "kind": "class",
+        "signature_sha256": "2ee172dcd74748851288695cbc23a179aa03b16bb0af50b74ce6b1509cecebdc"
+      },
+      "RetiredError": {
+        "kind": "class",
+        "signature_sha256": "ac48ce8e419a9558b2d5a642ab88618a1e3c2e24d2e203a5aabe0c868a664234"
+      },
+      "Retirement": {
+        "kind": "class",
+        "signature_sha256": "2a408b189192fea5d8f10ec2326572c8fde8137c2127886af13f18a1113e3484"
+      },
+      "Subject": {
+        "kind": "class",
+        "signature_sha256": "ea9a8d794ac5eee5259b370ce74c7f7ca65e9f9eb82c1bf478611f75a9bb8246"
+      }
+    },
     "scmle.api.non_tabular": {
       "Modeler": {
         "kind": "class",
@@ -41,7 +81,7 @@
       },
       "Project": {
         "kind": "class",
-        "signature_sha256": "02eeb48d0c87b1eaeba960694696e240e9d59808aac71e3e442bd126c4df7942"
+        "signature_sha256": "6f9eefb2d25e5a27bdca9f9c1cde0a769a157dc16a1f7d8d8a0ccc17346ab3cc"
       }
     },
     "scmle.api.sequential": {
@@ -493,7 +533,7 @@
       },
       "SignalMonitor": {
         "kind": "class",
-        "signature_sha256": "91a645caf57edb594b83e048fe58d974237ce7b9a0620e92517e14d2d25bdb24"
+        "signature_sha256": "928d4a7547290122ca4d1693e052a939f04cce814ef64273d1435a03758f2f46"
       },
       "SignalThresholds": {
         "kind": "class",
@@ -505,7 +545,7 @@
       },
       "Window": {
         "kind": "class",
-        "signature_sha256": "972e5a4bdb41576807e677b5a561976d6f71e7f456595490c1632b67fd971c59"
+        "signature_sha256": "4ccee8f3fda0b1c0abdeae13b6475ddb1417fa61a368604da9a4407476b1848e"
       }
     },
     "scmle.operations.spool": {

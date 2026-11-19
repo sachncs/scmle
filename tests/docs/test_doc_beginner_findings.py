@@ -8,7 +8,10 @@ from scmle.pipeline import stages
 
 
 def test_a_warn_run_logs_its_unsettled_suspects_while_profiling(caplog):
-    """Enforces docs/BEGINNER_FINDINGS.md:28 (the warning line)."""
+    """Enforces docs/BEGINNER_FINDINGS.md:28 (the warning line).
+
+    Also enforces website/src/learn/beginner-findings.html:13.
+    """
     spec = tasks.Config(
         data=tasks.Dataset(uri="m", target="survived"),
         leakage_policy="warn",

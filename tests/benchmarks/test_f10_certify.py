@@ -2,6 +2,10 @@
 
 import json
 
+import pytest
+from scipy import stats
+
+from benchmarks import acceptance
 from benchmarks.qualification import f10_certify
 from scmle.causal.identification import certified
 
@@ -57,13 +61,78 @@ def test_a_changed_method_makes_its_gate_uncertified(tmp_path):
 
 def test_rate_and_floor_helpers():
     row = f10_certify.rate(95, 100)
-    assert row["wilson"][0] < 0.95 < row["wilson"][1]
-    assert f10_certify.alarm_bound(0.01, 2000) > 0.01
+    assert row["exact"][0] < 0.95 < row["exact"][1]
     grid = [0.0, 0.1, 0.2]
     curve = f10_certify.power_curve(
         grid, {0.0: (5, 1000), 0.1: (50, 100), 0.2: (100, 100)}
     )
     assert curve["delta_min"] == 0.2
+
+
+def test_every_rate_is_decided_by_its_exact_bound_at_alpha():
+    alpha = acceptance.load()["alpha"].value
+    assert alpha == f10_certify.ALPHA
+    row = f10_certify.rate(15, 1000)
+    assert row["exact"][1] == pytest.approx(stats.beta.ppf(1 - alpha, 16, 985))
+    # battery_rd's no-violation count passed `0.01 + 2 SE`; its bound does not
+    assert not f10_certify.meets(f10_certify.FALSIFY, row)
+    # a placebo-in-space size of 0.04 over 125 runs passed `0.05 + 2 SE`
+    assert not f10_certify.meets(
+        f10_certify.FALSE_ALARM, f10_certify.rate(5, 125)
+    )
+    assert f10_certify.meets(f10_certify.FALSE_ALARM, f10_certify.rate(0, 300))
+    power = f10_certify.rate(382, 500)
+    assert power["exact"][0] == pytest.approx(stats.beta.ppf(alpha, 382, 119))
+    assert not f10_certify.meets(f10_certify.POWER, power)
+    assert f10_certify.meets(f10_certify.COVERAGE, f10_certify.rate(1890, 2000))
+
+
+def test_the_thresholds_are_the_acceptance_variables():
+    variables = acceptance.load()
+    assert variables["interval_coverage_min"].rule == f10_certify.COVERAGE
+    assert variables["causal_power_min"].rule == f10_certify.POWER
+    assert variables["causal_selection_min"].rule == f10_certify.SELECTION
+    assert variables["causal_false_alarm_max"].rule == f10_certify.FALSE_ALARM
+    assert acceptance.sized(0.01, variables) == f10_certify.FALSIFY
+    assert acceptance.sized(0.05, variables) == f10_certify.SYNTH_SIZE
+
+
+def test_each_gate_runs_the_count_it_states():
+    document = stored()
+    assert document["terms"] == f10_certify.terms()
+    stated = {name: entry[1] for name, entry in f10_certify.RUNNERS.items()}
+    assert stated["size_synth"] == 500
+    assert stated["sensitivity_did"] == 500
+    assert stated["sensitivity_bound"] == 1000
+    assert stated["false_confirm"] == 300
+    for name, entry in document["gates"].items():
+        assert entry["seeds"] == [0, stated[name]], name
+    gates = document["gates"]
+    assert gates["size_synth"]["size"]["n"] == 500
+    assert gates["battery_rd"]["false_alarm"]["n"] == 2000
+    assert gates["overlap"]["replicates"] == 2000
+    assert gates["sensitivity_bound"]["replicates"] == 1000
+    assert gates["sensitivity_did"]["m1_coverage"]["n"] == 500
+    assert gates["false_confirm"]["replicates"] == 300
+
+
+def test_the_stored_verdicts_follow_from_the_stored_counts():
+    for name, entry in stored()["gates"].items():
+        assert entry["passed"] is f10_certify.verdict(name, entry), name
+
+
+def test_a_verdict_that_does_not_follow_from_its_counts_is_reported():
+    document = stored()
+    entry = document["gates"]["battery_rd"]
+    entry["passed"] = not entry["passed"]
+    assert f10_certify.problems(document) == [
+        "battery_rd: passed does not follow from its counts"
+    ]
+    document = stored()
+    document["terms"] = {**document["terms"], "alpha": 0.1}
+    assert f10_certify.problems(document) == [
+        "terms: rule or replicate counts changed since measurement"
+    ]
 
 
 def test_a_small_selector_gate_has_the_expected_shape():

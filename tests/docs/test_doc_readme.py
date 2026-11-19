@@ -18,6 +18,7 @@ from scmle.models import custom
 from scmle.models import registry
 from scmle.pipeline import profiler
 import scmle.pipeline.planner
+from scmle.runtime import plugins
 
 TITANIC = (
     pathlib.Path(__file__).resolve().parents[1]
@@ -101,7 +102,10 @@ def test_the_reliability_benchmark_checks_the_nine_named_properties():
 
 
 def test_titanic_boat_and_body_are_flagged_by_the_documented_mechanisms():
-    """Enforces README.md:180."""
+    """Enforces README.md:180.
+
+    Also enforces website/src/pages/docs/benchmarks.astro:773.
+    """
     frame = pandas.read_csv(TITANIC)
     report = screen.screen_table(
         frame,
@@ -122,12 +126,15 @@ def test_titanic_boat_and_body_are_flagged_by_the_documented_mechanisms():
 def test_an_entry_point_adapter_is_registered_only_if_it_complies(
     monkeypatch,
 ):
-    """Enforces README.md:220."""
+    """Enforces README.md:228.
+
+    Also enforces website/src/pages/docs/architecture.astro:95.
+    """
     good = custom.rebuild(
         custom.Registration("plugin_nb", naive_bayes.GaussianNB, None, cost=1)
     )
     found = [entry("good", good), entry("bad", Taskless())]
-    monkeypatch.setattr(registry.metadata, "entry_points", lambda group: found)
+    monkeypatch.setattr(plugins.metadata, "entry_points", lambda group: found)
     catalog = registry.Catalog.stock()
     assert catalog.load_plugins() == ["bad"]
     assert catalog.get("plugin_nb") is good

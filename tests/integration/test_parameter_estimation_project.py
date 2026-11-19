@@ -56,7 +56,11 @@ def project_with_estimation(output_dir) -> scmle.api.project.Project:
 
 
 def test_project_run_persists_separate_estimation_evidence(tmp_path):
-    """Declared estimation is persisted without changing model selection."""
+    """Declared estimation is persisted without changing model selection.
+
+    Also enforces website/src/pages/docs/modeling.astro:15.
+    Also enforces website/src/pages/docs/modeling.astro:198.
+    """
     project = scmle.api.project.Project(
         estimation_frame(),
         "outcome",
@@ -210,7 +214,10 @@ def test_resume_fails_closed_when_estimation_declaration_is_missing(tmp_path):
 
 
 def test_resume_fails_closed_for_corrupt_estimation_declaration(tmp_path):
-    """Malformed declaration JSON stops resume before execution."""
+    """Malformed declaration JSON stops resume before execution.
+
+    Also enforces website/src/pages/docs/modeling.astro:213.
+    """
     original = interrupted_estimation_run(tmp_path)
     (original / "parameter_estimation_declaration.json").write_text(
         "not json", encoding="utf-8"
@@ -233,7 +240,10 @@ def test_resume_fails_closed_for_tampered_estimation_declaration(tmp_path):
 
 
 def test_project_run_rejects_missing_estimation_artifact(monkeypatch, tmp_path):
-    """A missing persisted report cannot produce a completed result."""
+    """A missing persisted report cannot produce a completed result.
+
+    Also enforces website/src/pages/docs/modeling.astro:213.
+    """
     original_read = Estimation.read
 
     def remove_artifact(path):
@@ -255,7 +265,10 @@ def test_project_run_rejects_missing_estimation_artifact(monkeypatch, tmp_path):
 def test_project_run_rejects_valid_digest_for_tampered_report(
     monkeypatch, tmp_path
 ):
-    """A report changed and re-digested after writing is still rejected."""
+    """A report changed and re-digested after writing is still rejected.
+
+    Also enforces website/src/pages/docs/modeling.astro:213.
+    """
     original_read = Estimation.read
 
     def tamper_artifact(path):
@@ -287,7 +300,10 @@ def test_project_run_rejects_valid_digest_for_tampered_report(
 
 
 def test_estimation_fails_closed_without_both_declarations(tmp_path):
-    """Undeclared estimation cannot silently infer a scientific policy."""
+    """Undeclared estimation cannot silently infer a scientific policy.
+
+    Also enforces website/src/pages/docs/modeling.astro:134.
+    """
     project = scmle.api.project.Project(
         estimation_frame(), "outcome", output_dir=tmp_path
     )
@@ -297,7 +313,10 @@ def test_estimation_fails_closed_without_both_declarations(tmp_path):
 
 
 def test_partial_estimation_declaration_is_rejected(tmp_path):
-    """An estimand without its policy is not a usable evidence contract."""
+    """An estimand without its policy is not a usable evidence contract.
+
+    Also enforces website/src/pages/docs/modeling.astro:134.
+    """
     with pytest.raises(errors.ConfigError, match="both"):
         scmle.api.project.Project(
             estimation_frame(),
@@ -308,7 +327,10 @@ def test_partial_estimation_declaration_is_rejected(tmp_path):
 
 
 def test_incompatible_likelihood_fails_before_model_selection(tmp_path):
-    """Likelihood mismatch is rejected before the orchestrator is called."""
+    """Likelihood mismatch is rejected before the orchestrator is called.
+
+    Also enforces website/src/pages/docs/modeling.astro:198.
+    """
     estimand = Estimand(
         name="wrong_likelihood",
         outcome="outcome",

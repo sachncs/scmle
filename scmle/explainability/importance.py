@@ -28,7 +28,9 @@ class Importance(diagnostics.Diagnostic):
                 time allowance.
 
         Returns:
-            The metric name, whether the feature loop was cut short
+            `available` False, the metric name and the reason when the
+            metric is not finite on the evaluation rows; otherwise the
+            metric name, whether the feature loop was cut short
             (`truncated`), the counts of features measured and available,
             and the measured features ranked by mean metric drop, largest
             first, each with its mean `importance` and standard deviation
@@ -41,6 +43,19 @@ class Importance(diagnostics.Diagnostic):
         target = inputs.target.iloc[rows].reset_index(drop=True)
         scorer = inputs.metric.scorer(inputs.positive_label)
         baseline = scorer(inputs.estimator, features, target)
+        if not numpy.isfinite(baseline):
+            # A drop from an undefined score is undefined: ROC AUC on rows
+            # of one class (both minority rows of a binary table kept for
+            # development) has no value, so no importance does either.
+            return {
+                "available": False,
+                "metric": inputs.metric.name,
+                "reason": (
+                    f"{inputs.metric.name} is undefined on the evaluation "
+                    f"rows ({len(set(target))} distinct labels), so no "
+                    "drop in it can be measured"
+                ),
+            }
         measured = []
         for index in rng.permutation(len(columns)):
             if inputs.expired():

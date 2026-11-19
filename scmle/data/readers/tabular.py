@@ -2,9 +2,13 @@
 
 Readers are polymorphic: `Loader` dispatches on file suffix to a
 `TableReader` subclass, so supporting a new format means adding one class.
+`Loader.stream` reads a file a chunk at a time: delimited text, JSON lines
+and Parquet are streamed with bounded memory; the other formats are read
+whole and then split.
 """
 
 import abc
+from collections.abc import Iterator
 import hashlib
 import pathlib
 from typing import ClassVar
@@ -18,6 +22,7 @@ import pandas
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.data.readers import delimited
+from scmle.data.readers import stream
 
 
 class TableReader(abc.ABC):
@@ -39,6 +44,25 @@ class TableReader(abc.ABC):
         Returns:
             The parsed table.
         """
+
+    def chunks(
+        self, path: pathlib.Path, rows: int
+    ) -> Iterator[pandas.DataFrame]:
+        """Reads `path` at most `rows` rows at a time.
+
+        This default reads the whole file and splits it; a format that can
+        be read incrementally overrides it.
+
+        Args:
+            path: Existing file with a supported suffix.
+            rows: Rows per chunk.
+
+        Yields:
+            The table's rows, in order, as consecutive chunks.
+        """
+        frame = self.load(path)
+        for start in range(0, len(frame), rows):
+            yield frame.iloc[start : start + rows].reset_index(drop=True)
 
 
 class Csv(TableReader):
@@ -95,6 +119,26 @@ class Csv(TableReader):
         except errors.InputError as error:
             raise errors.InputError(f"{path.name}: {error}") from error
 
+    def chunks(
+        self, path: pathlib.Path, rows: int
+    ) -> Iterator[pandas.DataFrame]:
+        """Streams a delimited file `rows` records at a time.
+
+        Args:
+            path: Existing delimited file, optionally compressed.
+            rows: Records per chunk.
+
+        Yields:
+            Each chunk parsed as `load` parses a file (see `stream`).
+
+        Raises:
+            InputError: As `load`, naming the file.
+        """
+        try:
+            yield from stream.frames(path, rows, self.delimiter, self.encoding)
+        except errors.InputError as error:
+            raise errors.InputError(f"{path.name}: {error}") from error
+
 
 class Tsv(Csv):
     """Tab-separated values."""
@@ -143,6 +187,22 @@ class Jsonl(TableReader):
         """
         return pandas.read_json(path, lines=True)
 
+    def chunks(
+        self, path: pathlib.Path, rows: int
+    ) -> Iterator[pandas.DataFrame]:
+        """Streams the records `rows` lines at a time.
+
+        Args:
+            path: Existing newline-delimited JSON file.
+            rows: Lines per chunk.
+
+        Yields:
+            Each chunk of records as a table.
+        """
+        with pandas.read_json(path, lines=True, chunksize=rows) as reader:
+            for chunk in reader:
+                yield chunk.reset_index(drop=True)
+
 
 class Excel(TableReader):
     """Excel workbooks, using the first sheet by default."""
@@ -185,6 +245,25 @@ class Parquet(TableReader):
             The parsed table.
         """
         return pandas.read_parquet(path)
+
+    def chunks(
+        self, path: pathlib.Path, rows: int
+    ) -> Iterator[pandas.DataFrame]:
+        """Streams the file `rows` rows at a time, batch by batch.
+
+        Args:
+            path: Existing Parquet file.
+            rows: Rows per chunk.
+
+        Yields:
+            Each record batch as a table.
+        """
+        import pyarrow.parquet  # noqa: PLC0415 -- only streamed reads need it
+
+        for batch in pyarrow.parquet.ParquetFile(path).iter_batches(
+            batch_size=rows
+        ):
+            yield batch.to_pandas()
 
 
 class Feather(TableReader):
@@ -289,6 +368,54 @@ class Loader:
             names = sorted(set(duplicated.astype(str)))
             raise errors.DataError(f"duplicate column names: {names}")
         return frame
+
+    def stream(
+        self, uri: str | pathlib.Path, rows: int
+    ) -> Iterator[pandas.DataFrame]:
+        """Reads a dataset `rows` rows at a time, checked as `load` checks.
+
+        Args:
+            uri: Path to a supported file.
+            rows: Rows per chunk.
+
+        Yields:
+            Non-empty tables of at most `rows` rows with the same unique
+            column names, in file order.
+
+        Raises:
+            DataError: If `rows` is not positive, the file is missing, has
+                an unsupported suffix, cannot be parsed, has no rows or has
+                duplicate column names.
+        """
+        if rows < 1:
+            raise errors.DataError("rows per chunk must be positive")
+        path = pathlib.Path(uri)
+        if not path.exists():
+            raise errors.DataError(f"dataset not found: {path}")
+        reader = self.pick(path)
+        found = 0
+        chunks = reader.chunks(path, rows)
+        while True:
+            try:
+                frame = next(chunks, None)
+            except errors.DataError:
+                raise
+            except Exception as error:  # Parser errors vary by engine.
+                raise errors.DataError(
+                    f"failed to read {path.name}: {error}"
+                ) from error
+            if frame is None:
+                break
+            if frame.empty:
+                continue
+            duplicated = frame.columns[frame.columns.duplicated()]
+            if len(duplicated):
+                names = sorted(set(duplicated.astype(str)))
+                raise errors.DataError(f"duplicate column names: {names}")
+            found += len(frame)
+            yield frame
+        if not found:
+            raise errors.DataError(f"{path.name} contains no rows")
 
 
 def read_table(uri: str | pathlib.Path) -> pandas.DataFrame:

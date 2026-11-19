@@ -50,7 +50,11 @@ def test_slo_passes_and_records_owner_runbook_and_budget():
 
 
 def test_slo_breach_preserves_incident_path_and_uses_worst_sample():
-    """One bad observation cannot be averaged away."""
+    """One bad observation cannot be averaged away.
+
+    Also enforces website/src/pages/docs/operations.astro:51.
+    Also enforces website/src/pages/docs/operations.astro:8.
+    """
     result = slo.evaluate(
         target(),
         (
@@ -67,7 +71,10 @@ def test_slo_breach_preserves_incident_path_and_uses_worst_sample():
 
 
 def test_slo_is_not_green_when_data_is_missing_or_future():
-    """Missing and temporally invalid telemetry fail closed."""
+    """Missing and temporally invalid telemetry fail closed.
+
+    Also enforces website/src/pages/docs/operations.astro:38.
+    """
     missing = slo.evaluate(
         target(),
         (metric(100.0, "2026-10-20T12:00:00+00:00"),),

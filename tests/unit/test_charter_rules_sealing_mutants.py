@@ -90,6 +90,7 @@ def test_an_amendment_that_loosens_any_one_of_the_three_is_refused():
 
 def test_an_amendment_may_tighten_alpha_or_wealth_but_not_loosen_either():
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:388.
+    # Enforces website/src/learn/when-things-go-wrong.html:168-169.
     old = make_charter(budget=budget.ErrorBudget.create(0.05, 0.1))
     for tighter in (
         budget.ErrorBudget.create(0.04, 0.1),

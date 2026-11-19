@@ -36,6 +36,8 @@ def test_the_command_line_only_records_replies_and_never_lifts_a_halt():
 
     A new `loop` or `operate` action fails this test, so that whoever adds a
     command to sign a reply or release a halt also corrects the page.
+
+    Also enforces website/src/learn/what-scmle-cannot-do.html:42-43.
     """
     commands = actions(cli.build_parser())
     loop = actions(commands["loop"])

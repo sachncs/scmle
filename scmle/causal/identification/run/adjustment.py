@@ -263,7 +263,7 @@ class RandomizedEstimator(Estimator):
         """
         spec = self.spec
         r = aipw.difference_in_means(c, spec.treatment, spec.outcome, level)
-        return Est(r.estimate, r.se, r.low, r.high, r.n)
+        return Est(r.estimate, r.se, r.low, r.high, r.n, df=r.df)
 
     def reckon(
         self, c: pandas.DataFrame, level: float, outcome: str | None = None
@@ -281,7 +281,7 @@ class RandomizedEstimator(Estimator):
         r = aipw.difference_in_means(
             c, self.spec.treatment, outcome or self.spec.outcome, level
         )
-        return Est(r.estimate, r.se, r.low, r.high, r.n)
+        return Est(r.estimate, r.se, r.low, r.high, r.n, df=r.df)
 
     def controls(self, c: pandas.DataFrame, level: float) -> list[battery.Test]:
         """Runs the declared negative-control outcomes on `C`.

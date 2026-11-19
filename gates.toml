@@ -13,15 +13,6 @@ blocks = "The unit verdict computed by the plan is coarser or unknown (UnitVerdi
 override = "none; the verdict is only computed when --unit is given, so omitting --unit skips the check."
 variables = ["--unit", "--target-table", "--eps-key", "--eps-null", "--max-key-size", "--max-queries", "--max-rows-scanned", "--max-seconds"]
 
-[ingest.multiplicity]
-site = "scmle.pipeline.ingest_stage:plurality"
-error = "BlockedError"
-claim = "C3"
-passes = "The declared family size equals the number of synthesized columns and the ledger registered exactly the non-excluded synthesized columns."
-blocks = "The declared family size differs from the number of synthesized columns; the synthesized columns registered in the ledger are not exactly those not quarantined or skipped."
-override = "none"
-variables = []
-
 [ingest.stage.run]
 site = "scmle.pipeline.ingest_stage:run"
 error = "BlockedError"
@@ -39,15 +30,6 @@ passes = "Every checkpoint registered for the completed stage's state approves i
 blocks = "A checkpoint whose gates include the stage's state returns a verdict that is not approved."
 override = "none; only checkpoints passed to Orchestrator(checkpoints=...) are consulted, and the default is none."
 variables = ["checkpoints"]
-
-[robustness.assessment_present]
-site = "scmle.pipeline.stages.qualification:Qualification.assess_robustness"
-error = "BlockedError"
-claim = "C1"
-passes = "The stability stage holds an assessment (stage.found is set)."
-blocks = "stage.found is None, meaning the second stage did not run; this is a type guard marked pragma no cover."
-override = "none"
-variables = []
 
 [leakage.policy]
 site = "scmle.pipeline.stages.screening:Screening.enforce_leakage_policy"
@@ -177,6 +159,15 @@ blocks = "The resolved task is not in the strategy's supported_tasks."
 override = "none"
 variables = ["validation.strategy", "task"]
 
+[split.test_support]
+site = "scmle.data.splitting.splitters.splitter:Splitter.support"
+error = "BlockedError"
+claim = "C1, C3"
+passes = "The task is not binary or multiclass, or every class of the target has at least MIN_TEST_CLASS_ROWS test rows (5: with fewer, even a perfect score on the class has an exact upper bound of its error rate at EVIDENCE_ALPHA above one half). The stratified strategy reserves that many test rows for every class with MIN_TEST_CLASS_ROWS + MIN_STRATUM_ROWS rows."
+blocks = "A class of a binary or multiclass target has fewer than MIN_TEST_CLASS_ROWS test rows, none included (ROC AUC undefined, F1 scored on one class); details name each class and its count."
+override = "none; a class with fewer test rows cannot be scored. Provide more rows of it, or, under a random, group, temporal or preset split, raise validation.test or use the stratified strategy, as the error message says."
+variables = ["MIN_TEST_CLASS_ROWS", "EVIDENCE_ALPHA", "MIN_STRATUM_ROWS", "validation.test", "validation.strategy", "data.target"]
+
 [split.resident.bind]
 site = "scmle.data.splitting.splitters.lockbox:Resident.bind"
 error = "LeakageError"
@@ -223,7 +214,7 @@ override = "none; start a new run (records are only read when a run is resumed).
 variables = []
 
 [split.rolling.partition]
-site = "scmle.data.splitting.splitters.splits:Rolling.partition"
+site = "scmle.data.splitting.splitters.temporal:Rolling.partition"
 error = "BlockedError"
 claim = "C5"
 passes = "The time column orders the rows and at least MIN_ROLLING_FOLDS windows, each with at least MIN_ROLLING_TRAIN training rows, fit."
@@ -250,16 +241,34 @@ override = "none"
 variables = ["MIN_STRATUM_ROWS", "data.target"]
 
 [split.temporal.holdout]
-site = "scmle.data.splitting.splitters.splits:Chronology.chronological_holdout"
+site = "scmle.data.splitting.splitters.temporal:Chronology.chronological_holdout"
+error = "BlockedError"
+claim = "C5"
+passes = "Some row has a timestamp earlier than the test window's first timestamp (the window starts at a timestamp, so no timestamp is on both sides) and, with validation.entities unseen, the held-out entities have rows in the test window and the others rows before it."
+blocks = "Every row before the planned cut shares the test window's first timestamp; or, with validation.entities unseen, the development or test side is left empty. Unparseable times and bad entity columns are raised by Chronology.times and Chronology.entities."
+override = "none; add rows with earlier timestamps or lower validation.test, or declare validation.entities known."
+variables = ["data.time", "validation.test", "validation.embargo", "data.horizon", "validation.entities", "validation.seed", "data.group"]
+
+[split.temporal.times]
+site = "scmle.data.splitting.splitters.temporal:Chronology.times"
 error = "BlockedError"
 claim = "C5"
 passes = "Every value of the time column parses as a datetime."
-blocks = "The time column has values that are missing or do not parse as datetimes."
-override = "none"
-variables = ["data.time", "validation.test", "validation.embargo", "data.horizon"]
+blocks = "The time column has values that are missing or do not parse as datetimes: the order, and so the split, would be ambiguous."
+override = "none; clean the time column."
+variables = ["data.time"]
+
+[split.temporal.entities]
+site = "scmle.data.splitting.splitters.temporal:Chronology.entities"
+error = "BlockedError"
+claim = "C5"
+passes = "validation.entities is known or no data.group is declared; or the entity column has no missing value and at least validation.folds + 2 entities (one team per fold, the held-out entities and one to train on)."
+blocks = "With validation.entities unseen and data.group declared, the entity column has missing values or fewer than validation.folds + 2 entities, so no split can keep every entity on one side."
+override = "Declare validation.entities known (an entity's past trains and its future is held out), lower validation.folds, or add entities."
+variables = ["validation.entities", "validation.folds", "data.group"]
 
 [split.temporal.partition]
-site = "scmle.data.splitting.splitters.splits:Chronology.partition"
+site = "scmle.data.splitting.splitters.temporal:Chronology.partition"
 error = "BlockedError"
 claim = "C5"
 passes = "The time column orders the rows and there are at least folds + 1 + embargo development rows."
@@ -437,3 +446,12 @@ passes = "At least one trial of the first chunk of candidates starts: preparatio
 blocks = "Every trial of the first chunk was skipped because preparation, longer than its estimate, closed the trial window; the message and details give the preparation seconds and the smallest budget that fits."
 override = "none; raise resources.budget (time_budget, --budget) to at least the smallest budget the refusal names."
 variables = ["resources.budget", "START_SECONDS"]
+
+[estimate.refusal]
+site = "scmle.cli.training:Estimation.execute"
+error = "BlockedError"
+claim = "C1"
+passes = "The declared estimand and policy were estimated on the data: parameter_estimation.json holds each parameter's estimate and interval, digest-checked on read-back."
+blocks = "estimate refused the declaration on this data (a missing or inconsistent column, missing values under the reject policy, a likelihood the estimator does not fit, or the estimator's own refusal); parameter_estimation_refusal.json in --output-dir gives the reason, its category and details."
+override = "none; fix the data or the declaration (for missing values, declare policy.missing = \"complete_case\"), as the recorded reason says."
+variables = ["--estimation", "--treatment", "policy.missing", "policy.estimator"]

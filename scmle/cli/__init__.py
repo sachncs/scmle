@@ -9,7 +9,9 @@ registry and the dispatcher, and re-exports every command.
 import argparse
 from collections.abc import Sequence
 import logging
+import os
 
+from scmle.cli.clustering import Clustering
 from scmle.cli.command import Command
 from scmle.cli.command import EXIT_BLOCKED
 from scmle.cli.command import EXIT_FAILED
@@ -23,6 +25,9 @@ from scmle.cli.delivery import Export
 from scmle.cli.delivery import Packaging
 from scmle.cli.delivery import Prediction
 from scmle.cli.delivery import Serve
+from scmle.cli.erasure import Deletion
+from scmle.cli.erasure import Forgetting
+from scmle.cli.erasure import Retirement
 from scmle.cli.governance import Claims
 from scmle.cli.governance import Loop
 from scmle.cli.governance import Trail
@@ -33,12 +38,14 @@ from scmle.cli.intake import IngestCommand
 from scmle.cli.maintenance import Records
 from scmle.cli.rollout import Deployment
 from scmle.cli.rollout import Operation
+from scmle.cli.training import Estimation
 from scmle.cli.training import Plan
 from scmle.cli.training import ProjectCommand
 from scmle.cli.training import Resumption
 from scmle.cli.training import Run
 from scmle.contracts import errors
 from scmle.runtime import logs
+from scmle.runtime import tracing
 
 __all__ = [
     "COMMANDS",
@@ -52,9 +59,13 @@ __all__ = [
     "Cataloging",
     "Charter",
     "Claims",
+    "Clustering",
     "Command",
+    "Deletion",
     "Deployment",
+    "Estimation",
     "Export",
+    "Forgetting",
     "Frame",
     "IngestCommand",
     "Loop",
@@ -66,6 +77,7 @@ __all__ = [
     "ProjectCommand",
     "Records",
     "Resumption",
+    "Retirement",
     "Run",
     "Serve",
     "Trail",
@@ -82,6 +94,7 @@ COMMANDS: tuple[Command, ...] = (
     Plan(),
     Run(),
     Resumption(),
+    Estimation(),
     Cataloging(),
     Prediction(),
     Batch(),
@@ -97,6 +110,10 @@ COMMANDS: tuple[Command, ...] = (
     Deployment(),
     Trail(),
     Records(),
+    Clustering(),
+    Forgetting(),
+    Retirement(),
+    Deletion(),
 )
 
 
@@ -118,6 +135,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="write the log as one JSON object per line, with run and "
         "request ids",
+    )
+    parser.add_argument(
+        "--trace",
+        action="store_true",
+        help="export OpenTelemetry spans of requests, scoring and pipeline "
+        "stages over OTLP (needs the tracing extra; also SCMLE_TRACING)",
     )
     parser.add_argument(
         "--debug",
@@ -150,6 +173,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     level = logging.DEBUG if args.debug else args.log_level
     logs.configure(level, structured=args.log_json)
+    if args.trace or os.environ.get(tracing.SWITCH):
+        tracing.TRACING.enable()
     command = next(c for c in COMMANDS if c.name == args.command)
     try:
         return command.execute(args)
@@ -169,6 +194,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         # handled: logged with its traceback by `report`, EXIT_INTERNAL
         report("internal error (a defect; please report it)", error, debug=True)
         return EXIT_INTERNAL
+    finally:
+        tracing.TRACING.disable()
 
 
 def report(label: str, error: BaseException, *, debug: bool) -> None:

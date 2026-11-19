@@ -87,6 +87,7 @@ def test_each_missing_condition_caps_the_tier_at_attested(changes, reason):
     ],
 )
 def test_missing_attestation_failed_design_or_rejection_is_unverified(changes):
+    # Enforces website/src/pages/docs/causal-decision.astro:64.
     out = tier.decide(facts(**changes))
     assert out.tier == Tier.UNVERIFIED and out.action == "downgrade_tier"
 
@@ -101,6 +102,9 @@ def test_the_held_out_estimate_alone_never_confirms():
     # negative control, no strata, no sensitivity analysis declared
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:126.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:347.
+    # Enforces website/src/learn/what-scmle-cannot-do.html:27-28.
+    # Enforces website/src/learn/when-things-go-wrong.html:153.
+    # Enforces website/src/pages/docs/causal-decision.astro:64.
     out = tier.decide(
         facts(
             battery_ran=False,

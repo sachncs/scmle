@@ -28,14 +28,55 @@ its own component name), the product's vectorised synthesis
 with the row-by-row reference `benchmarks.qualification.ingest_naive`,
 within `reference_rel_tol` relative and absolute (`acceptance.toml`).
 
-Verdict. `fail` when any file is silently wrong or any world differs.
-Otherwise `not measured`: the criterion also asks for at least
-`REAL_DATASETS` real relational datasets and for split hygiene, which this
-module does not measure; simulated worlds do not stand in for them.
+Real relational data. `relational.DATASETS` lists at least `REAL_DATASETS`
+public, freely licensed multi-table datasets pinned by URL and SHA-256;
+each is read by the product and, independently, by the standard library,
+and every primitive and nested feature of the grammar at hard cutoffs (ties
+with event and recorded times, window edges) is compared with
+`ingest_naive` within the same tolerance (see `relational`). A dataset that
+cannot be fetched, matched to its checksum or read counts against the row,
+as does any feature that differs.
 
-NOT measured: real relational datasets, the split criterion (no entity,
-duplicate or tied timestamp on both sides), Excel, Parquet and Feather
-files, the streaming reader (`streaming.Csv`), database connectors.
+Split hygiene. No tied timestamp may sit on both sides of any split, nor
+an entity where the product promised to keep it apart, nor a duplicate
+record of one declared entity. Identical rows are independent draws and may
+cross, as in scikit-learn, OpenML and the practitioner baseline (owner
+decision, 2026-11-19); C2 flags a duplicate rate above the table's natural
+rate as leakage. Duplicate crossings are counted and reported, not failed.
+`tables` lists the tables split: the child table of every relational
+dataset under each of `DECLARATIONS` (nothing declared, the entity as
+`group_column`, the event time as `time_column`, both, both under
+`validation="rolling"`, and the last two again with `entities="unseen"`),
+and every real table of `benchmarks.evidence.refusal` with the
+declarations its task needs. Each is
+split as a user run splits it (`hygiene`): `Project(...)` builds the
+specification, rows without a target are set aside, `TaskResolver`
+resolves the task and `Splitter(spec, task).split` makes the holdout and
+the folds. Every pair of sides (development against test, and each fold's
+training against its validation rows) is checked for a shared value of
+the declared `group_column` (entity), a shared duplicate record (the
+product's own `duplicates.duplicate_groups` over the splitter's feature
+columns; reported only), a shared duplicate record of one declared entity
+(the same duplicate group and the same `group_column` value on both sides;
+`copy`) and a shared value of the declared `time_column`. A column that is
+not declared is not checked: the product cannot know it. An entity on
+both sides of a temporal or rolling split is what a forecast of known
+entities asks for (its past trains, its future is held out), so there an
+entity or a `copy` crossing is a violation only where the run declared
+`entities="unseen"`; under any other strategy a declared entity column,
+and so a copy of one entity, must never cross. The summary
+reports how many runs with an entity column were declared each way. A split the
+product refuses (`BlockedError`, `DataError`) puts nothing on both sides
+and is reported; a table that cannot be loaded counts against the row.
+
+Verdict. `fail` when any file is silently wrong, any world differs, any
+real dataset fails to agree, or any split shares a timestamp, a duplicate
+record of one declared entity, or an entity where the product promised to
+keep it apart, across its sides; `pass` otherwise; `not measured` when
+`problems` finds any.
+
+NOT measured: Excel, Parquet and Feather files, the streaming reader
+(`streaming.Csv`), database connectors other than SQLite.
 
     python -m benchmarks.evidence.reading --write
     python -m benchmarks.evidence.reading --check
@@ -58,8 +99,11 @@ import numpy
 import pandas
 
 from benchmarks import acceptance
+from benchmarks.evidence import refusal
+from benchmarks.evidence import relational
 from benchmarks.qualification import ingest_checks
 from benchmarks.qualification import ingest_naive
+import scmle.api.project
 from scmle.assurance.detectors import certificates
 from scmle.assurance.ingest import asof_view
 from scmle.assurance.ingest import synthesize
@@ -68,12 +112,15 @@ import scmle.assurance.ingest.synthesize.grammar
 import scmle.assurance.ingest.synthesize.selection
 from scmle.contracts import errors
 from scmle.data.readers import tabular
+from scmle.data.splitting import duplicates
+from scmle.data.splitting import splitters
+import scmle.data.validation.target
 
 PATH = Path(__file__).with_suffix(".json")
 VARIABLE = "reference_rel_tol"
 # Generated worlds the plan's C5 criterion asks for (plan section 5).
 WORLDS = 1000
-# Real relational datasets the criterion asks for; none is registered.
+# Real relational datasets the criterion asks for (plan section 5).
 REAL_DATASETS = 5
 # Component name of the world stream; differs from ingest_certify's, so
 # these worlds are not the ones the qualification harness measured.
@@ -83,11 +130,31 @@ WORKERS = 2
 # column typed per chunk shows up.
 CHUNKED_ROWS = 300_000
 REFUSE = "refuse"
+# What a practitioner declares for a relational child table, one split each.
+DECLARATIONS = (
+    "rows",
+    "entity",
+    "time",
+    "both",
+    "rolling",
+    "unseen",
+    "unseen_rolling",
+)
+# What may not sit on both sides of a split: a declared entity, a duplicate
+# record of one declared entity, a tied timestamp.
+CROSSINGS = ("entity", "copy", "time")
+# What is counted on both sides of a split but is not a violation: identical
+# rows are independent draws (owner decision, 2026-11-19).
+REPORTED = ("duplicate",)
+# Strategies under which the entity declaration decides whether an entity
+# may cross: a known entity's past trains and its future is held out.
+TIMED = ("temporal", "rolling")
 NOT_MEASURED = (
-    f"{REAL_DATASETS} real relational datasets (none registered)",
-    "split criterion: no entity, duplicate or tied timestamp on both sides",
     "Excel, Parquet and Feather files",
-    "the streaming reader (streaming.Csv) and database connectors",
+    (
+        "the streaming reader (streaming.Csv), database connectors other "
+        "than SQLite"
+    ),
 )
 
 
@@ -538,6 +605,218 @@ def world(seed: int, tolerance: float) -> dict[str, Any]:
     }
 
 
+def tables() -> list[tuple[str, str]]:
+    """The tables split for the hygiene criterion.
+
+    Returns:
+        `(table, declared)` pairs: `<dataset>/<declaration>` for each
+        relational dataset and each of `DECLARATIONS`, then
+        `refusal/<task>` with `declared` "task" for each real refusal task.
+    """
+    found = [
+        (f"{d.name}/{declared}", declared)
+        for d in relational.DATASETS
+        for declared in DECLARATIONS
+    ]
+    found += [
+        (f"refusal/{name}", "task")
+        for name, task in refusal.catalog().items()
+        if task.group == "real"
+    ]
+    return found
+
+
+def declare(dataset: relational.Dataset, declared: str) -> dict[str, Any]:
+    """The `Project` arguments of one declaration on a child table.
+
+    Args:
+        dataset: The relational dataset.
+        declared: One of `DECLARATIONS`.
+
+    Returns:
+        The keyword arguments.
+    """
+    child = dataset.child
+    entity: dict[str, Any] = {"group_column": child.key}
+    time: dict[str, Any] = {"time_column": child.event}
+    rolling: dict[str, Any] = {"validation": "rolling"}
+    unseen: dict[str, Any] = {"entities": "unseen"}
+    options: dict[str, dict[str, Any]] = {
+        "rows": {},
+        "entity": entity,
+        "time": time,
+        "both": entity | time,
+        "rolling": entity | time | rolling,
+        "unseen": entity | time | unseen,
+        "unseen_rolling": entity | time | rolling | unseen,
+    }
+    return options[declared]
+
+
+def shared(left: numpy.ndarray, right: numpy.ndarray) -> int:
+    """Values found on both sides, missing values ignored.
+
+    Args:
+        left: One side's values.
+        right: The other side's values.
+
+    Returns:
+        The number of distinct values on both sides.
+    """
+    one = {v for v in left.tolist() if not pandas.isna(v)}
+    return len(one & {v for v in right.tolist() if not pandas.isna(v)})
+
+
+def hygiene(
+    frame: pandas.DataFrame, target: Any, options: dict[str, Any]
+) -> dict[str, Any]:
+    """Splits a table as a user run does and counts what crosses.
+
+    Args:
+        frame: The table.
+        target: The target column.
+        options: Further `Project` arguments (the declarations).
+
+    Returns:
+        The strategy, the number of splits checked (the holdout and each
+        fold), the number of splits sharing an entity, a duplicate record,
+        a duplicate record of one declared entity (`copy`) and a timestamp
+        across their sides, the refusal message (empty
+        when the product split the table), an empty error, the declared
+        `entities` and whether an entity column was declared (`grouped`).
+    """
+    with tempfile.TemporaryDirectory() as folder:
+        spec = scmle.api.project.Project(
+            frame, target, output_dir=folder, **options
+        ).spec
+    data = spec.data
+    rows = frame.loc[frame[data.target].notna()].reset_index(drop=True)
+    record: dict[str, Any] = dict.fromkeys(CROSSINGS + REPORTED, 0) | {
+        "strategy": "",
+        "splits": 0,
+        "refused": "",
+        "error": "",
+        "entities": spec.validation.entities,
+        "grouped": bool(data.group_column),
+    }
+    try:
+        task = scmle.data.validation.target.TaskResolver(spec).resolve(
+            rows[data.target]
+        )
+        splitter = splitters.Splitter(spec, task)
+        record["strategy"] = splitter.strategy_name
+        manifest = splitter.split(rows).manifest
+    except (errors.BlockedError, errors.DataError) as error:
+        record["refused"] = f"{type(error).__name__}: {error}"[:300]
+        return record
+    record["strategy"] = manifest.strategy
+    copies = duplicates.duplicate_groups(rows, splitter.feature_columns(rows))
+    copies = numpy.where(copies == duplicates.NOT_DUPLICATED, None, copies)
+    columns = {
+        "entity": data.group_column,
+        "time": data.time_column,
+    }
+    entity = (
+        rows[data.group_column].to_numpy()
+        if data.group_column
+        else numpy.full(len(rows), None)
+    )
+    owned = numpy.array(
+        [
+            None if c is None or pandas.isna(e) else repr((c, e))
+            for c, e in zip(copies, entity, strict=True)
+        ],
+        dtype=object,
+    )
+    development = numpy.asarray(manifest.train_ids)
+    sides = [(development, numpy.asarray(manifest.test_ids))] + [
+        (development[list(fit)], development[list(held)])
+        for fit, held in manifest.folds
+    ]
+    for left, right in sides:
+        record["duplicate"] += bool(shared(copies[left], copies[right]))
+        record["copy"] += bool(shared(owned[left], owned[right]))
+        for name, column in columns.items():
+            if column:
+                values = rows[column].to_numpy()
+                record[name] += bool(shared(values[left], values[right]))
+    record["splits"] = len(sides)
+    return record
+
+
+def split(table: str, declared: str) -> dict[str, Any]:
+    """Loads one table of `tables` and checks its split.
+
+    Args:
+        table: The table's name from `tables`.
+        declared: Its declaration.
+
+    Returns:
+        `hygiene`'s record with the table and declaration; on a failure to
+        load or split, the error.
+    """
+    record: dict[str, Any] = {"table": table, "declared": declared}
+    try:
+        source, name = table.split("/", 1)
+        if source == "refusal":
+            frame, target, options = refusal.catalog()[name].build()
+        else:
+            dataset = next(d for d in relational.DATASETS if d.name == source)
+            frame = relational.product(
+                dataset, relational.fetch(dataset), dataset.child
+            )
+            target = dataset.child.measures[0]
+            options = declare(dataset, name)
+        return record | hygiene(frame, target, options)
+    except Exception as error:  # noqa: BLE001 -- counted against the row
+        return (
+            record
+            | dict.fromkeys(CROSSINGS + REPORTED, 0)
+            | {
+                "strategy": "",
+                "splits": 0,
+                "refused": "",
+                "error": f"{type(error).__name__}: {error}"[:300],
+                "entities": "",
+                "grouped": False,
+            }
+        )
+
+
+def breached(record: dict[str, Any], crossing: str) -> bool:
+    """Whether one kind of crossing in a split record is a violation.
+
+    Args:
+        record: One `split` record.
+        crossing: One of `CROSSINGS`.
+
+    Returns:
+        True when it crossed, except an entity crossing, or a duplicate
+        record of one entity crossing (`copy`), in a temporal or rolling
+        split of a run that did not declare `entities="unseen"`: there the
+        entity is known and its past may train while its future is held
+        out. A timestamp is a violation under every strategy. A record
+        measured before `copy` was counted has none.
+    """
+    count = record.get(crossing, 0)
+    if crossing in ("entity", "copy") and record.get("strategy") in TIMED:
+        return bool(count) and record.get("entities") == "unseen"
+    return bool(count)
+
+
+def crossed(record: dict[str, Any]) -> bool:
+    """Whether a split record fails the criterion.
+
+    Args:
+        record: One `split` record.
+
+    Returns:
+        True when a crossing is a violation (`breached`) or the table could
+        not be split.
+    """
+    return bool(record["error"]) or any(breached(record, c) for c in CROSSINGS)
+
+
 def digest() -> str:
     """Hash of the code measured, the code measuring it and the corpus.
 
@@ -553,6 +832,18 @@ def digest() -> str:
         asof_view,
         ingest_naive,
         ingest_checks,
+        relational,
+        splitters.splits,
+        splitters.temporal,
+        splitters.Splitter,
+        duplicates,
+        tables,
+        declare,
+        shared,
+        hygiene,
+        split,
+        breached,
+        crossed,
         corpus,
         matches,
         number,
@@ -595,9 +886,17 @@ def measure(worlds: int = WORLDS, workers: int = WORKERS) -> dict[str, Any]:
     with tempfile.TemporaryDirectory() as folder:
         files = [read(c, Path(folder), tol) for c in cases]
     with futures.ProcessPoolExecutor(workers) as pool:
+        real = pool.map(
+            relational.compare,
+            relational.DATASETS,
+            [tol] * len(relational.DATASETS),
+        )
         done = list(
             pool.map(world, range(worlds), [tol] * worlds, chunksize=25)
         )
+        results = list(real)
+        listed = tables()
+        hygienic = list(pool.map(split, *zip(*listed, strict=True)))
     counts = {
         k: sum(f["outcome"] == k for f in files)
         for k in ("correct", "refused", "wrong")
@@ -627,7 +926,9 @@ def measure(worlds: int = WORLDS, workers: int = WORKERS) -> dict[str, Any]:
             "stream": STREAM,
             "reference": "benchmarks/qualification/ingest_naive.py",
         },
-        "real_datasets": 0,
+        "real": results,
+        "real_datasets": sum(relational.agrees(r) for r in results),
+        "splits": hygienic,
         "not_measured": list(NOT_MEASURED),
         "code": digest(),
         "seconds": round(time.monotonic() - started, 1),
@@ -659,8 +960,9 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
 
     Returns:
         Messages for a missing file, other code or corpus, a tolerance other
-        than acceptance.toml's, missing corpus cases or fewer worlds than
-        `WORLDS`; empty when the document is current.
+        than acceptance.toml's, missing corpus cases, fewer worlds than
+        `WORLDS`, real datasets not run or tables not split; empty when the
+        document is current.
     """
     found = load(document)
     if found is None:
@@ -677,6 +979,17 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
     missing = [c.name for c in corpus() if c.name not in names]
     if missing:
         issues.append(f"reading: cases not read: {missing}")
+    ran = {r.get("name") for r in found.get("real", [])}
+    absent = [d.name for d in relational.DATASETS if d.name not in ran]
+    if absent or len(relational.DATASETS) < REAL_DATASETS:
+        issues.append(f"reading: real datasets not run: {absent}")
+    if "splits" not in found:
+        issues.append("reading: split criterion not measured")
+    else:
+        done = {r.get("table") for r in found["splits"]}
+        unsplit = [t for t, _ in tables() if t not in done]
+        if unsplit:
+            issues.append(f"reading: tables not split: {unsplit}")
     count = found.get("point_in_time", {}).get("worlds", 0)
     if count < WORLDS:
         issues.append(
@@ -692,10 +1005,15 @@ def summary(document: dict[str, Any] | None = None) -> tuple[str, str]:
         document: The document; read from `PATH` when None.
 
     Returns:
-        The value text and `fail` when any file is silently wrong or any
-        world differs from the reference; otherwise `not measured`, since
-        the real-data and split parts of the criterion are not measured
-        here, and always `not measured` when `problems` finds any.
+        The value text and `fail` when any file is silently wrong, any
+        world differs from the reference, any real dataset fails to agree
+        (or to be read), or any split shares a timestamp or a duplicate
+        record of one declared entity across its sides, or an entity where
+        `breached` says it may not (or a table could not be split);
+        otherwise `pass`; `not measured` when `problems` finds any. A
+        duplicate record on both sides is reported, not failed. The value
+        counts the runs with an entity column declared `known` and
+        `unseen`.
     """
     found = load(document)
     if found is None or "corpus" not in found:
@@ -703,20 +1021,41 @@ def summary(document: dict[str, Any] | None = None) -> tuple[str, str]:
     files = found["corpus"]
     pit = found.get("point_in_time", {})
     unequal = pit.get("worlds", 0) - pit.get("equal", 0)
+    real = found.get("real", [])
+    agree = sum(relational.agrees(r) for r in real)
+    hygienic = found.get("splits", [])
+    bad = [r for r in hygienic if crossed(r)]
+    counts = ", ".join(
+        f"{c} {sum(breached(r, c) for r in hygienic)}" for c in CROSSINGS
+    )
+    copied = sum(bool(r.get("duplicate")) for r in hygienic)
+    grouped = [r for r in hygienic if r.get("grouped")]
+    declared = ", ".join(
+        f"{sum(r.get('entities') == way for r in grouped)} {way}"
+        for way in ("known", "unseen")
+    )
     value = (
         f"awkward files {files['cases']}: {files['correct']} correct, "
         f"{files['refused']} refused ({files['over_refused']} readable), "
         f"{files['wrong']} silently wrong; point in time "
         f"{pit.get('equal', 0)}/{pit.get('worlds', 0)} simulated worlds "
         f"equal the naive reference within {found.get('tolerance')}; "
-        f"real relational datasets {found.get('real_datasets', 0)} of "
-        f"{REAL_DATASETS} (simulated only)"
+        f"real relational datasets {agree} of {len(real)} equal the naive "
+        f"reference (at least {REAL_DATASETS} required); splits: "
+        f"{len(hygienic)} table runs, "
+        f"{sum(r['splits'] for r in hygienic)} splits checked, "
+        f"{sum(bool(r['refused']) for r in hygienic)} refused, "
+        f"{sum(bool(r['error']) for r in hygienic)} not loaded; "
+        f"{len(bad)} cross (table runs with a split sharing {counts}); "
+        f"{copied} runs share a duplicate record (reported, not a "
+        "violation); "
+        f"entity declared on {len(grouped)} runs: {declared}"
     )
     if problems(found):
         return value, "not measured"
-    if files["wrong"] or unequal:
+    if files["wrong"] or unequal or agree < len(real) or bad:
         return value, "fail"
-    return value, "not measured"
+    return value, "pass"
 
 
 def main(arguments: list[str] | None = None) -> int:

@@ -17,6 +17,7 @@ from scipy import stats
 
 from scmle.assurance.admissibility import leakage
 from scmle.assurance.admissibility.screen.settings import BINARY_CLASSES
+from scmle.assurance.admissibility.screen.settings import HELD
 from scmle.assurance.admissibility.screen.settings import KNOTS
 from scmle.assurance.admissibility.screen.settings import PAIR_LEVELS
 from scmle.assurance.admissibility.screen.settings import RIDGE
@@ -85,6 +86,40 @@ def basis(series: pandas.Series, knots: int = KNOTS) -> numpy.ndarray:
     if labels.nunique() <= leakage.MAX_LEVELS:
         return levels
     return numpy.hstack([levels, words(labels)])
+
+
+def line(series: pandas.Series, knots: int = KNOTS) -> numpy.ndarray | None:
+    """Builds the linear design of an ordered column: its value, its gaps.
+
+    The reading any model of one ordered column can make, ranking rows by
+    the value, with none of the smoother's knots to fit (`hypotheses.reading`
+    gives it to a skill suspect when it scores higher). A gap is filled with
+    the mean of the recorded values and marked by an indicator column.
+
+    Args:
+        series: One candidate column.
+        knots: As for `basis`: a column with at most this many distinct
+            values gets indicators there, so it has no line here.
+
+    Returns:
+        A float64 array of shape (n, 1), or (n, 2) with gaps; None for a
+        column that is not numeric or a date, or has few distinct values.
+    """
+    if pandas.api.types.is_datetime64_any_dtype(series):
+        series = (series - series.min()) / pandas.Timedelta(days=1)
+    numeric = pandas.api.types.is_numeric_dtype(
+        series
+    ) and not pandas.api.types.is_bool_dtype(series)
+    if not numeric:
+        return None
+    values = series.to_numpy(dtype="float64")
+    absent = numpy.isnan(values)
+    if len(numpy.unique(values[~absent])) <= knots:
+        return None
+    filled = numpy.where(absent, values[~absent].mean(), values)
+    if not absent.any():
+        return filled[:, None]
+    return numpy.column_stack([filled, absent.astype("float64")])
 
 
 def words(labels: pandas.Series) -> numpy.ndarray:
@@ -453,6 +488,60 @@ def skill_bound(
     return float(numpy.quantile(values, 1.0 - cfg.confidence))
 
 
+def margin(
+    problem: Problem,
+    mine: Sequence[numpy.ndarray],
+    theirs: Sequence[numpy.ndarray],
+    cfg: leakage.Config,
+    groups: numpy.ndarray | None,
+    rng: numpy.random.Generator,
+) -> float:
+    """One-sided lower confidence bound of one skill over another, paired.
+
+    Both sets of out-of-fold predictions are scored on the same bootstrap
+    rows (whole groups when given), so the noise the two share cancels: a
+    column and its companion measured on a small table (iris petal width and
+    length) differ by less than either's own bound.
+
+    Args:
+        problem: The outcome, task and folds.
+        mine: Output of `predict` for one design.
+        theirs: Output of `predict` (or a stack of the same form) for the
+            other.
+        cfg: Settings (`bootstrap`, `confidence`).
+        groups: Group label per row, or None.
+        rng: Random generator.
+
+    Returns:
+        The `1 - confidence` quantile of the skill differences, or -inf when
+        no draw can be scored.
+    """
+    fold_of = numpy.empty(len(problem.y), dtype="int64")
+    for number, split in enumerate(problem.splits):
+        fold_of[split[1]] = number
+    members = (
+        [numpy.flatnonzero(groups == g) for g in pandas.unique(groups)]
+        if groups is not None
+        else None
+    )
+    n = len(problem.y)
+    values = []
+    for draw in range(cfg.bootstrap):
+        del draw
+        if members is not None:
+            picks = rng.integers(0, len(members), size=len(members))
+            index = numpy.concatenate([members[i] for i in picks])
+        else:
+            index = rng.integers(0, n, size=n)
+        one = replicate(problem, mine, index, fold_of)
+        other = replicate(problem, theirs, index, fold_of)
+        if one is not None and other is not None:
+            values.append(one - other)
+    if not values:
+        return -math.inf
+    return float(numpy.quantile(values, 1.0 - cfg.confidence))
+
+
 def pair(first: str, second: str) -> str:
     """Names the joint hypothesis of two columns.
 
@@ -483,6 +572,31 @@ def pairs(
     """
     low = [n for n in names if frame[n].nunique() == PAIR_LEVELS]
     return list(itertools.combinations(low, 2))
+
+
+def enough(y: numpy.ndarray, task: str, cfg: leakage.Config) -> bool:
+    """Decides whether the screen's tests can be formed at all.
+
+    A cross-fitted skill needs, for every class, one row held out while
+    another of its class is in the training folds: two rows a class. Fewer
+    rows per class than folds (a fraud table with a handful of positives)
+    lowers power, not size: each permutation p-value stays exact, and the
+    probe states which plants such rows hide.
+
+    Args:
+        y: The encoded target.
+        task: `classification` or `regression`.
+        cfg: Settings (`min_rows`).
+
+    Returns:
+        False with fewer than `min_rows` rows or, for classification, a
+        class with fewer than two rows; True otherwise.
+    """
+    if len(y) < cfg.min_rows:
+        return False
+    if task == "classification":
+        return min(numpy.bincount(y).tolist()) >= HELD
+    return True
 
 
 def encode(

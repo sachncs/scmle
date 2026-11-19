@@ -14,6 +14,7 @@ from collections.abc import Generator
 from collections.abc import Mapping
 import concurrent.futures
 import contextlib
+import contextvars
 import enum
 import functools
 import re
@@ -287,7 +288,9 @@ class Admission:
                     f"all {self.max_concurrent} workers are busy"
                 )
             self.busy += 1
-        future = self.pool.submit(guarded)
+        # The worker runs in the caller's context, so the request id bound
+        # for logging and the current trace span follow the call.
+        future = self.pool.submit(contextvars.copy_context().run, guarded)
         future.add_done_callback(functools.partial(self.release, flag))
         try:
             result = future.result(timeout=self.timeout_seconds)

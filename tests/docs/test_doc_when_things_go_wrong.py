@@ -99,7 +99,10 @@ def opened(tmp_path):
     ],
 )
 def test_every_handled_failure_exits_one(monkeypatch, error):
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:21."""
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:21.
+
+    Also enforces website/src/learn/when-things-go-wrong.html:10.
+    """
     command = next(c for c in cli.COMMANDS if c.name == "catalog")
 
     def execute(args):
@@ -112,7 +115,10 @@ def test_every_handled_failure_exits_one(monkeypatch, error):
 def test_a_blocked_cli_run_exits_two_and_leaves_the_test_set_sealed(
     tmp_path, caplog
 ):
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:71."""
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:71.
+
+    Also enforces website/src/learn/when-things-go-wrong.html:39.
+    """
     frame = reliability.binary_data(200)
     frame["y"] = numpy.arange(len(frame)) % 5
     path = tmp_path / "d.csv"
@@ -130,7 +136,10 @@ def test_a_blocked_cli_run_exits_two_and_leaves_the_test_set_sealed(
 
 
 def test_no_model_that_can_enforce_the_monotonic_rule_blocks():
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:150."""
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:150.
+
+    Also enforces website/src/learn/when-things-go-wrong.html:72.
+    """
     context = types.SimpleNamespace(
         spec=types.SimpleNamespace(
             data=types.SimpleNamespace(monotonic_constraints={"a": 1})
@@ -150,7 +159,10 @@ def test_no_model_that_can_enforce_the_monotonic_rule_blocks():
 
 
 def test_an_unverified_feature_is_admitted_not_kept_out():
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:248."""
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:248.
+
+    Also enforces website/src/learn/when-things-go-wrong.html:110.
+    """
     rng = numpy.random.default_rng(0)
     features = pandas.DataFrame(
         {"a": rng.normal(size=300), "b": rng.normal(size=300)}
@@ -179,7 +191,11 @@ def test_an_unverified_feature_is_admitted_not_kept_out():
 
 
 def test_an_attestation_that_expires_before_its_date_is_refused():
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:295."""
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:295.
+
+    Also enforces website/src/learn/leakage.html:97.
+    Also enforces website/src/learn/when-things-go-wrong.html:135.
+    """
     fields = (
         "A. Owner",
         "data owner",
@@ -194,12 +210,18 @@ def test_an_attestation_that_expires_before_its_date_is_refused():
 
 
 def test_the_rollback_tolerance_defaults_to_one_hundredth():
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:554."""
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:554.
+
+    Also enforces website/src/learn/when-things-go-wrong.html:224-225.
+    """
     assert lifecycle.Trigger().tolerance == 0.01
 
 
 def test_a_second_reply_to_the_same_escalation_is_refused(tmp_path, caplog):
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:685."""
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:685.
+
+    Also enforces website/src/learn/when-things-go-wrong.html:291.
+    """
     deploy, pending = opened(tmp_path)
     answer = deployment_ledger.Attestation.create(
         KEY,
@@ -234,7 +256,10 @@ def test_a_second_reply_to_the_same_escalation_is_refused(tmp_path, caplog):
 
 
 def test_every_one_of_the_eleven_never_list_actions_needs_a_person(tmp_path):
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:709."""
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:709.
+
+    Also enforces website/src/learn/when-things-go-wrong.html:301.
+    """
     assert len(never_list.Forbidden) == 11
     settings = loop.Preregistration(reference=0.1, tau=0.5, scope="m:s")
     guarded = loop.Loop.open(
@@ -251,7 +276,10 @@ def test_every_one_of_the_eleven_never_list_actions_needs_a_person(tmp_path):
 
 
 def test_verify_cannot_see_that_the_newest_rows_were_removed(tmp_path, capsys):
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:713."""
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:713.
+
+    Also enforces website/src/learn/when-things-go-wrong.html:303.
+    """
     deploy, ignored = opened(tmp_path)
     path = deploy / deployment_ledger.FILE_NAME
     lines = path.read_text().splitlines()
@@ -303,7 +331,10 @@ def problems(document=None, **changes):
 
 
 def test_each_live_failure_names_the_documented_problem():
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:754."""
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:754.
+
+    Also enforces website/src/learn/when-things-go-wrong.html:319.
+    """
     clean = support_release.recorded
     other = {"artifact_digest": "sha256:" + "1" * 64}
     cases = [
@@ -340,7 +371,10 @@ def test_each_live_failure_names_the_documented_problem():
 
 
 def test_verify_record_of_a_file_that_cannot_be_read_exits_one(tmp_path):
-    """Enforces docs/WHEN_THINGS_GO_WRONG.md:771."""
+    """Enforces docs/WHEN_THINGS_GO_WRONG.md:771.
+
+    Also enforces website/src/learn/when-things-go-wrong.html:323.
+    """
     (tmp_path / "key").write_text("a-key")
     code = run(
         "deploy",

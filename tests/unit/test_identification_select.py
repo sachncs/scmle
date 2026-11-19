@@ -88,6 +88,7 @@ def test_no_chartered_order_uses_the_registry_order_and_says_so():
 
 
 def test_a_declared_dag_checks_the_adjustment_set():
+    # Enforces website/src/pages/docs/causal-decision.astro:57.
     confounded = scmle.assurance.admissibility.dag.Dag.build(
         source="test",
         edges=(("age", "t"), ("age", "y"), ("t", "y"), ("u", "t"), ("u", "y")),

@@ -348,6 +348,7 @@ class RefusingGuard:
 
 @pytest.mark.parametrize("split", SPLITS)
 def test_rollback_restores_the_previous_known_good_revision(tmp_path, split):
+    # Enforces website/src/pages/docs/operations.astro:8.
     release, plane, ignored = world(tmp_path, split)
     assert promote(release, plane, 1, support_runtime.OLD).done
     first = release.environment(MODEL, PRODUCTION)

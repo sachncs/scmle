@@ -80,6 +80,7 @@ def test_overlapping_folds_fall_back_to_the_pooled_scores():
 
 
 def test_a_model_set_above_the_cap_is_not_kept_and_the_cap_is_a_parameter():
+    # Enforces website/src/pages/docs/qualification.astro:72.
     held = [list(range(i, 200, 4)) for i in range(4)]
     models = [fitted(float(i)) for i in range(4)]
     size = cv_plus.serialized_size(models)

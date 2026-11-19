@@ -27,12 +27,59 @@ PURITY = "record_purity"
 ECHO = "echo"
 
 
+ENCODING = "encoding"
+
+
+DUPLICATION = "duplication"
+
+
+# A date column holding values after the declared prediction time
+# (`Dataset.cutoff`): not a test but a reading of the declaration, checked
+# in a run (`records.dated`) apart from the statistical family, with its own
+# certificate.
+DATED = "dated"
+
+
+DATED_ID = "f4-leakage-dated"
+
+
+DATED_DEFECT = "leak_dated"
+
+
+# The ceiling of the dated check: a record of the past holds no value after
+# the moment it is read, so the honest share of values after the cutoff is
+# zero and any larger share is late. Not tuned: it is the limit itself.
+LATE = 0.0
+
+
+# The noisy copy (the label with a few entries moved, or the number plus
+# noise) is the target read with errors: echo owns it. Its skill is matched
+# by the other columns of an easy table (`hypotheses.rival`), so skill alone
+# found it in 70 of 200 breast cancer worlds and echo in all 200. A target
+# mean over a few rows (`records.encodings`) and rows copied across the split
+# (`records.duplication`) have mechanisms of their own.
 MECHANISM_DEFECTS: Mapping[str, tuple[str, ...]] = {
-    SKILL: ("leak_copy", "leak_noisy_copy", "leak_threshold"),
+    SKILL: ("leak_copy", "leak_threshold"),
     MISSING: ("leak_missing_for_class",),
     PURITY: ("leak_rare_record",),
-    ECHO: (),
+    ECHO: ("leak_noisy_copy",),
+    ENCODING: ("leak_target_mean",),
+    DUPLICATION: ("leak_duplicates",),
 }
+
+
+# The ceiling of both record mechanisms is the largest effect honest data
+# can have, not a tuned value. A group-constant column that does not read
+# its rows' outcomes cannot predict the group's mean of the target more
+# precisely than that mean's own sampling noise (precision at most 1,
+# `records.encodings`); rows sampled from a population, however repetitive,
+# cannot hold more exact pairs than the Cauchy-Schwarz bound on their
+# singletons and triples allows (excess at most 1, `records.duplication`).
+NATURAL = 1.0
+
+
+# The finding of the duplication mechanism names the rows, not a column.
+ROWS = "(duplicate rows)"
 
 
 # A word of free text: a run of letters or digits.
@@ -61,6 +108,12 @@ BINARY_CLASSES = 2
 
 
 MIN_CLASSES = 2
+
+
+# Rows a class needs before the screen runs (`fitting.enough`): a
+# cross-fitted skill holds one row out while another of its class is in the
+# training folds.
+HELD = 2
 
 
 # Each kind of target has its own certificate, measured on a real table of
@@ -115,9 +168,10 @@ FIT_SECONDS: Mapping[str, float] = {
 
 
 # Most hypotheses one column can raise: skill, record purity, missingness,
-# echo, and one pair's skill on average (pairs are capped at the number of
-# candidate columns).
-HYPOTHESES = 5
+# echo, target mean, and one pair's skill on average (pairs are capped at
+# the number of candidate columns). The table adds one duplication
+# hypothesis.
+HYPOTHESES = 6
 
 
 BATCH = 200
@@ -137,6 +191,14 @@ WORDS = {
     MISSING: "association of being recorded with the target (Cramer's V)",
     PURITY: "share of one target class among the recorded values",
     ECHO: "the column read as the target itself (agreement, or R^2 unfitted)",
+    ENCODING: (
+        "precision of the column as its group's mean of the target, over "
+        "the mean's own sampling noise"
+    ),
+    DUPLICATION: (
+        "exact pairs of rows over the most a sample from a population holds"
+    ),
+    DATED: "share of the column's dates after the declared prediction time",
 }
 
 

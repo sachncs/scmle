@@ -38,6 +38,8 @@ def test_every_entry_point_defaults_to_the_warn_policy():
 
     What `warn` does with a flagged column (it trains and labels the score)
     is enforced by tests/leakage/test_leakage.py, which runs it end to end.
+
+    Also enforces website/src/learn/leakage.html:66-67.
     """
     signature = inspect.signature(project.Project)
     parser = cli.build_parser()
@@ -54,7 +56,10 @@ def test_every_entry_point_defaults_to_the_warn_policy():
 def test_the_probe_screens_plants_with_the_real_screens_settings(
     monkeypatch, structure
 ):
-    """Enforces docs/LEAKAGE.md:233."""
+    """Enforces docs/LEAKAGE.md:233.
+
+    Also enforces website/src/learn/leakage.html:67-68.
+    """
     calls = []
     original = screen.screen
     signature = inspect.signature(original)
@@ -95,11 +100,15 @@ def test_the_probe_screens_plants_with_the_real_screens_settings(
     else:
         assert real["block_size"] and planted["groups"] is None
     assert list(planted["frame"].index) == list(real["frame"].index)
-    assert set(report.probe) == set(plants.DEFECTS)
+    assert set(report.probe) == set(plants.KINDS)
 
 
 def test_an_attestation_that_expires_before_its_date_is_refused(tmp_path):
-    """Enforces docs/LEAKAGE.md:302."""
+    """Enforces docs/LEAKAGE.md:302.
+
+    Also enforces website/src/learn/leakage.html:97.
+    Also enforces website/src/learn/when-things-go-wrong.html:135.
+    """
     record = {
         "column": "worst area",
         "name_or_id": "A. Pathologist",
@@ -133,7 +142,10 @@ def test_an_attestation_that_expires_before_its_date_is_refused(tmp_path):
 
 @pytest.mark.parametrize("kind", screen_certify.KINDS)
 def test_no_null_world_of_the_certification_was_flagged(kind):
-    """Enforces docs/LEAKAGE.md:357 (0 of 1000 null worlds flagged)."""
+    """Enforces docs/LEAKAGE.md:357 (0 of 1000 null worlds flagged).
+
+    Also enforces website/src/learn/leakage.html:118.
+    """
     document = json.loads(
         screen_certify.MEASUREMENTS_PATH.read_text(encoding="utf-8")
     )[kind]
@@ -141,8 +153,10 @@ def test_no_null_world_of_the_certification_was_flagged(kind):
         screen.DETECTORS[kind], screen.code_digest()
     )
 
-    assert document["suspect_false_alarms"] == 0
+    # The certificate counts false alarms over every world (null, grouped
+    # and planted); the null worlds alone are the claim here.
+    assert document["null_false_alarms"] == 0
     assert document["null_replicates"] == 1000
     for outcome in cert.outcomes:
-        assert outcome.certificate.alarms == 0
-        assert outcome.certificate.clean == 1000
+        assert outcome.certificate.alarms == document["suspect_false_alarms"]
+        assert outcome.certificate.clean == document["clean_worlds"]

@@ -6,6 +6,7 @@ import numpy
 import pytest
 from scipy import stats
 
+from benchmarks import acceptance
 from benchmarks.qualification import f6_certify
 from scmle.assurance.detectors import certificates
 from scmle.assurance.robustness import shift
@@ -47,12 +48,66 @@ def test_missing_and_stale_certificates_are_reported():
 
 
 def test_the_floors_were_fixed_before_measuring():
-    assert certificates.Standard(0.80, 0.075, 0.95) == f6_certify.SHIFT_POLICY
-    assert (
-        certificates.Standard(0.80, 0.10, 0.95) == f6_certify.STABILITY_POLICY
+    variables = acceptance.load()
+    alpha = variables["alpha"].value
+    shift_policy = certificates.Standard(
+        variables["shift_recall_min"].value,
+        acceptance.sized(shift.ALPHA, variables).bound,
+        1 - 2 * alpha,
+        "exact",
     )
-    assert f6_certify.SHIFT_NULL >= 1000 and f6_certify.SHIFT_ROWS == 2000
+    assert shift_policy == f6_certify.SHIFT_POLICY
+    assert shift_policy.recall == 0.80
+    assert shift_policy.alarms == pytest.approx(0.05 * 1.69)
+    stability_policy = certificates.Standard(
+        variables["stability_recall_min"].value,
+        variables["stability_false_alarm_max"].value,
+        1 - 2 * alpha,
+        "exact",
+    )
+    assert stability_policy == f6_certify.STABILITY_POLICY
+    assert (stability_policy.recall, stability_policy.alarms) == (0.80, 0.10)
+    assert f6_certify.SHIFT_NULL == 1000 and f6_certify.SHIFT_ROWS == 2000
     assert f6_certify.PLANTED_AUC == 0.60
+
+
+def test_both_shift_tests_are_decided_on_the_stated_null_count():
+    store = stored()
+    digests = f6_certify.current_digests()
+    for test in (shift.C2ST_ID, shift.MMD_ID):
+        (cert,) = store.current(test, digests[test])
+        assert cert.policy == f6_certify.SHIFT_POLICY
+        (outcome,) = cert.outcomes
+        assert outcome.certificate.clean == f6_certify.SHIFT_NULL
+        upper = stats.beta.ppf(
+            1 - acceptance.load()["alpha"].value,
+            outcome.certificate.alarms + 1,
+            f6_certify.SHIFT_NULL - outcome.certificate.alarms,
+        )
+        assert outcome.alarms[1] == pytest.approx(upper)
+    (cert,) = store.current(
+        stability.DETECTOR_ID, digests[stability.DETECTOR_ID]
+    )
+    assert cert.policy == f6_certify.STABILITY_POLICY
+
+
+def test_a_certificate_under_another_policy_is_reported():
+    store = stored()
+    (cert,) = store.current(shift.MMD_ID, shift.code_digest())
+    old = certificates.Standard(0.80, 0.075, 0.95)
+    store.add(
+        certificates.certify(
+            cert.detector,
+            cert.digests["code"],
+            cert.digests["corpus"],
+            cert.seeds,
+            [o.certificate for o in cert.outcomes],
+            old,
+        )
+    )
+    assert f6_certify.problems(store) == [
+        f"{shift.MMD_ID}: measured under another policy or null count"
+    ]
 
 
 def test_development_and_certification_seeds_do_not_overlap():
@@ -89,11 +144,8 @@ def test_measurements_agree_with_the_certificates():
 
 
 def test_the_size_by_p_value_alone_is_in_the_99_percent_band():
-    nulls = {
-        shift.C2ST_ID: f6_certify.SHIFT_NULL,
-        shift.MMD_ID: f6_certify.MMD_NULL,
-    }
-    for test, count in nulls.items():
+    for test in (shift.C2ST_ID, shift.MMD_ID):
+        count = f6_certify.SHIFT_NULL
         row = measurements()[test]
         assert row["size_in_band"] is True
         assert row["null_replicates"] == count

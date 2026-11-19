@@ -37,7 +37,10 @@ def trained():
 def test_a_signed_bundle_without_the_key_is_refused_even_when_trusted(
     trained, tmp_path, monkeypatch
 ):
-    """Enforces docs/GLOSSARY.md:729."""
+    """Enforces docs/GLOSSARY.md:729.
+
+    Also enforces website/src/learn/glossary.html:367.
+    """
     monkeypatch.delenv(signing.SIGNING_KEY_ENV, raising=False)
     monkeypatch.delenv(signing.SIGNING_KEY_FILE_ENV, raising=False)
     monkeypatch.delenv("SCMLE_ENV", raising=False)
@@ -54,5 +57,8 @@ def test_a_signed_bundle_without_the_key_is_refused_even_when_trusted(
 
 
 def test_a_blocked_release_exits_with_code_two():
-    """Enforces docs/GLOSSARY.md:700 (the code the gate's refusal uses)."""
+    """Enforces docs/GLOSSARY.md:700 (the code the gate's refusal uses).
+
+    Also enforces website/src/learn/glossary.html:351.
+    """
     assert cli.EXIT_BLOCKED == 2

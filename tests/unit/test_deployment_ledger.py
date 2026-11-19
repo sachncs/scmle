@@ -139,6 +139,7 @@ def test_unknown_kinds_and_a_second_open_are_refused():
 
 def test_a_challenger_must_be_registered_before_it_is_scored():
     # Enforces docs/ARTIFACTS.md:90.
+    # Enforces website/src/pages/docs/artifacts.astro:54.
     ledger = make()
     body = {
         "name": "c1",
@@ -189,6 +190,8 @@ def make_with_registered(body):
 
 def test_an_attestation_is_bound_to_its_question_hash():
     # Enforces docs/ARTIFACTS.md:90.
+    # Enforces website/src/pages/docs/artifacts.astro:54.
+    # Enforces website/src/pages/docs/qualification.astro:118.
     ledger = make()
     identity, digest = escalate(ledger)
     wrong = reply(identity, "0" * 64)
@@ -205,6 +208,9 @@ def test_an_attestation_is_bound_to_its_question_hash():
 def test_an_attestation_signed_with_a_system_key_is_refused():
     # Enforces docs/GLOSSARY.md:383.
     # Enforces docs/ARTIFACTS.md:90.
+    # Enforces website/src/learn/glossary.html:191.
+    # Enforces website/src/pages/docs/artifacts.astro:54.
+    # Enforces website/src/pages/docs/qualification.astro:118.
     ledger = make()
     identity, digest = escalate(ledger)
     with pytest.raises(deployment_ledger.MisuseError, match="system holds"):

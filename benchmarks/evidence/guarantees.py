@@ -3,10 +3,14 @@
 A documented guarantee is found mechanically and conservatively, so that the
 count errs towards too many guarantees, never too few.
 
-Where it is looked for: `README.md` and every `docs/*.md`. Fenced code
-blocks, HTML comments, headings and table header rows are skipped. Each
-remaining paragraph or list item is split into sentences; each table data
-row is one unit, because its last cells usually name the enforcing test.
+Where it is looked for: everything the claim covers, "every guarantee in
+docs and site" (plan, C12): `README.md`, every Markdown file under `docs/`
+(with `docs/preregistration/`), and the website source, every `.astro`
+page and `.html` fragment under `website/src` (read by
+`benchmarks.evidence.pages`). Fenced code blocks, HTML comments, headings
+and table header rows are skipped. Each remaining paragraph or list item
+is split into sentences; each table data row is one unit, because its last
+cells usually name the enforcing test.
 
 What makes a unit a guarantee: it contains one of `WORDS`, matched as a
 whole word without regard to case, outside inline code and outside the
@@ -25,16 +29,23 @@ and would swamp the list without naming a behaviour that a test can check.
 A user instruction such as "you must set X" is kept, being a statement a
 test could contradict.
 
-What counts as a link (fuzzy word overlap never does):
+What counts as a link: a test that enforces that specific statement.
+Fuzzy word overlap never does, and neither does a test file that merely
+mentions the doc, nor a statement that names a whole test file:
 
-1. The unit itself cites a path under `tests/` that exists (a file, a
-   directory, or `path::name`). A cited path that does not exist is
+1. The unit itself cites one test, `tests/path.py::name` (or
+   `::Class::name`), and that test is defined in that file. A citation of
+   a whole file or directory names no specific test: it is recorded under
+   `vague` and does not link. A cited path or test that does not exist is
    recorded under `missing` and does not link.
-2. A Python file under `tests/` names the doc with a line or an anchor:
+2. A test function under `tests/` names the doc with a line or an anchor:
    `docs/X.md:12`, `docs/X.md:12-15`, `docs/X.md#L12`, `docs/X.md#L12-L15`
-   or `docs/X.md#heading-slug`. The enclosing test function (or the file,
-   for a module-level mention) is linked to every unit whose lines meet the
-   range, or to every unit directly under that heading.
+   or `docs/X.md#heading-slug` (site sources the same way, for example
+   `website/src/pages/docs/cli.astro:40`). That function is linked to every
+   unit whose lines meet the range. An anchor names a section, not a
+   statement, so it links only a section that holds exactly one guarantee.
+   A mention outside every test function (a module docstring) links
+   nothing.
 3. The spec-test convention: in a test file whose module docstring cites
    exactly one scanned doc, a function `test_l41_l43_...` or
    `test_l23_to_l39_...` links the units on lines 41 to 43 (or 23 to 39)
@@ -44,15 +55,15 @@ What counts as a link (fuzzy word overlap never does):
 Verdict: `pass` only when every guarantee has a link and there is at least
 one guarantee; `fail` otherwise. The value gives linked over total.
 
-The stored result goes stale when a scanned doc, the listing of `tests/`,
-any test-side doc mention (form 2) or this module's code changes.
+The stored result goes stale when a scanned doc or page, the listing of
+`tests/`, any test-side doc mention (form 2), a cited test file, or the
+code of this module or of `pages` changes.
 
     python -m benchmarks.evidence.guarantees --write
     python -m benchmarks.evidence.guarantees --check
 """
 
 import argparse
-import ast
 from collections import Counter
 import hashlib
 import json
@@ -62,6 +73,8 @@ import sys
 import time
 from typing import Any
 
+from benchmarks.evidence import links
+from benchmarks.evidence import pages
 from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
 
@@ -106,13 +119,8 @@ ROW = re.compile(r"^\s*\|")
 RULE = re.compile(r"^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$")
 CODE = re.compile(r"`[^`]*`|\[[^\]]*\]\([^)]*\)")
 BREAK = re.compile(r"(?<=[.!?])[\"')\]*_]*\s+(?=[A-Z0-9`*\[(\"_])")
-CITATION = re.compile(r"(?<![\w/.-])tests/[\w./-]*\w(?:::\w+)?")
-MENTION = re.compile(
-    r"(?<![\w/.-])(README\.md|docs/[\w-]+\.md)"
-    r"(?:#L(\d+)(?:-L?(\d+))?|:(\d+)(?:-(\d+))?\b|#([a-z0-9][a-z0-9-]*))"
-)
-SPEC = re.compile(r"^test_l(\d+)((?:_(?:to_)?l\d+)*)")
-DOC_NAME = re.compile(r"(?<![\w/.-])(README\.md|docs/[\w-]+\.md)")
+CITATION = re.compile(r"(?<![\w/.-])tests/[\w./-]*\w(?:::\w+){0,2}")
+SITE = ("*.astro", "*.html")
 
 
 def slugify(heading: str) -> str:
@@ -249,6 +257,8 @@ def split(unit: dict[str, Any]) -> list[dict[str, Any]]:
     def line_at(offset: int) -> int:
         return max(n for start, n in offsets if start <= offset)
 
+    single = len(unit["lines"]) == 1
+
     found = []
     begin = 0
     for match in [*BREAK.finditer(joined), None]:
@@ -258,7 +268,9 @@ def split(unit: dict[str, Any]) -> list[dict[str, Any]]:
             found.append(
                 {
                     "start": line_at(begin),
-                    "end": line_at(max(begin, stop - 1)),
+                    "end": (
+                        unit["end"] if single else line_at(max(begin, stop - 1))
+                    ),
                     "section": unit["section"],
                     "text": sentence,
                 }
@@ -272,8 +284,9 @@ def extract(text: str, name: str) -> list[dict[str, Any]]:
     """The guarantees in one doc, with the test paths they cite.
 
     Args:
-        text: The Markdown source.
-        name: The doc's path relative to the repository root.
+        text: The Markdown source, or a site page's source.
+        name: The doc's path relative to the repository root; a name not
+            ending in `.md` is read as a site page.
 
     Returns:
         One record per guarantee: `doc`, `line`, `end`, `section`, `text`,
@@ -281,7 +294,8 @@ def extract(text: str, name: str) -> list[dict[str, Any]]:
         `tests/` named in it).
     """
     found = []
-    for unit in chunk(text):
+    units = chunk(text) if name.endswith(".md") else pages.units(text, name)
+    for unit in units:
         for sentence in split(unit):
             words = KEYWORDS.findall(CODE.sub(" ", sentence["text"]))
             if not words:
@@ -300,130 +314,27 @@ def extract(text: str, name: str) -> list[dict[str, Any]]:
     return found
 
 
-def enclosing(tree: ast.Module, line: int) -> str | None:
-    """The innermost function whose source holds a line.
-
-    Args:
-        tree: The parsed test file.
-        line: 1-based line number.
-
-    Returns:
-        The function name (with its class, `Class::name`), or None for a
-        line outside every function.
-    """
-    owners = {
-        id(child): node.name
-        for node in ast.walk(tree)
-        if isinstance(node, ast.ClassDef)
-        for child in node.body
-    }
-    best: tuple[int, str] | None = None
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
-            continue
-        last = node.end_lineno or node.lineno
-        if node.lineno <= line <= last and (
-            best is None or node.lineno > best[0]
-        ):
-            owner = owners.get(id(node))
-            label = f"{owner}::{node.name}" if owner else node.name
-            best = (node.lineno, label)
-    return None if best is None else best[1]
-
-
-def mark(text: str, path: str, docs: set[str]) -> list[dict[str, Any]]:
-    """Test-side mentions of a scanned doc with a line or an anchor.
-
-    Args:
-        text: Source of one test file.
-        path: Its path relative to the repository root.
-        docs: The scanned doc paths.
-
-    Returns:
-        One record per mention: `doc`, `test` (`path::function`, or the
-        path), and either `lines` ([first, last]) or `anchor`.
-    """
-    hits = [m for m in MENTION.finditer(text) if m.group(1) in docs]
-    if not hits:
-        return []
-    try:
-        tree: ast.Module | None = ast.parse(text)
-    except SyntaxError:
-        tree = None
-    found = []
-    for hit in hits:
-        line = text.count("\n", 0, hit.start()) + 1
-        name = None if tree is None else enclosing(tree, line)
-        record: dict[str, Any] = {
-            "doc": hit.group(1),
-            "test": f"{path}::{name}" if name else path,
-        }
-        first = hit.group(2) or hit.group(4)
-        if first:
-            last = hit.group(3) or hit.group(5) or first
-            record["lines"] = [int(first), int(last)]
-        else:
-            record["anchor"] = hit.group(6)
-        found.append(record)
-    return found
-
-
-def specify(text: str, path: str, docs: set[str]) -> list[dict[str, Any]]:
-    """Links from the spec-test convention (`test_l41_l43_...`).
-
-    Args:
-        text: Source of one test file.
-        path: Its path relative to the repository root.
-        docs: The scanned doc paths.
-
-    Returns:
-        Records like those of `mark`, with `lines`; empty unless the module
-        docstring cites exactly one scanned doc.
-    """
-    try:
-        tree = ast.parse(text)
-    except SyntaxError:
-        return []
-    cited = set(DOC_NAME.findall(ast.get_docstring(tree) or "")) & docs
-    if len(cited) != 1:
-        return []
-    doc = cited.pop()
-    found = []
-    for node in tree.body:
-        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
-            continue
-        spec = SPEC.match(node.name)
-        if spec is None:
-            continue
-        numbers = [int(spec.group(1))]
-        numbers += [int(n) for n in re.findall(r"\d+", spec.group(2))]
-        found.append(
-            {
-                "doc": doc,
-                "test": f"{path}::{node.name}",
-                "lines": [min(numbers), max(numbers)],
-            }
-        )
-    return found
-
-
 def collect(root: Path) -> list[Path]:
-    """The scanned docs: `README.md` and every `docs/*.md`.
+    """The scanned docs: `README.md`, `docs/**/*.md` and the site source.
 
     Args:
         root: Repository root.
 
     Returns:
-        Existing paths in sorted order.
+        Existing paths: `README.md` first, then every Markdown file under
+        `docs/` (subdirectories included), then every `.astro` page and
+        `.html` fragment under `website/src`, each group sorted.
 
     Raises:
-        InputError: If `root` holds neither `README.md` nor `docs/`.
+        InputError: If `root` holds none of them.
     """
-    found = sorted((root / "docs").glob("*.md"))
+    found = sorted((root / "docs").rglob("*.md"))
     if (root / "README.md").is_file():
         found.insert(0, root / "README.md")
+    site = root / "website" / "src"
+    found += sorted(p for pattern in SITE for p in site.rglob(pattern))
     if not found:
-        message = f"no README.md or docs/*.md under {root}"
+        message = f"no README.md, docs/ or website/src under {root}"
         raise errors.InputError(message)
     return found
 
@@ -447,52 +358,24 @@ def survey(
         for p in base.rglob("*")
         if p.is_file() and "__pycache__" not in p.parts
     )
-    links: list[dict[str, Any]] = []
+    records: list[dict[str, Any]] = []
     for name in listing:
         if not name.endswith(".py"):
             continue
         text = (root / name).read_text(encoding="utf-8", errors="replace")
-        if "README.md" not in text and "docs/" not in text:
+        if not any(key in text for key in ("README.md", "docs/", "website/")):
             continue
-        links += mark(text, name, docs)
-        links += specify(text, name, docs)
-    return listing, links
-
-
-def link(
-    guarantees: list[dict[str, Any]],
-    links: list[dict[str, Any]],
-    exists: set[str],
-) -> None:
-    """Fills each guarantee's `tests` and `missing` in place.
-
-    Args:
-        guarantees: Records from `extract`.
-        links: Records from `mark` and `specify`.
-        exists: Cited paths that exist (without any `::name`).
-    """
-    for item in guarantees:
-        tests = {c for c in item["cited"] if c.split("::")[0] in exists}
-        for record in links:
-            if record["doc"] != item["doc"]:
-                continue
-            if "lines" in record:
-                first, last = record["lines"]
-                if first <= item["end"] and item["line"] <= last:
-                    tests.add(record["test"])
-            elif record["anchor"] == item["section"]:
-                tests.add(record["test"])
-        item["tests"] = sorted(tests)
-        item["missing"] = sorted(
-            c for c in item["cited"] if c.split("::")[0] not in exists
-        )
+        records += links.mark(text, name, docs)
+        records += links.specify(text, name, docs)
+    return listing, records
 
 
 def fingerprint(
     root: Path,
     paths: list[Path],
     listing: list[str],
-    links: list[dict[str, Any]],
+    records: list[dict[str, Any]],
+    exists: set[str],
 ) -> str:
     """Hash of everything the result depends on.
 
@@ -500,7 +383,9 @@ def fingerprint(
         root: Repository root.
         paths: The scanned docs.
         listing: The `tests/` listing.
-        links: The test-side link records.
+        records: The test-side link records.
+        exists: The citations that resolve (so a renamed or deleted cited
+            test makes the result stale).
 
     Returns:
         64 lowercase hexadecimal characters.
@@ -514,22 +399,27 @@ def fingerprint(
             start,
             split,
             extract,
-            enclosing,
-            mark,
-            specify,
-            link,
+            links.enclosing,
+            links.mark,
+            links.specify,
+            links.link,
             collect,
             survey,
+            links.defined,
+            links.resolve,
+            gather,
             tally,
         ).encode("ascii")
     )
+    digest.update(Path(pages.__file__).read_bytes())
     digest.update(json.dumps(WORDS).encode("utf-8"))
+    digest.update(json.dumps(sorted(exists)).encode("utf-8"))
     for path in paths:
         name = path.relative_to(root).as_posix()
         digest.update(name.encode("utf-8"))
         digest.update(hashlib.sha256(path.read_bytes()).digest())
     digest.update("\n".join(listing).encode("utf-8"))
-    digest.update(json.dumps(links, sort_keys=True).encode("utf-8"))
+    digest.update(json.dumps(records, sort_keys=True).encode("utf-8"))
     return digest.hexdigest()
 
 
@@ -550,6 +440,28 @@ def tally(guarantees: list[dict[str, Any]]) -> dict[str, int]:
     }
 
 
+def gather(
+    root: Path,
+) -> tuple[list[Path], list[str], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Scans the docs and tests and links every guarantee.
+
+    Args:
+        root: Repository root.
+
+    Returns:
+        The scanned paths, the `tests/` listing, the test-side links and
+        the guarantees found (not yet linked).
+    """
+    paths = collect(root)
+    docs = {p.relative_to(root).as_posix() for p in paths}
+    listing, records = survey(root, docs)
+    guarantees: list[dict[str, Any]] = []
+    for path in paths:
+        name = path.relative_to(root).as_posix()
+        guarantees += extract(path.read_text(encoding="utf-8"), name)
+    return paths, listing, records, guarantees
+
+
 def measure(root: Path = ROOT) -> dict[str, Any]:
     """Finds every documented guarantee and its enforcing tests.
 
@@ -562,34 +474,36 @@ def measure(root: Path = ROOT) -> dict[str, Any]:
         content hash and the duration.
     """
     started = time.monotonic()
-    paths = collect(root)
-    docs = {p.relative_to(root).as_posix() for p in paths}
-    listing, links = survey(root, docs)
-    guarantees: list[dict[str, Any]] = []
-    for path in paths:
-        name = path.relative_to(root).as_posix()
-        guarantees += extract(path.read_text(encoding="utf-8"), name)
-    cited = {c.split("::")[0] for g in guarantees for c in g["cited"]}
-    exists = {c for c in cited if (root / c).exists()}
-    link(guarantees, links, exists)
+    paths, listing, records, guarantees = gather(root)
+    exists = links.resolve(root, {c for g in guarantees for c in g["cited"]})
+    links.link(guarantees, records, exists)
     unlinked = Counter(g["doc"] for g in guarantees if not g["tests"])
     total = Counter(g["doc"] for g in guarantees)
     return {
-        "version": 1,
+        "version": 2,
         "claim": "C12",
         "definition": {
-            "docs": "README.md and docs/*.md",
+            "docs": (
+                "README.md, docs/**/*.md (with docs/preregistration) and the "
+                "site source website/src/**/*.astro and *.html"
+            ),
             "words": list(WORDS),
             "links": [
-                "the guarantee cites an existing path under tests/",
-                "a test file names the doc with :line, #Lline or #anchor",
+                (
+                    "the guarantee cites one test, tests/path.py::name, "
+                    "defined in that file (a whole file is vague, no link)"
+                ),
+                (
+                    "a test function names the doc with :line or #Lline; "
+                    "#anchor only for a section holding one guarantee"
+                ),
                 (
                     "spec-test convention test_l<a>_l<b> in a file whose "
                     "docstring cites the doc"
                 ),
             ],
         },
-        "docs": sorted(docs),
+        "docs": sorted(p.relative_to(root).as_posix() for p in paths),
         "counts": tally(guarantees),
         "by_doc": {
             doc: {
@@ -598,9 +512,10 @@ def measure(root: Path = ROOT) -> dict[str, Any]:
             }
             for doc in sorted(total)
         },
-        "test_links": len(links),
+        "test_links": len(records),
         "guarantees": guarantees,
-        "content_hash": fingerprint(root, paths, listing, links),
+        "vague": sum(1 for g in guarantees if g["vague"] and not g["tests"]),
+        "content_hash": fingerprint(root, paths, listing, records, exists),
         "seconds": round(time.monotonic() - started, 1),
     }
 
@@ -641,11 +556,11 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
     found = load(document)
     if found is None:
         return ["guarantees.json is missing"]
-    paths = collect(ROOT)
-    docs = {p.relative_to(ROOT).as_posix() for p in paths}
-    listing, links = survey(ROOT, docs)
+    paths, listing, records, guarantees = gather(ROOT)
+    exists = links.resolve(ROOT, {c for g in guarantees for c in g["cited"]})
     issues = []
-    if found.get("content_hash") != fingerprint(ROOT, paths, listing, links):
+    current = fingerprint(ROOT, paths, listing, records, exists)
+    if found.get("content_hash") != current:
         issues.append("guarantees: result is for other docs, tests or code")
     if found.get("counts") != tally(found.get("guarantees", [])):
         issues.append("guarantees: counts do not match the listed records")

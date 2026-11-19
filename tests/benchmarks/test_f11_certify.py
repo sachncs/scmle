@@ -91,6 +91,111 @@ def test_generators_have_the_stated_truth():
         assert acts[mask].mean() == pytest.approx(rate, abs=0.01)
 
 
+def test_the_a4_null_worlds_sit_on_the_decision_boundary():
+    import numpy
+
+    grid = numpy.linspace(*f11_certify.RANGE, 21)
+    for share, precision, rest in f11_certify.BOUNDARY.values():
+        truth = f11_generators.acted_differences(share, precision, rest, grid)
+        assert truth.min() == pytest.approx(0.0, abs=1e-12)
+        assert share * precision + (1 - share) * rest == pytest.approx(
+            f11_certify.PREVALENCE
+        )
+    independent = f11_generators.acted_differences(0.2, 0.2, 0.2, grid)
+    assert independent.min() < -0.05
+
+
+def test_the_acted_world_has_the_stated_rates():
+    import numpy
+
+    rng = numpy.random.default_rng(0)
+    y, acts = f11_generators.acted_world(rng, 400_000, 0.4, 0.4, 0.02)
+    assert acts.mean() == pytest.approx(0.4, abs=0.005)
+    assert y[acts == 1].mean() == pytest.approx(0.4, abs=0.005)
+    assert y[acts == 0].mean() == pytest.approx(0.02, abs=0.002)
+
+
+def test_gate_a4_decides_each_boundary_setting_with_the_exact_bound():
+    from benchmarks import acceptance
+
+    variables = acceptance.load()
+    rule = f11_certify.FALSE_USEFUL
+    alpha = variables["alpha"].value
+    result = f11_certify.gate_a4(3, f11_certify.DEV_SEED_BASE)
+    assert set(result["null"]) == {
+        f"{name}/{n}" for name in f11_certify.BOUNDARY for n in (2000, 20000)
+    }
+    for entry in result["null"].values():
+        assert entry["runs"] == 3
+        assert entry["meets_floor"] == rule.passes(
+            entry["useful"], entry["runs"], alpha
+        )
+    # three worlds are below the 34 a ceiling of 0.0845 needs to pass at all
+    assert result["minimum"] == rule.minimum(alpha) == 34
+    assert result["passed"] is False
+
+
+def test_hook_agreement_counts_only_deciding_worlds():
+    def scenario(deciding, agree):
+        return {"worlds": 100, "deciding": deciding, "agree": agree}
+
+    silent = {k: scenario(0, 0) for k in ("a", "b", "c", "d")}
+    verdict = f11_certify.agreement(silent)
+    assert verdict["deciding"] == 0 and verdict["passed"] is False
+    assert verdict["minimum"] == 59
+    enough = {"a": scenario(40, 40), "b": scenario(30, 30)}
+    assert f11_certify.agreement(enough)["passed"] is True
+    one_off = {"a": scenario(40, 40), "b": scenario(30, 29)}
+    assert f11_certify.agreement(one_off)["passed"] is False
+    few = {"a": scenario(30, 30)}
+    assert f11_certify.agreement(few)["passed"] is False
+
+
+def test_stored_a4_and_b9_verdicts_follow_from_their_counts():
+    document = json.loads(f11_certify.STORE_PATH.read_text(encoding="utf-8"))
+    a4 = document["gates"]["A4"]
+    from benchmarks import acceptance
+
+    variables = acceptance.load()
+    alpha = variables["alpha"].value
+    rule = f11_certify.FALSE_USEFUL
+    for entry in a4["null"].values():
+        assert entry["meets_floor"] == rule.passes(
+            entry["useful"], entry["runs"], alpha
+        )
+    assert a4["passed"] == all(e["meets_floor"] for e in a4["null"].values())
+    b9 = document["gates"]["B9"]
+    for entry in b9["through_hook"].values():
+        assert entry["agree"] <= entry["deciding"] <= entry["valid"]
+        assert entry["hook_decisions"] <= entry["deciding"]
+    verdict = f11_certify.agreement(b9["through_hook"])
+    assert b9["hook_agreement"] == verdict
+    runs = b9["replicates"]
+    promote = acceptance.sized(f11_certify.ALPHA_PROMOTE)
+    rollback = acceptance.sized(f11_certify.ALPHA_ROLLBACK)
+    assert b9["alpha"] == alpha
+    for name in ("no_effect", "below_delta_min"):
+        hits = b9[name]["false_promotions"]
+        assert b9[name]["upper"] == promote.limit(hits, runs, alpha)
+    hits = b9["false_rollback"]["rollbacks"]
+    assert b9["false_rollback"]["upper"] == rollback.limit(hits, runs, alpha)
+    assert b9["passed"] == (
+        verdict["passed"]
+        and promote.passes(b9["no_effect"]["false_promotions"], runs, alpha)
+        and promote.passes(
+            b9["below_delta_min"]["false_promotions"], runs, alpha
+        )
+        and rollback.passes(hits, runs, alpha)
+    )
+
+
+def test_the_hook_is_compared_in_worlds_where_the_e_process_acts():
+    document = json.loads(f11_certify.STORE_PATH.read_text(encoding="utf-8"))
+    through = document["gates"]["B9"]["through_hook"]
+    assert through["clear_gain"]["deciding"] > 0
+    assert through["clear_loss"]["deciding"] > 0
+
+
 def test_the_decision_package_has_no_custody_or_vault_imports():
     assert f11_certify.forbidden_imports() == []
 

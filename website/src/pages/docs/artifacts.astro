@@ -83,7 +83,7 @@ const service = [
   ["<code>requirements.txt</code>, <code>requirements.lock</code>, <code>environment.lock</code>", "Direct pins; the runtime closure installed with <code>--no-deps</code>; every package of the build environment."],
   ["<code>sbom.cdx.json</code>", "CycloneDX SBOM: runtime libraries, the bundle (by manifest digest) and the base image."],
   ["<code>provenance.json</code>", "Signed statement: the subject is the bundle digest; the materials are the files above. Verified by the service at start."],
-  ["<code>vuln-policy.json</code>", "The gate policy: block at HIGH and above, no exceptions."],
+  ["<code>vuln-policy.json</code>", "The gate policy: block at HIGH and above, with no vulnerability exceptions. One dated waiver lets the <code>scmle</code> package itself go unscanned (no index a scanner can query holds it; its dependencies are scanned), and it blocks again once it expires."],
   ["<code>base-image.lock.json</code>, <code>scan.json</code>, <code>build-metadata.json</code>, <code>image-attestation.json</code>", "Written by <code>build.sh</code>: the resolved base digest, the scanner report, the build's image digest, and the signed statement binding the image to the provenance."],
 ];
 ---

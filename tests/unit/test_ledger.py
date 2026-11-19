@@ -237,6 +237,7 @@ def test_deleting_or_reordering_a_line_breaks_the_chain(tmp_path):
 
 
 def test_truncating_the_tail_is_caught_only_against_a_recorded_head(tmp_path):
+    # Enforces website/src/pages/docs/artifacts.astro:54.
     path = make_file(tmp_path)
     head = scmle.assurance.ledger.ledger.Ledger.load(path).head
     write(path, lines(path)[:-1])

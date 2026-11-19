@@ -33,6 +33,13 @@ kind = "policy"
 claim = "all"
 derivation = "Conventional power; with alpha and an assumed true rate it fixes the planned sample size: the smallest n whose exact chance of passing reaches it (the normal formula [z(1-alpha) sqrt(p0 (1-p0)) + z(power) sqrt(p1 (1-p1))]^2 / (p0 - p1)^2 underpowers near 0 and 1)."
 
+[size_margin]
+value = 0.69
+unit = "share of a test's nominal level"
+kind = "policy"
+claim = "C2, C3"
+derivation = "Every size gate (a test of nominal level L run on n null replicates) passes when the exact upper bound of its rejection rate is at most L (1 + size_margin) (`acceptance.sized`); a ceiling of L itself fails a test whose true size is L most of the time. A correctly sized test rejects Binomial(n, L) times and passes with chance `power` exactly when the ceiling admits the `power` quantile k of that count, so a gate needs the margin BetaInv(1 - alpha; k + 1, n - k) / L - 1 (`acceptance.margin`). This is the largest need over the registered size gates, rounded up to hundredths: the falsification battery (L = 0.01, n = 2000, k = 24) needs 0.684; the synthetic-control placebo (L = 0.05, n = 500) 0.565; the two-sample tests (L = 0.05, n = 1000) 0.389; the Holm subgroup families, the intersection-union test and the net-benefit band (L = 0.05, n = 2000) 0.261. At 0.69 every gate passes a correctly sized test with chance at least 0.84 and fails one of true size 2 L with chance at least 0.99; a gate with fewer replicates needs a larger margin (tests/benchmarks/test_size_gates.py)."
+
 [bootstrap_resamples]
 value = 10000
 unit = "resamples"
@@ -104,6 +111,20 @@ kind = "statistical"
 rule = "floor"
 claim = "C3"
 derivation = "Nominal 95 percent intervals, allowed two points of shortfall for finite-sample effects; 42 fresh-data checks to pass at all."
+
+[coverage_power]
+value = 0.90
+unit = "probability"
+kind = "policy"
+claim = "C3"
+derivation = "Chance that exactly nominal intervals pass all three coverage families together. At the conventional 0.80 (1,369 trials per family) a nominal interval failed the row about one time in five and passed at 1,289/1,369, lower bound 0.93004, a verdict decided by noise; 0.90 needs each family to pass with 0.90 ** (1/3) = 0.9655, which Floor(0.93).plan(0.95, 0.05, 0.9655) reaches at 1,678 trials per family (exact joint chance 0.9008)."
+
+[coverage_assumed]
+value = 0.95
+unit = "share of intervals"
+kind = "policy"
+claim = "C3"
+derivation = "True coverage assumed when planning the C3 sample: the nominal level of the 95 percent interval the product reports, the rate an unbiased interval has."
 
 [null_skill_max]
 value = 0.05
@@ -378,3 +399,66 @@ unit = "minutes"
 kind = "policy"
 claim = "C10"
 derivation = "A pull request's checks finish within one break."
+
+# Decision layer (benchmarks/qualification/f11_certify.py).
+
+[hook_agreement_min]
+value = 0.95
+unit = "share of deciding worlds"
+kind = "statistical"
+rule = "floor"
+claim = "C3"
+derivation = "Gate B9: the rollout hook runs the same e-process as the vectorised path, so where either acts they should agree; a hook disagreeing in more than one deciding world in twenty is not the same test. Only worlds where the hook or the e-process promotes or rolls back count; n >= ln(alpha) / ln(0.95) = 59 deciding worlds to pass at all."
+
+# Causal identification gates (benchmarks/qualification/f10_certify.py).
+# Coverage floors use `interval_coverage_min`.
+
+[causal_power_min]
+value = 0.80
+unit = "share of replicates flagged or rejected"
+kind = "statistical"
+rule = "floor"
+claim = "C3"
+derivation = "The conventional power (see `power`): a planted violation counts as detectable, a weak-instrument or overlap flag as having recall, and a subgroup size as certified, only when the lower bound of the share flagged reaches it; n >= ln(alpha) / ln(0.80) = 14 replicates to pass at all."
+
+[causal_selection_min]
+value = 0.98
+unit = "share of generated charters"
+kind = "statistical"
+rule = "floor"
+claim = "C3"
+derivation = "The strategy selector is a table lookup, so refusing an ineligible charter and accepting an eligible one should almost never fail; one error in fifty is the most allowed; n >= ln(alpha) / ln(0.98) = 149 charters to pass at all."
+
+[causal_false_alarm_max]
+value = 0.05
+unit = "share of replicates with no effect or no violation"
+kind = "statistical"
+rule = "ceiling"
+claim = "C3"
+derivation = "A flag or tier rule with no nominal level of its own may fire in a world where it should not at most one time in twenty: false weak-instrument flags, false overlap refusals and false confirmations (a test with a level, such as the placebo-in-space test, is a size gate decided by `size_margin`); n >= ln(alpha) / ln(0.95) = 59 replicates to pass at all."
+
+# Robustness checks (benchmarks/qualification/f6_certify.py).
+
+[shift_recall_min]
+value = 0.80
+unit = "share of planted shifts"
+kind = "statistical"
+rule = "floor"
+claim = "C2"
+derivation = "Pre-registered recall floor of the two-sample tests at the planted shift of Bayes AUC 0.60, the conventional power; n >= ln(alpha) / ln(0.80) = 14 plants to pass at all."
+
+[stability_recall_min]
+value = 0.80
+unit = "share of planted fragile findings"
+kind = "statistical"
+rule = "floor"
+claim = "C2"
+derivation = "Pre-registered recall floor of the multiverse survival rule, per planted defect type, the conventional power; n >= ln(alpha) / ln(0.80) = 14 plants to pass at all."
+
+[stability_false_alarm_max]
+value = 0.10
+unit = "share of genuine effects"
+kind = "statistical"
+rule = "ceiling"
+claim = "C2"
+derivation = "Pre-registered: a genuine robust effect is labelled stable at least nine times in ten; n >= ln(alpha) / ln(0.90) = 29 genuine effects to pass at all."

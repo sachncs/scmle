@@ -371,6 +371,7 @@ def test_video_occlusion_zeroes_five_statistics_per_frame():
 
 
 def test_video_frames_need_a_decoder():
+    # Enforces website/src/pages/docs/data.astro:172.
     preparer = clips()
     with pytest.raises(errors.OrderError, match="explicit frame decoder"):
         video.frames(preparer, preparer.samples[0], None, [0], 0.0)

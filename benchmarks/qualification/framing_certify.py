@@ -8,24 +8,26 @@ size 10, cluster prevalence Beta with mean 0.3 and intraclass correlation
 0.1, the baseline with sensitivity 0.6 and false-positive rate 0.2, the
 range `[0.1, 0.4]`. Null worlds: `null_hi` (gain zero at the upper end,
 positive at the lower), `null_lo` (zero at the lower end, positive at the
-upper) and `null_both` (zero everywhere). Policy: empirical rejection at most
-`0.05 + 2 sqrt(0.05 * 0.95 / R)` with `R = 2000` replicates, at 20, 50 and
-200 clusters. `MIN_CLUSTERS` is the smallest tested count from which every
-tested count meets the bound.
+upper) and `null_both` (zero everywhere). Policy: the rejection rate over `R
+= 2000` replicates, at 20, 50 and 200 clusters, has one-sided exact
+(Clopper-Pearson) upper bound at `alpha` of `acceptance.toml` at most the
+size ceiling of the test's level 0.05, `0.05 (1 + size_margin)` (0.0845,
+`acceptance.sized`). `MIN_CLUSTERS` is the smallest tested count from which
+every tested count meets the bound.
 
 Power. A world with a gain at both ends. The closed form is the standardised
 gain over the cluster-robust standard error implied by `s_d` and the design
 effect measured on a large sample of the same world; where its power at the
-weaker end is at least 0.90, the empirical power of the claim must be at
-least `0.80 - 2 sqrt(0.8 * 0.2 / R)`.
+weaker end is at least 0.90, the one-sided exact lower bound at `alpha` of
+the empirical power of the claim must be at least 0.80.
 
 Selective labels (`framing-selective-labels`). 1000 rows. Plants: outcomes of
 rows with `b = 0` observed with probability drawn from U(0, 0.3), rows with
 `b = 1` fully observed. Clean worlds: outcomes missing completely at random
-at a rate drawn from {0, U(0, 0.15)}. 500 of each. Policy: recall Wilson
-lower bound at least 0.95, false-alarm Wilson upper bound at most 0.05, 95
-percent intervals. The plants are strong; the certificate says nothing about
-weak selection.
+at a rate drawn from {0, U(0, 0.15)}. 500 of each. Policy: recall lower
+bound at least 0.95, false-alarm upper bound at most 0.05, each the
+one-sided exact bound at `alpha`. The plants are strong; the certificate
+says nothing about weak selection.
 
 Feasibility. 600 exploration rows; the confirmation size is 0.6 or 1.6 times
 the true requirement (away from the boundary). Policy: the verdict equals the
@@ -35,8 +37,24 @@ oracle's in at least 95 percent of 500 runs. At ratio 1.0 the share reported
 Planted omission. 200 worlds where the cost threshold is unknown and the
 verdict flips inside the plausible range (question expected), 200 where the
 range leaves the verdict unchanged, 200 where the cost model is given.
-Policy: question recall Wilson lower bound at least 0.80; false-question
-Wilson upper bound at most 0.10 over the 400 worlds that need no question.
+Policy: question recall lower bound at least 0.80; false-question upper
+bound at most 0.10 over the 400 worlds that need no question; each the
+one-sided exact bound at `alpha`.
+
+Amendment 2026-11-19. The first measurements compared point estimates with
+`level + 2 sqrt(level (1 - level) / R)` (size) and `0.80 - 2 sqrt(0.8 * 0.2
+/ R)` (power), and used Wilson intervals (two-sided 95 percent) for the
+labels and the questions. Every rate is now decided by its one-sided exact
+bound at `alpha`, the rule of the other certificates; the worlds, floors,
+ceilings, counts and seeds are unchanged, and each result is filed whichever
+way it falls.
+
+Amendment 2026-11-19 (second). The size ceiling was the level 0.05 itself,
+which a world on the boundary of the null (`null_hi`, `null_lo`), where a
+correctly sized test rejects at its level, cannot meet. Every size gate now
+uses `level (1 + size_margin)`, the margin derived in `acceptance.toml` so
+that a correctly sized test passes with chance `power` at the gate's
+replicate count; the worlds, counts and seeds are unchanged.
 
 Seeds. Development seeds start at `DEV_SEED_BASE`; certification uses seeds
 0 up to the replicate count. The ranges never overlap.
@@ -50,6 +68,7 @@ import argparse
 import json
 import math
 from pathlib import Path
+import sys
 import time
 from typing import Any
 
@@ -57,6 +76,8 @@ import numpy
 import pandas
 from scipy import stats
 
+from benchmarks import acceptance
+from benchmarks import sources
 from scmle.assurance.charter import contracts
 import scmle.assurance.charter.feasibility
 from scmle.assurance.detectors import certificates
@@ -72,7 +93,11 @@ from scmle.runtime import randomness
 STORE_PATH = scmle.certificates.DIRECTORY / "framing_certificates.json"
 MEASUREMENTS_PATH = Path(__file__).with_name("framing_measurements.json")
 DEV_SEED_BASE = 10_000
+# level of the intersection-union test
 ALPHA = 0.05
+VARIABLES = acceptance.load()
+# one-sided error rate of every verdict below (`alpha` of acceptance.toml)
+RISK = VARIABLES["alpha"].value
 RUNS = 2000
 CLUSTER_COUNTS = (20, 50, 200)
 CLUSTER_SIZE = 10
@@ -83,7 +108,7 @@ BASE_SENSITIVITY = 0.6
 BASE_FALSE_POSITIVE = 0.2
 LABEL_ROWS = 1000
 LABEL_RUNS = 500
-LABEL_POLICY = certificates.Standard(0.95, 0.05, 0.95)
+LABEL_POLICY = certificates.Standard(0.95, 0.05, 1 - 2 * RISK, "exact")
 FEASIBILITY_RUNS = 500
 FEASIBILITY_ROWS = 600
 FEASIBILITY_CLUSTERS = 60
@@ -95,6 +120,11 @@ OMISSION_FALSE_CEILING = 0.10
 POWER_CLUSTERS = 100
 POWER_ATTAINABLE = 0.90
 POWER_FLOOR = 0.80
+# ceiling on the test's size (a size gate)
+SIZE = acceptance.sized(ALPHA, VARIABLES)
+POWER = acceptance.Floor(POWER_FLOOR)
+OMISSION_RECALL = acceptance.Floor(OMISSION_RECALL_FLOOR)
+OMISSION_FALSE = acceptance.Ceiling(OMISSION_FALSE_CEILING)
 Z_95 = 1.6448536269514722
 # share of rows with b = 1 in the selective-label worlds
 B_SHARE = 0.3
@@ -102,33 +132,6 @@ B_SHARE = 0.3
 UNSELECTED_SHARE = 0.5
 # outcome prevalence of the omission worlds
 FLIP_PREVALENCE = 0.3
-
-
-def size_bound(runs: int = RUNS) -> float:
-    """Largest empirical rejection rate accepted for a level-0.05 test.
-
-    Args:
-        runs: Number of replicates the rate is observed over.
-
-    Returns:
-        ``0.05 + 2 * sqrt(0.05 * 0.95 / runs)``.
-    """
-    return ALPHA + 2 * math.sqrt(ALPHA * (1 - ALPHA) / runs)
-
-
-def power_floor(runs: int = RUNS) -> float:
-    """Returns the lowest empirical power that passes at `runs` replicates.
-
-    The floor is the target power of 0.80 less two binomial standard errors
-    at that power.
-
-    Args:
-        runs: Number of replicates the power is observed over.
-
-    Returns:
-        ``0.80 - 2 * sqrt(0.8 * 0.2 / runs)``.
-    """
-    return POWER_FLOOR - 2 * math.sqrt(POWER_FLOOR * (1 - POWER_FLOOR) / runs)
 
 
 def world(
@@ -219,8 +222,9 @@ def size_rows(offset: int, runs: int) -> dict[str, Any]:
         runs: Replicates per world and cluster count.
 
     Returns:
-        For each `kind/clusters` key, the rejections, runs, rate and whether
-        the rate meets `size_bound(runs)`.
+        For each `kind/clusters` key, the rejections, runs, rate, its
+        one-sided exact upper bound at `RISK` and whether that bound is at
+        most the size ceiling (`SIZE`).
     """
     rows: dict[str, Any] = {}
     for kind in ("null_hi", "null_lo", "null_both"):
@@ -234,7 +238,8 @@ def size_rows(offset: int, runs: int) -> dict[str, Any]:
                 "rejections": rejected,
                 "runs": runs,
                 "rate": rejected / runs,
-                "meets_bound": rejected / runs <= size_bound(runs),
+                "upper": SIZE.limit(rejected, runs, RISK),
+                "meets_bound": SIZE.passes(rejected, runs, RISK),
             }
     return rows
 
@@ -294,8 +299,9 @@ def power_rows(offset: int, runs: int) -> dict[str, Any]:
         runs: Number of replicates.
 
     Returns:
-        The cluster count, closed-form and empirical power, the floor,
-        whether the closed form is attainable and the floor is met.
+        The cluster count, closed-form and empirical power, the empirical
+        power's one-sided exact lower bound at `RISK`, the floor, whether the
+        closed form is attainable and the floor is met by that bound.
     """
     se_a, fp_a = 0.72, 0.14
     rejected = sum(
@@ -308,8 +314,9 @@ def power_rows(offset: int, runs: int) -> dict[str, Any]:
         "closed_form_power": closed,
         "attainable": closed >= POWER_ATTAINABLE,
         "empirical_power": rejected / runs,
-        "floor": power_floor(runs),
-        "meets_floor": rejected / runs >= power_floor(runs),
+        "lower": POWER.limit(rejected, runs, RISK),
+        "floor": POWER_FLOOR,
+        "meets_floor": POWER.passes(rejected, runs, RISK),
         "runs": runs,
     }
 
@@ -572,9 +579,9 @@ def omission_rows(offset: int, runs: int) -> dict[str, Any]:
         runs: Worlds per case.
 
     Returns:
-        The counts of questions asked in each case, the Wilson lower bound of
-        recall, the Wilson upper bound of false questions and whether both
-        floors are met.
+        The counts of questions asked in each case, the one-sided exact lower
+        bound at `RISK` of recall, the upper bound of false questions and
+        whether both meet their floor and ceiling.
     """
     asked = sum(
         omission_asks(offset + s, flips=True, given=False) for s in range(runs)
@@ -585,17 +592,16 @@ def omission_rows(offset: int, runs: int) -> dict[str, Any]:
     given = sum(
         omission_asks(offset + s, flips=True, given=True) for s in range(runs)
     )
-    low = certificates.wilson_interval(asked, runs)[0]
-    high = certificates.wilson_interval(robust + given, 2 * runs)[1]
+    wrong = robust + given
     return {
         "runs_each": runs,
         "asked_when_critical": asked,
         "asked_when_robust": robust,
         "asked_when_given": given,
-        "recall_wilson_lower": low,
-        "false_question_wilson_upper": high,
-        "meets_floor": low >= OMISSION_RECALL_FLOOR
-        and high <= OMISSION_FALSE_CEILING,
+        "recall_lower": OMISSION_RECALL.limit(asked, runs, RISK),
+        "false_question_upper": OMISSION_FALSE.limit(wrong, 2 * runs, RISK),
+        "meets_floor": OMISSION_RECALL.passes(asked, runs, RISK)
+        and OMISSION_FALSE.passes(wrong, 2 * runs, RISK),
     }
 
 
@@ -649,6 +655,17 @@ def fuzz_rows(count: int = 1000) -> dict[str, Any]:
     return {"malformed": count, "accepted": accepted}
 
 
+def fingerprint() -> str:
+    """Hash of all the code the measurements run.
+
+    Returns:
+        The `sources.digest` of this module: its own code and every product
+        module it loads (framing, charter, contracts and what they import),
+        so a change to any of them makes the stored measurements stale.
+    """
+    return sources.digest(sys.modules[__name__])
+
+
 def certify_all(
     offset: int = 0, runs: int = RUNS
 ) -> tuple[certificates.Store, dict[str, Any]]:
@@ -668,7 +685,8 @@ def certify_all(
     sizes = size_rows(offset, runs)
     document = {
         "size": sizes,
-        "size_bound": size_bound(runs),
+        "size_ceiling": SIZE.bound,
+        "alpha": RISK,
         "min_clusters_measured": minimum_clusters(sizes),
         "min_clusters_in_code": baseline.MIN_CLUSTERS,
         "power": power_rows(offset, runs),
@@ -677,6 +695,7 @@ def certify_all(
         "planted_omission": omission_rows(offset, OMISSION_RUNS),
         "schema_fuzz": fuzz_rows(),
         "development_seed_base": DEV_SEED_BASE,
+        "code": fingerprint(),
         "seconds": round(time.monotonic() - started, 1),
     }
     return store, document
@@ -693,8 +712,9 @@ def problems(
 
     Returns:
         Messages for a missing or stale certificate, a missing measurements
-        file, a `MIN_CLUSTERS` that differs from the measured minimum and an
-        accepted malformed charter.
+        file, measurements made by other code (no code hash, or one that
+        differs from `fingerprint`), a `MIN_CLUSTERS` that differs from the
+        measured minimum and an accepted malformed charter.
     """
     found = []
     report = certificates.audit(
@@ -704,6 +724,8 @@ def problems(
     found += [f"{d}: stale" for d in report.stale]
     if document is None:
         return [*found, "framing_measurements.json missing"]
+    if document.get("code") != fingerprint():
+        found.append("framing_measurements.json: measured other code")
     if document["min_clusters_measured"] != baseline.MIN_CLUSTERS:
         found.append(
             "baseline.MIN_CLUSTERS differs from the measured minimum "

@@ -51,6 +51,10 @@ a pass, whatever the practice project shows.
   These children run with `OMP_NUM_THREADS=1` so the run is quick on a
   shared machine; the comparison does not depend on timing.
 
+Both stored families are fingerprinted with the product code they run
+(`product`: every Python file of the `PRODUCT` packages), so any change to
+the pipeline, runtime, models or the rest of a run's path makes them stale.
+
 Every run's one-minute load average is filed, because the laptop running
 this is shared and compliance depends on it.
 
@@ -69,6 +73,7 @@ import argparse
 from concurrent import futures
 import contextlib
 import functools
+import hashlib
 import json
 import math
 import os
@@ -81,6 +86,7 @@ import time
 from typing import Any
 
 from benchmarks import acceptance
+from benchmarks import evidence
 from benchmarks import reliability
 from benchmarks.evidence import quality
 from benchmarks.evidence import refusal
@@ -93,6 +99,22 @@ from scmle.runtime import limits
 
 PATH = Path(__file__).with_suffix(".json")
 ROOT = Path(__file__).resolve().parents[2]
+PACKAGE = ROOT / "scmle"
+# The product packages a `Project(...).run()` executes, from the call to the
+# packaged model: what C7 times and kills. A change to any file in them can
+# change a run's time, so the stored measurements go stale with it.
+PRODUCT = (
+    "api",
+    "artifacts",
+    "contracts",
+    "data",
+    "evaluation",
+    "explainability",
+    "models",
+    "pipeline",
+    "preparation",
+    "runtime",
+)
 VARIABLE = "budget_compliance_min"
 MODULE = "benchmarks.evidence.budget"
 # Small enough to repeat, large enough that an unloaded laptop finishes the
@@ -554,9 +576,10 @@ def current() -> str:
     """Hash of the code that decides what is measured.
 
     Returns:
-        The combined source hash.
+        The combined hash of this module's practice and resume code and of
+        the product code they run (`product`).
     """
-    return certificates.code_hash(
+    own = certificates.code_hash(
         allowance,
         settings,
         project,
@@ -573,7 +596,9 @@ def current() -> str:
         resumption,
         reliability.fast_project,
         reliability.binary_data,
+        product,
     )
+    return hashlib.sha256(f"{own}{product()}".encode()).hexdigest()
 
 
 def allot(cells: int) -> int:
@@ -843,13 +868,26 @@ def realsettings() -> dict[str, Any]:
     }
 
 
+def product(package: Path = PACKAGE) -> str:
+    """Hash of the product code a run executes.
+
+    Args:
+        package: The `scmle` package directory.
+
+    Returns:
+        `benchmarks.evidence.source` of the `PRODUCT` packages.
+    """
+    return evidence.source(PRODUCT, package)
+
+
 def realcode() -> str:
     """Hash of the code that decides what the real family measures.
 
     Returns:
-        The combined source hash.
+        The combined hash of this module's measuring code and of the
+        product code it runs (`product`).
     """
-    return certificates.code_hash(
+    own = certificates.code_hash(
         allowance,
         allot,
         tables,
@@ -867,7 +905,9 @@ def realcode() -> str:
         refusal.table,
         refusal.fetch,
         scmle_runner.seed_for,
+        product,
     )
+    return hashlib.sha256(f"{own}{product()}".encode()).hexdigest()
 
 
 def measure(

@@ -89,7 +89,10 @@ def record_of(reference):
 
 def test_probes_are_public_and_everything_else_needs_a_token(service):
     # Enforces docs/TENANT_ISOLATION.md:23.
-    # Enforces README.md:259.
+    # Enforces README.md:266.
+    # Enforces website/src/pages/docs/tenant-isolation.astro:29.
+    # Enforces website/src/pages/docs/threat-model.astro:19.
+    # Enforces website/src/pages/docs/operations.astro:8.
     adapter, ignored, clock = service
     assert call(adapter.address, "/livez")[0] == 200
     assert call(adapter.address, "/readyz")[0] == 200
@@ -102,6 +105,7 @@ def test_probes_are_public_and_everything_else_needs_a_token(service):
 
 
 def test_predict_works_with_the_scope_and_not_without(service, reference):
+    # Enforces website/src/pages/docs/threat-model.astro:19.
     adapter, ignored, clock = service
     payload = {"records": record_of(reference)}
     ok = call(adapter.address, "/v1/predict", bearer(clock), payload)
@@ -116,6 +120,9 @@ def test_predict_works_with_the_scope_and_not_without(service, reference):
 def test_error_bodies_never_say_why(service, reference):
     # Enforces docs/TENANT_ISOLATION.md:46.
     # Enforces docs/SERVICE_SLO.md:29.
+    # Enforces website/src/pages/docs/service.astro:50.
+    # Enforces website/src/pages/docs/tenant-isolation.astro:35.
+    # Enforces website/src/pages/docs/threat-model.astro:20.
     adapter, ignored, clock = service
     payload = {"records": record_of(reference)}
     bodies = []
@@ -139,6 +146,8 @@ def test_error_bodies_never_say_why(service, reference):
 
 def test_a_token_of_another_tenant_is_forbidden(service, reference):
     # Enforces docs/TENANT_ISOLATION.md:11 and docs/TENANT_ISOLATION.md:28.
+    # Enforces website/src/pages/docs/tenant-isolation.astro:30.
+    # Enforces website/src/pages/docs/tenant-isolation.astro:22.
     adapter, gateway, clock = service
     payload = {"records": record_of(reference)}
     other = bearer(clock, tenant="globex")
@@ -150,6 +159,7 @@ def test_a_token_of_another_tenant_is_forbidden(service, reference):
 
 
 def test_the_rate_limit_answers_429_with_retry_after(reference):
+    # Enforces website/src/pages/docs/threat-model.astro:21.
     clock = support_identity.Clock()
     ticks = support_identity.Clock(0.0)
     gateway = make_gateway(
@@ -172,6 +182,7 @@ def test_the_rate_limit_answers_429_with_retry_after(reference):
 
 
 def test_guessing_credentials_is_slowed(reference):
+    # Enforces website/src/pages/docs/threat-model.astro:21.
     clock = support_identity.Clock()
     ticks = support_identity.Clock(0.0)
     gateway = make_gateway(
@@ -191,6 +202,7 @@ def test_guessing_credentials_is_slowed(reference):
 def test_the_request_size_limit_still_applies_behind_the_gateway(
     reference,
 ):
+    # Enforces website/src/pages/docs/threat-model.astro:21.
     clock = support_identity.Clock()
     adapter = server.HttpServing(
         reference, gateway=make_gateway(clock), max_request_bytes=64
@@ -207,6 +219,7 @@ def test_audit_records_activation_access_and_admin_in_a_valid_chain(
     reference, tmp_path
 ):
     # Enforces docs/TENANT_ISOLATION.md:49.
+    # Enforces website/src/pages/docs/tenant-isolation.astro:36.
     clock = support_identity.Clock()
     path = tmp_path / "audit.jsonl"
     log = audit.Log.open(path, clock=clock)
@@ -253,6 +266,7 @@ def test_audit_records_activation_access_and_admin_in_a_valid_chain(
 
 def test_an_edited_audit_row_breaks_the_chain(tmp_path):
     # Enforces docs/TENANT_ISOLATION.md:69.
+    # Enforces website/src/pages/docs/tenant-isolation.astro:45.
     log = audit.Log.open(tmp_path / "a.jsonl")
     log.admin("ops", "one")
     log.admin("ops", "two")
@@ -282,9 +296,14 @@ def test_a_failed_activation_is_audited(tmp_path):
 
 def test_no_unauthenticated_server_can_listen_beyond_loopback(reference):
     # Enforces docs/TENANT_ISOLATION.md:87.
-    # Enforces docs/API_STABILITY.md:209.
+    # Enforces docs/API_STABILITY.md:212.
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:184.
-    # Enforces README.md:259.
+    # Enforces README.md:266.
+    # Enforces website/src/learn/what-scmle-cannot-do.html:46-47.
+    # Enforces website/src/pages/docs/api-stability.astro:76.
+    # Enforces website/src/pages/docs/architecture.astro:102.
+    # Enforces website/src/pages/docs/tenant-isolation.astro:55.
+    # Enforces website/src/pages/docs/threat-model.astro:19.
     with pytest.raises(errors.ConfigError, match="without authentication"):
         server.HttpServing(reference, host="0.0.0.0")  # nosec B104
     for host in ("127.0.0.1", "::1", "localhost"):
@@ -299,6 +318,7 @@ def test_no_unauthenticated_server_can_listen_beyond_loopback(reference):
 
 def test_the_runtime_default_host_needs_authentication():
     # Enforces docs/TENANT_ISOLATION.md:87.
+    # Enforces website/src/pages/docs/tenant-isolation.astro:55.
     plain = runtime.settings({})
     assert plain["host"] == "0.0.0.0" and plain["gateway"] is None  # nosec B104
     with pytest.raises(errors.ConfigError, match="without authentication"):
@@ -325,6 +345,8 @@ def test_authentication_settings_need_an_issuer_and_audience():
 
 def test_the_shipped_compose_file_publishes_no_port_and_secures_the_apis():
     # Enforces docs/TENANT_ISOLATION.md:87.
+    # Enforces website/src/pages/docs/tenant-isolation.astro:42.
+    # Enforces website/src/pages/docs/threat-model.astro:19.
     text = (ROOT / "compose.yaml").read_text(encoding="utf-8")
     assert not re.search(r"^\s*ports:", text, re.MULTILINE)
     demo = (ROOT / "deploy" / "local" / "demo.env").read_text()
@@ -340,6 +362,7 @@ def test_the_generated_image_does_not_turn_authentication_off(
     reference, tmp_path
 ):
     # Enforces docs/TENANT_ISOLATION.md:87.
+    # Enforces website/src/pages/docs/tenant-isolation.astro:55.
     folder = tmp_path / "svc"
     packaging.scaffold(reference, folder, signing_key=KEY)
     for name in ("Dockerfile", "serve.py", "README.md"):
@@ -375,7 +398,8 @@ def test_a_tampered_artifact_never_loads_in_production(reference, tmp_path):
 
 
 def test_the_modality_service_is_gated_the_same_way(tmp_path):
-    # Enforces docs/API_STABILITY.md:209.
+    # Enforces docs/API_STABILITY.md:212.
+    # Enforces website/src/pages/docs/api-stability.astro:76.
     from scmle.pipeline import modality_lifecycle
     from scmle.serving import modality
     from tests.unit import test_modality_serving

@@ -183,6 +183,7 @@ def test_a_sealed_version_one_manifest_still_verifies(path):
 
 @pytest.mark.parametrize("stamped", [False, True])
 def test_an_edited_manifest_is_refused(stamped):
+    # Enforces website/src/pages/docs/recovery.astro:11.
     record = stored("manifest")
     if stamped:
         record = manifest.Manifest.from_dict(record).to_dict()

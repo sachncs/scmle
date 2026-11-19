@@ -2,18 +2,23 @@
 
 import pytest
 
+from benchmarks.evidence import custody
+from benchmarks.evidence import leakage
 from benchmarks.evidence import refusal
 from scmle.contracts import errors
 
 
-def group(trials: int, refusals: int, gates: dict | None = None) -> dict:
+def group(
+    trials: int, refusals: int, gates: dict | None = None, failures: int = 0
+) -> dict:
     return {
         "trials": trials,
-        "models": trials - refusals,
+        "models": trials - refusals - failures,
         "refusals": refusals,
-        "failures": 0,
+        "failures": failures,
         "unfinished": 0,
         "gates": gates or {},
+        "deciding": {"trials": trials, "hits": refusals + failures},
     }
 
 
@@ -38,7 +43,7 @@ def test_too_few_real_trials_is_not_measured_and_says_how_many_more():
     value, verdict = refusal.summary(document(group(20, 0)))
 
     assert verdict == "not measured"
-    assert "39 more refusal-free real trials" in value
+    assert "39 more real validation trials that return a model" in value
 
 
 def test_simulated_trials_alone_never_pass_the_real_criterion():
@@ -59,6 +64,7 @@ def test_enough_clean_real_trials_and_justified_refusals_pass():
 
 
 def test_too_many_real_refusals_fail_once_the_minimum_is_reached():
+    # Enforces docs/preregistration/c14.md:43.
     value, verdict = refusal.summary(
         document(group(60, 6, {"task.auto": 6}), refused=29, justified=29)
     )
@@ -68,11 +74,70 @@ def test_too_many_real_refusals_fail_once_the_minimum_is_reached():
 
 
 def test_unjustified_refusals_fail_the_precision():
+    # Enforces docs/preregistration/c14.md:43.
     verdict = refusal.summary(document(group(59, 0), refused=30, justified=20))[
         1
     ]
 
     assert verdict == "fail"
+
+
+def test_a_crash_counts_against_the_rate_not_as_a_refusal_free_trial():
+    # Enforces docs/preregistration/c14.md:36.
+    # Enforces docs/preregistration/c14.md:66.
+    value, verdict = refusal.summary(
+        document(group(60, 0, failures=6), refused=29, justified=29)
+    )
+
+    assert verdict == "fail"
+    assert "6 failed" in value
+
+
+def test_only_validation_items_decide_the_rate():
+    tasks = refusal.catalog()
+    splits = refusal.splits()
+    held = next(
+        n
+        for n, t in tasks.items()
+        if t.group == "real" and splits.get(n) == "validation"
+    )
+    sealed = next(
+        n
+        for n, t in tasks.items()
+        if t.group == "real" and splits.get(n) == "acceptance"
+    )
+    records = [
+        {"name": held, "outcome": "failed"},
+        {"name": sealed, "outcome": "model"},
+        {"name": sealed, "outcome": "refused", "gate": "task.auto"},
+    ]
+
+    deciding = refusal.tally(records, tasks)["real"]["deciding"]
+
+    assert deciding == {"trials": 1, "hits": 1}
+
+
+def test_an_unfinished_validation_run_counts_against_the_rate():
+    # Enforces docs/preregistration/c14.md:36.
+    # Enforces docs/preregistration/c14.md:66.
+    tasks = refusal.catalog()
+    splits = refusal.splits()
+    held = next(
+        n
+        for n, t in tasks.items()
+        if t.group == "real" and splits.get(n) == "validation"
+    )
+
+    counts = refusal.tally([{"name": held, "outcome": "unfinished"}], tasks)
+
+    assert counts["real"]["deciding"] == {"trials": 1, "hits": 1}
+
+
+def test_the_stored_rate_is_not_measured_below_the_validation_minimum():
+    value, verdict = refusal.summary()
+
+    assert verdict != "pass"
+    assert "validation" in value
 
 
 def test_a_document_without_counts_is_refused():
@@ -142,8 +207,35 @@ def test_the_catalog_has_enough_sourced_real_tasks_for_the_rate():
     variables = refusal.acceptance.load()
     rule = variables["refusal_rate_max"].rule
     real = [t for t in refusal.catalog().values() if t.group == "real"]
-    assert len(real) >= rule.minimum(variables["alpha"].value)
-    assert set(refusal.SOURCES) == set(refusal.EXTRA)
+    # validation and acceptance each need the rule's minimum on their own.
+    assert len(real) >= 2 * rule.minimum(variables["alpha"].value)
+    assert set(refusal.SOURCES) == set(refusal.EXTRA) | set(refusal.SUITE)
+    assert all(source[2] for source in refusal.SOURCES.values())
+
+
+def test_every_openml_table_is_pinned_and_none_is_a_listed_copy():
+    keys = [
+        custody.identify(t)
+        for t in refusal.catalog().values()
+        if t.group == "real"
+    ]
+    used = {int(k.split(":")[1]) for k in keys if k.startswith("openml:")}
+    screened = {
+        case.table.source
+        for case in leakage.catalog().values()
+        if isinstance(case.table.source, int)
+    }
+    assert used | screened == set(refusal.PINS)
+    assert all(len(digest) == 64 for digest in refusal.PINS.values())
+    assert not used & set(refusal.COPIES)
+    assert all(reason for reason in refusal.COPIES.values())
+
+
+def test_a_table_whose_file_differs_from_its_pin_is_refused(monkeypatch):
+    identifier = next(i for i in refusal.EXTRA if refusal.cached(i))
+    monkeypatch.setitem(refusal.PINS, identifier, "0" * 64)
+    with pytest.raises(errors.InputError, match="pin"):
+        refusal.fetch(identifier)
 
 
 def test_the_stored_measurements_are_for_the_current_code():

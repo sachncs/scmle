@@ -61,7 +61,8 @@ def test_memory_limit_stops_new_trials_but_keeps_the_first(
 
 
 def test_required_gpu_blocks_with_an_explanation(binary_frame, tmp_path):
-    # Enforces README.md:267.
+    # Enforces README.md:274.
+    # Enforces website/src/pages/docs/architecture.astro:103.
     with pytest.raises(errors.BlockedError, match="gpu"):
         run_with(
             binary_frame, tmp_path, time_budget_seconds=600, gpu="required"
@@ -76,6 +77,7 @@ def test_disabled_gpu_is_accepted(binary_frame, tmp_path):
 
 
 def test_hard_enforcement_supervises_trials_end_to_end(binary_frame, tmp_path):
+    # Enforces website/src/pages/docs/troubleshooting.astro:20.
     result = run_with(
         binary_frame, tmp_path, time_budget_seconds=600, workers=2
     )
@@ -104,6 +106,7 @@ def test_a_trial_past_the_hard_ceiling_is_killed_and_the_run_continues(
     binary_frame, tmp_path
 ):
     # Enforces README.md:138.
+    # Enforces website/src/pages/docs/troubleshooting.astro:20.
     registry = scmle.models.registry.Catalog.stock()
     registry.register(SleepyAdapter())
     project = support.make_project(

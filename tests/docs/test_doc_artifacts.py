@@ -79,14 +79,23 @@ def read(path):
 
 
 def test_the_decision_log_holds_included_rejected_and_deferred_choices(folder):
-    """Enforces docs/ARTIFACTS.md:23."""
+    """Enforces docs/ARTIFACTS.md:23.
+
+    Also enforces website/src/pages/docs/artifacts.astro:9.
+    Also enforces website/src/pages/index.astro:200.
+    Also enforces website/src/pages/docs/architecture.astro:32.
+    """
     plan = read(folder / "diagnostics" / "decision_log.json")["plan"]
     assert {d["action"] for d in plan} == {"include", "reject", "defer"}
     assert all(d["technique"] and d["reason"] for d in plan)
 
 
 def test_without_criteria_the_release_evaluation_blocks(folder):
-    """Enforces docs/ARTIFACTS.md:125."""
+    """Enforces docs/ARTIFACTS.md:125.
+
+    Also enforces website/src/pages/docs/artifacts.astro:74.
+    Also enforces website/src/pages/docs/evidence.astro:82.
+    """
     record = read(folder / "release_evaluation.json")
     assert record["status"] == "policy_not_declared"
     assert record["blocked"] is True and record["passed"] is False
@@ -94,7 +103,10 @@ def test_without_criteria_the_release_evaluation_blocks(folder):
 
 
 def test_the_model_folder_is_checksummed_and_unsigned_needs_trust(folder):
-    """Enforces docs/ARTIFACTS.md:108."""
+    """Enforces docs/ARTIFACTS.md:108.
+
+    Also enforces website/src/pages/docs/artifacts.astro:130.
+    """
     model = folder / "model"
     for name in MODEL_FILES:
         assert (model / name).is_file(), name
@@ -106,7 +118,11 @@ def test_the_model_folder_is_checksummed_and_unsigned_needs_trust(folder):
 
 
 def test_the_custody_log_records_seal_issue_open_and_refusal():
-    """Enforces docs/ARTIFACTS.md:38."""
+    """Enforces docs/ARTIFACTS.md:38.
+
+    Also enforces website/src/pages/docs/artifacts.astro:23.
+    Also enforces website/src/pages/docs/qualification.astro:80.
+    """
     log = sealed.Journal()
     rows = lockbox.Resident(
         pandas.DataFrame({"a": [123456.789, 2.0, 3.0]}),
@@ -128,7 +144,10 @@ def test_the_custody_log_records_seal_issue_open_and_refusal():
 
 
 def test_build_sh_scans_resolves_builds_scans_and_attests_in_order(service):
-    """Enforces docs/ARTIFACTS.md:136."""
+    """Enforces docs/ARTIFACTS.md:136.
+
+    Also enforces website/src/pages/docs/artifacts.astro:82.
+    """
     script = (service / "build.sh").read_text(encoding="utf-8")
     assert "set -euo pipefail" in script
     places = [script.index(step) for step in STEPS]
@@ -138,7 +157,10 @@ def test_build_sh_scans_resolves_builds_scans_and_attests_in_order(service):
 
 
 def test_the_shipped_gate_policy_blocks_high_with_one_dated_waiver(service):
-    """Enforces docs/ARTIFACTS.md:140."""
+    """Enforces docs/ARTIFACTS.md:140.
+
+    Also enforces website/src/pages/docs/artifacts.astro:86.
+    """
     policy = read(service / "vuln-policy.json")
     assert policy == vuln_gate.DEFAULT_POLICY
     assert policy["fail_at_or_above"] == "HIGH"

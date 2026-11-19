@@ -160,7 +160,12 @@ def test_the_reports_validate_and_carry_the_curve_and_attribution(tmp_path):
     finding = stability_document["findings"][0]
     assert finding["specs"] and finding["attribution"] and finding["curve"]
     assert shift_document["status"] == "unverifiable"
-    assert shift_document["periods"]["status"] == "not_run"
+    assert shift_document["periods"] == {
+        "status": "unverifiable",
+        "reason": "the data have no time column",
+        "column": None,
+        "periods": [],
+    }
 
 
 def test_validators_reject_missing_keys_wrong_versions_and_unearned_passes(

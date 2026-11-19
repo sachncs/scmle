@@ -6,12 +6,12 @@ measurement documents.
 """
 
 import json
-import math
 from pathlib import Path
 
 import numpy
 import pytest
 
+from benchmarks import acceptance
 from benchmarks.qualification import framing_certify
 from scmle.assurance.charter import contracts
 from scmle.assurance.detectors import certificates
@@ -22,17 +22,25 @@ from scmle.assurance.framing import feasibility
 from scmle.runtime import randomness
 
 
-def test_the_size_bound_and_the_power_floor_are_two_standard_errors_off():
-    assert framing_certify.size_bound() == pytest.approx(
-        0.05 + 2 * math.sqrt(0.05 * 0.95 / 2000)
+def test_every_rate_is_decided_by_its_exact_one_sided_bound_at_alpha():
+    assert acceptance.load()["alpha"].value == framing_certify.RISK
+    assert acceptance.sized(0.05) == framing_certify.SIZE
+    assert acceptance.Floor(0.80) == framing_certify.POWER
+    assert acceptance.Floor(0.80) == framing_certify.OMISSION_RECALL
+    assert acceptance.Ceiling(0.10) == framing_certify.OMISSION_FALSE
+    assert (
+        certificates.Standard(0.95, 0.05, 1 - 2 * framing_certify.RISK, "exact")
+        == framing_certify.LABEL_POLICY
     )
-    assert framing_certify.size_bound(100) == pytest.approx(0.09358898943540674)
-    assert framing_certify.size_bound(2000) == pytest.approx(
-        0.059746794344808965
+    # 96 of 2000 (0.048): its exact upper bound at alpha 0.05 is above the
+    # level 0.05 but within the size ceiling 0.05 (1 + size_margin)
+    risk = framing_certify.RISK
+    assert framing_certify.SIZE.passes(96, 2000, risk)
+    assert framing_certify.SIZE.limit(96, 2000, risk) == pytest.approx(
+        0.0565, abs=5e-4
     )
-    assert framing_certify.power_floor() == pytest.approx(0.7821114561800018)
-    assert framing_certify.power_floor(100) == pytest.approx(0.72)
-    assert framing_certify.power_floor(400) == pytest.approx(0.76)
+    # a test of twice its level fails
+    assert not framing_certify.SIZE.passes(200, 2000, risk)
 
 
 def test_a_world_has_clustered_binary_outcomes_and_actions():
@@ -132,17 +140,23 @@ def test_size_rows_count_rejections_per_world_and_cluster_count(monkeypatch):
             "rejections": 3,
             "runs": 3,
             "rate": 1.0,
+            "upper": 1.0,
             "meets_bound": False,
         }
 
 
 def test_size_rows_meet_the_bound_when_nothing_is_rejected(monkeypatch):
     monkeypatch.setattr(framing_certify, "claim_p", lambda *a: 0.051)
-    rows = framing_certify.size_rows(0, 4)
+    # 34 = ln(alpha) / ln(1 - 0.0845) runs are the fewest that can pass
+    least = framing_certify.SIZE.minimum(framing_certify.RISK)
+    assert least == 34
+    rows = framing_certify.size_rows(0, least)
     assert all(
         row["rejections"] == 0 and row["rate"] == 0.0 and row["meets_bound"]
         for row in rows.values()
     )
+    few = framing_certify.size_rows(0, least - 1)
+    assert not any(row["meets_bound"] for row in few.values())
 
 
 def test_size_rows_of_real_worlds_use_the_size_bound():
@@ -150,8 +164,11 @@ def test_size_rows_of_real_worlds_use_the_size_bound():
     assert len(rows) == 9
     for row in rows.values():
         assert row["rate"] == row["rejections"] / 2
-        assert row["meets_bound"] == (
-            row["rate"] <= framing_certify.size_bound(2)
+        assert row["upper"] == framing_certify.SIZE.limit(
+            row["rejections"], 2, framing_certify.RISK
+        )
+        assert row["meets_bound"] == framing_certify.SIZE.passes(
+            row["rejections"], 2, framing_certify.RISK
         )
 
 
@@ -219,10 +236,12 @@ def test_power_rows_report_counts_floor_and_attainability(monkeypatch):
         "closed_form_power": 0.9,
         "attainable": True,
         "empirical_power": 1.0,
-        "floor": framing_certify.power_floor(4),
-        "meets_floor": True,
+        "lower": framing_certify.POWER.limit(4, 4, framing_certify.RISK),
+        "floor": 0.80,
+        "meets_floor": False,
         "runs": 4,
     }
+    assert row["lower"] == pytest.approx(0.05 ** (1 / 4))
 
 
 def test_power_rows_with_few_rejections_miss_the_floor(monkeypatch):
@@ -485,16 +504,17 @@ def test_omission_rows_count_the_three_cases(monkeypatch):
         + [(10 + s, False, False) for s in range(3)]
         + [(10 + s, True, True) for s in range(3)]
     )
-    low = certificates.wilson_interval(3, 3)[0]
-    high = certificates.wilson_interval(0, 6)[1]
+    low = framing_certify.OMISSION_RECALL.limit(3, 3, framing_certify.RISK)
+    high = framing_certify.OMISSION_FALSE.limit(0, 6, framing_certify.RISK)
+    assert low == pytest.approx(0.05 ** (1 / 3))
     assert rows == {
         "runs_each": 3,
         "asked_when_critical": 3,
         "asked_when_robust": 0,
         "asked_when_given": 0,
-        "recall_wilson_lower": low,
-        "false_question_wilson_upper": high,
-        "meets_floor": low >= 0.8 and high <= 0.1,
+        "recall_lower": low,
+        "false_question_upper": high,
+        "meets_floor": False,
     }
 
 
@@ -675,7 +695,8 @@ def test_certify_all_passes_the_offset_and_the_run_counts_through(
     assert store.certificates[0].detector == baseline.DETECTOR_ID
     assert set(document) == {
         "size",
-        "size_bound",
+        "size_ceiling",
+        "alpha",
         "min_clusters_measured",
         "min_clusters_in_code",
         "power",
@@ -684,9 +705,12 @@ def test_certify_all_passes_the_offset_and_the_run_counts_through(
         "planted_omission",
         "schema_fuzz",
         "development_seed_base",
+        "code",
         "seconds",
     }
-    assert document["size_bound"] == framing_certify.size_bound()
+    assert document["size_ceiling"] == framing_certify.SIZE.bound
+    assert document["code"] == framing_certify.fingerprint()
+    assert document["alpha"] == framing_certify.RISK
     assert document["min_clusters_measured"] == 50
     assert document["min_clusters_in_code"] == baseline.MIN_CLUSTERS
     assert document["development_seed_base"] == 10_000
@@ -696,7 +720,6 @@ def test_certify_all_passes_the_offset_and_the_run_counts_through(
     assert document["seconds"] >= 0
     store, document = framing_certify.certify_all(7, 11)
     assert seen["size"] == (7, 11)
-    assert document["size_bound"] == framing_certify.size_bound(11)
     assert document["selective_labels"]["seed_offset"] == 7
 
 

@@ -43,6 +43,15 @@ class Fixed(estimator.Estimator):
         return estimator.Est(value, se, value - 2 * se, value + 2 * se, len(c))
 
 
+class Student(estimator.Estimator):
+    """An estimate whose interval uses a t reference on 6 degrees of freedom."""
+
+    name = "student"
+
+    def estimate(self, c, level):
+        return estimator.Est(1.0, 0.4, 0.0, 2.0, len(c), df=6.0)
+
+
 def adapter(spec=None):
     return Fixed(spec or block(), pandas.DataFrame(), 0, "linear", 0.05)
 
@@ -147,6 +156,15 @@ def test_an_examination_records_the_wald_test_of_the_subgroup():
         "p_value": test.p_value,
     }
     assert found.calls == [(50, 0.9)]
+
+
+def test_an_examination_refers_the_wald_test_to_the_estimates_t():
+    found = Student(block(), pandas.DataFrame(), 0, "linear", 0.05)
+    row = strata.examine(found, frame(a=50, b=60), 0.9, "region", "a")
+    assert (
+        row["p_value"] == battery.wald("x", "subgroup", 1.0, 0.4, 6.0).p_value
+    )
+    assert row["p_value"] > battery.wald("x", "subgroup", 1.0, 0.4).p_value
 
 
 def test_an_examination_matches_values_as_text():

@@ -97,3 +97,29 @@ def test_out_of_fold_probabilities_cover_validation_rows_only_once():
         linear_model.LogisticRegression, features, target, folds
     )
     assert sorted(positions) == list(range(60, 120)) and len(probability) == 60
+
+
+def test_rewrap_keeps_the_thresholds_around_a_refit_core():
+    rng = numpy.random.default_rng(0)
+    features = pandas.DataFrame(
+        {"x": rng.normal(size=80), "g": rng.choice(["a", "b"], 80)}
+    )
+    target = (features.x > 0).astype(int)
+    rows = features[["x"]]
+    first = linear_model.LogisticRegression().fit(rows[:40], target[:40])
+    second = linear_model.LogisticRegression().fit(rows, target)
+    cut = thresholds.Classifier.around(first, 0.3)
+    grouped = thresholds.Segmenter(
+        cut, "g", thresholds.Grouper.fit(features.g), {"a": 0.2}, 0.3
+    )
+
+    plain = thresholds.rewrap(first, second)
+    single = thresholds.rewrap(cut, second)
+    both = thresholds.rewrap(grouped, second)
+
+    assert plain is second
+    assert single.threshold == 0.3 and single.estimator_ is second
+    assert both.thresholds == {"a": 0.2} and both.default_threshold == 0.3
+    assert both.assigner is grouped.assigner
+    assert both.estimator.estimator_ is second
+    assert first.coef_.tolist() != second.coef_.tolist()

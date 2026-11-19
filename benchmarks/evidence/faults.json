@@ -1,13 +1,17 @@
 {
   "claim": "C1",
-  "code": "8acf5d4f147a1c7b507fbac8de1f5db6e932bf9c3518dd3cdf3921ee459e0513",
-  "data": "simulated tables and synthetic inputs only",
+  "code": "57eadc7eb327b2d5966fa876260207fc505764bd3bdedcb1c316411bb43a69cc",
+  "data": {
+    "real": "public tables from the local caches (refusal.fetch), faults planted and injected through Project.run, Project.resume or a scmle command",
+    "simulated": "simulated tables and synthetic inputs, through runs and direct gate calls"
+  },
   "floor": 1.0,
   "gates": [
     "admissibility.quarantine_all",
     "budget.minimum_run",
     "confirm.single_use",
     "data.unlabeled",
+    "estimate.refusal",
     "ingest.cli.unit_verdict",
     "ingest.multiplicity",
     "ingest.reconcile",
@@ -54,10 +58,1000 @@
     "vault.open"
   ],
   "not_measured": [
-    "more than one injection per gate or per code path to a gate",
-    "real datasets (faults are planted in simulated tables)"
+    "more than one injection per gate and part or per code path to a gate",
+    "tables published as survival, uplift or ranking data (none is cached; the real churn and house sales tables serve those kinds)",
+    "a source published as relational (the ingest gates read the real house sales split into zip codes and sales)"
   ],
   "records": [
+    {
+      "by": "ingest.cli.unit_verdict",
+      "cause": "scmle ingest with unit zipcode-month on the zip-code table (a SQLite source of the OpenML 42731 house sales by zip code)",
+      "error": "BlockedError",
+      "gate": "ingest.cli.unit_verdict",
+      "level": "run",
+      "message": "unit verdict unknown: unit words do not map to columns",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.88,
+      "site": "scmle.cli.intake:IngestCommand.execute"
+    },
+    {
+      "cause": "scmle ingest with unit zipcode-month on the zip-code table (a SQLite source of the OpenML 42731 house sales by zip code)",
+      "gate": "ingest.cli.unit_verdict",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 0.9
+    },
+    {
+      "cause": "declared family size unlike the synthesized columns",
+      "gate": "ingest.multiplicity",
+      "level": "none",
+      "outcome": "not injected",
+      "part": "real",
+      "path": "fault",
+      "reason": "every column the ingest stage synthesizes reaches the ledger or its skipped list, and a structure column naming a synthesized one is refused before ingest (Labelling.vet), so no input to Project.run reaches the mismatch; only a direct call plants it"
+    },
+    {
+      "by": "ingest.stage.run",
+      "cause": "signed charter run whose ingest plan declares unit zipcode-month on the zip-code table (a SQLite source of the OpenML 42731 house sales by zip code)",
+      "error": "BlockedError",
+      "gate": "ingest.stage.run",
+      "level": "run",
+      "message": "the charter unit 'zipcode-month' does not match the grain of the target table (unknown): unit words do not map to columns",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 2.15,
+      "site": "scmle.pipeline.ingest_stage:run"
+    },
+    {
+      "cause": "signed charter run whose ingest plan declares unit zipcode-month on the zip-code table (a SQLite source of the OpenML 42731 house sales by zip code)",
+      "gate": "ingest.stage.run",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 10.87
+    },
+    {
+      "by": "ingest.reconcile",
+      "cause": "signed charter run whose reconcile block declares one sale more than the source holds (a SQLite source of the OpenML 42731 house sales by zip code)",
+      "error": "BlockedError",
+      "gate": "ingest.reconcile",
+      "level": "run",
+      "message": "the extract does not reproduce the totals of the source (declared in the charter or queried from the database): sales.row_count extract 21613 vs declared 21614",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 2.52,
+      "site": "scmle.assurance.ingest.declared:require"
+    },
+    {
+      "cause": "signed charter run whose reconcile block declares one sale more than the source holds (a SQLite source of the OpenML 42731 house sales by zip code)",
+      "gate": "ingest.reconcile",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 11.24
+    },
+    {
+      "by": "policy.checkpoints",
+      "cause": "a reviewer rejects the plan (OpenML 31 credit-g)",
+      "error": "BlockedError",
+      "gate": "policy.checkpoints",
+      "level": "run",
+      "message": "PLANNING not approved by reviewer: fault",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 2.55,
+      "site": "scmle.pipeline.orchestrator:Orchestrator.consult_checkpoints"
+    },
+    {
+      "cause": "a reviewer rejects the plan (OpenML 31 credit-g)",
+      "gate": "policy.checkpoints",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 5.29
+    },
+    {
+      "cause": "stability stage without an assessment",
+      "gate": "robustness.assessment_present",
+      "level": "none",
+      "outcome": "not injected",
+      "part": "real",
+      "path": "fault",
+      "reason": "guards misuse of a stability stage that ran without an assessment inside the product; no input to Project.run or Project.resume reaches it, so only a direct call plants it"
+    },
+    {
+      "by": "leakage.policy",
+      "cause": "a noisy copy of the diabetes target under leakage_policy block",
+      "error": "BlockedError",
+      "gate": "leakage.policy",
+      "level": "run",
+      "message": "unresolved leakage risk (permutation screen, Benjamini-Yekutieli level 0.05): leak",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.43,
+      "site": "scmle.pipeline.stages.screening:Screening.enforce_leakage_policy"
+    },
+    {
+      "cause": "a noisy copy of the diabetes target under leakage_policy block",
+      "gate": "leakage.policy",
+      "level": "run",
+      "outcome": "override",
+      "part": "real",
+      "path": "override",
+      "record": "WARNING on these rows the leakage screen did not find the planted leak_threshold: a leak of that kind may remain undetected",
+      "seconds": 3.15
+    },
+    {
+      "by": "admissibility.quarantine_all",
+      "cause": "signed charter run whose only feature copies the OpenML 31 credit-g label",
+      "error": "BlockedError",
+      "gate": "admissibility.quarantine_all",
+      "level": "run",
+      "message": "admissibility quarantined every feature",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 6.28,
+      "site": "scmle.pipeline.stages.admission:Admission.qualify_exploration"
+    },
+    {
+      "cause": "signed charter run whose only feature copies the OpenML 31 credit-g label",
+      "gate": "admissibility.quarantine_all",
+      "level": "run",
+      "outcome": "override",
+      "part": "real",
+      "path": "override",
+      "record": "admissibility_table.json: attestation of column copy",
+      "seconds": 7.33
+    },
+    {
+      "by": "data.unlabeled",
+      "cause": "a tenth of the diabetes target missing, unlabeled block",
+      "error": "BlockedError",
+      "gate": "data.unlabeled",
+      "level": "run",
+      "message": "target 'target' has 45 missing values; set data.unlabeled to 'ignore' or 'pseudo_label' to use the unlabeled rows",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.06,
+      "site": "scmle.pipeline.stages.labelling:Labelling.set_aside_unlabeled"
+    },
+    {
+      "cause": "a tenth of the diabetes target missing, unlabeled block",
+      "gate": "data.unlabeled",
+      "level": "run",
+      "outcome": "override",
+      "part": "real",
+      "path": "override",
+      "record": "curation_report.json: rows set aside (policy ignore)",
+      "seconds": 2.43
+    },
+    {
+      "by": "select.serving_limits",
+      "cause": "max_model_mb 1e-6, three candidates checked (OpenML 31 credit-g)",
+      "error": "BlockedError",
+      "gate": "select.serving_limits",
+      "level": "run",
+      "message": "none of the top 3 candidates satisfies the serving constraints; relax the limits or allow more candidates",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 4.18,
+      "site": "scmle.pipeline.stages.selecting:SelectStage.choose"
+    },
+    {
+      "cause": "max_model_mb 1e-6, three candidates checked (OpenML 31 credit-g)",
+      "gate": "select.serving_limits",
+      "level": "run",
+      "outcome": "override",
+      "part": "real",
+      "path": "override",
+      "record": "decision_log.json: within serving limits (max_model_mb 1000.0)",
+      "seconds": 6.23
+    },
+    {
+      "by": "select.pareto_front",
+      "cause": "Pareto selection with max_model_mb 1e-6 (OpenML 31 credit-g)",
+      "error": "BlockedError",
+      "gate": "select.pareto_front",
+      "level": "run",
+      "message": "none of the top 3 candidates satisfies the serving constraints; relax the limits or allow more candidates",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 4.44,
+      "site": "scmle.pipeline.stages.selecting:SelectStage.select_on_front"
+    },
+    {
+      "cause": "Pareto selection with max_model_mb 1e-6 (OpenML 31 credit-g)",
+      "gate": "select.pareto_front",
+      "level": "run",
+      "outcome": "override",
+      "part": "real",
+      "path": "override",
+      "record": "decision_log.json: fastest within (max_model_mb 1000.0)",
+      "seconds": 6.33
+    },
+    {
+      "by": "confirm.single_use",
+      "cause": "the same signed charter run twice on OpenML 31 credit-g",
+      "error": "LeakageError",
+      "gate": "confirm.single_use",
+      "level": "run",
+      "message": "this charter already confirmed claims on these confirmation rows in run run_20261118_001; a confirmation set is used once (record /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-w2bx6obh/runs/.confirmations/657284eeeda72de85ee6fc965244ca339b22956e04cabbbbd90a6de4917df1b9.json)",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 18.92,
+      "site": "scmle.assurance.ledger.confirm.opening:confirm"
+    },
+    {
+      "cause": "the same signed charter run twice on OpenML 31 credit-g",
+      "gate": "confirm.single_use",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 11.89
+    },
+    {
+      "by": "profile.monotonic_columns",
+      "cause": "monotonic constraint on categorical purpose (OpenML 31 credit-g)",
+      "error": "BlockedError",
+      "gate": "profile.monotonic_columns",
+      "level": "run",
+      "message": "monotonic constraints need numeric feature columns: ['purpose'] are missing, excluded or not numeric",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 2.13,
+      "site": "scmle.pipeline.profiler:Profiler.monotonic_features"
+    },
+    {
+      "cause": "monotonic constraint on categorical purpose (OpenML 31 credit-g)",
+      "gate": "profile.monotonic_columns",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 5.85
+    },
+    {
+      "by": "profile.target_and_features",
+      "cause": "the OpenML 31 credit-g label with a constant as its only feature",
+      "error": "BlockedError",
+      "gate": "profile.target_and_features",
+      "level": "run",
+      "message": "no usable feature columns remain after exclusions",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.07,
+      "site": "scmle.pipeline.profiler:Profiler.portray"
+    },
+    {
+      "by": "split.event.folds",
+      "cause": "two customers who stayed, half the rows locked for the test (OpenML 40701 churn survival)",
+      "error": "BlockedError",
+      "gate": "split.event.folds",
+      "level": "run",
+      "message": "too few events (or censored rows) after the test split",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.07,
+      "site": "scmle.data.splitting.splitters.splits:Events.cross_validation_folds"
+    },
+    {
+      "cause": "two customers who stayed, half the rows locked for the test (OpenML 40701 churn survival)",
+      "gate": "split.event.folds",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 1.69
+    },
+    {
+      "by": "split.event.stratify",
+      "cause": "a single customer who stayed (OpenML 40701 churn survival)",
+      "error": "BlockedError",
+      "gate": "split.event.stratify",
+      "level": "run",
+      "message": "events or censored rows number fewer than 2: cannot stratify",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.08,
+      "site": "scmle.data.splitting.splitters.splits:Events.stratifier"
+    },
+    {
+      "cause": "a single customer who stayed (OpenML 40701 churn survival)",
+      "gate": "split.event.stratify",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 1.69
+    },
+    {
+      "by": "split.group.class_complete_folds",
+      "cause": "the OpenML 31 credit-g minority class moved into a single group",
+      "error": "BlockedError",
+      "gate": "split.group.class_complete_folds",
+      "level": "run",
+      "message": "no group-disjoint split keeps every class in every fold; the classes are concentrated in too few groups",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.08,
+      "site": "scmle.data.splitting.splitters.splits:Group.class_complete_folds"
+    },
+    {
+      "cause": "the OpenML 31 credit-g minority class moved into a single group",
+      "gate": "split.group.class_complete_folds",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 6.0
+    },
+    {
+      "by": "split.group.partition",
+      "cause": "the sales relabelled into three queries (OpenML 42731 house sales by zip code ranking)",
+      "error": "BlockedError",
+      "gate": "split.group.partition",
+      "level": "run",
+      "message": "need at least 7 groups for group validation",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.12,
+      "site": "scmle.data.splitting.splitters.splits:Group.partition"
+    },
+    {
+      "by": "split.task_supported",
+      "cause": "binary task with validation stratified_events (OpenML 31 credit-g)",
+      "error": "BlockedError",
+      "gate": "split.task_supported",
+      "level": "run",
+      "message": "stratified_events validation does not support binary_classification",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.11,
+      "site": "scmle.data.splitting.splitters.partitions:Partitioner.check_task"
+    },
+    {
+      "cause": "binary task with validation stratified_events (OpenML 31 credit-g)",
+      "gate": "split.task_supported",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 5.65
+    },
+    {
+      "by": "split.resident.bind",
+      "cause": "a plugin stage binds the in-process test set before the final evaluation does (OpenML 31 credit-g)",
+      "error": "LeakageError",
+      "gate": "split.resident.bind",
+      "level": "run",
+      "message": "test set is already bound or used",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 3.55,
+      "site": "scmle.data.splitting.splitters.lockbox:Resident.bind"
+    },
+    {
+      "cause": "a plugin stage binds the in-process test set before the final evaluation does (OpenML 31 credit-g)",
+      "gate": "split.resident.bind",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 5.57
+    },
+    {
+      "by": "split.resident.open",
+      "cause": "a plugin stage opens the in-process test set with a guessed token (OpenML 31 credit-g)",
+      "error": "LeakageError",
+      "gate": "split.resident.open",
+      "level": "run",
+      "message": "test set is locked: invalid token",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 3.62,
+      "site": "scmle.data.splitting.splitters.lockbox:Resident.open"
+    },
+    {
+      "cause": "a plugin stage opens the in-process test set with a guessed token (OpenML 31 credit-g)",
+      "gate": "split.resident.open",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 5.73
+    },
+    {
+      "by": "split.resident.reopen",
+      "cause": "a completed OpenML 31 credit-g run, its evaluation and marker deleted, resumed",
+      "error": "BlockedError",
+      "gate": "split.resident.reopen",
+      "level": "run",
+      "message": "the test set of run run_20261118_001 was already opened; a resumed or edited run cannot score it again, so start a new run",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 5.85,
+      "site": "scmle.assurance.custody.journal:Journal.admit"
+    },
+    {
+      "cause": "a completed OpenML 31 credit-g run, its evaluation and marker deleted, resumed",
+      "gate": "split.resident.reopen",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 8.65
+    },
+    {
+      "by": "split.resident.journal",
+      "cause": "a rejected OpenML 31 credit-g run resumed after its custody journal's plan verdict was rewritten",
+      "error": "BlockedError",
+      "gate": "split.resident.journal",
+      "level": "run",
+      "message": "custody journal /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-cek5vtx_/custody/run_20261118_001.jsonl was edited; run run_20261118_001 cannot be resumed",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 2.72,
+      "site": "scmle.assurance.custody.journal:Journal.read"
+    },
+    {
+      "cause": "a rejected OpenML 31 credit-g run resumed after its custody journal's plan verdict was rewritten",
+      "gate": "split.resident.journal",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 8.8
+    },
+    {
+      "by": "split.resident.records",
+      "cause": "a rejected OpenML 31 credit-g run resumed after a stage record's seconds were rewritten",
+      "error": "BlockedError",
+      "gate": "split.resident.records",
+      "level": "run",
+      "message": "stage record /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-5m9k8qow/run_20261118_001/stages/00-ingeststage.json was edited or belongs to another configuration; the run cannot be resumed",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 3.02,
+      "site": "scmle.pipeline.archive:Directory.read"
+    },
+    {
+      "cause": "a rejected OpenML 31 credit-g run resumed after a stage record's seconds were rewritten",
+      "gate": "split.resident.records",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 9.1
+    },
+    {
+      "by": "split.rolling.partition",
+      "cause": "rolling validation with horizon_rows longer than the daily mean price series of OpenML 42731 house sales",
+      "error": "BlockedError",
+      "gate": "split.rolling.partition",
+      "level": "run",
+      "message": "only 0 rolling window(s) fit; shorten horizon_rows, window_rows or embargo_rows, or add data",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.12,
+      "site": "scmle.data.splitting.splitters.splits:Rolling.partition"
+    },
+    {
+      "cause": "rolling validation with horizon_rows longer than the daily mean price series of OpenML 42731 house sales",
+      "gate": "split.rolling.partition",
+      "level": "run",
+      "outcome": "override",
+      "part": "real",
+      "path": "override",
+      "record": "config.json: validation.rolling.horizon 10",
+      "seconds": 1.76
+    },
+    {
+      "by": "split.stratified.folds",
+      "cause": "the OpenML 31 credit-g minority class cut to two rows",
+      "error": "BlockedError",
+      "gate": "split.stratified.folds",
+      "level": "run",
+      "message": "insufficient minority-class examples after test split",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.07,
+      "site": "scmle.data.splitting.splitters.splits:Stratified.cross_validation_folds"
+    },
+    {
+      "cause": "the OpenML 31 credit-g minority class cut to two rows",
+      "gate": "split.stratified.folds",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 5.26
+    },
+    {
+      "by": "split.stratified.stratify",
+      "cause": "an OpenML 54 vehicle class of a single row",
+      "error": "BlockedError",
+      "gate": "split.stratified.stratify",
+      "level": "run",
+      "message": "a class has fewer than 2 examples: cannot stratify",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.06,
+      "site": "scmle.data.splitting.splitters.splits:Stratified.stratifier"
+    },
+    {
+      "by": "split.temporal.holdout",
+      "cause": "a missing sale date in OpenML 42731 house sales",
+      "error": "BlockedError",
+      "gate": "split.temporal.holdout",
+      "level": "run",
+      "message": "time column 'date' has unparseable/missing values: ordering ambiguous",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.09,
+      "site": "scmle.data.splitting.splitters.splits:Chronology.chronological_holdout"
+    },
+    {
+      "cause": "a missing sale date in OpenML 42731 house sales",
+      "gate": "split.temporal.holdout",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 6.31
+    },
+    {
+      "by": "split.temporal.partition",
+      "cause": "six dated OpenML 42731 house sales",
+      "error": "BlockedError",
+      "gate": "split.temporal.partition",
+      "level": "run",
+      "message": "too few rows for temporal cross-validation",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.09,
+      "site": "scmle.data.splitting.splitters.splits:Chronology.partition"
+    },
+    {
+      "cause": "six dated OpenML 42731 house sales",
+      "gate": "split.temporal.partition",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 5.88
+    },
+    {
+      "by": "split.treatment.folds",
+      "cause": "two treated customers who left, half the rows locked for the test (OpenML 40701 churn uplift)",
+      "error": "BlockedError",
+      "gate": "split.treatment.folds",
+      "level": "run",
+      "message": "too few rows in a treatment / outcome combination",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.07,
+      "site": "scmle.data.splitting.splitters.splits:Treatment.cross_validation_folds"
+    },
+    {
+      "cause": "two treated customers who left, half the rows locked for the test (OpenML 40701 churn uplift)",
+      "gate": "split.treatment.folds",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 2.02
+    },
+    {
+      "by": "split.treatment.stratify",
+      "cause": "a single treated customer who left (OpenML 40701 churn uplift)",
+      "error": "BlockedError",
+      "gate": "split.treatment.stratify",
+      "level": "run",
+      "message": "a treatment / outcome combination has fewer than 2 rows",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.07,
+      "site": "scmle.data.splitting.splitters.splits:Treatment.stratifier"
+    },
+    {
+      "cause": "a single treated customer who left (OpenML 40701 churn uplift)",
+      "gate": "split.treatment.stratify",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 2.49
+    },
+    {
+      "by": "task.resolve",
+      "cause": "the diabetes target with no non-missing value",
+      "error": "BlockedError",
+      "gate": "task.resolve",
+      "level": "run",
+      "message": "target 'target' has no non-missing values",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.06,
+      "site": "scmle.data.validation.target:TaskResolver.resolve"
+    },
+    {
+      "cause": "the diabetes target with no non-missing value",
+      "gate": "task.resolve",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 2.14
+    },
+    {
+      "by": "task.auto",
+      "cause": "auto task on the OpenML 40691 wine quality score (integers 3 to 8)",
+      "error": "BlockedError",
+      "gate": "task.auto",
+      "level": "run",
+      "message": "target 'class' looks like a small-cardinality integer (6 values): classification vs regression is ambiguous; set task= explicitly",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.05,
+      "site": "scmle.data.validation.target:TaskResolver.resolve_auto"
+    },
+    {
+      "cause": "auto task on the OpenML 40691 wine quality score (integers 3 to 8)",
+      "gate": "task.auto",
+      "level": "run",
+      "outcome": "override",
+      "part": "real",
+      "path": "override",
+      "record": "config.json: task regression",
+      "seconds": 2.81
+    },
+    {
+      "by": "task.classification",
+      "cause": "binary_classification declared on the four OpenML 54 vehicle classes",
+      "error": "BlockedError",
+      "gate": "task.classification",
+      "level": "run",
+      "message": "binary_classification requested but target has 4 classes",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.05,
+      "site": "scmle.data.validation.target:TaskResolver.resolve_classification"
+    },
+    {
+      "by": "task.ordinal",
+      "cause": "ordinal_order omits the top OpenML 40691 wine quality score",
+      "error": "BlockedError",
+      "gate": "task.ordinal",
+      "level": "run",
+      "message": "ordinal_order omits label(s) present in the data: ['8']",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.07,
+      "site": "scmle.data.validation.target:TaskResolver.resolve_ordinal"
+    },
+    {
+      "cause": "ordinal_order omits the top OpenML 40691 wine quality score",
+      "gate": "task.ordinal",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 3.63
+    },
+    {
+      "by": "task.ranking",
+      "cause": "a negative view grade (OpenML 42731 house sales by zip code ranking)",
+      "error": "BlockedError",
+      "gate": "task.ranking",
+      "level": "run",
+      "message": "ranking needs a relevance target of non-negative whole numbers (0 = not relevant)",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.08,
+      "site": "scmle.data.validation.target:TaskResolver.resolve_ranking"
+    },
+    {
+      "cause": "a negative view grade (OpenML 42731 house sales by zip code ranking)",
+      "gate": "task.ranking",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 2.21
+    },
+    {
+      "by": "task.regression",
+      "cause": "regression declared on the OpenML 31 credit-g text label good/bad",
+      "error": "BlockedError",
+      "gate": "task.regression",
+      "level": "run",
+      "message": "regression requested but the target is not numeric",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.06,
+      "site": "scmle.data.validation.target:TaskResolver.resolve_regression"
+    },
+    {
+      "by": "task.survival",
+      "cause": "a negative account length (OpenML 40701 churn survival)",
+      "error": "BlockedError",
+      "gate": "task.survival",
+      "level": "run",
+      "message": "survival needs a numeric duration target greater than zero",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.06,
+      "site": "scmle.data.validation.target:TaskResolver.resolve_survival"
+    },
+    {
+      "cause": "a negative account length (OpenML 40701 churn survival)",
+      "gate": "task.survival",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 1.52
+    },
+    {
+      "by": "task.uplift",
+      "cause": "the churn outcome stored as yes/no text (OpenML 40701 churn uplift)",
+      "error": "BlockedError",
+      "gate": "task.uplift",
+      "level": "run",
+      "message": "uplift needs a numeric outcome",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.07,
+      "site": "scmle.data.validation.target:TaskResolver.resolve_uplift"
+    },
+    {
+      "cause": "the churn outcome stored as yes/no text (OpenML 40701 churn uplift)",
+      "gate": "task.uplift",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 2.47
+    },
+    {
+      "by": "target.events",
+      "cause": "the event column doubled to 0 and 2 (OpenML 40701 churn survival)",
+      "error": "BlockedError",
+      "gate": "target.events",
+      "level": "run",
+      "message": "event column 'event' must hold 0 (censored) or 1 (event) in every row",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.07,
+      "site": "scmle.data.validation.target:check_events"
+    },
+    {
+      "by": "target.columns",
+      "cause": "OpenML 40589 emotions labels shifted by 0.5 (not 0/1)",
+      "error": "BlockedError",
+      "gate": "target.columns",
+      "level": "run",
+      "message": "label column 'amazed.suprised' must hold 0 or 1",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.07,
+      "site": "scmle.data.validation.target:check_targets"
+    },
+    {
+      "by": "target.treatment",
+      "cause": "every customer on the international plan (OpenML 40701 churn uplift)",
+      "error": "BlockedError",
+      "gate": "target.treatment",
+      "level": "run",
+      "message": "each arm needs at least 20 rows",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.07,
+      "site": "scmle.data.validation.target:check_treatment"
+    },
+    {
+      "by": "vault.bind",
+      "cause": "a plugin stage binds the sealed test set of a signed charter run before the final evaluation does (OpenML 31 credit-g)",
+      "error": "LeakageError",
+      "gate": "vault.bind",
+      "level": "run",
+      "message": "test set is locked: already bound or released",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 10.43,
+      "site": "scmle.assurance.custody.vault:SealedTestSet.bind"
+    },
+    {
+      "cause": "a plugin stage binds the sealed test set of a signed charter run before the final evaluation does (OpenML 31 credit-g)",
+      "gate": "vault.bind",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 12.13
+    },
+    {
+      "by": "vault.open",
+      "cause": "a plugin stage opens the sealed test set of a signed charter run with a guessed token (OpenML 31 credit-g)",
+      "error": "LeakageError",
+      "gate": "vault.open",
+      "level": "run",
+      "message": "test set is locked: invalid token",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 9.29,
+      "site": "scmle.assurance.custody.vault:SealedTestSet.open"
+    },
+    {
+      "cause": "a plugin stage opens the sealed test set of a signed charter run with a guessed token (OpenML 31 credit-g)",
+      "gate": "vault.open",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 11.51
+    },
+    {
+      "by": "plan.gpu_required",
+      "cause": "resources.gpu required (OpenML 31 credit-g)",
+      "error": "BlockedError",
+      "gate": "plan.gpu_required",
+      "level": "run",
+      "message": "resources.gpu='required' but no compatible model can use a GPU; set gpu='auto' or install a GPU-capable adapter",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 2.86,
+      "site": "scmle.pipeline.planner:GpuFilter.apply"
+    },
+    {
+      "cause": "resources.gpu required (OpenML 31 credit-g)",
+      "gate": "plan.gpu_required",
+      "level": "run",
+      "outcome": "override",
+      "part": "real",
+      "path": "override",
+      "record": "config.json: resources.gpu auto",
+      "seconds": 5.52
+    },
+    {
+      "by": "plan.monotonic",
+      "cause": "monotonic constraints on the OpenML 54 vehicle multiclass task",
+      "error": "BlockedError",
+      "gate": "plan.monotonic",
+      "level": "run",
+      "message": "monotonic constraints are supported for binary classification and regression, not multiclass",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 2.79,
+      "site": "scmle.pipeline.planner:MonotonicFilter.apply"
+    },
+    {
+      "cause": "monotonic constraints on the OpenML 54 vehicle multiclass task",
+      "gate": "plan.monotonic",
+      "level": "run",
+      "outcome": "override",
+      "part": "real",
+      "path": "override",
+      "record": "config.json: data.monotonic {}",
+      "seconds": 9.21
+    },
+    {
+      "by": "budget.minimum_run",
+      "cause": "a 1 s time budget, below the estimated minimum run (OpenML 31 credit-g)",
+      "error": "BlockedError",
+      "gate": "budget.minimum_run",
+      "level": "run",
+      "message": "the 1 s time budget cannot fit the minimum run (preparation, one cheapest trial and 4.5 s reserved for the final refit, diagnostics and packaging), estimated at 7.3 s; the smallest budget that fits is about 13 s",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.07,
+      "site": "scmle.runtime.budget:Reserve.admit"
+    },
+    {
+      "cause": "a 1 s time budget, below the estimated minimum run (OpenML 31 credit-g)",
+      "gate": "budget.minimum_run",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 6.89
+    },
+    {
+      "by": "train.first_trial",
+      "cause": "training starts after preparation used up the trial window (OpenML 31 credit-g; the training stage moves the run's start back)",
+      "error": "BlockedError",
+      "gate": "train.first_trial",
+      "level": "run",
+      "message": "preparation took 2.6 s and left no time for a first trial (trial window closed: 0.0 s left before the 49.2 s reserved for the final refit, diagnostics and packaging); the smallest budget that fits is about 11 s",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 2.63,
+      "site": "scmle.pipeline.stages.training:TrainStage.execute"
+    },
+    {
+      "cause": "training starts after preparation used up the trial window (OpenML 31 credit-g; the training stage moves the run's start back)",
+      "gate": "train.first_trial",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 5.05
+    },
+    {
+      "by": "estimate.refusal",
+      "cause": "scmle estimate of the diabetes target's slope on bmi, one bmi value missing",
+      "error": "BlockedError",
+      "gate": "estimate.refusal",
+      "level": "run",
+      "message": "parameter estimation refused: parameter estimation missing values require an explicit complete_case policy: {'bmi': 1}",
+      "outcome": "blocked",
+      "part": "real",
+      "path": "fault",
+      "seconds": 0.02,
+      "site": "scmle.cli.training:Estimation.execute"
+    },
+    {
+      "cause": "scmle estimate of the diabetes target's slope on bmi, one bmi value missing",
+      "gate": "estimate.refusal",
+      "level": "run",
+      "outcome": "passed",
+      "part": "real",
+      "path": "control",
+      "seconds": 0.01
+    },
     {
       "by": "ingest.cli.unit_verdict",
       "cause": "scmle ingest with unit customer-month on a customer table",
@@ -66,8 +1060,9 @@
       "level": "site",
       "message": "unit verdict coarser: ['customer_id'] is already a key, so rows are coarser than the unit",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 0.52,
+      "seconds": 0.01,
       "site": "scmle.cli.intake:IngestCommand.execute"
     },
     {
@@ -75,8 +1070,9 @@
       "gate": "ingest.cli.unit_verdict",
       "level": "site",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
-      "seconds": 0.52
+      "seconds": 0.01
     },
     {
       "by": "ingest.multiplicity",
@@ -86,6 +1082,7 @@
       "level": "site",
       "message": "declared family size 3 but 2 synthesized columns reached the table",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.0,
       "site": "scmle.pipeline.ingest_stage:plurality"
@@ -95,6 +1092,7 @@
       "gate": "ingest.multiplicity",
       "level": "site",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
       "seconds": 0.0
     },
@@ -106,6 +1104,7 @@
       "level": "site",
       "message": "the charter unit 'customer-month' does not match the grain of the target table (coarser): ['customer_id'] is already a key, so rows are coarser than the unit",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.01,
       "site": "scmle.pipeline.ingest_stage:run"
@@ -115,6 +1114,7 @@
       "gate": "ingest.stage.run",
       "level": "site",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
       "seconds": 0.01
     },
@@ -126,6 +1126,7 @@
       "level": "site",
       "message": "the extract does not reproduce the totals of the source (declared in the charter or queried from the database): orders.row_count extract 99 vs declared 100; orders.sum.amount extract 4950.0 vs declared 5000.0; orders.checksum.order_id extract 14adc8e56263ca75fc54658ffc26773a5a1dcd9f4b737f67b7e75f533",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.0,
       "site": "scmle.assurance.ingest.declared:require"
@@ -135,6 +1136,7 @@
       "gate": "ingest.reconcile",
       "level": "site",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
       "seconds": 0.0
     },
@@ -146,8 +1148,9 @@
       "level": "run",
       "message": "PLANNING not approved by reviewer: fault",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 0.97,
+      "seconds": 0.73,
       "site": "scmle.pipeline.orchestrator:Orchestrator.consult_checkpoints"
     },
     {
@@ -155,8 +1158,9 @@
       "gate": "policy.checkpoints",
       "level": "run",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
-      "seconds": 1.85
+      "seconds": 1.41
     },
     {
       "by": "robustness.assessment_present",
@@ -166,6 +1170,7 @@
       "level": "site",
       "message": "the second stage did not run",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.0,
       "site": "scmle.pipeline.stages.qualification:Qualification.assess_robustness"
@@ -178,8 +1183,9 @@
       "level": "run",
       "message": "unresolved leakage risk (permutation screen, Benjamini-Yekutieli level 0.05): leak",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 1.25,
+      "seconds": 0.8,
       "site": "scmle.pipeline.stages.screening:Screening.enforce_leakage_policy"
     },
     {
@@ -187,9 +1193,10 @@
       "gate": "leakage.policy",
       "level": "run",
       "outcome": "override",
+      "part": "simulated",
       "path": "override",
-      "record": "leakage suspect(s) leak stay in the features; the test score is provisional until a person settles them (declare the column unavailable at prediction, or attest it)",
-      "seconds": 2.16
+      "record": "WARNING on these rows the leakage screen did not find the planted leak_threshold: a leak of that kind may remain undetected",
+      "seconds": 1.79
     },
     {
       "by": "admissibility.quarantine_all",
@@ -199,8 +1206,9 @@
       "level": "site",
       "message": "admissibility quarantined every feature",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 0.81,
+      "seconds": 0.72,
       "site": "scmle.pipeline.stages.admission:Admission.qualify_exploration"
     },
     {
@@ -208,9 +1216,10 @@
       "gate": "admissibility.quarantine_all",
       "level": "site",
       "outcome": "override",
+      "part": "simulated",
       "path": "override",
       "record": "ledger check leakage.attestation:copy, tier attested",
-      "seconds": 0.79
+      "seconds": 0.71
     },
     {
       "by": "data.unlabeled",
@@ -220,6 +1229,7 @@
       "level": "run",
       "message": "target 'y' has 40 missing values; set data.unlabeled to 'ignore' or 'pseudo_label' to use the unlabeled rows",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.05,
       "site": "scmle.pipeline.stages.labelling:Labelling.set_aside_unlabeled"
@@ -229,9 +1239,10 @@
       "gate": "data.unlabeled",
       "level": "run",
       "outcome": "override",
+      "part": "simulated",
       "path": "override",
       "record": "curation_report.json: rows set aside (policy ignore)",
-      "seconds": 1.57
+      "seconds": 1.56
     },
     {
       "by": "select.serving_limits",
@@ -241,8 +1252,9 @@
       "level": "run",
       "message": "none of the top 3 candidates satisfies the serving constraints; relax the limits or allow more candidates",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 1.4,
+      "seconds": 1.0,
       "site": "scmle.pipeline.stages.selecting:SelectStage.choose"
     },
     {
@@ -250,9 +1262,10 @@
       "gate": "select.serving_limits",
       "level": "run",
       "outcome": "override",
+      "part": "simulated",
       "path": "override",
       "record": "decision_log.json: within serving limits (max_model_mb 1000.0)",
-      "seconds": 1.84
+      "seconds": 1.61
     },
     {
       "by": "select.pareto_front",
@@ -262,8 +1275,9 @@
       "level": "run",
       "message": "none of the top 3 candidates satisfies the serving constraints; relax the limits or allow more candidates",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 1.41,
+      "seconds": 1.16,
       "site": "scmle.pipeline.stages.selecting:SelectStage.select_on_front"
     },
     {
@@ -271,9 +1285,10 @@
       "gate": "select.pareto_front",
       "level": "run",
       "outcome": "override",
+      "part": "simulated",
       "path": "override",
       "record": "decision_log.json: fastest within (max_model_mb 1000.0)",
-      "seconds": 1.96
+      "seconds": 1.71
     },
     {
       "by": "confirm.single_use",
@@ -283,6 +1298,7 @@
       "level": "site",
       "message": "the confirmation set was already used for the confirmation",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.01,
       "site": "scmle.assurance.ledger.confirm.opening:confirm"
@@ -292,6 +1308,7 @@
       "gate": "confirm.single_use",
       "level": "site",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
       "seconds": 0.0
     },
@@ -303,8 +1320,9 @@
       "level": "run",
       "message": "monotonic constraints need numeric feature columns: ['region'] are missing, excluded or not numeric",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 0.88,
+      "seconds": 0.53,
       "site": "scmle.pipeline.profiler:Profiler.monotonic_features"
     },
     {
@@ -312,8 +1330,9 @@
       "gate": "profile.monotonic_columns",
       "level": "run",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
-      "seconds": 2.33
+      "seconds": 1.85
     },
     {
       "by": "profile.target_and_features",
@@ -323,6 +1342,7 @@
       "level": "run",
       "message": "no usable feature columns remain after exclusions",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.06,
       "site": "scmle.pipeline.profiler:Profiler.portray"
@@ -335,8 +1355,9 @@
       "level": "site",
       "message": "too few events (or censored rows) after the test split",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 0.0,
+      "seconds": 0.01,
       "site": "scmle.data.splitting.splitters.splits:Events.cross_validation_folds"
     },
     {
@@ -344,6 +1365,7 @@
       "gate": "split.event.folds",
       "level": "site",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
       "seconds": 0.0
     },
@@ -355,8 +1377,9 @@
       "level": "run",
       "message": "events or censored rows number fewer than 2: cannot stratify",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.06,
       "site": "scmle.data.splitting.splitters.splits:Events.stratifier"
     },
     {
@@ -364,8 +1387,9 @@
       "gate": "split.event.stratify",
       "level": "run",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
-      "seconds": 0.71
+      "seconds": 0.7
     },
     {
       "by": "split.group.class_complete_folds",
@@ -375,6 +1399,7 @@
       "level": "run",
       "message": "no group-disjoint split keeps every class in every fold; the classes are concentrated in too few groups",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.06,
       "site": "scmle.data.splitting.splitters.splits:Group.class_complete_folds"
@@ -384,8 +1409,9 @@
       "gate": "split.group.class_complete_folds",
       "level": "run",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
-      "seconds": 1.97
+      "seconds": 1.61
     },
     {
       "by": "split.group.partition",
@@ -395,6 +1421,7 @@
       "level": "run",
       "message": "need at least 7 groups for group validation",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.05,
       "site": "scmle.data.splitting.splitters.splits:Group.partition"
@@ -407,6 +1434,7 @@
       "level": "run",
       "message": "stratified_events validation does not support binary_classification",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.05,
       "site": "scmle.data.splitting.splitters.partitions:Partitioner.check_task"
@@ -416,8 +1444,9 @@
       "gate": "split.task_supported",
       "level": "run",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
-      "seconds": 1.89
+      "seconds": 1.43
     },
     {
       "by": "split.resident.bind",
@@ -427,6 +1456,7 @@
       "level": "site",
       "message": "test set is already bound or used",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.0,
       "site": "scmle.data.splitting.splitters.lockbox:Resident.bind"
@@ -436,6 +1466,7 @@
       "gate": "split.resident.bind",
       "level": "site",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
       "seconds": 0.0
     },
@@ -447,6 +1478,7 @@
       "level": "site",
       "message": "test set is locked: invalid token",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.0,
       "site": "scmle.data.splitting.splitters.lockbox:Resident.open"
@@ -456,6 +1488,7 @@
       "gate": "split.resident.open",
       "level": "site",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
       "seconds": 0.0
     },
@@ -467,6 +1500,7 @@
       "level": "site",
       "message": "the test set of run run_x was already opened; a resumed or edited run cannot score it again, so start a new run",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.0,
       "site": "scmle.assurance.custody.journal:Journal.admit"
@@ -476,6 +1510,7 @@
       "gate": "split.resident.reopen",
       "level": "site",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
       "seconds": 0.0
     },
@@ -485,8 +1520,9 @@
       "error": "BlockedError",
       "gate": "split.resident.journal",
       "level": "site",
-      "message": "custody journal /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-1cuc6y3p/custody/run_x.jsonl was edited; run run_x cannot be resumed",
+      "message": "custody journal /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-4dysq15l/custody/run_x.jsonl was edited; run run_x cannot be resumed",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.0,
       "site": "scmle.assurance.custody.journal:Journal.read"
@@ -496,6 +1532,7 @@
       "gate": "split.resident.journal",
       "level": "site",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
       "seconds": 0.0
     },
@@ -505,8 +1542,9 @@
       "error": "BlockedError",
       "gate": "split.resident.records",
       "level": "site",
-      "message": "stage record /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-jxp5kp4a/stages/00-profile.json was edited or belongs to another configuration; the run cannot be resumed",
+      "message": "stage record /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-xbqrvohp/stages/00-profile.json was edited or belongs to another configuration; the run cannot be resumed",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.0,
       "site": "scmle.pipeline.archive:Directory.read"
@@ -516,6 +1554,7 @@
       "gate": "split.resident.records",
       "level": "site",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
       "seconds": 0.0
     },
@@ -527,6 +1566,7 @@
       "level": "run",
       "message": "only 0 rolling window(s) fit; shorten horizon_rows, window_rows or embargo_rows, or add data",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.06,
       "site": "scmle.data.splitting.splitters.splits:Rolling.partition"
@@ -536,9 +1576,10 @@
       "gate": "split.rolling.partition",
       "level": "run",
       "outcome": "override",
+      "part": "simulated",
       "path": "override",
       "record": "config.json: validation.rolling.horizon 10",
-      "seconds": 1.23
+      "seconds": 1.13
     },
     {
       "by": "split.stratified.folds",
@@ -548,6 +1589,7 @@
       "level": "site",
       "message": "insufficient minority-class examples after test split",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.0,
       "site": "scmle.data.splitting.splitters.splits:Stratified.cross_validation_folds"
@@ -557,6 +1599,7 @@
       "gate": "split.stratified.folds",
       "level": "site",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
       "seconds": 0.0
     },
@@ -568,6 +1611,7 @@
       "level": "run",
       "message": "a class has fewer than 2 examples: cannot stratify",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.06,
       "site": "scmle.data.splitting.splitters.splits:Stratified.stratifier"
@@ -580,6 +1624,7 @@
       "level": "site",
       "message": "time column 't' has unparseable/missing values: ordering ambiguous",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.0,
       "site": "scmle.data.splitting.splitters.splits:Chronology.chronological_holdout"
@@ -589,6 +1634,7 @@
       "gate": "split.temporal.holdout",
       "level": "site",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
       "seconds": 0.0
     },
@@ -600,6 +1646,7 @@
       "level": "site",
       "message": "too few rows for temporal cross-validation",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.0,
       "site": "scmle.data.splitting.splitters.splits:Chronology.partition"
@@ -609,6 +1656,7 @@
       "gate": "split.temporal.partition",
       "level": "site",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
       "seconds": 0.0
     },
@@ -620,8 +1668,9 @@
       "level": "site",
       "message": "too few rows in a treatment / outcome combination",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 0.0,
+      "seconds": 0.01,
       "site": "scmle.data.splitting.splitters.splits:Treatment.cross_validation_folds"
     },
     {
@@ -629,6 +1678,7 @@
       "gate": "split.treatment.folds",
       "level": "site",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
       "seconds": 0.0
     },
@@ -640,6 +1690,7 @@
       "level": "run",
       "message": "a treatment / outcome combination has fewer than 2 rows",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.06,
       "site": "scmle.data.splitting.splitters.splits:Treatment.stratifier"
@@ -649,8 +1700,9 @@
       "gate": "split.treatment.stratify",
       "level": "run",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
-      "seconds": 0.96
+      "seconds": 1.01
     },
     {
       "by": "task.resolve",
@@ -660,6 +1712,7 @@
       "level": "site",
       "message": "target 'y' has no non-missing values",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.0,
       "site": "scmle.data.validation.target:TaskResolver.resolve"
@@ -669,6 +1722,7 @@
       "gate": "task.resolve",
       "level": "site",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
       "seconds": 0.0
     },
@@ -680,8 +1734,9 @@
       "level": "run",
       "message": "target 'y' looks like a small-cardinality integer (5 values): classification vs regression is ambiguous; set task= explicitly",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.07,
       "site": "scmle.data.validation.target:TaskResolver.resolve_auto"
     },
     {
@@ -689,9 +1744,10 @@
       "gate": "task.auto",
       "level": "run",
       "outcome": "override",
+      "part": "simulated",
       "path": "override",
       "record": "config.json: task regression",
-      "seconds": 1.52
+      "seconds": 1.59
     },
     {
       "by": "task.classification",
@@ -701,8 +1757,9 @@
       "level": "run",
       "message": "binary_classification requested but target has 3 classes",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.07,
       "site": "scmle.data.validation.target:TaskResolver.resolve_classification"
     },
     {
@@ -713,8 +1770,9 @@
       "level": "run",
       "message": "ordinal_order omits label(s) present in the data: ['extreme']",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.07,
       "site": "scmle.data.validation.target:TaskResolver.resolve_ordinal"
     },
     {
@@ -722,8 +1780,9 @@
       "gate": "task.ordinal",
       "level": "run",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
-      "seconds": 2.46
+      "seconds": 2.57
     },
     {
       "by": "task.ranking",
@@ -733,8 +1792,9 @@
       "level": "run",
       "message": "ranking needs a relevance target of non-negative whole numbers (0 = not relevant)",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.06,
       "site": "scmle.data.validation.target:TaskResolver.resolve_ranking"
     },
     {
@@ -742,8 +1802,9 @@
       "gate": "task.ranking",
       "level": "run",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
-      "seconds": 0.98
+      "seconds": 1.03
     },
     {
       "by": "task.regression",
@@ -753,8 +1814,9 @@
       "level": "run",
       "message": "regression requested but the target is not numeric",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.06,
       "site": "scmle.data.validation.target:TaskResolver.resolve_regression"
     },
     {
@@ -765,8 +1827,9 @@
       "level": "run",
       "message": "survival needs a numeric duration target greater than zero",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.08,
       "site": "scmle.data.validation.target:TaskResolver.resolve_survival"
     },
     {
@@ -774,8 +1837,9 @@
       "gate": "task.survival",
       "level": "run",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
-      "seconds": 0.71
+      "seconds": 0.84
     },
     {
       "by": "task.uplift",
@@ -785,8 +1849,9 @@
       "level": "run",
       "message": "uplift needs a numeric outcome",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.08,
       "site": "scmle.data.validation.target:TaskResolver.resolve_uplift"
     },
     {
@@ -794,8 +1859,9 @@
       "gate": "task.uplift",
       "level": "run",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
-      "seconds": 0.96
+      "seconds": 1.06
     },
     {
       "by": "target.events",
@@ -805,8 +1871,9 @@
       "level": "run",
       "message": "event column 'event' must hold 0 (censored) or 1 (event) in every row",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.06,
       "site": "scmle.data.validation.target:check_events"
     },
     {
@@ -817,8 +1884,9 @@
       "level": "run",
       "message": "label column 'label0' must hold 0 or 1",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.06,
       "site": "scmle.data.validation.target:check_targets"
     },
     {
@@ -829,6 +1897,7 @@
       "level": "run",
       "message": "each arm needs at least 20 rows",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.05,
       "site": "scmle.data.validation.target:check_treatment"
@@ -841,8 +1910,9 @@
       "level": "site",
       "message": "test set is locked: already bound or released",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 1.19,
+      "seconds": 1.39,
       "site": "scmle.assurance.custody.vault:SealedTestSet.bind"
     },
     {
@@ -850,8 +1920,9 @@
       "gate": "vault.bind",
       "level": "site",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
-      "seconds": 1.16
+      "seconds": 1.35
     },
     {
       "by": "vault.open",
@@ -861,8 +1932,9 @@
       "level": "site",
       "message": "test set is locked: invalid token",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 1.16,
+      "seconds": 1.29,
       "site": "scmle.assurance.custody.vault:SealedTestSet.open"
     },
     {
@@ -870,8 +1942,9 @@
       "gate": "vault.open",
       "level": "site",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
-      "seconds": 1.17
+      "seconds": 1.28
     },
     {
       "by": "plan.gpu_required",
@@ -881,8 +1954,9 @@
       "level": "run",
       "message": "resources.gpu='required' but no compatible model can use a GPU; set gpu='auto' or install a GPU-capable adapter",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 0.92,
+      "seconds": 0.84,
       "site": "scmle.pipeline.planner:GpuFilter.apply"
     },
     {
@@ -890,9 +1964,10 @@
       "gate": "plan.gpu_required",
       "level": "run",
       "outcome": "override",
+      "part": "simulated",
       "path": "override",
       "record": "config.json: resources.gpu auto",
-      "seconds": 1.8
+      "seconds": 1.72
     },
     {
       "by": "plan.monotonic",
@@ -902,8 +1977,9 @@
       "level": "run",
       "message": "monotonic constraints are supported for binary classification and regression, not multiclass",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 2.51,
+      "seconds": 1.16,
       "site": "scmle.pipeline.planner:MonotonicFilter.apply"
     },
     {
@@ -911,9 +1987,10 @@
       "gate": "plan.monotonic",
       "level": "run",
       "outcome": "override",
+      "part": "simulated",
       "path": "override",
       "record": "config.json: data.monotonic {}",
-      "seconds": 6.13
+      "seconds": 5.01
     },
     {
       "by": "budget.minimum_run",
@@ -923,6 +2000,7 @@
       "level": "run",
       "message": "the 1 s time budget cannot fit the minimum run (preparation, one cheapest trial and 3.8 s reserved for the final refit, diagnostics and packaging), estimated at 6.5 s; the smallest budget that fits is about 11 s",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
       "seconds": 0.05,
       "site": "scmle.runtime.budget:Reserve.admit"
@@ -932,8 +2010,9 @@
       "gate": "budget.minimum_run",
       "level": "run",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
-      "seconds": 1.83
+      "seconds": 1.59
     },
     {
       "by": "train.first_trial",
@@ -941,10 +2020,11 @@
       "error": "BlockedError",
       "gate": "train.first_trial",
       "level": "run",
-      "message": "preparation took 0.9 s and left no time for a first trial (trial window closed: 0.0 s left before the 18.5 s reserved for the final refit, diagnostics and packaging); the smallest budget that fits is about 8 s",
+      "message": "preparation took 0.7 s and left no time for a first trial (trial window closed: 0.0 s left before the 48.5 s reserved for the final refit, diagnostics and packaging); the smallest budget that fits is about 7 s",
       "outcome": "blocked",
+      "part": "simulated",
       "path": "fault",
-      "seconds": 0.96,
+      "seconds": 0.76,
       "site": "scmle.pipeline.stages.training:TrainStage.execute"
     },
     {
@@ -952,32 +2032,86 @@
       "gate": "train.first_trial",
       "level": "run",
       "outcome": "passed",
+      "part": "simulated",
       "path": "control",
-      "seconds": 1.81
+      "seconds": 1.72
+    },
+    {
+      "by": "estimate.refusal",
+      "cause": "scmle estimate of a slope whose feature has a missing value",
+      "error": "BlockedError",
+      "gate": "estimate.refusal",
+      "level": "run",
+      "message": "parameter estimation refused: parameter estimation missing values require an explicit complete_case policy: {'x1': 1}",
+      "outcome": "blocked",
+      "part": "simulated",
+      "path": "fault",
+      "seconds": 0.01,
+      "site": "scmle.cli.training:Estimation.execute"
+    },
+    {
+      "cause": "scmle estimate of a slope whose feature has a missing value",
+      "gate": "estimate.refusal",
+      "level": "run",
+      "outcome": "passed",
+      "part": "simulated",
+      "path": "control",
+      "seconds": 0.01
     }
   ],
-  "seconds": 29.7,
+  "seconds": 179.6,
   "tally": {
-    "controls": {
-      "not_passed": [],
-      "passed": 30,
-      "run": 30
+    "real": {
+      "controls": {
+        "not_passed": [],
+        "passed": 30,
+        "run": 30
+      },
+      "elsewhere": [],
+      "faults": 49,
+      "outcomes": {
+        "blocked": 47,
+        "failed": 0,
+        "not injected": 2,
+        "override": 9,
+        "silent": 0
+      },
+      "override_blocked": [],
+      "overrides": 9,
+      "runs": 56,
+      "satisfied": 56,
+      "share": 0.9655172413793104,
+      "sites": 0,
+      "units": 58,
+      "unsatisfied": [
+        "ingest.multiplicity (fault: not injected, none)",
+        "robustness.assessment_present (fault: not injected, none)"
+      ]
     },
-    "elsewhere": [],
-    "faults": 48,
-    "outcomes": {
-      "blocked": 48,
-      "failed": 0,
-      "not injected": 0,
-      "override": 9,
-      "silent": 0
-    },
-    "override_blocked": [],
-    "overrides": 9,
-    "satisfied": 57,
-    "share": 1.0,
-    "units": 57,
-    "unsatisfied": []
+    "simulated": {
+      "controls": {
+        "not_passed": [],
+        "passed": 31,
+        "run": 31
+      },
+      "elsewhere": [],
+      "faults": 49,
+      "outcomes": {
+        "blocked": 49,
+        "failed": 0,
+        "not injected": 0,
+        "override": 9,
+        "silent": 0
+      },
+      "override_blocked": [],
+      "overrides": 9,
+      "runs": 37,
+      "satisfied": 58,
+      "share": 1.0,
+      "sites": 21,
+      "units": 58,
+      "unsatisfied": []
+    }
   },
   "variable": "gate_fault_block_min"
 }

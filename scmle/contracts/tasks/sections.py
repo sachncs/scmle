@@ -8,6 +8,7 @@ the step built from it. A configuration in the old spelling still loads.
 """
 
 from collections.abc import Mapping
+import datetime
 from typing import Any
 from typing import ClassVar
 from typing import Literal
@@ -93,6 +94,11 @@ class Dataset(Section):
         id_columns: Identifier columns (never features).
         group_column: Entity column for grouped and series data.
         time_column: Column ordering the rows in time.
+        cutoff: The prediction time, as ISO 8601 text (`2020-01-01`): the
+            moment the rows' features are read for a prediction, such as
+            the date of a training snapshot. A date column holding values
+            after it was not known then, and the leakage screen blocks it.
+            None (the default) declares none, and no date is read that way.
         time_as_feature: Also give the time column to the model as a
             feature (a numeric stamp stays numeric; a date becomes date
             parts). Off by default because a model that keys on absolute
@@ -235,6 +241,7 @@ class Dataset(Section):
     id_columns: list[str] = pydantic.Field(default_factory=list)
     group_column: str | None = None
     time_column: str | None = None
+    cutoff: str | None = None
     time_as_feature: bool = False
     excluded_columns: list[str] = pydantic.Field(default_factory=list)
     unavailable_at_prediction: list[str] = pydantic.Field(default_factory=list)
@@ -267,6 +274,29 @@ class Dataset(Section):
     logged_action_column: str | None = None
     ingest_plan: str | None = None
 
+    @pydantic.field_validator("cutoff")
+    @classmethod
+    def moment(cls, value: str | None) -> str | None:
+        """Checks that the prediction time is an ISO 8601 date or time.
+
+        Args:
+            value: The declared prediction time, or None.
+
+        Returns:
+            The value unchanged.
+
+        Raises:
+            ValueError: If it is not ISO 8601 text.
+        """
+        if value is not None:
+            try:
+                datetime.datetime.fromisoformat(value)
+            except ValueError as error:
+                raise ValueError(
+                    f"cutoff {value!r} is not an ISO 8601 date or time"
+                ) from error
+        return value
+
 
 class Validation(Section):
     """How data is partitioned for model selection and final testing.
@@ -283,6 +313,11 @@ class Validation(Section):
         horizon_rows: Rolling only: rows in each validation window.
         window_rows: Rolling only: rows in each training window (None keeps
             every earlier row, an expanding window).
+        entities: Temporal and rolling only, with `data.group_column`: whom
+            the model will predict for. `known` (the default) forecasts the
+            entities it was trained on, so an entity's past trains and its
+            future is held out; `unseen` predicts new entities, so every
+            entity sits wholly on one side of each split.
     """
 
     vocabulary: ClassVar[dict[str, str]] = {
@@ -310,6 +345,7 @@ class Validation(Section):
     embargo_rows: int = pydantic.Field(default=0, ge=0)
     horizon_rows: int | None = pydantic.Field(default=None, ge=1)
     window_rows: int | None = pydantic.Field(default=None, ge=1)
+    entities: Literal["known", "unseen"] = "known"
 
 
 class Resources(Section):
@@ -510,17 +546,18 @@ class Threshold(Section):
 
 
 class Parity(Section):
-    """Optional reduction of outcome gaps between groups (binary tasks).
+    """Optional reduction of outcome gaps between groups.
 
     Attributes:
         mitigation: `none` only reports gaps; `group_thresholds` gives each
             group of a sensitive column its own probability threshold when
-            that closes the gap without costing too much accuracy. The
-            decision and its evidence are always recorded. `reweighing`
-            instead weights the development rows (never the locked ones) so
-            group and label are independent in training, for binary and
-            multiclass tasks; it cannot be combined with
-            `data.weight_column`.
+            that closes the gap without costing too much accuracy (binary
+            tasks). The decision and its evidence are always recorded.
+            `reweighing` instead weights the development rows (never the
+            locked ones) so group and label are independent in training,
+            for binary, multiclass and regression tasks (a continuous
+            outcome is balanced by its equal-count bins); it cannot be
+            combined with `data.weight_column`.
         criterion: Gap to close: `demographic_parity` (equal selection
             rates) or `equal_opportunity` (equal true-positive rates).
         column: Sensitive column to mitigate on; defaults to the first of

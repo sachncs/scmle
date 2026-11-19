@@ -20,6 +20,8 @@ def resident(values=(1.0, 2.0, 3.0)):
 
 def test_log_chains_entries_and_verifies():
     # Enforces docs/ARTIFACTS.md:38.
+    # Enforces website/src/pages/docs/artifacts.astro:23.
+    # Enforces website/src/pages/docs/threat-model.astro:24.
     log = sealed.Journal()
     first = log.append("C", "sealed", "orchestrator")
     second = log.append("C", "open", "confirmation")
@@ -80,6 +82,7 @@ def test_a_set_opens_once_and_every_attempt_is_logged():
 
 def test_a_wrong_token_is_denied_and_logged_without_opening():
     # Enforces docs/ARTIFACTS.md:38.
+    # Enforces website/src/pages/docs/artifacts.astro:23.
     log = sealed.Journal()
     held = sealed.Locker("C", resident(), log)
     with pytest.raises(errors.LeakageError, match="invalid token"):
@@ -216,6 +219,7 @@ def rechain(path, key=None):
 
 
 def test_a_keyed_log_carries_a_mac_on_every_entry(tmp_path):
+    # Enforces website/src/pages/docs/qualification.astro:80.
     log = sealed.Journal(tmp_path / "log.jsonl", signing_key="k1")
     first = log.append("C", "sealed", "orchestrator")
     assert first["mac"] == sealed.authenticate(first["hash"], b"k1")

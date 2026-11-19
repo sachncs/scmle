@@ -63,7 +63,10 @@ def make_frame() -> pandas.DataFrame:
 
 
 def test_period_specific_ipw_is_deterministic_and_auditable() -> None:
-    """The result contains period diagnostics, covariance, and reference evidence."""
+    """The result contains period diagnostics, covariance, and reference evidence.
+
+    Also enforces website/src/pages/docs/modeling.astro:242.
+    """
     estimator = Estimator(make_estimand(), Config(seed=23))
     first = estimator.fit(make_frame())
     second = estimator.fit(make_frame())
@@ -146,7 +149,10 @@ def test_complete_case_policy_records_dropped_rows() -> None:
 
 
 def test_required_assumptions_are_not_implicit() -> None:
-    """Omitting any identification assumption blocks estimation declaration."""
+    """Omitting any identification assumption blocks estimation declaration.
+
+    Also enforces website/src/pages/docs/modeling.astro:134.
+    """
     with pytest.raises(ValueError, match="required assumptions"):
         Estimand(
             name="period_specific_treatment_effect",

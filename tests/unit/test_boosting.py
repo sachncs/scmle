@@ -9,6 +9,7 @@ from scmle.models import conformance
 from scmle.models.boosting import boosters
 from scmle.models.boosting import early_stopping
 import scmle.models.registry
+from scmle.models.sklearn import classical
 
 
 @pytest.mark.parametrize("library", ["lightgbm", "xgboost"])
@@ -20,6 +21,7 @@ def test_adapters_pass_conformance_when_installed(library):
 
 def test_adapters_are_rejected_not_failing_when_library_missing(monkeypatch):
     # Enforces docs/DEPENDENCIES.md:12.
+    # Enforces website/src/pages/docs/dependencies.astro:6.
     registry = scmle.models.registry.Catalog.stock()
     monkeypatch.setattr(boosters.XGBOOST, "requires", ("not_installed_pkg",))
     compatible, rejected = registry.candidates(tasks.Task.BINARY)
@@ -194,3 +196,13 @@ def test_catboost_multiclass_predictions_are_one_dimensional(multiclass_frame):
     features = multiclass_frame.drop(columns="y")
     estimator.fit(features, multiclass_frame["y"])
     assert estimator.predict(features).shape == (len(features),)
+
+
+@pytest.mark.parametrize("task", [tasks.Task.MULTICLASS, tasks.Task.REGRESSION])
+def test_untuned_histogram_boosting_shrinks_and_search_can_override(task):
+    adapter = scmle.models.registry.Catalog.stock().get(
+        "hist_gradient_boosting"
+    )
+    assert adapter.build(task, 0).learning_rate == classical.SHRINKAGE == 0.05
+    tuned = adapter.build(task, 0, {"learning_rate": 0.2})
+    assert tuned.learning_rate == 0.2

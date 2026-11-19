@@ -18,6 +18,7 @@ from scmle.artifacts.bundle import core
 from scmle.artifacts.bundle import layout
 from scmle.artifacts.bundle import provenance
 from scmle.artifacts.bundle import seal
+from scmle.artifacts.bundle import tombstone
 from scmle.contracts import artifacts
 from scmle.contracts import errors
 from scmle.contracts import signing
@@ -546,9 +547,12 @@ class Archive(core.Core):
         Raises:
             ArtifactError: If the bundle is unauthenticated, tampered with,
                 incomplete, or incompatible.
+            RetiredError: If the bundle carries a retirement mark; it is
+                refused before anything is read.
         """
         envelope.vouch(trusted)
         root = pathlib.Path(directory)
+        tombstone.enforce(root)
         manifest, schema = unpack(root)
         info, legacy = admit(manifest, trusted, allow_legacy_format)
         authenticate(root, info, legacy, trusted, signing_key)

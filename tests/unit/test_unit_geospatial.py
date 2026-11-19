@@ -305,6 +305,7 @@ def test_pairs_enforces_the_match_limit():
 
 
 def test_transform_guards_feature_metadata():
+    # Enforces website/src/pages/docs/api.astro:278.
     features = [mark("a", 1, 2, properties={"k": 1})]
 
     def shift(feature, source, target):
@@ -334,6 +335,7 @@ def test_transform_guards_feature_metadata():
 
 
 def test_a_dataset_hash_binds_crs_and_ignores_order():
+    # Enforces website/src/pages/docs/api.astro:279.
     first, second = mark("a", 0, 0), mark("b", 1, 1)
     forward = dataset.Dataset((first, second), crs=" EPSG:4326 ")
     assert forward.crs == "EPSG:4326"
@@ -566,6 +568,7 @@ def test_prepare_features_lists_bounds_and_centroids():
 
 
 def test_envelop_and_straddle_count_blocks():
+    # Enforces website/src/pages/docs/api.astro:259.
     line = geometry.Placemark(
         "l", {"type": "LineString", "coordinates": [[0, 0], [2.5, 0.5]]}
     )
@@ -589,6 +592,8 @@ def test_envelop_and_straddle_count_blocks():
 
 
 def test_tile_keeps_each_block_in_one_partition():
+    # Enforces website/src/pages/docs/api.astro:259.
+    # Enforces website/src/pages/docs/data.astro:220.
     features = tuple(mark(str(i), float(i), 0.0) for i in range(10))
     data = dataset.Dataset(features, crs="X")
     partition = data.tile(2.0, 0.2, 0.2, seed=0)
@@ -635,6 +640,7 @@ def payload_tile(**kwargs):
 
 
 def test_a_tile_validates_its_metadata():
+    # Enforces website/src/pages/docs/data.astro:220.
     tile = payload_tile(nodata_value=0)
     assert tile.byte_size == 6
     assert tile.nodata_value == 0.0

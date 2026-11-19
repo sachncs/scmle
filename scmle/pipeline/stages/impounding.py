@@ -54,8 +54,10 @@ class Impounding(exploration.Exploration):
         The weights come from development rows only; the locked rows are
         untouched. The weight column then trains the models as any other. Does
         nothing unless reweighing is the requested mitigation; for tasks other
-        than binary and multiclass it records a rejection instead. The group
-        is the fairness column, or the first sensitive column if none is set.
+        than binary, multiclass and regression it records a rejection
+        instead. A regression outcome is balanced by its equal-count bins
+        (`reweighing.discretise`). The group is the fairness column, or the
+        first sensitive column if none is set.
 
         Args:
             context: The run context; its specification gains the weight column.
@@ -68,15 +70,25 @@ class Impounding(exploration.Exploration):
             return
         column = fairness.column or context.spec.data.sensitive_columns[0]
         label = f"fairness:{column}"
-        if task not in (tasks.Task.BINARY, tasks.Task.MULTICLASS):
+        if task not in (
+            tasks.Task.BINARY,
+            tasks.Task.MULTICLASS,
+            tasks.Task.REGRESSION,
+        ):
             context.enter(
                 label,
                 experiments.Edict.REJECT,
-                "reweighing applies to binary and multiclass tasks only",
+                "reweighing applies to binary, multiclass and regression "
+                "tasks only",
             )
             return
+        levels = (
+            reweighing.discretise(split.dev_target)
+            if task is tasks.Task.REGRESSION
+            else split.dev_target
+        )
         weights = reweighing.weigh(
-            split.dev_features[column].astype(str), split.dev_target
+            split.dev_features[column].astype(str), levels
         )
         split.dev_features[tasks.FAIRNESS_WEIGHT] = weights
         context.spec = context.spec.model_copy(

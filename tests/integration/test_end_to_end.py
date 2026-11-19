@@ -27,6 +27,9 @@ def run(frame, tmp_path, **kwargs):
 
 
 def test_binary_end_to_end_artifacts_and_inference(binary_frame, tmp_path):
+    # Enforces website/src/pages/docs/architecture.astro:32.
+    # Enforces website/src/pages/docs/modeling.astro:31.
+    # Enforces website/src/pages/docs/operations.astro:8.
     result = run(binary_frame, tmp_path)
     evaluation = result.evaluation
     assert evaluation["metrics"]["roc_auc"] > 0.8
@@ -148,6 +151,10 @@ def test_group_and_temporal_runs(binary_frame, tmp_path):
 def test_blocked_run_records_terminal_state(binary_frame, tmp_path):
     # Enforces README.md:132.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:71.
+    # Enforces website/src/learn/when-things-go-wrong.html:39.
+    # Enforces website/src/pages/index.astro:313.
+    # Enforces website/src/pages/docs/architecture.astro:48.
+    # Enforces website/src/pages/docs/modeling.astro:19.
     ambiguous = binary_frame.assign(y=numpy.arange(len(binary_frame)) % 5)
     with pytest.raises(errors.BlockedError) as caught:
         run(ambiguous, tmp_path)

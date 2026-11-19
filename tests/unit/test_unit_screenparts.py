@@ -13,6 +13,7 @@ from scmle.assurance.admissibility.screen import fitting
 from scmle.assurance.admissibility.screen import hypotheses
 from scmle.assurance.admissibility.screen import permutation
 from scmle.assurance.admissibility.screen import planning
+from scmle.assurance.admissibility.screen import records
 from scmle.assurance.admissibility.screen import report
 from scmle.assurance.admissibility.screen import settings
 from scmle.assurance.detectors import certificates
@@ -40,21 +41,33 @@ def test_the_mechanisms_and_detectors_are_named():
         settings.MISSING,
         settings.PURITY,
         settings.ECHO,
+        settings.ENCODING,
+        settings.DUPLICATION,
     ) == (
         "skill",
         "missingness",
         "record_purity",
         "echo",
+        "encoding",
+        "duplication",
     )
-    assert settings.MECHANISM_DEFECTS[settings.ECHO] == ()
+    # Echo owns the noisy copy: the label read with errors (hypotheses.py).
+    assert settings.MECHANISM_DEFECTS[settings.ECHO] == ("leak_noisy_copy",)
     assert settings.MECHANISM_DEFECTS[settings.PURITY] == ("leak_rare_record",)
+    assert settings.MECHANISM_DEFECTS[settings.ENCODING] == (
+        "leak_target_mean",
+    )
+    assert settings.MECHANISM_DEFECTS[settings.DUPLICATION] == (
+        "leak_duplicates",
+    )
+    assert settings.NATURAL == 1.0
     assert settings.DETECTORS == {
         "binary": "f4-leakage-screen",
         "multiclass": "f4-leakage-screen-multiclass",
         "regression": "f4-leakage-screen-regression",
     }
     assert settings.STORE_PATH.name == "screen_certificates.json"
-    assert set(settings.WORDS) == set(settings.MECHANISM_DEFECTS)
+    assert set(settings.WORDS) == {*settings.MECHANISM_DEFECTS, settings.DATED}
 
 
 def test_the_word_pattern_splits_on_underscores_and_punctuation():
@@ -460,6 +473,8 @@ def test_caps_share_the_association_ceiling():
         "missingness": 0.5,
         "record_purity": 0.5,
         "echo": 0.5,
+        "encoding": 1.0,
+        "duplication": 1.0,
     }
 
 
@@ -734,3 +749,260 @@ def test_disclose_records_the_probe_and_missed_plants():
             "fit the 0.0 s left of the screen's 0.0 s share of the time budget"
         )
     )
+
+
+# ---- records: target means and copied rows ----------------------------------
+
+
+def grouped(seed=0, groups=200, size=5, leak=True):
+    """Rows in groups of `size` along a source column, with a mean column."""
+    rng = numpy.random.default_rng(seed)
+    n = groups * size
+    source = rng.permutation(n).astype(float)
+    y = rng.integers(0, 2, n).astype(float)
+    level = (source // size).astype("int64")
+    means = pandas.Series(y).groupby(level).transform("mean").to_numpy()
+    honest = pandas.Series(rng.random(groups)).iloc[level].to_numpy()
+    frame = pandas.DataFrame(
+        {"source": source, "mean": means if leak else honest, "y": y}
+    )
+    keep = rng.random(n) < 0.6
+    return frame[keep].reset_index(drop=True)
+
+
+def screened(frame, columns=("source", "mean")):
+    problem = fitting.encode(frame["y"], "classification", config(), None, None)
+    return records.encodings(frame, list(columns), problem, config())
+
+
+def test_a_target_mean_fitted_on_all_rows_is_more_precise_than_noise():
+    found = {h.feature: h for h in screened(grouped())}
+    leak = found["mean"]
+    assert leak.mechanism == settings.ENCODING
+    assert leak.p_value < 1e-6
+    assert leak.bound > settings.NATURAL
+    assert hypotheses.floor(leak, None, None, None, None, None, None) == (
+        leak.bound
+    )
+
+
+def test_an_honest_group_constant_column_is_not_precise():
+    p = [
+        h.p_value
+        for seed in range(20)
+        for h in screened(grouped(seed, leak=False))
+        if h.feature == "mean"
+    ]
+    assert len(p) == 20
+    assert sum(value < 0.05 for value in p) <= 3
+
+
+def test_columns_off_the_target_scale_are_not_tested():
+    frame = grouped().assign(mean=lambda f: f["mean"] + 2.0)
+    assert [h.feature for h in screened(frame)] == []
+
+
+def test_runs_follow_the_column_the_value_is_constant_along():
+    values = numpy.repeat([0.2, 0.4, 0.2, 0.6], 3)
+    source = numpy.arange(12)
+    noise = numpy.random.default_rng(0).permutation(12)
+    labels = records.runs(values, [noise, source])
+    assert len(set(labels.tolist())) == 4
+    # An order unrelated to the value gives no runs; its levels are kept.
+    assert records.runs(values, [noise]) is None
+    # The column's own key (here the first, then the second) is left out.
+    assert len(records.groupings(values, [noise, source], 0)) == 2
+    assert len(records.groupings(values, [noise, source], 1)) == 1
+
+
+def test_precision_needs_two_groups_with_spread():
+    labels = numpy.array([0, 0, 1])
+    assert records.precision(labels, numpy.ones(3), numpy.ones(3)) is None
+    ratio, groups, freedom = records.precision(
+        numpy.array([0, 0, 1, 1]),
+        numpy.array([0.0, 1.0, 0.0, 1.0]),
+        numpy.array([0.5, 0.5, 0.5, 0.5]),
+    )
+    assert (ratio, groups) == (0.0, 2)
+    assert freedom == pytest.approx(2.0)
+
+
+def test_the_pair_bound_holds_for_a_population_and_not_for_copies():
+    assert records.excess(1000, 10, 5, 1100) == (1.0, 1.0)
+    p, ratio = records.excess(1000, 200, 0, 1400)
+    assert p < 1e-9 and ratio > 1.0
+
+
+def test_copied_rows_are_found_and_natural_repeats_are_not():
+    rng = numpy.random.default_rng(0)
+    frame = pandas.DataFrame(
+        {"x": rng.normal(size=600), "y": rng.integers(0, 2, 600)}
+    )
+    copied = pandas.concat([frame, frame.sample(180, random_state=0)])
+    found = records.duplication(copied, ["x"], "y", config())
+    assert found.feature == settings.ROWS
+    assert found.p_value < 1e-6 and found.bound > settings.NATURAL
+    coarse = pandas.DataFrame(
+        {"x": rng.integers(0, 6, 600), "y": rng.integers(0, 2, 600)}
+    )
+    natural = records.duplication(coarse, ["x"], "y", config())
+    assert natural.p_value == 1.0 and natural.bound <= settings.NATURAL
+    assert records.duplication(frame.head(2), ["x"], "y", config()) is None
+
+
+def test_the_screen_runs_with_two_rows_of_a_class():
+    y = numpy.r_[numpy.zeros(198, "int64"), [1, 1]]
+    assert fitting.enough(y, "classification", config())
+    assert not fitting.enough(y[:-1], "classification", config())
+    assert not fitting.enough(y[:50], "regression", config())
+
+
+def test_a_tie_with_the_rest_counts_and_a_weaker_column_does_not():
+    problem = binary_problem(n=200)
+    perfect = [problem.y.astype(float)]
+    rng = numpy.random.default_rng(0)
+    assert fitting.margin(problem, perfect, perfect, config(), None, rng) == 0
+    weak = [problem.y + rng.normal(size=200)]
+    assert fitting.margin(problem, weak, perfect, config(), None, rng) < 0
+
+
+# ---- the column's own reading against its rest ------------------------------
+
+
+def test_a_numeric_column_has_a_linear_reading_and_a_level_column_none():
+    values = pandas.Series(numpy.arange(30, dtype=float))
+    design = fitting.line(values)
+    assert design.shape == (30, 1)
+    gappy = values.where(values % 7 != 0)
+    gaps = fitting.line(gappy)
+    assert gaps.shape == (30, 2)
+    assert gaps[:, 1].tolist() == gappy.isna().astype(float).tolist()
+    assert not numpy.isnan(gaps).any()
+    days = pandas.Series(pandas.date_range("2020-01-01", periods=30))
+    assert fitting.line(days)[:, 0].tolist() == list(range(30))
+    assert fitting.line(pandas.Series([0.0, 1.0] * 15)) is None
+    assert fitting.line(pandas.Series(list("abc") * 10)) is None
+
+
+def test_a_noisy_class_code_is_read_by_its_line_when_that_scores_higher():
+    # The binary threshold plant (class code plus a quarter of a standard
+    # deviation of noise): its smoother on ten quantile knots scores about
+    # 0.993 AUC on breast cancer, its ranking about 0.997 (seed 2 of the
+    # certificate), so the margin over its rest reads the line.
+    rng = numpy.random.default_rng(0)
+    y = numpy.r_[numpy.zeros(300), numpy.ones(300)]
+    frame = pandas.DataFrame({"leak": y + 0.25 * rng.normal(size=600)})
+    problem = fitting.encode(
+        pandas.Series(y.astype("int64")),
+        "classification",
+        config(),
+        None,
+        None,
+    )
+    (h,) = hypotheses.gauge("leak", fitting.basis(frame["leak"]), problem)
+    read = hypotheses.reading(h, h.data, frame, problem)
+    straight = fitting.predict(problem, fitting.line(frame["leak"]))
+    smooth = fitting.predict(problem, h.data)
+    score = fitting.skill_statistic(problem, fitting.line(frame["leak"]))
+    if float(score(problem.y[None, :])[0]) > h.observed:
+        assert numpy.allclose(read[0], straight[0])
+    else:
+        assert numpy.allclose(read[0], smooth[0])
+    pair = hypotheses.Pending(
+        "a & b",
+        settings.SKILL,
+        0.9,
+        None,
+        False,
+        data=h.data,
+        columns=("a", "b"),
+    )
+    assert numpy.allclose(
+        hypotheses.reading(pair, h.data, frame, problem)[0], smooth[0]
+    )
+
+
+# ---- dated columns: values after the declared prediction time ---------------
+
+
+def closing(cutoff="2020-01-01"):
+    start = pandas.Timestamp(cutoff)
+    days = pandas.to_timedelta(numpy.arange(40) % 30 + 1, unit="D")
+    return pandas.DataFrame(
+        {
+            "closed": start + days,
+            "opened": start - days,
+            "amount": numpy.arange(40, dtype=float),
+            "y": [0, 1] * 20,
+        }
+    )
+
+
+def test_the_dated_mechanism_is_named_and_its_ceiling_is_zero():
+    assert settings.DATED == "dated"
+    assert settings.DATED_ID == "f4-leakage-dated"
+    assert settings.DATED_DEFECT == "leak_dated"
+    assert settings.LATE == 0.0
+    assert settings.DATED in settings.WORDS
+
+
+def test_a_date_after_the_cutoff_is_late_and_one_before_it_is_not():
+    frame = closing()
+    found = records.dated(frame, ["closed", "opened", "amount"], "2020-01-01")
+    assert [f.feature for f in found] == ["closed"]
+    (late,) = found
+    assert late.mechanism == settings.DATED
+    assert late.statistic == 1.0 and late.lower_bound == 1.0
+    assert late.suspect and late.blocking and late.significant
+    half = records.dated(frame, ["closed"], "2020-01-15")
+    assert half[0].statistic == pytest.approx(
+        float((frame["closed"] > pandas.Timestamp("2020-01-15")).mean())
+    )
+    assert records.dated(frame, ["closed"], "2020-03-01") == []
+    assert records.dated(frame, ["closed"], None) == []
+
+
+def test_the_cutoff_meets_a_zoned_column_in_the_column_zone():
+    frame = closing()
+    frame["closed"] = frame["closed"].dt.tz_localize("UTC")
+    assert [f.feature for f in records.dated(frame, ["closed"], "2020-01-01")]
+    zoned = records.dated(frame, ["opened"], "2020-01-01T00:00:00+00:00")
+    assert zoned == []
+
+
+def test_a_cutoff_that_is_not_a_moment_is_refused():
+    with pytest.raises(errors.InputError, match="cutoff"):
+        records.dated(closing(), ["closed"], "soon")
+
+
+def test_a_run_with_a_cutoff_blocks_a_closing_date():
+    from scmle.assurance.admissibility import screen
+
+    rng = numpy.random.default_rng(0)
+    frame = pandas.DataFrame(
+        {"x": rng.normal(size=200), "y": rng.integers(0, 2, 200)}
+    )
+    frame["closed"] = pandas.Timestamp("2020-01-01") + pandas.to_timedelta(
+        rng.integers(1, 30, 200), unit="D"
+    )
+    names = ["x", "closed"]
+    report = screen.screen_table(
+        frame, "y", "classification", names, 0, cutoff="2020-01-01"
+    )
+    assert "closed" in [f.feature for f in report.blocking]
+    assert report.gates[settings.DATED] is certificates.Authority.GATING
+    assert report.ceilings[settings.DATED] == settings.LATE
+    assert any("dated" in s for s in report.sentences())
+    plain = screen.screen_table(frame, "y", "classification", names, 0)
+    assert settings.DATED not in plain.gates
+
+
+def test_the_prediction_time_is_declared_on_the_data_and_defaults_to_none():
+    from scmle.contracts import tasks
+
+    assert tasks.Dataset(uri="x", target="y").cutoff is None
+    declared = tasks.Dataset(uri="x", target="y", cutoff="2020-01-01")
+    assert declared.cutoff == "2020-01-01"
+    assert tasks.Dataset.model_validate(declared.model_dump()) == declared
+    with pytest.raises(ValueError, match="cutoff"):
+        tasks.Dataset(uri="x", target="y", cutoff="soon")

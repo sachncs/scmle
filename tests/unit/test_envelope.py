@@ -70,6 +70,16 @@ def test_a_rewritten_header_and_digest_fail_the_signature(tmp_path, tripwire):
         envelope.read(path, "another-key")
 
 
+def test_an_invalid_signature_is_refused_even_when_trusted(tmp_path, tripwire):
+    path = envelope.seal(tmp_path / "e.bin", {"kind": "test"}, payload(), KEY)
+    with pytest.raises(errors.ArtifactError, match="not authentic"):
+        envelope.read(path, "another-key", trusted=True)
+    changed = {**envelope.sign({"artifact_digest": "a" * 64}, KEY)}
+    changed["artifact_digest"] = "b" * 64
+    with pytest.raises(errors.ArtifactError, match="not authentic"):
+        envelope.check(changed, "pkg", KEY, trusted=True)
+
+
 def test_an_unsigned_envelope_needs_trust(tmp_path, tripwire):
     path = envelope.seal(tmp_path / "e.bin", {"kind": "test"}, payload())
     with pytest.raises(errors.ArtifactError, match="not signed"):

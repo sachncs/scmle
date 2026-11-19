@@ -103,6 +103,22 @@ def test_importance_is_deterministic_and_ranks_the_signal_first():
     assert first == second and first["features"][0]["feature"] == "signal"
 
 
+def test_importance_is_unavailable_when_the_metric_is_undefined():
+    # A binary run with two minority rows keeps both for development, so
+    # the evaluation rows hold one class and ROC AUC is undefined there.
+    inputs = test_diagnostics.make_inputs(tasks.Task.BINARY)
+    kept = inputs.target == inputs.target.iloc[0]
+    single = dataclasses.replace(
+        inputs, features=inputs.features[kept], target=inputs.target[kept]
+    )
+
+    report = importance.Importance().compute(single)
+
+    assert report["available"] is False
+    assert "undefined" in report["reason"]
+    assert "features" not in report
+
+
 def test_a_suite_shares_its_time_allowance_among_diagnostics():
     inputs = test_diagnostics.make_inputs(tasks.Task.BINARY)
 

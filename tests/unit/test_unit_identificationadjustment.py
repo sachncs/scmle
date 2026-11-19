@@ -6,6 +6,7 @@ import pytest
 
 from scmle.assurance.charter import causal
 from scmle.causal.identification import aipw
+from scmle.causal.identification import battery
 from scmle.causal.identification import sensitivity
 from scmle.causal.identification.run import adjustment
 from scmle.contracts import errors
@@ -194,12 +195,13 @@ def test_a_randomized_estimate_is_the_difference_in_means():
     assert adjustment.RandomizedEstimator.name == "randomized_diff"
     est = adapter.estimate(c, 0.9)
     direct = aipw.difference_in_means(c, "t", "y", 0.9)
-    assert (est.estimate, est.se, est.low, est.high, est.n) == (
+    assert (est.estimate, est.se, est.low, est.high, est.n, est.df) == (
         direct.estimate,
         direct.se,
         direct.low,
         direct.high,
         direct.n,
+        direct.df,
     )
     other = adapter.reckon(c, 0.9, "nco")
     assert (
@@ -213,6 +215,11 @@ def test_randomized_controls_skip_exposures():
     tests = adapter.controls(c, 0.9)
     assert [t.name for t in tests] == ["negative_outcome:nco"]
     assert tests[0].kind == "negative_outcome"
+    est = adapter.reckon(c, 0.9, "nco")
+    expected = battery.wald(
+        "n", "negative_outcome", est.estimate, est.se, est.df
+    )
+    assert tests[0].p_value == expected.p_value
 
 
 def test_randomized_sensitivity_is_not_applicable():

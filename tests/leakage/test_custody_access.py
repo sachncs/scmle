@@ -88,6 +88,8 @@ def reachable(root, limit=200_000):
 
 def test_the_view_reaches_no_sealed_object_or_token():
     # Enforces docs/GLOSSARY.md:304.
+    # Enforces website/src/learn/glossary.html:155.
+    # Enforces website/src/pages/docs/threat-model.astro:24.
     built = build()
     outcome, vault = built.outcome, built.vault
     tokens = {s.mint() for s in vault.sets.values()}
@@ -130,6 +132,7 @@ def test_pickling_the_view_leaks_neither_rows_nor_tokens():
 
 
 def test_the_open_log_and_manifest_hold_ids_but_never_values():
+    # Enforces website/src/pages/docs/artifacts.astro:23.
     frame, outcome, vault, log = build()
     held = vault.sets["C"]
     held.commit("claims-1", "ledger-1")
@@ -143,6 +146,9 @@ def test_the_open_log_and_manifest_hold_ids_but_never_values():
 def test_the_orchestrator_process_keeps_only_the_ids():
     # Enforces docs/GLOSSARY.md:304.
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:130.
+    # Enforces website/src/learn/glossary.html:155.
+    # Enforces website/src/learn/what-scmle-cannot-do.html:28-29.
+    # Enforces website/src/pages/docs/qualification.astro:7.
     built = build()
     outcome, vault = built.outcome, built.vault
     held = vault.sets["C"]
@@ -154,6 +160,9 @@ def test_the_orchestrator_process_keeps_only_the_ids():
 
 
 def test_a_second_open_is_refused_and_both_attempts_are_logged():
+    # Enforces website/src/pages/docs/qualification.astro:7.
+    # Enforces website/src/pages/docs/qualification.astro:80.
+    # Enforces website/src/pages/docs/threat-model.astro:24.
     built = build()
     vault, log = built.vault, built.log
     held = vault.sets["C"]
@@ -174,6 +183,7 @@ def test_a_second_open_is_refused_and_both_attempts_are_logged():
 
 
 def test_a_release_for_a_different_selection_is_refused_by_the_vault():
+    # Enforces website/src/pages/docs/threat-model.astro:32.
     built = build()
     held, log = built.vault.sets["C"], built.log
     held.commit("claims-1", "ledger-1")

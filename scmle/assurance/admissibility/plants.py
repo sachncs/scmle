@@ -7,8 +7,8 @@ evidence and the product use one definition of each leak type. `Classes`
 and `Numbers` write each type for their kind of target:
 
 * `leak_copy`: the target itself (class codes for classes).
-* `leak_noisy_copy`: the target with `FLIP` of the labels moved to another
-  class, or with `NOISE` standard deviations of noise for a number.
+* `leak_noisy_copy`: the target's labels with `FLIP` of them moved to
+  another class, or with `NOISE` standard deviations of noise for a number.
 * `leak_threshold`: a field derived from the target with noise: the class
   code, or the target cut into `BANDS` quantile bands (such as a price band).
 * `leak_missing_for_class`: noise recorded only when the target is not the
@@ -16,6 +16,11 @@ and `Numbers` write each type for their kind of target:
 * `leak_rare_record`: noise recorded for `RARE` of the rows of the first
   row's class, or for `TOP` of the rows in the top decile of a number; about
   9 percent of the rows either way, all from one class or band.
+* `leak_target_mean`: a target encoding fitted on all rows: the mean of the
+  target (or of the first row's class) over consecutive groups of `LEVEL`
+  rows, each row's own outcome included.
+* `leak_duplicates` (`copy`, rows rather than a column): `COPIES` of the
+  rows copied once, so copies fall on both sides of a split.
 """
 
 import numpy
@@ -30,13 +35,18 @@ DEFECTS = {
     "leak_threshold": "threshold",
     "leak_missing_for_class": "missing",
     "leak_rare_record": "rare",
+    "leak_target_mean": "mean",
 }
+DUPLICATES = "leak_duplicates"
+KINDS = (*DEFECTS, DUPLICATES)
 FLIP = 0.02
 NOISE = 0.1
 SPREAD = 0.25
 BANDS = 10
 RARE = 0.25
 TOP = 0.9
+LEVEL = 5
+COPIES = 0.3
 
 
 class Classes:
@@ -74,11 +84,20 @@ class Classes:
         return self.codes
 
     def noisy(self) -> pandas.Series:
-        """The class codes with `FLIP` of them moved to another class."""
-        classes = max(int(self.codes.max()) + 1, 2)
+        """The labels with `FLIP` of them moved to another class.
+
+        A field recorded after the outcome holds the label itself, so the
+        plant spells the target's labels (not its codes, whose order
+        follows the first row and can invert a two-class label).
+        """
+        labels = pandas.unique(self.target)
+        classes = max(len(labels), 2)
         shift = self.rng.integers(1, classes, size=len(self.codes))
-        moved = (self.codes + shift) % classes
-        return self.codes.where(self.draws >= FLIP, moved)
+        moved = (self.codes.to_numpy("int64") + shift) % classes
+        if len(labels) < classes:
+            return self.codes.where(self.draws >= FLIP, moved)
+        written = pandas.Series(labels[moved], self.target.index)
+        return self.target.where(self.draws >= FLIP, written)
 
     def threshold(self) -> pandas.Series:
         """The class codes with noise."""
@@ -91,6 +110,23 @@ class Classes:
     def rare(self) -> pandas.Series:
         """Noise recorded for `RARE` of the rows of the first row's class."""
         return self.noise.where(self.first & (self.draws < RARE))
+
+    def mean(self) -> pandas.Series:
+        """The share of the first row's class over groups of `LEVEL` rows."""
+        return self.encode(self.first.astype(float))
+
+    def encode(self, values: pandas.Series) -> pandas.Series:
+        """Means of `values` over consecutive groups of `LEVEL` rows.
+
+        Args:
+            values: One number per row.
+
+        Returns:
+            Each row's group mean, its own value included.
+        """
+        groups = numpy.arange(len(values)) // LEVEL
+        means = values.groupby(groups).transform("mean")
+        return pandas.Series(means.to_numpy(), self.target.index)
 
 
 class Numbers(Classes):
@@ -130,6 +166,10 @@ class Numbers(Classes):
         top = self.values >= float(self.values.quantile(0.9))
         return self.noise.where(top & (self.draws < TOP))
 
+    def mean(self) -> pandas.Series:
+        """The target's mean over groups of `LEVEL` rows."""
+        return self.encode(self.values)
+
 
 def plant(
     target: pandas.Series, defect: str, seed: int, continuous: bool
@@ -154,6 +194,26 @@ def plant(
     kind = (Numbers if continuous else Classes)(target, rng)
     column: pandas.Series = getattr(kind, method)()
     return column
+
+
+def copy(frame: pandas.DataFrame, seed: int) -> pandas.DataFrame:
+    """Copies `COPIES` of the rows once.
+
+    Args:
+        frame: Rows including the target.
+        seed: Run seed.
+
+    Returns:
+        The rows and their copies, in a seeded random order, with a fresh
+        index.
+    """
+    rng = randomness.component_rng(seed, "plants", len(DEFECTS))
+    picked = rng.choice(len(frame), round(COPIES * len(frame)), replace=False)
+    # Positions, not `pandas.concat`: concat compares the frames' `attrs`,
+    # which fails when they hold a Series (an uplift task's treatment).
+    rows = numpy.concatenate([numpy.arange(len(frame)), numpy.sort(picked)])
+    order = rng.permutation(len(rows))
+    return frame.iloc[rows[order]].reset_index(drop=True)
 
 
 def table(

@@ -12,6 +12,7 @@ def test_the_committed_split_matches_its_recorded_seed():
 
 
 def test_every_task_is_in_exactly_one_set():
+    # Enforces docs/preregistration/README.md:47.
     tasks = split.load_tasks()
     sets = split.assign(tasks)
 
@@ -30,6 +31,7 @@ def test_each_problem_type_is_represented_in_both_sets():
 
 
 def test_the_assignment_depends_on_the_seed_but_not_on_row_order():
+    # Enforces docs/preregistration/README.md:47.
     tasks = split.load_tasks()
 
     reordered = split.assign(list(reversed(tasks)))

@@ -91,11 +91,13 @@ def test_cancelled_run_resumes_and_reuses_completed_trials(
     ).resume(run_dir)
     assert resumed.state == "COMPLETED"
     # 5 CV fits were reused. The new fits are the final refit of the selected
-    # model (ties go to the alphabetically first equal-cost model), the 5
-    # out-of-fold fits that calibrate the conformal intervals and the 5 fits
-    # of the learning curve.
+    # model (ties go to the alphabetically first equal-cost model), its refit
+    # on every row for the bundle (`shipped`), the 5 out-of-fold fits that
+    # calibrate the conformal intervals and the 5 fits of the learning curve.
     assert resumed.selected_model == "canceller"
-    assert canceller.fits == 5 + 1 + 5 + 5, "the cancelled trial must be reused"
+    assert canceller.fits == 5 + 1 + 1 + 5 + 5, (
+        "the cancelled trial must be reused"
+    )
     assert counting.fits >= 5, "the unfinished trial must be computed"
     assert [t.model_name for t in resumed.trials] == [
         "dummy",
@@ -151,6 +153,7 @@ def test_resume_of_tuned_run_recomputes_nothing(
 
 
 def test_cannot_resume_completed_run_or_changed_config(binary_frame, tmp_path):
+    # Enforces website/src/pages/docs/operations.astro:19.
     result = support.make_project(binary_frame, "y", output_dir=tmp_path).run()
     with pytest.raises(errors.ConfigError, match="already completed"):
         scmle.api.project.Project.resume(result.run_dir, data=binary_frame)
@@ -219,6 +222,9 @@ def test_resume_refuses_checkpoints_computed_on_different_data(
     binary_frame, tmp_path
 ):
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:171.
+    # Enforces website/src/learn/when-things-go-wrong.html:82.
+    # Enforces website/src/pages/docs/operations.astro:19.
+    # Enforces website/src/pages/docs/operations.astro:8.
     counting, canceller = Counting, Canceller
     counting.fits = canceller.fits = 0
     canceller.armed = True

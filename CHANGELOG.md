@@ -296,6 +296,142 @@ marked `Breaking:` and listed first in their group.
 
 ### Added
 
+- Clustering has a user path: `scmle cluster DATA --output DIR` and
+  `scmle.api.clustering.cluster`. It searches k-means, Gaussian mixture and
+  agglomerative clustering over `--counts` (default 2 to 8) with
+  `--rounds` bootstrap refits for the stability score, labels every row
+  and saves a bundle of task `clustering`, so `scmle predict` and
+  `Bundle.predict` return cluster labels. The numeric columns, less
+  `--exclude` and `--truth`, are the features. `clustering.json` beside the
+  bundle holds every candidate, the chosen one, its silhouette,
+  Davies-Bouldin, Calinski-Harabasz and stability, and, with `--truth`, the
+  adjusted Rand index and normalized mutual information against the known
+  groups. `clustering.evaluate` scores a saved bundle on other rows. The
+  save is staged and renamed, so an interrupted save leaves no partial
+  bundle, and an existing non-empty folder is refused. Clustering is still
+  not qualified (see [`docs/BREADTH.md`](docs/BREADTH.md)).
+- The pinned public API (`tests/fixtures/public_api.json`) now includes
+  `scmle.api.clustering` (`Segmentation`, `cluster`, `evaluate`) and
+  `scmle.api.erasure` (`Forgetting`, `Retirement`, `Deletion`, `Subject`,
+  `Receipt`, `RetiredError`); `Project` (the `entities` and `cutoff`
+  keywords) and the `scmle.operations.signals` `Window` and `SignalMonitor`
+  signatures were re-pinned.
+- Erasure with signed receipts (`scmle.api.erasure`): `scmle forget
+  dataset ROOTS --data FILE | --digest D` forgets every run, model, sealed
+  trail and prediction log derived from a dataset; `scmle forget subject
+  ROOTS --data FILE --column COL --value V | --values-file F` also purges a
+  data subject's rows from the source and, with `--retrain`, trains each
+  affected run again without them; `scmle retire TARGET` retires one bundle
+  or registered version (`--model`, `--version`); `scmle delete TARGETS`
+  deletes runs or project folders; `scmle forget verify RECEIPT` checks a
+  receipt's signature. Each erasure is planned once, journaled step by step
+  under `--receipts` (`<id>/plan.json`, `<id>/journal.jsonl`) and closed by
+  an HMAC-signed receipt `<id>.json`; running the same request again
+  resumes it, and `--dry-run` prints the plan and changes nothing. The
+  custody records of a run (provenance, attestation, evidence graph,
+  dataset manifest, events, charter, ledger, claims, custody log) are kept
+  and their digests listed. A subject's identifiers are kept only as
+  SHA-256 hashes. Without a signing key (`--key-file` or
+  `SCMLE_SIGNING_KEY`) nothing is changed.
+- Retired models are refused. Retiring writes `retired.json` into the
+  bundle directory (outside the checksummed members, so the content address
+  is unchanged), and `Bundle.load` refuses such a directory with
+  `RetiredError` (a `BlockedError`, exit code 2), so `predict`, `batch`,
+  `serve`, `package`, `export-onnx` and the registry all refuse it. A
+  registered version's release state becomes `retired`.
+- `scmle estimate DATA --estimation FILE [--treatment COL] [--output-dir
+  DIR]` estimates a declared parameter without training a model: it writes
+  `parameter_estimation.json` (each parameter's estimate and interval,
+  digest-checked on read-back) or, when the declaration cannot be estimated
+  on the data, `parameter_estimation_refusal.json` with the reason, its
+  category and details, and exits 2 (gate `estimate.refusal`). The file is a
+  JSON object with `estimand` and `policy`, in the stored layout or the
+  version-1 layout; a run's own `parameter_estimation_declaration.json` is
+  accepted. `scmle run --estimation FILE` makes the same estimate beside
+  model selection and keeps it in the run; model selection never reads it.
+- `scmle run` and `plan` take `--mitigation {none,reweighing,group_thresholds}`
+  for the first sensitive column. Reweighing now also mitigates regression:
+  the outcome is cut into equal-count bins (Sturges' rule, at most ten) and
+  the bins play the part of the labels, so group and outcome level become
+  independent in the weighted development rows. Group thresholds remain
+  binary only.
+- Per-period drift. With a time column, a charter run's
+  `shift_report.json` has a `periods` record: the exploration rows are cut
+  into contiguous periods of equal size (at least 50 rows each, at most
+  ten), every later period is compared with the first column by column
+  (Kolmogorov-Smirnov or chi-square) and Benjamini-Hochberg runs once over
+  every period and column. Status is `pass`, `fail` or `unverifiable` (no
+  time column); reports written earlier read as `not_run`. Like the other
+  shift tests it detects covariate drift only, and a pass is a failure to
+  detect.
+- `scmle serve` runs the packaged service's loop: SIGTERM or SIGINT stops
+  accepting connections and drains the requests in flight
+  (`--drain-seconds`, default the longest an admitted request can take);
+  SIGHUP reloads the bundle directory while the old model keeps serving,
+  and a failed reload keeps the old one. The operations signals over the
+  last `--signals-window` seconds (default 300), drift judged against the
+  served bundle's training reference, are evaluated every
+  `--signals-interval` seconds (default 60) and appended as JSON lines to
+  `--signals-file`, or to the log.
+- `--trace` (or `SCMLE_TRACING`) exports OpenTelemetry spans of requests,
+  scoring calls, scored files and pipeline stages over OTLP; it needs the
+  `tracing` extra and is a no-op without it.
+- `scmle batch` streams its input: `--chunk-rows` rows (default 10,000) are
+  read and scored at a time, so memory holds one chunk; delimited text is
+  read record by record (`scmle.data.readers.stream`). Each chunk is
+  appended to `<output>.partial` and `<output>.progress.json` records the
+  rows and bytes written; running the same command again resumes after the
+  last scored chunk, and `--restart` scores from the first row.
+- `validation.entities` (`known`, the default, or `unseen`) for temporal
+  and rolling splits with `data.group_column`: `known` forecasts the
+  entities trained on, so an entity's past trains and its future is held
+  out; `unseen` keeps every entity wholly on one side of the test split and
+  of each fold. `unseen` without `data.group_column` is refused. A
+  configuration at the default hashes as it did before the field existed.
+- C14 runs on 90 more public OpenML tables (`benchmarks/evidence/refusal.py`
+  `SUITE`, listed in `benchmarks/evidence/data/refusal/README.md`). The
+  selection rule was fixed before any was run: every dataset of
+  OpenML-CC18, the AutoML benchmark classification and regression suites
+  and OpenML-CTR23, less those already in the catalog, copies of a table
+  another evidence set uses (`COPIES`), tables over 20,000,000 cells and
+  tables with no stated licence. Every OpenML table is pinned by the
+  SHA-256 of its ARFF file (`PINS`). No product change.
+- Gate `split.test_support`: a binary or multiclass split whose test rows
+  hold fewer than `MIN_TEST_CLASS_ROWS` (5) rows of a class is refused. A
+  binary run with two minority rows used to complete with both in
+  development, test ROC AUC NaN and F1 1.0 on a single class. Five is the
+  fewest rows of a class on which even a perfect score has an exact upper
+  bound of its error rate, at `EVIDENCE_ALPHA` 0.05, below one half. The
+  stratified split now reserves that many test rows for every class with at
+  least `MIN_TEST_CLASS_ROWS + MIN_STRATUM_ROWS` (7) rows, drawn with the
+  validation seed; a split whose classes already reach it is unchanged.
+- One plugin registry for every kind of extension (`scmle.runtime.plugins`).
+  `plugins.REGISTRY` enrols, withdraws, lists and finds items by a
+  `plugins.Kind` (`ESTIMATORS`, `METRICS`, `READERS`, `DETECTORS`, `STAGES`,
+  `TRANSFORMERS`) and loads a kind's entry-point group with `discover`, which
+  reports a broken plugin instead of raising. The groups are `scmle.models`
+  (unchanged, so installed model plugins keep loading), `scmle.metrics`,
+  `scmle.readers`, `scmle.detectors`, `scmle.stages` and the new
+  `scmle.transformers`. Estimators enrolled here join the model catalog,
+  metrics the metric catalog and stages the standard stage sequence, where
+  their `requires` and state place them.
+- One state machine for every run (`scmle.runtime.state.Machine`): a state
+  and a transition table given as data. The tabular run (`state.TABLE`,
+  through `Tracker`, which still emits an event per transition), the
+  modality lifecycle (`modality_lifecycle.state.TABLE`) and the workflow
+  executor (`workflow.executor.status.TABLE`) are three tables on it, and
+  `state.chain` builds a forward table. A workflow run now refuses a move its
+  table does not allow; `Executor.resume` returns a run whose state has no
+  way out (succeeded, rejected, expired, budget-stopped) as it is, as before.
+- The workflow executor keeps a run's records through
+  `workflow.executor.records.Bucket`, the object-store implementation of the
+  engine's `Archive` protocol (`scmle.pipeline.engine.Archive`, now generic
+  over what a stage makes): `record` writes `steps/<step>.json`, `restore`
+  hands back a succeeded step's outputs, `keep` writes `run.json` and
+  approvals. Keys and fields are unchanged, so runs stored by earlier
+  versions load and resume (`tests/fixtures/workflow_records.json`); leases,
+  fencing, the cost budget and its append-only `spend` list, approvals and
+  resume behave as before.
 - Stage records and a completion marker (CON-3). After each stage finishes and
   its approval gates pass, a run writes `stages/NN-name.json` atomically with
   the stage, its state, its seconds, the run's elapsed seconds, the
@@ -1150,6 +1286,85 @@ marked `Breaking:` and listed first in their group.
 
 ### Changed
 
+* **One rule for every size gate.** A gate that measures a test of nominal
+  level `L` (the falsification battery, the placebo-in-space test, the Holm
+  subgroup families, the intersection-union test, the two-sample shift
+  tests, the net-benefit band and the rollout e-process) passes when the
+  exact upper bound of its rejection rate is at most `L (1 + size_margin)`.
+  A ceiling of `L` itself fails a correctly sized test most of the time.
+  `size_margin` (0.69, `acceptance.toml`) is the largest margin any
+  registered gate needs, at its replicate count, `alpha` and `power`, for a
+  correctly sized test to pass with chance `power`; a test of twice its
+  level still fails. `falsification_alarm_max`, `familywise_error_max`,
+  `shift_false_alarm_max` (0.075) and `false_useful_max` are removed.
+* **Regression-discontinuity tests use Student's t.** The jump, its
+  placebos and its covariate balance are referred to t with
+  Welch-Satterthwaite degrees of freedom of the HC3 variance (each record
+  carries `dof`) instead of the normal. With the normal the falsification
+  battery rejected 0.0119 of 30000 development null worlds at level 0.01
+  (exact lower bound 0.0109), and rejects 0.0097 with t (upper bound
+  0.0107); intervals are slightly wider.
+* **The served model is refit on every row.** After the one-time test, the
+  selected configuration (with its pseudo-labels, decision threshold and
+  group thresholds) is refit on development and test rows together and the
+  bundle serves that refit; `evaluation.json` records it under `shipped`
+  (`refit`, `rows`, `reason`). The test metrics stay those of the fit that
+  never saw the test rows. The refit is skipped, on record, under a charter,
+  for streamed training, or when it would not end before the packaging
+  reserve.
+* **Repeated records are exchangeable draws.** The random, stratified and
+  event-stratified splits no longer move copies of one record to one side of
+  every split; as in scikit-learn's k-fold and OpenML's splits, a future case
+  may repeat a past one, so repeats may fall on both sides. The split notes
+  count the test rows that repeat a development record. Copies of one entity
+  are declared with `data.group_column`; a charter run's custody carve still
+  keeps copies together. `duplicates.cohere`, `locate` and `majority` and
+  `Splitter.gather` are removed (`Splitter.disclose` counts instead).
+* **C5 split hygiene amended (owner decision 2026-11-19).** Identical rows
+  are independent draws and may cross a split, as in scikit-learn and
+  OpenML; copies of one declared entity (`data.group_column`, or
+  `validation.entities = unseen`) never cross. C5 now requires no declared
+  entity and no tied timestamp on both sides of any split; duplicate rows
+  that cross are reported and are a violation only when they belong to one
+  declared entity. As registered, any duplicate on both sides failed the
+  row ([`docs/preregistration/c5.md`](docs/preregistration/c5.md)). Copies
+  beyond chance are leakage for C2 instead: the leakage screen's
+  `duplication` hypothesis flags a duplicate rate above the table's own
+  natural rate (the exact pairs its singletons and triples allow).
+* **Gradient boosting stops early at a smaller learning rate.** The
+  untuned histogram gradient boosting model (classifier and regressor)
+  runs at learning rate
+  `SHRINKAGE` 0.05 (was scikit-learn's 0.1) with up to `ROUNDS` 500
+  rounds, stopping after `PATIENCE` 20 rounds without improvement on a
+  held-out tenth of the training rows; the search still ranges over 0.02
+  to 0.3. A fit whose rarest class has a single row runs every round
+  instead, and records whether it was allowed to stop (`stopped_`).
+* **Classification trees split the same on every CPU architecture (C6).**
+  The decision tree, random forest and extra trees classifiers are now
+  `scmle.models.sklearn.trees.Tree`, `Forest` and `Extra`. scikit-learn's
+  Gini split proxy, fused into one multiply-add on arm64, could break an
+  exact tie differently from x86-64; these grow the equivalent regression
+  trees on the class indicators, whose ties are decided by exactly rounded
+  arithmetic, and store them as stock classification trees, so prediction,
+  persistence and ONNX export see ordinary scikit-learn trees.
+  `oob_score` and `warm_start` are refused. Bundles now pickle
+  `scmle.models.sklearn.trees`, recorded in the pickle census of bundle
+  format 4 (`tests/fixtures/pickled_modules.json`).
+
+- Deprecated, warning with `DeprecationWarning` and refused in the next
+  release: a plain string as a plugin kind (`plugins.REGISTRY.enrol("metrics",
+  ...)`; pass `plugins.Kind.METRICS`), and `scmle.models.registry.adopt`,
+  `extensions` and `deregister` (use `plugins.REGISTRY.enrol`, `entries` and
+  `withdraw` with `plugins.Kind.ESTIMATORS`).
+- The modality lifecycle runs on the pipeline engine. Its mutable `Context`
+  is replaced by `modality_lifecycle.Board` (the run's fixed inputs and the
+  frozen product of each finished stage) and `clocked` by
+  `lifecycle.measure`, which builds the performance observations from the
+  engine's stage timings. Reports, checkpoints and their digests are
+  unchanged, and checkpoints signed earlier still resume.
+- `benchmarks/profile.py` reads each stage's seconds and peak memory from
+  the engine (`Pipeline.timings`) instead of wrapping the stages' `execute`,
+  so it profiles every stage of the run, enrolled ones included.
 - Resume (`Project.resume`, `scmle resume`) keeps the time a run already
   spent: the largest elapsed seconds in its stage records start the time
   budget and the run clock, so the budget is not restarted (CON-4). Resume
@@ -1336,6 +1551,13 @@ marked `Breaking:` and listed first in their group.
 
 ### Removed
 
+- Gates `ingest.multiplicity` and `robustness.assessment_present`, which no
+  input could reach (`tests/unit/test_unreachable_gates.py`). The declared
+  family size and the synthesized columns are counted from one dictionary;
+  the split keeps every column but the target; the exploration plan puts
+  every column among its hypotheses or its skipped list and registers every
+  hypothesis; and the governed exploration always runs the stability stage,
+  which sets its assessment or raises before the report is written.
 - Cloud infrastructure and everything built on it, to focus on the package: the
   Terraform for AWS and GCP and its reader, policy check and orphan finder; the
   ECS and Cloud Run runtime adapters and `scmle deploy observe`; the S3 and GCS

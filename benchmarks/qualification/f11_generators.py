@@ -146,6 +146,57 @@ def binormal_differences(
     return numpy.stack([rule, rule - everyone])
 
 
+def acted_world(
+    rng: numpy.random.Generator,
+    n: int,
+    share: float,
+    precision: float,
+    rest: float,
+) -> tuple[NDArray[numpy.float64], NDArray[numpy.float64]]:
+    """A rule acting on `share` of rows, with set outcome rates on each side.
+
+    Args:
+        rng: Random generator.
+        n: Number of rows.
+        share: Probability that the rule acts on a row.
+        precision: Outcome rate among the rows the rule acts on.
+        rest: Outcome rate among the rows it leaves alone.
+
+    Returns:
+        The labels and the rule's actions, each of shape (n,).
+    """
+    acts = (rng.random(n) < share).astype(float)
+    rate = numpy.where(acts == 1.0, precision, rest)
+    return (rng.random(n) < rate).astype(float), acts
+
+
+def acted_differences(
+    share: float,
+    precision: float,
+    rest: float,
+    ts: NDArray[numpy.float64],
+) -> NDArray[numpy.float64]:
+    """True `NB_rule - NB_none` and `NB_rule - NB_all` of `acted_world`.
+
+    With `w = t / (1 - t)`, the rule's net benefit is
+    `share (precision - w (1 - precision))` and its gain over treating
+    everyone is `(1 - share) (w (1 - rest) - rest)`.
+
+    Args:
+        share: Probability that the rule acts on a row.
+        precision: Outcome rate among the rows the rule acts on.
+        rest: Outcome rate among the rows it leaves alone.
+        ts: Threshold probabilities in (0, 1).
+
+    Returns:
+        The two differences at each threshold, shape `(2, grid)`.
+    """
+    w = ts / (1.0 - ts)
+    rule = share * (precision - w * (1.0 - precision))
+    gain = (1.0 - share) * (w * (1.0 - rest) - rest)
+    return numpy.stack([rule, gain])
+
+
 # --- off-policy evaluation -------------------------------------------------
 
 EFFECT_UP = 0.25

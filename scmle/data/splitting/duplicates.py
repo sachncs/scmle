@@ -1,12 +1,10 @@
-"""Keeps copies of one record on the same side of every split.
+"""Finds rows that repeat one record.
 
-If a record appears twice and the copies land in training and in the locked
-test set, the test score rewards memorising rather than generalising. Rows
-whose features match (numbers compared to six decimals, text exactly) form a
-group, and a post-processing pass moves each group wholly to one side.
+Rows whose features match (numbers compared to six decimals, text exactly)
+form a group. The splitter counts test rows that repeat a development record
+(`splitters.Splitter.disclose`); a charter run's custody carve keeps each
+group on one side; the duplicate detector reports them.
 """
-
-from collections import Counter
 
 import numpy
 import pandas
@@ -41,104 +39,3 @@ def duplicate_groups(
     codes, uniques = pandas.factorize(hashes)
     sizes = numpy.bincount(codes, minlength=len(uniques))
     return numpy.where(sizes[codes] > 1, codes, NOT_DUPLICATED)
-
-
-def majority(values: list[int]) -> int:
-    """Finds the most common value, preferring the smallest on a tie.
-
-    An empty list is not valid: `max` fails on it with a `ValueError`.
-
-    Args:
-        values: A non-empty list of integers.
-
-    Returns:
-        The value that occurs most often; among equally common values, the
-        smallest (the conservative side).
-    """
-    counts = Counter(values)
-    best = max(counts.values())
-    return min(value for value, count in counts.items() if count == best)
-
-
-def locate(
-    dev_ids: numpy.ndarray,
-    folds: list[tuple[numpy.ndarray, numpy.ndarray]],
-    members: dict[int, list[int]],
-    side: dict[int, int],
-) -> dict[int, int]:
-    """Finds the fold that holds out each development row of a duplicate group.
-
-    Each duplicate group is held out in the single fold where most of its
-    rows were held out.
-
-    Args:
-        dev_ids: Development row ids before the move.
-        folds: Folds as positions within `dev_ids`.
-        members: Row ids of each duplicate group.
-        side: Side of each row after the move, 0 for development.
-
-    Returns:
-        The fold index for every development row that is held out.
-    """
-    held_in: dict[int, int] = {}
-    for index, fold in enumerate(folds):
-        for position in fold[1]:
-            held_in[int(dev_ids[position])] = index
-    for rows in members.values():
-        inside = [held_in[row] for row in rows if row in held_in]
-        if not inside:
-            continue
-        chosen = majority(inside)
-        for row in rows:
-            if side[row] == 0:
-                held_in[row] = chosen
-    return held_in
-
-
-def cohere(
-    dev_ids: numpy.ndarray,
-    test_ids: numpy.ndarray,
-    folds: list[tuple[numpy.ndarray, numpy.ndarray]],
-    groups: numpy.ndarray,
-) -> tuple[
-    numpy.ndarray, numpy.ndarray, list[tuple[numpy.ndarray, numpy.ndarray]], int
-]:
-    """Moves each duplicate group wholly into development or the test.
-
-    A group goes where most of its rows already sit (development on a tie).
-    Inside development, each group is held out in the single fold where most
-    of its rows were held out.
-
-    Args:
-        dev_ids: Development row ids.
-        test_ids: Test row ids.
-        folds: Folds as positions within `dev_ids`.
-        groups: Group id per row of the frame.
-
-    Returns:
-        The new development ids, test ids and folds, and the number of
-        duplicate groups kept together.
-    """
-    side = {int(i): 0 for i in dev_ids} | {int(i): 1 for i in test_ids}
-    members: dict[int, list[int]] = {}
-    for row, group in enumerate(groups):
-        if group != NOT_DUPLICATED:
-            members.setdefault(int(group), []).append(row)
-    for rows in members.values():
-        target = majority([side[row] for row in rows])
-        for row in rows:
-            side[row] = target
-    new_dev = numpy.array(sorted(r for r, s in side.items() if s == 0))
-    new_test = numpy.array(sorted(r for r, s in side.items() if s == 1))
-    held_in = locate(dev_ids, folds, members, side)
-    rebuilt = []
-    for index in range(len(folds)):
-        held_rows = {row for row, fold in held_in.items() if fold == index}
-        held = numpy.array(
-            [p for p, row in enumerate(new_dev) if int(row) in held_rows]
-        )
-        fit = numpy.array(
-            [p for p, row in enumerate(new_dev) if int(row) not in held_rows]
-        )
-        rebuilt.append((fit, held))
-    return new_dev, new_test, rebuilt, len(members)

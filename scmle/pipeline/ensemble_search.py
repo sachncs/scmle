@@ -69,7 +69,10 @@ class Stacker:
         Nothing is done if the configured ensemble size is below
         `ensembles.MIN_MEMBERS` or the resource governor asks to skip. With
         fewer than `ensembles.MIN_MEMBERS` eligible models, each combiner is
-        rejected with that reason.
+        rejected with that reason. A combiner that does not support the
+        task (an ordinal stack would be a plain regression, without the class
+        probabilities an ordinal model must give) is rejected with the
+        adapter's objection and never run.
 
         Args:
             evaluated: All trials produced before the ensemble step.
@@ -94,9 +97,14 @@ class Stacker:
                 for t in members
             ]
         }
+        task = scmle.pipeline.context.require(self.context.task, "task")
         for combiner in COMBINERS:
             if self.context.regulator.skip_reason(first=False):
                 return
+            reason = self.context.registry.get(combiner).objection(task)
+            if reason is not None:
+                self.context.enter(combiner, experiments.Edict.REJECT, reason)
+                continue
             self.context.check_cancelled()
             trial_id = self.context.allocate(1)[0]
             outcome = self.runner.run(trial_id, combiner, params)

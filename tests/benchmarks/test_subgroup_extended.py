@@ -73,3 +73,39 @@ def test_a_changed_hash_is_reported():
     assert subgroup_extended.problems(document) == [
         "subgroup_extended: measurements are for other code"
     ]
+
+
+def test_the_stored_verdicts_follow_from_the_exact_bounds():
+    document = stored()
+    assert document["terms"] == subgroup_extended.terms()
+    certify = subgroup_extended.subgroup_certify
+    unequal = document["unequal_levels"]
+    assert unequal["passed"] is (
+        certify.controlled(unequal["familywise_error_null"])
+        and certify.controlled(unequal["familywise_error_partial_null"])
+    )
+    enough = [
+        int(k)
+        for k, row in unequal["power_at_effect_half_sd"].items()
+        if certify.powered(row)
+    ]
+    assert unequal["min_rows_power_80"] == (min(enough) if enough else None)
+    assert unequal["power_replicates"] == subgroup_extended.POWER_REPLICATES
+    overlap = document["overlapping_columns"]
+    assert overlap["passed"] is (
+        certify.controlled(overlap["familywise_error_null"])
+        and certify.controlled(
+            overlap["familywise_error_true_nulls_with_effect_in_g0"]
+        )
+    )
+    # 107 of 2000 is within the size ceiling; twice the level is not
+    assert certify.controlled(certify.rate(107, 2000))
+    assert not certify.controlled(certify.rate(200, 2000))
+
+
+def test_changed_terms_are_reported():
+    document = stored()
+    document["terms"] = {**document["terms"], "replicates": 1000}
+    assert subgroup_extended.problems(document) == [
+        "subgroup_extended: measured under another rule or replicate count"
+    ]

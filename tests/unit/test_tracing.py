@@ -154,9 +154,7 @@ def test_the_cli_switch_enables_tracing_for_the_command(monkeypatch):
     monkeypatch.setattr(
         tracing.TRACING, "enable", lambda: seen.append("on") or True
     )
-    monkeypatch.setattr(
-        tracing.TRACING, "disable", lambda: seen.append("off")
-    )
+    monkeypatch.setattr(tracing.TRACING, "disable", lambda: seen.append("off"))
     code = cli.main(["--trace", "batch", "missing-bundle", "missing.csv"])
     assert code == cli.EXIT_FAILED
     assert seen == ["on", "off"]

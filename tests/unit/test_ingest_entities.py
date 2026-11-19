@@ -68,6 +68,8 @@ def test_resolution_with_labels_reports_pair_completeness_and_recall():
 
 
 def test_unlabelled_resolution_is_unverified_and_groups_more_not_less():
+    # Enforces website/src/pages/docs/artifacts.astro:114.
+    # Enforces website/src/pages/docs/qualification.astro:70.
     frame = ingest_worlds.er_world(3, 200)
     truth = frame["entity"].to_numpy()
     result = entities.resolve(frame, FIELDS, PASSES)

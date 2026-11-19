@@ -2,6 +2,7 @@
 
 import pytest
 
+from benchmarks import acceptance
 from benchmarks.qualification import __main__
 from benchmarks.qualification import f5
 from benchmarks.qualification import standins
@@ -15,15 +16,21 @@ def committed():
     return certificates.Store.load(f5.CERT_PATH)
 
 
-def test_policy_is_the_pre_declared_one():
-    assert f5.POLICY.recall == 0.80
-    assert f5.POLICY.alarms == 0.05
-    assert f5.POLICY.confidence == 0.95
+def test_policy_is_the_plans_one():
+    # Plan section 7, exploratory analysis: recall bound >= 0.90 and false
+    # findings <= 0.05, both read from acceptance.toml, never typed here.
+    variables = acceptance.load()
+    assert f5.POLICY.recall == variables["profile_recall_min"].value == 0.90
+    assert f5.POLICY.alarms == variables["profile_false_max"].value
+    # Each bound is the one-sided exact (Clopper-Pearson) bound at alpha.
+    assert f5.POLICY.confidence == 1.0 - 2 * variables["alpha"].value
+    assert f5.POLICY.method == "exact"
     assert set(f5.ROW_SEEDS).isdisjoint(range(100, 200))
 
 
 def test_committed_certificates_are_current_and_consistent(committed):
     assert f5.problems(committed) == []
+    assert {c.policy for c in committed.certificates} == {f5.POLICY}
     assert f5.audit_problems(committed) == []
     assert {c.detector for c in committed.certificates} == set(registry.SPECS)
     for item in committed.certificates:

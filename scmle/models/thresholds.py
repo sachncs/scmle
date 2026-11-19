@@ -457,3 +457,30 @@ class Segmenter(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc]
             positive, self.classes_[1], self.classes_[0]
         )
         return labels
+
+
+def rewrap(wrapped: Any, fitted: Any) -> Any:
+    """Puts a refit classifier inside the threshold wrappers of another.
+
+    Args:
+        wrapped: A fitted model, possibly inside `Classifier` and
+            `Segmenter` wrappers.
+        fitted: The refit model to put at the core.
+
+    Returns:
+        `fitted` inside the same wrappers, with the same thresholds and
+        group assigner; `fitted` itself when `wrapped` has no wrapper.
+    """
+    if isinstance(wrapped, Segmenter):
+        return Segmenter(
+            rewrap(wrapped.estimator, fitted),
+            wrapped.column,
+            wrapped.assigner,
+            wrapped.thresholds,
+            wrapped.default_threshold,
+        )
+    if isinstance(wrapped, Classifier):
+        return Classifier.around(
+            rewrap(wrapped.estimator_, fitted), wrapped.threshold
+        )
+    return fitted

@@ -1,4 +1,6 @@
 {
+  "alpha": 0.05,
+  "code": "894b99828fadfec549b1446917e96cdfc7b10dfa2b45480e9ad7cb25c7ddc7cf",
   "development_seed_base": 10000,
   "feasibility": {
     "agreement": 0.986,
@@ -19,9 +21,9 @@
     "asked_when_critical": 200,
     "asked_when_given": 0,
     "asked_when_robust": 0,
-    "false_question_wilson_upper": 0.009512294334296508,
+    "false_question_upper": 0.007461355528799602,
     "meets_floor": true,
-    "recall_wilson_lower": 0.9811546736227335,
+    "recall_lower": 0.9851329607687279,
     "runs_each": 200
   },
   "power": {
@@ -29,7 +31,8 @@
     "closed_form_power": 0.9544588413906322,
     "clusters": 100,
     "empirical_power": 0.9655,
-    "floor": 0.7821114561800018,
+    "floor": 0.8,
+    "lower": 0.9580090024751033,
     "meets_floor": true,
     "runs": 2000
   },
@@ -37,7 +40,7 @@
     "accepted": 0,
     "malformed": 1000
   },
-  "seconds": 7.4,
+  "seconds": 9.0,
   "selective_labels": {
     "alpha": 0.01,
     "clean": 500,
@@ -53,64 +56,73 @@
       "meets_bound": true,
       "rate": 0.025,
       "rejections": 50,
-      "runs": 2000
+      "runs": 2000,
+      "upper": 0.031538027740025856
     },
     "null_both/200": {
       "clusters": 200,
       "meets_bound": true,
       "rate": 0.024,
       "rejections": 48,
-      "runs": 2000
+      "runs": 2000,
+      "upper": 0.030426954715855138
     },
     "null_both/50": {
       "clusters": 50,
       "meets_bound": true,
       "rate": 0.026,
       "rejections": 52,
-      "runs": 2000
+      "runs": 2000,
+      "upper": 0.03264673689915205
     },
     "null_hi/20": {
       "clusters": 20,
       "meets_bound": true,
       "rate": 0.0465,
       "rejections": 93,
-      "runs": 2000
+      "runs": 2000,
+      "upper": 0.05500401220708392
     },
     "null_hi/200": {
       "clusters": 200,
       "meets_bound": true,
       "rate": 0.048,
       "rejections": 96,
-      "runs": 2000
+      "runs": 2000,
+      "upper": 0.056619530854990115
     },
     "null_hi/50": {
       "clusters": 50,
       "meets_bound": true,
       "rate": 0.051,
       "rejections": 102,
-      "runs": 2000
+      "runs": 2000,
+      "upper": 0.05984437570293134
     },
     "null_lo/20": {
       "clusters": 20,
       "meets_bound": true,
       "rate": 0.017,
       "rejections": 34,
-      "runs": 2000
+      "runs": 2000,
+      "upper": 0.022568926635159147
     },
     "null_lo/200": {
       "clusters": 200,
       "meets_bound": true,
       "rate": 0.001,
       "rejections": 2,
-      "runs": 2000
+      "runs": 2000,
+      "upper": 0.0031445178378896837
     },
     "null_lo/50": {
       "clusters": 50,
       "meets_bound": true,
       "rate": 0.0055,
       "rejections": 11,
-      "runs": 2000
+      "runs": 2000,
+      "upper": 0.009087352469332526
     }
   },
-  "size_bound": 0.059746794344808965
+  "size_ceiling": 0.0845
 }

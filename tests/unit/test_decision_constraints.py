@@ -57,6 +57,7 @@ def test_a_point_estimate_below_the_bound_is_not_satisfaction():
 
 
 def test_small_groups_are_not_assessable_never_passing():
+    # Enforces website/src/pages/docs/causal-decision.astro:24.
     groups = numpy.array([0] * 300 + [1] * 10)
     y = numpy.tile([1.0, 0.0], 155)
     acts = y.copy()
@@ -85,6 +86,7 @@ def test_each_criterion_reads_its_own_rate():
 
 
 def test_group_thresholds_close_a_gap_and_the_price_is_reported():
+    # Enforces website/src/pages/docs/causal-decision.astro:24.
     score, y, groups = binormal(30000, 2)
     t = 0.3
     free = (score >= t).astype(float)
@@ -126,6 +128,7 @@ def test_predictive_parity_cannot_be_reached_by_group_thresholds():
 
 
 def test_incompatible_criteria_are_refused_only_when_base_rates_differ():
+    # Enforces website/src/pages/docs/causal-decision.astro:24.
     pair = (
         constraint("demographic_parity"),
         constraint("equalized_odds"),
@@ -170,6 +173,7 @@ def test_clustered_rows_are_not_declared_satisfied_more_often_than_alpha():
     # test may make it in at most 7 percent of 400 worlds, and the row-wise
     # test, which treats the rows as independent, makes it at least 3 points
     # more often.
+    # Enforces website/src/pages/docs/causal-decision.astro:24.
     rule = constraint("demographic_parity", gap=0.05, minimum=30)
     worlds = 400
     rows = cluster_aware = 0

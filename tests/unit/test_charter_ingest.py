@@ -94,7 +94,7 @@ def entity_block():
 
 
 def test_a_format_seven_ingest_charter_keeps_hash_and_signature():
-    # Enforces docs/API_STABILITY.md:85.
+    # Enforces docs/API_STABILITY.md:88.
     charter = make_charter(ingest=ingest.Ingestion(features=50, lag=1.0))
     assert charter.charter_hash == FORMAT_SEVEN_HASH
     assert charter.format_version == 7
@@ -103,7 +103,8 @@ def test_a_format_seven_ingest_charter_keeps_hash_and_signature():
 
 
 def test_the_entity_block_needs_format_eight_and_round_trips():
-    # Enforces docs/API_STABILITY.md:85.
+    # Enforces docs/API_STABILITY.md:88.
+    # Enforces website/src/pages/docs/api-stability.astro:53.
     spec = ingest.Ingestion(features=50, lag=1.0, entity=entity_block())
     charter = make_charter(ingest=spec)
     assert charter.format_version == 8
@@ -158,7 +159,8 @@ def reconcile_block():
 
 
 def test_the_reconcile_block_needs_format_eight_and_round_trips():
-    # Enforces docs/API_STABILITY.md:85.
+    # Enforces docs/API_STABILITY.md:88.
+    # Enforces website/src/pages/docs/api-stability.astro:53.
     spec = ingest.Ingestion(reconcile=reconcile_block())
     charter = make_charter(ingest=spec)
     assert charter.format_version == 8

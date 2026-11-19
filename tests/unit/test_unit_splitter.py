@@ -4,10 +4,12 @@ import numpy
 import pandas
 import pytest
 
+from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.splitting.splitters import partitions
 from scmle.data.splitting.splitters import splits
 from scmle.data.splitting.splitters import splitter
+from scmle.data.splitting.splitters import temporal
 
 
 def spec(strategy="auto", **data):
@@ -38,8 +40,8 @@ def test_the_registry_names_every_strategy():
         "treatment_stratified": splits.Treatment,
         "preset": splits.Preset,
         "group": splits.Group,
-        "temporal": splits.Chronology,
-        "rolling": splits.Rolling,
+        "temporal": temporal.Chronology,
+        "rolling": temporal.Rolling,
     } == splitter.STRATEGIES
     assert splitter.TASK_STRATEGIES == {
         tasks.Task.SURVIVAL: "stratified_events",
@@ -120,12 +122,15 @@ def test_split_is_disjoint_and_records_its_manifest():
 def test_split_uses_a_preset_side_column():
     data = frame(10)
     data["split_side"] = [0] * 8 + [1] * 2
-    result = splitter.Splitter(spec(), tasks.Task.BINARY).split(data)
+    result = splitter.Splitter(spec(), tasks.Task.REGRESSION).split(data)
     assert result.manifest.strategy == "preset"
     assert result.manifest.test_ids == (8, 9)
+    # two test rows cannot score both classes of a binary task
+    with pytest.raises(errors.BlockedError, match="test rows"):
+        splitter.Splitter(spec(), tasks.Task.BINARY).split(data)
 
 
-def test_gather_keeps_duplicate_rows_together():
+def test_disclose_counts_test_rows_that_repeat_development():
     data = pandas.DataFrame(
         {"x": [1.0, 1.0, 2.0, 3.0, 4.0, 5.0], "y": [0, 0, 1, 0, 1, 0]}
     )
@@ -133,22 +138,22 @@ def test_gather_keeps_duplicate_rows_together():
     part = partitions.Partition(
         numpy.array([0, 2, 3, 4]), numpy.array([1, 5]), [], ["n"]
     )
-    gathered = built.gather(data, part)
-    dev, test = set(gathered.dev_ids.tolist()), set(gathered.test_ids.tolist())
-    assert {0, 1} <= dev or {0, 1} <= test
-    assert gathered.notes[0] == "n"
-    assert gathered.notes[1] == (
-        "1 groups of duplicate rows (2 rows) kept on one side of every split"
+    told = built.disclose(data, part)
+    assert told.dev_ids.tolist() == [0, 2, 3, 4]
+    assert told.test_ids.tolist() == [1, 5]
+    assert told.notes[0] == "n"
+    assert told.notes[1].startswith(
+        "1 of 2 test rows repeat a development record"
     )
     unique = pandas.DataFrame({"x": [1.0, 2.0], "y": [0, 1]})
     plain = partitions.Partition(numpy.array([0]), numpy.array([1]), [], [])
-    assert built.gather(unique, plain) is plain
+    assert built.disclose(unique, plain) is plain
 
 
 def test_duplicates_are_ignored_by_identity_columns():
     data = pandas.DataFrame({"i": [1, 2], "x": [1.0, 1.0], "y": [0, 1]})
     built = splitter.Splitter(spec(id_columns=["i"]), tasks.Task.BINARY)
     part = partitions.Partition(numpy.array([0]), numpy.array([1]), [], [])
-    assert built.gather(data, part) is not part
+    assert built.disclose(data, part) is not part
     keyed = splitter.Splitter(spec(), tasks.Task.BINARY)
-    assert keyed.gather(data, part) is part
+    assert keyed.disclose(data, part) is part

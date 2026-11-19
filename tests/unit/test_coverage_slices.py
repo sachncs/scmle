@@ -39,6 +39,7 @@ def descriptive_gate():
 
 
 def test_the_summary_gives_coverage_interval_size_and_a_descriptive_flag():
+    # Enforces website/src/pages/docs/artifacts.astro:61.
     rng = numpy.random.default_rng(0)
     labels = numpy.array(["x"] * 200 + ["y"] * 200 + ["z"] * 5)
     inside = rng.random(405) < 0.9
@@ -64,6 +65,7 @@ def test_the_summary_gives_coverage_interval_size_and_a_descriptive_flag():
 
 
 def test_a_badly_undercovered_slice_is_flagged_and_certified_only_when_gating():
+    # Enforces website/src/pages/docs/artifacts.astro:61.
     rng = numpy.random.default_rng(1)
     labels = numpy.array(["ok"] * 300 + ["bad"] * 300)
     inside = numpy.concatenate([rng.random(300) < 0.9, rng.random(300) < 0.5])
@@ -87,6 +89,7 @@ def test_a_badly_undercovered_slice_is_flagged_and_certified_only_when_gating():
 
 
 def test_a_slice_below_the_certified_size_is_not_certified():
+    # Enforces website/src/pages/docs/qualification.astro:123.
     labels = numpy.array(["a"] * 60 + ["b"] * 300)
     inside = numpy.ones(360, dtype=bool)
     gate = coverage_slices.FlagGate(coverage_slices.GATING, "test", 100)
@@ -99,6 +102,7 @@ def test_a_slice_below_the_certified_size_is_not_certified():
 
 
 def test_the_flag_gate_follows_the_stored_certificate(tmp_path):
+    # Enforces website/src/pages/docs/artifacts.astro:61.
     path = tmp_path / "c.json"
     assert coverage_slices.flag_gate(path).status == "descriptive"
     entry = {

@@ -105,6 +105,7 @@ def test_data_beyond_tabpfns_row_and_feature_limits_is_refused():
 
 
 def test_sample_weights_are_refused_rather_than_silently_ignored():
+    # Enforces website/src/pages/docs/modeling.astro:51.
     features, labels = separable(50)
 
     with pytest.raises(ValueError, match="does not support sample weights"):
@@ -156,7 +157,10 @@ def test_the_adapter_is_rejected_without_the_package_and_explains_why():
 def test_the_adapter_stays_extension_only_when_its_package_is_available(
     monkeypatch,
 ):
-    """Installing TabPFN must not silently promote it into the beta."""
+    """Installing TabPFN must not silently promote it into the beta.
+
+    Also enforces website/src/pages/docs/capabilities.astro:10.
+    """
     adapter = registry.Catalog.stock().get("tabpfn")
     monkeypatch.setattr(adapter, "is_available", lambda: True)
 

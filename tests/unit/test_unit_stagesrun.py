@@ -11,6 +11,8 @@ import json
 import numpy
 import pandas
 import pytest
+from sklearn import base
+from sklearn import metrics
 
 import scmle.api.project
 from scmle.pipeline.stages import admission
@@ -238,6 +240,39 @@ def test_the_package_serves_the_selected_model(run):
         .read_text("utf-8")
         .startswith("<!doctype html>")
     )
+
+
+def test_the_package_serves_the_choice_refit_on_every_row(run):
+    result, frame = run
+    evaluation = read(result, "evaluation.json")
+    features, target = frame.drop(columns="y"), frame["y"]
+    served = result.bundle.pipeline
+    again = base.clone(served).fit(features, target)
+    numpy.testing.assert_allclose(
+        served.predict_proba(features), again.predict_proba(features)
+    )
+    assert evaluation["shipped"] == {
+        "refit": True,
+        "rows": len(frame),
+        "reason": "",
+    }
+
+
+def test_the_test_metrics_come_from_the_fit_without_the_test_rows(run):
+    result, frame = run
+    evaluation = read(result, "evaluation.json")
+    manifest = read(result, "validation_manifest.json")
+    features, target = frame.drop(columns="y"), frame["y"]
+    dev, test = manifest["training"], manifest["test"]
+    evaluated = base.clone(result.bundle.pipeline).fit(
+        features.iloc[dev], target.iloc[dev]
+    )
+    held = evaluated.predict_proba(features.iloc[test])[:, 1]
+    served = result.bundle.pipeline.predict_proba(features.iloc[test])[:, 1]
+    assert evaluation["metrics"]["roc_auc"] == pytest.approx(
+        metrics.roc_auc_score(target.iloc[test], held)
+    )
+    assert not numpy.allclose(held, served)
 
 
 def test_the_run_completes_with_a_record_of_the_whole(run):

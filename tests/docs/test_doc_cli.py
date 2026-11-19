@@ -3,7 +3,6 @@
 import logging
 import os
 import pathlib
-import types
 
 from scmle import cli
 from scmle.deploy import parity
@@ -29,7 +28,10 @@ def options(parser):
 
 
 def test_deploy_commands_take_keys_only_as_files():
-    """Enforces docs/CLI.md:163."""
+    """Enforces docs/CLI.md:163.
+
+    Also enforces website/src/pages/docs/cli.astro:96.
+    """
     deploy = next(
         action.choices["deploy"]
         for action in vars(cli.build_parser())["_actions"]
@@ -40,24 +42,24 @@ def test_deploy_commands_take_keys_only_as_files():
     assert all(option.endswith("-file") for option in named), named
 
 
-class Interrupted:
-    """Stands in for `threading.Event` in the CLI: waiting is a Ctrl-C."""
-
-    def wait(self):
-        raise KeyboardInterrupt
+def briefly(adapter, *unused):
+    """Stands in for `runtime.hold`: starts the server, then stops it."""
+    adapter.start()
+    adapter.stop()
 
 
 def test_serve_needs_authentication_beyond_loopback(
     tmp_path, monkeypatch, caplog
 ):
-    """Enforces docs/CLI.md:190."""
+    """Enforces docs/CLI.md:190.
+
+    Also enforces website/src/pages/docs/cli.astro:100.
+    """
     for name in list(os.environ):
         if name.startswith("SCMLE_AUTH_"):
             monkeypatch.delenv(name)
     monkeypatch.delenv("SCMLE_ENV", raising=False)
-    monkeypatch.setattr(
-        cli.delivery, "threading", types.SimpleNamespace(Event=Interrupted)
-    )
+    monkeypatch.setattr(cli.delivery.runtime, "hold", briefly)
     folder = tmp_path / "bundle"
     parity.handwrite(parity.goldens(GOLDEN).spec).save(folder)
     command = ["serve", str(folder), "--trusted", "--port", "0"]

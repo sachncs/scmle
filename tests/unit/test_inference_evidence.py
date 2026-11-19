@@ -37,7 +37,10 @@ def write_graph(path, graph: lineage.Graph) -> None:
 
 
 def test_linker_persists_exact_bundle_link_and_is_idempotent(tmp_path):
-    """An inference event is linked to the exact serving bundle once."""
+    """An inference event is linked to the exact serving bundle once.
+
+    Also enforces website/src/pages/docs/evidence.astro:117.
+    """
     path = tmp_path / "evidence" / "graph.json"
     write_graph(path, build_graph())
     linker = evidence.Linker()
@@ -67,7 +70,10 @@ def test_linker_persists_exact_bundle_link_and_is_idempotent(tmp_path):
 
 
 def test_linker_rejects_conflicting_event_and_bundle_identity(tmp_path):
-    """An event ID cannot be reused for different content or a new bundle."""
+    """An event ID cannot be reused for different content or a new bundle.
+
+    Also enforces website/src/pages/docs/evidence.astro:117.
+    """
     path = tmp_path / "graph.json"
     write_graph(path, build_graph())
     linker = evidence.Linker()
