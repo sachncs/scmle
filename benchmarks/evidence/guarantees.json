@@ -77,8 +77,8 @@
       "unlinked": 0
     },
     "docs/PORTABLE_TRAINING.md": {
-      "guarantees": 4,
-      "unlinked": 0
+      "guarantees": 5,
+      "unlinked": 1
     },
     "docs/READING_RESULTS.md": {
       "guarantees": 5,
@@ -101,8 +101,8 @@
       "unlinked": 0
     },
     "docs/TENANT_ISOLATION.md": {
-      "guarantees": 13,
-      "unlinked": 0
+      "guarantees": 18,
+      "unlinked": 4
     },
     "docs/TRAIL.md": {
       "guarantees": 1,
@@ -149,8 +149,8 @@
       "unlinked": 4
     },
     "docs/preregistration/c2.md": {
-      "guarantees": 12,
-      "unlinked": 2
+      "guarantees": 14,
+      "unlinked": 4
     },
     "docs/preregistration/c3.md": {
       "guarantees": 3,
@@ -310,7 +310,7 @@
     },
     "website/src/pages/docs/portable-training.astro": {
       "guarantees": 3,
-      "unlinked": 0
+      "unlinked": 3
     },
     "website/src/pages/docs/qualification.astro": {
       "guarantees": 18,
@@ -362,11 +362,11 @@
     }
   },
   "claim": "C12",
-  "content_hash": "179bbf7c70ee173085929a9cd12f26aaabe7161e56f4565ea97fd4353a85d470",
+  "content_hash": "c8faf1bcb1068476f2d337b4bdf52a838deb6b3b79a8c9b82c366661f684cf79",
   "counts": {
-    "guarantees": 715,
-    "linked": 667,
-    "unlinked": 48
+    "guarantees": 723,
+    "linked": 665,
+    "unlinked": 58
   },
   "definition": {
     "docs": "README.md, docs/**/*.md (with docs/preregistration) and the site source website/src/**/*.astro and *.html",
@@ -1709,7 +1709,7 @@
         "tests/unit/test_service_hardening.py::test_the_dockerfile_pins_locks_and_drops_privileges",
         "tests/unit/test_service_hardening.py::test_the_placeholder_digest_stops_the_build"
       ],
-      "text": "`Dockerfile`, `.dockerignore`, `build.sh` | Base image pinned by a digest placeholder that the build refuses until `build.sh` resolves it; non-root user; locked install; credential files excluded; the script that scans the context, resolves the base, builds, scans and attests.",
+      "text": "`Dockerfile`, `.dockerignore`, `build.sh` | Base image pinned by digest: the default is the digest scmle recorded for that base (`scmle.deploy.base_image.PINNED`), `build.sh` resolves it again, and a base with no recorded pin gets the placeholder digest, which the build refuses; non-root user; locked install; credential files excluded; the script that scans the context, resolves the base, builds, scans and attests.",
       "vague": [],
       "words": [
         "refuses"
@@ -3239,17 +3239,31 @@
     {
       "cited": [],
       "doc": "docs/PORTABLE_TRAINING.md",
-      "end": 59,
-      "line": 55,
+      "end": 69,
+      "line": 64,
       "missing": [],
       "section": "runners",
       "tests": [
         "tests/unit/test_portable_training.py::test_the_entrypoint_checks_the_spec_digest_and_the_store_scheme"
       ],
-      "text": "A runner for a container platform starts `python -m scmle.runners.entrypoint` in the image, which opens the `file://` store named by `SCMLE_STORE_URI`, loads the stored spec, refuses it if its digest is not the one the runner started, and runs the workload (`SCMLE_WORKLOAD`, default `scmle.runners.project:run_project`).",
+      "text": "A runner for a container platform starts `python -m scmle.runners.entrypoint` in the image, which opens the `file://` store named by `SCMLE_STORE_URI` (confined to `tenants/<tenant>/` when `SCMLE_TENANT` is set), loads the stored spec, refuses it if its digest is not the one the runner started, and runs the workload (`SCMLE_WORKLOAD`, default `scmle.runners.project:run_project`).",
       "vague": [],
       "words": [
         "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/PORTABLE_TRAINING.md",
+      "end": 83,
+      "line": 79,
+      "missing": [],
+      "section": "the-image",
+      "tests": [],
+      "text": "`Dockerfile` at the repository root builds the image that trains: the released wheel on `deploy/requirements.lock`, every file installed with `--require-hashes`, on a base pinned by the digest of its multi-architecture index (`scmle.deploy.base_image.PINNED`; the placeholder digest and a bare tag are refused), run as uid 10001.",
+      "vague": [],
+      "words": [
+        "refused"
       ]
     },
     {
@@ -3991,8 +4005,80 @@
     {
       "cited": [],
       "doc": "docs/TENANT_ISOLATION.md",
-      "end": 44,
-      "line": 41,
+      "end": 39,
+      "line": 36,
+      "missing": [],
+      "section": "rules",
+      "tests": [
+        "tests/docs/test_doc_tenant_isolation.py::test_each_tenant_reaches_only_its_own_prefix"
+      ],
+      "text": "A JWK may carry a `tenant` field: that key then verifies only tokens whose tenant claim names that tenant (otherwise `wrong_tenant`), so even a key wrongly shared cannot carry a token from one tenant to another.",
+      "vague": [],
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 43,
+      "line": 40,
+      "missing": [],
+      "section": "rules",
+      "tests": [],
+      "text": "Each tenant's objects live in the namespace `tenants/<tenant>/` of the store (`scmle.storage.tenancy.Tenancy`): callers name keys relative to their namespace and the prefix is added underneath, never taken from the key.",
+      "vague": [],
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 45,
+      "line": 43,
+      "missing": [],
+      "section": "rules",
+      "tests": [],
+      "text": "A key that tries `..`, an absolute path, a backslash, a percent-encoded separator or the `tenants` root is refused, and a backend listing outside the namespace is refused too.",
+      "vague": [],
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 47,
+      "line": 46,
+      "missing": [],
+      "section": "rules",
+      "tests": [],
+      "text": "Tenant names are lowercase DNS labels, so two never share a directory on a case-insensitive file system.",
+      "vague": [],
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 51,
+      "line": 51,
+      "missing": [],
+      "section": "rules",
+      "tests": [],
+      "text": "A local store refuses any path through a symbolic link.",
+      "vague": [],
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 55,
+      "line": 52,
       "missing": [],
       "section": "rules",
       "tests": [
@@ -4008,8 +4094,8 @@
     {
       "cited": [],
       "doc": "docs/TENANT_ISOLATION.md",
-      "end": 46,
-      "line": 45,
+      "end": 57,
+      "line": 56,
       "missing": [],
       "section": "rules",
       "tests": [
@@ -4025,8 +4111,8 @@
     {
       "cited": [],
       "doc": "docs/TENANT_ISOLATION.md",
-      "end": 47,
-      "line": 46,
+      "end": 58,
+      "line": 57,
       "missing": [],
       "section": "rules",
       "tests": [
@@ -4042,8 +4128,8 @@
     {
       "cited": [],
       "doc": "docs/TENANT_ISOLATION.md",
-      "end": 52,
-      "line": 49,
+      "end": 63,
+      "line": 60,
       "missing": [],
       "section": "rules",
       "tests": [
@@ -4059,8 +4145,8 @@
     {
       "cited": [],
       "doc": "docs/TENANT_ISOLATION.md",
-      "end": 68,
-      "line": 66,
+      "end": 79,
+      "line": 77,
       "missing": [],
       "section": "what-this-does-not-give-you",
       "tests": [
@@ -4076,8 +4162,8 @@
     {
       "cited": [],
       "doc": "docs/TENANT_ISOLATION.md",
-      "end": 71,
-      "line": 69,
+      "end": 82,
+      "line": 80,
       "missing": [],
       "section": "what-this-does-not-give-you",
       "tests": [
@@ -4093,8 +4179,8 @@
     {
       "cited": [],
       "doc": "docs/TENANT_ISOLATION.md",
-      "end": 84,
-      "line": 84,
+      "end": 111,
+      "line": 111,
       "missing": [],
       "section": "configuration",
       "tests": [
@@ -4110,8 +4196,8 @@
     {
       "cited": [],
       "doc": "docs/TENANT_ISOLATION.md",
-      "end": 89,
-      "line": 87,
+      "end": 116,
+      "line": 114,
       "missing": [],
       "section": "configuration",
       "tests": [
@@ -5807,12 +5893,42 @@
     {
       "cited": [],
       "doc": "docs/preregistration/c2.md",
-      "end": 97,
-      "line": 94,
+      "end": 101,
+      "line": 98,
       "missing": [],
       "section": "where-the-current-module-differs",
       "tests": [],
-      "text": "- Holm is applied with the two C14 rows entered as not rejected (they are decided in `benchmarks/evidence/refusal.py`), which can only lower the C2 levels; at the first step the 78 clean tables are below the 86 a pass needs.",
+      "text": "- A future timestamp is screened as its user would run it, with the prediction time declared (`Dataset.cutoff`, the snapshot the closing dates fall after); the plan does not mention that declaration, and without it a closing date cannot be told from a legitimate trend.",
+      "vague": [],
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/preregistration/c2.md",
+      "end": 104,
+      "line": 102,
+      "missing": [],
+      "section": "where-the-current-module-differs",
+      "tests": [],
+      "text": "- A clean table the split gate refuses (a class too rare for the test rows) counts as a false block, as the plan words it; the row's outcomes count those apart from screen blocks.",
+      "vague": [],
+      "words": [
+        "block",
+        "blocks",
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/preregistration/c2.md",
+      "end": 109,
+      "line": 107,
+      "missing": [],
+      "section": "where-the-current-module-differs",
+      "tests": [],
+      "text": "- Holm is applied with the two C14 rows entered as not rejected (they are decided in `benchmarks/evidence/refusal.py`), which can only lower the C2 levels.",
       "vague": [],
       "words": [
         "rejected"
@@ -5821,15 +5937,17 @@
     {
       "cited": [],
       "doc": "docs/preregistration/c2.md",
-      "end": 99,
-      "line": 98,
+      "end": 112,
+      "line": 110,
       "missing": [],
       "section": "where-the-current-module-differs",
       "tests": [],
-      "text": "- Its result (recall 11/68, false blocks 8/78) was scored before this registration and decides nothing.",
+      "text": "- Its last recorded result, recall 63/68 (lower bound 0.823 against 0.90) and false blocks 10/167 (5 blocked by the screen, 5 refused by the split gate; upper bound 0.112 against 0.05), fails both rows.",
       "vague": [],
       "words": [
-        "blocks"
+        "blocked",
+        "blocks",
+        "refused"
       ]
     },
     {
@@ -8719,7 +8837,7 @@
         "tests/unit/test_service_hardening.py::test_the_dockerfile_pins_locks_and_drops_privileges",
         "tests/unit/test_service_hardening.py::test_the_placeholder_digest_stops_the_build"
       ],
-      "text": "`Dockerfile`, `.dockerignore`, `build.sh` | Base image pinned by a digest placeholder that the build refuses until `build.sh` resolves it; non-root user; locked install; credential files excluded; the script that scans the context, resolves the base, builds, scans and attests.",
+      "text": "`Dockerfile`, `.dockerignore`, `build.sh` | Base image pinned by digest: the default is the digest scmle recorded for that base, `build.sh` resolves it again, and a base with no recorded pin gets the placeholder digest, which the build refuses; non-root user; locked install; credential files excluded; the script that scans the context, resolves the base, builds, scans and attests.",
       "vague": [],
       "words": [
         "refuses"
@@ -11340,14 +11458,11 @@
     {
       "cited": [],
       "doc": "website/src/pages/docs/portable-training.astro",
-      "end": 27,
-      "line": 27,
+      "end": 29,
+      "line": 29,
       "missing": [],
       "section": "roles",
-      "tests": [
-        "tests/docs/test_doc_portable_training.py::test_check_separation_refuses_each_overlap_on_its_own",
-        "tests/unit/test_portable_training.py::test_training_cannot_run_as_serving_or_touch_released_bundles"
-      ],
+      "tests": [],
       "text": "A separation check refuses overlapping write prefixes, a training role that can write `bundles/` and a serving role that can write `runs/`.",
       "vague": [],
       "words": [
@@ -11357,14 +11472,11 @@
     {
       "cited": [],
       "doc": "website/src/pages/docs/portable-training.astro",
-      "end": 27,
-      "line": 27,
+      "end": 29,
+      "line": 29,
       "missing": [],
       "section": "roles",
-      "tests": [
-        "tests/docs/test_doc_portable_training.py::test_check_separation_refuses_each_overlap_on_its_own",
-        "tests/unit/test_portable_training.py::test_training_cannot_run_as_serving_or_touch_released_bundles"
-      ],
+      "tests": [],
       "text": "Workloads receive a `RoleStore` that enforces the training role, and a job spec naming the serving identity is refused by every runner.",
       "vague": [],
       "words": [
@@ -11375,14 +11487,12 @@
     {
       "cited": [],
       "doc": "website/src/pages/docs/portable-training.astro",
-      "end": 31,
-      "line": 31,
+      "end": 33,
+      "line": 33,
       "missing": [],
       "section": "runners",
-      "tests": [
-        "tests/unit/test_portable_training.py::test_the_entrypoint_checks_the_spec_digest_and_the_store_scheme"
-      ],
-      "text": "It opens the `file://` store named by `SCMLE_STORE_URI`, loads the stored spec, refuses it if its digest is not the one the runner started, and runs the workload named by `SCMLE_WORKLOAD`.",
+      "tests": [],
+      "text": "It opens the `file://` store named by `SCMLE_STORE_URI` (confined to the tenant's namespace when `SCMLE_TENANT` is set), loads the stored spec, refuses it if its digest is not the one the runner started, and runs the workload named by `SCMLE_WORKLOAD`.",
       "vague": [],
       "words": [
         "refuses"
@@ -12866,8 +12976,8 @@
       ]
     }
   ],
-  "seconds": 3.2,
-  "test_links": 1232,
+  "seconds": 3.1,
+  "test_links": 1233,
   "vague": 0,
   "version": 2
 }

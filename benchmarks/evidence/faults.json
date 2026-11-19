@@ -1,6 +1,6 @@
 {
   "claim": "C1",
-  "code": "905e59555d2af715040f40763c9ad396932b15514311c48a71fc2885fd41ff8f",
+  "code": "118b2ddeb35b6836b176b8ac72bf55dbeac8d45715227a1f5a5fd9dd36f95e74",
   "data": {
     "real": "public tables from the local caches (refusal.fetch), faults planted and injected through Project.run, Project.resume or a scmle command",
     "simulated": "simulated tables and synthetic inputs, through runs and direct gate calls"
@@ -9,6 +9,8 @@
   "gates": [
     "admissibility.quarantine_all",
     "budget.minimum_run",
+    "confirm.reuse_exhausted",
+    "confirm.reuse_journal",
     "confirm.single_use",
     "data.unlabeled",
     "estimate.refusal",
@@ -74,7 +76,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.91,
+      "seconds": 0.79,
       "site": "scmle.cli.intake:IngestCommand.execute"
     },
     {
@@ -84,7 +86,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 0.89
+      "seconds": 0.78
     },
     {
       "by": "ingest.stage.run",
@@ -96,7 +98,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 2.32,
+      "seconds": 2.01,
       "site": "scmle.pipeline.ingest_stage:run"
     },
     {
@@ -106,7 +108,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 25.59
+      "seconds": 23.05
     },
     {
       "by": "ingest.reconcile",
@@ -118,7 +120,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 4.32,
+      "seconds": 3.9,
       "site": "scmle.assurance.ingest.declared:require"
     },
     {
@@ -128,7 +130,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 30.12
+      "seconds": 24.19
     },
     {
       "by": "policy.checkpoints",
@@ -140,7 +142,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 9.53,
+      "seconds": 7.52,
       "site": "scmle.pipeline.orchestrator:Orchestrator.consult_checkpoints"
     },
     {
@@ -150,7 +152,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 17.36
+      "seconds": 13.66
     },
     {
       "by": "leakage.policy",
@@ -162,7 +164,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 1.27,
+      "seconds": 1.04,
       "site": "scmle.pipeline.stages.screening:Screening.enforce_leakage_policy"
     },
     {
@@ -173,7 +175,7 @@
       "part": "real",
       "path": "override",
       "record": "WARNING on these rows the leakage screen did not find the planted leak_threshold: a leak of that kind may remain undetected",
-      "seconds": 9.14
+      "seconds": 6.73
     },
     {
       "by": "admissibility.quarantine_all",
@@ -185,7 +187,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 17.07,
+      "seconds": 14.55,
       "site": "scmle.pipeline.stages.admission:Admission.qualify_exploration"
     },
     {
@@ -196,7 +198,7 @@
       "part": "real",
       "path": "override",
       "record": "admissibility_table.json: attestation of column copy",
-      "seconds": 19.11
+      "seconds": 14.61
     },
     {
       "by": "data.unlabeled",
@@ -219,7 +221,7 @@
       "part": "real",
       "path": "override",
       "record": "curation_report.json: rows set aside (policy ignore)",
-      "seconds": 5.83
+      "seconds": 5.04
     },
     {
       "by": "select.serving_limits",
@@ -231,7 +233,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 13.61,
+      "seconds": 10.78,
       "site": "scmle.pipeline.stages.selecting:SelectStage.choose"
     },
     {
@@ -242,7 +244,7 @@
       "part": "real",
       "path": "override",
       "record": "decision_log.json: within serving limits (max_model_mb 1000.0)",
-      "seconds": 16.88
+      "seconds": 14.28
     },
     {
       "by": "select.pareto_front",
@@ -254,7 +256,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 12.99,
+      "seconds": 10.93,
       "site": "scmle.pipeline.stages.selecting:SelectStage.select_on_front"
     },
     {
@@ -265,29 +267,47 @@
       "part": "real",
       "path": "override",
       "record": "decision_log.json: fastest within (max_model_mb 1000.0)",
-      "seconds": 17.92
+      "seconds": 15.38
     },
     {
-      "by": "confirm.single_use",
       "cause": "the same signed charter run twice on OpenML 31 credit-g",
-      "error": "LeakageError",
+      "error": "ScmleError",
       "gate": "confirm.single_use",
       "level": "run",
-      "message": "this charter already confirmed claims on these confirmation rows in run run_20261119_001; a confirmation set is used once (record /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-dnu_2etv/runs/.confirmations/657284eeeda72de85ee6fc965244ca339b22956e04cabbbbd90a6de4917df1b9.json)",
-      "outcome": "blocked",
+      "message": "sequence item 6: expected str instance, float found",
+      "outcome": "failed",
       "part": "real",
       "path": "fault",
-      "seconds": 53.63,
-      "site": "scmle.assurance.ledger.confirm.opening:confirm"
+      "seconds": 14.79
     },
     {
       "cause": "the same signed charter run twice on OpenML 31 credit-g",
+      "error": "ScmleError",
       "gate": "confirm.single_use",
       "level": "run",
-      "outcome": "passed",
+      "message": "sequence item 6: expected str instance, float found",
+      "outcome": "failed",
       "part": "real",
       "path": "control",
-      "seconds": 31.24
+      "seconds": 16.02
+    },
+    {
+      "cause": "a charter run's reusable holdout asked past its answers",
+      "gate": "confirm.reuse_exhausted",
+      "level": "none",
+      "outcome": "not injected",
+      "part": "real",
+      "path": "fault",
+      "reason": "a run asks one query per survivor and stops at the session's terms, so no run on real data reaches the limit; the gate is planted only by a direct call"
+    },
+    {
+      "cause": "a charter run resumed with a reuse journal of other rows",
+      "gate": "confirm.reuse_journal",
+      "level": "none",
+      "outcome": "not injected",
+      "part": "real",
+      "path": "fault",
+      "reason": "planting it needs a run interrupted between two answers and its journal replaced, which no real-data run here does"
     },
     {
       "by": "profile.monotonic_columns",
@@ -299,7 +319,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 7.56,
+      "seconds": 6.71,
       "site": "scmle.pipeline.profiler:Profiler.monotonic_features"
     },
     {
@@ -309,7 +329,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 17.85
+      "seconds": 14.87
     },
     {
       "by": "profile.target_and_features",
@@ -344,7 +364,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 3.88
+      "seconds": 3.32
     },
     {
       "by": "split.event.stratify",
@@ -356,7 +376,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.12,
+      "seconds": 0.13,
       "site": "scmle.data.splitting.splitters.splits:Events.stratifier"
     },
     {
@@ -366,7 +386,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 5.01
+      "seconds": 3.64
     },
     {
       "by": "split.group.class_complete_folds",
@@ -388,7 +408,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 17.85
+      "seconds": 14.55
     },
     {
       "by": "split.group.partition",
@@ -400,7 +420,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.21,
+      "seconds": 0.19,
       "site": "scmle.data.splitting.splitters.splits:Group.partition"
     },
     {
@@ -413,7 +433,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.15,
+      "seconds": 0.1,
       "site": "scmle.data.splitting.splitters.partitions:Partitioner.check_task"
     },
     {
@@ -423,7 +443,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 16.99
+      "seconds": 14.43
     },
     {
       "by": "split.test_support",
@@ -435,7 +455,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.13,
+      "seconds": 0.12,
       "site": "scmle.data.splitting.splitters.splitter:Splitter.support"
     },
     {
@@ -445,7 +465,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 16.68
+      "seconds": 14.09
     },
     {
       "by": "split.resident.bind",
@@ -457,7 +477,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 11.77,
+      "seconds": 10.64,
       "site": "scmle.data.splitting.splitters.lockbox:Resident.bind"
     },
     {
@@ -467,7 +487,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 9.93
+      "seconds": 13.61
     },
     {
       "by": "split.resident.open",
@@ -479,7 +499,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 6.93,
+      "seconds": 9.83,
       "site": "scmle.data.splitting.splitters.lockbox:Resident.open"
     },
     {
@@ -489,7 +509,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 6.68
+      "seconds": 13.62
     },
     {
       "by": "split.resident.reopen",
@@ -501,7 +521,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 6.63,
+      "seconds": 12.27,
       "site": "scmle.assurance.custody.journal:Journal.admit"
     },
     {
@@ -511,7 +531,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 11.37
+      "seconds": 10.53
     },
     {
       "by": "split.resident.journal",
@@ -519,11 +539,11 @@
       "error": "BlockedError",
       "gate": "split.resident.journal",
       "level": "run",
-      "message": "custody journal /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-gbsgbagi/custody/run_20261119_001.jsonl was edited; run run_20261119_001 cannot be resumed",
+      "message": "custody journal /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-seuvg0l6/custody/run_20261119_001.jsonl was edited; run run_20261119_001 cannot be resumed",
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 3.98,
+      "seconds": 4.0,
       "site": "scmle.assurance.custody.journal:Journal.read"
     },
     {
@@ -533,7 +553,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 11.37
+      "seconds": 9.65
     },
     {
       "by": "split.resident.records",
@@ -541,11 +561,11 @@
       "error": "BlockedError",
       "gate": "split.resident.records",
       "level": "run",
-      "message": "stage record /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-19jlqmvt/run_20261119_001/stages/00-ingeststage.json was edited or belongs to another configuration; the run cannot be resumed",
+      "message": "stage record /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-lo4rw14a/run_20261119_001/stages/00-ingeststage.json was edited or belongs to another configuration; the run cannot be resumed",
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 4.02,
+      "seconds": 3.44,
       "site": "scmle.pipeline.archive:Directory.read"
     },
     {
@@ -555,7 +575,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 11.38
+      "seconds": 9.68
     },
     {
       "by": "split.rolling.partition",
@@ -578,7 +598,7 @@
       "part": "real",
       "path": "override",
       "record": "config.json: validation.rolling.horizon 10",
-      "seconds": 1.65
+      "seconds": 1.43
     },
     {
       "by": "split.stratified.folds",
@@ -590,7 +610,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.07,
+      "seconds": 0.06,
       "site": "scmle.data.splitting.splitters.splits:Stratified.cross_validation_folds"
     },
     {
@@ -600,7 +620,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 6.19
+      "seconds": 5.09
     },
     {
       "by": "split.stratified.stratify",
@@ -612,7 +632,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.07,
+      "seconds": 0.06,
       "site": "scmle.data.splitting.splitters.splits:Stratified.stratifier"
     },
     {
@@ -635,7 +655,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 6.98
+      "seconds": 5.41
     },
     {
       "by": "split.temporal.times",
@@ -647,7 +667,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.09,
+      "seconds": 0.08,
       "site": "scmle.data.splitting.splitters.temporal:Chronology.times"
     },
     {
@@ -657,7 +677,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 7.04
+      "seconds": 5.28
     },
     {
       "by": "split.temporal.entities",
@@ -669,7 +689,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.1,
+      "seconds": 0.08,
       "site": "scmle.data.splitting.splitters.temporal:Chronology.entities"
     },
     {
@@ -680,7 +700,7 @@
       "part": "real",
       "path": "override",
       "record": "config.json: validation.entities known",
-      "seconds": 3.06
+      "seconds": 2.39
     },
     {
       "cause": "the OpenML 42731 house sales of three zip codes, each zip code an entity declared unseen",
@@ -689,7 +709,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 6.87
+      "seconds": 5.35
     },
     {
       "by": "split.temporal.partition",
@@ -701,7 +721,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.1,
+      "seconds": 0.08,
       "site": "scmle.data.splitting.splitters.temporal:Chronology.partition"
     },
     {
@@ -711,7 +731,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 6.95
+      "seconds": 5.27
     },
     {
       "by": "split.treatment.folds",
@@ -723,7 +743,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.08,
+      "seconds": 0.06,
       "site": "scmle.data.splitting.splitters.splits:Treatment.cross_validation_folds"
     },
     {
@@ -733,7 +753,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 2.49
+      "seconds": 1.99
     },
     {
       "by": "split.treatment.stratify",
@@ -745,7 +765,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.07,
+      "seconds": 0.06,
       "site": "scmle.data.splitting.splitters.splits:Treatment.stratifier"
     },
     {
@@ -755,7 +775,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 2.84
+      "seconds": 2.33
     },
     {
       "by": "task.resolve",
@@ -777,7 +797,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 2.43
+      "seconds": 2.14
     },
     {
       "by": "task.auto",
@@ -789,7 +809,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.06,
+      "seconds": 0.05,
       "site": "scmle.data.validation.target:TaskResolver.resolve_auto"
     },
     {
@@ -800,7 +820,7 @@
       "part": "real",
       "path": "override",
       "record": "config.json: task regression",
-      "seconds": 3.39
+      "seconds": 2.95
     },
     {
       "by": "task.classification",
@@ -812,7 +832,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.06,
+      "seconds": 0.05,
       "site": "scmle.data.validation.target:TaskResolver.resolve_classification"
     },
     {
@@ -825,7 +845,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.06,
+      "seconds": 0.05,
       "site": "scmle.data.validation.target:TaskResolver.resolve_ordinal"
     },
     {
@@ -835,7 +855,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 3.86
+      "seconds": 3.41
     },
     {
       "by": "task.ranking",
@@ -857,7 +877,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 2.47
+      "seconds": 2.18
     },
     {
       "by": "task.regression",
@@ -882,7 +902,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.07,
+      "seconds": 0.06,
       "site": "scmle.data.validation.target:TaskResolver.resolve_survival"
     },
     {
@@ -892,7 +912,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 1.84
+      "seconds": 1.55
     },
     {
       "by": "task.uplift",
@@ -904,7 +924,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.07,
+      "seconds": 0.06,
       "site": "scmle.data.validation.target:TaskResolver.resolve_uplift"
     },
     {
@@ -914,7 +934,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 2.71
+      "seconds": 2.34
     },
     {
       "by": "target.events",
@@ -926,7 +946,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.07,
+      "seconds": 0.06,
       "site": "scmle.data.validation.target:check_events"
     },
     {
@@ -939,7 +959,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.07,
+      "seconds": 0.06,
       "site": "scmle.data.validation.target:check_targets"
     },
     {
@@ -952,52 +972,52 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 0.07,
+      "seconds": 0.06,
       "site": "scmle.data.validation.target:check_treatment"
     },
     {
-      "by": "vault.bind",
       "cause": "a plugin stage binds the sealed test set of a signed charter run before the final evaluation does (OpenML 31 credit-g)",
-      "error": "LeakageError",
+      "error": "ScmleError",
       "gate": "vault.bind",
       "level": "run",
-      "message": "test set is locked: already bound or released",
-      "outcome": "blocked",
+      "message": "sequence item 6: expected str instance, float found",
+      "outcome": "failed",
       "part": "real",
       "path": "fault",
-      "seconds": 12.06,
-      "site": "scmle.assurance.custody.vault:SealedTestSet.bind"
+      "seconds": 7.06
     },
     {
       "cause": "a plugin stage binds the sealed test set of a signed charter run before the final evaluation does (OpenML 31 credit-g)",
+      "error": "ScmleError",
       "gate": "vault.bind",
       "level": "run",
-      "outcome": "passed",
+      "message": "sequence item 6: expected str instance, float found",
+      "outcome": "failed",
       "part": "real",
       "path": "control",
-      "seconds": 13.79
+      "seconds": 7.05
     },
     {
-      "by": "vault.open",
       "cause": "a plugin stage opens the sealed test set of a signed charter run with a guessed token (OpenML 31 credit-g)",
-      "error": "LeakageError",
+      "error": "ScmleError",
       "gate": "vault.open",
       "level": "run",
-      "message": "test set is locked: invalid token",
-      "outcome": "blocked",
+      "message": "sequence item 6: expected str instance, float found",
+      "outcome": "failed",
       "part": "real",
       "path": "fault",
-      "seconds": 12.01,
-      "site": "scmle.assurance.custody.vault:SealedTestSet.open"
+      "seconds": 7.08
     },
     {
       "cause": "a plugin stage opens the sealed test set of a signed charter run with a guessed token (OpenML 31 credit-g)",
+      "error": "ScmleError",
       "gate": "vault.open",
       "level": "run",
-      "outcome": "passed",
+      "message": "sequence item 6: expected str instance, float found",
+      "outcome": "failed",
       "part": "real",
       "path": "control",
-      "seconds": 13.86
+      "seconds": 7.07
     },
     {
       "by": "plan.gpu_required",
@@ -1009,7 +1029,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 3.91,
+      "seconds": 3.44,
       "site": "scmle.pipeline.planner:GpuFilter.apply"
     },
     {
@@ -1020,7 +1040,7 @@
       "part": "real",
       "path": "override",
       "record": "config.json: resources.gpu auto",
-      "seconds": 6.99
+      "seconds": 5.98
     },
     {
       "by": "plan.monotonic",
@@ -1032,7 +1052,7 @@
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 4.19,
+      "seconds": 3.52,
       "site": "scmle.pipeline.planner:MonotonicFilter.apply"
     },
     {
@@ -1043,7 +1063,7 @@
       "part": "real",
       "path": "override",
       "record": "config.json: data.monotonic {}",
-      "seconds": 9.34
+      "seconds": 8.01
     },
     {
       "by": "budget.minimum_run",
@@ -1065,7 +1085,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 6.88
+      "seconds": 5.94
     },
     {
       "by": "train.first_trial",
@@ -1073,11 +1093,11 @@
       "error": "BlockedError",
       "gate": "train.first_trial",
       "level": "run",
-      "message": "preparation took 3.5 s and left no time for a first trial (trial window closed: 0.0 s left before the 49.2 s reserved for the final refit, diagnostics and packaging); the smallest budget that fits is about 12 s",
+      "message": "preparation took 183.4 s and left no time for a first trial (trial window closed: 0.0 s left before the 49.2 s reserved for the final refit, diagnostics and packaging); the smallest budget that fits is about 252 s",
       "outcome": "blocked",
       "part": "real",
       "path": "fault",
-      "seconds": 3.53,
+      "seconds": 3.46,
       "site": "scmle.pipeline.stages.training:TrainStage.execute"
     },
     {
@@ -1087,7 +1107,7 @@
       "outcome": "passed",
       "part": "real",
       "path": "control",
-      "seconds": 6.14
+      "seconds": 5.96
     },
     {
       "by": "estimate.refusal",
@@ -1153,7 +1173,7 @@
       "outcome": "passed",
       "part": "simulated",
       "path": "control",
-      "seconds": 0.01
+      "seconds": 0.0
     },
     {
       "by": "ingest.reconcile",
@@ -1187,7 +1207,7 @@
       "outcome": "blocked",
       "part": "simulated",
       "path": "fault",
-      "seconds": 1.07,
+      "seconds": 1.08,
       "site": "scmle.pipeline.orchestrator:Orchestrator.consult_checkpoints"
     },
     {
@@ -1197,7 +1217,7 @@
       "outcome": "passed",
       "part": "simulated",
       "path": "control",
-      "seconds": 1.88
+      "seconds": 1.85
     },
     {
       "by": "leakage.policy",
@@ -1220,30 +1240,29 @@
       "part": "simulated",
       "path": "override",
       "record": "WARNING on these rows the leakage screen did not find the planted leak_threshold: a leak of that kind may remain undetected",
-      "seconds": 2.57
+      "seconds": 2.55
     },
     {
-      "by": "admissibility.quarantine_all",
       "cause": "the only exploration feature is a copy of the target",
-      "error": "BlockedError",
+      "error": "AttributeError",
       "gate": "admissibility.quarantine_all",
       "level": "site",
-      "message": "admissibility quarantined every feature",
-      "outcome": "blocked",
+      "message": "'types.SimpleNamespace' object has no attribute 'services'",
+      "outcome": "failed",
       "part": "simulated",
       "path": "fault",
-      "seconds": 1.2,
-      "site": "scmle.pipeline.stages.admission:Admission.qualify_exploration"
+      "seconds": 0.0
     },
     {
       "cause": "the only exploration feature is a copy of the target",
+      "error": "AttributeError",
       "gate": "admissibility.quarantine_all",
       "level": "site",
-      "outcome": "override",
+      "message": "'types.SimpleNamespace' object has no attribute 'services'",
+      "outcome": "failed",
       "part": "simulated",
       "path": "override",
-      "record": "ledger check leakage.attestation:copy, tier attested",
-      "seconds": 1.19
+      "seconds": 0.0
     },
     {
       "by": "data.unlabeled",
@@ -1278,7 +1297,7 @@
       "outcome": "blocked",
       "part": "simulated",
       "path": "fault",
-      "seconds": 1.44,
+      "seconds": 1.46,
       "site": "scmle.pipeline.stages.selecting:SelectStage.choose"
     },
     {
@@ -1289,7 +1308,7 @@
       "part": "simulated",
       "path": "override",
       "record": "decision_log.json: within serving limits (max_model_mb 1000.0)",
-      "seconds": 1.87
+      "seconds": 1.98
     },
     {
       "by": "select.pareto_front",
@@ -1312,7 +1331,7 @@
       "part": "simulated",
       "path": "override",
       "record": "decision_log.json: fastest within (max_model_mb 1000.0)",
-      "seconds": 2.01
+      "seconds": 2.0
     },
     {
       "by": "confirm.single_use",
@@ -1337,6 +1356,50 @@
       "seconds": 0.0
     },
     {
+      "by": "confirm.reuse_exhausted",
+      "cause": "a reusable holdout asked one query past its answers",
+      "error": "LeakageError",
+      "gate": "confirm.reuse_exhausted",
+      "level": "site",
+      "message": "the reusable holdout gave its 3 answers",
+      "outcome": "blocked",
+      "part": "simulated",
+      "path": "fault",
+      "seconds": 0.0,
+      "site": "scmle.assurance.ledger.confirm.thresholdout:Thresholdout.query"
+    },
+    {
+      "cause": "a reusable holdout asked one query past its answers",
+      "gate": "confirm.reuse_exhausted",
+      "level": "site",
+      "outcome": "passed",
+      "part": "simulated",
+      "path": "control",
+      "seconds": 0.0
+    },
+    {
+      "by": "confirm.reuse_journal",
+      "cause": "a reusable holdout resumed from a journal of other holdout rows",
+      "error": "LeakageError",
+      "gate": "confirm.reuse_journal",
+      "level": "site",
+      "message": "the journal /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/tmpyglqhp51/journal.json belongs to other rows or terms",
+      "outcome": "blocked",
+      "part": "simulated",
+      "path": "fault",
+      "seconds": 0.0,
+      "site": "scmle.assurance.ledger.confirm.thresholdout:Thresholdout.resume"
+    },
+    {
+      "cause": "a reusable holdout resumed from a journal of other holdout rows",
+      "gate": "confirm.reuse_journal",
+      "level": "site",
+      "outcome": "passed",
+      "part": "simulated",
+      "path": "control",
+      "seconds": 0.0
+    },
+    {
       "by": "profile.monotonic_columns",
       "cause": "monotonic constraint on a categorical column",
       "error": "BlockedError",
@@ -1346,7 +1409,7 @@
       "outcome": "blocked",
       "part": "simulated",
       "path": "fault",
-      "seconds": 1.01,
+      "seconds": 1.02,
       "site": "scmle.pipeline.profiler:Profiler.monotonic_features"
     },
     {
@@ -1356,7 +1419,7 @@
       "outcome": "passed",
       "part": "simulated",
       "path": "control",
-      "seconds": 2.23
+      "seconds": 2.28
     },
     {
       "by": "profile.target_and_features",
@@ -1368,7 +1431,7 @@
       "outcome": "blocked",
       "part": "simulated",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.06,
       "site": "scmle.pipeline.profiler:Profiler.portray"
     },
     {
@@ -1413,7 +1476,7 @@
       "outcome": "passed",
       "part": "simulated",
       "path": "control",
-      "seconds": 0.66
+      "seconds": 0.69
     },
     {
       "by": "split.group.class_complete_folds",
@@ -1435,7 +1498,7 @@
       "outcome": "passed",
       "part": "simulated",
       "path": "control",
-      "seconds": 2.0
+      "seconds": 2.02
     },
     {
       "by": "split.group.partition",
@@ -1470,7 +1533,7 @@
       "outcome": "passed",
       "part": "simulated",
       "path": "control",
-      "seconds": 1.87
+      "seconds": 1.88
     },
     {
       "by": "split.test_support",
@@ -1492,7 +1555,7 @@
       "outcome": "passed",
       "part": "simulated",
       "path": "control",
-      "seconds": 1.85
+      "seconds": 1.87
     },
     {
       "by": "split.resident.bind",
@@ -1566,7 +1629,7 @@
       "error": "BlockedError",
       "gate": "split.resident.journal",
       "level": "site",
-      "message": "custody journal /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-z7m5yhan/custody/run_x.jsonl was edited; run run_x cannot be resumed",
+      "message": "custody journal /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-cqspp8l_/custody/run_x.jsonl was edited; run run_x cannot be resumed",
       "outcome": "blocked",
       "part": "simulated",
       "path": "fault",
@@ -1588,7 +1651,7 @@
       "error": "BlockedError",
       "gate": "split.resident.records",
       "level": "site",
-      "message": "stage record /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-k65o3_85/stages/00-profile.json was edited or belongs to another configuration; the run cannot be resumed",
+      "message": "stage record /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-rxdt411x/stages/00-profile.json was edited or belongs to another configuration; the run cannot be resumed",
       "outcome": "blocked",
       "part": "simulated",
       "path": "fault",
@@ -1614,7 +1677,7 @@
       "outcome": "blocked",
       "part": "simulated",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.06,
       "site": "scmle.data.splitting.splitters.temporal:Rolling.partition"
     },
     {
@@ -1625,7 +1688,7 @@
       "part": "simulated",
       "path": "override",
       "record": "config.json: validation.rolling.horizon 10",
-      "seconds": 1.11
+      "seconds": 1.03
     },
     {
       "by": "split.stratified.folds",
@@ -1802,7 +1865,7 @@
       "outcome": "passed",
       "part": "simulated",
       "path": "control",
-      "seconds": 0.96
+      "seconds": 0.92
     },
     {
       "by": "task.resolve",
@@ -1847,7 +1910,7 @@
       "part": "simulated",
       "path": "override",
       "record": "config.json: task regression",
-      "seconds": 1.6
+      "seconds": 1.58
     },
     {
       "by": "task.classification",
@@ -1872,7 +1935,7 @@
       "outcome": "blocked",
       "part": "simulated",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.04,
       "site": "scmle.data.validation.target:TaskResolver.resolve_ordinal"
     },
     {
@@ -1882,7 +1945,7 @@
       "outcome": "passed",
       "part": "simulated",
       "path": "control",
-      "seconds": 2.29
+      "seconds": 2.27
     },
     {
       "by": "task.ranking",
@@ -1904,7 +1967,7 @@
       "outcome": "passed",
       "part": "simulated",
       "path": "control",
-      "seconds": 0.97
+      "seconds": 0.94
     },
     {
       "by": "task.regression",
@@ -1939,7 +2002,7 @@
       "outcome": "passed",
       "part": "simulated",
       "path": "control",
-      "seconds": 0.68
+      "seconds": 0.72
     },
     {
       "by": "task.uplift",
@@ -1961,7 +2024,7 @@
       "outcome": "passed",
       "part": "simulated",
       "path": "control",
-      "seconds": 0.93
+      "seconds": 0.97
     },
     {
       "by": "target.events",
@@ -2022,7 +2085,7 @@
       "outcome": "passed",
       "part": "simulated",
       "path": "control",
-      "seconds": 1.11
+      "seconds": 1.1
     },
     {
       "by": "vault.open",
@@ -2044,7 +2107,7 @@
       "outcome": "passed",
       "part": "simulated",
       "path": "control",
-      "seconds": 1.12
+      "seconds": 1.14
     },
     {
       "by": "plan.gpu_required",
@@ -2067,7 +2130,7 @@
       "part": "simulated",
       "path": "override",
       "record": "config.json: resources.gpu auto",
-      "seconds": 1.83
+      "seconds": 1.88
     },
     {
       "by": "plan.monotonic",
@@ -2079,7 +2142,7 @@
       "outcome": "blocked",
       "part": "simulated",
       "path": "fault",
-      "seconds": 1.71,
+      "seconds": 1.72,
       "site": "scmle.pipeline.planner:MonotonicFilter.apply"
     },
     {
@@ -2090,7 +2153,7 @@
       "part": "simulated",
       "path": "override",
       "record": "config.json: data.monotonic {}",
-      "seconds": 4.89
+      "seconds": 5.1
     },
     {
       "by": "budget.minimum_run",
@@ -2112,7 +2175,7 @@
       "outcome": "passed",
       "part": "simulated",
       "path": "control",
-      "seconds": 1.86
+      "seconds": 1.91
     },
     {
       "by": "train.first_trial",
@@ -2120,7 +2183,7 @@
       "error": "BlockedError",
       "gate": "train.first_trial",
       "level": "run",
-      "message": "preparation took 1.0 s and left no time for a first trial (trial window closed: 0.0 s left before the 48.5 s reserved for the final refit, diagnostics and packaging); the smallest budget that fits is about 8 s",
+      "message": "preparation took 181.0 s and left no time for a first trial (trial window closed: 0.0 s left before the 48.5 s reserved for the final refit, diagnostics and packaging); the smallest budget that fits is about 248 s",
       "outcome": "blocked",
       "part": "simulated",
       "path": "fault",
@@ -2134,7 +2197,7 @@
       "outcome": "passed",
       "part": "simulated",
       "path": "control",
-      "seconds": 1.85
+      "seconds": 1.88
     },
     {
       "by": "estimate.refusal",
@@ -2159,55 +2222,68 @@
       "seconds": 0.01
     }
   ],
-  "seconds": 337.9,
+  "seconds": 271.4,
   "tally": {
     "real": {
       "controls": {
-        "not_passed": [],
-        "passed": 33,
+        "not_passed": [
+          "confirm.single_use (failed: ScmleError)",
+          "vault.bind (failed: ScmleError)",
+          "vault.open (failed: ScmleError)"
+        ],
+        "passed": 30,
         "run": 33
       },
       "elsewhere": [],
-      "faults": 50,
+      "faults": 52,
       "outcomes": {
-        "blocked": 50,
-        "failed": 0,
-        "not injected": 0,
+        "blocked": 47,
+        "failed": 3,
+        "not injected": 2,
         "override": 10,
         "silent": 0
       },
       "override_blocked": [],
       "overrides": 10,
       "runs": 60,
-      "satisfied": 60,
-      "share": 1.0,
+      "satisfied": 57,
+      "share": 0.9193548387096774,
       "sites": 0,
-      "units": 60,
-      "unsatisfied": []
+      "units": 62,
+      "unsatisfied": [
+        "confirm.reuse_exhausted (fault: not injected, none)",
+        "confirm.reuse_journal (fault: not injected, none)",
+        "confirm.single_use (fault: failed, run)",
+        "vault.bind (fault: failed, run)",
+        "vault.open (fault: failed, run)"
+      ]
     },
     "simulated": {
       "controls": {
         "not_passed": [],
-        "passed": 33,
-        "run": 33
+        "passed": 35,
+        "run": 35
       },
       "elsewhere": [],
-      "faults": 50,
+      "faults": 52,
       "outcomes": {
-        "blocked": 50,
-        "failed": 0,
+        "blocked": 51,
+        "failed": 2,
         "not injected": 0,
-        "override": 10,
+        "override": 9,
         "silent": 0
       },
       "override_blocked": [],
       "overrides": 10,
       "runs": 38,
       "satisfied": 60,
-      "share": 1.0,
-      "sites": 22,
-      "units": 60,
-      "unsatisfied": []
+      "share": 0.967741935483871,
+      "sites": 24,
+      "units": 62,
+      "unsatisfied": [
+        "admissibility.quarantine_all (fault: failed, site)",
+        "admissibility.quarantine_all (override: failed, site)"
+      ]
     }
   },
   "variable": "gate_fault_block_min"
