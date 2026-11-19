@@ -1,0 +1,537 @@
+# Rename map, lane 3.3: scmle/pipeline, scmle/runtime, scmle/workflow, scmle/operations, scmle/monitoring.
+#
+# One `dotted.old.name = "new"` entry per definition; a method or
+# attribute is listed once for its overriding family (rename.py
+# renames every override). Applied with
+#     uv run python scripts/rename.py pipeline --dry-run
+# The [review] table lists names no single word fits without
+# ambiguity, with two or three candidates and the reason; rename.py
+# reads only the top-level entries. A candidate equal to the old name
+# means keeping it. The trailing comment block lists
+# the names that are not mapped and why.
+# scmle/pipeline was being refactored while this map was made: the
+# lead re-runs the dry run before applying, and drops entries the
+# refactor removed.
+
+"scmle.monitoring.abtest.compare_arms" = "compare"
+"scmle.monitoring.alerts.Alert.evidence_digest" = "digest"
+"scmle.monitoring.alerts.Pager.backoff_seconds" = "backoff"
+"scmle.monitoring.alerts.Pager.timeout_seconds" = "timeout"
+"scmle.monitoring.champion.Comparison.challenger_score" = "score"
+"scmle.monitoring.champion.Comparison.probability_better" = "better"
+"scmle.monitoring.events.PredictionLog.log_observability" = "log"
+"scmle.monitoring.events.PredictionLog.observability_policy" = "policy"
+"scmle.monitoring.events.PredictionLog.record_outcomes" = "record"
+"scmle.monitoring.incidents.Incidents.read_events" = "read"
+"scmle.monitoring.incidents.require_text" = "require"
+"scmle.monitoring.labels.is_matured" = "matured"
+"scmle.monitoring.monitor.Drift.high_share" = "share"
+"scmle.monitoring.monitor.FeatureDriftAdvisor" = "Inputs"
+"scmle.monitoring.monitor.OutputDriftAdvisor" = "Outputs"
+"scmle.monitoring.observability.Evaluation.expired_metrics" = "metrics"
+"scmle.monitoring.observability.Evaluation.missing_signals" = "signals"
+"scmle.monitoring.observability.Evaluation.threshold_breaches" = "breaches"
+"scmle.monitoring.observability.parse_timestamp" = "parse"
+"scmle.monitoring.sequential_tests.Betting.log_capital" = "capital"
+"scmle.monitoring.sequential_tests.Confidence.lower_tests" = "tests"
+"scmle.monitoring.sequential_tests.Mixture.log_capital" = "capital"
+"scmle.monitoring.sequential_tests.Mixture.log_weights" = "weights"
+"scmle.monitoring.sequential_tests.PromotionSequence" = "Sequence"
+"scmle.monitoring.sequential_tests.validate_unit" = "validate"
+"scmle.monitoring.shadow.Agreement.disagreement_rate" = "disagreement"
+"scmle.monitoring.shadow.Understudy.challenger_output" = "output"
+"scmle.monitoring.slo.Assessment.incident_required" = "required"
+"scmle.monitoring.slo.Assessment.observed_maximum" = "maximum"
+"scmle.monitoring.slo.Slo.alert_route" = "route"
+"scmle.monitoring.slo.Slo.minimum_samples" = "samples"
+"scmle.monitoring.slo.Slo.window_days" = "window"
+"scmle.monitoring.slo.parse_timestamp" = "parse"
+"scmle.monitoring.slo.require_text" = "require"
+"scmle.operations.continuous.evaluation.ContinuousEvaluation" = "Evaluation"
+"scmle.operations.continuous.evaluation.ContinuousEvaluation.seen_alarms" = "alarms"
+"scmle.operations.continuous.feeding.Feeding.record_training" = "record"
+"scmle.operations.continuous.policies.RetrainDecision" = "Decision"
+"scmle.operations.continuous.policies.RetrainPolicy" = "Policy"
+"scmle.operations.continuous.promotion.holdback_check" = "check"
+"scmle.operations.continuous.records.TrainingHistory" = "History"
+"scmle.operations.continuous.records.load_dataset" = "load"
+"scmle.operations.controller.Controller.dead_man" = "man"
+"scmle.operations.controller.Intake.run_batch" = "batch"
+"scmle.operations.controller.Intake.run_labels" = "labels"
+"scmle.operations.lifecycle.Ledger.skip_reason" = "skip"
+"scmle.operations.lifecycle.Maintainer.rollout_decides" = "decides"
+"scmle.operations.logs.Journal.artifact_digest" = "digest"
+"scmle.operations.metrics.Instrumentation.artifact_digest" = "digest"
+"scmle.operations.notify.WebhookSender" = "Sender"
+"scmle.operations.notify.WebhookSender.backoff_seconds" = "backoff"
+"scmle.operations.notify.verify_signature" = "verify"
+"scmle.operations.recovery.Measurement.rpo_lost" = "lost"
+"scmle.operations.recovery.Measurement.rto_seconds" = "rto"
+"scmle.operations.recovery.time_scale" = "scale"
+"scmle.operations.respond.Desk.artifact_digest" = "digest"
+"scmle.operations.respond.Response.audit_head" = "head"
+"scmle.operations.respond.Response.telemetry_digest" = "digest"
+"scmle.operations.signals.SignalMonitor" = "Monitor"
+"scmle.operations.signals.SignalMonitor.observe_outcomes" = "observe"
+"scmle.operations.signals.SignalThresholds" = "Thresholds"
+"scmle.operations.signals.SignalThresholds.loss_tolerance" = "tolerance"
+"scmle.operations.signals.SignalThresholds.reference_loss" = "loss"
+"scmle.operations.signals.Window.window_seconds" = "window"
+"scmle.operations.spool.MetricsSpool" = "Spool"
+"scmle.pipeline.engine.Board.check_cancelled" = "check"
+"scmle.pipeline.fingerprint.ml_difficulty" = "difficulty"
+"scmle.pipeline.ingest_stage.read_frame" = "read"
+"scmle.pipeline.ingest_stage.resolve_entities" = "resolve"
+"scmle.pipeline.inspection.Inspection.check_weights" = "check"
+"scmle.pipeline.journal.Journal.trial_counter" = "counter"
+"scmle.pipeline.journal.Journal.write_json" = "write"
+"scmle.pipeline.modality_lifecycle.checkpoints.Checkpoint.verify_signature" = "verify"
+"scmle.pipeline.modality_lifecycle.containers.Cancellation.is_cancelled" = "cancelled"
+"scmle.pipeline.modality_lifecycle.curators.Curation.verify_signature" = "verify"
+"scmle.pipeline.modality_lifecycle.curators.ExtensionCurator.curation_callback" = "callback"
+"scmle.pipeline.modality_lifecycle.curators.Preparer.sample_id" = "sample"
+"scmle.pipeline.modality_lifecycle.explanation.Stability.perturbation_stability" = "stability"
+"scmle.pipeline.modality_lifecycle.plans.Plan.cancellation_check" = "check"
+"scmle.pipeline.modality_lifecycle.plans.Plan.checkpoint_target" = "target"
+"scmle.pipeline.modality_lifecycle.plans.Plan.package_preexisting" = "preexisting"
+"scmle.pipeline.modality_lifecycle.preparers.video.Footage.frame_decoder" = "decoder"
+"scmle.pipeline.modality_lifecycle.preparers.video.Footage.temporal_cutoff" = "cutoff"
+"scmle.pipeline.modality_lifecycle.reporting.Record.verify_signature" = "verify"
+"scmle.pipeline.modality_lifecycle.state.Board.check_cancelled" = "check"
+"scmle.pipeline.modality_lifecycle.state.Stage.performance_operation" = "operation"
+"scmle.pipeline.modality_lifecycle.verification.load_package" = "load"
+"scmle.pipeline.orchestrator.Orchestrator.cancel_event" = "event"
+"scmle.pipeline.orchestrator.Orchestrator.consult_checkpoints" = "consult"
+"scmle.pipeline.orchestrator.environment_lock" = "lock"
+"scmle.pipeline.planner.GpuFilter" = "Gpu"
+"scmle.pipeline.planner.MonotonicFilter" = "Monotonic"
+"scmle.pipeline.profiler.Profiler.monotonic_features" = "features"
+"scmle.pipeline.roster.extension_capability" = "capability"
+"scmle.pipeline.rules.Situation.approved_models" = "models"
+"scmle.pipeline.services.Services.approved_plan" = "plan"
+"scmle.pipeline.services.Services.cancel_event" = "event"
+"scmle.pipeline.services.Services.capability_observation" = "observation"
+"scmle.pipeline.stages.admission.Admission.baseline_runner" = "runner"
+"scmle.pipeline.stages.admission.Admission.qualify_exploration" = "qualify"
+"scmle.pipeline.stages.assessment.Exam.final_pipeline" = "pipeline"
+"scmle.pipeline.stages.assessment.Exam.test_rows" = "rows"
+"scmle.pipeline.stages.diagnosis.Diagnosis.bias_variance" = "variance"
+"scmle.pipeline.stages.diagnosis.Diagnosis.forecast_backtest" = "forecast"
+"scmle.pipeline.stages.diagnosis.Diagnosis.learning_curve" = "curve"
+"scmle.pipeline.stages.diagnosis.Diagnosis.nested_validation" = "validation"
+"scmle.pipeline.stages.documentation.Documentation.explanation_evidence" = "evidence"
+"scmle.pipeline.stages.examination.Examination.uplift_report" = "report"
+"scmle.pipeline.stages.ingestion.Intake.cleaning_notes" = "notes"
+"scmle.pipeline.stages.packaging.Package.evidence_graph" = "graph"
+"scmle.pipeline.stages.planning.Blueprint.capability_registry" = "registry"
+"scmle.pipeline.stages.qualification.Qualification.assess_robustness" = "assess"
+"scmle.pipeline.stages.releasing.Releasing.release_evaluation" = "release"
+"scmle.pipeline.stages.scoring.reference_scores" = "scores"
+"scmle.pipeline.stages.selecting.Choice.pareto_front" = "front"
+"scmle.pipeline.stages.selecting.Choice.pending_ledger" = "ledger"
+"scmle.pipeline.stages.training.Search.trial_counter" = "counter"
+"scmle.pipeline.trials.Payload.ceiling_seconds" = "ceiling"
+"scmle.pipeline.trials.Payload.feature_plan" = "plan"
+"scmle.pipeline.trials.Payload.memory_gb" = "memory"
+"scmle.pipeline.trials.Runner.feature_plan" = "plan"
+"scmle.pipeline.trials.Runner.run_many" = "many"
+"scmle.pipeline.trials.evaluate_payload" = "evaluate"
+"scmle.pipeline.tuning.Tuner.run_batch" = "batch"
+"scmle.runtime.limits.Governor.skip_reason" = "skip"
+"scmle.runtime.limits.Supervisor.ceiling_seconds" = "ceiling"
+"scmle.runtime.limits.Supervisor.memory_gb" = "memory"
+"scmle.runtime.randomness.component_rng" = "rng"
+"scmle.runtime.randomness.seed_path" = "seed"
+"scmle.runtime.resource_observation.Observation.extra_observations" = "observations"
+"scmle.workflow.definition.StepKind" = "Kind"
+"scmle.workflow.definition.Workflow.cost_budget" = "budget"
+"scmle.workflow.definition.Workflow.group_limits" = "limits"
+"scmle.workflow.definition.standard_workflow" = "workflow"
+"scmle.workflow.executor.context.StepContext" = "Context"
+"scmle.workflow.executor.context.StepContext.run_budget" = "budget"
+"scmle.workflow.executor.failures.StepBudgetError" = "BudgetError"
+"scmle.workflow.executor.leases.Leases.renew_lease" = "renew"
+"scmle.workflow.executor.records.Records.run_record" = "record"
+"scmle.workflow.executor.steps.Steps.run_step" = "step"
+
+[review]
+"scmle.monitoring.abtest.Comparison.control_rows" = ["rows", "control"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.abtest.Comparison.control_score" = ["score", "control"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.abtest.Comparison.treatment_rows" = ["rows", "treatment"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.abtest.Comparison.treatment_score" = ["score", "treatment"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.alerts.Alert.alert_id" = ["alert", "alert_id"]  # no single word fits without ambiguity
+"scmle.monitoring.alerts.Alert.created_at" = ["created", "created_at"]  # a joining word carries the meaning
+"scmle.monitoring.alerts.Alert.from_evidence" = ["evidence", "parse"]  # a joining word carries the meaning
+"scmle.monitoring.alerts.Delivery.alert_id" = ["alert", "alert_id"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.alerts.Delivery.observed_at" = ["observed", "observed_at"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.alerts.Pager.max_attempts" = ["attempts", "max_attempts"]  # max qualifier
+"scmle.monitoring.champion.Comparison.champion_score" = ["champion", "champion_score"]  # no single word fits without ambiguity
+"scmle.monitoring.events.Outcome.event_id" = ["event", "event_id"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.events.PredictionLog" = ["Log", "Predictions"]  # Log reads as logging
+"scmle.monitoring.events.PredictionLog.observability_path" = ["observability", "observability_path"]  # no single word fits without ambiguity
+"scmle.monitoring.events.PredictionLog.run_id" = ["run", "run_id"]  # no single word fits without ambiguity
+"scmle.monitoring.events.Served.event_id" = ["event", "event_id"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.events.Served.model_version" = ["version", "model"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.incidents.incident_id" = ["incident", "incident_id"]  # no single word fits without ambiguity
+"scmle.monitoring.labels.Mechanism.AUDIT_SLICE" = ["SLICE", "AUDIT"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.monitoring.labels.Mechanism.LOGGED_PROPENSITY" = ["PROPENSITY", "LOGGED"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.monitoring.labels.Uniformity.p_value" = ["value", "p_value"]  # no single word fits without ambiguity
+"scmle.monitoring.monitor.Drift.output_psi" = ["psi", "output"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.monitor.Drift.output_raw_psi" = ["psi", "output", "raw"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.monitor.Drift.output_status" = ["status", "output"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.monitor.FeatureDrift" = ["Drift", "Shift"]  # beside the drift advisors
+"scmle.monitoring.monitor.FeatureDrift.missing_rate" = ["missing", "rate"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.monitor.FeatureDrift.raw_psi" = ["raw", "raw_psi"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.monitor.FeatureDrift.reference_missing_rate" = ["rate", "reference", "missing"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.monitor.FeatureDrift.unseen_rate" = ["unseen", "rate"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.monitor.Performance.labeled_fraction" = ["labeled", "fraction"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.monitor.Performance.labeled_rows" = ["labeled", "labeled_rows"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.monitor.Performance.reference_metrics" = ["reference", "reference_metrics"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.monitor.Thresholds.high_drift_feature_share" = ["share", "high", "drift"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.monitor.Thresholds.min_labeled_rows" = ["rows", "min_labeled_rows"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.monitor.Thresholds.performance_tolerance" = ["tolerance", "performance"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.monitor.Thresholds.psi_high" = ["high", "psi"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.monitor.Thresholds.psi_moderate" = ["moderate", "psi"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.monitor.Thresholds.unseen_category_rate" = ["rate", "unseen", "category"]  # stored key: the class serializes its fields by name
+"scmle.monitoring.observability.Evaluation.future_metrics" = ["future", "future_metrics"]  # no single word fits without ambiguity
+"scmle.monitoring.observability.Evaluation.observed_at" = ["observed", "observed_at"]  # a joining word carries the meaning
+"scmle.monitoring.sequential_tests.Betting.e_value" = ["value", "e_value"]  # no single word fits without ambiguity
+"scmle.monitoring.sequential_tests.Betting.null_mean" = ["mean", "null"]  # no single word fits without ambiguity
+"scmle.monitoring.sequential_tests.Comparison.e_value" = ["value", "e_value"]  # no single word fits without ambiguity
+"scmle.monitoring.sequential_tests.Confidence.upper_tests" = ["upper", "upper_tests"]  # no single word fits without ambiguity
+"scmle.monitoring.sequential_tests.Mixture.e_value" = ["value", "e_value"]  # no single word fits without ambiguity
+"scmle.monitoring.sequential_tests.Mixture.null_mean" = ["mean", "null"]  # no single word fits without ambiguity
+"scmle.monitoring.shadow.Agreement.mean_probability_gap" = ["gap", "mean"]  # mean qualifier
+"scmle.monitoring.shadow.Understudy.champion_output" = ["output", "champion"]  # every candidate is taken, a builtin or a library name
+"scmle.monitoring.slo.Assessment.error_budget_remaining" = ["remaining", "error", "budget"]  # no single word fits without ambiguity
+"scmle.monitoring.slo.Assessment.in_window_count" = ["count", "window"]  # a joining word carries the meaning
+"scmle.monitoring.slo.Assessment.observed_at" = ["observed", "observed_at"]  # a joining word carries the meaning
+"scmle.monitoring.slo.Assessment.sample_count" = ["count", "sample"]  # a count: the head noun alone reads as the items
+"scmle.monitoring.slo.Slo.metric_name" = ["metric", "metric_name"]  # no single word fits without ambiguity
+"scmle.monitoring.slo.Status.INSUFFICIENT_DATA" = ["DATA", "INSUFFICIENT"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.operations.classify.Verdict.DATA_QUALITY" = ["QUALITY", "DATA"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.operations.classify.Verdict.MODEL_PERFORMANCE" = ["PERFORMANCE", "MODEL"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.operations.continuous.evaluation.ContinuousEvaluation.last_proposal_batch" = ["batch", "last", "proposal"]  # no single word fits without ambiguity
+"scmle.operations.continuous.feeding.Feeding.seen_alarms" = ["seen", "seen_alarms"]  # no single word fits without ambiguity
+"scmle.operations.continuous.policies.RetrainDecision.alarm_gates_retrain" = ["retrain", "alarm", "gates"]  # stored key: the class serializes its fields by name
+"scmle.operations.continuous.policies.RetrainDecision.escalation_id" = ["escalation", "escalation_id"]  # stored key: the class serializes its fields by name
+"scmle.operations.continuous.policies.RetrainDecision.held_back" = ["back", "held"]  # stored key: the class serializes its fields by name
+"scmle.operations.continuous.policies.RetrainPolicy.cooldown_batches" = ["batches", "cooldown"]  # stored key: the class serializes its fields by name
+"scmle.operations.continuous.policies.RetrainPolicy.max_age_days" = ["days", "max_age_days"]  # stored key: the class serializes its fields by name
+"scmle.operations.continuous.policies.RetrainPolicy.min_outcomes" = ["outcomes", "min_outcomes"]  # stored key: the class serializes its fields by name
+"scmle.operations.continuous.promotion.post_promotion_check" = ["post", "promotion"]  # no single word fits without ambiguity
+"scmle.operations.continuous.records.dataset_version" = ["version", "dataset"]  # no single word fits without ambiguity
+"scmle.operations.continuous.retraining.Retraining.run_approved_retrain" = ["approved", "run_approved_retrain"]  # no single word fits without ambiguity
+"scmle.operations.controller.Limits.max_idle_ticks" = ["ticks", "max_idle_ticks"]  # max qualifier
+"scmle.operations.controller.Limits.max_unlabelled_ticks" = ["ticks", "max_unlabelled_ticks"]  # max qualifier
+"scmle.operations.controller.file_digest" = ["digest", "file_digest"]  # digest is already bound at scmle/operations/controller.py:395
+"scmle.operations.cost.Rates.gib_second" = ["second", "gib"]  # stored key: the class serializes its fields by name
+"scmle.operations.cost.Rates.per_gb_egress" = ["egress", "per"]  # stored key: the class serializes its fields by name
+"scmle.operations.cost.Rates.per_thousand_requests" = ["requests", "per", "thousand"]  # stored key: the class serializes its fields by name
+"scmle.operations.cost.Rates.vcpu_second" = ["second", "vcpu"]  # stored key: the class serializes its fields by name
+"scmle.operations.cost.Usage.egress_gb" = ["egress", "egress_gb"]  # stored key: the class serializes its fields by name
+"scmle.operations.cost.Usage.gib_seconds" = ["gib", "seconds"]  # stored key: the class serializes its fields by name
+"scmle.operations.cost.Usage.vcpu_seconds" = ["vcpu", "seconds"]  # stored key: the class serializes its fields by name
+"scmle.operations.lifecycle.Cadence.cooldown_rows" = ["rows", "cooldown"]  # stored key: the class serializes its fields by name
+"scmle.operations.lifecycle.Cadence.min_rows" = ["rows", "min_rows"]  # stored key: the class serializes its fields by name
+"scmle.operations.lifecycle.Maintainer.work_dir" = ["work", "work_dir"]  # no single word fits without ambiguity
+"scmle.operations.lifecycle.Outcome.restored_version" = ["version", "restored"]  # stored key: the class serializes its fields by name
+"scmle.operations.lifecycle.Outcome.rolled_back" = ["back", "rolled"]  # stored key: the class serializes its fields by name
+"scmle.operations.lifecycle.Rollback.rollout_decides" = ["rollout", "rollout_decides"]  # no single word fits without ambiguity
+"scmle.operations.lifecycle.Staging.rollout_decides" = ["rollout", "rollout_decides"]  # no single word fits without ambiguity
+"scmle.operations.lifecycle.Staging.work_dir" = ["work", "work_dir"]  # no single word fits without ambiguity
+"scmle.operations.lifecycle.Trigger.min_rows" = ["rows", "min_rows"]  # stored key: the class serializes its fields by name
+"scmle.operations.lifecycle.Verdict.promoted_version" = ["version", "promoted"]  # stored key: the class serializes its fields by name
+"scmle.operations.logs.Journal.model_version" = ["version", "model"]  # no single word fits without ambiguity
+"scmle.operations.metrics.Instrumentation.model_version" = ["version", "model"]  # no single word fits without ambiguity
+"scmle.operations.notify.Delivery.http_status" = ["status", "http"]  # stored key: the class serializes its fields by name
+"scmle.operations.notify.Delivery.idempotency_key" = ["key", "idempotency"]  # stored key: the class serializes its fields by name
+"scmle.operations.notify.WebhookSender.max_attempts" = ["attempts", "max_attempts"]  # max qualifier
+"scmle.operations.recovery.Fault.cloud_needs" = ["needs", "cloud"]  # stored key: the class serializes its fields by name
+"scmle.operations.recovery.Fault.local_limits" = ["limits", "local_limits"]  # stored key: the class serializes its fields by name
+"scmle.operations.recovery.Objective.rpo_lost" = ["lost", "rpo"]  # stored key: the class serializes its fields by name
+"scmle.operations.recovery.Objective.rpo_unit" = ["unit", "rpo"]  # stored key: the class serializes its fields by name
+"scmle.operations.recovery.Objective.rto_seconds" = ["rto", "seconds"]  # stored key: the class serializes its fields by name
+"scmle.operations.recovery.Outcome.fault_id" = ["fault", "fault_id"]  # no single word fits without ambiguity
+"scmle.operations.recovery.Runner.not_run" = ["run", "not"]  # a joining word carries the meaning
+"scmle.operations.respond.Desk.model_version" = ["version", "model"]  # no single word fits without ambiguity
+"scmle.operations.respond.Response.incident_id" = ["incident", "incident_id"]  # no single word fits without ambiguity
+"scmle.operations.rollout_hook.Hook.champion_id" = ["champion", "champion_id"]  # no single word fits without ambiguity
+"scmle.operations.rollout_hook.Hook.experiment_id" = ["id", "experiment"]  # every candidate is taken, a builtin or a library name
+"scmle.operations.signals.Category.DATA_QUALITY" = ["QUALITY", "DATA"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.operations.signals.Category.MODEL_PERFORMANCE" = ["PERFORMANCE", "MODEL"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.operations.signals.SignalThresholds.invalid_request_rate" = ["rate", "invalid", "request"]  # no single word fits without ambiguity
+"scmle.operations.signals.SignalThresholds.latency_p95_seconds" = ["seconds", "latency", "p95"]  # no single word fits without ambiguity
+"scmle.operations.signals.SignalThresholds.missing_rate_increase" = ["increase", "missing", "rate"]  # no single word fits without ambiguity
+"scmle.operations.signals.SignalThresholds.server_error_rate" = ["rate", "server", "error"]  # no single word fits without ambiguity
+"scmle.operations.signals.Status.INSUFFICIENT_DATA" = ["DATA", "INSUFFICIENT"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.operations.signals.Window.min_samples" = ["samples", "min_samples"]  # min qualifier
+"scmle.operations.signals.Window.sample_rate" = ["sample", "rate"]  # no single word fits without ambiguity
+"scmle.operations.signals.as_metric_samples" = ["samples", "metric"]  # a joining word carries the meaning
+"scmle.pipeline.context.Context.check_cancelled" = ["check", "check_cancelled"]  # no such definition now (the pipeline refactor removed or moved it)
+"scmle.pipeline.context.Context.cleaning_notes" = ["notes", "cleaning_notes"]  # no such definition now (the pipeline refactor removed or moved it)
+"scmle.pipeline.context.Context.cluster_column" = ["column", "cluster"]  # no single word fits without ambiguity
+"scmle.pipeline.context.Context.coverage_claim_sha256" = ["sha256", "coverage", "claim"]  # a proper name or method acronym; one word loses it
+"scmle.pipeline.context.Context.custody_vault" = ["vault", "custody_vault"]  # no such definition now (the pipeline refactor removed or moved it)
+"scmle.pipeline.context.Context.evidence_graph" = ["graph", "evidence_graph"]  # no such definition now (the pipeline refactor removed or moved it)
+"scmle.pipeline.context.Context.fairness_mitigation" = ["mitigation", "fairness_mitigation"]  # no such definition now (the pipeline refactor removed or moved it)
+"scmle.pipeline.context.Context.final_pipeline" = ["pipeline", "final_pipeline"]  # no such definition now (the pipeline refactor removed or moved it)
+"scmle.pipeline.context.Context.ordinal_labels" = ["labels", "ordinal"]  # no single word fits without ambiguity
+"scmle.pipeline.context.Context.pareto_front" = ["front", "pareto_front"]  # no such definition now (the pipeline refactor removed or moved it)
+"scmle.pipeline.context.Context.pending_ledger" = ["ledger", "pending_ledger"]  # no such definition now (the pipeline refactor removed or moved it)
+"scmle.pipeline.context.Context.read_seconds" = ["read", "seconds"]  # no single word fits without ambiguity
+"scmle.pipeline.context.Context.reference_scores" = ["scores", "reference_scores"]  # no such definition now (the pipeline refactor removed or moved it)
+"scmle.pipeline.context.Context.seasonal_baseline" = ["baseline", "seasonal_baseline"]  # no such definition now (the pipeline refactor removed or moved it)
+"scmle.pipeline.context.Context.semi_supervised" = ["supervised", "semi_supervised"]  # no such definition now (the pipeline refactor removed or moved it)
+"scmle.pipeline.context.Context.test_rows" = ["rows", "test_rows"]  # no such definition now (the pipeline refactor removed or moved it)
+"scmle.pipeline.inspection.Inspection.duplicate_count" = ["count", "duplicate"]  # a count: the head noun alone reads as the items
+"scmle.pipeline.inspection.Inspection.leakage_screen" = ["screen", "leakage"]  # a certificate or evidence row hashes its source; regenerate it with the rename
+"scmle.pipeline.journal.Journal.write_text" = ["text", "write_text"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.checkpoints.Checkpoint.read_verified" = ["verified", "read_verified"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.checkpoints.Checkpoint.schema_version" = ["version", "schema"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.containers.Batch.feature_names" = ["names", "feature"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.containers.Batch.sample_ids" = ["ids", "sample"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.containers.LifecycleCancelledError" = ["CancelledError", "AbortError"]  # asyncio defines CancelledError
+"scmle.pipeline.modality_lifecycle.containers.Package.model_sha256" = ["sha256", "model"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.containers.Package.schema_version" = ["version", "schema"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.curators.Curation.read_verified" = ["verified", "read_verified"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.curators.Curation.schema_version" = ["version", "schema"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.curators.ExtensionCurator" = ["Curator", "Extension"]  # which word names the curator
+"scmle.pipeline.modality_lifecycle.curators.ExtensionCurator.dataset_hash_value" = ["value", "dataset"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.curators.ExtensionCurator.sample_values" = ["values", "sample"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.curators.Preparer.explanation_ground_truth" = ["truth", "explanation", "ground"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.explanation.ModelExplainabilityStage" = ["Stage", "Explanation"]  # the lifecycle has several stages
+"scmle.pipeline.modality_lifecycle.explanation.Stability.perturbation_reports" = ["perturbation", "perturbation_reports"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.explanation.Stability.zero_ablation_consistency" = ["consistency", "zero", "ablation"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.plans.Plan.package_target" = ["package", "package_target"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.plans.Plan.report_preexisting" = ["report", "report_preexisting"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.plans.Plan.report_target" = ["report", "report_target"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.plans.Plan.require_independent_ground_truth" = ["truth", "require", "independent"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.plans.Plan.signing_key" = ["key", "signing"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.predictors.Predictor.feature_names" = ["names", "feature"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.predictors.Predictor.features_for" = ["features", "features_for"]  # a joining word carries the meaning
+"scmle.pipeline.modality_lifecycle.predictors.Predictor.from_package" = ["parse", "from_package"]  # a joining word carries the meaning
+"scmle.pipeline.modality_lifecycle.predictors.Predictor.lifecycle_report_digest" = ["digest", "lifecycle", "report"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.predictors.Predictor.training_dataset_hash" = ["training", "dataset"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.preparers.audio.AudioPreparer" = ["Preparer", "AudioPreparer"]  # Preparer is already bound at scmle/pipeline/modality_lifecycle/__init__.py:60
+"scmle.pipeline.modality_lifecycle.preparers.audio.AudioPreparer.background_noise_robustness" = ["robustness", "background", "noise"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.preparers.audio.Span.end_seconds" = ["end", "seconds"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.audio.Span.frames_observed" = ["observed", "frames"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.audio.Span.score_delta_from_full" = ["full", "delta"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.audio.Span.start_frame" = ["frame", "start"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.audio.Span.start_seconds" = ["start", "seconds"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.document.DocumentPreparer" = ["Preparer", "DocumentPreparer"]  # Preparer is already bound at scmle/pipeline/modality_lifecycle/__init__.py:60
+"scmle.pipeline.modality_lifecycle.preparers.geospatial.GeospatialPreparer" = ["Preparer", "GeospatialPreparer"]  # Preparer is already bound at scmle/pipeline/modality_lifecycle/__init__.py:60
+"scmle.pipeline.modality_lifecycle.preparers.geospatial.GeospatialPreparer.block_size" = ["size", "block"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.preparers.graph.GraphPreparer" = ["Preparer", "GraphPreparer"]  # Preparer is already bound at scmle/pipeline/modality_lifecycle/__init__.py:63
+"scmle.pipeline.modality_lifecycle.preparers.image.ImagePreparer" = ["Preparer", "ImagePreparer"]  # Preparer is already bound at scmle/pipeline/modality_lifecycle/__init__.py:64
+"scmle.pipeline.modality_lifecycle.preparers.raster.Imagery.decoder_name" = ["name", "decoder_name"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.preparers.raster.Imagery.labels_by_source" = ["source", "labels_by_source"]  # a joining word carries the meaning
+"scmle.pipeline.modality_lifecycle.preparers.raster.Imagery.max_pixels" = ["pixels", "max_pixels"]  # max qualifier
+"scmle.pipeline.modality_lifecycle.preparers.raster.Nodata.declared_values" = ["values", "declared"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.raster.Nodata.fraction_max" = ["fraction", "fraction_max"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.raster.Nodata.fraction_min" = ["fraction", "fraction_min"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.raster.Pixels.max_pixels" = ["pixels", "max_pixels"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.raster.Pixels.measured_nodata_fraction" = ["fraction", "measured", "nodata"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.raster.Survey.label_counts" = ["counts", "label"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.raster.Survey.total_bytes" = ["total", "total_bytes"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.raster.Survey.transform_lengths" = ["lengths", "transform"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.raster.Window.pixel_window" = ["window", "pixel"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.raster.Window.score_delta" = ["delta", "score"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.raster.Window.spatial_bounds" = ["bounds", "spatial"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.video.Blank.frame_index" = ["index", "frame"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.video.Blank.score_delta_from_full" = ["full", "score", "delta"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.video.Blank.time_seconds" = ["time", "seconds"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.video.Footage.max_frame_pixels" = ["pixels", "max_frame_pixels"]  # max qualifier
+"scmle.pipeline.modality_lifecycle.preparers.video.Footage.max_frames" = ["frames", "max_frames"]  # max qualifier
+"scmle.pipeline.modality_lifecycle.preparers.video.Slot.frame_index" = ["index", "frame"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.video.Slot.score_delta" = ["delta", "score"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.preparers.video.Slot.time_seconds" = ["time", "seconds"]  # stored key: the class serializes its fields by name
+"scmle.pipeline.modality_lifecycle.reporting.Record.read_verified" = ["verified", "read_verified"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.reporting.Record.schema_version" = ["version", "schema"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.verification.file_digest" = ["digest", "file_digest"]  # digest is already bound at scmle/operations/controller.py:395
+"scmle.pipeline.modality_lifecycle.verification.require_feature_names" = ["require", "names", "feature"]  # no single word fits without ambiguity
+"scmle.pipeline.modality_lifecycle.verification.verify_package_manifest" = ["verify", "manifest", "package"]  # no single word fits without ambiguity
+"scmle.pipeline.orchestrator.Orchestrator.capability_registry" = ["capability", "capability_registry"]  # no single word fits without ambiguity
+"scmle.pipeline.orchestrator.Orchestrator.new_context" = ["context", "new_context"]  # no such definition now (the pipeline refactor removed or moved it)
+"scmle.pipeline.orchestrator.Orchestrator.tracking_path" = ["path", "tracking"]  # no single word fits without ambiguity
+"scmle.pipeline.roster.experimental_tabular_capability" = ["capability", "experimental", "tabular"]  # no single word fits without ambiguity
+"scmle.pipeline.services.Services.capability_registry" = ["capability", "capability_registry"]  # no single word fits without ambiguity
+"scmle.pipeline.services.Services.input_frame" = ["frame", "input_frame"]  # no single word fits without ambiguity
+"scmle.pipeline.stages.assessment.FinalEvaluationStage" = ["Stage", "FinalEvaluationStage"]  # Stage is already bound at scmle/pipeline/stages/__init__.py:49
+"scmle.pipeline.stages.defaults.default_stages" = ["default", "stages"]  # no single word fits without ambiguity
+"scmle.pipeline.stages.exploration.Escrow.holds_for_coverage" = ["coverage", "holds"]  # a joining word carries the meaning
+"scmle.pipeline.stages.impounding.Impounding.check_known_entity" = ["check", "entity", "known"]  # no single word fits without ambiguity
+"scmle.pipeline.stages.ingestion.IngestStage" = ["Stage", "IngestStage"]  # Stage is already bound at scmle/pipeline/stages/__init__.py:49
+"scmle.pipeline.stages.ingestion.Intake.read_seconds" = ["read", "seconds"]  # no single word fits without ambiguity
+"scmle.pipeline.stages.labelling.Labelling.set_aside_unlabeled" = ["unlabeled", "aside"]  # no single word fits without ambiguity
+"scmle.pipeline.stages.packaging.PackageStage" = ["Stage", "PackageStage"]  # Stage is already bound at scmle/pipeline/stages/__init__.py:49
+"scmle.pipeline.stages.profiling.ProfileStage" = ["Stage", "ProfileStage"]  # Stage is already bound at scmle/pipeline/stages/__init__.py:49
+"scmle.pipeline.stages.releasing.Releasing.evidence_index" = ["index", "evidence_index"]  # no single word fits without ambiguity
+"scmle.pipeline.stages.scoring.choose_decision_threshold" = ["choose", "threshold", "decision"]  # no single word fits without ambiguity
+"scmle.pipeline.stages.scoring.coverage_on_confirmation" = ["confirmation", "coverage"]  # a joining word carries the meaning
+"scmle.pipeline.stages.screening.Screening.enforce_leakage_policy" = ["policy", "enforce"]  # a certificate or evidence row hashes its source; regenerate it with the rename
+"scmle.pipeline.stages.selecting.SelectStage" = ["Stage", "SelectStage"]  # Stage is already bound at scmle/pipeline/stages/__init__.py:49
+"scmle.pipeline.stages.selecting.SelectStage.select_on_front" = ["select", "front"]  # a joining word carries the meaning
+"scmle.pipeline.stages.training.TrainStage" = ["Stage", "TrainStage"]  # Stage is already bound at scmle/pipeline/stages/__init__.py:49
+"scmle.pipeline.suite.run_suite" = ["suite", "run_suite"]  # every candidate is taken, a builtin or a library name
+"scmle.pipeline.trials.Job.fold_count" = ["count", "fold"]  # a count: the head noun alone reads as the items
+"scmle.pipeline.trials.Job.model_name" = ["name", "model"]  # no single word fits without ambiguity
+"scmle.pipeline.trials.Job.trial_id" = ["trial", "trial_id"]  # no single word fits without ambiguity
+"scmle.pipeline.trials.Payload.positive_label" = ["label", "positive"]  # no single word fits without ambiguity
+"scmle.runtime.limits.Governor.started_at" = ["started", "started_at"]  # a joining word carries the meaning
+"scmle.runtime.limits.peak_memory_gb" = ["peak", "memory"]  # no single word fits without ambiguity
+"scmle.runtime.limits.ps_table" = ["table", "ps_table"]  # no single word fits without ambiguity
+"scmle.runtime.limits.psutil_table" = ["table", "psutil"]  # no single word fits without ambiguity
+"scmle.runtime.randomness.component_seed_sequence" = ["sequence", "component", "seed"]  # no single word fits without ambiguity
+"scmle.runtime.randomness.derive_int_seed" = ["seed", "derive_int_seed"]  # no single word fits without ambiguity
+"scmle.runtime.resource_observation.Observation.captured_at" = ["captured", "captured_at"]  # a joining word carries the meaning
+"scmle.runtime.resource_observation.Observation.disk_path" = ["path", "disk"]  # no single word fits without ambiguity
+"scmle.runtime.resource_observation.observe_memory_gb" = ["observe", "memory"]  # no single word fits without ambiguity
+"scmle.runtime.resource_observation.observe_runtime_resources" = ["observe", "resources", "runtime"]  # no single word fits without ambiguity
+"scmle.runtime.resource_observation.observe_windows_memory_gb" = ["observe", "windows"]  # no single word fits without ambiguity
+"scmle.runtime.resource_observation.project_extra_requirements" = ["requirements", "project", "extra"]  # no single word fits without ambiguity
+"scmle.runtime.retry.Retries.base_delay_seconds" = ["seconds", "base"]  # stored key: the class serializes its fields by name
+"scmle.runtime.retry.Retries.max_attempts" = ["attempts", "max_attempts"]  # stored key: the class serializes its fields by name
+"scmle.runtime.retry.Retries.max_delay_seconds" = ["seconds", "max_delay_seconds"]  # stored key: the class serializes its fields by name
+"scmle.runtime.state.Tracker.config_hash" = ["config", "config_hash"]  # no single word fits without ambiguity
+"scmle.runtime.state.Tracker.run_id" = ["run", "run_id"]  # no single word fits without ambiguity
+"scmle.workflow.definition.CatchUp" = ["Backfill", "Catchup"]  # a phrasal verb
+"scmle.workflow.definition.CatchUp.LATEST_ONLY" = ["ONLY", "LATEST"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.workflow.definition.CatchUp.RUN_ALL" = ["ALL", "RUN"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.workflow.definition.Schedule.catch_up" = ["catch", "catch_up"]  # stored key: the class serializes its fields by name
+"scmle.workflow.definition.Schedule.interval_seconds" = ["interval", "seconds"]  # stored key: the class serializes its fields by name
+"scmle.workflow.definition.Schedule.max_catch_up" = ["up", "max"]  # stored key: the class serializes its fields by name
+"scmle.workflow.definition.Schedule.start_epoch" = ["epoch", "start"]  # stored key: the class serializes its fields by name
+"scmle.workflow.definition.Step.concurrency_group" = ["group", "concurrency"]  # stored key: the class serializes its fields by name
+"scmle.workflow.definition.Step.cost_budget" = ["budget", "cost"]  # stored key: the class serializes its fields by name
+"scmle.workflow.definition.Step.depends_on" = ["depends", "depends_on"]  # stored key: the class serializes its fields by name
+"scmle.workflow.definition.Step.expires_seconds" = ["expires", "seconds"]  # stored key: the class serializes its fields by name
+"scmle.workflow.definition.Step.timeout_seconds" = ["timeout", "seconds"]  # stored key: the class serializes its fields by name
+"scmle.workflow.definition.StepKind.BATCH_PREDICT" = ["PREDICT", "BATCH"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.workflow.definition.Workflow.max_concurrent_runs" = ["runs", "max_concurrent_runs"]  # max qualifier
+"scmle.workflow.definition.Workflow.max_parallel" = ["parallel", "max_parallel"]  # max qualifier
+"scmle.workflow.executor.context.StepContext.idempotency_key" = ["key", "idempotency"]  # no single word fits without ambiguity
+"scmle.workflow.executor.context.StepContext.run_id" = ["run", "run_id"]  # no single word fits without ambiguity
+"scmle.workflow.executor.context.StepContext.run_spent" = ["run", "run_spent"]  # no single word fits without ambiguity
+"scmle.workflow.executor.failures.ConcurrencyLimitError" = ["ConcurrencyError", "LimitError"]  # which word names the failure
+"scmle.workflow.executor.records.Records.approver_keys" = ["keys", "approver"]  # no single word fits without ambiguity
+"scmle.workflow.executor.records.Records.lease_seconds" = ["seconds", "lease_seconds"]  # no single word fits without ambiguity
+"scmle.workflow.executor.records.Records.step_record" = ["step", "step_record"]  # no single word fits without ambiguity
+"scmle.workflow.executor.records.run_id_for" = ["for", "id"]  # a joining word carries the meaning
+"scmle.workflow.executor.status.Progress.BUDGET_STOPPED" = ["STOPPED", "BUDGET"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.workflow.executor.status.Progress.WAITING_APPROVAL" = ["APPROVAL", "WAITING"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.workflow.executor.steps.Steps.idempotency_key" = ["key", "idempotency"]  # no single word fits without ambiguity
+
+# Refused, not mapped:
+# scmle.monitoring.abtest.Comparison.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.monitoring.abtest.Comparison.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.monitoring.alerts.Alert.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.monitoring.alerts.Alert.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.monitoring.alerts.Delivery.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.monitoring.alerts.Delivery.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.monitoring.incidents.Incident.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.monitoring.incidents.Incident.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.monitoring.incidents.Phase.ACKNOWLEDGED: one word: structure.compound counts every all-caps name as compound
+# scmle.monitoring.incidents.Phase.OPEN: one word: structure.compound counts every all-caps name as compound
+# scmle.monitoring.incidents.Phase.RESOLVED: one word: structure.compound counts every all-caps name as compound
+# scmle.monitoring.labels.Mechanism.COMPLETE: one word: structure.compound counts every all-caps name as compound
+# scmle.monitoring.labels.Mechanism.UNVERIFIED: one word: structure.compound counts every all-caps name as compound
+# scmle.monitoring.monitor.Assessment.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.monitoring.observability.Evaluation.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.monitoring.observability.Evaluation.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.monitoring.sequential_tests.Betting.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.monitoring.sequential_tests.Betting.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.monitoring.sequential_tests.Comparison.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.monitoring.sequential_tests.Comparison.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.monitoring.sequential_tests.Mixture.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.monitoring.sequential_tests.Mixture.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.monitoring.sequential_tests.Tripwire.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.monitoring.sequential_tests.Tripwire.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.monitoring.slo.Assessment.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.monitoring.slo.Assessment.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.monitoring.slo.Slo.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.monitoring.slo.Slo.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.monitoring.slo.Status.BREACHED: one word: structure.compound counts every all-caps name as compound
+# scmle.monitoring.slo.Status.INVALID: one word: structure.compound counts every all-caps name as compound
+# scmle.monitoring.slo.Status.PASS: one word: structure.compound counts every all-caps name as compound
+# scmle.operations.classify.Classification.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.operations.classify.Verdict.INDETERMINATE: one word: structure.compound counts every all-caps name as compound
+# scmle.operations.classify.Verdict.INFRASTRUCTURE: one word: structure.compound counts every all-caps name as compound
+# scmle.operations.classify.Verdict.MIXED: one word: structure.compound counts every all-caps name as compound
+# scmle.operations.classify.Verdict.NONE: one word: structure.compound counts every all-caps name as compound
+# scmle.operations.continuous.evaluation.Replacement.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.operations.continuous.policies.RetrainDecision.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.operations.continuous.policies.RetrainDecision.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.operations.controller.Tick.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.operations.metrics.Instrumentation.CPU: one word: structure.compound counts every all-caps name as compound
+# scmle.operations.metrics.Instrumentation.DURATION: one word: structure.compound counts every all-caps name as compound
+# scmle.operations.metrics.Instrumentation.MEMORY: one word: structure.compound counts every all-caps name as compound
+# scmle.operations.metrics.Instrumentation.REQUESTS: one word: structure.compound counts every all-caps name as compound
+# scmle.operations.notify.Delivery.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.operations.notify.Delivery.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.operations.recovery.Measurement.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.operations.recovery.Measurement.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.operations.recovery.Outcome.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.operations.recovery.Outcome.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.operations.respond.Response.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.operations.respond.Response.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.operations.signals.Category.INFRASTRUCTURE: one word: structure.compound counts every all-caps name as compound
+# scmle.operations.signals.Signal.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.operations.signals.Status.BREACHED: one word: structure.compound counts every all-caps name as compound
+# scmle.operations.signals.Status.OK: one word: structure.compound counts every all-caps name as compound
+# scmle.operations.spool.MetricsSpool.batch_size: library keyword argument stored as a hyperparameter (phase5 D6)
+# scmle.pipeline.modality_lifecycle.checkpoints.Checkpoint.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.pipeline.modality_lifecycle.checkpoints.Checkpoint.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.pipeline.modality_lifecycle.containers.Package.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.pipeline.modality_lifecycle.containers.Package.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.pipeline.modality_lifecycle.curators.Curation.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.pipeline.modality_lifecycle.curators.Curation.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.pipeline.modality_lifecycle.reporting.Record.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.pipeline.modality_lifecycle.reporting.Record.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.pipeline.recommendations.Recommendation.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.runtime.plugins.Kind.DETECTORS: one word: structure.compound counts every all-caps name as compound
+# scmle.runtime.plugins.Kind.ESTIMATORS: one word: structure.compound counts every all-caps name as compound
+# scmle.runtime.plugins.Kind.METRICS: one word: structure.compound counts every all-caps name as compound
+# scmle.runtime.plugins.Kind.READERS: one word: structure.compound counts every all-caps name as compound
+# scmle.runtime.plugins.Kind.STAGES: one word: structure.compound counts every all-caps name as compound
+# scmle.runtime.plugins.Kind.TRANSFORMERS: one word: structure.compound counts every all-caps name as compound
+# scmle.runtime.resource_observation.Observation.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.runtime.retry.Retries.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.runtime.retry.Retries.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.runtime.state.Progress.BLOCKED: one word: structure.compound counts every all-caps name as compound
+# scmle.runtime.state.Progress.CANCELLED: one word: structure.compound counts every all-caps name as compound
+# scmle.runtime.state.Progress.COMPLETED: one word: structure.compound counts every all-caps name as compound
+# scmle.runtime.state.Progress.CREATED: one word: structure.compound counts every all-caps name as compound
+# scmle.runtime.state.Progress.FAILED: one word: structure.compound counts every all-caps name as compound
+# scmle.runtime.state.Progress.PACKAGING: one word: structure.compound counts every all-caps name as compound
+# scmle.runtime.state.Progress.PLANNING: one word: structure.compound counts every all-caps name as compound
+# scmle.runtime.state.Progress.PROFILING: one word: structure.compound counts every all-caps name as compound
+# scmle.runtime.state.Progress.SELECTING: one word: structure.compound counts every all-caps name as compound
+# scmle.runtime.state.Progress.TESTING: one word: structure.compound counts every all-caps name as compound
+# scmle.runtime.state.Progress.TRAINING: one word: structure.compound counts every all-caps name as compound
+# scmle.runtime.state.Progress.VALIDATING: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.definition.CatchUp.SKIP: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.definition.Step.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.definition.Step.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.workflow.definition.StepKind.APPROVAL: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.definition.StepKind.EVALUATE: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.definition.StepKind.INGEST: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.definition.StepKind.MONITOR: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.definition.StepKind.TRAIN: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.definition.Workflow.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.definition.Workflow.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.workflow.executor.status.Phase.EXPIRED: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.executor.status.Phase.FAILED: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.executor.status.Phase.PENDING: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.executor.status.Phase.REJECTED: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.executor.status.Phase.RUNNING: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.executor.status.Phase.SKIPPED: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.executor.status.Phase.SUCCEEDED: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.executor.status.Phase.WAITING: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.executor.status.Progress.EXPIRED: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.executor.status.Progress.FAILED: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.executor.status.Progress.REJECTED: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.executor.status.Progress.RUNNING: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.executor.status.Progress.SUCCEEDED: one word: structure.compound counts every all-caps name as compound
+# scmle.workflow.schedule.Tick.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)

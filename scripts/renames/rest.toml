@@ -1,0 +1,1339 @@
+# Rename map, lane 3.4: every other scmle package.
+#
+# One `dotted.old.name = "new"` entry per definition; a method or
+# attribute is listed once for its overriding family (rename.py
+# renames every override). Applied with
+#     uv run python scripts/rename.py rest --dry-run
+# The [review] table lists names no single word fits without
+# ambiguity, with two or three candidates and the reason; rename.py
+# reads only the top-level entries. A candidate equal to the old name
+# means keeping it. The trailing comment block lists
+# the names that are not mapped and why.
+
+"scmle.api.non_tabular.Modeler.performance_baseline" = "baseline"
+"scmle.api.non_tabular.Modeler.performance_budget" = "budget"
+"scmle.api.non_tabular.Scope.decoder_policy" = "policy"
+"scmle.api.non_tabular.Scope.model_family" = "family"
+"scmle.api.predict.load_model" = "load"
+"scmle.api.project.Definition.baseline_subject" = "subject"
+"scmle.api.project.Definition.cluster_address" = "address"
+"scmle.api.project.Definition.embargo_rows" = "rows"
+"scmle.api.project.Definition.embedding_model" = "model"
+"scmle.api.project.Definition.estimation_policy" = "policy"
+"scmle.api.project.Definition.feature_delays" = "delays"
+"scmle.api.project.Definition.feature_graph" = "graph"
+"scmle.api.project.Definition.forecast_calendar" = "calendar"
+"scmle.api.project.Definition.forecast_lags" = "lags"
+"scmle.api.project.Definition.forecast_windows" = "windows"
+"scmle.api.project.Definition.framing_draft" = "draft"
+"scmle.api.project.Definition.leakage_attestations" = "attestations"
+"scmle.api.project.Definition.monotonic_constraints" = "constraints"
+"scmle.api.project.Definition.ordinal_order" = "order"
+"scmle.api.project.Definition.seasonal_period" = "period"
+"scmle.api.project.Definition.text_encoding" = "encoding"
+"scmle.api.project.Definition.time_budget" = "budget"
+"scmle.api.project.ModalityProject.performance_baseline" = "baseline"
+"scmle.api.project.ModalityProject.performance_budget" = "budget"
+"scmle.api.project.Project.estimate_parameters" = "estimate"
+"scmle.api.project.Project.verify_replay" = "verify"
+"scmle.api.sequential.Estimation.verify_replay" = "verify"
+"scmle.artifacts.bundle.core.Core.coverage_report" = "report"
+"scmle.artifacts.bundle.core.Core.cv_plus" = "plus"
+"scmle.artifacts.bundle.core.Core.history_lock" = "lock"
+"scmle.artifacts.bundle.core.Core.read_frame" = "read"
+"scmle.artifacts.bundle.core.Core.shift_weights" = "weights"
+"scmle.artifacts.bundle.provenance.Manifest.environment_lock" = "lock"
+"scmle.artifacts.bundle.seal.verify_signature" = "verify"
+"scmle.artifacts.claims_audit.files.read_optional" = "read"
+"scmle.artifacts.claims_audit.registration.check_registered" = "check"
+"scmle.artifacts.reproducibility.Comparison.trials_compared" = "compared"
+"scmle.artifacts.results.Run.selected_model" = "model"
+"scmle.artifacts.store.Workspace.write_json" = "write"
+"scmle.causal.identification.battery.run_battery" = "battery"
+"scmle.causal.identification.certified.SubgroupGate" = "Gate"
+"scmle.causal.identification.certified.method_hashes" = "hashes"
+"scmle.causal.identification.certified.subgroup_gate" = "gate"
+"scmle.causal.identification.run.adjustment.RandomizedEstimator" = "Randomized"
+"scmle.causal.identification.run.analysis.Trial.alpha_falsify" = "falsify"
+"scmle.causal.identification.run.estimator.Estimator.alpha_falsify" = "falsify"
+"scmle.causal.identification.run.estimator.Estimator.single_unit" = "unit"
+"scmle.causal.identification.run.exogeneity.RdEstimator" = "Discontinuity"
+"scmle.causal.identification.select.Verdict.missing_assumptions" = "assumptions"
+"scmle.causal.identification.select.Verdict.missing_design" = "design"
+"scmle.causal.identification.tier.Inputs.adjustment_checked" = "checked"
+"scmle.causal.identification.tier.Inputs.battery_gate" = "gate"
+"scmle.causal.identification.tier.Inputs.battery_passed" = "passed"
+"scmle.causal.identification.tier.Inputs.battery_ran" = "ran"
+"scmle.causal.identification.tier.Inputs.design_gates" = "gates"
+"scmle.causal.identification.tier.Inputs.sensitivity_holds" = "holds"
+"scmle.causal.identification.tier.Inputs.single_unit" = "unit"
+"scmle.causal.identification.tier.Inputs.weak_instrument" = "instrument"
+"scmle.cli.build_parser" = "build"
+"scmle.cli.governance.Claims.run_show" = "show"
+"scmle.cli.governance.Claims.run_verify" = "verify"
+"scmle.cli.governance.Loop.run_init" = "init"
+"scmle.cli.governance.Loop.run_mature" = "mature"
+"scmle.cli.governance.Loop.run_observe" = "observe"
+"scmle.cli.governance.Loop.run_pending" = "pending"
+"scmle.cli.governance.Loop.run_reply" = "reply"
+"scmle.cli.governance.Loop.run_step" = "step"
+"scmle.cli.governance.Loop.run_verify" = "verify"
+"scmle.cli.intake.Charter.run_check" = "check"
+"scmle.cli.intake.Charter.run_init" = "init"
+"scmle.cli.intake.Charter.run_sign" = "sign"
+"scmle.cli.rollout.Deployment.run_gate" = "gate"
+"scmle.cli.rollout.Deployment.run_live" = "live"
+"scmle.cli.rollout.Deployment.run_reconcile" = "reconcile"
+"scmle.cli.rollout.Operation.run_grant" = "grant"
+"scmle.cli.rollout.Operation.run_halt" = "halt"
+"scmle.cli.rollout.Operation.run_revoke" = "revoke"
+"scmle.cli.rollout.Operation.run_status" = "status"
+"scmle.cli.rollout.Operation.run_tick" = "tick"
+"scmle.contracts.capabilities.axes.ModelFamily" = "Family"
+"scmle.contracts.capabilities.catalog.Catalog.model_families" = "families"
+"scmle.contracts.capabilities.catalog.Catalog.runtime_environment" = "environment"
+"scmle.contracts.capabilities.declarations.Capability.evidence_links" = "links"
+"scmle.contracts.capabilities.declarations.Capability.failure_modes" = "modes"
+"scmle.contracts.capabilities.declarations.Capability.required_extras" = "extras"
+"scmle.contracts.capabilities.declarations.Coordinate.model_family" = "family"
+"scmle.contracts.capabilities.declarations.Declaration.evidence_links" = "links"
+"scmle.contracts.capabilities.declarations.Declaration.failure_modes" = "modes"
+"scmle.contracts.capabilities.declarations.Declaration.model_family" = "family"
+"scmle.contracts.capabilities.declarations.Declaration.required_extras" = "extras"
+"scmle.contracts.capabilities.declarations.Environment.available_extras" = "extras"
+"scmle.contracts.capabilities.declarations.Environment.cpu_cores" = "cores"
+"scmle.contracts.capabilities.declarations.Environment.disk_gb" = "disk"
+"scmle.contracts.capabilities.declarations.Environment.gpu_available" = "available"
+"scmle.contracts.capabilities.declarations.Environment.memory_gb" = "memory"
+"scmle.contracts.capabilities.declarations.Resources.cpu_cores" = "cores"
+"scmle.contracts.capabilities.declarations.Resources.disk_gb" = "disk"
+"scmle.contracts.capabilities.declarations.Resources.gpu_required" = "required"
+"scmle.contracts.capabilities.declarations.Resources.memory_gb" = "memory"
+"scmle.contracts.data.findings.FindingSeverity" = "Severity"
+"scmle.contracts.data.profiles.Curation.cleaning_notes" = "notes"
+"scmle.contracts.data.profiles.Curation.profiled_rows" = "rows"
+"scmle.contracts.data.profiles.Curation.quality_findings" = "findings"
+"scmle.contracts.data.profiles.Curation.release_ready" = "release"
+"scmle.contracts.data.profiles.Datasheet.feature_summary" = "summary"
+"scmle.contracts.data.profiles.Datasheet.intended_use" = "use"
+"scmle.contracts.data.profiles.Datasheet.quality_findings" = "findings"
+"scmle.contracts.data.profiles.Datasheet.review_status" = "status"
+"scmle.contracts.data.profiles.Portrait.column_statistics" = "statistics"
+"scmle.contracts.data.profiles.Portrait.feature_plan" = "plan"
+"scmle.contracts.data.profiles.Portrait.quality_evidence" = "evidence"
+"scmle.contracts.data.profiles.Portrait.quality_findings" = "findings"
+"scmle.contracts.data.profiles.Portrait.target_summary" = "summary"
+"scmle.contracts.data.profiles.Preprocessing.embedding_model" = "model"
+"scmle.contracts.data.profiles.Preprocessing.high_cardinality" = "cardinality"
+"scmle.contracts.data.profiles.Preprocessing.log_skewed" = "skewed"
+"scmle.contracts.data.profiles.Preprocessing.text_encoding" = "encoding"
+"scmle.contracts.data.provenance.DatasetManifest" = "Manifest"
+"scmle.contracts.evaluation.support.UncertaintyMethod" = "Method"
+"scmle.contracts.evidence.require_text" = "require"
+"scmle.contracts.explanations.require_text" = "require"
+"scmle.contracts.lineage.Graph.add_node" = "add"
+"scmle.contracts.lineage.Graph.topological_order" = "order"
+"scmle.contracts.lineage.require_text" = "require"
+"scmle.contracts.metrics.Formula.response_method" = "method"
+"scmle.contracts.metrics.Formula.score_function" = "function"
+"scmle.contracts.metrics.PositiveLabelMetric.response_methods" = "methods"
+"scmle.contracts.metrics.PositiveLabelMetric.score_function" = "function"
+"scmle.contracts.modalities.Declaration.failure_modes" = "modes"
+"scmle.contracts.modalities.Declaration.missing_stages" = "stages"
+"scmle.contracts.modalities.Declaration.required_extras" = "extras"
+"scmle.contracts.modalities.Declaration.stage_evidence" = "evidence"
+"scmle.contracts.modalities.Proof.evidence_links" = "links"
+"scmle.contracts.models.Capabilities.handles_missing" = "missing"
+"scmle.contracts.models.Capabilities.memory_factor" = "factor"
+"scmle.contracts.models.Capabilities.native_categorical" = "categorical"
+"scmle.contracts.models.Capabilities.needs_scaling" = "scaling"
+"scmle.contracts.models.Model.auto_candidate" = "candidate"
+"scmle.contracts.models.Model.conformance_params" = "params"
+"scmle.contracts.models.Model.is_available" = "available"
+"scmle.contracts.models.Model.monotonic_param" = "param"
+"scmle.contracts.models.Model.search_space" = "space"
+"scmle.contracts.observability.Inference.error_category" = "category"
+"scmle.contracts.observability.Inference.input_fingerprint" = "fingerprint"
+"scmle.contracts.observability.Inference.latency_ms" = "latency"
+"scmle.contracts.observability.Inference.redacted_fields" = "fields"
+"scmle.contracts.observability.Requirements.alert_thresholds" = "thresholds"
+"scmle.contracts.observability.Requirements.redacted_fields" = "fields"
+"scmle.contracts.observability.Requirements.required_signals" = "signals"
+"scmle.contracts.observability.Requirements.retention_days" = "retention"
+"scmle.contracts.observability.require_text" = "require"
+"scmle.contracts.observability.validate_timestamp" = "validate"
+"scmle.contracts.performance.Baseline.reference_runs" = "runs"
+"scmle.contracts.performance.Comparison.relative_regressions" = "regressions"
+"scmle.contracts.performance.parse_timestamp" = "parse"
+"scmle.contracts.serving.schema_digest" = "digest"
+"scmle.contracts.tasks.kinds.Task.is_classification" = "classification"
+"scmle.decision.anytime.confidence_bound" = "bound"
+"scmle.decision.anytime.pseudo_outcomes" = "outcomes"
+"scmle.decision.constraints.cuts.Thresholds.net_benefit" = "benefit"
+"scmle.decision.constraints.cuts.Thresholds.target_rate" = "target"
+"scmle.decision.constraints.rates.check_feasibility" = "check"
+"scmle.decision.reports.decision_report" = "report"
+"scmle.decision.reports.file_digest" = "digest"
+"scmle.decision.rollout.Watchdog.new_prob" = "prob"
+"scmle.decision.threshold.cost_interval" = "interval"
+"scmle.deploy.contract.references.BundleRef" = "Bundle"
+"scmle.deploy.contract.references.ImageRef" = "Image"
+"scmle.deploy.contract.references.SecretRef" = "Secret"
+"scmle.deploy.contract.references.require_digest" = "require"
+"scmle.deploy.contract.runtime.Runtime.bundle_digest" = "digest"
+"scmle.deploy.contract.runtime.Runtime.cpu_limit" = "limit"
+"scmle.deploy.gate.Candidate.config_digest" = "digest"
+"scmle.deploy.gate.Candidate.source_commit" = "commit"
+"scmle.deploy.gate.Candidate.staging_record" = "record"
+"scmle.deploy.gate.GateDecision" = "Decision"
+"scmle.deploy.gate.ImageScan" = "Scan"
+"scmle.deploy.gate.ImageScan.container_digest" = "digest"
+"scmle.deploy.livetests.http_fetch" = "fetch"
+"scmle.deploy.livetests.json_headers" = "headers"
+"scmle.deploy.livetests.run_checks" = "checks"
+"scmle.deploy.packaging.write_text" = "write"
+"scmle.deploy.parity.Goldens.cross_environment" = "environment"
+"scmle.deploy.parity.Goldens.same_process" = "process"
+"scmle.deploy.parity.read_json" = "read"
+"scmle.deploy.provenance.bundle_digest" = "digest"
+"scmle.deploy.record.read_record" = "read"
+"scmle.deploy.record.write_record" = "write"
+"scmle.deploy.release.read_json" = "read"
+"scmle.deploy.release_state.reconcile.ReleaseRegistry" = "Registry"
+"scmle.deploy.release_state.status.ReleaseState" = "State"
+"scmle.deploy.verify.Verified.bundle_digest" = "digest"
+"scmle.deploy.verify.Verified.bundle_signed" = "signed"
+"scmle.deploy.verify.Verified.provenance_verified" = "verified"
+"scmle.durability.append_text" = "append"
+"scmle.durability.write_atomically" = "write"
+"scmle.explainability.quality.Comparison.expected_features" = "features"
+"scmle.explainability.quality.Comparison.minimum_overlap" = "overlap"
+"scmle.explainability.quality.Comparison.overlap_score" = "score"
+"scmle.explainability.quality.Evaluation.fidelity_score" = "score"
+"scmle.explainability.quality.Thresholds.fidelity_minimum" = "minimum"
+"scmle.explainability.quality.Truth.expected_features" = "features"
+"scmle.explainability.quality.Truth.minimum_overlap" = "overlap"
+"scmle.explainability.quality.fidelity_score" = "score"
+"scmle.governance.deployment_ledger.chain.DeploymentLedger" = "Ledger"
+"scmle.governance.deployment_ledger.kinds.parse_date" = "parse"
+"scmle.governance.deployment_ledger.rules.Oversight.apply_open" = "apply"
+"scmle.governance.deployment_ledger.rules.Oversight.envelope_revoked" = "revoked"
+"scmle.governance.deployment_ledger.rules.Oversight.envelope_uses" = "uses"
+"scmle.governance.escalation.risk_coverage" = "coverage"
+"scmle.governance.keyring.parse_timestamp" = "parse"
+"scmle.governance.keyring.require_text" = "require"
+"scmle.governance.ledger.observed_access" = "access"
+"scmle.governance.loop.alarms.Alarms.coverage_test" = "test"
+"scmle.governance.loop.contest.Contest.consecutive_rollbacks" = "rollbacks"
+"scmle.governance.loop.contest.Contest.rollback_watch" = "watch"
+"scmle.governance.loop.cycle.Loop.pending_batches" = "batches"
+"scmle.governance.loop.desk.Desk.halt_reason" = "reason"
+"scmle.governance.loop.desk.Desk.pending_escalations" = "escalations"
+"scmle.governance.loop.desk.Desk.record_incident" = "record"
+"scmle.governance.loop.guard.Gatekeeper.move_champion" = "move"
+"scmle.governance.loop.guard.Gatekeeper.reopen_sealed" = "reopen"
+"scmle.governance.loop.memory.Memory.save_state" = "save"
+"scmle.governance.model_card.Card.evidence_artifacts" = "artifacts"
+"scmle.governance.model_card.Card.intended_use" = "use"
+"scmle.governance.model_card.Card.model_fingerprint" = "fingerprint"
+"scmle.governance.model_card.Card.review_status" = "status"
+"scmle.governance.never_list.Guard.single_use" = "use"
+"scmle.governance.registry.Store.read_index" = "read"
+"scmle.governance.registry.Store.write_index" = "write"
+"scmle.governance.reliability.Emission.observed_outcome" = "outcome"
+"scmle.governance.reliability.Harness.artifact_root" = "root"
+"scmle.governance.reliability.Harness.write_atomically" = "write"
+"scmle.governance.review.Signoff.verify_signature" = "verify"
+"scmle.governance.review.require_text" = "require"
+"scmle.governance.sbom.source_timestamp" = "timestamp"
+"scmle.governance.uncertainty_feed.UncertaintyFeed" = "Feed"
+"scmle.optimization.optimizers.Optimizer.is_available" = "available"
+"scmle.preparation.multitarget.MultiLabelEstimator" = "Multilabel"
+"scmle.preparation.preprocessing.build_preprocessor" = "build"
+"scmle.preparation.resampling.PreprocessedResamplingClassifier" = "Preprocessed"
+"scmle.preparation.resampling.RandomOverSampler" = "Oversampler"
+"scmle.preparation.resampling.RandomUnderSampler" = "Undersampler"
+"scmle.preparation.resampling.ResamplingClassifier" = "Resampled"
+"scmle.preparation.selection.SparseSelector" = "Selector"
+"scmle.preparation.strategies.features.Features.log_skewed" = "skewed"
+"scmle.preparation.synthesis.Copula.missing_rates" = "rates"
+"scmle.preparation.synthesis.GeneratorOverSampler" = "Generated"
+"scmle.preparation.weighting.Reweighter.query_column" = "query"
+"scmle.preparation.wrappers.FitParamsClassifier" = "Parametrised"
+"scmle.preparation.wrappers.FlatPredictionClassifier" = "Flattened"
+"scmle.rehearsal.demo.client.post_json" = "post"
+"scmle.rehearsal.faults.crashes.job_interruption" = "interruption"
+"scmle.rehearsal.faults.crashes.process_kill" = "process"
+"scmle.rehearsal.faults.harness.export_service" = "export"
+"scmle.rehearsal.faults.release.bad_release" = "release"
+"scmle.rehearsal.faults.service.Client.longest_gap" = "gap"
+"scmle.rehearsal.faults.service.corrupted_bundle" = "bundle"
+"scmle.rehearsal.faults.service.incompatible_schema" = "schema"
+"scmle.rehearsal.faults.service.invalid_credentials" = "credentials"
+"scmle.rehearsal.local_faults.interruptions.Interruptions.run_timeout" = "timeout"
+"scmle.rehearsal.local_faults.workspace.Workspace.write_json" = "write"
+"scmle.runners.base.job.CostBudget" = "Budget"
+"scmle.runners.base.job.CostRate" = "Rate"
+"scmle.runners.base.ledger.RunManifest" = "Manifest"
+"scmle.runners.base.runner.Runner.serving_identity" = "identity"
+"scmle.runners.base.runner.Runner.stop_reason" = "reason"
+"scmle.runners.checkpoint.CheckpointStore" = "Store"
+"scmle.runners.project.run_project" = "project"
+"scmle.runners.roles.Role.allows_read" = "read"
+"scmle.runners.roles.RoleDeniedError" = "DeniedError"
+"scmle.runners.roles.RoleStore" = "Store"
+"scmle.runners.roles.RoleStore.need_read" = "read"
+"scmle.runners.roles.check_distinct" = "check"
+"scmle.security.access.Config.hs256_secret" = "secret"
+"scmle.security.access.RateLimiter" = "Limiter"
+"scmle.security.access.is_loopback" = "loopback"
+"scmle.security.remote.Keystore.allow_http" = "http"
+"scmle.security.remote.Keystore.refresh_started" = "started"
+"scmle.security.remote.Revocations.allow_http" = "http"
+"scmle.security.tokens.Verifier.tenant_claim" = "claim"
+"scmle.security.tokens.sign_hs256" = "sign"
+"scmle.storage.conformance.check_delete" = "check"
+"scmle.storage.conformance.run_conformance" = "conformance"
+"scmle.storage.objectstore.LocalObjectStore" = "Disk"
+"scmle.storage.objectstore.RetryingStore" = "Retrier"
+"scmle.storage.objectstore.TransientStoreError" = "TransientError"
+"scmle.trail.inputs.sign_inputs" = "sign"
+"scmle.trail.records.read_json" = "read"
+"scmle.trail.records.write_json" = "write"
+
+[review]
+"scmle.api.curator.Curator.output_dir" = ["output", "output_dir"]  # no single word fits without ambiguity
+"scmle.api.curator.Curator.signing_key" = ["key", "signing"]  # no single word fits without ambiguity
+"scmle.api.non_tabular.Modeler.checkpoint_path" = ["path", "checkpoint"]  # no single word fits without ambiguity
+"scmle.api.non_tabular.Modeler.observed_adapter" = ["observed", "observed_adapter"]  # no single word fits without ambiguity
+"scmle.api.non_tabular.Modeler.output_dir" = ["output", "output_dir"]  # no single word fits without ambiguity
+"scmle.api.non_tabular.Modeler.require_independent_ground_truth" = ["truth", "require", "independent"]  # no single word fits without ambiguity
+"scmle.api.non_tabular.Modeler.signing_key" = ["key", "signing"]  # no single word fits without ambiguity
+"scmle.api.non_tabular.UnsupportedNonTabularModelError" = ["UnsupportedError", "ModalityError"]  # a four-word name
+"scmle.api.non_tabular.video_scope" = ["scope", "video_scope"]  # scope is already bound at scmle/api/non_tabular.py:387
+"scmle.api.project.Definition.baseline_column" = ["column", "baseline"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.event_column" = ["column", "event"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.excluded_columns" = ["columns", "excluded"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.group_column" = ["column", "group"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.horizon_rows" = ["rows", "horizon"]  # every candidate is taken, a builtin or a library name
+"scmle.api.project.Definition.id_columns" = ["columns", "id_columns"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.ingest_plan" = ["ingest", "ingest_plan"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.leakage_policy" = ["leakage", "leakage_policy"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.logged_action_column" = ["column", "logged", "action"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.memory_budget_gb" = ["memory", "budget"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.memory_limit_gb" = ["memory", "limit"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.output_dir" = ["output", "output_dir"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.propensity_column" = ["column", "propensity"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.pseudo_label_confidence" = ["confidence", "pseudo", "label"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.query_column" = ["column", "query"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.sensitive_columns" = ["columns", "sensitive"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.test_fraction" = ["test", "fraction"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.time_as_feature" = ["feature", "time"]  # a joining word carries the meaning
+"scmle.api.project.Definition.time_column" = ["column", "time"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.treatment_column" = ["column", "treatment"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.unavailable_at_prediction" = ["prediction", "unavailable"]  # a joining word carries the meaning
+"scmle.api.project.Definition.weight_column" = ["column", "weight"]  # no single word fits without ambiguity
+"scmle.api.project.Definition.window_rows" = ["window", "window_rows"]  # no single word fits without ambiguity
+"scmle.api.project.ModalityProject" = ["Modality", "Project"]  # beside api.project.Project
+"scmle.api.project.ModalityProject.checkpoint_path" = ["path", "checkpoint"]  # no single word fits without ambiguity
+"scmle.api.project.ModalityProject.observed_adapter" = ["observed", "observed_adapter"]  # no single word fits without ambiguity
+"scmle.api.project.ModalityProject.output_dir" = ["output", "output_dir"]  # no single word fits without ambiguity
+"scmle.api.project.ModalityProject.require_independent_ground_truth" = ["truth", "require", "independent"]  # no single word fits without ambiguity
+"scmle.api.project.ModalityProject.signing_key" = ["key", "signing"]  # no single word fits without ambiguity
+"scmle.api.sequential.Estimation.artifact_path" = ["path", "artifact"]  # no single word fits without ambiguity
+"scmle.api.sequential.Estimation.output_dir" = ["output", "output_dir"]  # no single word fits without ambiguity
+"scmle.artifacts.bundle.archive.Archive.rotate_signing_key" = ["rotate", "key", "signing"]  # no single word fits without ambiguity
+"scmle.artifacts.bundle.archive.Archive.write_interval_members" = ["write", "members", "interval"]  # no single word fits without ambiguity
+"scmle.artifacts.bundle.intervals.Intervals.predict_interval" = ["interval", "predict_interval"]  # no single word fits without ambiguity
+"scmle.artifacts.bundle.intervals.Intervals.predict_set" = ["predict", "set"]  # every candidate is taken, a builtin or a library name
+"scmle.artifacts.bundle.outputs.Outputs.environment_lock" = ["environment", "environment_lock"]  # no single word fits without ambiguity
+"scmle.artifacts.bundle.outputs.Outputs.export_onnx" = ["export", "onnx"]  # a proper name or method acronym; one word loses it
+"scmle.artifacts.bundle.outputs.Outputs.predict_survival" = ["survival", "predict_survival"]  # no single word fits without ambiguity
+"scmle.artifacts.bundle.provenance.Manifest.decision_threshold" = ["threshold", "decision"]  # stored key: the class serializes its fields by name
+"scmle.artifacts.bundle.provenance.Manifest.model_name" = ["name", "model"]  # stored key: the class serializes its fields by name
+"scmle.artifacts.bundle.provenance.Manifest.model_params" = ["params", "model"]  # stored key: the class serializes its fields by name
+"scmle.artifacts.bundle.provenance.Manifest.model_version" = ["version", "model"]  # stored key: the class serializes its fields by name
+"scmle.artifacts.bundle.provenance.Manifest.scmle_version" = ["version", "scmle"]  # stored key: the class serializes its fields by name
+"scmle.artifacts.claims_audit.custody.check_decision_files" = ["check", "decision"]  # no single word fits without ambiguity
+"scmle.artifacts.claims_audit.custody.coverage_report_problems" = ["problems", "coverage", "report"]  # no single word fits without ambiguity
+"scmle.artifacts.claims_audit.custody.frozen_selection_problem" = ["problem", "frozen", "selection"]  # no single word fits without ambiguity
+"scmle.artifacts.claims_audit.seal.check_ledger_head" = ["check", "head", "ledger"]  # no single word fits without ambiguity
+"scmle.artifacts.claims_audit.seal.stage_two_record_problems" = ["stage", "problems", "two"]  # no single word fits without ambiguity
+"scmle.artifacts.claims_audit.verdict.Verification.run_dir" = ["run", "run_dir"]  # no single word fits without ambiguity
+"scmle.artifacts.reproducibility.Comparison.max_abs_difference" = ["difference", "max_abs_difference"]  # max qualifier
+"scmle.artifacts.results.Run.run_dir" = ["run", "run_dir"]  # no single word fits without ambiguity
+"scmle.artifacts.results.Run.run_id" = ["run", "run_id"]  # no single word fits without ambiguity
+"scmle.artifacts.store.Workspace.run_id" = ["run", "run_id"]  # no single word fits without ambiguity
+"scmle.artifacts.store.Workspace.write_text" = ["text", "write_text"]  # no single word fits without ambiguity
+"scmle.causal.identification.aipw.Estimate.n_input" = ["input", "n_input"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.aipw.Estimate.nuisance_digest" = ["digest", "nuisance"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.aipw.difference_in_means" = ["means", "difference"]  # a joining word carries the meaning
+"scmle.causal.identification.aipw.effective_sample_size" = ["size", "effective", "sample"]  # no single word fits without ambiguity
+"scmle.causal.identification.attest.Applied.evaluated_on" = ["evaluated", "evaluated_on"]  # a joining word carries the meaning
+"scmle.causal.identification.battery.Replication.p_heterogeneity" = ["heterogeneity", "p_heterogeneity"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.battery.Replication.pooled_sign" = ["sign", "pooled"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.battery.Replication.same_sign" = ["sign", "same"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.battery.Test.p_value" = ["value", "p_value"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.certified.SubgroupGate.min_rows" = ["rows", "min_rows"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.did.Estimate.max_pre_change" = ["change", "max_pre_change"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.did.Estimate.mean_horizon" = ["horizon", "mean"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.did.Estimate.n_never" = ["never", "n_never"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.did.Estimate.pretrend_p" = ["pretrend", "pretrend_p"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.iv.Estimate.ar_high" = ["high", "ar"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.iv.Estimate.ar_kind" = ["kind", "ar_kind"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.iv.Estimate.ar_low" = ["low", "ar"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.iv.Estimate.f_stat" = ["stat", "f_stat"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.iv.Estimate.first_stage" = ["stage", "first"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.iv.Estimate.wald_high" = ["wald", "wald_high"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.iv.Estimate.wald_low" = ["wald", "wald_low"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.iv.anderson_rubin" = ["rubin", "anderson"]  # a proper name or method acronym; one word loses it
+"scmle.causal.identification.overid.hansen_j" = ["hansen", "hansen_j"]  # a proper name or method acronym; one word loses it
+"scmle.causal.identification.overid.not_testable" = ["testable", "not_testable"]  # a joining word carries the meaning
+"scmle.causal.identification.rd.Estimate.bias_corrected" = ["corrected", "bias"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.rd.Estimate.density_p" = ["density", "density_p"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.rd.Estimate.n_left" = ["left", "n_left"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.rd.Estimate.n_right" = ["right", "n_right"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.run.analysis.Trial.alpha_primary" = ["alpha", "alpha_primary"]  # no single word fits without ambiguity
+"scmle.causal.identification.run.analysis.design_only" = ["only", "design_only"]  # a joining word carries the meaning
+"scmle.causal.identification.run.exogeneity.Instrument.controls_columns" = ["columns", "controls_columns"]  # no single word fits without ambiguity
+"scmle.causal.identification.run.panel.DiD" = ["Differences", "Panel"]  # an acronym
+"scmle.causal.identification.run.strata.subgroup_results" = ["results", "subgroup"]  # no single word fits without ambiguity
+"scmle.causal.identification.select.Plan.chartered_order" = ["chartered", "chartered_order"]  # no single word fits without ambiguity
+"scmle.causal.identification.sensitivity.Sensitivity.rv_alpha" = ["alpha", "rv_alpha"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.sensitivity.smd_to_rr" = ["smd", "smd_to_rr"]  # a joining word carries the meaning
+"scmle.causal.identification.synth.Estimate.min_p" = ["min", "min_p"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.synth.Estimate.p_value" = ["value", "p_value"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.synth.Estimate.placebo_ratios" = ["ratios", "placebo"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.synth.Estimate.post_rmspe" = ["rmspe", "post"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.synth.Estimate.pre_rmspe" = ["rmspe", "pre"]  # stored key: the class serializes its fields by name
+"scmle.causal.identification.synth.ratio_for" = ["ratio", "ratio_for"]  # a joining word carries the meaning
+"scmle.causal.identification.tier.Inputs.design_passed" = ["design", "design_passed"]  # no single word fits without ambiguity
+"scmle.causal.identification.tier.Inputs.estimated_on_c" = ["estimated", "estimated_on_c"]  # a joining word carries the meaning
+"scmle.causal.identification.tier.Inputs.interval_gate" = ["interval", "interval_gate"]  # no single word fits without ambiguity
+"scmle.causal.identification.tier.Inputs.negative_control_declared" = ["declared", "negative", "control"]  # no single word fits without ambiguity
+"scmle.causal.identification.tier.Inputs.replication_passed" = ["replication", "replication_passed"]  # no single word fits without ambiguity
+"scmle.causal.identification.tier.Inputs.sensitivity_gate" = ["sensitivity", "sensitivity_gate"]  # no single word fits without ambiguity
+"scmle.causal.identification.tier.evidence_shortfalls" = ["evidence", "evidence_shortfalls"]  # no single word fits without ambiguity
+"scmle.cli.governance.Claims.run_list" = ["list", "run_list"]  # every candidate is taken, a builtin or a library name
+"scmle.cli.intake.IngestCommand" = ["Command", "IngestCommand"]  # Command is already bound at scmle/cli/__init__.py:106
+"scmle.cli.rollout.Deployment.run_model_digest" = ["digest", "model"]  # no single word fits without ambiguity
+"scmle.cli.rollout.Deployment.run_verify_record" = ["record", "verify"]  # no single word fits without ambiguity
+"scmle.cli.training.ProjectCommand" = ["Command", "ProjectCommand"]  # Command is already bound at scmle/cli/__init__.py:44
+"scmle.contracts.artifacts.Conformance.missing_value_counts" = ["counts", "value"]  # stored key: the class serializes its fields by name
+"scmle.contracts.artifacts.Conformance.unseen_categories" = ["categories", "unseen"]  # stored key: the class serializes its fields by name
+"scmle.contracts.capabilities.axes.Explainability.MODALITY_SPECIFIC" = ["SPECIFIC", "MODALITY"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.capabilities.axes.Fairness.GROUP_REPORT" = ["REPORT", "GROUP"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.capabilities.axes.Fairness.INTERSECTIONAL_REPORT" = ["REPORT", "INTERSECTIONAL"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.capabilities.axes.Inference.REFERENCE_HTTP" = ["HTTP", "REFERENCE"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.capabilities.axes.ModelFamily.AUDIO_TRANSFORMER" = ["TRANSFORMER", "AUDIO"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.capabilities.axes.ModelFamily.MULTIMODAL_TRANSFORMER" = ["TRANSFORMER", "MULTIMODAL"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.capabilities.axes.ModelFamily.TEXT_TRANSFORMER" = ["TRANSFORMER", "TEXT"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.capabilities.axes.ModelFamily.VIDEO_TRANSFORMER" = ["TRANSFORMER", "VIDEO"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.capabilities.axes.ModelFamily.VISION_TRANSFORMER" = ["TRANSFORMER", "VISION"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.capabilities.axes.Status.EXTENSION_ONLY" = ["ONLY", "EXTENSION"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.capabilities.axes.Uncertainty.CALIBRATED_PROBABILITY" = ["PROBABILITY", "CALIBRATED"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.capabilities.axes.Uncertainty.PREDICTION_INTERVAL" = ["INTERVAL", "PREDICTION"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.capabilities.axes.Uncertainty.SURVIVAL_CURVE" = ["CURVE", "SURVIVAL"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.capabilities.catalog.Catalog.list_model_families" = ["families", "model"]  # no single word fits without ambiguity
+"scmle.contracts.capabilities.declarations.Environment.network_available" = ["network", "network_available"]  # no single word fits without ambiguity
+"scmle.contracts.capabilities.declarations.Resources.max_rows" = ["rows", "max_rows"]  # max qualifier
+"scmle.contracts.capabilities.declarations.Resources.network_required" = ["network", "network_required"]  # no single word fits without ambiguity
+"scmle.contracts.data.findings.Disposition.FALSE_POSITIVE" = ["POSITIVE", "FALSE"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.data.profiles.Blueprint.binary_outcome" = ["outcome", "binary"]  # stored key: the class serializes its fields by name
+"scmle.contracts.data.profiles.Blueprint.embedding_model" = ["model", "embedding"]  # stored key: the class serializes its fields by name
+"scmle.contracts.data.profiles.Blueprint.event_column" = ["column", "event"]  # stored key: the class serializes its fields by name
+"scmle.contracts.data.profiles.Blueprint.extra_inputs" = ["inputs", "extra"]  # stored key: the class serializes its fields by name
+"scmle.contracts.data.profiles.Blueprint.group_column" = ["column", "group"]  # stored key: the class serializes its fields by name
+"scmle.contracts.data.profiles.Blueprint.high_cardinality" = ["cardinality", "high"]  # stored key: the class serializes its fields by name
+"scmle.contracts.data.profiles.Blueprint.informative_missing" = ["missing", "informative"]  # stored key: the class serializes its fields by name
+"scmle.contracts.data.profiles.Blueprint.ordinal_levels" = ["levels", "ordinal"]  # stored key: the class serializes its fields by name
+"scmle.contracts.data.profiles.Blueprint.query_column" = ["column", "query"]  # stored key: the class serializes its fields by name
+"scmle.contracts.data.profiles.Blueprint.target_columns" = ["columns", "target"]  # stored key: the class serializes its fields by name
+"scmle.contracts.data.profiles.Blueprint.text_encoding" = ["encoding", "text_encoding"]  # stored key: the class serializes its fields by name
+"scmle.contracts.data.profiles.Blueprint.time_column" = ["column", "time"]  # stored key: the class serializes its fields by name
+"scmle.contracts.data.profiles.Blueprint.treatment_column" = ["column", "treatment"]  # stored key: the class serializes its fields by name
+"scmle.contracts.data.profiles.Blueprint.value_column" = ["column", "value"]  # stored key: the class serializes its fields by name
+"scmle.contracts.data.profiles.Blueprint.weight_column" = ["column", "weight"]  # stored key: the class serializes its fields by name
+"scmle.contracts.data.profiles.Curation.dropped_columns" = ["columns", "dropped"]  # no single word fits without ambiguity
+"scmle.contracts.data.profiles.Curation.feature_columns" = ["columns", "feature"]  # no single word fits without ambiguity
+"scmle.contracts.data.profiles.Curation.read_seconds" = ["read", "seconds"]  # no single word fits without ambiguity
+"scmle.contracts.data.profiles.Curation.risk_findings" = ["risk", "risk_findings"]  # no single word fits without ambiguity
+"scmle.contracts.data.profiles.Curation.schema_version" = ["version", "schema"]  # no single word fits without ambiguity
+"scmle.contracts.data.profiles.Curation.source_rows" = ["source", "source_rows"]  # no single word fits without ambiguity
+"scmle.contracts.data.profiles.Curation.unresolved_blocking_findings" = ["unresolved", "blocking"]  # no single word fits without ambiguity
+"scmle.contracts.data.profiles.Datasheet.dataset_id" = ["dataset", "dataset_id"]  # no single word fits without ambiguity
+"scmle.contracts.data.profiles.Datasheet.generated_at" = ["generated", "generated_at"]  # a joining word carries the meaning
+"scmle.contracts.data.profiles.Datasheet.out_of_scope" = ["scope", "out"]  # a joining word carries the meaning
+"scmle.contracts.data.profiles.Datasheet.risk_findings" = ["risk", "risk_findings"]  # no single word fits without ambiguity
+"scmle.contracts.data.profiles.Datasheet.schema_version" = ["version", "schema"]  # no single word fits without ambiguity
+"scmle.contracts.data.profiles.Datasheet.snapshot_id" = ["snapshot", "snapshot_id"]  # no single word fits without ambiguity
+"scmle.contracts.data.profiles.Portrait.dataset_statistics" = ["dataset", "dataset_statistics"]  # no single word fits without ambiguity
+"scmle.contracts.data.profiles.Portrait.risk_findings" = ["risk", "risk_findings"]  # no single word fits without ambiguity
+"scmle.contracts.data.provenance.DatasetManifest.schema_version" = ["version", "schema"]  # no single word fits without ambiguity
+"scmle.contracts.data.provenance.Passport.schema_version" = ["version", "schema"]  # no single word fits without ambiguity
+"scmle.contracts.evaluation.parts.Calibration.maximum_error" = ["error", "maximum"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.parts.Equity.required_evidence" = ["evidence", "required"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.parts.Explanations.fidelity_threshold" = ["threshold", "fidelity"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.parts.Explanations.require_fidelity" = ["fidelity", "require"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.parts.Explanations.require_stability" = ["stability", "require"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.parts.Explanations.required_evidence" = ["evidence", "required"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.parts.Explanations.required_methods" = ["methods", "required"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.parts.Explanations.stability_threshold" = ["threshold", "stability"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.parts.Fairness.sensitive_columns" = ["columns", "sensitive"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.parts.Gates.diagnostic_gates" = ["gates", "diagnostic"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.parts.Gates.fairness_gates" = ["gates", "fairness"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.parts.Gates.metric_gates" = ["gates", "metric"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.parts.Gates.required_evidence" = ["evidence", "required"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.parts.Requirement.required_evidence" = ["evidence", "required"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.parts.Subgroups.blocking_threshold" = ["threshold", "blocking"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.parts.Subgroups.warning_threshold" = ["threshold", "warning"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.parts.Uncertainty.confidence_level" = ["level", "confidence"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.parts.Uncertainty.coverage_target" = ["target", "coverage"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.parts.Uncertainty.minimum_rows" = ["rows", "minimum"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.policy.Criteria.primary_metric" = ["metric", "primary"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.policy.Criteria.small_groups" = ["groups", "small"]  # stored key: the class serializes its fields by name
+"scmle.contracts.evaluation.policy.Registry.list_policies" = ["policies", "list_policies"]  # no single word fits without ambiguity
+"scmle.contracts.evaluation.support.Procedure.RELIABILITY_CURVE" = ["CURVE", "RELIABILITY"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.evaluation.support.Technique.GROUP_REPORT" = ["REPORT", "GROUP"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.evaluation.support.Technique.INTERSECTIONAL_REPORT" = ["REPORT", "INTERSECTIONAL"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.evaluation.support.UncertaintyMethod.CALIBRATED_PROBABILITY" = ["PROBABILITY", "CALIBRATED"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.evaluation.support.UncertaintyMethod.PREDICTION_INTERVAL" = ["INTERVAL", "PREDICTION"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.evaluation.support.UncertaintyMethod.SURVIVAL_CURVE" = ["CURVE", "SURVIVAL"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.events.Event.config_hash" = ["config", "config_hash"]  # stored key: the class serializes its fields by name
+"scmle.contracts.events.Event.run_id" = ["run", "run_id"]  # stored key: the class serializes its fields by name
+"scmle.contracts.experiments.Precedent.cv_score" = ["score", "cv_score"]  # stored key: the class serializes its fields by name
+"scmle.contracts.experiments.Precedent.data_hash" = ["data", "data_hash"]  # stored key: the class serializes its fields by name
+"scmle.contracts.experiments.Precedent.dataset_id" = ["dataset", "dataset_id"]  # stored key: the class serializes its fields by name
+"scmle.contracts.experiments.Precedent.run_id" = ["run", "run_id"]  # stored key: the class serializes its fields by name
+"scmle.contracts.experiments.Precedent.selected_model" = ["model", "selected"]  # stored key: the class serializes its fields by name
+"scmle.contracts.experiments.Precedent.selected_strategy" = ["strategy", "selected"]  # stored key: the class serializes its fields by name
+"scmle.contracts.experiments.Trial.evaluation_config" = ["config", "evaluation"]  # stored key: the class serializes its fields by name
+"scmle.contracts.experiments.Trial.fit_seconds" = ["fit", "seconds"]  # stored key: the class serializes its fields by name
+"scmle.contracts.experiments.Trial.fold_scores" = ["scores", "fold"]  # stored key: the class serializes its fields by name
+"scmle.contracts.experiments.Trial.model_name" = ["name", "model"]  # stored key: the class serializes its fields by name
+"scmle.contracts.experiments.Trial.observed_access" = ["access", "observed"]  # stored key: the class serializes its fields by name
+"scmle.contracts.experiments.Trial.score_mean" = ["mean", "score"]  # stored key: the class serializes its fields by name
+"scmle.contracts.experiments.Trial.score_std" = ["std", "score"]  # stored key: the class serializes its fields by name
+"scmle.contracts.experiments.Trial.train_scores" = ["scores", "train"]  # stored key: the class serializes its fields by name
+"scmle.contracts.experiments.Trial.trial_id" = ["trial", "trial_id"]  # stored key: the class serializes its fields by name
+"scmle.contracts.explanations.Clearance.redacted_fields" = ["fields", "redacted"]  # stored key: the class serializes its fields by name
+"scmle.contracts.explanations.Evidence.bundle_digest" = ["digest", "bundle"]  # stored key: the class serializes its fields by name
+"scmle.contracts.explanations.Evidence.causal_warning" = ["warning", "causal"]  # stored key: the class serializes its fields by name
+"scmle.contracts.explanations.Evidence.dataset_snapshot" = ["snapshot", "dataset"]  # stored key: the class serializes its fields by name
+"scmle.contracts.explanations.Evidence.evidence_links" = ["links", "evidence"]  # stored key: the class serializes its fields by name
+"scmle.contracts.explanations.Evidence.feature_graph" = ["graph", "feature"]  # stored key: the class serializes its fields by name
+"scmle.contracts.explanations.Evidence.input_fingerprint" = ["fingerprint", "input_fingerprint"]  # stored key: the class serializes its fields by name
+"scmle.contracts.explanations.Evidence.model_fingerprint" = ["fingerprint", "model"]  # stored key: the class serializes its fields by name
+"scmle.contracts.explanations.Evidence.privacy_decision" = ["decision", "privacy"]  # stored key: the class serializes its fields by name
+"scmle.contracts.explanations.Evidence.software_version" = ["version", "software"]  # stored key: the class serializes its fields by name
+"scmle.contracts.explanations.Evidence.validate_causal_warning" = ["warning", "causal"]  # no single word fits without ambiguity
+"scmle.contracts.explanations.Evidence.validate_limitations" = ["validate", "limitations"]  # every candidate is taken, a builtin or a library name
+"scmle.contracts.explanations.Evidence.validate_timestamp" = ["validate", "timestamp"]  # every candidate is taken, a builtin or a library name
+"scmle.contracts.lineage.Graph.schema_version" = ["version", "schema"]  # no single word fits without ambiguity
+"scmle.contracts.lineage.Kind.FEATURE_GRAPH" = ["GRAPH", "FEATURE"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.lineage.Kind.PARAMETER_ESTIMATION" = ["ESTIMATION", "PARAMETER"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.lineage.Kind.RAW_SOURCE" = ["SOURCE", "RAW"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.metrics.Metric.greater_is_better" = ["better", "greater"]  # no single word fits without ambiguity
+"scmle.contracts.metrics.Metric.scorer_name" = ["name", "scorer"]  # every candidate is taken, a builtin or a library name
+"scmle.contracts.metrics.PositiveLabelMetric" = ["Positive", "Metric"]  # Positive alone loses label
+"scmle.contracts.modalities.Phase.DATA_EXPLAINABILITY" = ["EXPLAINABILITY", "DATA"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.modalities.Phase.FEATURE_PREPARATION" = ["PREPARATION", "FEATURE"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.modalities.Phase.MODEL_EXPLAINABILITY" = ["EXPLAINABILITY", "MODEL"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.modalities.Phase.RECOVERY_AND_RESOURCE_TESTS" = ["TESTS", "RECOVERY"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.modalities.Status.EXTENSION_ONLY" = ["ONLY", "EXTENSION"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.models.Capabilities.max_rows" = ["rows", "max_rows"]  # max qualifier
+"scmle.contracts.models.Capabilities.sparse_input" = ["sparse", "sparse_input"]  # no single word fits without ambiguity
+"scmle.contracts.models.Capabilities.stream_only" = ["only", "stream"]  # a joining word carries the meaning
+"scmle.contracts.models.Model.capability_family" = ["capability", "capability_family"]  # no single word fits without ambiguity
+"scmle.contracts.observability.Indicator.DATA_QUALITY" = ["QUALITY", "DATA"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.observability.Inference.model_fingerprint" = ["model", "model_fingerprint"]  # no single word fits without ambiguity
+"scmle.contracts.observability.Inference.request_id" = ["request", "request_id"]  # no single word fits without ambiguity
+"scmle.contracts.observability.Inference.run_id" = ["run", "run_id"]  # no single word fits without ambiguity
+"scmle.contracts.performance.Baseline.max_relative_regression" = ["regression", "max_relative_regression"]  # max qualifier
+"scmle.contracts.performance.Budget.max_peak_memory_gb" = ["gb", "max"]  # max qualifier
+"scmle.contracts.performance.Budget.max_seconds" = ["seconds", "max_seconds"]  # no single word fits without ambiguity
+"scmle.contracts.performance.Comparison.baseline_run_count" = ["count", "baseline", "run"]  # a count: the head noun alone reads as the items
+"scmle.contracts.performance.Comparison.current_run_id" = ["current", "run"]  # no single word fits without ambiguity
+"scmle.contracts.qualification.Certificate.false_alarm_rate" = ["rate", "false", "alarm"]  # no single word fits without ambiguity
+"scmle.contracts.qualification.Certificate.recall_lower_bound" = ["bound", "lower"]  # no single word fits without ambiguity
+"scmle.contracts.qualification.Check.p_value" = ["value", "p_value"]  # no single word fits without ambiguity
+"scmle.contracts.qualification.Claim.adjusted_p_value" = ["value", "adjusted"]  # no single word fits without ambiguity
+"scmle.contracts.records.Record.schema_version" = ["version", "schema_version"]  # stored key: the class serializes its fields by name
+"scmle.contracts.reliability.Contingency.CHANGED_SNAPSHOT" = ["SNAPSHOT", "CHANGED"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.Contingency.CORRUPT_ARTIFACT" = ["ARTIFACT", "CORRUPT"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.Contingency.DEPENDENCY_MISMATCH" = ["MISMATCH", "DEPENDENCY"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.Contingency.DISK_FULL" = ["FULL", "DISK"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.Contingency.DUPLICATE_EVENT" = ["EVENT", "DUPLICATE"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.Contingency.INCOMPLETE_LINEAGE" = ["LINEAGE", "INCOMPLETE"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.Contingency.INVALID_SIGNATURE" = ["SIGNATURE", "INVALID"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.Contingency.MEMORY_EXHAUSTION" = ["EXHAUSTION", "MEMORY"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.Contingency.PARTIAL_WRITE" = ["WRITE", "PARTIAL"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.Contingency.PROCESS_DEATH" = ["DEATH", "PROCESS"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.Contingency.REJECTED_APPROVAL" = ["APPROVAL", "REJECTED"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.Contingency.RETRY_EXHAUSTION" = ["EXHAUSTION", "RETRY"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.Contingency.STALE_CHECKPOINT" = ["CHECKPOINT", "STALE"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.Contingency.WORKER_LOSS" = ["LOSS", "WORKER"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.Outcome.SAFE_OUTCOME_OBSERVED" = ["OBSERVED", "SAFE"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.Outcome.UNSAFE_OUTCOME_OBSERVED" = ["OBSERVED", "UNSAFE"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.Recoverability.OPERATOR_ASSISTED" = ["ASSISTED", "OPERATOR"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.Recoverability.TERMINAL_SAFE_FAILURE" = ["FAILURE", "TERMINAL"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.Registry.from_json" = ["json", "parse"]  # a joining word carries the meaning
+"scmle.contracts.reliability.SafeOutcome" = ["Safe", "Outcome"]  # an adjective or a noun
+"scmle.contracts.reliability.SafeOutcome.ABORT_BEFORE_PUBLICATION" = ["PUBLICATION", "ABORT"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.SafeOutcome.BLOCK_RELEASE_FOR_MISSING_LINEAGE" = ["LINEAGE", "BLOCK"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.SafeOutcome.BLOCK_RELEASE_FOR_REJECTED_APPROVAL" = ["APPROVAL", "BLOCK"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.SafeOutcome.CANCEL_AND_RECORD_TERMINAL_FAILURE" = ["FAILURE", "CANCEL"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.SafeOutcome.IGNORE_DUPLICATE_EVENT" = ["EVENT", "IGNORE"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.SafeOutcome.INVALIDATE_CHANGED_SNAPSHOT" = ["SNAPSHOT", "INVALIDATE"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.SafeOutcome.PRESERVE_DURABLE_ARTIFACT" = ["ARTIFACT", "PRESERVE"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.SafeOutcome.QUARANTINE_CORRUPT_ARTIFACT" = ["ARTIFACT", "QUARANTINE"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.SafeOutcome.REJECT_INCOMPATIBLE_DEPENDENCY" = ["DEPENDENCY", "REJECT"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.SafeOutcome.REJECT_STALE_CHECKPOINT" = ["CHECKPOINT", "REJECT"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.SafeOutcome.REJECT_UNTRUSTED_ARTIFACT" = ["ARTIFACT", "REJECT"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.SafeOutcome.RESUME_DURABLE_CHECKPOINT" = ["CHECKPOINT", "RESUME"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.SafeOutcome.RETRY_IDEMPOTENT_WORK" = ["WORK", "RETRY"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.reliability.SafeOutcome.TERMINATE_AFTER_RETRY_EXHAUSTION" = ["EXHAUSTION", "TERMINATE"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.contracts.serving.Inquiry.expected_schema_digest" = ["digest", "expected", "schema"]  # no single word fits without ambiguity
+"scmle.contracts.serving.Inquiry.schema_version" = ["version", "schema"]  # no single word fits without ambiguity
+"scmle.decision.anytime.Martingale.log_e" = ["log", "log_e"]  # no single word fits without ambiguity
+"scmle.decision.anytime.Martingale.max_log_e" = ["max", "max_log_e"]  # max qualifier
+"scmle.decision.anytime.log_wealth_paths" = ["log", "paths", "wealth"]  # no single word fits without ambiguity
+"scmle.decision.constraints.cuts.Thresholds.development_gap" = ["gap", "development_gap"]  # gap is already bound at scmle/decision/constraints/cuts.py:209
+"scmle.decision.constraints.cuts.development_gap" = ["gap", "development_gap"]  # gap is already bound at scmle/decision/constraints/cuts.py:209
+"scmle.decision.constraints.rates.base_rates" = ["rates", "base_rates"]  # rates is already bound at scmle/decision/constraints/rates.py:227
+"scmle.decision.constraints.satisfaction.Satisfaction.max_gap" = ["gap", "max_gap"]  # stored key: the class serializes its fields by name
+"scmle.decision.constraints.satisfaction.Satisfaction.point_gap" = ["gap", "point"]  # stored key: the class serializes its fields by name
+"scmle.decision.constraints.satisfaction.Satisfaction.small_groups" = ["groups", "small"]  # stored key: the class serializes its fields by name
+"scmle.decision.constraints.satisfaction.Satisfaction.upper_bound" = ["bound", "upper"]  # stored key: the class serializes its fields by name
+"scmle.decision.constraints.satisfaction.cluster_satisfaction_test" = ["cluster", "test", "satisfaction"]  # no single word fits without ambiguity
+"scmle.decision.design.fixed_horizon_rows" = ["rows", "fixed", "horizon"]  # no single word fits without ambiguity
+"scmle.decision.design.srm_log_bayes_factor" = ["factor", "log"]  # a proper name or method acronym; one word loses it
+"scmle.decision.netbenefit.Benefit.treat_all" = ["treat", "treat_all"]  # stored key: the class serializes its fields by name
+"scmle.decision.netbenefit.Benefit.useful_range" = ["useful", "useful_range"]  # stored key: the class serializes its fields by name
+"scmle.decision.netbenefit.FinalNetBenefit" = ["Benefit", "Final"]  # Benefit alone loses net
+"scmle.decision.netbenefit.rule_hash" = ["rule", "rule_hash"]  # no single word fits without ambiguity
+"scmle.decision.ope.Estimate.clipped_share" = ["share", "clipped_share"]  # stored key: the class serializes its fields by name
+"scmle.decision.ope.Estimate.ess_ratio" = ["ess", "ratio"]  # stored key: the class serializes its fields by name
+"scmle.decision.reports.policy_value" = ["value", "policy"]  # no single word fits without ambiguity
+"scmle.decision.reports.rollout_design" = ["design", "rollout"]  # every candidate is taken, a builtin or a library name
+"scmle.decision.rollout.Decision.challenger_units" = ["challenger", "challenger_units"]  # stored key: the class serializes its fields by name
+"scmle.decision.rollout.Decision.log_e" = ["log", "log_e"]  # stored key: the class serializes its fields by name
+"scmle.decision.rollout.Decision.lower_bound" = ["bound", "lower"]  # stored key: the class serializes its fields by name
+"scmle.decision.rollout.Rollout.challenger_units" = ["challenger", "challenger_units"]  # no single word fits without ambiguity
+"scmle.decision.rollout.Rollout.done_at" = ["done", "done_at"]  # a joining word carries the meaning
+"scmle.decision.rollout.Rollout.experiment_id" = ["experiment", "experiment_id"]  # no single word fits without ambiguity
+"scmle.decision.rollout.Rollout.primary_z" = ["primary", "primary_z"]  # no single word fits without ambiguity
+"scmle.decision.rollout.Watchdog.done_at" = ["done", "done_at"]  # a joining word carries the meaning
+"scmle.decision.rollout.metric_stream" = ["stream", "metric_stream"]  # stream is already bound at scmle/decision/rollout.py:325
+"scmle.decision.rollout.metric_values" = ["values", "metric"]  # no single word fits without ambiguity
+"scmle.decision.rollout.row_hash" = ["row", "row_hash"]  # no single word fits without ambiguity
+"scmle.decision.threshold.Calibration.p_value" = ["value", "p_value"]  # stored key: the class serializes its fields by name
+"scmle.decision.threshold.Thresholding.cost_interval" = ["interval", "cost"]  # stored key: the class serializes its fields by name
+"scmle.decision.threshold.Thresholding.expected_cost" = ["cost", "expected"]  # stored key: the class serializes its fields by name
+"scmle.decision.threshold.Thresholding.stable_range" = ["stable", "stable_range"]  # stored key: the class serializes its fields by name
+"scmle.deploy.contract.references.SecretSource" = ["Provider", "Source"]  # beside refs.Secret
+"scmle.deploy.contract.references.require_positive" = ["positive", "require_positive"]  # no single word fits without ambiguity
+"scmle.deploy.contract.runtime.Provider.supported_architectures" = ["supported", "supported_architectures"]  # no single word fits without ambiguity
+"scmle.deploy.contract.runtime.Runtime.image_digest" = ["image", "image_digest"]  # no single word fits without ambiguity
+"scmle.deploy.contract.runtime.Runtime.memory_limit_mb" = ["memory", "memory_limit_mb"]  # no single word fits without ambiguity
+"scmle.deploy.contract.runtime.Runtime.model_version" = ["version", "model"]  # no single word fits without ambiguity
+"scmle.deploy.contract.runtime.Runtime.read_only_root" = ["root", "read", "only"]  # a joining word carries the meaning
+"scmle.deploy.contract.runtime.Runtime.run_as_non_root" = ["root", "run"]  # a joining word carries the meaning
+"scmle.deploy.contract.runtime.Runtime.secret_names" = ["names", "secret"]  # no single word fits without ambiguity
+"scmle.deploy.contract.runtime.Runtime.spec_digest" = ["spec", "spec_digest"]  # no single word fits without ambiguity
+"scmle.deploy.contract.runtime.conformance_problems" = ["problems", "conformance_problems"]  # problems is already bound at scmle/deploy/contract/runtime.py:205
+"scmle.deploy.control.ControlPlane" = ["Controller", "Plane"]  # Plane alone loses control
+"scmle.deploy.control.ControlPlane.set_traffic" = ["traffic", "set_traffic"]  # no single word fits without ambiguity
+"scmle.deploy.control.RuntimeUnconfirmed" = ["Unconfirmed", "Unverified"]  # an adjective as a class name
+"scmle.deploy.gate.Candidate.approved_at" = ["approved", "approved_at"]  # a joining word carries the meaning
+"scmle.deploy.gate.Candidate.container_digest" = ["container", "container_digest"]  # no single word fits without ambiguity
+"scmle.deploy.gate.Candidate.model_digest" = ["digest", "model"]  # every candidate is taken, a builtin or a library name
+"scmle.deploy.gate.Candidate.requested_by" = ["requested", "requested_by"]  # a joining word carries the meaning
+"scmle.deploy.gate.ImageScan.report_digest" = ["report", "report_digest"]  # no single word fits without ambiguity
+"scmle.deploy.gate.model_digest_of" = ["model", "digest"]  # a joining word carries the meaning
+"scmle.deploy.livetests.Target.base_url" = ["url", "base"]  # stored key: the class serializes its fields by name
+"scmle.deploy.livetests.Target.container_digest" = ["digest", "container"]  # stored key: the class serializes its fields by name
+"scmle.deploy.livetests.Target.model_digest" = ["digest", "model"]  # stored key: the class serializes its fields by name
+"scmle.deploy.livetests.Target.read_only_token" = ["read", "only"]  # stored key: the class serializes its fields by name
+"scmle.deploy.livetests.Target.source_commit" = ["commit", "source"]  # stored key: the class serializes its fields by name
+"scmle.deploy.mocks.MetricsSink" = ["Sink", "MetricsSink"]  # taken in its module: taken in scope
+"scmle.deploy.mocks.get_object" = ["get", "get_object"]  # no single word fits without ambiguity
+"scmle.deploy.observation.Observation.image_digest" = ["digest", "image"]  # stored key: the class serializes its fields by name
+"scmle.deploy.observation.Observation.observed_at" = ["observed", "observed_at"]  # stored key: the class serializes its fields by name
+"scmle.deploy.parity.Parity.max_probability_error" = ["error", "max_probability_error"]  # max qualifier
+"scmle.deploy.parity.Tolerance.probability_abs" = ["probability", "probability_abs"]  # no single word fits without ambiguity
+"scmle.deploy.provenance.file_digest" = ["file", "file_digest"]  # no single word fits without ambiguity
+"scmle.deploy.provenance.manifest_digest" = ["manifest", "manifest_digest"]  # no single word fits without ambiguity
+"scmle.deploy.provenance.sha256_digest" = ["sha256", "sha256_digest"]  # a proper name or method acronym; one word loses it
+"scmle.deploy.record.Record.schema_version" = ["schema", "schema_version"]  # stored key: the class serializes its fields by name
+"scmle.deploy.release_state.status.RuntimeDisagrees" = ["Disagreement", "Mismatch"]  # a verb as a class name
+"scmle.durability.sync_directory" = ["directory", "sync_directory"]  # no single word fits without ambiguity
+"scmle.explainability.counterfactual.Recourse.max_changes" = ["changes", "max_changes"]  # max qualifier
+"scmle.explainability.quality.Comparison.observed_features" = ["observed", "observed_features"]  # no single word fits without ambiguity
+"scmle.explainability.quality.Comparison.sample_id" = ["sample", "sample_id"]  # no single word fits without ambiguity
+"scmle.explainability.quality.Evaluation.sample_count" = ["count", "sample"]  # a count: the head noun alone reads as the items
+"scmle.explainability.quality.Evaluation.stability_score" = ["stability", "stability_score"]  # no single word fits without ambiguity
+"scmle.explainability.quality.Suite.reference_count" = ["count", "reference"]  # a count: the head noun alone reads as the items
+"scmle.explainability.quality.Suite.sample_count" = ["count", "sample"]  # a count: the head noun alone reads as the items
+"scmle.explainability.quality.Thresholds.stability_minimum" = ["stability", "stability_minimum"]  # no single word fits without ambiguity
+"scmle.governance.attestation.Attestation.schema_version" = ["version", "schema"]  # no single word fits without ambiguity
+"scmle.governance.deployment_ledger.grants.Attestation.key_id" = ["key", "key_id"]  # stored key: the class serializes its fields by name
+"scmle.governance.deployment_ledger.grants.Attestation.schema_version" = ["version", "schema"]  # stored key: the class serializes its fields by name
+"scmle.governance.deployment_ledger.grants.Envelope.key_id" = ["key", "key_id"]  # stored key: the class serializes its fields by name
+"scmle.governance.deployment_ledger.grants.Envelope.schema_version" = ["version", "schema"]  # stored key: the class serializes its fields by name
+"scmle.governance.deployment_ledger.kinds.Reply.CANNOT_DECIDE" = ["DECIDE", "CANNOT"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.governance.deployment_ledger.rules.Oversight.system_keys" = ["keys", "system"]  # no single word fits without ambiguity
+"scmle.governance.envelope.Action.TRAIN_CHALLENGER" = ["CHALLENGER", "TRAIN"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.governance.envelope.Guard.on_write" = ["write", "on_write"]  # a joining word carries the meaning
+"scmle.governance.envelope.Guard.verification_keys" = ["keys", "verification"]  # no single word fits without ambiguity
+"scmle.governance.escalation.Step.p_value" = ["value", "p_value"]  # stored key: the class serializes its fields by name
+"scmle.governance.escalation.Threshold.r_star" = ["star", "r_star"]  # stored key: the class serializes its fields by name
+"scmle.governance.escalation.binomial_p_value" = ["value", "binomial"]  # no single word fits without ambiguity
+"scmle.governance.keyring.Credential.key_id" = ["key", "key_id"]  # no single word fits without ambiguity
+"scmle.governance.keyring.Keyring.from_json" = ["json", "parse"]  # a joining word carries the meaning
+"scmle.governance.keyring.Wrapper.key_id" = ["key", "key_id"]  # no single word fits without ambiguity
+"scmle.governance.loop.alarms.Alarms.naive_flag" = ["naive", "naive_flag"]  # no single word fits without ambiguity
+"scmle.governance.loop.alarms.Alarms.novelty_test" = ["novelty", "novelty_test"]  # no single word fits without ambiguity
+"scmle.governance.loop.guard.Gatekeeper.act_on_unverified" = ["unverified", "act"]  # a joining word carries the meaning
+"scmle.governance.loop.guard.Gatekeeper.amend_policy" = ["amend", "amend_policy"]  # no single word fits without ambiguity
+"scmle.governance.loop.guard.Gatekeeper.change_label_policy" = ["change", "label"]  # no single word fits without ambiguity
+"scmle.governance.loop.guard.Gatekeeper.delete_or_send" = ["delete", "send"]  # a joining word carries the meaning
+"scmle.governance.loop.intake.Intake.naive_flag" = ["naive", "naive_flag"]  # no single word fits without ambiguity
+"scmle.governance.loop.memory.Memory.consecutive_rollbacks" = ["consecutive", "consecutive_rollbacks"]  # no single word fits without ambiguity
+"scmle.governance.loop.memory.Memory.coverage_test" = ["coverage", "coverage_test"]  # no single word fits without ambiguity
+"scmle.governance.loop.memory.Memory.escalation_batch" = ["escalation", "escalation_batch"]  # no single word fits without ambiguity
+"scmle.governance.loop.memory.Memory.halt_reason" = ["halt", "halt_reason"]  # no single word fits without ambiguity
+"scmle.governance.loop.memory.Memory.halted_by_state" = ["state", "halted_by_state"]  # a joining word carries the meaning
+"scmle.governance.loop.memory.Memory.naive_alarm" = ["naive", "naive_alarm"]  # no single word fits without ambiguity
+"scmle.governance.loop.memory.Memory.naive_flag" = ["naive", "naive_flag"]  # no single word fits without ambiguity
+"scmle.governance.loop.memory.Memory.novelty_test" = ["novelty", "novelty_test"]  # no single word fits without ambiguity
+"scmle.governance.loop.memory.Memory.pending_batches" = ["pending", "pending_batches"]  # no single word fits without ambiguity
+"scmle.governance.loop.memory.Memory.rollback_watch" = ["rollback", "rollback_watch"]  # no single word fits without ambiguity
+"scmle.governance.loop.memory.Memory.verification_keys" = ["keys", "verification"]  # no single word fits without ambiguity
+"scmle.governance.loop.risk.Risk.write_label_mechanism" = ["write", "label"]  # no single word fits without ambiguity
+"scmle.governance.loop.terms.Consequence.safe_default_applies" = ["applies", "safe", "default"]  # stored key: the class serializes its fields by name
+"scmle.governance.loop.terms.Escalation.proposed_default" = ["default", "proposed"]  # stored key: the class serializes its fields by name
+"scmle.governance.loop.terms.Escalation.question_hash" = ["hash", "question"]  # stored key: the class serializes its fields by name
+"scmle.governance.loop.terms.Hooks.open_incident" = ["incident", "open_incident"]  # stored key: the class serializes its fields by name
+"scmle.governance.model_card.Card.dataset_id" = ["dataset", "dataset_id"]  # no single word fits without ambiguity
+"scmle.governance.model_card.Card.feature_names" = ["names", "feature"]  # no single word fits without ambiguity
+"scmle.governance.model_card.Card.from_run" = ["run", "parse"]  # a joining word carries the meaning
+"scmle.governance.model_card.Card.generated_at" = ["generated", "generated_at"]  # a joining word carries the meaning
+"scmle.governance.model_card.Card.model_name" = ["name", "model"]  # no single word fits without ambiguity
+"scmle.governance.model_card.Card.model_version" = ["version", "model"]  # no single word fits without ambiguity
+"scmle.governance.model_card.Card.out_of_scope" = ["scope", "out"]  # a joining word carries the meaning
+"scmle.governance.model_card.Card.schema_version" = ["version", "schema"]  # no single word fits without ambiguity
+"scmle.governance.model_card.Card.snapshot_id" = ["snapshot", "snapshot_id"]  # no single word fits without ambiguity
+"scmle.governance.model_card.Card.support_status" = ["support", "support_status"]  # no single word fits without ambiguity
+"scmle.governance.never_list.AttestationRequired" = ["Unattested", "Attestation"]  # an adjective as a class name
+"scmle.governance.never_list.AttestationRequired.escalation_id" = ["escalation", "escalation_id"]  # no single word fits without ambiguity
+"scmle.governance.never_list.Forbidden.ACT_ON_UNVERIFIED" = ["UNVERIFIED", "ACT"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.governance.never_list.Forbidden.ANSWER_HIGH_IMPACT" = ["IMPACT", "ANSWER"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.governance.never_list.Forbidden.CHANGE_CHARTER" = ["CHARTER", "CHANGE"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.governance.never_list.Forbidden.CHANGE_LABEL_POLICY" = ["POLICY", "CHANGE"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.governance.never_list.Forbidden.DELETE_OR_EXTERNAL" = ["EXTERNAL", "DELETE"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.governance.never_list.Forbidden.EDIT_LEDGER" = ["LEDGER", "EDIT"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.governance.never_list.Forbidden.MOVE_CHAMPION" = ["CHAMPION", "MOVE"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.governance.never_list.Forbidden.RELAX_THRESHOLD" = ["THRESHOLD", "RELAX"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.governance.never_list.Forbidden.REOPEN_SEALED" = ["SEALED", "REOPEN"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.governance.never_list.Forbidden.SELF_ATTEST" = ["ATTEST", "SELF"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.governance.never_list.Forbidden.SUPPRESS_ALERT" = ["ALERT", "SUPPRESS"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.governance.never_list.Guard.on_write" = ["write", "on_write"]  # a joining word carries the meaning
+"scmle.governance.never_list.Guard.verification_keys" = ["keys", "verification"]  # no single word fits without ambiguity
+"scmle.governance.registry.ModelRegistryStore" = ["Registry", "Store"]  # which word names the store
+"scmle.governance.registry.Release.content_id" = ["content", "content_id"]  # stored key: the class serializes its fields by name
+"scmle.governance.registry.Release.registered_at" = ["registered", "registered_at"]  # stored key: the class serializes its fields by name
+"scmle.governance.registry.Release.run_id" = ["run", "run_id"]  # stored key: the class serializes its fields by name
+"scmle.governance.registry.Sanction.approved_at" = ["approved", "approved_at"]  # a joining word carries the meaning
+"scmle.governance.registry.Sanction.content_id" = ["content", "content_id"]  # no single word fits without ambiguity
+"scmle.governance.reliability.Emission.evidence_type" = ["evidence", "evidence_type"]  # no single word fits without ambiguity
+"scmle.governance.reliability.Harness.execution_id" = ["execution", "execution_id"]  # no single word fits without ambiguity
+"scmle.governance.reliability.Harness.recorded_at" = ["recorded", "recorded_at"]  # a joining word carries the meaning
+"scmle.governance.review.Signoff.schema_version" = ["version", "schema"]  # no single word fits without ambiguity
+"scmle.governance.review.require_artifact_digests" = ["require", "digests", "artifact"]  # no single word fits without ambiguity
+"scmle.optimization.optimizers.Grid.MAX_CHOICES" = ["CHOICES", "MAX"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.optimization.optimizers.Optimizer.greater_is_better" = ["better", "greater"]  # no single word fits without ambiguity
+"scmle.optimization.optimizers.suggest_float" = ["float", "suggest"]  # every candidate is taken, a builtin or a library name
+"scmle.optimization.optimizers.suggest_int" = ["int", "suggest"]  # every candidate is taken, a builtin or a library name
+"scmle.preparation.preprocessing.Overflow.fit_transform" = ["fit", "transform"]  # every candidate is taken, a builtin or a library name
+"scmle.preparation.preprocessing.Overflow.n_features_in_" = ["in", "n_features_in_"]  # fitted-attribute convention (trailing underscore)
+"scmle.preparation.preprocessing.default_options" = ["default", "options"]  # no single word fits without ambiguity
+"scmle.preparation.pseudo_labeling.Outcome.pseudo_rows" = ["rows", "pseudo"]  # stored key: the class serializes its fields by name
+"scmle.preparation.resampling.DensityWeightedRegressor" = ["Weighted", "Density"]  # a method name of three words
+"scmle.preparation.strategies.features.IterativeImputation" = ["Iterative", "Imputation"]  # beside other imputation strategies
+"scmle.preparation.strategies.rebalancing.Adasyn.sampler_name" = ["sampler", "sampler_name"]  # no single word fits without ambiguity
+"scmle.preparation.strategies.rebalancing.Copula.resampler_class" = ["resampler", "resampler_class"]  # no single word fits without ambiguity
+"scmle.preparation.strategies.rebalancing.PlainSmote" = ["Smote", "Plain"]  # SMOTE is an acronym
+"scmle.preparation.strategies.rebalancing.Smote.min_features" = ["features", "min_features"]  # min qualifier
+"scmle.preparation.survival.EventAwareEstimator" = ["Estimator", "Events"]  # Aware is the distinguishing word
+"scmle.preparation.survival.EventAwareEstimator.predict_survival" = ["survival", "predict_survival"]  # no single word fits without ambiguity
+"scmle.preparation.synthesis.Copula.sorted_values" = ["values", "sorted_values"]  # no single word fits without ambiguity
+"scmle.preparation.synthesis.CopulaOverSampler" = ["Copula", "CopulaOverSampler"]  # taken in its module: taken in scope
+"scmle.preparation.synthesis.CopulaOverSampler.generator_class" = ["generator", "generator_class"]  # no single word fits without ambiguity
+"scmle.preparation.uplift.TreatmentAwareEstimator" = ["Estimator", "Treatment"]  # Aware is the distinguishing word
+"scmle.preparation.weighting.Reweighter.event_column" = ["event", "event_column"]  # no single word fits without ambiguity
+"scmle.preparation.weighting.Reweighter.predict_survival" = ["survival", "predict_survival"]  # no single word fits without ambiguity
+"scmle.preparation.weighting.Reweighter.target_columns" = ["columns", "target"]  # no single word fits without ambiguity
+"scmle.preparation.weighting.Reweighter.treatment_column" = ["treatment", "treatment_column"]  # no single word fits without ambiguity
+"scmle.preparation.weighting.Reweighter.value_column" = ["value", "value_column"]  # no single word fits without ambiguity
+"scmle.preparation.wrappers.MonotoneClassifier" = ["Classifier", "Monotone"]  # a parallel family in one module; the target needs a module split (phase6_seams 1.8)
+"scmle.preparation.wrappers.MonotoneEstimator" = ["Estimator", "Monotone"]  # a parallel family in one module; the target needs a module split (phase6_seams 1.8)
+"scmle.preparation.wrappers.MonotoneRegressor" = ["Regressor", "Monotone"]  # a parallel family in one module; the target needs a module split (phase6_seams 1.8)
+"scmle.rehearsal.faults.catalogue.run_all" = ["all", "run_all"]  # a joining word carries the meaning
+"scmle.rehearsal.faults.outages.object_store_loss" = ["loss", "store"]  # no single word fits without ambiguity
+"scmle.rehearsal.faults.service.Client.stop_flag" = ["flag", "stop"]  # no single word fits without ambiguity
+"scmle.rehearsal.local_faults.interruptions.Interruptions.run_process_death" = ["death", "process"]  # no single word fits without ambiguity
+"scmle.rehearsal.local_faults.interruptions.Interruptions.run_retry_exhaustion" = ["exhaustion", "retry"]  # no single word fits without ambiguity
+"scmle.rehearsal.local_faults.interruptions.Interruptions.run_stale_checkpoint" = ["checkpoint", "stale"]  # no single word fits without ambiguity
+"scmle.rehearsal.local_faults.interruptions.Interruptions.run_worker_loss" = ["loss", "worker"]  # no single word fits without ambiguity
+"scmle.rehearsal.local_faults.provenance.Provenance.run_changed_snapshot" = ["snapshot", "changed"]  # no single word fits without ambiguity
+"scmle.rehearsal.local_faults.provenance.Provenance.run_duplicate_event" = ["event", "duplicate"]  # no single word fits without ambiguity
+"scmle.rehearsal.local_faults.provenance.Provenance.run_incomplete_lineage" = ["lineage", "incomplete"]  # no single word fits without ambiguity
+"scmle.rehearsal.local_faults.provenance.Provenance.run_invalid_signature" = ["signature", "invalid"]  # no single word fits without ambiguity
+"scmle.rehearsal.local_faults.provenance.Provenance.run_rejected_approval" = ["approval", "rejected"]  # no single word fits without ambiguity
+"scmle.rehearsal.local_faults.resources.Resources.run_corrupt_artifact" = ["corrupt", "run_corrupt_artifact"]  # no single word fits without ambiguity
+"scmle.rehearsal.local_faults.resources.Resources.run_dependency_mismatch" = ["mismatch", "dependency"]  # no single word fits without ambiguity
+"scmle.rehearsal.local_faults.resources.Resources.run_disk_full" = ["full", "disk"]  # no single word fits without ambiguity
+"scmle.rehearsal.local_faults.resources.Resources.run_memory_exhaustion" = ["exhaustion", "memory"]  # no single word fits without ambiguity
+"scmle.rehearsal.local_faults.resources.Resources.run_partial_write" = ["write", "partial"]  # no single word fits without ambiguity
+"scmle.runners.base.job.CostBudget.max_cost" = ["cost", "max_cost"]  # stored key: the class serializes its fields by name
+"scmle.runners.base.job.CostRate.per_cpu_hour" = ["hour", "per", "cpu"]  # stored key: the class serializes its fields by name
+"scmle.runners.base.job.CostRate.per_gb_hour" = ["hour", "per"]  # stored key: the class serializes its fields by name
+"scmle.runners.base.job.CostRate.per_gpu_hour" = ["hour", "per", "gpu"]  # stored key: the class serializes its fields by name
+"scmle.runners.base.job.Job.project_digest" = ["digest", "project"]  # every candidate is taken, a builtin or a library name
+"scmle.runners.base.job.Job.run_id" = ["run", "run_id"]  # stored key: the class serializes its fields by name
+"scmle.runners.base.job.Job.timeout_seconds" = ["timeout", "seconds"]  # stored key: the class serializes its fields by name
+"scmle.runners.base.job.Progress.BUDGET_STOPPED" = ["STOPPED", "BUDGET"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.runners.base.job.Progress.RETRIES_EXHAUSTED" = ["EXHAUSTED", "RETRIES"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.runners.base.job.Progress.TIMED_OUT" = ["OUT", "TIMED"]  # all-caps constant: needs the structure.compound caps fix before rename.py accepts a caps word
+"scmle.runners.base.job.Resources.gpu_reason" = ["reason", "gpu_reason"]  # stored key: the class serializes its fields by name
+"scmle.runners.base.job.Resources.memory_mb" = ["memory", "memory_mb"]  # stored key: the class serializes its fields by name
+"scmle.runners.base.job.Ticket.job_id" = ["job", "job_id"]  # stored key: the class serializes its fields by name
+"scmle.runners.base.ledger.Attempt.ended_at" = ["ended", "ended_at"]  # stored key: the class serializes its fields by name
+"scmle.runners.base.ledger.Attempt.job_id" = ["job", "job_id"]  # stored key: the class serializes its fields by name
+"scmle.runners.base.ledger.Attempt.started_at" = ["started", "started_at"]  # stored key: the class serializes its fields by name
+"scmle.runners.base.runner.Runner.poll_seconds" = ["seconds", "poll_seconds"]  # no single word fits without ambiguity
+"scmle.runners.base.runner.Runner.result_key" = ["key", "result_key"]  # no single word fits without ambiguity
+"scmle.runners.base.runner.Runner.spec_key" = ["key", "spec"]  # no single word fits without ambiguity
+"scmle.runners.checkpoint.content_digest" = ["digest", "content_digest"]  # digest is already bound at scmle/runners/checkpoint.py:208
+"scmle.runners.local.Context.run_id" = ["run", "run_id"]  # no single word fits without ambiguity
+"scmle.runners.roles.RoleStore.list_objects" = ["objects", "list_objects"]  # no single word fits without ambiguity
+"scmle.runners.roles.check_separation" = ["separation", "check_separation"]  # no single word fits without ambiguity
+"scmle.security.access.Config.audit_file" = ["file", "audit"]  # no single word fits without ambiguity
+"scmle.security.access.Config.keys_file" = ["file", "keys"]  # no single word fits without ambiguity
+"scmle.security.access.Config.revoked_file" = ["file", "revoked"]  # no single word fits without ambiguity
+"scmle.security.access.DeniedError.retry_after" = ["after", "retry"]  # a joining word carries the meaning
+"scmle.security.access.Gateway.failure_limiter" = ["failure", "failure_limiter"]  # no single word fits without ambiguity
+"scmle.security.access.gateway_from_environment" = ["environment", "gateway"]  # a joining word carries the meaning
+"scmle.security.access.require_authentication_for" = ["require", "authentication"]  # a joining word carries the meaning
+"scmle.security.remote.Keystore.fetched_at" = ["fetched", "fetched_at"]  # a joining word carries the meaning
+"scmle.security.remote.Keystore.max_stale" = ["stale", "max_stale"]  # max qualifier
+"scmle.security.remote.Keystore.min_refresh" = ["refresh", "min"]  # min qualifier
+"scmle.security.remote.Revocations.fetched_at" = ["fetched", "fetched_at"]  # a joining word carries the meaning
+"scmle.security.remote.Revocations.max_stale" = ["stale", "max_stale"]  # max qualifier
+"scmle.security.tokens.Key.not_before" = ["before", "not_before"]  # a joining word carries the meaning
+"scmle.security.tokens.Keystore.from_file" = ["file", "parse"]  # a joining word carries the meaning
+"scmle.security.tokens.Principal.key_id" = ["key", "key_id"]  # no single word fits without ambiguity
+"scmle.security.tokens.Principal.token_id" = ["token", "token_id"]  # no single word fits without ambiguity
+"scmle.security.tokens.RevocationList" = ["Revocations", "Blocklist"]  # List is a builtin
+"scmle.security.tokens.RevocationList.from_file" = ["file", "parse"]  # a joining word carries the meaning
+"scmle.security.tokens.RevocationList.key_ids" = ["ids", "key"]  # no single word fits without ambiguity
+"scmle.storage.conformance.check_binary_and_empty" = ["check", "empty", "binary"]  # a joining word carries the meaning
+"scmle.storage.conformance.check_if_absent" = ["absent", "check_if_absent"]  # a joining word carries the meaning
+"scmle.storage.conformance.check_if_absent_race" = ["race", "check_if_absent_race"]  # a joining word carries the meaning
+"scmle.storage.conformance.check_if_version" = ["version", "check_if_version"]  # a joining word carries the meaning
+"scmle.storage.conformance.check_if_version_race" = ["race", "check_if_version_race"]  # a joining word carries the meaning
+"scmle.storage.conformance.check_isolation" = ["isolation", "check_isolation"]  # no single word fits without ambiguity
+"scmle.storage.conformance.check_key_rules" = ["rules", "key"]  # no single word fits without ambiguity
+"scmle.storage.conformance.check_large" = ["large", "check_large"]  # no single word fits without ambiguity
+"scmle.storage.conformance.check_listing" = ["listing", "check_listing"]  # no single word fits without ambiguity
+"scmle.storage.conformance.check_missing" = ["missing", "check_missing"]  # no single word fits without ambiguity
+"scmle.storage.conformance.check_overwrite" = ["overwrite", "check_overwrite"]  # no single word fits without ambiguity
+"scmle.storage.conformance.check_round_trip" = ["trip", "check_round_trip"]  # no single word fits without ambiguity
+"scmle.storage.mlflow_store.MlflowExperimentStore" = ["Mlflow", "Experiments"]  # a library name
+"scmle.storage.mlflow_store.MlflowExperimentStore.experiment_id" = ["experiment", "experiment_id"]  # no single word fits without ambiguity
+"scmle.storage.objectstore.ObjectMeta" = ["Metadata", "Meta"]  # Meta is an abbreviation
+"scmle.storage.stores.SqliteExperimentStore" = ["Sqlite", "Experiments"]  # beside the MLflow store
+"scmle.trail.records.read_lines" = ["lines", "read_lines"]  # no single word fits without ambiguity
+"scmle.trail.trace.evidence.Evidence.content_id" = ["content", "content_id"]  # no single word fits without ambiguity
+"scmle.trail.trace.evidence.Evidence.run_id" = ["run", "run_id"]  # no single word fits without ambiguity
+"scmle.trail.trace.planning.Planning.charter_hash" = ["charter", "charter_hash"]  # no single word fits without ambiguity
+"scmle.trail.trace.reader.Reader.charter_hash" = ["charter", "charter_hash"]  # no single word fits without ambiguity
+"scmle.trail.trace.reader.Reader.content_id" = ["content", "content_id"]  # no single word fits without ambiguity
+"scmle.trail.trace.reader.Reader.run_id" = ["run", "run_id"]  # no single word fits without ambiguity
+"scmle.unsupervised.clustering.Candidate.calinski_harabasz" = ["harabasz", "calinski"]  # stored key: the class serializes its fields by name
+"scmle.unsupervised.clustering.Candidate.davies_bouldin" = ["bouldin", "davies"]  # stored key: the class serializes its fields by name
+
+# Refused, not mapped:
+# scmle.api.erasure.receipts.Receipt.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.api.erasure.steps.Step.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.api.non_tabular.Scope.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.api.non_tabular.Scope.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.artifacts.bundle.provenance.Manifest.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.artifacts.bundle.provenance.Manifest.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.artifacts.claims_audit.verdict.Finding.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.artifacts.claims_audit.verdict.Verification.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.artifacts.claims_audit.verdict.Verification.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.causal.identification.aipw.Difference.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.causal.identification.aipw.Estimate.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.causal.identification.aipw.Estimate.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.causal.identification.attest.Applied.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.causal.identification.attest.Applied.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.causal.identification.attest.Attestation.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.causal.identification.attest.Attestation.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.causal.identification.battery.Battery.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.causal.identification.battery.Replication.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.causal.identification.battery.Replication.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.causal.identification.battery.Test.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.causal.identification.certified.SubgroupGate.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.causal.identification.certified.SubgroupGate.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.causal.identification.did.Estimate.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.causal.identification.did.Estimate.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.causal.identification.iv.Estimate.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.causal.identification.iv.Estimate.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.causal.identification.rd.Estimate.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.causal.identification.rd.Estimate.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.causal.identification.select.Plan.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.causal.identification.select.Plan.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.causal.identification.select.Verdict.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.causal.identification.select.Verdict.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.causal.identification.sensitivity.Sensitivity.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.causal.identification.sensitivity.Sensitivity.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.causal.identification.synth.Estimate.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.causal.identification.synth.Estimate.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.causal.identification.tier.Assignment.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.artifacts.Interface.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.artifacts.Interface.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.capabilities.axes.Evaluation.CALIBRATED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Evaluation.FORECASTING: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Evaluation.MULTILABEL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Evaluation.MULTIOUTPUT: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Evaluation.RANKING: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Evaluation.STANDARD: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Evaluation.SURVIVAL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Evaluation.UPLIFT: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Explainability.COUNTERFACTUAL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Explainability.FULL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Explainability.GLOBAL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Explainability.LOCAL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Explainability.NONE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Fairness.MITIGATION: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Fairness.NONE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Inference.BATCH: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Inference.LIBRARY: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Inference.ONNX: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Inference.STREAMING: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Modality.AUDIO: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Modality.DOCUMENT: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Modality.GEOSPATIAL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Modality.GRAPH: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Modality.IMAGE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Modality.RASTER: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Modality.TABULAR: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Modality.TEXT: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Modality.VIDEO: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.ModelFamily.JEPA: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.ModelFamily.TRANSFORMER: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Status.EXPERIMENTAL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Status.SUPPORTED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Uncertainty.ABSTENTION: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Uncertainty.CONFORMAL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.axes.Uncertainty.NONE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.capabilities.declarations.Capability.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.capabilities.declarations.Coordinate.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.capabilities.declarations.Declaration.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.capabilities.declarations.Reason.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.capabilities.declarations.Resources.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.capabilities.registry.Registry.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.capabilities.registry.Registry.to_json: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.data.findings.Disposition.ACCEPTED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.data.findings.Disposition.OPEN: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.data.findings.Disposition.RESOLVED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.data.findings.Disposition.WAIVED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.data.findings.Finding.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.data.findings.Finding.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.data.findings.FindingSeverity.CRITICAL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.data.findings.FindingSeverity.ERROR: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.data.findings.FindingSeverity.INFO: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.data.findings.FindingSeverity.WARNING: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.data.profiles.Blueprint.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.data.profiles.Curation.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.data.profiles.Datasheet.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.data.profiles.Portrait.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.data.provenance.Ancestry.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.data.provenance.Ancestry.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.data.provenance.Confidentiality.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.data.provenance.Confidentiality.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.data.provenance.DatasetManifest.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.data.provenance.DatasetManifest.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.data.provenance.Origin.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.data.provenance.Origin.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.data.provenance.Passport.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.data.provenance.Passport.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.evaluation.policy.Registry.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.evaluation.support.Explicability.COUNTERFACTUAL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evaluation.support.Explicability.FULL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evaluation.support.Explicability.GLOBAL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evaluation.support.Explicability.LOCAL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evaluation.support.Explicability.NONE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evaluation.support.Orientation.MAXIMIZE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evaluation.support.Orientation.MINIMIZE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evaluation.support.Procedure.DIRICHLET: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evaluation.support.Procedure.ISOTONIC: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evaluation.support.Procedure.NONE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evaluation.support.Procedure.PLATT: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evaluation.support.Remedy.BLOCK: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evaluation.support.Remedy.WARN: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evaluation.support.Technique.MITIGATION: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evaluation.support.Technique.NONE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evaluation.support.UncertaintyMethod.ABSTENTION: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evaluation.support.UncertaintyMethod.CONFORMAL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evaluation.support.UncertaintyMethod.NONE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.events.Event.to_json: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.evidence.Disposition.ACCEPTED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evidence.Disposition.BLOCKED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evidence.Disposition.REQUIRED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evidence.Index.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.evidence.Index.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.evidence.Outcome.FAIL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evidence.Outcome.PASS: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evidence.Outcome.WAIVED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.evidence.Record.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.evidence.Record.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.experiments.Decision.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.experiments.Edict.DEFER: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.experiments.Edict.INCLUDE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.experiments.Edict.REJECT: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.experiments.Plan.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.experiments.Plan.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.experiments.Termination.FAILED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.experiments.Termination.OK: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.experiments.Termination.PRUNED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.experiments.Termination.SKIPPED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.experiments.Trial.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.explanations.Contract.model_config: scmle.contracts.explanations.Contract.model_config overrides pydantic.main.BaseModel
+# scmle.contracts.lineage.Edge.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.lineage.Edge.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.lineage.Graph.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.lineage.Graph.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.lineage.Kind.BUNDLE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.lineage.Kind.CURATION: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.lineage.Kind.EVALUATION: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.lineage.Kind.EXPLANATION: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.lineage.Kind.INFERENCE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.lineage.Kind.MODEL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.lineage.Kind.SNAPSHOT: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.lineage.Kind.SPLIT: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.lineage.Node.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.lineage.Node.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.modalities.Declaration.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.modalities.Modality.AUDIO: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Modality.DOCUMENT: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Modality.GEOSPATIAL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Modality.GRAPH: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Modality.IMAGE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Modality.RASTER: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Modality.TABULAR: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Modality.TEXT: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Modality.VIDEO: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Phase.CURATION: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Phase.DOCUMENTATION: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Phase.EVALUATION: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Phase.INFERENCE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Phase.INGESTION: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Phase.MODELLING: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Phase.MONITORING: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Phase.PACKAGING: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Phase.PROFILING: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Phase.SPLITTING: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Phase.VALIDATION: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Proof.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.modalities.Registry.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.modalities.Registry.to_json: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.modalities.Status.EXPERIMENTAL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.modalities.Status.SUPPORTED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.models.Capabilities.early_stopping: library keyword argument stored as a hyperparameter (phase5 D6)
+# scmle.contracts.observability.Indicator.CALIBRATION: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.observability.Indicator.COVERAGE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.observability.Indicator.DRIFT: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.observability.Indicator.ERROR: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.observability.Indicator.FAIRNESS: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.observability.Indicator.LATENCY: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.observability.Indicator.MEMORY: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.observability.Indicator.NOVELTY: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.observability.Indicator.THROUGHPUT: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.observability.Inference.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.observability.Requirements.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.observability.Sample.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.observability.Sample.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.performance.Baseline.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.performance.Budget.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.performance.Comparison.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.performance.Observation.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.performance.Observation.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.performance.Operation.FIT: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.performance.Operation.INFERENCE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.performance.Operation.INGEST: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.performance.Operation.LOAD: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.performance.Operation.PACKAGE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.performance.Run.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.performance.Run.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.performance.Verdict.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.qualification.Certificate.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.qualification.Certificate.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.qualification.Check.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.qualification.Check.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.qualification.Claim.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.qualification.Claim.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.qualification.Decision.BLOCK: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.qualification.Decision.PASS: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.qualification.Decision.QUARANTINE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.qualification.Decision.WARN: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.qualification.Subset.ALL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.qualification.Subset.CONFIRMATION: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.qualification.Subset.EXPLORATION: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.qualification.Subset.FORWARD: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.qualification.Tier.ATTESTED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.qualification.Tier.CONFIRMED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.qualification.Tier.UNVERIFIED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.records.Schema.model_config: scmle.contracts.records.Schema.model_config overrides pydantic.main.BaseModel
+# scmle.contracts.reliability.Contingency.TIMEOUT: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.reliability.Evidence.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.reliability.Evidence.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.reliability.Outcome.INCONCLUSIVE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.reliability.Plan.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.reliability.Plan.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.reliability.Recoverability.AUTOMATIC: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.reliability.Registry.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.reliability.Registry.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.reliability.Registry.to_json: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.contracts.reliability.Verification.FAILED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.reliability.Verification.INCONCLUSIVE: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.reliability.Verification.PASSED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.reliability.Verification.PLANNED: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.tasks.config.Config.charter_path: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.config.Config.check_cross_field_rules: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.config.Config.config_hash: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.config.Config.confirmation_failure_policy: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.config.Config.confirmation_rule: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.config.Config.feature_graph: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.config.Config.leakage_attestations: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.config.Config.leakage_policy: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.config.Config.ledger_rule: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.config.Config.primary_metric: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.config.check_multi_target_rules: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.config.check_streaming_and_fairness_rules: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.config.check_survival_and_ordinal_rules: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.kinds.Task.BINARY: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.tasks.kinds.Task.FORECAST: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.tasks.kinds.Task.MULTICLASS: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.tasks.kinds.Task.MULTILABEL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.tasks.kinds.Task.MULTIOUTPUT: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.tasks.kinds.Task.ORDINAL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.tasks.kinds.Task.RANKING: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.tasks.kinds.Task.REGRESSION: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.tasks.kinds.Task.SURVIVAL: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.tasks.kinds.Task.UPLIFT: one word: structure.compound counts every all-caps name as compound
+# scmle.contracts.tasks.sections.Candidates.exclude_families: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Candidates.exclude_models: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Candidates.experimental_models: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.baseline_column: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.baseline_subject: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.embedding_model: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.event_column: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.excluded_columns: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.feature_delays: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.forecast_calendar: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.forecast_lags: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.forecast_windows: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.framing_draft: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.group_column: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.id_columns: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.ingest_plan: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.logged_action_column: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.memory_budget_gb: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.monotonic_constraints: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.ordinal_order: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.propensity_column: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.pseudo_label_confidence: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.query_column: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.reference_uri: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.seasonal_period: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.sensitive_columns: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.text_encoding: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.time_as_feature: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.time_column: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.treatment_column: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.unavailable_at_prediction: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.value_column: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Dataset.weight_column: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Parity.max_accuracy_cost: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Parity.min_reduction: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Parity.trigger_gap: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Problem.success_criteria: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Resources.cluster_address: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Resources.cpu_limit: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Resources.memory_limit_gb: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Resources.time_budget_seconds: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Search.configs_per_model: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Search.prune_fraction: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Search.top_models: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Selection.bayesian_confidence: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Selection.bias_variance_replicates: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Selection.latency_safety_factor: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Selection.max_candidates_checked: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Selection.max_model_mb: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Selection.max_p95_latency_ms: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Selection.nested_cv: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Selection.pareto_tolerance: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Selection.sensitivity_repeats: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Selection.tie_breaker: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Selection.tie_tolerance: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Strategies.top_models: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Threshold.false_negative_cost: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Threshold.false_positive_cost: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Threshold.threshold_objective: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Validation.embargo_rows: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Validation.horizon_rows: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Validation.test_fraction: Config field: lane 3.5 renames it with aliases
+# scmle.contracts.tasks.sections.Validation.window_rows: Config field: lane 3.5 renames it with aliases
+# scmle.decision.constraints.satisfaction.Satisfaction.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.decision.constraints.satisfaction.Satisfaction.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.decision.netbenefit.Benefit.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.decision.netbenefit.Benefit.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.decision.ope.Estimate.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.decision.ope.Estimate.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.decision.rollout.Decision.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.decision.rollout.Decision.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.decision.threshold.Thresholding.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.decision.threshold.Thresholding.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.contract.deployment.Deployment.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.contract.deployment.Deployment.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.contract.deployment.Probes.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.contract.deployment.Probes.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.contract.deployment.Resources.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.contract.deployment.Resources.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.contract.references.Architecture.AMD64: one word: structure.compound counts every all-caps name as compound
+# scmle.deploy.contract.references.Architecture.ARM64: one word: structure.compound counts every all-caps name as compound
+# scmle.deploy.contract.references.BundleRef.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.contract.references.BundleRef.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.contract.references.Environment.LOCAL: one word: structure.compound counts every all-caps name as compound
+# scmle.deploy.contract.references.Environment.PRODUCTION: one word: structure.compound counts every all-caps name as compound
+# scmle.deploy.contract.references.Environment.STAGING: one word: structure.compound counts every all-caps name as compound
+# scmle.deploy.contract.references.ImageRef.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.contract.references.ImageRef.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.contract.references.SecretRef.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.contract.references.SecretRef.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.contract.references.SecretSource.ENVIRONMENT: one word: structure.compound counts every all-caps name as compound
+# scmle.deploy.contract.references.SecretSource.FILE: one word: structure.compound counts every all-caps name as compound
+# scmle.deploy.contract.references.SecretSource.STORE: one word: structure.compound counts every all-caps name as compound
+# scmle.deploy.gate.GateDecision.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.livetests.Check.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.livetests.Check.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.mocks.Handler.do_PUT: http.server calls do_<METHOD> by name; structure.EXEMPT lacks it
+# scmle.deploy.observation.Observation.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.deploy.observation.Observation.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.parity.Parity.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.deploy.parity.Parity.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.record.Record.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.record.Record.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.release_state.status.Finding.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.release_state.status.Outcome.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.release_state.status.Reconciliation.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.deploy.release_state.status.ReleaseState.APPROVED: one word: structure.compound counts every all-caps name as compound
+# scmle.deploy.release_state.status.ReleaseState.CANDIDATE: one word: structure.compound counts every all-caps name as compound
+# scmle.deploy.release_state.status.ReleaseState.CHALLENGER: one word: structure.compound counts every all-caps name as compound
+# scmle.deploy.release_state.status.ReleaseState.PRODUCTION: one word: structure.compound counts every all-caps name as compound
+# scmle.deploy.release_state.status.ReleaseState.RETIRED: one word: structure.compound counts every all-caps name as compound
+# scmle.explainability.quality.Comparison.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.explainability.quality.Evaluation.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.explainability.quality.Suite.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.explainability.quality.Thresholds.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.explainability.quality.Truth.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.attestation.Attestation.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.attestation.Attestation.from_records: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.attestation.Attestation.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.deployment_ledger.grants.Attestation.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.deployment_ledger.grants.Attestation.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.deployment_ledger.grants.Envelope.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.deployment_ledger.grants.Envelope.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.deployment_ledger.kinds.Reply.APPROVE: one word: structure.compound counts every all-caps name as compound
+# scmle.governance.deployment_ledger.kinds.Reply.OVERRIDE: one word: structure.compound counts every all-caps name as compound
+# scmle.governance.deployment_ledger.kinds.Reply.REJECT: one word: structure.compound counts every all-caps name as compound
+# scmle.governance.escalation.Curve.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.escalation.Threshold.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.governance.escalation.Threshold.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.keyring.Credential.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.keyring.Credential.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.keyring.Keyring.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.keyring.Keyring.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.keyring.Keyring.to_json: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.keyring.State.ACTIVE: one word: structure.compound counts every all-caps name as compound
+# scmle.governance.keyring.State.RETIRED: one word: structure.compound counts every all-caps name as compound
+# scmle.governance.keyring.State.REVOKED: one word: structure.compound counts every all-caps name as compound
+# scmle.governance.keyring.Wrapper.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.keyring.Wrapper.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.loop.terms.Preregistration.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.loop.terms.Preregistration.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.model_card.Card.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.registry.Sanction.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.governance.registry.Sanction.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.registry.Verdict.APPROVED: one word: structure.compound counts every all-caps name as compound
+# scmle.governance.registry.Verdict.REJECTED: one word: structure.compound counts every all-caps name as compound
+# scmle.governance.review.Kind.EXPLANATION: one word: structure.compound counts every all-caps name as compound
+# scmle.governance.review.Kind.FAIRNESS: one word: structure.compound counts every all-caps name as compound
+# scmle.governance.review.Kind.METRIC: one word: structure.compound counts every all-caps name as compound
+# scmle.governance.review.Kind.RELIABILITY: one word: structure.compound counts every all-caps name as compound
+# scmle.governance.review.Kind.SECURITY: one word: structure.compound counts every all-caps name as compound
+# scmle.governance.review.Recomputation.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.review.Recomputation.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.review.Signoff.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.review.Signoff.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.governance.review.Verdict.APPROVED: one word: structure.compound counts every all-caps name as compound
+# scmle.governance.review.Verdict.BLOCKED: one word: structure.compound counts every all-caps name as compound
+# scmle.optimization.optimizers.Grid.LEVELS: one word: structure.compound counts every all-caps name as compound
+# scmle.preparation.forecasters.Forecaster.value_column: estimator convention of sklearn.base.RegressorMixin: get_params reads constructor-named and fitted attributes by name
+# scmle.preparation.forecasters.Naive.value_column: estimator convention of sklearn.base.RegressorMixin: get_params reads constructor-named and fitted attributes by name
+# scmle.preparation.multitarget.Multitarget.target_columns: estimator convention of sklearn.base.BaseEstimator: get_params reads constructor-named and fitted attributes by name
+# scmle.preparation.pseudo_labeling.Outcome.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.preparation.pseudo_labeling.Outcome.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.preparation.ranking.Ranker.query_column: estimator convention of sklearn.base.RegressorMixin: get_params reads constructor-named and fitted attributes by name
+# scmle.preparation.resampling.DensityWeightedRegressor.max_weight: estimator convention of sklearn.base.RegressorMixin: get_params reads constructor-named and fitted attributes by name
+# scmle.preparation.resampling.ResamplingClassifier.random_state: library keyword argument stored as a hyperparameter (phase5 D6)
+# scmle.preparation.selection.Constructor.feature_names_in_: estimator convention of sklearn.base.TransformerMixin: get_params reads constructor-named and fitted attributes by name
+# scmle.preparation.selection.SparseSelector.n_features_in_: estimator convention of sklearn.base.TransformerMixin: get_params reads constructor-named and fitted attributes by name
+# scmle.preparation.selection.SparseSelector.random_state: library keyword argument stored as a hyperparameter (phase5 D6)
+# scmle.preparation.survival.EventAwareEstimator.event_column: estimator convention of sklearn.base.RegressorMixin: get_params reads constructor-named and fitted attributes by name
+# scmle.preparation.uplift.TreatmentAwareEstimator.treatment_column: estimator convention of sklearn.base.RegressorMixin: get_params reads constructor-named and fitted attributes by name
+# scmle.preparation.weighting.Reweighter.random_state: library keyword argument stored as a hyperparameter (phase5 D6)
+# scmle.preparation.wrappers.Curried.fit_params: estimator convention of sklearn.base.RegressorMixin: get_params reads constructor-named and fitted attributes by name
+# scmle.preparation.wrappers.FitParamsClassifier.fit_params: estimator convention of sklearn.base.ClassifierMixin: get_params reads constructor-named and fitted attributes by name
+# scmle.rehearsal.demo.client.Authenticator.handler_order: scmle.rehearsal.demo.client.Authenticator.handler_order overrides urllib.request.BaseHandler
+# scmle.rehearsal.demo.journal.Transcript.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.runners.base.job.Exit.FAILED: one word: structure.compound counts every all-caps name as compound
+# scmle.runners.base.job.Exit.INTERRUPTED: one word: structure.compound counts every all-caps name as compound
+# scmle.runners.base.job.Exit.KILLED: one word: structure.compound counts every all-caps name as compound
+# scmle.runners.base.job.Exit.SUCCEEDED: one word: structure.compound counts every all-caps name as compound
+# scmle.runners.base.job.Exit.TRANSIENT: one word: structure.compound counts every all-caps name as compound
+# scmle.runners.base.job.Job.KEYS: one word: structure.compound counts every all-caps name as compound
+# scmle.runners.base.job.Job.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.runners.base.job.Progress.FAILED: one word: structure.compound counts every all-caps name as compound
+# scmle.runners.base.job.Progress.STARTED: one word: structure.compound counts every all-caps name as compound
+# scmle.runners.base.job.Progress.SUCCEEDED: one word: structure.compound counts every all-caps name as compound
+# scmle.runners.base.job.State.CANCELLED: one word: structure.compound counts every all-caps name as compound
+# scmle.runners.base.job.State.FAILED: one word: structure.compound counts every all-caps name as compound
+# scmle.runners.base.job.State.INTERRUPTED: one word: structure.compound counts every all-caps name as compound
+# scmle.runners.base.job.State.PENDING: one word: structure.compound counts every all-caps name as compound
+# scmle.runners.base.job.State.RUNNING: one word: structure.compound counts every all-caps name as compound
+# scmle.runners.base.job.State.SUCCEEDED: one word: structure.compound counts every all-caps name as compound
+# scmle.runners.base.ledger.RunManifest.from_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.runners.base.ledger.RunManifest.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.runners.checkpoint.Condition.ABSENT: one word: structure.compound counts every all-caps name as compound
+# scmle.runners.checkpoint.Condition.CORRUPT: one word: structure.compound counts every all-caps name as compound
+# scmle.runners.checkpoint.Condition.LOADED: one word: structure.compound counts every all-caps name as compound
+# scmle.runners.local.Container.MOUNT: one word: structure.compound counts every all-caps name as compound
+# scmle.storage.conformance.Conformance.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.storage.stores.SqliteExperimentStore.COLUMNS: one word: structure.compound counts every all-caps name as compound
+# scmle.trail.chain.Verification.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.trail.trace.finding.Finding.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
+# scmle.unsupervised.clustering.Clustering.to_dict: record layer: phase 5 replaces it (phase6_seams 1.8)
