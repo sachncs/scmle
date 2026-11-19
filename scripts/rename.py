@@ -137,6 +137,9 @@ class Plan:
 def read(path: pathlib.Path) -> dict[str, str]:
     """Reads a map, flattening TOML's dotted keys back to dotted paths.
 
+    The `[review]` table holds unresolved candidates, not renames, and is
+    dropped before flattening.
+
     Args:
         path: The map file.
 
@@ -159,7 +162,9 @@ def read(path: pathlib.Path) -> dict[str, str]:
                 raise ValueError(f"{name}: the new name must be a string")
         return found
 
-    return flatten(tomllib.loads(path.read_text(encoding="utf-8")), "")
+    table = tomllib.loads(path.read_text(encoding="utf-8"))
+    table.pop("review", None)
+    return flatten(table, "")
 
 
 def listing(root: pathlib.Path) -> list[str]:
