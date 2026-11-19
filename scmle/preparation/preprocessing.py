@@ -41,8 +41,9 @@ SPARSE_THRESHOLD = 0.3
 NATIVE_LEVELS = 255
 
 
-class Overflow(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
-    """Target-encodes the columns with more levels than native codes hold.
+@dataclasses.dataclass(frozen=True)
+class Overflow:
+    """The high-cardinality columns with more levels than native codes hold.
 
     Integer codes pool every level past `NATIVE_LEVELS` into one code, so a
     column with more levels would silently lose the target signal of its
@@ -55,126 +56,76 @@ class Overflow(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]
       carries no information about the target;
     * target encoding keeps one number per level, its empirical-Bayes
       smoothing (`smooth="auto"`) shrinks a rare level toward the prior in
-      proportion to its own variance, and `fit_transform` cross-fits
-      (`cv` folds), so no training row's encoding has seen its own label.
+      proportion to its own variance, and the column transformer's fit
+      cross-fits it (`cv` folds), so no training row's encoding has seen
+      its own label.
 
-    It is leakage-safe inside cross-validation: the whole pipeline is
-    refitted per fold, so validation rows are encoded only with statistics
-    of the training fold, and the training rows with cross-fitted ones. The
-    encoded columns are placed after every other block, so the positions of
-    the native codes and of the numeric columns do not move. A column
-    within `NATIVE_LEVELS` adds nothing.
+    An instance is the column transformer's selector for that block: the
+    transformer calls it on the rows it fits and keeps the chosen columns
+    for every later transform. It is leakage-safe inside cross-validation:
+    the whole pipeline is refitted per fold, so the choice and the
+    statistics come from the training fold alone. The encoded columns are
+    placed after every other block, so the positions of the native codes
+    and of the numeric columns do not move. A column within `NATIVE_LEVELS`
+    adds nothing.
 
     Attributes:
-        levels: The native code limit; a column with more levels is encoded.
-        seed: Seed of the cross-fitting folds.
-        folds: Cross-fitting folds.
+        names: The high-cardinality columns to choose from.
+        levels: The native code limit; a column with more levels, counting
+            missing as the one level its token fills, is chosen.
     """
 
-    def __init__(
-        self, levels: int = NATIVE_LEVELS, seed: int = 0, folds: int = 5
-    ) -> None:
-        """Initializes the encoder.
+    names: tuple[str, ...]
+    levels: int = NATIVE_LEVELS
+
+    def __call__(self, frame: pandas.DataFrame) -> list[str]:
+        """Chooses the columns of the fitted rows that overflow.
 
         Args:
-            levels: The native code limit.
-            seed: Seed of the cross-fitting folds.
-            folds: Cross-fitting folds.
-        """
-        self.levels = levels
-        self.seed = seed
-        self.folds = folds
-
-    def fit(self, features: Any, target: Any) -> "Overflow":
-        """Fits the encoder (through the cross-fitted `fit_transform`).
-
-        Args:
-            features: Categorical block, missing values already filled.
-            target: Labels or values.
+            frame: The rows the column transformer fits.
 
         Returns:
-            The fitted encoder.
+            The overflowing columns, in the order of `names`.
         """
-        self.fit_transform(features, target)
-        return self
-
-    def fit_transform(
-        self,
-        features: Any,
-        target: Any = None,
-        **params: Any,  # noqa: ARG002 -- scikit-learn's fit_transform signature
-    ) -> numpy.ndarray:
-        """Finds the wide columns and cross-fits their encoding.
-
-        Args:
-            features: Categorical block, missing values already filled.
-            target: Labels or values.
-            **params: Unused fit parameters.
-
-        Returns:
-            The cross-fitted encoding of the wide columns, one column per
-            wide column (one per class and column for more than two
-            classes); no column when none is wide.
-        """
-        block = numpy.asarray(features, dtype=object)
-        self.n_features_in_ = block.shape[1]
-        self.wide_ = [
-            index
-            for index in range(block.shape[1])
-            if len(pandas.unique(block[:, index])) > self.levels
+        return [
+            name
+            for name in self.names
+            if frame[name].nunique(dropna=False) > self.levels
         ]
-        if not self.wide_:
-            self.encoder_ = None
-            return numpy.zeros((len(block), 0))
-        self.encoder_ = preprocessing.TargetEncoder(
-            smooth="auto",
-            cv=self.folds,
-            shuffle=True,
-            random_state=self.seed,  # pyright: ignore[reportArgumentType]  # scikit-learn infers this parameter as str from its default
-        )
-        encoded: numpy.ndarray = self.encoder_.fit_transform(
-            block[:, self.wide_], target
-        )
-        return encoded
 
-    def transform(self, features: Any) -> numpy.ndarray:
-        """Encodes the wide columns with the statistics of the fit.
 
-        Args:
-            features: Categorical block, missing values already filled.
+def suffix(transformer: Any, names: Any) -> numpy.ndarray:  # noqa: ARG001 -- scikit-learn's feature_names_out signature
+    """Names the overflow encoding `<column>__target`.
 
-        Returns:
-            The encoding, or an empty block when no column is wide.
-        """
-        block = numpy.asarray(features, dtype=object)
-        if self.encoder_ is None:
-            return numpy.zeros((len(block), 0))
-        encoded: numpy.ndarray = self.encoder_.transform(block[:, self.wide_])
-        return encoded
+    Args:
+        transformer: The naming step.
+        names: Names out of the target encoder (`<column>_<class>` for more
+            than two classes).
 
-    def get_feature_names_out(
-        self, input_features: Any = None
-    ) -> numpy.ndarray:
-        """Names the encoded columns `<column>__target`.
+    Returns:
+        Each name with the `__target` suffix, apart from the native codes
+        of the same column.
+    """
+    return numpy.asarray([f"{name}__target" for name in names], dtype=object)
 
-        Args:
-            input_features: Names of the input columns.
 
-        Returns:
-            The output names; `_<class>` precedes the suffix for more than
-            two classes.
-        """
-        names = (
-            [f"x{i}" for i in range(self.n_features_in_)]
-            if input_features is None
-            else [str(n) for n in input_features]
-        )
-        if self.encoder_ is None:
-            return numpy.asarray([], dtype=object)
-        inner = self.encoder_.get_feature_names_out(
-            [names[i] for i in self.wide_]
-        )
-        return numpy.asarray([f"{n}__target" for n in inner], dtype=object)
+def overflow(special: tuple[str, ...]) -> tuple[str, Any, Overflow]:
+    """The column-transformer block that target-encodes overflowing columns.
+
+    Args:
+        special: The high-cardinality columns.
+
+    Returns:
+        The block's name, its cross-fitted target-encoding pipeline (named
+        by `suffix`) and the `Overflow` selector.
+    """
+    encoder = cast(
+        "pipeline.Pipeline",
+        columns.Categorical().high_cardinality_transformer("target"),
+    )
+    named = preprocessing.FunctionTransformer(feature_names_out=suffix)
+    steps = [*encoder.steps, ("name", named)]
+    return "overflow", pipeline.Pipeline(steps), Overflow(special)
 
 
 def build_preprocessor(
@@ -190,7 +141,7 @@ def build_preprocessor(
     Returns:
         An unfitted transformer that drops every non-feature column.
     """
-    parts = []
+    parts: list[tuple[str, Any, Any]] = []
     special = isolate(plan, options)
     if special:
         encoder = encode(options.high_cardinality)
@@ -219,13 +170,7 @@ def build_preprocessor(
             )
         )
     if special and options.high_cardinality == "ordinal":
-        parts.append(
-            (
-                "overflow",
-                columns.Categorical().encode(Overflow()),
-                list(special),
-            )
-        )
+        parts.append(overflow(special))
     return compose.ColumnTransformer(
         parts,
         remainder="drop",

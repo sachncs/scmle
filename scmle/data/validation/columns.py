@@ -8,7 +8,6 @@ preprocessing therefore iterate over kinds instead of branching on dtype.
 
 import abc
 import importlib
-import re
 from typing import Any
 from typing import ClassVar
 
@@ -24,6 +23,7 @@ from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data import embedding
 from scmle.data import transformers
+from scmle.data.validation import dates
 
 MISSING_TOKEN = "__missing__"  # nosec B105  # noqa: S105 -- a category placeholder, not a secret
 ID_UNIQUE_RATIO = 0.95
@@ -40,13 +40,6 @@ MIN_ASSOCIATION_ROWS = 10
 MIN_MISSING_RATE = 0.05
 MIN_PRESENT_ROWS = 20
 OUTLIER_IQR = 1.5
-# ISO 8601 calendar date, optionally with a time (minutes, seconds,
-# fractions) and a zone. Year, month, day in that order is the one layout
-# no reader takes two ways; day-first or month-first text is not matched.
-ISO_DATE = re.compile(
-    r"\d{4}-\d{2}-\d{2}"
-    r"(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}(?::?\d{2})?)?)?"
-)
 
 
 def entropy(series: pandas.Series) -> float:
@@ -189,63 +182,6 @@ def stump(values: pandas.Series, labels: pandas.Series) -> float:
     return max(0.0, (accuracy - majority) / (1.0 - majority))
 
 
-def iso(series: pandas.Series) -> bool:
-    """Whether a text column holds ISO 8601 dates in a single layout.
-
-    Every distinct non-missing value must match `ISO_DATE` with the digits
-    in the same places (one layout, so every parser reads the column the
-    same way) and `pandas.to_datetime`, the parser the calendar features
-    use, must read each as a moment.
-
-    Args:
-        series: Column values.
-
-    Returns:
-        True for a text, object or categorical column whose non-missing
-        values are all ISO dates of one layout; False otherwise, including
-        for a column with no non-missing value.
-    """
-    values = texts(series)
-    if (
-        values is None
-        or values.empty
-        or not all(isinstance(v, str) for v in values)
-        or not ISO_DATE.fullmatch(values.iloc[0])
-        or not values.str.fullmatch(ISO_DATE.pattern).all()
-    ):
-        return False
-    layouts = values.str.replace(r"\d", "0", regex=True)
-    if not (layouts == layouts.iloc[0]).all():
-        return False
-    try:
-        parsed = pandas.to_datetime(values, errors="coerce")
-    except (ValueError, TypeError):
-        return False
-    return bool(
-        pandas.api.types.is_datetime64_any_dtype(parsed)
-        and parsed.notna().all()
-    )
-
-
-def texts(series: pandas.Series) -> pandas.Series | None:
-    """The distinct non-missing values of a text-like column.
-
-    Args:
-        series: Column values.
-
-    Returns:
-        The categories of a categorical column, the distinct non-missing
-        values of an object or string column, or None for any other dtype.
-    """
-    if isinstance(series.dtype, pandas.CategoricalDtype):
-        return pandas.Series(series.cat.categories)
-    if pandas.api.types.is_object_dtype(
-        series
-    ) or pandas.api.types.is_string_dtype(series):
-        return pandas.Series(series.dropna().unique())
-    return None
-
-
 def temporal(frame: pandas.DataFrame) -> pandas.DataFrame:
     """Parses the columns of ISO 8601 date text into datetimes.
 
@@ -263,7 +199,7 @@ def temporal(frame: pandas.DataFrame) -> pandas.DataFrame:
         name
         for name in frame.columns
         if not pandas.api.types.is_datetime64_any_dtype(frame[name])
-        and iso(frame[name])
+        and dates.iso(frame[name])
     ]
     if not names:
         return frame
@@ -585,7 +521,7 @@ class DatetimeKind(Family):
         """
         if pandas.api.types.is_datetime64_any_dtype(series):
             return True
-        return iso(series)
+        return dates.iso(series)
 
     def rationale(self, series: pandas.Series) -> str | None:  # noqa: ARG002 -- Family hook; every kind shares this signature
         """Datetimes are kept: the profiler expands them into features.

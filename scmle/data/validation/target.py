@@ -11,6 +11,11 @@ AMBIGUOUS_MAX_VALUES = 10
 AMBIGUOUS_MAX_RATIO = 0.05
 MIN_CLASSES = 2
 BINARY_CLASSES = 2
+# Requests checked against the classes of the target; every other request
+# without a resolver of its own names its task by value.
+CLASSIFICATION = frozenset(
+    {"classification", "binary_classification", "multiclass_classification"}
+)
 
 
 def quantitative(target: pandas.Series) -> bool:
@@ -164,9 +169,11 @@ class TaskResolver:
         handler = handlers.get(self.request)
         if handler is not None:
             return handler(target)
-        if self.request in ("multilabel", "multioutput", "forecast"):
-            return tasks.Task(self.request)
-        return self.resolve_classification(target)
+        if self.request in CLASSIFICATION:
+            return self.resolve_classification(target)
+        # Every other request names its task by value and has no target
+        # check of its own (multilabel, multioutput, forecast, a new task).
+        return tasks.Task(self.request)
 
     def resolve_survival(self, target: pandas.Series) -> tasks.Task:
         """Validates a survival request: durations must be positive numbers.
