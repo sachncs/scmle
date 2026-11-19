@@ -215,7 +215,9 @@ def resemble(
     other = [c for c in columns if c not in numeric]
     if not other or len(frame) < MIN_BLOCK:
         return flags
-    text = frame[other].astype(str).agg(" ".join, axis=1).to_numpy()
+    text = (
+        frame[other].astype(str).fillna("nan").agg(" ".join, axis=1).to_numpy()
+    )
     keys, labels = minhash.group([minhash.shingles(t) for t in text])
     block = standardize(frame, numeric)
     radius = cut * math.sqrt(max(len(numeric), 1))

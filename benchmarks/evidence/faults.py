@@ -821,17 +821,17 @@ def admissibility(attest: bool) -> str | None:
                 ),
                 encoding="utf-8",
             )
+        spec = types.SimpleNamespace(
+            leakage_attestations=None if path is None else str(path),
+            data=types.SimpleNamespace(group_column=None, time_column=None),
+        )
         context: Any = types.SimpleNamespace(
-            spec=types.SimpleNamespace(
-                leakage_attestations=None if path is None else str(path),
-                data=types.SimpleNamespace(group_column=None, time_column=None),
-            ),
+            services=types.SimpleNamespace(spec=spec),
+            journal=types.SimpleNamespace(write_json=ignore, emit=ignore),
             ingest=None,
             profile=types.SimpleNamespace(
                 feature_plan=data.Blueprint(("copy",), ())
             ),
-            write_json=ignore,
-            emit=ignore,
         )
         charter: Any = types.SimpleNamespace(
             estimand=types.SimpleNamespace(kind="predictive", causal=None),
@@ -969,6 +969,142 @@ def rejournal(foreign: bool) -> None:
         thresholdout.Thresholdout((rows, labels), (rows, labels)).resume(
             journal
         )
+
+
+# OpenML 1461 (bank marketing, 45211 calls): the cached binary table large
+# enough for a reusable holdout under Thresholdout's default terms.
+BANK = 1461
+# The confirmation set's share of a charter run's rows: a quarter (the
+# charter's `confirmation_fraction`) of the four fifths not held for test;
+# 4322 of the 21613 house sales in a measured run.
+HELD = 0.2
+# Slack over the expected size for the stratified rounding of both splits.
+SLACK = 1.05
+
+
+def planter(fault: str, other: Task) -> type:
+    """A plugin stage that leaves a reuse journal in the run directory.
+
+    It runs right after the reservation, before the exploration opens `C`:
+    the place a stale `thresholdout_journal.json` of another session would
+    be found by the run's reuse session.
+
+    Args:
+        fault: `foreign` (a journal written for `other`, rows the run does
+            not hold) or `none` (writes nothing).
+        other: Rows of the same table outside the run, and their target.
+
+    Returns:
+        The `Stage` subclass.
+    """
+    from scmle.assurance.ledger import governed
+    from scmle.assurance.ledger.confirm import thresholdout
+    from scmle.pipeline import stages
+    from scmle.pipeline.stages import reservation
+    import scmle.runtime.state
+
+    class Plant(stages.Stage):
+        """Leaves a reuse journal of other rows before `C` opens."""
+
+        state = scmle.runtime.state.Progress.VALIDATING
+        requires = (reservation.Reservation,)
+
+        def describe(self, context: Any) -> str:
+            """Names the stage.
+
+            Args:
+                context: The run context; not consulted.
+
+            Returns:
+                The stage's reason text.
+            """
+            del context
+            return f"plugin stage (journal {fault})"
+
+        def execute(self, context: Any) -> None:
+            """Writes one answered session on `other` as the run's journal.
+
+            Args:
+                context: The run context holding the run's store.
+            """
+            if fault != "foreign":
+                return
+            frame, target, _ = other
+            labels = pandas.Series(frame[target] == "2", name=target)
+            rows = (frame.drop(columns=[target]), labels)
+            terms = thresholdout.Terms(len(frame), queries=1, budget=1)
+            folder = Path(context.services.store.directory)
+            thresholdout.Thresholdout(
+                rows, rows, terms, journal=folder / governed.JOURNAL
+            ).query(lambda *scored: numpy.zeros(len(scored[1])))
+
+    return Plant
+
+
+def replanted(fault: str) -> Any:
+    """Runs a signed `thresholdout` charter on real bank calls with `planter`.
+
+    The charter is the C8 search's (`bypass.CHARTER`) with rules whose
+    failure policy is `thresholdout`, so the confirmation also runs the
+    reuse session `governed.replication` journals in the run directory. The
+    run keeps enough calls for a confirmation set of `thresholdout.minimum`
+    rows; the calls it leaves out are the other rows of the planted journal.
+
+    Args:
+        fault: As for `planter`.
+
+    Returns:
+        The completed run.
+    """
+    import math
+
+    from benchmarks.evidence import bypass
+    from scmle.assurance.charter import rules
+    from scmle.assurance.ledger import confirm
+    from scmle.assurance.ledger.confirm import thresholdout
+    from scmle.runtime import plugins
+
+    calls = refusal.fetch(BANK, 10**6)
+    kept = math.ceil(SLACK * thresholdout.minimum() / HELD)
+    frame = calls.sample(kept, random_state=SEED)
+    rest = calls.drop(index=frame.index).reset_index(drop=True)
+    lab = bypass.Lab(Path(tempfile.mkdtemp(prefix="faults-")))
+    procedure = dataclasses.replace(
+        rules.Procedure(), failure=confirm.THRESHOLDOUT
+    )
+    bare = lab.folder / "charter.json"
+    bare.write_text(
+        json.dumps({**bypass.CHARTER, "rules": procedure.to_dict()}),
+        encoding="utf-8",
+    )
+    key = lab.folder / "key.txt"
+    key.write_text(bypass.KEY, encoding="utf-8")
+    path = lab.folder / "signed.json"
+    bypass.cli(
+        [
+            "charter",
+            "sign",
+            str(bare),
+            "--output",
+            str(path),
+            "--key-file",
+            str(key),
+        ]
+    )
+    name = f"faults-journal-{fault}"
+    plugins.REGISTRY.enrol(
+        plugins.Kind.STAGES, name, planter(fault, (rest, "Class", {}))
+    )
+    try:
+        with bypass.environ(SCMLE_SIGNING_KEY=bypass.KEY):
+            return launch(
+                frame.reset_index(drop=True),
+                "Class",
+                task="classification",
+                charter=path,
+            )
+    finally:
+        plugins.REGISTRY.withdraw(plugins.Kind.STAGES, name)
 
 
 def confirmation(times: int) -> None:
@@ -1120,15 +1256,18 @@ def overrun(spent: bool, part: str = "simulated") -> Any:
     class Late(stages.TrainStage):
         """Training that first spends the whole budget when `spent`."""
 
-        def execute(self, context: Any) -> None:
+        def execute(self, context: Any) -> Any:
             """Moves the run's start back, then trains.
 
             Args:
                 context: The run context.
+
+            Returns:
+                What the training stage returns.
             """
             if spent:
                 context.regulator.started_at -= BUDGET
-            super().execute(context)
+            return super().execute(context)
 
     frame, target, options = clean("binary", part)
     project = scmle.api.project.Project(
@@ -2333,6 +2472,7 @@ def absent(cause: str, reason: str) -> Injection:
 CREDIT = "OpenML 31 credit-g"
 CHURNED = "OpenML 40701 churn"
 LISTED = "OpenML 42731 house sales by zip code"
+BANKED = "OpenML 1461 bank marketing"
 MARKET = "a SQLite source of the OpenML 42731 house sales by zip code"
 
 REAL: dict[str, Injection] = {
@@ -2401,14 +2541,20 @@ REAL: dict[str, Injection] = {
     ),
     "confirm.reuse_exhausted": absent(
         "a charter run's reusable holdout asked past its answers",
-        "a run asks one query per survivor and stops at the session's "
-        "terms, so no run on real data reaches the limit; the gate is "
-        "planted only by a direct call",
+        "a run's analyst (`governed.replication`) asks at most one query "
+        "per survivor and stops when the budget is spent, its terms are "
+        "the module defaults (no charter field tightens them), and the "
+        "session records a refusal as status `exhausted` instead of "
+        "raising; a session journal that spends the budget first would "
+        "have to be sealed for C's rows, which only opening C gives; the "
+        "gate is planted only by a direct call",
     ),
-    "confirm.reuse_journal": absent(
-        "a charter run resumed with a reuse journal of other rows",
-        "planting it needs a run interrupted between two answers and its "
-        "journal replaced, which no real-data run here does",
+    "confirm.reuse_journal": Injection(
+        "run",
+        f"a plugin stage leaves a reuse journal of other calls in the run "
+        f"directory of a signed thresholdout charter run ({BANKED})",
+        bind(replanted, "foreign"),
+        bind(replanted, "none"),
     ),
     "profile.monotonic_columns": Injection(
         "run",

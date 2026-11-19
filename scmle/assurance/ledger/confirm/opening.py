@@ -512,16 +512,23 @@ def evaluate(
     Returns:
         What the runner produced; every claim `failed` when it crashed; None
         without a runner.
+
+    Raises:
+        LeakageError: If the runner raises it: a gate refused (a reuse
+            journal of other rows, `thresholdout.Thresholdout.resume`), so
+            the refusal is logged as `claims_failed` and propagated.
     """
     if runner is None:
         return None
     try:
         return runner.run(*rows)
-    except Exception as failure:  # noqa: BLE001 -- a crashing claim runner marks its claims failed and is logged, not raised
+    except Exception as failure:
         # handled: claim runner crash logged to custody log; claims marked
-        # FAILED
+        # FAILED; a gate's LeakageError is logged and propagated
         failed = phrase("evaluating the registered claims", failure)
         log.append("C", "claims_failed", records.ACTOR, {"reason": failed})
+        if isinstance(failure, errors.LeakageError):
+            raise
         return records.Output(
             {i.claim_id: records.FAILED for i in runner.registered},
             {},

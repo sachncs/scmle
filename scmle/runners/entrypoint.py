@@ -42,11 +42,20 @@ from scmle.storage import tenancy
 DEFAULT_WORKLOAD = "scmle.runners.project:run_project"
 
 
-def mount(uri: str) -> objectstore.Depot:
+def mount(
+    uri: str, environ: Mapping[str, str] | None = None
+) -> objectstore.Depot:
     """Opens a `file://` store, confined to the tenant `SCMLE_TENANT` names.
+
+    The confinement follows `environ`, the job's environment: a runner
+    started with `SCMLE_TENANT` registers its specs in the tenant's
+    namespace and its jobs inherit the variable, so both open the store
+    the same way (`tenancy.confine`).
 
     Args:
         uri: Store URI.
+        environ: The environment naming the tenant; None reads the
+            process's own.
 
     Returns:
         A local object store at the path of the URI; with `SCMLE_TENANT`
@@ -60,7 +69,9 @@ def mount(uri: str) -> objectstore.Depot:
     if parts.scheme == "file":
         # url2pathname turns /C:/dir into C:\\dir on Windows
         store = objectstore.LocalObjectStore(url2pathname(parts.path))
-        return tenancy.confine(store, os.environ)
+        return tenancy.confine(
+            store, os.environ if environ is None else environ
+        )
     raise errors.ConfigError(
         f"unsupported store URI scheme {parts.scheme!r}; only file:// is "
         "built in, so open any other store in your own workload"
@@ -187,8 +198,10 @@ def main(environ: Mapping[str, str], store: Any = None) -> int:
 
     Args:
         environ: The environment (`SCMLE_RUN_ID`, `SCMLE_ATTEMPT`,
-            `SCMLE_STORE_URI`, `SCMLE_SPEC_DIGEST`, `SCMLE_WORKLOAD`).
-        store: The training store; opened from `SCMLE_STORE_URI` if None.
+            `SCMLE_STORE_URI`, `SCMLE_SPEC_DIGEST`, `SCMLE_WORKLOAD`,
+            `SCMLE_TENANT`).
+        store: The training store; opened from `SCMLE_STORE_URI` (confined
+            to the tenant of `environ`) if None.
 
     Returns:
         A `base.Exit`: `SUCCEEDED` if the workload returned, `INTERRUPTED`
@@ -201,7 +214,7 @@ def main(environ: Mapping[str, str], store: Any = None) -> int:
         with alarm.armed():
             run_id = environ["SCMLE_RUN_ID"]
             attempt = int(environ.get("SCMLE_ATTEMPT", "1"))
-            training = store or mount(environ["SCMLE_STORE_URI"])
+            training = store or mount(environ["SCMLE_STORE_URI"], environ)
             spec = respec(training, run_id)
             verify(spec, environ.get("SCMLE_SPEC_DIGEST"))
             context = local.Context(

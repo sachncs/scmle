@@ -39,6 +39,7 @@ from scmle.runners import checkpoint
 from scmle.runners import roles
 from scmle.runtime import retry
 from scmle.storage import objectstore
+from scmle.storage import tenancy
 
 LOGGER = logging.getLogger(__name__)
 
@@ -274,6 +275,8 @@ class Process(base.Runner):
     """Runs each attempt as a child process of the entrypoint.
 
     Attributes:
+        root: The shared store's directory on this machine (a tenant's store
+            lies under it; the job confines itself by `SCMLE_TENANT`).
         workload: The workload the entrypoint runs, as `module:function`.
         grace: Seconds between SIGTERM and SIGKILL on a stop.
         directory: Working directory of the job process; None keeps ours.
@@ -295,8 +298,9 @@ class Process(base.Runner):
         """Initializes the runner.
 
         Args:
-            store: Durable storage; a `LocalObjectStore`, so the job can open
-                it by its `file://` URI.
+            store: Durable storage; a `LocalObjectStore`, or a tenant's
+                `Tenancy` over one, so the job can open it by its `file://`
+                URI and the tenant (`environment`).
             serving_identity: The serving identity (see `base.Runner`).
             workload: The workload as `module:function`, importable in the
                 job's environment.
@@ -305,29 +309,26 @@ class Process(base.Runner):
             **options: `clock` and `poll_seconds` (see `base.Runner`).
 
         Raises:
-            ConfigError: If the store is not a local object store, the
-                workload is not `module:function` or the grace is negative.
+            ConfigError: If the store is not a local object store, or a
+                tenancy over one, the workload is not `module:function` or the
+                grace is negative.
         """
-        if not isinstance(store, objectstore.LocalObjectStore):
+        inner = store.inner if isinstance(store, tenancy.Tenancy) else store
+        if not isinstance(inner, objectstore.LocalObjectStore):
             raise errors.ConfigError(
                 f"the {self.kind} runner needs a LocalObjectStore the job "
-                f"can open by URI, not {type(store).__name__}"
+                f"can open by URI, not {type(inner).__name__}"
             )
         if ":" not in workload or grace < 0:
             raise errors.ConfigError(
                 "workload must be module:function and grace not negative"
             )
         super().__init__(store, serving_identity=serving_identity, **options)
+        self.root = inner.root
         self.workload = workload
         self.grace = grace
         self.directory = directory
         self.jobs: dict[str, Child] = {}
-
-    @property
-    def root(self) -> pathlib.Path:
-        """The store's directory on this machine."""
-        root: pathlib.Path = getattr(self.store, "root")  # noqa: B009 -- checked to be a LocalObjectStore in __init__
-        return root
 
     def uri(self) -> str:
         """Names the store as the job opens it.
@@ -345,10 +346,16 @@ class Process(base.Runner):
             attempt: Attempt number, from 1.
 
         Returns:
-            The job's environment.
+            The job's environment. `SCMLE_TENANT` names the runner's tenant,
+            or is empty when its store is not confined, whatever the spec
+            sets, so a job opens the namespace its runner was given.
         """
+        tenant = (
+            self.store.tenant if isinstance(self.store, tenancy.Tenancy) else ""
+        )
         return {
             **spec.environment,
+            tenancy.VARIABLE: tenant,
             "SCMLE_RUN_ID": spec.run_id,
             "SCMLE_ATTEMPT": str(attempt),
             "SCMLE_STORE_URI": self.uri(),
@@ -695,7 +702,9 @@ def main(arguments: list[str] | None = None) -> int:
     )
     options = parser.parse_args(arguments)
     try:
-        store = objectstore.LocalObjectStore(options.store)
+        store = tenancy.confine(
+            objectstore.LocalObjectStore(options.store), os.environ
+        )
         for item in options.put:
             key, separator, path = item.partition("=")
             if not separator:

@@ -15,6 +15,7 @@ from scmle.runners import checkpoint
 from scmle.runners import local
 from scmle.runtime import retry
 from scmle.storage import objectstore
+from scmle.storage import tenancy
 from tests import support_runners
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -228,6 +229,8 @@ def test_the_container_command_is_hardened_and_carries_no_values(tmp_path):
         "--env",
         "SCMLE_STORE_URI",
         "--env",
+        "SCMLE_TENANT",
+        "--env",
         "SCMLE_WORKLOAD",
         "scmle@sha256:" + "a" * 64,
         "python",
@@ -236,6 +239,7 @@ def test_the_container_command_is_hardened_and_carries_no_values(tmp_path):
     ]
     assert runner.environment(spec, 2) == {
         "MODE": "fast",
+        "SCMLE_TENANT": "",
         "SCMLE_RUN_ID": "box-1",
         "SCMLE_ATTEMPT": "2",
         "SCMLE_STORE_URI": "file:///store",
@@ -262,7 +266,10 @@ def test_the_entrypoint_exit_status_tells_transient_from_interrupted(store):
     assert signal.getsignal(signal.SIGTERM) is signal.SIG_DFL
 
 
-def test_the_command_line_runs_a_spec_in_a_process(tmp_path, capsys):
+def test_the_command_line_runs_a_spec_in_a_process(
+    tmp_path, capsys, monkeypatch
+):
+    monkeypatch.delenv(tenancy.VARIABLE, raising=False)
     spec = job("cli-1", {"steps": 2})
     path = tmp_path / "job.json"
     path.write_text(json.dumps(spec.to_dict()))
@@ -289,3 +296,63 @@ def test_the_command_line_runs_a_spec_in_a_process(tmp_path, capsys):
     assert local.main([*arguments[:-2], "--put", "nokey"]) == 1
     assert "--put needs KEY=PATH" in capsys.readouterr().err
     assert local.main([*arguments, "--serving", TRAIN]) == 1
+
+
+def test_a_tenant_runner_runs_its_job_in_the_tenant_namespace(tmp_path):
+    shared = objectstore.LocalObjectStore(tmp_path / "store")
+    confined = tenancy.Tenancy(shared, "acme")
+    runner = process(confined, "count")
+    assert runner.root == shared.root
+    manifest = runner.run(job("tenant-1", {"steps": 2}))
+    assert manifest.state == "succeeded"
+    assert (
+        json.loads(confined.get("runs/tenant-1/result.json")[0])["steps"] == 2
+    )
+    assert shared.head("tenants/acme/runs/tenant-1/result.json") is not None
+    assert shared.list_objects("runs/") == []
+
+
+def test_the_job_environment_names_the_runner_tenant_over_the_spec(store):
+    spec = job("names-1", environment={"SCMLE_TENANT": "other"})
+    confined = process(tenancy.Tenancy(store, "acme"), "count")
+    assert confined.environment(spec, 1)["SCMLE_TENANT"] == "acme"
+    assert process(store, "count").environment(spec, 1)["SCMLE_TENANT"] == ""
+
+
+def test_a_tenancy_over_a_store_the_job_cannot_open_is_refused(tmp_path):
+    remote = objectstore.RetryingStore(
+        objectstore.LocalObjectStore(tmp_path / "s"), retry.Retries()
+    )
+    with pytest.raises(errors.ConfigError, match="needs a LocalObjectStore"):
+        local.Process(tenancy.Tenancy(remote, "acme"), serving_identity=SERVE)
+
+
+def test_the_command_line_confines_the_store_to_its_tenant(
+    tmp_path, capsys, monkeypatch
+):
+    monkeypatch.setenv(tenancy.VARIABLE, "acme")
+    spec = job("cli-tenant-1", {"steps": 1})
+    path = tmp_path / "job.json"
+    path.write_text(json.dumps(spec.to_dict()))
+    data = tmp_path / "train.csv"
+    data.write_text("a,y\n1,0\n")
+    arguments = [
+        "--store",
+        str(tmp_path / "store"),
+        "--spec",
+        str(path),
+        "--serving",
+        SERVE,
+        "--workload",
+        "tests.support_jobs:count",
+        "--poll",
+        "0.02",
+        "--put",
+        f"data/train.csv={data}",
+    ]
+    assert local.main(arguments) == 0
+    assert capsys.readouterr().out == "cli-tenant-1: succeeded\n"
+    shared = objectstore.LocalObjectStore(tmp_path / "store")
+    assert shared.get("tenants/acme/data/train.csv")[0] == b"a,y\n1,0\n"
+    assert shared.head("tenants/acme/runs/cli-tenant-1/result.json")
+    assert shared.list_objects("data/") == []
