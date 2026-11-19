@@ -10,6 +10,8 @@ import dataclasses
 from typing import Any
 from typing import cast
 
+import numpy
+import pandas
 from sklearn import base
 from sklearn import compose
 from sklearn import pipeline
@@ -37,6 +39,142 @@ SPARSE_THRESHOLD = 0.3
 # keep their own code and the rest share one infrequent code, which the
 # fitted encoder records in `infrequent_categories_`.
 NATIVE_LEVELS = 255
+
+
+class Overflow(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+    """Target-encodes the columns with more levels than native codes hold.
+
+    Integer codes pool every level past `NATIVE_LEVELS` into one code, so a
+    column with more levels would silently lose the target signal of its
+    tail. Each such column also gets scikit-learn's `TargetEncoder`, chosen
+    over the alternatives because:
+
+    * ordinal codes beyond `NATIVE_LEVELS` cannot be native categories, and
+      as plain numbers they impose an order the levels do not have;
+    * frequency encoding merges every pair of levels of equal count and
+      carries no information about the target;
+    * target encoding keeps one number per level, its empirical-Bayes
+      smoothing (`smooth="auto"`) shrinks a rare level toward the prior in
+      proportion to its own variance, and `fit_transform` cross-fits
+      (`cv` folds), so no training row's encoding has seen its own label.
+
+    It is leakage-safe inside cross-validation: the whole pipeline is
+    refitted per fold, so validation rows are encoded only with statistics
+    of the training fold, and the training rows with cross-fitted ones. The
+    encoded columns are placed after every other block, so the positions of
+    the native codes and of the numeric columns do not move. A column
+    within `NATIVE_LEVELS` adds nothing.
+
+    Attributes:
+        levels: The native code limit; a column with more levels is encoded.
+        seed: Seed of the cross-fitting folds.
+        folds: Cross-fitting folds.
+    """
+
+    def __init__(
+        self, levels: int = NATIVE_LEVELS, seed: int = 0, folds: int = 5
+    ) -> None:
+        """Initializes the encoder.
+
+        Args:
+            levels: The native code limit.
+            seed: Seed of the cross-fitting folds.
+            folds: Cross-fitting folds.
+        """
+        self.levels = levels
+        self.seed = seed
+        self.folds = folds
+
+    def fit(self, features: Any, target: Any) -> "Overflow":
+        """Fits the encoder (through the cross-fitted `fit_transform`).
+
+        Args:
+            features: Categorical block, missing values already filled.
+            target: Labels or values.
+
+        Returns:
+            The fitted encoder.
+        """
+        self.fit_transform(features, target)
+        return self
+
+    def fit_transform(
+        self,
+        features: Any,
+        target: Any = None,
+        **params: Any,  # noqa: ARG002 -- scikit-learn's fit_transform signature
+    ) -> numpy.ndarray:
+        """Finds the wide columns and cross-fits their encoding.
+
+        Args:
+            features: Categorical block, missing values already filled.
+            target: Labels or values.
+            **params: Unused fit parameters.
+
+        Returns:
+            The cross-fitted encoding of the wide columns, one column per
+            wide column (one per class and column for more than two
+            classes); no column when none is wide.
+        """
+        block = numpy.asarray(features, dtype=object)
+        self.n_features_in_ = block.shape[1]
+        self.wide_ = [
+            index
+            for index in range(block.shape[1])
+            if len(pandas.unique(block[:, index])) > self.levels
+        ]
+        if not self.wide_:
+            self.encoder_ = None
+            return numpy.zeros((len(block), 0))
+        self.encoder_ = preprocessing.TargetEncoder(
+            smooth="auto",
+            cv=self.folds,
+            shuffle=True,
+            random_state=self.seed,  # pyright: ignore[reportArgumentType]  # scikit-learn infers this parameter as str from its default
+        )
+        encoded: numpy.ndarray = self.encoder_.fit_transform(
+            block[:, self.wide_], target
+        )
+        return encoded
+
+    def transform(self, features: Any) -> numpy.ndarray:
+        """Encodes the wide columns with the statistics of the fit.
+
+        Args:
+            features: Categorical block, missing values already filled.
+
+        Returns:
+            The encoding, or an empty block when no column is wide.
+        """
+        block = numpy.asarray(features, dtype=object)
+        if self.encoder_ is None:
+            return numpy.zeros((len(block), 0))
+        encoded: numpy.ndarray = self.encoder_.transform(block[:, self.wide_])
+        return encoded
+
+    def get_feature_names_out(
+        self, input_features: Any = None
+    ) -> numpy.ndarray:
+        """Names the encoded columns `<column>__target`.
+
+        Args:
+            input_features: Names of the input columns.
+
+        Returns:
+            The output names; `_<class>` precedes the suffix for more than
+            two classes.
+        """
+        names = (
+            [f"x{i}" for i in range(self.n_features_in_)]
+            if input_features is None
+            else [str(n) for n in input_features]
+        )
+        if self.encoder_ is None:
+            return numpy.asarray([], dtype=object)
+        inner = self.encoder_.get_feature_names_out(
+            [names[i] for i in self.wide_]
+        )
+        return numpy.asarray([f"{n}__target" for n in inner], dtype=object)
 
 
 def build_preprocessor(
@@ -78,6 +216,14 @@ def build_preprocessor(
                 "constructed",
                 columns.Quantitative().transformer(options),
                 compose.make_column_selector(pattern=f"^{selection.PREFIX}"),
+            )
+        )
+    if special and options.high_cardinality == "ordinal":
+        parts.append(
+            (
+                "overflow",
+                columns.Categorical().encode(Overflow()),
+                list(special),
             )
         )
     return compose.ColumnTransformer(

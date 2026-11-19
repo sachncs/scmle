@@ -61,28 +61,77 @@ def summarize(
     return summary, risks
 
 
-# Profiling outside the leakage screen, the baselines and the label-noise
-# check (ingest, statistics, missingness, fingerprint), fitted 2026-11-17 on
-# the 15 evidence tables (OMP_NUM_THREADS=1, two runs at a time):
-# seconds = REST_BASE + REST_ROW x rows. The largest measured to predicted
-# ratio was 1.30 (1.34 s against 1.03 s on a 1132-row, 111-column table);
-# REST_MARGIN = 1.5 keeps a fifth more headroom than that, because the model
-# has no column term.
+# Preparation outside the leakage screen, the baselines and the label-noise
+# check (split, ingest, statistics, the per-column target association of
+# `describe`, missingness, custody), measured 2026-11-19 as the seconds to
+# the first trial less those three parts, on 30 runs of 24 OpenML tables
+# (800-3,200 rows, 5-970 columns, budgets 30 and 60 s, OMP_NUM_THREADS=1,
+# two runs at a time; `scratchpad/c14/prep.py`): seconds = REST_BASE +
+# REST_ROW x rows + REST_CELL x rows x columns. On wide tables the cell term
+# dominates: `describe` fits one small tree per numeric column (3.0 s of
+# gina's 4.7 s). Least squares gives 0.85, 2.3e-5 and 1.6e-6; the stated
+# coefficients round them to 1.0, 3e-5 and 1.5e-6, under which the largest
+# measured to predicted ratio is 1.13 (philippine, 3,200 x 308), so
+# REST_MARGIN = 1.5 keeps a third more headroom than any measured table.
 REST_BASE = 1.0
 REST_ROW = 3e-5
+REST_CELL = 1.5e-6
 REST_MARGIN = 1.5
+# The label-noise check as it actually runs: a five-fold boosted model of
+# `label_noise.ESTIMATOR_MAX_ITER` rounds, one tree per class above two, on
+# the rows its allowance admits (`label_noise.affordable`). On the same runs
+# it took NOISE_BASE + NOISE_CELL x rows x columns x C' seconds or less (C'
+# the classes above two, else 1): least squares gives 0.015 s and 3.24e-6
+# s per cell; 3.6e-6 bounds every measured check (largest measured to
+# predicted ratio 0.99; gina 8.8 s on 2,522 x 970 cells), so no further
+# margin is added. `label_noise.cost` (1.5e-7 per cell, fitted on narrow
+# tables where the fixed cost dominates) predicts 1.1 s for gina and so
+# admits every row; this model prices what that admits.
+NOISE_BASE = 0.15
+NOISE_CELL = 3.6e-6
 
 
-def rest(rows: int) -> float:
+def rest(rows: int, columns: int = 0) -> float:
     """Predicts an upper bound on the seconds of the uncapped profiling.
 
     Args:
         rows: Rows profiled.
+        columns: Feature columns.
 
     Returns:
-        `REST_MARGIN x (REST_BASE + REST_ROW x rows)`.
+        `REST_MARGIN x (REST_BASE + REST_ROW x rows + REST_CELL x rows x
+        columns)`.
     """
-    return REST_MARGIN * (REST_BASE + REST_ROW * rows)
+    return REST_MARGIN * (
+        REST_BASE + REST_ROW * rows + REST_CELL * rows * columns
+    )
+
+
+def noise(rows: int, columns: int, classes: int, budget: float) -> float:
+    """Predicts the seconds of the label-noise check as it will run.
+
+    The check samples the rows its allowance (`label_noise.SHARE` of the
+    budget) admits by `label_noise.cost` and skips below
+    `label_noise.MIN_ROWS`; those rows are priced by the measured model.
+
+    Args:
+        rows: Development rows.
+        columns: Feature columns.
+        classes: Classes of the target.
+        budget: The run's time budget in seconds.
+
+    Returns:
+        `NOISE_BASE + NOISE_CELL x checked rows x columns x C'`, or 0.0
+        when the check will be skipped.
+    """
+    admitted = label_noise.affordable(
+        columns, classes, budget * label_noise.SHARE
+    )
+    if admitted < label_noise.MIN_ROWS:
+        return 0.0
+    checked = min(rows, label_noise.MAX_ROWS, admitted)
+    ways = classes if classes > label_noise.BINARY_CLASSES else 1
+    return NOISE_BASE + NOISE_CELL * checked * columns * ways
 
 
 def estimate(rows: int, columns: int, classes: int, budget: float) -> float:
@@ -90,11 +139,11 @@ def estimate(rows: int, columns: int, classes: int, budget: float) -> float:
 
     Preparation is reading and profiling the development rows: the leakage
     screen and its probe, the difficulty baselines and, for classification,
-    the label-noise check. Each of the three is capped at its share of the
-    budget (`screen.SCREEN_SHARE`, `fingerprint.SHARE`, `label_noise.SHARE`)
-    and reduced or skipped to fit it, so its part is the smaller of its
-    predicted cost and its share; the rest is `rest`. Every cost model is
-    an upper bound on the measured single-thread seconds.
+    the label-noise check. The screen and the baselines are capped at their
+    share of the budget (`screen.SCREEN_SHARE`, `fingerprint.SHARE`), so
+    their part is the smaller of their predicted cost and their share; the
+    label-noise check is priced as it will run (`noise`); the rest, which
+    grows with rows x columns, is `rest`.
 
     Args:
         rows: Development rows to be profiled.
@@ -113,7 +162,7 @@ def estimate(rows: int, columns: int, classes: int, budget: float) -> float:
             "estimate needs non-negative rows, columns and classes and a "
             f"positive budget, got {rows}, {columns}, {classes}, {budget}"
         )
-    total = rest(rows)
+    total = rest(rows, columns)
     total += min(
         screen.bound(rows, columns, classes), budget * screen.SCREEN_SHARE
     )
@@ -121,11 +170,7 @@ def estimate(rows: int, columns: int, classes: int, budget: float) -> float:
         fingerprint.cost(rows, columns, classes), budget * fingerprint.SHARE
     )
     if classes >= inspection.MIN_BALANCE_CLASSES:
-        noisy = min(rows, label_noise.MAX_ROWS)
-        total += min(
-            label_noise.cost(noisy, columns, classes),
-            budget * label_noise.SHARE,
-        )
+        total += noise(rows, columns, classes, budget)
     return total
 
 
@@ -357,6 +402,9 @@ class Profiler(inspection.Inspection):
                 "missing values"
             )
         roles = self.exclude(frame)
+        # ISO date text is profiled, screened and expanded as the dates it
+        # is, so the screen's `cutoff` reading sees it.
+        frame = columns.temporal(frame)
         statistics, dropped, features, quality = self.inspect(frame, roles)
         usable = features["numeric"] + features["categorical"]
         if not (usable or features["datetime"] or features["text"]):
