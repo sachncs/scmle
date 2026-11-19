@@ -77,6 +77,12 @@ class MismatchError(StoreError):
     category = "store_corrupt"
 
 
+class EscapeError(StoreError):
+    """A key's path leaves the root or passes through a symbolic link."""
+
+    category = "store_escape"
+
+
 class TransientStoreError(retry.TransientError, StoreError):
     """Throttling, a timeout or a 5xx: the operation may be retried."""
 
@@ -394,6 +400,21 @@ def locked(path: pathlib.Path) -> Generator[None, None, None]:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
+def direct(path: pathlib.Path) -> bool:
+    """Whether an absolute path reaches its target without a link.
+
+    Args:
+        path: A normalised absolute path; its last parts may not exist.
+
+    Returns:
+        True if no existing part of the path is a symbolic link or a
+        junction, compared without regard to case where the file system
+        ignores it.
+    """
+    real = os.path.normcase(os.path.realpath(path))
+    return real == os.path.normcase(str(path))
+
+
 class LocalObjectStore(Depot):
     """Objects as files under a root directory.
 
@@ -418,7 +439,11 @@ class LocalObjectStore(Depot):
         The check is lexical on the normalised absolute path: keys are
         validated by `validate`, and resolving the target would depend on
         which directories exist at that instant (and on 8.3 short names on
-        Windows), which a concurrent writer can change.
+        Windows), which a concurrent writer can change. A path that passes
+        through a symbolic link (or a junction) already inside the root is
+        refused as well: a link is the one route from one key prefix, such as
+        a tenant's namespace, into another. The check runs before each
+        operation, so a link planted afterwards is caught by the next one.
 
         Args:
             key: The object key.
@@ -427,11 +452,15 @@ class LocalObjectStore(Depot):
             The absolute path of the file that holds the object.
 
         Raises:
-            StoreError: If the key is not valid or its path leaves the root.
+            StoreError: If the key is not valid.
+            EscapeError: If its path leaves the root or passes through a
+                symbolic link.
         """
         target = pathlib.Path(os.path.abspath(self.root / validate(key)))  # noqa: PTH100 -- abspath normalises `..` without following symlinks; resolve() would also follow them and change which keys are accepted
         if self.root not in target.parents:
-            raise StoreError(f"key {key!r} escapes the store root")
+            raise EscapeError(f"key {key!r} escapes the store root")
+        if not direct(target):
+            raise EscapeError(f"key {key!r} passes through a symbolic link")
         return target
 
     def describe(self, key: str, path: pathlib.Path, data: bytes) -> ObjectMeta:
@@ -587,8 +616,9 @@ class LocalObjectStore(Depot):
     def list_objects(self, prefix: str = "") -> list[ObjectMeta]:
         """Lists the objects under a prefix, sorted by key.
 
-        Temporary files left by interrupted writers are not listed. An
-        invalid prefix raises `StoreError`.
+        Temporary files left by interrupted writers are not listed, nor is
+        a file reached through a symbolic link. An invalid prefix raises
+        `StoreError`.
 
         Args:
             prefix: Key prefix; empty for every object.
@@ -600,7 +630,7 @@ class LocalObjectStore(Depot):
             validate(prefix.removesuffix("/"))
         found = []
         for path in sorted(self.root.rglob("*")):
-            if not path.is_file() or partial(path.name):
+            if not path.is_file() or partial(path.name) or not direct(path):
                 continue
             key = path.relative_to(self.root).as_posix()
             if key.startswith(prefix):

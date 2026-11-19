@@ -13,7 +13,10 @@ verify. Tokens are refused unless every one of these holds:
 * the signature is correct;
 * `iss` and `aud` match, `sub` is present, `exp` is in the future and `nbf` /
   `iat` are not in the future (a small leeway is allowed);
-* the token, its `jti` or its subject is not revoked.
+* the token, its `jti` or its subject is not revoked;
+* a key bound to a tenant (the JWK field `tenant`) verifies only tokens
+  whose tenant claim names that tenant, so a token cannot be carried from
+  one tenant to another even where a key was wrongly shared.
 
 The failure reason is a short code for the audit log; the caller is never
 told which check failed (see `scmle.security.access`).
@@ -61,6 +64,7 @@ NOT_YET_VALID = "not_yet_valid"
 MISSING_CLAIM = "missing_claim"
 REVOKED = "revoked"
 REVOCATION_UNAVAILABLE = "revocation_unavailable"
+WRONG_TENANT = "wrong_tenant"
 
 
 class TokenError(errors.ScmleError):
@@ -140,6 +144,8 @@ class Key:
         exponent: RSA public exponent (RS256 only).
         not_before: Epoch seconds before which the key is not yet valid.
         expires: Epoch seconds from which the key no longer verifies.
+        tenant: The one tenant whose tokens the key may verify, or None for
+            a key not bound to a tenant.
     """
 
     kid: str
@@ -149,6 +155,7 @@ class Key:
     exponent: int = 0
     not_before: float | None = None
     expires: float | None = None
+    tenant: str | None = None
 
     def __post_init__(self) -> None:
         """Validates the key id, algorithm and key material.
@@ -157,10 +164,16 @@ class Key:
             ConfigError: If the `kid` is empty or over 128 characters, the
                 algorithm is not `HS256` or `RS256`, an HS256 secret is under
                 32 bytes, an RS256 modulus is under 2048 bits, or the RSA
-                exponent is even or below 3.
+                exponent is even or below 3, or the tenant is given but is
+                not a non-empty string.
         """
         if not self.kid or len(self.kid) > MAX_KID_LENGTH:
             raise errors.ConfigError("a key needs a kid of 1-128 characters")
+        bound: object = self.tenant
+        if bound is not None and (not isinstance(bound, str) or not bound):
+            raise errors.ConfigError(
+                "a key's tenant must be a non-empty string"
+            )
         if self.algorithm == HS256:
             if len(self.secret) < MIN_HMAC_BYTES:
                 raise errors.ConfigError(
@@ -184,7 +197,7 @@ class Key:
 
         `kty` `oct` (field `k`) gives HS256, `RSA` (fields `n`, `e`) gives
         RS256. The extension fields `nbf` and `exp` (epoch seconds) bound the
-        key's validity.
+        key's validity, and `tenant` binds it to one tenant.
 
         Args:
             entry: The JWK object.
@@ -195,29 +208,26 @@ class Key:
         Raises:
             ConfigError: If the entry lacks `kid` or `kty`, a key field is
                 missing or not base64url, the type is neither `oct` nor `RSA`,
-                a non-numeric `nbf` or `exp`, or the key is too weak.
+                a non-numeric `nbf` or `exp`, a `tenant` that is not a
+                non-empty string, or the key is too weak.
         """
         try:
             kid = str(entry["kid"])
             kind = entry["kty"]
-            not_before = coerce(entry.get("nbf"))
-            expires = coerce(entry.get("exp"))
+            window: dict[str, Any] = {
+                "not_before": coerce(entry.get("nbf")),
+                "expires": coerce(entry.get("exp")),
+                "tenant": entry.get("tenant"),
+            }
             if kind == "oct":
-                return cls(
-                    kid,
-                    HS256,
-                    secret=unbase(entry["k"]),
-                    not_before=not_before,
-                    expires=expires,
-                )
+                return cls(kid, HS256, secret=unbase(entry["k"]), **window)
             if kind == "RSA":
                 return cls(
                     kid,
                     RS256,
                     modulus=unpack(entry["n"]),
                     exponent=unpack(entry["e"]),
-                    not_before=not_before,
-                    expires=expires,
+                    **window,
                 )
         except (KeyError, TypeError, ValueError, TokenError) as error:
             raise errors.ConfigError("malformed JWK entry") from error
@@ -601,8 +611,9 @@ class Verifier:
         Raises:
             TokenError: If the issuer or audience differs, `sub` or `exp` is
                 missing, `exp`, `nbf` or `iat` is not a number, the token is
-                expired or not yet valid, it is revoked, or the revocation
-                list is unavailable.
+                expired or not yet valid, it is revoked, the revocation list
+                is unavailable, or the key is bound to a tenant the token
+                does not name.
         """
         if claims.get("iss") != self.issuer:
             raise TokenError(BAD_ISSUER)
@@ -625,11 +636,14 @@ class Verifier:
         revocations = self.denylist()
         if revocations is not None and revocations.revokes(header, claims):
             raise TokenError(REVOKED)
-        tenant = claims.get(self.tenant_claim)
+        claimed = claims.get(self.tenant_claim)
+        tenant = claimed if isinstance(claimed, str) and claimed else None
+        if key.tenant is not None and tenant != key.tenant:
+            raise TokenError(WRONG_TENANT)
         scopes = collect(claims)
         return Principal(
             subject=subject,
-            tenant=tenant if isinstance(tenant, str) and tenant else None,
+            tenant=tenant,
             scopes=scopes,
             token_id=str(claims["jti"]) if "jti" in claims else None,
             key_id=key.kid,

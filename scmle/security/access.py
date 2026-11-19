@@ -11,7 +11,9 @@ Probe paths (`/livez`, `/readyz`) are public by design: they disclose only
 liveness and readiness. Every other path needs a token with the scope the
 route table names; a path missing from the table is denied.
 
-Tenant isolation: see `docs/TENANT_ISOLATION.md`.
+Tenant isolation: see `docs/TENANT_ISOLATION.md`. The tenant a verified
+token names also confines storage: `Gateway.confine` hands a caller only the
+namespace of its own tenant (`scmle.storage.tenancy`).
 """
 
 from collections.abc import Callable
@@ -28,6 +30,8 @@ from typing import NoReturn
 from scmle.contracts import errors
 from scmle.security import tokens
 import scmle.security.audit
+from scmle.storage import objectstore
+from scmle.storage import tenancy
 
 PUBLIC_PATHS = frozenset({"/livez", "/readyz"})
 SCOPE_READ = "model:read"
@@ -390,6 +394,37 @@ class Gateway:
             raise DeniedError(429, "too_many_failures", wait)
         raise DeniedError(status, reason)
 
+    def confine(
+        self, store: objectstore.Depot, principal: tokens.Principal
+    ) -> tenancy.Tenancy:
+        """Gives a verified caller the namespace of its own tenant.
+
+        The tenant comes from the token only. A caller of another tenant
+        than the deployment's, or with no tenant, gets no store at all, so
+        no key it names can reach another tenant's objects.
+
+        Args:
+            store: The shared store.
+            principal: The caller `check` verified.
+
+        Returns:
+            The store confined to the caller's tenant.
+
+        Raises:
+            DeniedError: With status 403 if the caller has no tenant, its
+                tenant differs from the deployment's, or the name is not a
+                valid tenant name.
+        """
+        tenant = principal.tenant
+        if tenant is None:
+            raise DeniedError(403, "no_tenant", None, principal)
+        if self.tenant is not None and tenant != self.tenant:
+            raise DeniedError(403, "tenant_mismatch", None, principal)
+        try:
+            return tenancy.Tenancy(store, tenant)
+        except tenancy.TenantError:
+            raise DeniedError(403, "invalid_tenant", None, principal) from None
+
     def rotate(self, keys: tokens.Keystore, actor: str, reason: str) -> None:
         """Replaces the verifier's trusted keys and audits the change.
 
@@ -482,8 +517,9 @@ def gateway_from_environment(environ: Mapping[str, str]) -> Gateway | None:
 
     Raises:
         ConfigError: If keys are configured without an issuer and audience,
-            or the key file or inline secret is unusable (for example an
-            HS256 secret under 32 bytes).
+            the key file or inline secret is unusable (for example an HS256
+            secret under 32 bytes), `SCMLE_TENANT` is not a valid tenant
+            name, or a key is bound to another tenant than `SCMLE_TENANT`.
     """
     settings = Config.load(environ)
     if not settings.configured:
@@ -503,6 +539,21 @@ def gateway_from_environment(environ: Mapping[str, str]) -> Gateway | None:
                 )
             ]
         )
+    if settings.tenant:
+        try:
+            tenancy.qualify(settings.tenant)
+        except tenancy.TenantError as error:
+            raise errors.ConfigError(str(error)) from error
+        foreign = sorted(
+            key.kid
+            for key in keys.keys.values()
+            if key.tenant not in (None, settings.tenant)
+        )
+        if foreign:
+            raise errors.ConfigError(
+                f"keys {foreign} are bound to another tenant than "
+                f"{settings.tenant!r}"
+            )
     revocation_source: Callable[[], tokens.RevocationList] | None = None
     if settings.revoked_file:
         path = settings.revoked_file

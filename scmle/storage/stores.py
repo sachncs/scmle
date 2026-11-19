@@ -18,6 +18,7 @@ from scmle import durability
 from scmle.contracts import errors
 from scmle.contracts import events
 from scmle.contracts import experiments
+from scmle.storage import tenancy
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
@@ -200,6 +201,7 @@ class SqliteExperimentStore(Store):
     Attributes:
         COLUMNS: Run columns that `revise` may set.
         path: Path of the database file.
+        tenant: The tenant whose runs the database holds, or None.
     """
 
     COLUMNS = frozenset(
@@ -220,13 +222,29 @@ class SqliteExperimentStore(Store):
         }
     )
 
-    def __init__(self, path: str | pathlib.Path) -> None:
+    def __init__(
+        self, path: str | pathlib.Path, tenant: str | None = None
+    ) -> None:
         """Opens (creating if needed) the database.
+
+        A tenant's runs live in a database file of their own, in
+        `tenants/<tenant>/` beside `path`, so no query of one tenant can
+        read, overwrite or remove a run of another, whatever run id it
+        names. Without a tenant the database is `path` itself, as before.
 
         Args:
             path: Database file path; parent directories are created.
+            tenant: The tenant whose runs the database holds.
+
+        Raises:
+            TenantError: If the tenant name is invalid.
+            EscapeError: If the tenant's directory is a symbolic link.
         """
-        self.path = pathlib.Path(path)
+        path = pathlib.Path(path)
+        self.tenant = tenant
+        if tenant is not None:
+            path = tenancy.directory(path.parent, tenant) / path.name
+        self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with (
             durability.latch(self.path),

@@ -17,6 +17,7 @@ from scmle.security import audit
 from scmle.security import tokens
 from scmle.serving import server
 from scmle.storage import objectstore
+from scmle.storage import tenancy
 from tests import support_identity
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -167,7 +168,7 @@ def test_before_it_is_ready_the_probe_gives_no_model_identity():
 
 
 def test_refusals_use_three_fixed_messages(reference):
-    """Enforces docs/TENANT_ISOLATION.md:45 and docs/TENANT_ISOLATION.md:46.
+    """Enforces docs/TENANT_ISOLATION.md:56 and docs/TENANT_ISOLATION.md:57.
 
     A missing scope and a foreign tenant give the same 403 body, so the body
     tells neither which check failed nor whether the other tenant exists.
@@ -212,7 +213,7 @@ def test_refusals_use_three_fixed_messages(reference):
 
 
 def test_audit_rows_carry_the_request_id_and_never_a_body(reference, tmp_path):
-    """Enforces docs/TENANT_ISOLATION.md:49.
+    """Enforces docs/TENANT_ISOLATION.md:60.
 
     Also enforces website/src/pages/docs/tenant-isolation.astro:36.
     """
@@ -251,7 +252,7 @@ def admin_rows(path, count):
 def test_the_chain_catches_edits_gaps_and_reordering_but_not_a_cut_tail(
     tmp_path,
 ):
-    """Enforces docs/TENANT_ISOLATION.md:69.
+    """Enforces docs/TENANT_ISOLATION.md:80.
 
     Also enforces website/src/pages/docs/tenant-isolation.astro:45.
     """
@@ -271,7 +272,7 @@ def test_the_chain_catches_edits_gaps_and_reordering_but_not_a_cut_tail(
 def test_the_revocation_file_named_by_the_environment_is_read_per_request(
     tmp_path,
 ):
-    """Enforces docs/TENANT_ISOLATION.md:84 and docs/TENANT_ISOLATION.md:66.
+    """Enforces docs/TENANT_ISOLATION.md:111 and docs/TENANT_ISOLATION.md:77.
 
     Also enforces website/src/pages/docs/tenant-isolation.astro:10.
     Also enforces website/src/pages/docs/tenant-isolation.astro:44.
@@ -310,7 +311,7 @@ def test_the_revocation_file_named_by_the_environment_is_read_per_request(
 
 
 def test_serving_and_training_roles_keep_to_their_prefixes(tmp_path):
-    """Enforces docs/TENANT_ISOLATION.md:41.
+    """Enforces docs/TENANT_ISOLATION.md:52.
 
     Also enforces website/src/pages/docs/tenant-isolation.astro:34.
     """
@@ -334,3 +335,31 @@ def test_serving_and_training_roles_keep_to_their_prefixes(tmp_path):
     with pytest.raises(roles.RoleDeniedError):
         training_store.put("bundles/model/v2/manifest.json", b"x")
     assert not inner.exists("bundles/model/v2/manifest.json")
+
+
+def test_each_tenant_reaches_only_its_own_prefix(tmp_path):
+    """Enforces docs/TENANT_ISOLATION.md:37 (separate storage).
+
+    A tenant's store is a namespace of the shared root that the token's
+    tenant selects; no key, listing or link reaches another tenant's prefix.
+    """
+    clock = support_identity.Clock()
+    shared = objectstore.LocalObjectStore(str(tmp_path / "store"))
+    tenancy.Tenancy(shared, "globex").put("bundles/m/v1.json", b"globex")
+    gate = gateway(clock)
+    principal = gate.check(
+        "GET", "/health", "Bearer " + bearer(clock), "127.0.0.1", "r"
+    )
+    store = gate.confine(shared, principal)
+    assert store.list_objects() == []
+    for key in (
+        "../globex/bundles/m/v1.json",
+        "tenants/globex/bundles/m/v1.json",
+    ):
+        with pytest.raises(objectstore.StoreError):
+            store.get(key)
+    store.put("bundles/m/v1.json", b"acme")
+    assert shared.get("tenants/globex/bundles/m/v1.json")[0] == b"globex"
+    foreign = gate.verifier.verify(bearer(clock, tenant="globex"))
+    with pytest.raises(access.DeniedError):
+        gate.confine(shared, foreign)
