@@ -597,10 +597,10 @@ def test_the_probe_never_reaches_the_real_report():
     assert not {f.feature for f in report.findings} & set(plants.DEFECTS)
 
 
-def test_a_column_named_like_a_plant_is_refused():
+def test_a_column_named_like_a_plant_is_screened_beside_the_plants():
     frame = world(20).assign(leak_copy=0.0)
-    with pytest.raises(ValueError, match="named as plants"):
-        probed(frame)
+    report = probed(frame)
+    assert set(report.probe) == set(plants.KINDS)
 
 
 def test_without_gates_a_suspect_warns_and_cannot_block():

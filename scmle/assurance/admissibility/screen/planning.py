@@ -14,10 +14,13 @@ from scmle.assurance.admissibility import leakage
 from scmle.assurance.admissibility import plants
 from scmle.assurance.admissibility.screen.fitting import encode
 from scmle.assurance.admissibility.screen.fitting import enough
+from scmle.assurance.admissibility.screen.fitting import Problem
+from scmle.assurance.admissibility.screen.hypotheses import Pending
 from scmle.assurance.admissibility.screen.hypotheses import propose
 from scmle.assurance.admissibility.screen.hypotheses import sift
 from scmle.assurance.admissibility.screen.hypotheses import tested
 from scmle.assurance.admissibility.screen.permutation import resamples
+from scmle.assurance.admissibility.screen.records import candidates
 from scmle.assurance.admissibility.screen.records import duplication
 from scmle.assurance.admissibility.screen.records import encodings
 from scmle.assurance.admissibility.screen.report import halt
@@ -29,6 +32,9 @@ from scmle.assurance.admissibility.screen.settings import MAX_PERMUTATIONS
 from scmle.assurance.admissibility.screen.settings import MAX_ROWS
 from scmle.assurance.admissibility.screen.settings import MECHANISM_DEFECTS
 from scmle.assurance.admissibility.screen.settings import MIN_CLASSES
+from scmle.assurance.admissibility.screen.settings import prepare
+from scmle.assurance.admissibility.screen.settings import SCAN_SECONDS
+from scmle.assurance.admissibility.screen.settings import SCREEN_SHARE
 from scmle.assurance.admissibility.screen.settings import SKILL
 from scmle.assurance.admissibility.screen.settings import STORE_PATH
 from scmle.assurance.admissibility.screen.settings import TIME_BLOCKS
@@ -170,6 +176,95 @@ def decline(
     )
 
 
+def admit(
+    frame: pandas.DataFrame,
+    target: str,
+    task: str,
+    cfg: leakage.Config,
+    names: Sequence[Hashable],
+    groups: pandas.Series | None,
+    block_size: int | None,
+    limit: float | None,
+) -> Screen | None:
+    """Declines a real scan whose work before any permutation cannot fit.
+
+    Args:
+        frame: Rows to screen, with the target.
+        target: Target column.
+        task: `classification` or `regression`.
+        cfg: Settings.
+        names: Candidate columns.
+        groups: Group label per row, or None.
+        block_size: Rows per time block, or None.
+        limit: The screen's share of the time budget (`share`), or None.
+
+    Returns:
+        The declined report (`forgo`) when `foresee` predicts more than
+        `limit`; None when the scan may go on, or stops before proposing
+        (and so says why itself, or raises as `screen` does).
+    """
+    if limit is None:
+        return None
+    before = foresee(frame, target, task, cfg, names, groups, block_size)
+    if before is None or before <= limit:
+        return None
+    return forgo(cfg, before, limit, limit / SCREEN_SHARE, names)
+
+
+def confine(
+    cfg: leakage.Config, demand: Demand, limit: float | None
+) -> Screen | None:
+    """Declines a scan whose formed family cannot fit its seconds.
+
+    Args:
+        cfg: Settings.
+        demand: The scan's work (`reckon`).
+        limit: Seconds the scan may take, or None for no cap.
+
+    Returns:
+        The declined report (`decline`) when the demand is over `limit`,
+        else None.
+    """
+    if limit is None or demand.seconds <= limit:
+        return None
+    return decline(cfg, demand, limit, limit / SCREEN_SHARE)
+
+
+def forgo(
+    cfg: leakage.Config,
+    seconds: float,
+    limit: float,
+    budget_seconds: float,
+    columns: Sequence[Hashable],
+) -> Screen:
+    """Builds the report of a real scan declined before it proposed anything.
+
+    Args:
+        cfg: Settings.
+        seconds: Predicted seconds before any permutation (`foresee`).
+        limit: Seconds the scan may take.
+        budget_seconds: The declared time budget.
+        columns: Candidate columns, all unchecked.
+
+    Returns:
+        A report listing every candidate column as unchecked.
+    """
+    return halt(
+        cfg,
+        dict.fromkeys(MECHANISM_DEFECTS, certificates.Authority.GATING),
+        0,
+        0,
+        (
+            f"proposing the hypotheses of {len(columns)} columns and their "
+            f"target-mean tests is predicted to take {seconds:.1f} s before "
+            f"any permutation; the limit is {limit:.1f} s. Nothing was "
+            "flagged (power, not size, is lost): screen fewer columns"
+        ),
+        tuple(str(c) for c in columns),
+        f"work limit for a {budget_seconds:g} s time budget",
+    )
+
+
 def arrange(
     frame: pandas.DataFrame, group_column: str | None, time_column: str | None
 ) -> tuple[pandas.DataFrame, pandas.Series | None, int | None]:
@@ -264,20 +359,31 @@ def bound(rows: int, columns: int, classes: int) -> float:
     """
     task = "classification" if classes >= MIN_CLASSES else "regression"
     seen = min(rows, MAX_ROWS)
-    ways = classes if classes > BINARY_CLASSES else 1
+    split = classes if classes > BINARY_CLASSES else 1
     alpha = budget.exact(leakage.CERTIFIED.alpha, "alpha")
     total = 0.0
     for width in (columns, columns + len(plants.DEFECTS)):
-        draws = max(
-            leakage.CERTIFIED.permutations,
-            resamples(HYPOTHESES * width + 1, alpha),
+        draws = min(
+            max(
+                leakage.CERTIFIED.permutations,
+                resamples(HYPOTHESES * width + 1, alpha),
+            ),
+            MAX_PERMUTATIONS,
         )
-        work = min(draws, MAX_PERMUTATIONS) * width * ways
-        total += cost(task, seen, work)
+        live = (HYPOTHESES - 1) * width
+        levels = max(classes, leakage.TARGET_BINS)
+        total += prepare(width, split, seen * width * width) + cost(
+            task,
+            seen,
+            draws * width * split,
+            draws,
+            draws * live * levels,
+            live + width,
+        )
     return total
 
 
-def measure(
+def ready(
     frame: pandas.DataFrame,
     target: str,
     task: str,
@@ -285,11 +391,8 @@ def measure(
     names: Sequence[Hashable],
     groups: pandas.Series | None,
     block_size: int | None,
-) -> Demand | None:
-    """Counts the work of `screen` on these rows without drawing any.
-
-    It chooses the rows as `screen` does and forms the same hypotheses
-    (without their statistics), so the count equals the scan's.
+) -> tuple[pandas.DataFrame, numpy.ndarray | None, int | None, Problem] | None:
+    """Chooses the rows as `screen` does and encodes their outcome.
 
     Args:
         frame: Rows to screen, with the target.
@@ -301,10 +404,10 @@ def measure(
         block_size: Rows per time block, or None.
 
     Returns:
-        The demand; None when the scan will stop before drawing (a missing
+        The chosen rows, their groups, the block size and the encoded
+        outcome; None when the scan will stop before proposing (a missing
         target or candidate column, which `screen` refuses, an invalid
-        outcome, too few rows, nothing to test, or the permutation limit),
-        which costs no more than `SCAN_SECONDS`.
+        outcome or too few rows), which costs no more than `SCAN_SECONDS`.
     """
     known = target in frame.columns
     if not known or any(c not in frame.columns or c == target for c in names):
@@ -325,6 +428,124 @@ def measure(
         return None
     if not enough(problem.y, task):
         return None
+    return sample, grouping, blocks, problem
+
+
+def foresee(
+    frame: pandas.DataFrame,
+    target: str,
+    task: str,
+    cfg: leakage.Config,
+    names: Sequence[Hashable],
+    groups: pandas.Series | None,
+    block_size: int | None,
+) -> float | None:
+    """Predicts the seconds of a scan before its first statistic.
+
+    Read from the table's shape alone (`prepare`): proposing every column
+    and the target-mean test, the work a scan does whatever its
+    permutations, so a scan that cannot fit is declined before any of it.
+
+    Args:
+        frame: Rows to screen, with the target.
+        target: Target column.
+        task: `classification` or `regression`.
+        cfg: Settings.
+        names: Candidate columns.
+        groups: Group label per row, or None.
+        block_size: Rows per time block, or None.
+
+    Returns:
+        `SCAN_SECONDS` plus the proposing and record seconds; None when the
+        scan stops before proposing (`ready`), which costs no more than
+        `SCAN_SECONDS`.
+    """
+    found = ready(frame, target, task, cfg, names, groups, block_size)
+    if found is None:
+        return None
+    sample, problem = found[0], found[3]
+    cells = len(sample) * len(candidates(sample, names, problem)) * len(names)
+    return SCAN_SECONDS + prepare(len(names), ways(problem), cells)
+
+
+def ways(problem: Problem) -> int:
+    """Classes of the target when more than two (one-vs-rest), else 1."""
+    return problem.classes if problem.classes > BINARY_CLASSES else 1
+
+
+def reckon(
+    pending: Sequence[Pending],
+    problem: Problem,
+    frame: pandas.DataFrame,
+    names: Sequence[Hashable],
+    cfg: leakage.Config,
+) -> Demand:
+    """Counts the work of a scan whose hypotheses are proposed and sifted.
+
+    Args:
+        pending: The family, after `sift`.
+        problem: The encoded outcome.
+        frame: The chosen rows.
+        names: Candidate columns.
+        cfg: Settings.
+
+    Returns:
+        The demand; its seconds are those of the whole scan: proposing and
+        records (`prepare`) and the permutations, fits, readings and
+        bounds (`cost`).
+    """
+    alpha = budget.exact(cfg.alpha, "alpha")
+    family = len(pending)
+    total = max(cfg.permutations, resamples(family, alpha))
+    live = [h for h in pending if h.statistic is not None and h.active]
+    skill = sum(1 for h in live if h.mechanism == SKILL)
+    work = total * skill * ways(problem)
+    draws = total if live else 0
+    reads = (
+        draws * (len(live) - skill) * max(problem.classes, leakage.TARGET_BINS)
+    )
+    rows = len(frame)
+    cells = rows * len(candidates(frame, names, problem)) * len(names)
+    seconds = prepare(len(names), ways(problem), cells) + cost(
+        problem.task, rows, work, draws, reads, len(live)
+    )
+    columns = tested(pending, names)
+    return Demand(rows, family, total, skill, work, columns, seconds)
+
+
+def measure(
+    frame: pandas.DataFrame,
+    target: str,
+    task: str,
+    cfg: leakage.Config,
+    names: Sequence[Hashable],
+    groups: pandas.Series | None,
+    block_size: int | None,
+) -> Demand | None:
+    """Counts the work of `screen` on these rows without drawing any.
+
+    It chooses the rows as `screen` does and forms the same hypotheses, so
+    the count equals the scan's; forming them is itself the work `foresee`
+    predicts.
+
+    Args:
+        frame: Rows to screen, with the target.
+        target: Target column.
+        task: `classification` or `regression`.
+        cfg: Settings.
+        names: Candidate columns.
+        groups: Group label per row, or None.
+        block_size: Rows per time block, or None.
+
+    Returns:
+        The demand (`reckon`); None when the scan will stop before drawing
+        (`ready`, nothing to test, or the permutation limit), which costs no
+        more than `SCAN_SECONDS`.
+    """
+    found = ready(frame, target, task, cfg, names, groups, block_size)
+    if found is None:
+        return None
+    sample, grouping, blocks, problem = found
     classes = leakage.bucket(sample[target], task)
     codes = pandas.factorize(classes, sort=True)[0].astype("int64")
     totals = numpy.bincount(codes).astype("float64")
@@ -343,14 +564,7 @@ def measure(
     copied = duplication(frame, names, target, cfg) if pending else None
     pending += [] if copied is None else [copied]
     live = sift(pending, cfg)
-    skill = sum(1 for h in pending if h.mechanism == SKILL and h.active)
-    family = len(pending)
-    columns = tested(pending, names)
-    alpha = budget.exact(cfg.alpha, "alpha")
-    total = max(cfg.permutations, resamples(family, alpha))
-    if family == 0 or (live and total > MAX_PERMUTATIONS):
+    demand = reckon(pending, problem, sample, names, cfg)
+    if not pending or (live and demand.permutations > MAX_PERMUTATIONS):
         return None
-    ways = problem.classes if problem.classes > BINARY_CLASSES else 1
-    work = total * skill * ways
-    seconds = cost(task, len(sample), work)
-    return Demand(len(sample), family, total, skill, work, columns, seconds)
+    return demand

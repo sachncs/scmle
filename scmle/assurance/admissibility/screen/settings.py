@@ -191,6 +191,59 @@ FIT_SECONDS: Mapping[str, float] = {
 }
 
 
+# The rest of a scan's work, which the fits above leave out. Measured
+# 2026-11-19 with OMP_NUM_THREADS=1 in CPU seconds of each part of `scan`
+# (`screen` on every column, at most 2,000 rows) on 16 OpenML tables
+# (wilt, qsar-biodeg, christine, Bioresponse, APSFailure, satimage,
+# pendigits, mfeat-factors, semeion, cnae-9, fabert, micro-mass, isolet,
+# cpu_act, elevators, space_ga) and breast cancer, and on seeded tables
+# whose gaps carry the class. Each rate is the largest measured, raised by
+# a quarter for headroom, so every table is under the line:
+# * Proposing (`hypotheses.propose`: each column's observed skill, echo,
+#   missingness and purity) costs COLUMN_SECONDS per column plus
+#   WAY_SECONDS per column and class way (one-vs-rest above two classes):
+#   1.6-2.7 ms a column for two classes (Bioresponse highest), 5.0-7.3 ms
+#   for 6-10 classes (fabert highest), 11.3 ms for 20 (micro-mass) and
+#   16.8 ms for 26 (isolet); the line through Bioresponse and fabert,
+#   1.9 ms + 0.78 ms a way, is above every table, and a quarter more is
+#   2.4 ms + 0.97 ms. A regression column took 0.2-0.7 ms.
+# * Records (`records.encodings`): each column on the target's scale is
+#   grouped along every other column's order (`records.runs`), so the work
+#   is rows x candidate columns x orders, 1.0e-8 to 1.33e-8 s each
+#   (semeion highest; Bioresponse's 1,776 x 1,776 x 2,000 took 63 s), so
+#   RECORD_SECONDS is 1.7e-8.
+# * Drawing (`permutation.draw_permutations`): each permutation drawn costs
+#   4.2e-8 to 4.7e-8 s a row whatever reads it (DRAW_SECONDS 5.9e-8), and
+#   each active statistic without a fit (missingness, purity, echo) reads
+#   it in 0.7e-9 to 1.06e-9 s a row per class (quartile bin for a number),
+#   READ_SECONDS 1.4e-9.
+# * Bounds (`report.conclude`): a hypothesis that can be significant is
+#   bootstrapped, 0.95e-4 (APSFailure) to 1.48e-4 s (breast cancer) a row,
+#   BOUND_SECONDS 1.9e-4.
+# Left out, a wide table was predicted to need seconds while proposing and
+# records took minutes (fabert 117 s, cnae-9 39 s, micro-mass and isolet
+# 28 s, christine 19 s of a 4.5 s share): `screen_table` predicts them from
+# the table's shape before proposing anything (`planning.foresee`) and the
+# whole scan once its family is formed (`planning.reckon`), and declines a
+# scan that cannot fit with the reason recorded.
+COLUMN_SECONDS = 2.4e-3
+
+
+WAY_SECONDS = 9.7e-4
+
+
+RECORD_SECONDS = 1.7e-8
+
+
+DRAW_SECONDS = 5.9e-8
+
+
+READ_SECONDS = 1.4e-9
+
+
+BOUND_SECONDS = 1.9e-4
+
+
 # Most hypotheses one column can raise: skill, record purity, missingness,
 # echo, target mean, and one pair's skill on average (pairs are capped at
 # the number of candidate columns). The table adds one duplication
@@ -281,16 +334,51 @@ def share(time_budget_seconds: float | None) -> float | None:
     return time_budget_seconds * SCREEN_SHARE
 
 
-def cost(task: str, rows: int, work: int) -> float:
-    """Predicts an upper bound on the seconds of one scan.
+def cost(
+    task: str,
+    rows: int,
+    work: int,
+    draws: int = 0,
+    reads: int = 0,
+    bounds: int = 0,
+) -> float:
+    """Predicts an upper bound on the seconds of one scan's permutations.
 
     Args:
         task: `classification` or `regression`.
         rows: Rows the scan sees (after `subsample`).
         work: Cross-fitted fits: permutations x skill columns x classes
             (one-vs-rest above two classes).
+        draws: Permutations drawn (none when no statistic is active).
+        reads: Permutations x active statistics without a fit x classes
+            (quartile bins for a number).
+        bounds: Hypotheses that can be significant, each bootstrapped.
 
     Returns:
-        `SCAN_SECONDS + FIT_SECONDS[task] x rows x work`.
+        `SCAN_SECONDS + FIT_SECONDS[task] x rows x work`, plus each other
+        part's rate times rows times its count.
     """
-    return SCAN_SECONDS + FIT_SECONDS[task] * rows * work
+    return SCAN_SECONDS + rows * (
+        FIT_SECONDS[task] * work
+        + DRAW_SECONDS * draws
+        + READ_SECONDS * reads
+        + BOUND_SECONDS * bounds
+    )
+
+
+def prepare(columns: int, ways: int, cells: int) -> float:
+    """Predicts an upper bound on the seconds before any permutation.
+
+    Args:
+        columns: Candidate columns, each proposed.
+        ways: Classes of the target when more than two, else 1.
+        cells: Rows x candidate columns of the record test x orders each
+            is grouped along (`records.runs`).
+
+    Returns:
+        `columns x (COLUMN_SECONDS + WAY_SECONDS x ways)` plus
+        `RECORD_SECONDS x cells`.
+    """
+    return columns * (COLUMN_SECONDS + WAY_SECONDS * ways) + (
+        RECORD_SECONDS * cells
+    )

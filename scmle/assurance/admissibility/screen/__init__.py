@@ -158,14 +158,20 @@ from scmle.assurance.admissibility.screen.hypotheses import spell
 from scmle.assurance.admissibility.screen.hypotheses import tested
 from scmle.assurance.admissibility.screen.permutation import draw_permutations
 from scmle.assurance.admissibility.screen.permutation import resamples
+from scmle.assurance.admissibility.screen.planning import admit
 from scmle.assurance.admissibility.screen.planning import arrange
 from scmle.assurance.admissibility.screen.planning import bound
 from scmle.assurance.admissibility.screen.planning import bundled
+from scmle.assurance.admissibility.screen.planning import confine
 from scmle.assurance.admissibility.screen.planning import decline
 from scmle.assurance.admissibility.screen.planning import Demand
 from scmle.assurance.admissibility.screen.planning import disclose
+from scmle.assurance.admissibility.screen.planning import foresee
+from scmle.assurance.admissibility.screen.planning import forgo
 from scmle.assurance.admissibility.screen.planning import load_store
 from scmle.assurance.admissibility.screen.planning import measure
+from scmle.assurance.admissibility.screen.planning import ready
+from scmle.assurance.admissibility.screen.planning import reckon
 from scmle.assurance.admissibility.screen.planning import subsample
 from scmle.assurance.admissibility.screen.records import dated
 from scmle.assurance.admissibility.screen.records import declared
@@ -183,6 +189,8 @@ from scmle.assurance.admissibility.screen.report import throttle
 from scmle.assurance.admissibility.screen.settings import allowance
 from scmle.assurance.admissibility.screen.settings import BATCH
 from scmle.assurance.admissibility.screen.settings import BINARY_CLASSES
+from scmle.assurance.admissibility.screen.settings import BOUND_SECONDS
+from scmle.assurance.admissibility.screen.settings import COLUMN_SECONDS
 from scmle.assurance.admissibility.screen.settings import cost
 from scmle.assurance.admissibility.screen.settings import DATED
 from scmle.assurance.admissibility.screen.settings import DATED_DEFECT
@@ -190,6 +198,7 @@ from scmle.assurance.admissibility.screen.settings import DATED_ID
 from scmle.assurance.admissibility.screen.settings import DECLARED
 from scmle.assurance.admissibility.screen.settings import DETECTOR_ID
 from scmle.assurance.admissibility.screen.settings import DETECTORS
+from scmle.assurance.admissibility.screen.settings import DRAW_SECONDS
 from scmle.assurance.admissibility.screen.settings import DUPLICATION
 from scmle.assurance.admissibility.screen.settings import ECHO
 from scmle.assurance.admissibility.screen.settings import ENCODING
@@ -208,7 +217,10 @@ from scmle.assurance.admissibility.screen.settings import MIN_CLASSES
 from scmle.assurance.admissibility.screen.settings import MISSING
 from scmle.assurance.admissibility.screen.settings import NATURAL
 from scmle.assurance.admissibility.screen.settings import PAIR_LEVELS
+from scmle.assurance.admissibility.screen.settings import prepare
 from scmle.assurance.admissibility.screen.settings import PURITY
+from scmle.assurance.admissibility.screen.settings import READ_SECONDS
+from scmle.assurance.admissibility.screen.settings import RECORD_SECONDS
 from scmle.assurance.admissibility.screen.settings import RIDGE
 from scmle.assurance.admissibility.screen.settings import ROWS
 from scmle.assurance.admissibility.screen.settings import SCAN_SECONDS
@@ -219,6 +231,7 @@ from scmle.assurance.admissibility.screen.settings import Statistic
 from scmle.assurance.admissibility.screen.settings import STORE_PATH
 from scmle.assurance.admissibility.screen.settings import TIME_BLOCKS
 from scmle.assurance.admissibility.screen.settings import TOLERANCE
+from scmle.assurance.admissibility.screen.settings import WAY_SECONDS
 from scmle.assurance.admissibility.screen.settings import WORD
 from scmle.assurance.admissibility.screen.settings import WORDS
 from scmle.assurance.detectors import certificates
@@ -229,12 +242,15 @@ from scmle.contracts import errors
 __all__ = [
     "BATCH",
     "BINARY_CLASSES",
+    "BOUND_SECONDS",
+    "COLUMN_SECONDS",
     "DATED",
     "DATED_DEFECT",
     "DATED_ID",
     "DECLARED",
     "DETECTORS",
     "DETECTOR_ID",
+    "DRAW_SECONDS",
     "DUPLICATION",
     "ECHO",
     "ENCODING",
@@ -253,6 +269,8 @@ __all__ = [
     "NATURAL",
     "PAIR_LEVELS",
     "PURITY",
+    "READ_SECONDS",
+    "RECORD_SECONDS",
     "RIDGE",
     "ROWS",
     "SCAN_SECONDS",
@@ -261,6 +279,7 @@ __all__ = [
     "STORE_PATH",
     "TIME_BLOCKS",
     "TOLERANCE",
+    "WAY_SECONDS",
     "WORD",
     "WORDS",
     "Demand",
@@ -270,6 +289,7 @@ __all__ = [
     "Screen",
     "Statistic",
     "abstain",
+    "admit",
     "allowance",
     "arrange",
     "aucs",
@@ -280,6 +300,7 @@ __all__ = [
     "chisquare",
     "conclude",
     "concordance",
+    "confine",
     "cost",
     "cramer",
     "crossfit",
@@ -298,6 +319,8 @@ __all__ = [
     "family",
     "floor",
     "forecast",
+    "foresee",
+    "forgo",
     "gauge",
     "halt",
     "hedge",
@@ -310,8 +333,11 @@ __all__ = [
     "pairs",
     "permute",
     "predict",
+    "prepare",
     "propose",
     "purity_statistic",
+    "ready",
+    "reckon",
     "reflect",
     "replicate",
     "resample",
@@ -363,9 +389,11 @@ def screen_table(
         time_column: Time column, or None. Ignored when it is not a column
             of `frame` or when `group_column` is used.
         time_budget_seconds: The project's declared time budget; the real
-            scan and the probe together may take `share` of it by `cost`,
-            and a scan predicted not to fit is declined. None means no cap
-            beyond `MAX_PERMUTATIONS`.
+            scan and the probe together may take `share` of it, predicted
+            from the table's shape before proposing (`foresee`) and from
+            the proposed family before drawing (`reckon`), and a scan
+            predicted not to fit is declined with the reason recorded. None
+            means no cap beyond `MAX_PERMUTATIONS`.
         cutoff: The declared prediction time (`Dataset.cutoff`), or None.
         known: When each column becomes known (`Dataset.known`), or None.
 
@@ -380,31 +408,27 @@ def screen_table(
     late = (dated(frame, present, cutoff), declared(present, known))
     rows, grouping, block_size = arrange(frame, group_column, time_column)
     limit = share(time_budget_seconds)
-    left = None
-    if limit is not None and time_budget_seconds is not None:
-        demand = measure(
-            rows, target, task, cfg, features, grouping, block_size
-        )
-        if demand is not None and demand.seconds > limit:
-            report = decline(cfg, demand, limit, time_budget_seconds)
-            notes = (
-                evidence(task, int(frame[target].nunique())),
-                "probe not run: the screen itself did not run",
-            )
-            report = dataclasses.replace(report, notes=(*report.notes, *notes))
-            return stamp(report, late, cutoff)
-        left = limit - (SCAN_SECONDS if demand is None else demand.seconds)
-    report = screen(
-        rows,
-        target,
-        task,
-        cfg,
-        features,
-        grouping,
-        block_size,
-        dict.fromkeys(MECHANISM_DEFECTS, certificates.Authority.GATING),
+    report = admit(
+        rows, target, task, cfg, features, grouping, block_size, limit
     )
+    if report is None:
+        report = screen(
+            rows,
+            target,
+            task,
+            cfg,
+            features,
+            grouping,
+            block_size,
+            dict.fromkeys(MECHANISM_DEFECTS, certificates.Authority.GATING),
+            limit=limit,
+        )
     classes = int(frame[target].nunique()) if len(frame) else 0
+    if limit is not None and report.rationale.startswith("work limit"):
+        unrun = "probe not run: the screen itself did not run"
+        notes = (*report.notes, evidence(task, classes), unrun)
+        return stamp(dataclasses.replace(report, notes=notes), late, cutoff)
+    left = None if limit is None else limit - max(report.seconds, SCAN_SECONDS)
     found = probe(
         rows, target, task, list(features), cfg, grouping, block_size, left
     )
@@ -489,9 +513,10 @@ def probe(
     """Finds whether the screen catches each planted leak on these rows.
 
     The planted copy is screened with the same settings and structure as
-    the real one, when its predicted seconds (`measure`) fit `limit`. Each
-    plant is found when it is a suspect by the mechanism its type belongs
-    to.
+    the real one, when its predicted seconds (`foresee`, then `reckon`)
+    fit `limit`. Each plant is found when it is a suspect by the mechanism
+    its type belongs to; the plants are named apart from every column
+    (`plants.names`), so a user column named like a leak type stays.
 
     Args:
         rows: The rows to screen, in screening order, with the target.
@@ -510,13 +535,13 @@ def probe(
     """
     if limit is not None and limit < SCAN_SECONDS:
         return {}
-    planted = plants.table(
-        rows[[*features, target]], target, cfg.run_seed, task == "regression"
-    )
-    names = [*features, *plants.DEFECTS]
+    source = rows[[*features, target]]
+    labels = plants.names(source.columns)
+    planted = plants.table(source, target, cfg.run_seed, task == "regression")
+    names = [*features, *labels.values()]
     if limit is not None:
-        demand = measure(planted, target, task, cfg, names, groups, block_size)
-        if demand is not None and demand.seconds > limit:
+        before = foresee(planted, target, task, cfg, names, groups, block_size)
+        if before is not None and before > limit:
             return {}
     report = screen(
         planted,
@@ -527,11 +552,14 @@ def probe(
         groups,
         block_size,
         None,
-        apart=tuple(plants.DEFECTS),
+        apart=tuple(labels.values()),
         counted=plants.copy(planted, cfg.run_seed),
+        limit=limit,
     )
+    if report.unchecked:
+        return {}
     owner = {d: m for m, ds in MECHANISM_DEFECTS.items() for d in ds}
-    where = {**{d: d for d in plants.DEFECTS}, plants.DUPLICATES: ROWS}
+    where = {**labels, plants.DUPLICATES: ROWS}
     return {
         defect: any(
             f.suspect
@@ -593,6 +621,7 @@ def scan(
     time_budget_seconds: float | None = None,
     apart: Sequence[Hashable] = (),
     extra: Sequence[Pending] = (),
+    limit: float | None = None,
 ) -> Screen:
     """Runs the screen on rows that are already chosen.
 
@@ -607,13 +636,12 @@ def scan(
         gates: Gate status per mechanism.
         time_budget_seconds: Declared time budget; None for no cap.
         apart: Columns left out of every other column's rest (`rival`).
-        extra: Hypotheses formed on all rows (duplication), joined to a
-            family that is not empty.
+        extra: Hypotheses formed on all rows (duplication), for a family.
+        limit: Seconds the scan may take (`planning.confine`), or None.
 
     Returns:
-        The report; when the outcome is invalid, rows are too few, no column
-        could be tested or the work exceeds the limits, it has no findings,
-        says why and lists the candidates in `unchecked`.
+        The report; one that stopped (an invalid outcome, too few rows, no
+        column to test, a limit) says why and lists `unchecked` columns.
     """
     n = len(frame)
     try:
@@ -627,7 +655,6 @@ def scan(
         )
     alpha = budget.exact(cfg.alpha, "alpha")
     labels = tally(frame[target], task)
-    class_codes = labels[0]
     structured = groups is not None or block_size is not None
     found = propose(
         frame, target, names, problem, cfg, *labels, structured=structured
@@ -640,27 +667,28 @@ def scan(
             cfg, gates, n, "screen not run: no column could be tested", names
         )
     total = max(cfg.permutations, resamples(family, alpha))
-    declined = tested(pending, names)
-    size = (n, family, total)
+    declined, size = tested(pending, names), (n, family, total)
     if sift(pending, cfg) and total > MAX_PERMUTATIONS:
         return exceed(cfg, gates, size, MAX_PERMUTATIONS, declined)
+    demand = reckon(pending, problem, frame, names, cfg)
     overrun = throttle(
         cfg, gates, size, pending, problem, declined, time_budget_seconds
-    )
+    ) or confine(cfg, demand, limit)
     if overrun is not None:
         return overrun
     strata = stratify(n, groups, block_size)
     draw_permutations(
-        pending, problem.y, class_codes, strata, total, alpha, cfg.run_seed
+        pending, problem.y, labels[0], strata, total, alpha, cfg.run_seed
     )
     plan = (total, alpha)
     findings = conclude(
         pending, plan, problem, frame, labels, cfg, groups, gates, apart
     )
     notes = (*notes, *faint(n, cfg))
-    return Screen(
+    report = Screen(
         tuple(findings), n, family, total, cfg.alpha, gates, caps(cfg), notes
     )
+    return dataclasses.replace(report, seconds=demand.seconds)
 
 
 def screen(
@@ -675,6 +703,7 @@ def screen(
     time_budget_seconds: float | None = None,
     apart: Sequence[Hashable] = (),
     counted: pandas.DataFrame | None = None,
+    limit: float | None = None,
 ) -> Screen:
     """Screens the candidate columns of training data for leakage suspicion.
 
@@ -697,6 +726,7 @@ def screen(
             the probe's plants, each judged against the real columns only.
         counted: The rows the duplication test counts, with the same
             columns; None counts `frame` (the probe passes its copied rows).
+        limit: Seconds the scan may take (`scan`); None for no cap.
 
     Returns:
         The report. Nothing is raised for a degenerate target or too few
@@ -739,4 +769,5 @@ def screen(
         time_budget_seconds,
         apart,
         () if copied is None else (copied,),
+        limit,
     )

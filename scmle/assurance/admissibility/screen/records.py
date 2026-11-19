@@ -45,6 +45,7 @@ from scmle.assurance.admissibility.screen.settings import OUTCOME
 from scmle.assurance.admissibility.screen.settings import ROWS
 from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
+from scmle.data.validation import dates
 
 # Rows a group needs for its variance: the precision test compares each
 # group's mean with that mean's sampling noise, estimated within the group.
@@ -56,6 +57,17 @@ PAIR = 2
 # A fixed number of rows (`n`) makes the counts binomial, which multiplies
 # the bound by `(n - 1) / (n - 2)`.
 SCHWARZ = 1.5
+
+
+# Orders sorted together by `runs`: one array of this many orders by the
+# rows (at 2,000 rows, 256 orders hold 4 MB per int64 array), so the sorts
+# run in numpy rather than one Python call per order, in bounded memory.
+SORTS = 256
+
+
+# Most rows whose codes (each below the row count) fit 16 bits, which numpy
+# sorts stably by radix rather than by comparison.
+RADIX = 2**16
 
 
 def outcomes(problem: Problem) -> list[numpy.ndarray]:
@@ -103,7 +115,7 @@ def keys(
 
 
 def runs(
-    values: numpy.ndarray, orders: Sequence[numpy.ndarray]
+    values: numpy.ndarray, orders: Sequence[numpy.ndarray] | numpy.ndarray
 ) -> numpy.ndarray | None:
     """Groups the rows into runs of one value along the most telling order.
 
@@ -119,7 +131,8 @@ def runs(
 
     Args:
         values: The column, as numbers.
-        orders: Sort keys from `keys`, without the column's own.
+        orders: Sort keys from `keys` (a list, or stacked one per row),
+            without the column's own.
 
     Returns:
         A group label per row; None when no order is below the expected
@@ -128,18 +141,42 @@ def runs(
     codes, levels = pandas.factorize(values)
     shares = numpy.bincount(codes, minlength=len(levels)) / len(values)
     best = 1.0 - float((shares**2).sum())
+    # Sorting the rows by value, then stably by the key, orders them as
+    # `lexsort((values, key))` does; codes below 2**16 sort by radix.
+    ranks = pandas.factorize(values, sort=True)[0]
+    first = numpy.argsort(ranks, kind="stable")
+    ranked = ranks[first].astype(narrow(len(values)))
     labels = None
-    for key in orders:
-        order = numpy.lexsort((values, key))
-        held = values[order]
-        changed = numpy.r_[True, held[1:] != held[:-1]]
-        moved = numpy.r_[True, key[order][1:] != key[order][:-1]]
-        share = changed.sum() / (changed | moved).sum()
-        if share < best:
-            best = share
+    for start in range(0, len(orders), SORTS):
+        keys = numpy.asarray(orders[start : start + SORTS])
+        keys = keys.astype(narrow(len(values)), copy=False)[:, first]
+        then = numpy.argsort(keys, axis=1, kind="stable")
+        held = ranked[then]
+        changed = held[:, 1:] != held[:, :-1]
+        moved = numpy.take_along_axis(keys, then, axis=1)
+        moved = moved[:, 1:] != moved[:, :-1]
+        found = (numpy.count_nonzero(changed, axis=1) + 1) / (
+            numpy.count_nonzero(changed | moved, axis=1) + 1
+        )
+        index = int(numpy.argmin(found))
+        if found[index] < best:
+            best = float(found[index])
+            steps = numpy.concatenate(([True], changed[index]))
             labels = numpy.empty(len(values), dtype="int64")
-            labels[order] = numpy.cumsum(changed) - 1
+            labels[first[then[index]]] = numpy.cumsum(steps) - 1
     return labels
+
+
+def narrow(rows: int) -> str:
+    """The integer type that holds codes below `rows` and sorts fastest.
+
+    Args:
+        rows: Rows, an upper bound on every code.
+
+    Returns:
+        `uint16` up to `RADIX` rows (sorted by radix), `int64` beyond.
+    """
+    return "uint16" if rows <= RADIX else "int64"
 
 
 def precision(
@@ -191,8 +228,12 @@ def encodings(
 ) -> list[Pending]:
     """Tests every numeric column on the target's scale as a target mean.
 
-    A column is a candidate when it has no missing values and lies within
-    the outcomes' range (a mean of the outcome cannot leave it). Its groups
+    A column is a candidate when it is numeric and its recorded values lie
+    within the outcomes' range (a mean of the outcome cannot leave it); a
+    column with gaps is tested on the rows where it is recorded, since an
+    encoding that leaves a level blank (a missing source value) is still a
+    target mean where it is filled, and a column that never read the
+    outcomes stays honest on any rows chosen without them. Its groups
     come from `groupings`; the p-value is the smallest lower tail of
     `F(G, nu)` over the groupings and outcomes, times their number `K`
     (Bonferroni, `judge`). The effect is the precision `1 / R`, and its
@@ -213,38 +254,83 @@ def encodings(
         One hypothesis per candidate column that has groups to test.
     """
     targets = outcomes(problem)
-    low = min(float(t.min()) for t in targets)
-    high = max(float(t.max()) for t in targets)
-    orders = keys(frame, names)
+    chosen = candidates(frame, names, problem)
+    orders = numpy.empty((0, len(frame)), narrow(len(frame)))
+    if chosen:
+        orders = numpy.stack(keys(frame, names)).astype(narrow(len(frame)))
     found = []
-    for index, name in enumerate(names):
-        series = frame[name]
-        numeric = pandas.api.types.is_numeric_dtype(series)
-        if not numeric or series.isna().any():
-            continue
-        values = series.to_numpy(dtype="float64")
-        if values.min() < low or values.max() > high:
-            continue
+    for index in chosen:
+        values = numbers(frame[names[index]])
+        held = ~numpy.isnan(values)
+        rows = orders if held.all() else orders[:, held]
         found.extend(
             judge(
-                str(name),
-                values,
-                groupings(values, orders, index),
-                targets,
+                str(names[index]),
+                values[held],
+                groupings(values[held], rows, index),
+                [t[held] for t in targets],
                 cfg,
             )
         )
     return found
 
 
+def numbers(series: pandas.Series) -> numpy.ndarray:
+    """A numeric column as floats, a missing value as NaN.
+
+    Args:
+        series: A numeric column (nullable integers included).
+
+    Returns:
+        One float per row.
+    """
+    return series.to_numpy(dtype="float64", na_value=numpy.nan)
+
+
+def candidates(
+    frame: pandas.DataFrame, names: Sequence[Hashable], problem: Problem
+) -> list[int]:
+    """The columns the target-mean test reads, without reading the outcome.
+
+    A mean of the outcome cannot leave the outcomes' range, so a candidate
+    is a numeric column whose recorded values (at least `PAIR`) lie inside
+    it.
+
+    Args:
+        frame: The chosen rows.
+        names: Candidate columns.
+        problem: The encoded target.
+
+    Returns:
+        The positions in `names` of the candidate columns, in order.
+    """
+    targets = outcomes(problem)
+    low = min(float(t.min()) for t in targets)
+    high = max(float(t.max()) for t in targets)
+    found = []
+    for index, name in enumerate(names):
+        series = frame[name]
+        if not pandas.api.types.is_numeric_dtype(series):
+            continue
+        values = numbers(series)
+        values = values[~numpy.isnan(values)]
+        if len(values) < PAIR:
+            continue
+        if values.min() >= low and values.max() <= high:
+            found.append(index)
+    return found
+
+
 def groupings(
-    values: numpy.ndarray, orders: Sequence[numpy.ndarray], index: int
+    values: numpy.ndarray,
+    orders: Sequence[numpy.ndarray] | numpy.ndarray,
+    index: int,
 ) -> list[numpy.ndarray]:
     """The groupings one column is tested on, read from the columns alone.
 
     Args:
         values: The column, as numbers.
-        orders: Sort keys from `keys`.
+        orders: Sort keys from `keys` (a list, or stacked one per row).
         index: The column's own key, left out of `runs`.
 
     Returns:
@@ -252,7 +338,7 @@ def groupings(
         holds), then its runs along the most telling order, when one is.
     """
     found = [pandas.factorize(values)[0]]
-    labels = runs(values, [*orders[:index], *orders[index + 1 :]])
+    labels = runs(values, numpy.delete(numpy.asarray(orders), index, axis=0))
     return found if labels is None else [*found, labels]
 
 
@@ -504,9 +590,10 @@ def dated(
     There is no test and no p-value: the declaration decides, so a finding
     is significant, complete and blocking. A column of dates scheduled in
     advance (a due date) is late by this reading and must be given as a lead
-    time (days from the cutoff) instead. Only date columns are read: a
-    number that measures something known later (a call's duration) is not
-    a date.
+    time (days from the cutoff) instead. Only date columns are read, a
+    datetime column or text the data reader reads as dates (ISO 8601 of one
+    layout, `scmle.data.validation.dates.iso`): a number that measures
+    something known later (a call's duration) is not a date.
 
     Args:
         frame: Every row to screen.
@@ -535,7 +622,9 @@ def dated(
     for name in names:
         series = frame[name]
         if not pandas.api.types.is_datetime64_any_dtype(series):
-            continue
+            if not dates.iso(series):
+                continue
+            series = pandas.to_datetime(series)
         zone = series.dt.tz
         if zone is not None:
             stamp = (

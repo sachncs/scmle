@@ -137,6 +137,8 @@ class Screen:
         rationale: Why they were declined, for the warning.
         probe: Leak type to whether its plant was found on these rows; empty
             when no probe ran.
+        seconds: The predicted seconds of the scan (`planning.reckon`), what
+            it takes of a time budget's share; 0 when it drew nothing.
     """
 
     findings: tuple[Finding, ...]
@@ -150,6 +152,7 @@ class Screen:
     unchecked: tuple[str, ...] = ()
     rationale: str = ""
     probe: Mapping[str, bool] = dataclasses.field(default_factory=dict)
+    seconds: float = 0.0
 
     @property
     def warning(self) -> str:

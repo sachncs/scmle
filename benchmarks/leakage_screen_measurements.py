@@ -9,8 +9,10 @@ truth that is decided by provenance, not by the data:
   legitimate measurement, so every suspect is a false flag.
 * Titanic: `boat` and `body` are recorded after the outcome (leaks); the
   other columns are known at boarding.
-* Planted leaks: five leak types planted among real breast-cancer columns,
-  several seeds each; the planted column is the only leak.
+* Planted leaks: every leak type the certificate measures
+  (`screen_certify.DEFECTS`) planted among real breast-cancer columns,
+  several seeds each; the planted column (or, for copied rows, the rows)
+  is the only leak.
 
 It also copies the certified false-alarm and detection rates from
 `benchmarks/qualification/screen_measurements.json`, so the documentation
@@ -33,6 +35,7 @@ from sklearn import datasets
 from benchmarks.qualification import f4_certify
 from benchmarks.qualification import screen_certify
 from scmle.assurance.admissibility import leakage
+from scmle.assurance.admissibility import plants
 from scmle.assurance.admissibility import screen
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -169,6 +172,32 @@ def titanic_tables() -> list[dict[str, Any]]:
     ]
 
 
+def planted_table(
+    frame: pandas.DataFrame, names: Sequence[str], defect: str, seed: int
+) -> tuple[pandas.DataFrame, str]:
+    """One leak type planted among real columns.
+
+    A column type adds its planted column, named `planted_<type>`; the rows
+    type (`plants.DUPLICATES`) copies rows instead, and the screen names
+    that finding `screen.ROWS`.
+
+    Args:
+        frame: The table, including the target.
+        names: The real columns kept.
+        defect: A leak type of `screen_certify.DEFECTS`.
+        seed: Seed of the plant.
+
+    Returns:
+        The table and the name its leak is flagged under.
+    """
+    table = frame[[*names, f4_certify.TARGET]]
+    if defect == plants.DUPLICATES:
+        return plants.copy(table, seed), screen.ROWS
+    column = f"planted_{defect}"
+    plant = screen_certify.plant_column(frame, defect, seed)
+    return table.assign(**{column: plant}), column
+
+
 def planted() -> dict[str, Any]:
     """Plants each leak type among real breast-cancer columns.
 
@@ -185,12 +214,7 @@ def planted() -> dict[str, Any]:
         real_total = 0
         for seed in PLANT_SEEDS:
             names = screen_certify.real_columns(frame, PLANT_COLUMNS, seed)
-            plant = screen_certify.plant_column(frame, defect, seed)
-            # Not the leak type's own name: the screen plants its own copy
-            # of each type (its probe) and refuses a table that already
-            # holds a column of that name.
-            column = f"planted_{defect}"
-            table = frame[[*names, f4_certify.TARGET]].assign(**{column: plant})
+            table, column = planted_table(frame, names, defect, seed)
             report = screened(table, f4_certify.TARGET)
             flagged = flagged_names(report)
             found += int(column in flagged)

@@ -19,17 +19,24 @@ without the network, at most `refusal.ROWS` rows):
   reason"): a table the split gate refuses (a class too rare for the test
   rows) is a false block of the row, though not of the screen, and the
   row's `outcomes` count the two apart (`refused`, `blocked`). The first 78
-  tables were chosen by hand. The rest follow a rule fixed before any of
-  them was screened: every real table of the C14 catalog (`refusal.EXTRA`,
-  then `refusal.SUITE`: four published OpenML suites and the tables cached
-  before them) not already here, with the task C14 declares, except a
+  tables were chosen by hand (75 once the sealed copies below are out).
+  The rest follow a rule fixed before any of them was screened: every
+  real table of the C14 catalog (`refusal.EXTRA`, then `refusal.SUITE`:
+  four published OpenML suites and the tables cached before them) not
+  already here, with the task C14 declares, except a
   table that is one already here under another source (`SAME`). One of
   them has documented leaks: Tecator (OpenML 505), whose description says
   its moisture and protein, like fat, the outcome its spectra are to
   predict, were "determined by analytic chemistry"; they are removed here
   and are leak cases below. C14's other documented leak, NYC green taxi
   `total_amount`, is already here with the column removed. The rule adds
-  89 tables, so the 86 clean tables the first Holm step needs are reached.
+  84 tables, so the 86 clean tables the first Holm step needs are reached
+  (159 in all). No table is a copy of the sealed TabArena-v0.1 hold-out
+  (`benchmarks/sota/split.json`), which no evidence run may read: the
+  tables C14's rule 5 names (`refusal.SEALED`: credit-g, diabetes and
+  diamonds, chosen here by hand, and Amazon_employee_access, Diabetes130US
+  and KDDCup09_appetency, added by the rule) are left out, and a planted
+  base among them is replaced as `BASES` states.
 * `leak`: two provenances, stated on every case.
   `documented real leak`: the real leaked dataset itself (Titanic `boat`
   and `body`, recorded after the sinking; bank marketing `V12`, the call
@@ -263,16 +270,24 @@ def clean() -> list[Table]:
         }.items()
         if source not in have and source not in SAME
     ]
-    return found
+    return [t for t in found if t.source not in refusal.SEALED]
 
 
 # Real tables that receive planted leaks: binary and regression targets, so
 # a target mean and a target-ordered date are well defined.
+# A base that is a copy of the sealed hold-out (`refusal.SEALED`) is
+# replaced, in its place (so every other base keeps its seed), by the first
+# clean table of its kind in `clean()` order that is not a base and not
+# sealed, and whose numeric column with the most values (where the target
+# encoding is planted, `plant`) has at least one value per `LEVEL` rows, so
+# its bins of `LEVEL` rows are bins of its values rather than of row
+# positions among tied values: credit-g (31) by credit-approval (29),
+# diabetes (37) by adult (179), diamonds (42225) by auto_price (195).
 BASES = (
-    "openml_31", "openml_37", "openml_1464", "openml_1489", "openml_44",
+    "openml_29", "openml_179", "openml_1464", "openml_1489", "openml_44",
     "openml_40701", "openml_1067", "openml_1120", "breast_cancer",
     "openml_151", "openml_183", "openml_189", "openml_197", "openml_43939",
-    "openml_42225", "diabetes",
+    "openml_195", "diabetes",
 )  # fmt: skip
 
 

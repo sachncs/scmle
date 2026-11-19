@@ -73,12 +73,28 @@ def test_the_table_adds_one_column_per_type_and_keeps_the_rows():
     assert planted[["x", "y"]].equals(frame)
 
 
-def test_unknown_types_and_name_clashes_are_refused():
+def test_unknown_types_are_refused():
     with pytest.raises(KeyError):
         plants.plant(numbers(), "leak_unknown", 0, True)
+
+
+def test_a_plant_never_takes_the_name_of_a_user_column():
+    columns = ["y", "leak_copy", "leak_copy (1)", "leak_threshold"]
+    labels = plants.names(columns)
+    assert list(labels) == list(plants.DEFECTS)
+    assert labels["leak_copy"] == "leak_copy (2)"
+    assert labels["leak_threshold"] == "leak_threshold (1)"
+    assert labels["leak_noisy_copy"] == "leak_noisy_copy"
+    assert not set(labels.values()) & set(columns)
+    assert len(set(labels.values())) == len(labels)
+
+
+def test_the_table_keeps_a_user_column_named_as_a_plant():
     frame = pandas.DataFrame({"y": numbers(20), "leak_copy": 0.0})
-    with pytest.raises(ValueError, match="named as plants"):
-        plants.table(frame, "y", 0, True)
+    planted = plants.table(frame, "y", 0, True)
+    assert planted["leak_copy"].eq(0.0).all()
+    assert planted["leak_copy (1)"].equals(frame["y"].astype(float))
+    assert len(planted.columns) == 2 + len(plants.DEFECTS)
 
 
 def test_a_target_mean_holds_each_rows_own_outcome():

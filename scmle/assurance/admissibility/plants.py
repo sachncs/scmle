@@ -23,10 +23,12 @@ and `Numbers` write each type for their kind of target:
   rows copied once, so copies fall on both sides of a split.
 """
 
+from collections.abc import Hashable
+from collections.abc import Iterable
+
 import numpy
 import pandas
 
-from scmle.contracts import errors
 from scmle.runtime import randomness
 
 DEFECTS = {
@@ -216,6 +218,34 @@ def copy(frame: pandas.DataFrame, seed: int) -> pandas.DataFrame:
     return frame.iloc[rows[order]].reset_index(drop=True)
 
 
+def names(columns: Iterable[Hashable]) -> dict[str, str]:
+    """Names a planted column per leak type that no given column has.
+
+    The probe adds its plants to a copy of the user's rows, which may hold a
+    column of any name, a leak type's own among them. Each plant keeps its
+    type's name when that is free, and otherwise takes the first free
+    `<type> (<k>)`, `k` counting up from 1, so no plant replaces or shadows
+    a user column.
+
+    Args:
+        columns: The columns the plants go beside, the target included.
+
+    Returns:
+        Leak type in `DEFECTS` to its column name, every name distinct and
+        none in `columns`.
+    """
+    taken = {str(c) for c in columns}
+    found = {}
+    for defect in DEFECTS:
+        name, count = defect, 0
+        while name in taken:
+            count += 1
+            name = f"{defect} ({count})"
+        taken.add(name)
+        found[defect] = name
+    return found
+
+
 def table(
     frame: pandas.DataFrame, target: str, seed: int, continuous: bool
 ) -> pandas.DataFrame:
@@ -228,14 +258,13 @@ def table(
         continuous: Whether the target is a number.
 
     Returns:
-        A copy of `frame` with a column per leak type, named after it.
-
-    Raises:
-        ValueError: If a column already has a leak type's name.
+        A copy of `frame` with a column per leak type, in `DEFECTS` order,
+        named by `names` so that none clashes with a column of `frame`.
     """
-    clashes = [d for d in DEFECTS if d in frame.columns]
-    if clashes:
-        raise errors.InputError(f"columns already named as plants: {clashes}")
+    labels = names(frame.columns)
     return frame.assign(
-        **{d: plant(frame[target], d, seed, continuous) for d in DEFECTS}
+        **{
+            labels[d]: plant(frame[target], d, seed, continuous)
+            for d in DEFECTS
+        }
     )
