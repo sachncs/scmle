@@ -351,3 +351,38 @@ def test_the_stored_reading_is_for_the_current_code():
     assert stored["code"] == reading.digest()
     assert reading.problems() == []
     assert reading.summary()[1] in {"fail", "not measured"}
+
+
+def test_every_group_has_a_file_for_each_deciding_split():
+    # benchmarks.evidence.custody needs one file of every group in each of
+    # validation and acceptance.
+    groups: dict[str, int] = {}
+    for case in reading.corpus():
+        groups[case.group] = groups.get(case.group, 0) + 1
+    assert all(count >= 2 for count in groups.values())
+    for group in reading.GENERATED:
+        assert groups[group] == reading.FILES
+
+
+def test_generated_files_are_fixed_and_have_their_group_property():
+    first = [c for c in reading.corpus() if "generated" in c.name]
+    again = [c for c in reading.corpus() if "generated" in c.name]
+    assert first == again
+    assert len(first) == len(reading.GENERATED) * (reading.FILES - 1)
+    for case in first:
+        columns = list(zip(*case.rows, strict=True))
+        empty = [all(v is None for v in column) for column in columns]
+        if case.group == "empty columns":
+            assert any(empty) and not all(empty)
+        else:
+            assert case.group == "baseline"
+            assert not any(v is None for row in case.rows for v in row)
+        assert len(case.columns) == len(columns)
+
+
+def test_generated_expectations_match_an_independent_reader(tmp_path):
+    for case in reading.corpus():
+        if "generated" in case.name:
+            path = tmp_path / f"{case.name}{case.suffix}"
+            path.write_bytes(case.payload)
+            assert reading.judge(case, pandas.read_csv(path), TOL) == ""

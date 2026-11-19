@@ -34,12 +34,23 @@ of the package drawn before anything is run, by a rule fixed here:
    `2 * MULTIPLIER * (baseline seconds + CONSTANT)`, a wall limit per
    module of `CAP` seconds and `BUDGET` seconds in all.
 
-The score is killed over decided mutants. A timeout, a crash, a suspicious
-result or `no tests` is not a kill; no surviving mutant is removed as
-equivalent, so the score is a lower estimate. The row passes when the
-one-sided Clopper-Pearson lower bound of the pooled score at `alpha` is at
-least the floor, on at least `planned` mutants from at least `least`
-modules.
+8. Tool crashes: a mutmut process that dies with an exception raised in
+   mutmut's own code (`fault`) has produced no test outcome, so the
+   module's attempt is discarded and the module is generated and run again
+   from scratch, at most `attempts()` times in all, inside its wall limit;
+   after a crash in mutmut's worker pool (`mutmut/workers/`) the next
+   attempts run single-worker. Each crashed attempt is recorded with its
+   exception in the module's `retries` and `note`. A module that crashes on
+   every attempt is `undecided`: it stays in the sample, none of its
+   mutants counts (not as killed, not as survived) and the row is `not
+   measured` while any module is undecided.
+
+The score is killed over decided mutants. A timeout, a crash of a test
+run, a suspicious result or `no tests` is not a kill; no surviving mutant
+is removed as equivalent, so the score is a lower estimate. The row passes
+when the one-sided Clopper-Pearson lower bound of the pooled score at
+`alpha` is at least the floor, on at least `planned` mutants from at least
+`least` modules.
 
 NOT measured: tests outside `tests/unit`, modules not drawn, entry points
 and modules without mutants, module-level code (mutmut mutates
@@ -85,6 +96,12 @@ ASSUMED = 0.90
 # Mutants drawn per module, as a multiple of the even share of `planned`.
 MARGIN = 2
 WORKERS = 2
+# Largest chance per attempt that mutmut crashes on a module for reasons of
+# its own (a race in its worker pool) and still counts as flaky rather than
+# broken: a tool that crashes more often than not is not retried into an
+# answer. `attempts()` is the fewest attempts after which such a flaky
+# crash recurs on every one with chance at most `alpha`.
+FLAKE = 0.5
 # mutmut's timeout settings: the CPU limit per mutant is
 # 2 * MULTIPLIER * (seconds of the tests that cover it + CONSTANT).
 MULTIPLIER = 2.0
@@ -92,6 +109,12 @@ CONSTANT = 5.0
 # Wall seconds per module and in all (the run is capped near 45 minutes).
 CAP = 420
 BUDGET = 45 * 60
+# A frame of mutmut's own code in a traceback, and of its worker pool.
+TOOL = re.compile(r'File "[^"]*[/\\]mutmut[/\\]')
+POOL = re.compile(r'File "[^"]*[/\\]mutmut[/\\]workers[/\\]')
+# The last line of a traceback: an exception class and its message (not a
+# line mutmut prints before a deliberate exit, such as "FAILED: ...").
+RAISED = re.compile(r"^(\w+\.)*\w*(Error|Exception|Interrupt|Exit)(: .*)?$")
 # Directories never copied into the work tree.
 SKIP = (
     ".git",
@@ -585,46 +608,141 @@ def idle(output: str) -> bool:
     )
 
 
-def examine(
-    work: Path, path: str, position: int, limit: float
-) -> dict[str, Any]:
-    """Generates, draws and runs one module's mutants.
+def attempts() -> int:
+    """Attempts a module gets when mutmut keeps crashing on it.
+
+    Returns:
+        `ceil(ln alpha / ln FLAKE)`: a crash that recurs independently with
+        chance `FLAKE` survives all of them with chance at most `alpha`.
+    """
+    alpha = acceptance.load()["alpha"].value
+    return math.ceil(math.log(alpha) / math.log(FLAKE))
+
+
+def fault(status: int, output: str) -> str | None:
+    """The exception mutmut itself died with, if it did.
+
+    Args:
+        status: The process's exit code (-1 when killed at the wall limit).
+        output: The tail of its output.
+
+    Returns:
+        The exception line (`KeyError: 20420`) when the process failed with
+        a traceback through mutmut's own code; None for a clean exit, a
+        wall-limit kill or any other failure.
+    """
+    if status in {0, -1} or not TOOL.search(output):
+        return None
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    if not lines or not RAISED.match(lines[-1]):
+        return None
+    return lines[-1]
+
+
+def pooled(output: str) -> bool:
+    """Whether a crash's traceback passes through mutmut's worker pool.
+
+    Args:
+        output: The tail of mutmut's output.
+
+    Returns:
+        True when a frame lies in `mutmut/workers/`.
+    """
+    return POOL.search(output) is not None
+
+
+def trial(
+    work: Path,
+    path: str,
+    position: int,
+    workers: int,
+    limit: float,
+) -> tuple[list[str], dict[str, int | None], str | None, int, str]:
+    """One attempt: generates, draws and runs one module's mutants.
 
     Args:
         work: The work tree.
         path: The module.
         position: Its place in the sorted sample.
-        limit: Wall seconds left for this module.
+        workers: mutmut's `--max-children`.
+        limit: Wall seconds for the attempt.
 
     Returns:
-        The module's kill set, drawn mutants, counts per status, the
-        mutants not run, a note on anything that went wrong, its file
-        fingerprint and the seconds taken.
+        The drawn names, their exit codes (None when not run), a note on
+        anything that went wrong, the last process's exit code and the
+        tail of its output.
     """
     started = time.monotonic()
     tests = suite(path, work)
     configure(work, path, tests)
-    count = design()[1]
     status, output = call(work, ["-c", GENERATE], limit)
-    names = pick(list(codes(work, path)), position, count)
-    note = None if status == 0 else f"generation failed: {output[-500:]}"
-    outcome: dict[str, int | None] = dict.fromkeys(names)
-    if names and note is None:
-        if tests:
-            left = limit - (time.monotonic() - started)
-            command = ["-m", "mutmut", "run", "--max-children", str(WORKERS)]
-            status, output = call(work, [*command, *names], left)
-            stored = codes(work, path)
-            outcome = {n: stored.get(n) for n in names}
-            if status == -1:
-                note = "stopped at the wall limit"
-            elif idle(output):
-                outcome = dict.fromkeys(names, 33)
-                note = "the kill set ran no test that reaches the module"
-            elif status != 0:
-                note = f"mutmut exited {status}: {output[-500:]}"
-        else:
-            outcome = dict.fromkeys(names, 33)
+    names = pick(list(codes(work, path)), position, design()[1])
+    if status != 0:
+        failed = f"generation failed: {output[-500:]}"
+        return names, dict.fromkeys(names), failed, status, output
+    if not names or not tests:
+        return names, dict.fromkeys(names, 33), None, status, output
+    left = limit - (time.monotonic() - started)
+    command = ["-m", "mutmut", "run", "--max-children", str(workers)]
+    status, output = call(work, [*command, *names], left)
+    stored = codes(work, path)
+    outcome = {n: stored.get(n) for n in names}
+    note: str | None = None
+    if status == -1:
+        note = "stopped at the wall limit"
+    elif idle(output):
+        outcome = dict.fromkeys(names, 33)
+        note = "the kill set ran no test that reaches the module"
+    elif status != 0:
+        note = f"mutmut exited {status}: {output[-500:]}"
+    return names, outcome, note, status, output
+
+
+def examine(
+    work: Path, path: str, position: int, limit: float
+) -> dict[str, Any]:
+    """Generates, draws and runs one module's mutants, retrying tool crashes.
+
+    Args:
+        work: The work tree.
+        path: The module.
+        position: Its place in the sorted sample.
+        limit: Wall seconds left for this module, over all attempts.
+
+    Returns:
+        The module's kill set, drawn mutants, counts per status, the
+        mutants not run, every crashed attempt, whether it is undecided, a
+        note on anything that went wrong, its file fingerprint and the
+        seconds taken.
+    """
+    started = time.monotonic()
+    tests = suite(path, work)
+    retries: list[dict[str, Any]] = []
+    workers = WORKERS
+    while True:
+        left = limit - (time.monotonic() - started)
+        names, outcome, note, status, output = trial(
+            work, path, position, workers, left
+        )
+        error = None if idle(output) else fault(status, output)
+        if error is None:
+            break
+        retries.append({"workers": workers, "exception": error})
+        if pooled(output):
+            workers = 1
+        spent = time.monotonic() - started >= limit
+        if len(retries) >= attempts() or spent:
+            break
+    crashes = "; ".join(
+        f"attempt {i} ({r['workers']} workers) crashed in mutmut: "
+        f"{r['exception']}"
+        for i, r in enumerate(retries, 1)
+    )
+    if error is not None:
+        outcome = dict.fromkeys(names)
+        note = f"undecided, mutmut crashed on every attempt: {crashes}"
+    elif retries:
+        note = "; ".join(filter(None, [crashes, note]))
     counts = dict.fromkeys(STATUSES, 0)
     for code in outcome.values():
         found = classify(code)
@@ -640,6 +758,8 @@ def examine(
         "decided": sum(counts.values()),
         "not_run": sum(c is None for c in outcome.values()),
         "survivors": sorted(n for n, c in outcome.items() if c == 0),
+        "retries": retries,
+        "undecided": error is not None,
         "note": note,
         "files": fingerprint([path, *tests], work),
         "seconds": round(time.monotonic() - started, 1),
@@ -711,6 +831,10 @@ def digest() -> str:
         classify,
         configure,
         idle,
+        attempts,
+        fault,
+        pooled,
+        trial,
         examine,
         pool,
     )
@@ -772,6 +896,11 @@ def measure() -> dict[str, Any]:
             "mutants": "default_rng([SEED, position]).choice of mutmut names",
             "kill_set": "tests/unit/test_*.py files importing the module",
             "workers": WORKERS,
+            "attempts": attempts(),
+            "retry": "a mutmut process that dies with an exception in "
+            "mutmut's own code is discarded and the module run again from "
+            "scratch, single-worker after a worker-pool crash; a module "
+            "crashing on every attempt is undecided",
             "timeout": f"2 * {MULTIPLIER} * (baseline + {CONSTANT}) CPU s",
             "cap_seconds": CAP,
             "budget_seconds": BUDGET,
@@ -849,9 +978,9 @@ def problems(
             ones.
 
     Returns:
-        The `stale` messages, plus fewer modules decided than the rule's
-        minimum or fewer decided mutants than planned; empty when the
-        document decides.
+        The `stale` messages, plus a module left undecided by mutmut
+        crashes, fewer modules decided than the rule's minimum or fewer
+        decided mutants than planned; empty when the document decides.
     """
     found = read(document)
     issues = stale(found, root)
@@ -859,6 +988,12 @@ def problems(
         return issues
     least, planned = required()
     run = [m for m in found.get("modules", []) if "counts" in m]
+    issues += [
+        f"mutation: {m['module']} undecided after "
+        f"{len(m.get('retries', []))} mutmut crashes"
+        for m in run
+        if m.get("undecided")
+    ]
     used = [m for m in run if m["decided"]]
     if len(used) < least:
         issues.append(

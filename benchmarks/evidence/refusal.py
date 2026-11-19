@@ -53,7 +53,10 @@ values (sick, okcupid-stem, house_prices_nominal) and dates turned into
 numbers (nyc-taxi-green-dec-2016, kick). None of them stores a date as a
 calendar value, so a date column is not covered by real tables.
 * `simulated`: clean generated tasks of every kind, several sizes and shapes
-  (plain, mixed types with missing values, wide with noise columns).
+  (plain, mixed types with missing values, wide with noise columns):
+  `worlds()` of them, world `i` the layout `LAYOUTS[i % len(LAYOUTS)]`
+  with seed `i`, twice the rate's minimum so custody can give each of
+  validation and acceptance the minimum.
 * `planted`: tasks built to be refused (a constant or identifier target,
   missing labels, a class of one row, too few rows, a planted leak under
   `leakage_policy="block"`, malformed event, treatment or label columns, too
@@ -115,9 +118,9 @@ GATES = ROOT / "gates.toml"
 # Policy: seconds of training budget per run; short, as a quick first look.
 BUDGET = 30
 # Policy: wall clock for the whole measurement. Every validation task must
-# run for the rate to be decided; about 190 tasks at some 30 s each,
-# `PARALLEL` at a time, take about 25 minutes on an idle laptop, and twice
-# that allows a loaded one.
+# run for the rate to be decided; about 285 tasks (the simulated ones take
+# some 10 s, the rest at most the 30 s budget), `PARALLEL` at a time, take
+# about 25 minutes on an idle laptop, and twice that allows a loaded one.
 SECONDS = 3000
 # Policy: a run is killed past this; 12 times the budget allows a loaded
 # laptop (one run at a 60 s budget took 514 s with load average 60).
@@ -1163,6 +1166,50 @@ PINS: dict[int, str] = {
 }
 
 
+# Kind, rows and shape of each simulated world, cycled: world `i` is
+# `LAYOUTS[i % len(LAYOUTS)]` simulated with seed `i`.
+LAYOUTS = (
+    ("binary", 500, "plain"),
+    ("regression", 300, "mixed"),
+    ("multiclass", 1500, "plain"),
+    ("survival", 800, "plain"),
+    ("ordinal", 1200, "mixed"),
+    ("ranking", 1500, "plain"),
+    ("multilabel", 1000, "plain"),
+    ("multioutput", 600, "plain"),
+    ("forecast", 400, "plain"),
+    ("uplift", 3000, "plain"),
+    ("binary", 2000, "wide"),
+    ("regression", 2000, "wide"),
+    ("multiclass", 600, "mixed"),
+    ("survival", 2000, "mixed"),
+    ("forecast", 1000, "plain"),
+    ("uplift", 1500, "mixed"),
+    ("binary", 1000, "mixed"),
+    ("ordinal", 400, "plain"),
+    ("multilabel", 2000, "wide"),
+    ("multioutput", 2000, "mixed"),
+    ("ranking", 600, "mixed"),
+    ("regression", 800, "plain"),
+)
+
+
+def worlds() -> int:
+    """Simulated worlds: enough for both deciding splits of custody.
+
+    `benchmarks.evidence.custody` needs `refusal_rate_max`'s ceiling
+    minimum, `ceil(ln alpha / ln(1 - 0.05))` = 59, in each of validation
+    and acceptance, so the group holds twice that. The rule was fixed
+    before any added world was run: world `i` takes `LAYOUTS[i % 22]` with
+    seed `i`, so the first 22 are the worlds run before.
+
+    Returns:
+        `2 * Ceiling(refusal_rate_max).minimum(alpha)`.
+    """
+    alpha = acceptance.load()["alpha"].value
+    return 2 * acceptance.ceiling("refusal_rate_max").minimum(alpha)
+
+
 def catalog() -> dict[str, Task]:
     """Every task, in the order they are run.
 
@@ -1359,38 +1406,17 @@ def catalog() -> dict[str, Task]:
         Task(name, kind, "real", table(identifier, target, task))
         for identifier, (name, kind, target, task) in (EXTRA | SUITE).items()
     )
-    layouts = (
-        ("binary", 500, "plain"),
-        ("regression", 300, "mixed"),
-        ("multiclass", 1500, "plain"),
-        ("survival", 800, "plain"),
-        ("ordinal", 1200, "mixed"),
-        ("ranking", 1500, "plain"),
-        ("multilabel", 1000, "plain"),
-        ("multioutput", 600, "plain"),
-        ("forecast", 400, "plain"),
-        ("uplift", 3000, "plain"),
-        ("binary", 2000, "wide"),
-        ("regression", 2000, "wide"),
-        ("multiclass", 600, "mixed"),
-        ("survival", 2000, "mixed"),
-        ("forecast", 1000, "plain"),
-        ("uplift", 1500, "mixed"),
-        ("binary", 1000, "mixed"),
-        ("ordinal", 400, "plain"),
-        ("multilabel", 2000, "wide"),
-        ("multioutput", 2000, "mixed"),
-        ("ranking", 600, "mixed"),
-        ("regression", 800, "plain"),
-    )
     simulated = [
         Task(
-            f"sim_{kind}_{rows}_{shape}",
+            f"sim_{kind}_{rows}_{shape}"
+            + (f"_{index // len(LAYOUTS)}" if index >= len(LAYOUTS) else ""),
             kind,
             "simulated",
             functools.partial(simulate, kind, rows, index, shape),
         )
-        for index, (kind, rows, shape) in enumerate(layouts)
+        for index, (kind, rows, shape) in (
+            (i, LAYOUTS[i % len(LAYOUTS)]) for i in range(worlds())
+        )
     ]
     defects = (
         (
@@ -1719,6 +1745,7 @@ def fingerprint() -> str:
     return certificates.code_hash(
         Task,
         simulate,
+        worlds,
         *LABELERS.values(),
         forecast,
         fetch,

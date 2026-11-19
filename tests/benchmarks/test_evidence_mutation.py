@@ -187,3 +187,125 @@ def test_a_kill_set_that_reaches_nothing_counts_as_no_tests():
     assert mutation.idle(skipped)
     broken = "1 failed, 7 skipped in 0.02s\nUnable to force test failures"
     assert not mutation.idle(broken)
+
+
+CRASH = (
+    "Traceback (most recent call last):\n"
+    '  File "/x/site-packages/mutmut/__main__.py", line 1007, in drain\n'
+    "    result = runner.wait_for_result()\n"
+    '  File "/x/site-packages/mutmut/workers/isolation.py", line 889, in '
+    "wait_for_result\n"
+    "    worker = self._running.pop(pid)\n"
+    "KeyError: 20420\n"
+)
+
+
+def test_a_tool_exception_is_told_apart_from_a_test_outcome():
+    assert mutation.fault(1, CRASH) == "KeyError: 20420"
+    assert mutation.fault(0, CRASH) is None
+    assert mutation.fault(-1, CRASH) is None
+    failing = (
+        'File "/repo/tests/unit/test_a.py", line 3, in test_a\n'
+        "AssertionError: 1 != 2\n"
+    )
+    assert mutation.fault(1, failing) is None
+    assert mutation.fault(1, "mutmut exited without a traceback") is None
+
+
+def test_a_crash_in_the_worker_pool_is_recognised():
+    assert mutation.pooled(CRASH)
+    assert not mutation.pooled(CRASH.replace("workers/isolation", "core"))
+
+
+def test_the_retry_count_comes_from_alpha():
+    alpha = acceptance.load()["alpha"].value
+    assert mutation.attempts() == 5
+    assert mutation.FLAKE ** mutation.attempts() <= alpha
+    assert mutation.FLAKE ** (mutation.attempts() - 1) > alpha
+
+
+def fake(tmp_path, monkeypatch, crashes: int) -> list[list[str]]:
+    """A tested module whose mutmut run crashes `crashes` times first."""
+    package = tmp_path / "scmle" / "part"
+    package.mkdir(parents=True)
+    (tmp_path / "tests" / "unit").mkdir(parents=True)
+    (package / "used.py").write_text("def f(x):\n    return x + 1\n")
+    (tmp_path / "tests" / "unit" / "test_used.py").write_text(
+        "from scmle.part import used\n"
+    )
+    path = "scmle/part/used.py"
+    meta = tmp_path / "mutants" / f"{path}.meta"
+    names = [f"scmle.part.used.x_f__mutmut_{i}" for i in range(1, 4)]
+    calls: list[list[str]] = []
+
+    def call(work, command, limit):
+        calls.append(command)
+        meta.parent.mkdir(parents=True, exist_ok=True)
+        if command[0] == "-c":
+            stored = dict.fromkeys(names)
+        elif len([c for c in calls if c[0] == "-m"]) <= crashes:
+            stored = {names[0]: 1, names[1]: None, names[2]: None}
+            meta.write_text(json.dumps({"exit_code_by_key": stored}))
+            return 1, CRASH
+        else:
+            stored = {names[0]: 1, names[1]: 1, names[2]: 0}
+        meta.write_text(json.dumps({"exit_code_by_key": stored}))
+        return 0, "done"
+
+    monkeypatch.setattr(mutation, "call", call)
+    return calls
+
+
+def runs(calls: list[list[str]]) -> list[list[str]]:
+    return [c for c in calls if c[0] == "-m"]
+
+
+def test_a_crashed_module_is_retried_single_worker_and_noted(
+    tmp_path, monkeypatch
+):
+    calls = fake(tmp_path, monkeypatch, crashes=2)
+    found = mutation.examine(tmp_path, "scmle/part/used.py", 0, 60.0)
+    made = runs(calls)
+    assert len(made) == 3
+    assert made[0][made[0].index("--max-children") + 1] == "2"
+    assert all(c[c.index("--max-children") + 1] == "1" for c in made[1:])
+    assert found["counts"]["killed"] == 2
+    assert found["counts"]["survived"] == 1
+    assert found["decided"] == 3
+    assert not found["undecided"]
+    assert len(found["retries"]) == 2
+    assert all(r["exception"] == "KeyError: 20420" for r in found["retries"])
+    assert found["note"].count("KeyError: 20420") == 2
+
+
+def test_a_module_that_always_crashes_stays_undecided(tmp_path, monkeypatch):
+    calls = fake(tmp_path, monkeypatch, crashes=100)
+    found = mutation.examine(tmp_path, "scmle/part/used.py", 0, 60.0)
+    assert len(runs(calls)) == mutation.attempts()
+    assert found["undecided"]
+    assert found["decided"] == 0
+    assert found["counts"]["killed"] == 0
+    assert found["not_run"] == len(found["drawn"]) == 3
+    assert len(found["retries"]) == mutation.attempts()
+    assert found["note"].count("KeyError: 20420") == mutation.attempts()
+
+
+def test_an_undecided_module_keeps_the_row_not_measured():
+    least, planned = mutation.required()
+    each = -(-planned // least)
+    names = mutation.population()[: least + 1]
+    modules = [module(n, each, each) for n in names]
+    modules[-1] = module(names[-1], 0, 0) | {
+        "undecided": True,
+        "note": "mutmut crashed",
+    }
+    found = document(modules)
+    issues = mutation.problems(found)
+    assert any("undecided" in i and names[-1] in i for i in issues)
+    assert mutation.summary(found)[1] == "not measured"
+
+
+def test_a_deliberate_mutmut_exit_is_not_a_tool_crash():
+    printed = CRASH.rsplit("KeyError", 1)[0] + "FAILED: Unable to force\n"
+    assert mutation.fault(1, printed) is None
+    assert mutation.fault(1, "Failed to run clean test\n") is None

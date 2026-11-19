@@ -240,3 +240,27 @@ def test_a_table_whose_file_differs_from_its_pin_is_refused(monkeypatch):
 
 def test_the_stored_measurements_are_for_the_current_code():
     assert refusal.problems() == []
+
+
+def test_the_simulated_worlds_fill_both_deciding_splits():
+    need = custody.minimum("refusal_rate_max")
+    assert refusal.worlds() == 2 * need == 118
+    simulated = [
+        t for t in refusal.catalog().values() if t.group == "simulated"
+    ]
+    assert len(simulated) == refusal.worlds()
+    assert len({t.name for t in simulated}) == len(simulated)
+
+
+def test_the_world_rule_keeps_the_first_cycle_and_cycles_the_layouts():
+    simulated = [
+        t for t in refusal.catalog().values() if t.group == "simulated"
+    ]
+    width = len(refusal.LAYOUTS)
+    assert [t.name for t in simulated[:width]] == [
+        f"sim_{kind}_{rows}_{shape}" for kind, rows, shape in refusal.LAYOUTS
+    ]
+    for index, task in enumerate(simulated):
+        kind, rows, shape = refusal.LAYOUTS[index % width]
+        assert task.kind == kind
+        assert task.build.args == (kind, rows, index, shape)

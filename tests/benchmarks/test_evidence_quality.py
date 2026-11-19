@@ -1,9 +1,15 @@
 """Claim C4 evidence: the product against a competent practitioner."""
 
+import json
+import math
+
 import pytest
 
 from benchmarks import acceptance
+from benchmarks.evidence import custody
 from benchmarks.evidence import quality
+from benchmarks.evidence import refusal
+from benchmarks.sota import scmle_runner
 from scmle.contracts import errors
 
 
@@ -87,3 +93,84 @@ def test_stale_code_is_not_measured():
 
 def test_the_stored_measurement_is_current():
     assert quality.problems() == []
+
+
+def test_every_kind_holds_both_deciding_splits():
+    # Custody needs `minimum()` tasks of each kind in each of validation
+    # and acceptance; a table another set placed first keeps its split.
+    sets = custody.catalog()
+    placed = custody.assign(sets)["quality"]
+    each = next(s for s in sets if s.name == "quality")
+    for ids in quality.TASKS.values():
+        assert len(ids) >= 2 * quality.minimum()
+        splits = [placed[str(t)] for t in ids]
+        assert splits.count(custody.VALIDATION) >= quality.minimum()
+        assert splits.count(custody.ACCEPTANCE) >= quality.minimum()
+    assert {i.stratum for i in each.items} == set(quality.TASKS)
+
+
+def test_every_task_is_pinned_with_its_licence_and_table():
+    tasks = [t for ids in quality.TASKS.values() for t in ids]
+    assert len(tasks) == len(set(tasks))
+    assert set(quality.PINS) == set(tasks) == set(quality.TABLES)
+    for task, (digest, licence) in quality.PINS.items():
+        assert len(digest) == 64
+        assert licence and licence != "NA"
+        meta = json.loads((quality.DATA / f"{task}.json").read_text("utf-8"))
+        assert meta["sha256"] == digest
+        assert meta["licence"] == licence
+        assert quality.TABLES[task] == meta["dataset"]
+    assert set(quality.SAME) <= set(quality.TABLES.values())
+
+
+def test_no_task_is_sealed_or_a_listed_copy():
+    split = json.loads(quality.SPLIT.read_text("utf-8"))
+    tasks = {t for ids in quality.TASKS.values() for t in ids}
+    assert not tasks & set(split["holdout"])
+    assert not set(quality.TABLES.values()) & set(refusal.COPIES)
+
+
+def test_a_table_shared_with_another_set_keeps_its_custody_key():
+    each = next(s for s in custody.catalog() if s.name == "quality")
+    keys = {i.name: i.source for i in each.items}
+    for task, table in quality.TABLES.items():
+        expected = custody.origin(quality.SAME.get(table, table))
+        assert keys[str(task)] == expected
+
+
+def test_a_mismatched_file_is_refused(monkeypatch, tmp_path):
+    task = quality.TASKS["binary"][0]
+    monkeypatch.setitem(quality.PINS, task, ("0" * 64, "Public"))
+    with pytest.raises(errors.InputError):
+        quality.verify(task, b"not the pinned file", "Public")
+
+
+def test_the_run_count_comes_from_alpha():
+    alpha = acceptance.load()["alpha"].value
+    runs = quality.runs()
+    assert runs == 6
+    assert 2 * 0.5**runs <= alpha < 2 * 0.5 ** (runs - 1)
+    assert runs == math.ceil(1 + math.log2(1 / alpha))
+
+
+def test_the_first_run_is_the_registered_one_and_the_rest_differ():
+    task = quality.TASKS["binary"][0]
+    seeds = [quality.seed(task, r) for r in range(quality.runs())]
+    assert seeds[0] == scmle_runner.seed_for(task, 0, 0)
+    assert len(set(seeds)) == len(seeds)
+
+
+def test_the_noise_is_reported_but_the_first_run_decides():
+    row = {
+        "gap": 0.0,
+        "product": {"score": 0.0},
+        "repeats": [{"gap": g} for g in (0.1, -0.1, 0.0, 0.2, 0.0)],
+        "spread": 0.3,
+    }
+    rows = [row] * 5
+    found = quality.tally("binary", rows)
+    assert found["median"] == 0.0
+    assert found["passed"]
+    assert found["noise"]["spread"] == pytest.approx(0.3)
+    assert found["noise"]["medians"][1] == pytest.approx(0.1)
+    assert len(found["noise"]["medians"]) == quality.runs()

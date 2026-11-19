@@ -239,3 +239,30 @@ def test_the_stored_record_matches_the_current_items():
     placed = custody.assign(sets, document["seed"])
     for record in document["sets"]:
         assert record["items"] == placed[record["name"]]
+
+
+def test_no_stratum_of_the_catalog_is_short():
+    sets = custody.catalog()
+    placed = custody.assign(sets)
+    for each in sets:
+        for name, stratum in custody.shares(each, placed[each.name]).items():
+            assert not stratum["short"], f"{each.name}/{name}"
+
+
+@pytest.mark.parametrize(
+    ("name", "strata"),
+    [
+        ("refusal", ("simulated",)),
+        ("quality", ("binary", "multiclass", "regression")),
+        ("reading", ("baseline", "empty columns")),
+    ],
+)
+def test_the_grown_strata_fill_both_deciding_splits(name, strata):
+    sets = custody.catalog()
+    each = next(s for s in sets if s.name == name)
+    found = custody.shares(each, custody.assign(sets)[name])
+    for stratum in strata:
+        counts = found[stratum]["counts"]
+        need = found[stratum]["need"]
+        assert counts[custody.VALIDATION] >= need
+        assert counts[custody.ACCEPTANCE] >= need

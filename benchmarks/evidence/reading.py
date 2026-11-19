@@ -7,7 +7,19 @@ encodings (UTF-8 with a byte-order mark, latin-1, UTF-16), other
 delimiters, quoted newlines and delimiters, mixed types, empty columns,
 duplicate headers, huge and long integers, leading zeros, dates in several
 formats, and truncated files. Each has its expected table, written by hand,
-or an expected refusal. Every file is read with the product's reader,
+or an expected refusal. The groups `GENERATED` (plain files and files with
+empty columns) had one hand-written file each, too few for custody, which
+needs a file of every group in each of validation and acceptance
+(`benchmarks.evidence.custody.GROUPED`); `generated` adds files to each
+until it holds `FILES`, one for each of development, validation and
+acceptance. The generator was fixed before any generated file was read:
+`default_rng([SEED, group, index])` draws 2 to 5 columns `c0, c1, ...`
+and 2 to 7 rows; each column holds integers in [-999, 999] or words of
+`WORDS`, chosen per column; in an empty-columns file a random 1 to
+`width - 1` of the columns, at any position, are left empty in every row.
+The expected table is the cells as drawn, an empty cell as missing.
+
+Every file is read with the product's reader,
 `scmle.data.readers.tabular.read_table`, and the outcome is one of:
 
 * `correct`: the table equals the expected one;
@@ -130,6 +142,18 @@ WORKERS = 2
 # column typed per chunk shows up.
 CHUNKED_ROWS = 300_000
 REFUSE = "refuse"
+# Groups whose files `generated` adds to, and the files each then holds:
+# custody needs one in each of validation and acceptance, and development
+# keeps one to build against.
+GENERATED = ("baseline", "empty columns")
+FILES = 3
+# Seed of the generator, fixed before any generated file was read.
+SEED = 20261119
+# Chance that a generated column holds words rather than integers.
+TEXT = 0.5
+# Words of a generated text column: none reads as a number, a boolean, a
+# date or a missing-value marker.
+WORDS = ("apple", "berry", "cedar", "delta", "ember", "fjord")
 # What a practitioner declares for a relational child table, one split each.
 DECLARATIONS = (
     "rows",
@@ -246,11 +270,66 @@ def truncated_gzip() -> Case:
     return Case("gzip_cut", "truncated", ".csv.gz", whole[: len(whole) // 2])
 
 
-def corpus() -> list[Case]:
-    """The awkward-file corpus with hand-written expectations.
+def generated(group: str, index: int) -> Case:
+    """One generated file of a `GENERATED` group (module docstring).
+
+    Args:
+        group: One of `GENERATED`.
+        index: The file's number in its group, from 1.
 
     Returns:
-        Every case, in a fixed order.
+        The case, with the cells it was written from as its expectation.
+    """
+    rng = numpy.random.default_rng([SEED, GENERATED.index(group), index])
+    width = int(rng.integers(2, 6))
+    height = int(rng.integers(2, 8))
+    words = rng.random(width) < TEXT
+    empty = numpy.zeros(width, dtype=bool)
+    if group == "empty columns":
+        count = int(rng.integers(1, width))
+        empty[rng.choice(width, count, replace=False)] = True
+    rows = []
+    for _ in range(height):
+        row: list[Any] = []
+        for column in range(width):
+            if empty[column]:
+                row.append(None)
+            elif words[column]:
+                row.append(str(rng.choice(WORDS)))
+            else:
+                row.append(int(rng.integers(-999, 1000)))
+        rows.append(tuple(row))
+    columns = tuple(f"c{i}" for i in range(width))
+    lines = [",".join(columns)]
+    lines += [",".join("" if v is None else str(v) for v in r) for r in rows]
+    stem = "plain" if group == "baseline" else "empty_column"
+    return text(
+        f"{stem}_generated_{index}",
+        group,
+        "\n".join(lines) + "\n",
+        columns,
+        tuple(rows),
+    )
+
+
+def corpus() -> list[Case]:
+    """The awkward-file corpus: hand-written and generated expectations.
+
+    Returns:
+        Every case, in a fixed order; the generated files last.
+    """
+    return written() + [
+        generated(group, index)
+        for group in GENERATED
+        for index in range(1, FILES)
+    ]
+
+
+def written() -> list[Case]:
+    """The hand-written part of the corpus.
+
+    Returns:
+        Every hand-written case, in a fixed order.
     """
     big = 9007199254740993  # 2**53 + 1: not a float64
     huge = 123456789012345678901234567890

@@ -3,13 +3,51 @@
 Pre-registered before any score was computed (this docstring is the
 registration; changing it changes `digest` and invalidates the stored JSON).
 
-Tasks. TabArena-v0.1 OpenML tasks of the development set of
-`benchmarks/sota/split.json` (the hold-out stays sealed): the five with the
-fewest rows of each problem type, listed in `TASKS`. Each task is scored on
-its own OpenML split, repeat 0 fold 0: the system sees the training rows
-only and is scored on the test rows with TabArena's metric (binary ROC AUC,
-multiclass log loss, regression RMSE). The files are cached under
-`data/quality/` (see its README for source and licence).
+Tasks. Per problem type, the tasks of `TASKS`, chosen by a rule fixed
+before any of the added tasks was run (scmle's results on the first five
+of each type were known; they are kept, never dropped):
+
+1. Candidates, in order: the TabArena-v0.1 tasks of the development set
+   of `benchmarks/sota/split.json` (the hold-out stays sealed), then the
+   tasks of published OpenML suites, OpenML-CC18 (study 99) and the
+   AutoML benchmark's classification suite (study 271) for binary and
+   multiclass, OpenML-CTR23 (study 353) and the AutoML benchmark's
+   regression suite (study 269) for regression; within each source by
+   fewest rows, ties by task id. A suite task is binary with two classes
+   and multiclass with more, by OpenML's `NumberOfClasses`.
+2. A candidate is skipped when its table is already taken (by OpenML data
+   id), is a copy of a TabArena-v0.1 table under another id (development
+   or sealed hold-out: same data under another name, such as `dna` for
+   `splice` or `red_wine` for `wine_quality`), is a copy listed in
+   `benchmarks.evidence.refusal.COPIES`, or states no licence on OpenML.
+3. Candidates are taken in order until custody
+   (`benchmarks.evidence.custody`) gives each of validation and acceptance
+   `minimum()` tasks of the type. Twice `minimum()` is the least that can
+   do it; a table that an earlier evidence set already placed keeps that
+   split, so a type can need more. This gives 10 binary, 14 multiclass and
+   11 regression tasks.
+
+Every task's Parquet file is pinned by SHA-256 with the licence OpenML
+states (`PINS`); `fetch` refuses a file that differs. A TabArena table that
+another evidence set uses under its original OpenML id is keyed by that id
+in custody (`SAME`), so both stay in one split.
+
+Each task is scored on its own OpenML split, repeat 0 fold 0: the system
+sees the training rows only and is scored on the test rows with
+TabArena's metric (binary ROC AUC, multiclass log loss, regression RMSE).
+The rule's unit is the task: the folds and repeats of one task share its
+rows, so they are not independent trials and add none; the rule needs one
+split per task. The files are cached under `data/quality/` (see its README
+for source and licence).
+
+Run-to-run noise. The product is run `runs()` times on each task, run 0
+with the registered seed and the rest with seeds of their own (`seed`);
+only run 0 decides. `runs()` = `ceil(1 + log2(1 / alpha))` = 6 is the
+fewest runs whose range covers the median run's gap with chance at least
+`1 - alpha` (all runs fall on one side of it with chance `2 * 0.5 ** runs`),
+so a task whose decision gap lies outside that range is visibly noisy.
+Each task reports the gaps of every run and their spread; each type, the
+median spread and its median gap under each run.
 
 Competent-practitioner baseline (`practitioner`), fixed in advance:
 scikit-learn `HistGradientBoosting{Classifier,Regressor}` with native
@@ -24,7 +62,7 @@ last one would end past `CUTOFF` of the budget, and the first always runs.
 
 Product (`product`): `scmle.api.project.Project` with its defaults except
 the task, the task's metric, `time_budget=BUDGET` (the default is 1800 s)
-and a seed derived from the task (`scmle_runner.seed_for`).
+and a seed derived from the task and run (`seed`).
 
 Normalised gap per task (`gap`): with `o` the score oriented so higher is
 better, the anchor `t` a trivial predictor (AUC 0.5, the training class
@@ -46,6 +84,7 @@ other data kind is measured; those are not, so the best verdict here is
 
 NOT measured: data kinds other than tabular, the hold-out tasks, more than
 one split per task, the default 1800 s budget, AutoGluon-class baselines.
+The run-to-run noise is reported, not decided.
 
     python -m benchmarks.evidence.quality --write
     python -m benchmarks.evidence.quality --check
@@ -83,10 +122,244 @@ PATH = Path(__file__).with_suffix(".json")
 DATA = Path(__file__).parent / "data" / "quality"
 MEDIAN = "benchmark_median_gap_max"
 UPPER = "benchmark_gap_upper_max"
+SPLIT = Path(__file__).resolve().parents[1] / "sota" / "split.json"
+# In the order of the selection rule (module docstring).
 TASKS = {
-    "binary": (363621, 363696, 363682, 363684, 363674),
-    "multiclass": (363685, 363711, 363702, 363704, 363699),
-    "regression": (363698, 363625, 363612, 363708, 363686),
+    "binary": (
+        363621,
+        363696,
+        363682,
+        363684,
+        363674,
+        363700,
+        363620,
+        363623,
+        363694,
+        363706,
+    ),
+    "multiclass": (
+        363685,
+        363711,
+        363702,
+        363704,
+        363699,
+        11,
+        2079,
+        3560,
+        3549,
+        53,
+        3022,
+        9981,
+        146800,
+        23,
+    ),
+    "regression": (
+        363698,
+        363625,
+        363612,
+        363708,
+        363686,
+        363678,
+        363705,
+        363672,
+        361618,
+        361619,
+        361622,
+    ),
+}
+# The OpenML data id of each task's table.
+TABLES = {
+    363621: 46913,
+    363696: 46952,
+    363682: 46938,
+    363684: 46940,
+    363674: 46930,
+    363700: 46956,
+    363620: 46912,
+    363623: 46915,
+    363694: 46950,
+    363706: 46962,
+    363685: 46941,
+    363711: 46980,
+    363702: 46958,
+    363704: 46960,
+    363699: 46955,
+    11: 11,
+    2079: 188,
+    3560: 469,
+    3549: 458,
+    53: 54,
+    3022: 307,
+    9981: 1468,
+    146800: 40966,
+    23: 23,
+    363698: 46954,
+    363625: 46917,
+    363612: 46904,
+    363708: 46964,
+    363686: 46942,
+    363678: 46934,
+    363705: 46961,
+    363672: 46928,
+    361618: 44962,
+    361619: 44967,
+    361622: 44994,
+}
+# TabArena tables that another evidence set uses under their original
+# OpenML id, by name and size: custody keys both by the original id.
+SAME = {
+    46913: 1464,  # blood-transfusion-service-center
+    46952: 1494,  # qsar-biodeg
+    46912: 4134,  # Bioresponse
+    46915: 40701,  # churn
+    46958: 46,  # splice
+    46964: 287,  # wine_quality
+    46934: 537,  # houses
+    46961: 44964,  # superconductivity
+}
+# SHA-256 of each task's Parquet file as OpenML serves it, and the licence
+# OpenML states for it.
+PINS: dict[int, tuple[str, str]] = {
+    363621: (
+        "8e9fecb0a04af9e4c8d3c625c8cd1c173a15de655254ddaed480d77a9008d00a",
+        "CC BY 4.0",
+    ),
+    363696: (
+        "864c269749defdf2e50e52fa631fa89d4ad8360f3bf82bcd47e2ceaf0f48773d",
+        "CC BY 4.0",
+    ),
+    363682: (
+        "3aaa17c39e531131573284fcdcf511c1a763d4593ff9d8b87f61536af912ddcf",
+        "CC0: Public Domain",
+    ),
+    363684: (
+        "e468d6379be297953dac8780594ccdd98af606a6c5bd7ee43408365a27a360a6",
+        "Public",
+    ),
+    363674: (
+        "e77e8942836e009170196386614de7e378cde967787bef2445e241aaaa98791e",
+        "CC BY-SA",
+    ),
+    363700: (
+        "907dfa3a1301742a86bd6d3e2901814d8f50489567530ce99429a4002c426a4b",
+        "CC BY 4.0",
+    ),
+    363620: (
+        "44ec2028029fc3a234e63483dbcd69455c70c353a7a6c1df8952fff823dc096e",
+        "Public Domain",
+    ),
+    363623: (
+        "22960d2796ac7ec4fa7f2ba775095746ba82d42b3e4e798d3a4adb5b0a1907d7",
+        "MIT License",
+    ),
+    363694: (
+        "afe5fcf497e005cd4da0e6c36ce87e899f8b3080abe53b0e52f6e6d92f3d24e1",
+        "CC BY 4.0",
+    ),
+    363706: (
+        "0c39553394605c0807d94797ec59b9ac7cb1ab88be24b31bfe2f284a752ba55d",
+        "CC BY 4.0",
+    ),
+    363685: (
+        "d9697e031fb0e3db02f3f62445ebbfdb15baff56c8cc2bc75520a4deaba83bc4",
+        "CC BY 4.0",
+    ),
+    363711: (
+        "c11fbe1287697050d5bfb4b99bec749cb6ec59518feb86af573dedd55515cb30",
+        "CC BY 4.0",
+    ),
+    363702: (
+        "7a6c5fae358d9e0eb0acc1defab3d9eb395e87da294396e40802caf4515c3dd4",
+        "CC BY 4.0",
+    ),
+    363704: (
+        "37fb1767ab33ed77c316eae266e9f868f90d923af0ce68a4137e5e80b71c14ec",
+        "CC BY 4.0",
+    ),
+    363699: (
+        "668a363a27266198aa6c0da81e338e52aa91d1ca0f06a3bfc487f041f392f042",
+        "Public Domain",
+    ),
+    11: (
+        "ff6000f4086ffc8540a891c2eecd5692080c85226e30f5aa6e54ed6d7905ea2c",
+        "Public",
+    ),
+    2079: (
+        "40d70a65201f73b1000552323048c7a80816693a4f8cdde66c2ce3971d80a8b8",
+        "Public",
+    ),
+    3560: (
+        "e0202b33dad1fb0463b77327f08332afe35596a108918488a945c91ae54be70e",
+        "Public",
+    ),
+    3549: (
+        "253fe3ef7808becbafeecd5d8279f44d73bd6d1d037ff76e65c0ed30e0a52006",
+        "Public",
+    ),
+    53: (
+        "240c7d30b152b614a514e07303e86d502486230e69aef60efcf52d4fa9e4ed65",
+        "Public",
+    ),
+    3022: (
+        "4bc383f7d2cdcb9f53ee53e88783e63d9e7b83b65a5c34d32276354065f85ebe",
+        "Public",
+    ),
+    9981: (
+        "59db7443e1e54cab22384fd3ba99eb8d70996737c77d4eb2008c84811dd50854",
+        "Public",
+    ),
+    146800: (
+        "7ced21880af8755dcbb7a11c8da181361b2948426151241a435a05b6f0cb07a9",
+        "Public",
+    ),
+    23: (
+        "e27aa2f656cddac85adabdc4d2d4398656b9d499b4efce447640b15549cd5640",
+        "Public",
+    ),
+    363698: (
+        "ccf8655ae2a13062a436cd7e95c7594710576d7655ef148c320da6266ef5626c",
+        "CC BY 4.0",
+    ),
+    363625: (
+        "c5853f3c8e7e10524d81878cd2b0d61d8129242467a814187f4d015b4895df21",
+        "CC BY 4.0",
+    ),
+    363612: (
+        "d98c8cf8b64d81cbd43aabd76222f4b54ae02f4cb2b67d4fb1c4ee9f309509d8",
+        "CC BY 4.0",
+    ),
+    363708: (
+        "d34509cc5ecaca4dfe35ea0eb72211f20aed8b88b6f727ab4a5d4bf4943277ee",
+        "CC BY 4.0",
+    ),
+    363686: (
+        "eb38dc11f87c375ca4a66222ce03cb7cd1d0e38084d9a91d4635f09900dfb898",
+        "CC BY-NC-SA",
+    ),
+    363678: (
+        "450e15e660005e5f286d69a1651e99aab276420bc8557c82bad86a3d1d084090",
+        "Public",
+    ),
+    363705: (
+        "5dd5598eb8039c9ad2c485202769a7840b7f06babcbfc700aa2e0d4712d12426",
+        "CC BY 4.0",
+    ),
+    363672: (
+        "6e0c67b2857816548bee0cb159893443ad1a575a5af133cd1505696e75b12e54",
+        "Database Contents License (DbCL) v1.0",
+    ),
+    361618: (
+        "ab189460ac8f4f45e6d77cb1a45e8955efa46b0168a50507d5f7eea3708d39aa",
+        "CC BY 4.0",
+    ),
+    361619: (
+        "392bad0e6113e69c7eb29e8e46b318684be42203ba4068e6be3e534a598754f5",
+        "CC BY 4.0",
+    ),
+    361622: (
+        "eb6f68449c8722a4d4848cbbb9fdddd34fad4211483c182906d8dcdff32b8c28",
+        "Public",
+    ),
 }
 BUDGET = 60
 CUTOFF = 0.8
@@ -147,6 +420,7 @@ def fetch(task: int) -> None:
     dataset = int(tag(xml, "data_set_id"))
     described = text(f"{OPENML}/data/{dataset}")
     parquet = request.urlopen(tag(described, "parquet_url")).read()
+    verify(task, parquet, tag(described, "licence"))
     splits = text(tag(xml, "data_splits_url")).splitlines()
     test = sorted(
         int(parts[1])
@@ -164,12 +438,37 @@ def fetch(task: int) -> None:
         "version": tag(described, "version"),
         "licence": tag(described, "licence"),
         "target": tag(xml, "target_feature"),
-        "ignore": re.findall(r"<oml:ignore_attribute>([^<]*)", described),
+        "ignore": re.findall(
+            r"<oml:(?:ignore|row_id)_attribute>([^<]*)", described
+        ),
         "source": f"https://www.openml.org/t/{task}",
         "sha256": hashlib.sha256(parquet).hexdigest(),
         "test": test,
     }
     (DATA / f"{task}.json").write_text(json.dumps(meta) + "\n", "utf-8")
+
+
+def verify(task: int, parquet: bytes, licence: str) -> None:
+    """Refuses a task file other than the pinned one.
+
+    Args:
+        task: OpenML task id.
+        parquet: The Parquet file as served.
+        licence: The licence OpenML states.
+
+    Raises:
+        InputError: If the task has a pin and the file's SHA-256 or the
+            licence differs from it.
+    """
+    if task not in PINS:
+        return
+    digest, stated = PINS[task]
+    found = hashlib.sha256(parquet).hexdigest()
+    if found != digest or licence != stated:
+        raise errors.InputError(
+            f"task {task}: file {found[:12]} under {licence!r} is not the "
+            f"pinned {digest[:12]} under {stated!r}"
+        )
 
 
 def text(url: str) -> str:
@@ -375,8 +674,40 @@ def practitioner(
     }
 
 
+def runs() -> int:
+    """Product runs per task, for the run-to-run noise.
+
+    Returns:
+        `ceil(1 + log2(1 / alpha))`: the fewest runs whose range covers the
+        median run with chance at least `1 - alpha`.
+    """
+    alpha = acceptance.load()["alpha"].value
+    return math.ceil(1 + math.log2(1 / alpha))
+
+
+def seed(task: int, run: int) -> int:
+    """The product's seed for one run on one task.
+
+    Args:
+        task: OpenML task id.
+        run: The run, from 0.
+
+    Returns:
+        The registered `scmle_runner.seed_for(task, 0, 0)` for run 0; a
+        31-bit seed from SHA-256 of the task and run otherwise.
+    """
+    if run == 0:
+        return scmle_runner.seed_for(task, 0, 0)
+    key = f"scmle-quality-noise:{task}:{run}".encode()
+    return int(hashlib.sha256(key).hexdigest(), 16) % 2**31
+
+
 def product(
-    task: int, train: pandas.DataFrame, test: pandas.DataFrame, target: str
+    task: int,
+    train: pandas.DataFrame,
+    test: pandas.DataFrame,
+    target: str,
+    run: int = 0,
 ) -> dict[str, Any]:
     """The product's default run on one task; a crash is recorded.
 
@@ -385,13 +716,18 @@ def product(
         train: Training rows with the target.
         test: Test rows with the target.
         target: Target column.
+        run: The run, which picks the seed (`seed`).
 
     Returns:
-        Score (None on failure), seconds and the error text.
+        Score (None on failure), seconds, the seed and the error text.
     """
     name = kind(task)
     started = time.monotonic()
-    found: dict[str, Any] = {"score": None, "error": ""}
+    found: dict[str, Any] = {
+        "score": None,
+        "error": "",
+        "seed": seed(task, run),
+    }
     with tempfile.TemporaryDirectory() as folder:
         try:
             result = scmle.api.project.Project(
@@ -400,7 +736,7 @@ def product(
                 task="regression" if name == "regression" else "classification",
                 metric=scmle_runner.METRICS[name],
                 time_budget=BUDGET,
-                seed=scmle_runner.seed_for(task, 0, 0),
+                seed=found["seed"],
                 output_dir=Path(folder) / "run",
             ).run()
             found["score"] = scmle_runner.score(result, test, target, name)
@@ -474,12 +810,18 @@ def run(task: int) -> dict[str, Any]:
         task: OpenML task id.
 
     Returns:
-        The task's raw scores, times and gap.
+        The task's raw scores, times and gap (run 0's), the further runs
+        and the spread of every run's gap.
     """
     train, test, target = load(task)
     baseline = practitioner(task, train, test, target)
-    ours = product(task, train, test, target)
+    name = kind(task)
     anchor = trivial(task, train, test, target)
+    done = [product(task, train, test, target, r) for r in range(runs())]
+    for each in done:
+        each["gap"] = gap(name, baseline["score"], each["score"], anchor)
+    ours, repeats = done[0], done[1:]
+    gaps = [each["gap"] for each in done]
     meta = json.loads((DATA / f"{task}.json").read_text("utf-8"))
     return {
         "task": task,
@@ -491,7 +833,9 @@ def run(task: int) -> dict[str, Any]:
         "trivial": anchor,
         "practitioner": baseline,
         "product": ours,
-        "gap": gap(kind(task), baseline["score"], ours["score"], anchor),
+        "gap": ours["gap"],
+        "repeats": repeats,
+        "spread": max(gaps) - min(gaps),
     }
 
 
@@ -533,11 +877,20 @@ def tally(name: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
         rows: What `run` returned for its tasks.
 
     Returns:
-        The gaps, their median and upper bound, failures and whether the
-        type passes.
+        The gaps, their median and upper bound, failures, whether the type
+        passes, and the noise: the median spread of a task's runs and the
+        median gap under each run (reported, not decided).
     """
     variables = acceptance.load()
     gaps = [r["gap"] for r in rows]
+    repeated = [r for r in rows if r.get("repeats")]
+    width = min((len(r["repeats"]) for r in repeated), default=0)
+    medians = [float(numpy.median(gaps))] if gaps else []
+    medians += [
+        float(numpy.median([r["repeats"][i]["gap"] for r in repeated]))
+        for i in range(width)
+    ]
+    spreads = [r["spread"] for r in repeated]
     median = float(numpy.median(gaps)) if gaps else None
     bound = upper(gaps) if gaps else None
     passed = (
@@ -555,6 +908,10 @@ def tally(name: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
         "upper": bound,
         "failures": sum(r["product"]["score"] is None for r in rows),
         "passed": passed,
+        "noise": {
+            "spread": float(numpy.median(spreads)) if spreads else None,
+            "medians": medians,
+        },
     }
 
 
@@ -613,6 +970,8 @@ def measure(workers: int = WORKERS) -> dict[str, Any]:
         "design": {
             "budget_seconds": BUDGET,
             "split": "OpenML repeat 0 fold 0",
+            "runs": runs(),
+            "noise": "range of runs() product runs per task; run 0 decides",
             "grid": list(GRID),
             "fixed": FIXED,
             "folds": FOLDS,

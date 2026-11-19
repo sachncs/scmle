@@ -10,9 +10,15 @@ Sets, in the order they are assigned:
 
 * `leakage`: the clean and leaking cases of `leakage.catalog` (claim C2).
 * `refusal`: the real and simulated tasks of `refusal.catalog` (C14); the
-  planted tasks are not in custody here.
-* `quality`: the OpenML tasks of `quality.TASKS` (C4).
-* `reading`: the awkward files of `reading.corpus` (C5).
+  planted tasks are not in custody here. The simulated group holds
+  `refusal.worlds()` = 2 x 59 worlds.
+* `quality`: the OpenML tasks of `quality.TASKS` (C4), each keyed by its
+  table (`quality.TABLES`, or the id another set uses for the same table,
+  `quality.SAME`), so a table shared with an earlier set keeps its split.
+  Each problem type holds enough tasks for `minimum` in both deciding
+  splits (`quality`'s selection rule).
+* `reading`: the awkward files of `reading.corpus` (C5); every group holds
+  at least `2 GROUPED` files, generated ones where too few were written.
 * `coverage`: the simulation seeds of `coverage.run`, `(family, trial)` for
   `trial < coverage.TRIALS` (C3).
 * `practitioner`: the practitioner-study tasks (C4, C13); empty until the
@@ -281,11 +287,12 @@ def tasks() -> Set:
         Item(
             str(task),
             kind,
-            f"openml-task:{task}",
+            origin(quality.SAME.get(table, table)),
             functools.partial(files, task),
         )
         for kind, ids in quality.TASKS.items()
         for task in ids
+        for table in (quality.TABLES[task],)
     )
     return Set(
         "quality",
