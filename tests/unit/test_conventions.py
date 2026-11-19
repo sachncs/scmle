@@ -3,12 +3,17 @@
 Dunder names (`__init__`, `__all__`, ...) are language protocol and exempt.
 Everything else, in the package and in the tests, must be a public name.
 
+The owner rules beyond these (multi-word names, broad handlers, stub
+bodies, docstrings, `print`) live in `scripts/rules.py`, which pre-commit
+runs on staged files; `test_owner_rules_hold` runs it over the tree.
+
 The run context (`scmle/pipeline/context.py`) is deleted: stages read the
 products the run's board (`engine.Board`) holds by type. `CONTEXTUAL`, the
 modules still allowed to import it, is empty and stays so.
 """
 
 import ast
+import importlib.util
 import pathlib
 
 import pytest
@@ -207,3 +212,22 @@ def test_the_import_checker_finds_nested_and_from_imports():
     assert CONTEXT not in imported(
         ast.parse("from scmle.pipeline import kinds")
     )
+
+
+def owner():
+    """Imports `scripts/rules.py`, since `scripts/` is not a package."""
+    spec = importlib.util.spec_from_file_location(
+        "rules", ROOT / "scripts" / "rules.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_owner_rules_hold():
+    """Every owner rule `scripts/rules.py` checks, over the whole tree.
+
+    Pre-commit runs the same script on the staged files, so a violation
+    fails at write time; this test holds the tree to it in CI.
+    """
+    assert not owner().check()

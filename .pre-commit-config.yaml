@@ -1,0 +1,34 @@
+# Every owner rule fails at write time, so review never reads for them.
+# Install once with `uvx pre-commit install`; run on demand with
+# `uvx pre-commit run --all-files`. The hooks are local, so they use the
+# locked tool versions in uv.lock rather than a second pinned copy.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff check
+        entry: uv run ruff check --force-exclude
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format --check --force-exclude
+        language: system
+        types_or: [python, pyi]
+      - id: mypy
+        name: mypy (changed files)
+        entry: uv run mypy
+        language: system
+        types_or: [python, pyi]
+        files: ^(scmle|benchmarks|scripts/rules\.py)
+      - id: lint-imports
+        name: import-linter contracts
+        entry: uv run lint-imports
+        language: system
+        pass_filenames: false
+        types_or: [python]
+      - id: rules
+        name: owner rules (scripts/rules.py)
+        entry: uv run python scripts/rules.py
+        language: system
+        types_or: [python]
