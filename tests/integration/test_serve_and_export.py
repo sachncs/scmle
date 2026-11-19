@@ -2,8 +2,10 @@
 
 import importlib.util
 import json
+import os
+import signal
 import threading
-import types
+import time
 import urllib.error
 import urllib.request
 
@@ -268,31 +270,31 @@ def test_the_serve_command_starts_a_server_for_a_trusted_bundle(
     saved, monkeypatch
 ):
     root = saved[0]
-    started = threading.Event()
     seen = {}
-
-    class Recorder:
-        def wait(self):
-            seen["address"] = adapters[-1].address
-            started.set()
-            raise KeyboardInterrupt
-
-    adapters = []
     real = server.HttpServing
 
     def build(*args, **kwargs):
-        adapters.append(real(*args, **kwargs))
-        return adapters[-1]
+        adapter = real(*args, **kwargs)
+        seen["adapter"] = adapter
+        return adapter
+
+    def drive():
+        deadline = time.monotonic() + 30
+        while "adapter" not in seen or seen["adapter"].httpd is None:
+            assert time.monotonic() < deadline
+            time.sleep(0.02)
+        seen["address"] = seen["adapter"].address
+        os.kill(os.getpid(), signal.SIGTERM)
 
     monkeypatch.setattr(cli.delivery.server, "HttpServing", build)
-    monkeypatch.setattr(
-        cli.delivery, "threading", types.SimpleNamespace(Event=Recorder)
-    )
-
+    driver = threading.Thread(target=drive)
+    driver.start()
     code = cli.main(["serve", str(root / "bundle"), "--trusted", "--port", "0"])
+    driver.join(30)
 
-    assert code == 0 and started.is_set()
+    assert code == 0
     assert seen["address"].startswith("http://127.0.0.1:")
+    assert seen["adapter"].httpd is None and seen["adapter"].draining
 
 
 @pytest.fixture(scope="module")

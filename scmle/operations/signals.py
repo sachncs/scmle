@@ -7,7 +7,7 @@
 * data quality: missing-rate increase, unseen categories, the share of
   requests rejected as invalid, and the noise-adjusted PSI of each feature
   against the training reference (`scmle.data.reference`), from feature
-  rows (sampled at ``sample_rate``);
+  rows (sampled at ``sample_rate``, at most ``capacity`` of them);
 * model performance: the mean loss of cases whose outcome has arrived
   (delayed labels) against ``reference_loss`` plus a tolerance, using the same
   names as `scmle.governance.loop.Preregistration`.
@@ -18,6 +18,7 @@ never treated as healthy. Nothing here decides what to do; the classifier
 """
 
 from collections import deque
+from collections.abc import Hashable
 from collections.abc import Sequence
 import dataclasses
 import enum
@@ -34,6 +35,11 @@ import scmle.data.reference
 from scmle.monitoring import monitor
 
 INVALID_STATUSES = frozenset({400, 409, 413, 415, 422})
+# Most feature rows a window keeps. A share (a missing rate, a PSI bin)
+# estimated from n rows has a 95% interval half-width of at most
+# 1.96 * sqrt(0.25 / n); a half-width of 0.01 needs n = 9604 rows. More
+# rows sharpen the feature signals little while memory grows with them.
+CAPACITY = 9604
 
 
 class Category(enum.StrEnum):
@@ -109,19 +115,23 @@ class Window:
         min_samples: Fewest observations a signal needs to be judged.
         sample_rate: Share of feature rows kept, in (0, 1].
         seed: Seed of the row sampler (deterministic).
+        capacity: Most feature rows kept; past it the oldest go first, so
+            memory stays bounded however busy the service is.
     """
 
     window_seconds: float = 300.0
     min_samples: int = 30
     sample_rate: float = 1.0
     seed: int = 0
+    capacity: int = CAPACITY
 
     def __post_init__(self) -> None:
         """Validates ranges.
 
         Raises:
             ValueError: If the window length or minimum sample count is not
-                positive, or the sample rate is outside (0, 1].
+                positive, the sample rate is outside (0, 1], or the
+                capacity is below the minimum sample count.
         """
         if self.window_seconds <= 0 or self.min_samples < 1:
             raise errors.InputError(
@@ -129,6 +139,8 @@ class Window:
             )
         if not 0.0 < self.sample_rate <= 1.0:
             raise errors.InputError("sample_rate must be in (0, 1]")
+        if self.capacity < self.min_samples:
+            raise errors.InputError("capacity must be at least min_samples")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -346,8 +358,11 @@ class SignalMonitor:
         self.thresholds = thresholds
         self.profile = profile
         self.requests: deque[tuple[float, str, int, float]] = deque()
-        self.features: deque[tuple[float, pandas.DataFrame]] = deque()
+        # Kept as records: a frame per request costs ten times the memory.
+        self.features: deque[tuple[float, list[dict[Hashable, Any]]]] = deque()
         self.outcomes: deque[tuple[float, numpy.ndarray]] = deque()
+        # Feature rows in `features`, kept at most `policy.capacity`.
+        self.held = 0
         self.sampler = numpy.random.default_rng(policy.seed)
         self.lock = threading.Lock()
 
@@ -363,8 +378,23 @@ class SignalMonitor:
         with self.lock:
             self.requests.append((at, route, status, seconds))
 
+    def adopt(self, profile: scmle.data.reference.Baseline | None) -> None:
+        """Judges the feature signals against another training reference.
+
+        The serving adapter calls this whenever it starts serving a bundle,
+        so drift is measured against the reference of the model that
+        scores. The rows already kept stay: they are the traffic.
+
+        Args:
+            profile: The reference; None stops the feature signals.
+        """
+        with self.lock:
+            self.profile = profile
+
     def sense(self, at: float, frame: pandas.DataFrame) -> int:
         """Keeps a sample of the rows of a scored batch; returns the count.
+
+        Past the policy's capacity the oldest kept rows are dropped.
 
         Args:
             at: Time of the batch, in epoch seconds.
@@ -377,11 +407,25 @@ class SignalMonitor:
         if frame.empty:
             return 0
         keep = self.sampler.random(len(frame)) < self.policy.sample_rate
-        kept = frame.loc[keep].reset_index(drop=True)
-        if not kept.empty:
+        kept = frame.loc[keep].to_dict("records")
+        if kept:
             with self.lock:
                 self.features.append((at, kept))
+                self.held += len(kept)
+                self.trim()
         return len(kept)
+
+    def trim(self) -> None:
+        """Drops the oldest feature rows past the capacity; holds the lock."""
+        while self.held > self.policy.capacity:
+            at, oldest = self.features[0]
+            excess = self.held - self.policy.capacity
+            if len(oldest) <= excess:
+                self.features.popleft()
+                self.held -= len(oldest)
+            else:
+                self.features[0] = (at, oldest[excess:])
+                self.held -= excess
 
     def observe_outcomes(
         self, at: float, losses: Sequence[float] | numpy.ndarray
@@ -421,9 +465,11 @@ class SignalMonitor:
             now: The current time, in epoch seconds.
         """
         start = now - self.policy.window_seconds
-        for queue in (self.requests, self.features, self.outcomes):
+        for queue in (self.requests, self.outcomes):
             while queue and queue[0][0] < start:
                 queue.popleft()
+        while self.features and self.features[0][0] < start:
+            self.held -= len(self.features.popleft()[1])
 
     def evaluate(self, now: float) -> tuple[Signal, ...]:
         """Evaluates every signal over the window ending at ``now``.
@@ -443,10 +489,12 @@ class SignalMonitor:
         with self.lock:
             self.prune(now)
             requests = [r for r in self.requests if r[0] <= now]
-            frames = [f for at, f in self.features if at <= now]
+            kept = [
+                row for at, rows in self.features if at <= now for row in rows
+            ]
             outcomes = [o for at, o in self.outcomes if at <= now]
         found = self.assess(requests)
-        found += self.gauge(frames, requests)
+        found += self.gauge([pandas.DataFrame(kept)] if kept else [], requests)
         found += self.degradation(outcomes)
         return tuple(found)
 
@@ -555,9 +603,10 @@ class SignalMonitor:
                 minimum,
             )
         ]
-        if self.profile is None:
+        profile = self.profile  # read once: `adopt` may replace it
+        if profile is None:
             return found
-        return found + quality(self.profile, frames, limits, minimum)
+        return found + quality(profile, frames, limits, minimum)
 
     def degradation(self, outcomes: list[numpy.ndarray]) -> list[Signal]:
         """Judges the mean loss of cases whose outcome arrived.

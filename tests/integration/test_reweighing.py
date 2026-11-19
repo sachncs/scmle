@@ -6,6 +6,7 @@ import numpy
 import pandas
 import pytest
 
+from scmle import cli
 import scmle.api.project
 from scmle.contracts import tasks
 from scmle.evaluation import reweighing
@@ -103,3 +104,95 @@ def test_reweighing_cannot_be_combined_with_a_weight_column():
             sensitive_columns=["group"],
             fairness=tasks.Parity(mitigation="reweighing"),
         )
+
+
+def test_a_regression_project_reweights_by_outcome_bins():
+    rng = numpy.random.default_rng(2)
+    rows = 1200
+    group = rng.choice(["a", "b"], rows, p=[0.6, 0.4])
+    signal = rng.normal(size=rows)
+    outcome = signal - 1.2 * (group == "b") + rng.normal(0, 0.5, rows)
+    frame = pandas.DataFrame({"group": group, "signal": signal, "y": outcome})
+
+    def run(mitigation):
+        result = scmle.api.project.Project(
+            frame,
+            "y",
+            task="regression",
+            time_budget=60,
+            sensitive_columns=["group"],
+            fairness=tasks.Parity(mitigation=mitigation),
+        ).run()
+        scored = pandas.Series(result.predict(frame.drop(columns="y")))
+        means = scored.groupby(frame.group.to_numpy()).mean()
+        return result, float(means.max() - means.min())
+
+    reweighed, narrow = run("reweighing")
+    unchanged, wide = run("none")
+
+    assert narrow < wide
+    assert unchanged.run_dir != reweighed.run_dir
+    log = json.loads(
+        (reweighed.run_dir / "diagnostics/decision_log.json").read_text()
+    )
+    notes = [
+        (o["action"], o["reason"])
+        for o in log["outcomes"]
+        if o["technique"] == "fairness:group"
+    ]
+    assert len(notes) == 1
+    assert notes[0][0] == "include"
+    assert notes[0][1].startswith(
+        "development rows reweighted so group and label are independent"
+    )
+
+
+def test_the_cli_mitigation_option_reweights_a_regression_run(tmp_path):
+    rng = numpy.random.default_rng(5)
+    rows = 400
+    group = rng.choice(["a", "b"], rows)
+    signal = rng.normal(size=rows)
+    outcome = signal - (group == "b") + rng.normal(0, 0.5, rows)
+    path = tmp_path / "data.csv"
+    pandas.DataFrame({"group": group, "signal": signal, "y": outcome}).to_csv(
+        path, index=False
+    )
+
+    code = cli.main(
+        [
+            "run",
+            str(path),
+            "--target",
+            "y",
+            "--task",
+            "regression",
+            "--budget",
+            "30",
+            "--sensitive",
+            "group",
+            "--mitigation",
+            "reweighing",
+            "--output-dir",
+            str(tmp_path / "runs"),
+        ]
+    )
+
+    assert code == cli.EXIT_OK
+    run = next((tmp_path / "runs").glob("run_*"))
+    log = json.loads((run / "diagnostics/decision_log.json").read_text())
+    notes = [
+        o["action"]
+        for o in log["outcomes"]
+        if o["technique"] == "fairness:group"
+    ]
+    assert notes == ["include"]
+
+
+def test_the_cli_refuses_an_unknown_mitigation(capsys):
+    with pytest.raises(SystemExit) as caught:
+        cli.build_parser().parse_args(
+            ["run", "d.csv", "--target", "y", "--mitigation", "bogus"]
+        )
+
+    assert caught.value.code == cli.EXIT_USAGE
+    assert "invalid choice: 'bogus'" in capsys.readouterr().err

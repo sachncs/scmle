@@ -72,6 +72,7 @@ def test_the_folder_has_every_hardening_file(signed_service):
 
 def test_the_dockerfile_pins_locks_and_drops_privileges(signed_service):
     # Enforces docs/ARTIFACTS.md:136.
+    # Enforces website/src/pages/docs/artifacts.astro:82.
     text = (signed_service / "Dockerfile").read_text(encoding="utf-8")
     assert f"@{PLACEHOLDER}" in text and "-slim@sha256:" in text
     assert "pip install --no-cache-dir --no-deps -r requirements.lock" in text
@@ -91,6 +92,7 @@ def test_no_generated_text_documents_the_trusted_escape_hatch(signed_service):
 
 def test_the_placeholder_digest_stops_the_build(signed_service):
     # Enforces docs/ARTIFACTS.md:136.
+    # Enforces website/src/pages/docs/artifacts.astro:82.
     text = (signed_service / "Dockerfile").read_text(encoding="utf-8")
     block = text[text.index("RUN case") : text.index("ENV PYTHON")]
     script = block.removeprefix("RUN ").replace("\\\n", " ")
@@ -239,6 +241,11 @@ def test_trusted_is_refused_in_production_everywhere(
     # Enforces docs/CLI.md:179.
     # Enforces docs/GLOSSARY.md:612.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:442.
+    # Enforces website/src/learn/glossary.html:306.
+    # Enforces website/src/learn/when-things-go-wrong.html:183.
+    # Enforces website/src/pages/docs/cli.astro:99.
+    # Enforces website/src/pages/docs/quickstart.astro:118.
+    # Enforces website/src/pages/docs/threat-model.astro:15.
     with pytest.raises(
         errors.ArtifactError, match="SCMLE_TRUSTED=1 is refused"
     ):
@@ -257,6 +264,7 @@ def test_verification_happens_before_anything_is_deserialized(
     signed_service, tmp_path, monkeypatch
 ):
     # Enforces docs/SECURITY.md:35.
+    # Enforces website/src/pages/docs/threat-model.astro:16.
     def forbidden(*arguments, **keywords):
         raise AssertionError("deserialization before verification")
 
@@ -274,6 +282,7 @@ def test_an_unsigned_bundle_never_verifies_in_production(
     signed_service, tmp_path
 ):
     # Enforces docs/SECURITY.md:35.
+    # Enforces website/src/pages/docs/threat-model.astro:15.
     unsigned = copy_of(signed_service, tmp_path)
     (unsigned / "model" / "signature.json").unlink()
     with pytest.raises(errors.ArtifactError, match="unauthenticated"):
@@ -288,6 +297,7 @@ def test_an_unsigned_bundle_never_verifies_in_production(
 
 def test_a_wrong_key_is_refused(signed_service):
     # Enforces docs/SECURITY.md:35.
+    # Enforces website/src/pages/docs/threat-model.astro:16.
     with pytest.raises(errors.ArtifactError, match="signature is invalid"):
         verify.inspect(
             signed_service,
@@ -298,6 +308,8 @@ def test_a_wrong_key_is_refused(signed_service):
 def test_production_needs_verifiable_provenance(signed_service, tmp_path):
     # Enforces docs/SECURITY.md:35.
     # Enforces docs/GLOSSARY.md:629.
+    # Enforces website/src/learn/glossary.html:314.
+    # Enforces website/src/pages/docs/threat-model.astro:15.
     missing = copy_of(signed_service, tmp_path)
     (missing / "provenance.json").unlink()
     with pytest.raises(errors.ArtifactError, match="provenance"):
@@ -319,6 +331,7 @@ def test_changed_build_materials_are_refused(signed_service, tmp_path):
 def test_provenance_for_another_bundle_is_refused(signed_service, tmp_path):
     # Enforces docs/SECURITY.md:35.
     # Enforces docs/GLOSSARY.md:629.
+    # Enforces website/src/learn/glossary.html:314.
     swapped = copy_of(signed_service, tmp_path)
     attest.stamp(
         swapped, "sha256:" + "9" * 64, "someone", "python:3.12-slim", KEY
@@ -361,6 +374,7 @@ def test_the_build_context_holds_no_secret(signed_service):
 
 def test_the_context_scan_finds_planted_secrets(signed_service, tmp_path):
     # Enforces docs/ARTIFACTS.md:136.
+    # Enforces website/src/pages/docs/artifacts.astro:82.
     folder = copy_of(signed_service, tmp_path)
     (folder / ".env").write_text("TOKEN=abc")
     (folder / "id_rsa").write_text("x")
@@ -465,6 +479,7 @@ def test_the_gate_passes_a_clean_report_and_fails_any_pip_audit_finding():
 
 
 def test_the_gate_applies_severity_and_expiring_exceptions():
+    # Enforces website/src/pages/docs/threat-model.astro:18.
     trivy = {
         "Results": [
             {
@@ -502,6 +517,7 @@ def test_the_gate_applies_severity_and_expiring_exceptions():
 
 
 def test_the_gate_fails_closed():
+    # Enforces website/src/pages/docs/threat-model.astro:18.
     with pytest.raises(vuln_gate.GateError, match="no packages"):
         vuln_gate.evaluate({"dependencies": []}, POLICY, today=TODAY)
     with pytest.raises(vuln_gate.GateError, match="unrecognised"):
@@ -517,6 +533,7 @@ def test_the_gate_fails_closed():
 
 
 def test_the_gate_checks_that_the_scan_covered_the_sbom(signed_service):
+    # Enforces website/src/pages/docs/threat-model.astro:18.
     document = json.loads((signed_service / "sbom.cdx.json").read_text())
     covered = {
         "dependencies": [
@@ -570,6 +587,8 @@ def test_the_framework_may_be_unscanned_only_while_its_exception_lives(
 ):
     # Enforces docs/SERVICE_SLO.md:136.
     # Enforces docs/ARTIFACTS.md:140.
+    # Enforces website/src/pages/docs/service.astro:86.
+    # Enforces website/src/pages/docs/artifacts.astro:86.
     document = json.loads((signed_service / "sbom.cdx.json").read_text())
     scanned = {
         "dependencies": [

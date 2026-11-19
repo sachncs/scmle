@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from http import server
 import json
 import logging
@@ -14,9 +15,12 @@ from scmle.contracts import errors
 from scmle.contracts import serving
 from scmle.inference import guard
 from scmle.runtime import logs
+from scmle.runtime import tracing
 from scmle.security import access
 
 LOGGER = logging.getLogger("scmle.serving")
+# Probes are polled every few seconds and carry no work worth a span.
+PROBES = frozenset({"/livez", "/readyz"})
 
 if TYPE_CHECKING:
     from scmle.serving.server import web
@@ -87,6 +91,7 @@ class Exchange(server.BaseHTTPRequestHandler):
             self.send_header(name, value)
         self.end_headers()
         self.wfile.write(body)
+        tracing.TRACING.annotate("http.response.status_code", status)
         self.adapter.observe(self.path, status, time.monotonic() - self.started)
 
     def fail(
@@ -172,6 +177,20 @@ class Exchange(server.BaseHTTPRequestHandler):
             return False
         return True
 
+    def traced(self) -> contextlib.AbstractContextManager[None]:
+        """The `request` span of this request, continuing the caller's trace.
+
+        Returns:
+            The span's context manager; a no-op one for the probes.
+        """
+        if self.path in PROBES:
+            return contextlib.nullcontext()
+        return tracing.TRACING.span(
+            "request",
+            {"http.request.method": self.command, "url.path": self.path},
+            carrier=self.headers,
+        )
+
     def log_message(
         self,
         format: str,  # noqa: A002 -- name fixed by BaseHTTPRequestHandler
@@ -190,10 +209,11 @@ class Responder(Exchange):
 
     def do_GET(self) -> None:
         """Serves the probes, health and schema endpoints."""
-        if not self.identify() or not self.authorize("GET"):
-            return
-        with logs.bind(request=self.request_id):
-            self.probe()
+        with self.traced():
+            if not self.identify() or not self.authorize("GET"):
+                return
+            with logs.bind(request=self.request_id):
+                self.probe()
 
     def probe(self) -> None:
         """Answers a GET for the probes, health and schema endpoints."""
@@ -291,10 +311,11 @@ class Responder(Exchange):
 
     def do_POST(self) -> None:
         """Scores a prediction request under the admission limit."""
-        if not self.identify() or not self.authorize("POST"):
-            return
-        with logs.bind(request=self.request_id):
-            self.accept()
+        with self.traced():
+            if not self.identify() or not self.authorize("POST"):
+                return
+            with logs.bind(request=self.request_id):
+                self.accept()
 
     def accept(self) -> None:
         """Routes a POST to scoring under the admission limit."""
@@ -302,7 +323,9 @@ class Responder(Exchange):
         if self.path not in serving.PREDICT_PATHS:
             self.fail(404, "not found", "request")
             return
-        readiness = adapter.health()
+        # Not `health`: draining takes the service out of rotation, but a
+        # request accepted before the drain began is still finished.
+        readiness = guard.assess(adapter.readiness, adapter.admission)
         if not readiness["ready"]:
             self.fail(
                 503,

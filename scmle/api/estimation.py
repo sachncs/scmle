@@ -32,6 +32,14 @@ PARAMETER_ESTIMATION_DECLARATION_ARTIFACT = (
 )
 PARAMETER_ESTIMATION_DECLARATION_LOCK = "parameter_estimation_declaration.lock"
 PARAMETER_ESTIMATION_DECLARATION_SCHEMA = 2
+REPORT = "parameter_estimation.json"
+REFUSAL = "parameter_estimation_refusal.json"
+REFUSAL_SCHEMA = 1
+REFUSALS = (errors.ConfigError, errors.DataError)
+"""What `estimate` raises when the declaration cannot be estimated on the
+data: a missing or inconsistent column, missing values under `reject`, a
+likelihood the estimator does not fit, or an estimator's own refusal (too few
+rows per arm, no overlap, a singular design)."""
 
 
 def declare(
@@ -266,13 +274,136 @@ def restore(
             "parameter estimation declaration is incomplete",
             {"run_dir": str(artifact_path)},
         )
+    return decode(
+        envelope, errors.ArtifactError, {"run_dir": str(artifact_path)}
+    )
+
+
+def decode(
+    envelope: Mapping[str, Any],
+    failure: type[errors.ScmleError],
+    details: Mapping[str, str],
+) -> tuple[parameter_estimation.Estimand, parameter_estimation.Config]:
+    """Rebuilds a declaration, raising one typed error for any defect.
+
+    Args:
+        envelope: The declaration, with `schema_version`, `estimand` and
+            `policy`.
+        failure: The error raised when it is invalid.
+        details: Where the declaration came from, for the error.
+
+    Returns:
+        The estimand and the policy.
+
+    Raises:
+        ScmleError: `failure`, when a field is absent, has the wrong shape
+            or is invalid.
+    """
     try:
         return rebuild(envelope)
     except (KeyError, TypeError, ValueError) as error:
-        raise errors.ArtifactError(
-            "parameter estimation declaration is invalid",
-            {"run_dir": str(artifact_path)},
+        raise failure(
+            "parameter estimation declaration is invalid", dict(details)
         ) from error
+
+
+def load(
+    path: str | pathlib.Path,
+) -> tuple[parameter_estimation.Estimand, parameter_estimation.Config]:
+    """Reads a parameter-estimation declaration file.
+
+    The file is a JSON object with `estimand` and `policy` in the layout a
+    run stores (single-word keys, `schema_version` 2, the default) or in the
+    version-1 layout with `schema_version` 1. A run's own
+    `parameter_estimation_declaration.json` is accepted as it is.
+
+    Args:
+        path: The declaration file.
+
+    Returns:
+        The estimand and the policy.
+
+    Raises:
+        ConfigError: If the file cannot be read, is not a JSON object with
+            `estimand` and `policy`, has an unsupported `schema_version` or
+            declares an invalid estimand or policy.
+    """
+    source = {"path": str(path)}
+    try:
+        envelope = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise errors.ConfigError(
+            "parameter estimation declaration cannot be read", source
+        ) from error
+    if not isinstance(envelope, dict) or not {"estimand", "policy"} <= set(
+        envelope
+    ):
+        raise errors.ConfigError(
+            "parameter estimation declaration must be a JSON object with "
+            "`estimand` and `policy`",
+            source,
+        )
+    version = envelope.get(
+        "schema_version", PARAMETER_ESTIMATION_DECLARATION_SCHEMA
+    )
+    if version not in range(
+        records.ORIGIN, PARAMETER_ESTIMATION_DECLARATION_SCHEMA + 1
+    ):
+        raise errors.ConfigError(
+            "unsupported parameter estimation declaration schema", source
+        )
+    return decode(
+        {
+            "schema_version": version,
+            "estimand": envelope["estimand"],
+            "policy": envelope["policy"],
+        },
+        errors.ConfigError,
+        source,
+    )
+
+
+def refuse(
+    directory: str | pathlib.Path,
+    estimand: parameter_estimation.Estimand,
+    policy: parameter_estimation.Config,
+    error: errors.ScmleError,
+) -> pathlib.Path:
+    """Records why a declared estimate was refused.
+
+    Writes `REFUSAL` atomically and removes a report an earlier estimate
+    left in the same directory, so the directory never holds both.
+
+    Args:
+        directory: Where the record is written; created when missing.
+        estimand: The declared population quantity.
+        policy: The declared estimation policy.
+        error: The refusal `estimate` raised.
+
+    Returns:
+        The path of the record, which holds `status` `refused`, the
+        `reason`, its `category` and `details`, the estimand and the policy.
+    """
+    folder = pathlib.Path(directory)
+    folder.mkdir(parents=True, exist_ok=True)
+    record = {
+        "schema_version": REFUSAL_SCHEMA,
+        "status": "refused",
+        "reason": str(error),
+        "category": error.category,
+        "details": error.details,
+        "estimand": estimand.to_dict(),
+        "policy": policy.to_dict(),
+    }
+    path = folder / REFUSAL
+    durability.write_atomically(
+        path,
+        (
+            json.dumps(record, default=str, indent=2, sort_keys=True) + "\n"
+        ).encode("utf-8"),
+    )
+    (folder / REPORT).unlink(missing_ok=True)
+    return path
 
 
 def bind(
@@ -541,7 +672,8 @@ def estimate(
         policy: The declared estimation policy.
         artifact_directory: If given, the report is written there as
             ``parameter_estimation.json`` and the returned result is the one
-            read back through the digest-checking reader.
+            read back through the digest-checking reader; a refusal record
+            an earlier attempt left there is removed.
 
     Returns:
         The estimation result, with diagnostics naming the columns used, the
@@ -599,9 +731,8 @@ def estimate(
         },
     )
     if artifact_directory is not None:
-        artifact = (
-            pathlib.Path(artifact_directory) / "parameter_estimation.json"
-        )
+        artifact = pathlib.Path(artifact_directory) / REPORT
         estimation.write(artifact)
         estimation = parameter_estimation.Estimation.read(artifact)
+        (artifact.parent / REFUSAL).unlink(missing_ok=True)
     return estimation

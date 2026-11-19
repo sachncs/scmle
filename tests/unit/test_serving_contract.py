@@ -184,6 +184,8 @@ def test_the_artifact_digest_names_the_saved_manifest(bundle, tmp_path):
 def test_the_versioned_path_and_unknown_versions(golden, running):
     # Enforces docs/SERVICE_SLO.md:48.
     # Enforces docs/SERVICE_SLO.md:36.
+    # Enforces website/src/pages/docs/service.astro:53.
+    # Enforces website/src/pages/docs/service.astro:61.
     status, body = call(
         f"{running.address}/v1/predict", {"records": golden.records[:1]}
     )
@@ -206,6 +208,8 @@ def test_nulls_unseen_categories_and_extra_columns_are_reported_per_row(
 ):
     # Enforces docs/SERVICE_SLO.md:56.
     # Enforces docs/SERVICE_SLO.md:38.
+    # Enforces website/src/pages/docs/service.astro:14.
+    # Enforces website/src/pages/docs/service.astro:53.
     status, body = call(
         f"{running.address}/predict", {"records": golden.records}
     )
@@ -222,6 +226,7 @@ def test_nulls_unseen_categories_and_extra_columns_are_reported_per_row(
 
 def test_policies_can_reject_nulls_and_unseen_categories(golden, bundle):
     # Enforces docs/SERVICE_SLO.md:56.
+    # Enforces website/src/pages/docs/service.astro:14.
     strict = scmle.serving.server.HttpServing(
         bundle, on_null="reject", on_unseen="reject"
     )
@@ -247,6 +252,8 @@ def test_policies_can_reject_nulls_and_unseen_categories(golden, bundle):
 def test_schema_changes_are_explicit(golden, running):
     # Enforces docs/SERVICE_SLO.md:38.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:509.
+    # Enforces website/src/learn/when-things-go-wrong.html:206.
+    # Enforces website/src/pages/docs/service.astro:53.
     base = running.address
     status, body = call(
         f"{base}/predict", {"records": [{"age": 1.0, "plan": "pro"}]}
@@ -365,6 +372,7 @@ def test_a_scoring_call_past_its_deadline_answers_504(
     golden, bundle, monkeypatch
 ):
     # Enforces docs/SERVICE_SLO.md:71.
+    # Enforces website/src/pages/docs/service.astro:26.
     adapter = scmle.serving.server.HttpServing(
         bundle, scoring_timeout_seconds=0.2
     )
@@ -399,6 +407,7 @@ def test_a_hung_call_makes_the_replica_unready_until_it_returns(
     # Enforces docs/SERVICE_SLO.md:71.
     # SRV-1: a timed-out call kept its worker and the lock while readiness
     # stayed true, so traffic kept arriving and queued behind it.
+    # Enforces website/src/pages/docs/service.astro:26.
     adapter = scmle.serving.server.HttpServing(
         bundle, max_concurrent=2, scoring_timeout_seconds=0.2
     )
@@ -435,6 +444,7 @@ def test_a_hung_call_makes_the_replica_unready_until_it_returns(
 
 def test_consecutive_timeouts_fail_liveness_and_never_queue():
     # Enforces docs/SERVICE_SLO.md:71.
+    # Enforces website/src/pages/docs/service.astro:26.
     control = guard.Admission(2, 0.05, strikes=2)
     release = threading.Event()
     try:
@@ -484,6 +494,7 @@ def test_an_abandoned_call_knows_before_it_mutates_anything():
 
 def test_readiness_follows_verify_then_load_then_warm_up(golden, bundle):
     # Enforces docs/SERVICE_SLO.md:15.
+    # Enforces website/src/pages/docs/service.astro:7.
     order = []
 
     def loader(readiness):
@@ -522,6 +533,10 @@ def test_a_failed_verification_keeps_the_service_alive_but_never_ready(
     # Enforces docs/SERVICE_SLO.md:14.
     # Enforces docs/GLOSSARY.md:629.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:484.
+    # Enforces website/src/learn/glossary.html:314.
+    # Enforces website/src/learn/when-things-go-wrong.html:196.
+    # Enforces website/src/pages/docs/service.astro:6.
+    # Enforces website/src/pages/docs/service.astro:7.
     def loader(readiness):
         readiness.begin(guard.Phase.VERIFYING)
         raise errors.ArtifactError("bundle signature is invalid")
@@ -549,6 +564,7 @@ def test_a_failed_verification_keeps_the_service_alive_but_never_ready(
 
 def test_not_ready_while_the_loader_is_still_running(bundle):
     # Enforces docs/SERVICE_SLO.md:15.
+    # Enforces website/src/pages/docs/service.astro:7.
     release = threading.Event()
 
     def loader(readiness):
@@ -586,6 +602,7 @@ def test_a_failing_warm_up_is_not_ready(bundle):
 
 def test_readiness_steps_cannot_be_skipped_or_reordered():
     # Enforces docs/SERVICE_SLO.md:15.
+    # Enforces website/src/pages/docs/service.astro:7.
     readiness = guard.Readiness()
     with pytest.raises(errors.ScmleError, match="cannot begin loading"):
         readiness.begin(guard.Phase.LOADING)

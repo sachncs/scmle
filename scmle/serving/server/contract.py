@@ -15,6 +15,7 @@ from scmle.contracts import serving
 from scmle.deploy import provenance
 from scmle.inference import guard
 from scmle.inference import validation
+from scmle.runtime import tracing
 
 LOGGER = logging.getLogger("scmle.serving")
 
@@ -96,8 +97,28 @@ class Server(abc.ABC):
         """Digest of the input schema of the bundle being served."""
         return serving.schema_digest(self.bundle.schema.anchor())
 
-    def synthesise(self) -> dict[str, Any] | None:
+    def identity(self) -> dict[str, Any]:
+        """Reports the model version and digest.
+
+        Returns:
+            `model_version` and `artifact_digest`; an empty mapping before
+            the model is loaded.
+        """
+        if self.loaded is None:
+            return {}
+        return {
+            "model_version": self.loaded.info.model_version,
+            "artifact_digest": self.artifact_digest,
+        }
+
+    def synthesise(
+        self, bundle: scmle.artifacts.bundle.Bundle | None = None
+    ) -> dict[str, Any] | None:
         """Derives a record that is valid for the schema.
+
+        Args:
+            bundle: The bundle whose schema is used; the served one when
+                None.
 
         Returns:
             A record with 0.0 for every numeric feature and the first known
@@ -105,7 +126,7 @@ class Server(abc.ABC):
             categorical one; None when the schema has series, extra or
             optional inputs.
         """
-        schema = self.bundle.schema
+        schema = (self.bundle if bundle is None else bundle).schema
         if schema.series or schema.extras or schema.optional:
             return None
         record: dict[str, Any] = dict.fromkeys(schema.numeric, 0.0)
@@ -114,30 +135,39 @@ class Server(abc.ABC):
             record[name] = known[0]
         return record
 
+    def rehearse(self, bundle: scmle.artifacts.bundle.Bundle) -> str:
+        """Scores the warm-up records once on `bundle`.
+
+        Warm-up records come from `warmup_records` or `synthesise`. The
+        call never feeds series history.
+
+        Args:
+            bundle: The bundle to warm up.
+
+        Returns:
+            What was scored, or why nothing was.
+        """
+        records = self.warmup_records
+        note = "explicit warm-up records"
+        if records is None:
+            record = self.synthesise(bundle)
+            records = None if record is None else [record]
+            note = "synthetic record from the schema"
+        if records is None:
+            return "skipped: no synthetic record for series or extra inputs"
+        bundle.score(pandas.DataFrame(records))
+        return note
+
     def warm(self) -> None:
         """Scores once so the first request does not pay for initialization.
 
-        Marks the warm-up step complete, or skipped when no record can be
-        derived, or marks the service failed if scoring raises. Warm-up
-        records come from `warmup_records` or `synthesise`. The warm-up
-        call never feeds series history. A `ScmleError` from
+        Marks the warm-up step complete (see `rehearse`), or marks the
+        service failed if scoring raises. A `ScmleError` from
         `Readiness.begin` (warm-up started out of order) is not caught.
         """
         self.readiness.begin(guard.Phase.WARMING)
         try:
-            records = self.warmup_records
-            note = "explicit warm-up records"
-            if records is None:
-                record = self.synthesise()
-                records = None if record is None else [record]
-                note = "synthetic record from the schema"
-            if records is None:
-                self.readiness.complete(
-                    guard.Phase.WARMING,
-                    "skipped: no synthetic record for series or extra inputs",
-                )
-                return
-            self.bundle.score(pandas.DataFrame(records))
+            note = self.rehearse(self.bundle)
         except Exception as error:
             LOGGER.exception("warm-up failed")
             self.readiness.fail(f"warm-up failed: {type(error).__name__}")
@@ -216,7 +246,14 @@ class Server(abc.ABC):
         # parallel (SRV-1); with series, scoring reads the history the
         # previous request remembered, so score and remember stay one step.
         held = self.lock if bundle.schema.series else contextlib.nullcontext()
-        with held:
+        traced = tracing.TRACING.span(
+            "predict",
+            {
+                "scmle.rows": len(frame),
+                "scmle.model_version": bundle.info.model_version,
+            },
+        )
+        with traced, held:
             rows = validation.Validator(bundle.schema).describe(frame)
             response = bundle.score(frame)
             self.enforce(rows)

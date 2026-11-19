@@ -4,10 +4,13 @@
   "status": "definition_only",
   "task_family": "clustering",
   "modality": "tabular",
-  "built": "library_only",
+  "built": "tabular_beta_path",
   "evidence_in_repo": [
     "scmle/unsupervised/clustering.py",
-    "tests/unit/test_clustering.py"
+    "scmle/api/clustering.py",
+    "scmle/cli/clustering.py",
+    "tests/unit/test_clustering.py",
+    "tests/integration/test_clustering_path.py"
   ],
   "deployment_requirement": {
     "statement": "Segments that a named team will act on, with a stated tolerance for segments that do not persist.",

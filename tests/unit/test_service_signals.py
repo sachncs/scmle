@@ -109,12 +109,21 @@ def test_the_runtime_writes_evaluated_signals_as_json_lines(tmp_path):
     assert len(target.read_text().splitlines()) == 2
 
 
-def test_the_settings_choose_the_signal_file_and_interval():
+def test_the_settings_choose_the_signal_file_interval_and_window():
     chosen = runtime.cadence(
         {
             "SCMLE_SIGNALS_FILE": "/var/run/signals.jsonl",
             "SCMLE_SIGNALS_INTERVAL": "15",
+            "SCMLE_SIGNALS_WINDOW": "120",
         }
     )
-    assert chosen == {"path": "/var/run/signals.jsonl", "interval": 15.0}
-    assert runtime.cadence({}) == {"path": None, "interval": 60.0}
+    assert chosen == {
+        "path": "/var/run/signals.jsonl",
+        "interval": 15.0,
+        "window": 120.0,
+    }
+    assert runtime.cadence({}) == {
+        "path": None,
+        "interval": 60.0,
+        "window": 300.0,
+    }

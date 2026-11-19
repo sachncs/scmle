@@ -5,6 +5,10 @@
 the bundle load and the warm-up finished. A folder that fails verification
 leaves the process alive and unready, with the reason at `/readyz`, so the
 orchestrator keeps it out of rotation and an operator can read why.
+
+`hold` is the serving loop `run` and `scmle serve` share: SIGTERM or
+SIGINT drains the requests in flight and stops, SIGHUP reloads the bundle
+without downtime, and a background thread writes the operations signals.
 """
 
 from collections.abc import Mapping
@@ -12,6 +16,7 @@ import json
 import logging
 import os
 import pathlib
+import queue
 import signal
 import sys
 import threading
@@ -25,6 +30,7 @@ from scmle.deploy import verify
 from scmle.inference import guard
 from scmle.operations import signals
 from scmle.runtime import logs
+from scmle.runtime import tracing
 from scmle.security import access
 from scmle.serving import server
 
@@ -32,6 +38,12 @@ LOGGER = logging.getLogger(__name__)
 # Set (to any non-empty value) for JSON-lines logs, as `scmle --log-json`.
 LOG_JSON = "SCMLE_LOG_JSON"
 DEFAULT_HOST = "0.0.0.0"  # noqa: S104 -- a container service binds all interfaces  # nosec B104
+# Seconds between two evaluations of the signals: the shortest window the
+# operations signals evaluate (one minute), so each window is written once.
+INTERVAL = 60.0
+# The signals that stop the service (drained) and that reload its bundle.
+STOPS = (signal.SIGTERM, signal.SIGINT)
+RELOAD = getattr(signal, "SIGHUP", None)
 
 
 def number(environ: Mapping[str, str], name: str, default: float) -> float:
@@ -69,8 +81,9 @@ def settings(environ: Mapping[str, str]) -> dict[str, Any]:
 
     Returns:
         Keyword arguments for `HttpServing`: host, port, request and concurrency
-        limits, scoring timeout, null and unseen-value policies, and the access
-        gateway.
+        limits, scoring timeout, null and unseen-value policies, the access
+        gateway and the drain time (`SCMLE_DRAIN_SECONDS`; unset or 0 keeps
+        the derived default).
     """
     return {
         "host": environ.get("HOST", DEFAULT_HOST),
@@ -94,6 +107,7 @@ def settings(environ: Mapping[str, str]) -> dict[str, Any]:
         "on_null": environ.get("SCMLE_ON_NULL", "impute"),
         "on_unseen": environ.get("SCMLE_ON_UNSEEN", "report"),
         "gateway": access.gateway_from_environment(environ),
+        "drain_seconds": (number(environ, "SCMLE_DRAIN_SECONDS", 0.0) or None),
     }
 
 
@@ -105,12 +119,17 @@ def cadence(environ: Mapping[str, str]) -> dict[str, Any]:
             `SCMLE_SIGNALS_INTERVAL`).
 
     Returns:
-        A dict with `path` (None to use the service log) and `interval` in
-        seconds (60 by default).
+        A dict with `path` (None to use the service log), `interval` in
+        seconds (`INTERVAL` by default) and `window`, the seconds of traffic
+        each evaluation covers (`SCMLE_SIGNALS_WINDOW`, the `Window`
+        default otherwise).
     """
     return {
         "path": environ.get("SCMLE_SIGNALS_FILE") or None,
-        "interval": number(environ, "SCMLE_SIGNALS_INTERVAL", 60.0),
+        "interval": number(environ, "SCMLE_SIGNALS_INTERVAL", INTERVAL),
+        "window": number(
+            environ, "SCMLE_SIGNALS_WINDOW", signals.Window().window_seconds
+        ),
     }
 
 
@@ -208,40 +227,141 @@ def prime(folder: pathlib.Path, environ: Mapping[str, str]) -> server.Loader:
     return loader
 
 
+def fetch(path: pathlib.Path, trusted: bool) -> server.Loader:
+    """Builds the loader that reads a bundle directory, for `scmle serve`.
+
+    Args:
+        path: The bundle directory.
+        trusted: Whether an unsigned bundle is vouched for.
+
+    Returns:
+        A function that, given the readiness tracker, loads the bundle;
+        `Bundle.load` checks its signature, so that is the verify step.
+    """
+
+    def loader(readiness: guard.Readiness) -> bundle.Bundle:
+        """Loads the bundle, checking its signature.
+
+        Args:
+            readiness: The readiness tracker updated at each step.
+
+        Returns:
+            The loaded model bundle.
+        """
+        readiness.begin(guard.Phase.VERIFYING)
+        readiness.complete(
+            guard.Phase.VERIFYING, "signature checked while loading"
+        )
+        readiness.begin(guard.Phase.LOADING)
+        model = bundle.Bundle.load(path, trusted=trusted)
+        readiness.complete(guard.Phase.LOADING, str(path))
+        return model
+
+    return loader
+
+
+def refresh(adapter: server.HttpServing, loader: server.Loader | None) -> None:
+    """Reloads the served bundle; a failure keeps the old one serving.
+
+    Args:
+        adapter: The running server.
+        loader: The loader of the replacement; the adapter's own if None.
+    """
+    try:
+        digest = adapter.reload(loader)
+    except Exception:  # the old model keeps serving whatever went wrong
+        LOGGER.exception("reload failed; the previous bundle keeps serving")
+        return
+    LOGGER.info("serving %s", digest)
+
+
+def hold(
+    adapter: server.HttpServing,
+    monitor: signals.SignalMonitor,
+    path: pathlib.Path | str | None,
+    interval: float,
+    loader: server.Loader | None = None,
+) -> None:
+    """Serves until SIGTERM or SIGINT, reloading on SIGHUP, then drains.
+
+    Must run on the main thread, which receives the signals. Starts the
+    server and the thread that writes the signals; each SIGHUP reloads the
+    bundle while the old one keeps serving (`HttpServing.reload`). SIGTERM
+    or SIGINT stops accepting connections, lets the requests in flight
+    finish (`HttpServing.stop`), writes the signals one last time and
+    restores the previous signal handlers.
+
+    Args:
+        adapter: The server to run; not yet started.
+        monitor: The signal monitor the server feeds.
+        path: File the signals are appended to, or None for the log.
+        interval: Seconds between two evaluations of the signals.
+        loader: The loader SIGHUP reloads from; the adapter's own if None.
+
+    Raises:
+        ConfigError: If `interval` is not positive or this is not the main
+            thread.
+    """
+    if interval <= 0:
+        raise errors.ConfigError("the signals interval must be positive")
+    if threading.current_thread() is not threading.main_thread():
+        raise errors.ConfigError("serve from the main thread")
+    inbox: queue.SimpleQueue[int] = queue.SimpleQueue()
+    wanted = [*STOPS, *([] if RELOAD is None else [RELOAD])]
+    previous = {
+        number: signal.signal(number, lambda *got: inbox.put(got[0]))
+        for number in wanted
+    }
+    stop = threading.Event()
+    writer = threading.Thread(
+        target=pulse, args=(monitor, stop, path, interval), daemon=True
+    )
+    try:
+        adapter.start()
+        writer.start()
+        LOGGER.info("listening on %s", adapter.address)
+        while inbox.get() == RELOAD:
+            refresh(adapter, loader)
+        LOGGER.info("stopping: draining the requests in flight")
+    finally:
+        stop.set()
+        adapter.stop()
+        if writer.is_alive():
+            writer.join(timeout=interval)
+        emit(monitor, time.time(), path)
+        for number, handler in previous.items():
+            signal.signal(number, handler)
+
+
 def run(folder: pathlib.Path, environ: Mapping[str, str]) -> None:
     """Serves the folder until the process is told to stop.
 
-    Starts the HTTP server and a background thread that writes the signals, and
-    returns after SIGTERM or a keyboard interrupt, once the server is stopped.
+    Serves through `hold`: SIGHUP verifies and loads the folder again and
+    swaps the model in without downtime; SIGTERM or SIGINT drains and
+    returns once the server is stopped. With `SCMLE_TRACING` set the
+    requests are traced (see `scmle.runtime.tracing`).
 
     Args:
         folder: Service folder.
-        environ: The environment (settings, signing key, access settings
-            and `SCMLE_LOG_JSON`).
+        environ: The environment (settings, signing key, access settings,
+            `SCMLE_LOG_JSON` and `SCMLE_TRACING`).
     """
     logs.configure(logging.INFO, structured=bool(environ.get(LOG_JSON)))
-    monitor = signals.SignalMonitor()
+    if environ.get(tracing.SWITCH):
+        tracing.TRACING.enable(environ=environ)
+    chosen = cadence(environ)
+    monitor = signals.SignalMonitor(
+        signals.Window(window_seconds=chosen["window"])
+    )
     adapter = server.HttpServing(
         loader=prime(folder, environ),
         monitor=monitor,
         **settings(environ),
     )
-    stop = threading.Event()
-    signal.signal(signal.SIGTERM, lambda *ignored: stop.set())
-    chosen = cadence(environ)
-    threading.Thread(
-        target=pulse,
-        args=(monitor, stop, chosen["path"], chosen["interval"]),
-        daemon=True,
-    ).start()
-    adapter.start()
-    LOGGER.info("listening on %s; not ready until verified", adapter.address)
     try:
-        stop.wait()
-    except KeyboardInterrupt:
-        LOGGER.info("interrupted")
+        hold(adapter, monitor, chosen["path"], chosen["interval"])
     finally:
-        adapter.stop()
+        tracing.TRACING.disable()
 
 
 def healthcheck(environ: Mapping[str, str]) -> int:
