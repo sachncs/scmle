@@ -54,8 +54,8 @@ class Manifest:
     Attributes:
         strategy: Name of the strategy that produced the split.
         seed: Random seed used.
-        train_ids: Row ids of the development partition.
-        test_ids: Row ids of the locked test partition.
+        training: Row ids of the development partition.
+        test: Row ids of the locked test partition.
         folds: Cross-validation folds as positions within the development
             partition.
         notes: Adjustments made while splitting (for example fewer folds).
@@ -65,8 +65,8 @@ class Manifest:
 
     strategy: str
     seed: int
-    train_ids: tuple[int, ...]
-    test_ids: tuple[int, ...]
+    training: tuple[int, ...]
+    test: tuple[int, ...]
     folds: tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]
     notes: tuple[str, ...] = ()
     entities: str | None = None
@@ -87,8 +87,8 @@ class Manifest:
             (
                 self.strategy,
                 self.seed,
-                self.train_ids,
-                self.test_ids,
+                self.training,
+                self.test,
                 self.folds,
             )
         )
@@ -111,10 +111,10 @@ class Manifest:
                 "strategy": self.strategy,
                 "seed": self.seed,
                 "fingerprint": self.fingerprint,
-                "n_train": len(self.train_ids),
-                "n_test": len(self.test_ids),
-                "train_ids": list(self.train_ids),
-                "test_ids": list(self.test_ids),
+                "n_train": len(self.training),
+                "n_test": len(self.test),
+                "train_ids": list(self.training),
+                "test_ids": list(self.test),
                 "folds": [
                     {"train": list(train), "val": list(val)}
                     for train, val in self.folds
@@ -129,14 +129,14 @@ class Partition:
     """Raw output of a split strategy.
 
     Attributes:
-        dev_ids: Row ids available for model development.
-        test_ids: Row ids reserved for the final test.
-        folds: Cross-validation folds over positions in `dev_ids`.
+        development: Row ids available for model development.
+        test: Row ids reserved for the final test.
+        folds: Cross-validation folds over positions in `development`.
         notes: Adjustments made while splitting.
     """
 
-    dev_ids: numpy.ndarray
-    test_ids: numpy.ndarray
+    development: numpy.ndarray
+    test: numpy.ndarray
     folds: list[Fold]
     notes: list[str] = dataclasses.field(default_factory=list)
 
@@ -147,15 +147,15 @@ class Split:
 
     Attributes:
         manifest: Immutable split record.
-        dev_features: Development features (target removed).
-        dev_target: Development labels.
-        locked_test: The sealed test partition.
+        features: Development features (target removed).
+        target: Development labels.
+        test: The sealed test partition.
     """
 
     manifest: Manifest
-    dev_features: pandas.DataFrame
-    dev_target: pandas.Series
-    locked_test: Lockbox
+    features: pandas.DataFrame
+    target: pandas.Series
+    test: Lockbox
 
 
 def tuplify(values: numpy.ndarray) -> tuple[int, ...]:
@@ -175,19 +175,19 @@ class Partitioner(abc.ABC):
 
     Attributes:
         name: Strategy name used in configuration.
-        supported_tasks: Task types the strategy can serve.
+        scope: Task types the strategy can serve.
         data: The data section of the project specification.
         validation: The validation section of the project specification.
         task: The resolved task type.
     """
 
     name: ClassVar[str]
-    supported_tasks: ClassVar[frozenset[tasks.Task]] = frozenset(tasks.Task)
+    scope: ClassVar[frozenset[tasks.Task]] = frozenset(tasks.Task)
 
     def __init__(self, spec: tasks.Config, task: tasks.Task) -> None:
         """Initializes the strategy.
 
-        The task is checked by `check_task`, so a `BlockedError` from it
+        The task is checked by `check`, so a `BlockedError` from it
         propagates when the strategy cannot serve the task.
 
         Args:
@@ -197,15 +197,15 @@ class Partitioner(abc.ABC):
         self.data = spec.data
         self.validation = spec.validation
         self.task = task
-        self.check_task()
+        self.check()
 
-    def check_task(self) -> None:
-        """Rejects tasks outside `supported_tasks`.
+    def check(self) -> None:
+        """Rejects tasks outside `scope`.
 
         Raises:
             BlockedError: If the strategy cannot serve the task.
         """
-        if self.task not in self.supported_tasks:
+        if self.task not in self.scope:
             raise errors.BlockedError(
                 f"{self.name} validation does not support {self.task.value}"
             )

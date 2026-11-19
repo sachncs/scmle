@@ -13,7 +13,7 @@ def transcript(**changes) -> metadata.Transcript:
         "text": "hello there",
         "source": "clip.wav",
         "provider": "asr",
-        "provider_version": "1.0",
+        "version": "1.0",
         "language": "en",
     }
     values.update(changes)

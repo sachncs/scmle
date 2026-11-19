@@ -137,7 +137,7 @@ class Test:
             name: Human-readable name, unique within the ledger.
             family: Family the hypothesis belongs to.
             statistic: Registered statistic; an unknown name is refused by
-                `bivariate.code_hash` with a `ValueError`.
+                `bivariate.fingerprint` with a `ValueError`.
             null: The null hypothesis, in words.
             column: Feature column the statistic reads, if any.
             direction: `two-sided`, `greater` or `less`.
@@ -154,7 +154,7 @@ class Test:
             direction=direction,
             subset=subset,
             column=column,
-            digests=Digests(code=bivariate.code_hash(statistic)),
+            digests=Digests(code=bivariate.fingerprint(statistic)),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -239,11 +239,11 @@ class Hypothesis:
     """A registered hypothesis.
 
     Attributes:
-        hypothesis_id: Identifier assigned at registration (`h000001`, ...).
+        identifier: Identifier assigned at registration (`h000001`, ...).
         spec: The specification.
     """
 
-    hypothesis_id: str
+    identifier: str
     spec: Test
 
 
@@ -252,7 +252,7 @@ class Outcome:
     """The recorded outcome of one hypothesis.
 
     Attributes:
-        hypothesis_id: The hypothesis.
+        hypothesis: The hypothesis.
         check: The `Check` (None when the hypothesis was not tested).
         e_value: E-value used by e-LOND, or None.
         level: Test level the rule assigned.
@@ -262,7 +262,7 @@ class Outcome:
         reason: Why a hypothesis was not tested, or an empty string.
     """
 
-    hypothesis_id: str
+    hypothesis: str
     check: qualification.Check | None
     e_value: float | None
     level: Fraction
@@ -282,11 +282,11 @@ class Selection:
     """The frozen selection that goes to the confirmation set.
 
     Attributes:
-        hypothesis_ids: Rejected hypotheses, in registration order.
+        hypotheses: Rejected hypotheses, in registration order.
         sha256: Hash of their ids and specifications.
     """
 
-    hypothesis_ids: tuple[str, ...]
+    hypotheses: tuple[str, ...]
     sha256: str
 
 

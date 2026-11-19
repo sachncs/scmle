@@ -13,7 +13,7 @@ from scmle.contracts import errors
 def make_charter(**overrides):
     values = {
         "question": "Which customers churn within 30 days?",
-        "estimand": contracts.AnalysisEstimand(
+        "estimand": contracts.Estimand(
             kind="predictive",
             population="active subscribers in 2024",
             target="churned within 30 days of the prediction moment",
@@ -34,39 +34,39 @@ def make_charter(**overrides):
                 certificate="cert.leakage.skill",
             ),
         ),
-        "sets": contracts.SetSizes(confirmation=0.25, embargo=0),
+        "sets": contracts.Sizes(confirmation=0.25, embargo=0),
         "effect": 0.2,
         "quota": 10,
         "power": 0.8,
-        "budget": budget.ErrorBudget.create(0.05, 0.1),
+        "budget": budget.Alpha.create(0.05, 0.1),
         "multiverse": (
             contracts.Choice("imputation", ("median", "mice"), "median"),
         ),
         "seed": 7,
     }
     values.update(overrides)
-    return contracts.AnalysisCharter(**values)
+    return contracts.Charter(**values)
 
 
 def test_valid_charter_round_trips_through_json():
     charter = make_charter()
     record = json.loads(json.dumps(charter.to_dict()))
-    assert contracts.AnalysisCharter.from_dict(record) == charter
+    assert contracts.Charter.from_dict(record) == charter
 
 
 def test_hash_is_stable_and_sensitive_to_a_single_change():
     first = make_charter()
-    assert first.charter_hash == make_charter().charter_hash
-    assert len(first.charter_hash) == 64
+    assert first.digest == make_charter().digest
+    assert len(first.digest) == 64
     changed = make_charter(question="Which customers churn within 31 days?")
-    assert changed.charter_hash != first.charter_hash
+    assert changed.digest != first.digest
 
 
 def test_hash_ignores_dict_key_order():
     record = make_charter().to_dict()
     reordered = dict(reversed(list(record.items())))
-    rebuilt = contracts.AnalysisCharter.from_dict(reordered)
-    assert rebuilt.charter_hash == make_charter().charter_hash
+    rebuilt = contracts.Charter.from_dict(reordered)
+    assert rebuilt.digest == make_charter().digest
 
 
 @pytest.mark.parametrize("field", ["population", "target", "moment", "summary"])
@@ -75,7 +75,7 @@ def test_estimand_rejects_a_blank_required_attribute(field):
     values["intercurrent"] = make_charter().estimand.intercurrent
     values[field] = "  "
     with pytest.raises(ValueError, match=field):
-        contracts.AnalysisEstimand(**values)
+        contracts.Estimand(**values)
 
 
 def test_estimand_requires_an_intercurrent_event_strategy():
@@ -150,16 +150,16 @@ def test_numeric_fields_are_range_checked(field, value):
 @pytest.mark.parametrize("fraction", [0.0, 1.0, -0.1, float("nan"), 0.6, True])
 def test_confirmation_fraction_must_leave_room_for_exploration(fraction):
     with pytest.raises(ValueError, match="confirmation"):
-        contracts.SetSizes(confirmation=fraction, embargo=0)
+        contracts.Sizes(confirmation=fraction, embargo=0)
 
 
 def test_from_dict_rejects_unknown_and_missing_fields():
     record = make_charter().to_dict()
     with pytest.raises(ValueError, match="unexpected"):
-        contracts.AnalysisCharter.from_dict({**record, "extra": 1})
+        contracts.Charter.from_dict({**record, "extra": 1})
     del record["seed"]
     with pytest.raises(ValueError, match="missing"):
-        contracts.AnalysisCharter.from_dict(record)
+        contracts.Charter.from_dict(record)
 
 
 def test_multiverse_default_must_be_one_of_the_options():

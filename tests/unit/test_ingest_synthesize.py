@@ -129,7 +129,7 @@ def test_datetime_columns_become_days_and_null_keys_never_match():
     seen = view.visible(asked(20_000.0, key=1))
     assert len(seen) == 1
     assert seen[asof_view.EVENT_COLUMN].iloc[0] == pytest.approx(19_723.0)
-    assert asof_view.to_days(pandas.Series(["2024-01-01"]))[0] == pytest.approx(
+    assert asof_view.convert(pandas.Series(["2024-01-01"]))[0] == pytest.approx(
         19_723.0
     )
 
@@ -137,7 +137,7 @@ def test_datetime_columns_become_days_and_null_keys_never_match():
 def test_iso_times_of_mixed_precision_in_one_column_are_read():
     # Northwind's Orders.OrderDate holds both forms in one column.
     mixed = pandas.Series(["2016-07-04", "2023-08-29 09:23:46", None])
-    days = asof_view.to_days(mixed)
+    days = asof_view.convert(mixed)
     assert days[0] == 16_986.0
     assert days[1] == pytest.approx(
         19_598.0 + (9 * 3600 + 23 * 60 + 46) / 86_400
@@ -195,15 +195,15 @@ def test_synthesis_declares_family_size_and_drops_with_reasons():
     reasons = {m["dropped"] for m in found.manifest if not m["kept"]}
     assert "constant" in reasons
     assert any(r.startswith("duplicate of") for r in reasons)
-    assert found.declared_family_size == found.frame.shape[1]
-    assert found.declared_family_size == len(found.kept())
+    assert found.family == found.frame.shape[1]
+    assert found.family == len(found.kept())
     capped = synthesize.synthesize(
         targets, "moment", [synthesize.Source(view, "cid")], max_features=5
     )
     assert sum(m["dropped"] == "cap" for m in capped.manifest) == (
         len(capped.manifest) - 5
     )
-    assert capped.declared_family_size <= 5
+    assert capped.family <= 5
 
 
 def test_mutable_dimension_is_excluded_by_default_and_unverified_when_opened():
@@ -214,15 +214,15 @@ def test_mutable_dimension_is_excluded_by_default_and_unverified_when_opened():
     out = synthesize.synthesize(
         targets, "moment", [synthesize.Source(closed, "cid", synthesize.PARENT)]
     )
-    assert out.declared_family_size == 0
+    assert out.family == 0
     assert out.manifest[0]["dropped"].startswith("no as-of rule")
     opened = asof_view.View(dim, "cid", rule, name="dim", permissive=True)
     sources = [synthesize.Source(opened, "cid", synthesize.PARENT)]
     permissive = synthesize.synthesize(targets, "moment", sources)
     assert permissive.manifest[0]["tier"] == "unverified"
-    assert permissive.declared_family_size == 1
+    assert permissive.family == 1
     strict = synthesize.synthesize(targets, "moment", sources, strict=True)
-    assert strict.declared_family_size == 0
+    assert strict.family == 0
     assert strict.manifest[0]["dropped"] == "unverified (strict)"
     table = synthesize.lineage(permissive, 0.0, [opened])
     assert table.fields[0].tier() is qualification.Tier.UNVERIFIED
@@ -317,12 +317,10 @@ def test_multiplicity_matches_registered_hypotheses_and_mismatch_fails():
         seed=0,
     )
     registered = synthesize.enlist(ledger, out)
-    assert len(registered) == out.declared_family_size
-    short = synthesize.Selection(
-        out.frame, out.manifest, out.declared_family_size + 1
-    )
+    assert len(registered) == out.family
+    short = synthesize.Selection(out.frame, out.manifest, out.family + 1)
     with pytest.raises(synthesize.MultiplicityError):
-        synthesize.plurality(short.declared_family_size, ledger)
+        synthesize.plurality(short.family, ledger)
 
 
 def imported_modules(path):

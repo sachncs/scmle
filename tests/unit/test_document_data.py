@@ -66,9 +66,9 @@ def test_reader_loads_utf8_markdown_and_builds_identity_and_provenance(
 
     assert sample.format is document.Format.MARKDOWN
     assert sample.encoding == "utf-8"
-    assert sample.size_bytes == len(valid_markdown)
+    assert sample.size == len(valid_markdown)
     assert len(sample.content_hash) == 64
-    assert sample.source_digest == hashlib.sha256(valid_markdown).hexdigest()
+    assert sample.digest == hashlib.sha256(valid_markdown).hexdigest()
     assert [citation.locator for citation in sample.citations()] == [
         "page 1",
         "Introduction",
@@ -91,9 +91,9 @@ def test_plain_text_reader_infers_path_format(tmp_path):
     sample = document.Reader().load(path)
 
     assert sample.format is document.Format.TEXT
-    assert sample.document_id == "notes.txt"
-    assert sample.source_uri == path.resolve().as_uri()
-    assert sample.source_digest == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert sample.identifier == "notes.txt"
+    assert sample.uri == path.resolve().as_uri()
+    assert sample.digest == hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def test_reader_accepts_an_explicit_layout_extractor_contract():
@@ -118,12 +118,12 @@ def test_reader_accepts_an_explicit_layout_extractor_contract():
         return document.Layout(
             source="layout://run-1",
             provider="fixture-layout",
-            provider_version="1",
+            version="1",
             elements=(document.Element("heading", 0, 7, 1),),
             source_digest=hashlib.sha256(raw_bytes).hexdigest(),
         )
 
-    sample = document.Reader(layout_reader=layout_reader).load(
+    sample = document.Reader(reader=layout_reader).load(
         b"Heading", document_id="doc-1"
     )
 
@@ -133,7 +133,7 @@ def test_reader_accepts_an_explicit_layout_extractor_contract():
         "document_format": document.Format.TEXT,
     }
     assert sample.layout is not None
-    assert sample.layout.source_digest == sample.source_digest
+    assert sample.layout.source_digest == sample.digest
 
 
 @pytest.mark.parametrize(
@@ -141,16 +141,16 @@ def test_reader_accepts_an_explicit_layout_extractor_contract():
     [
         (
             document.Reader(
-                layout_reader=lambda *arguments: (
-                    generator for generator in ()
-                ).throw(ImportError())
+                reader=lambda *arguments: (generator for generator in ()).throw(
+                    ImportError()
+                )
             ),
             document.DependencyError,
             "missing_dependency",
         ),
         (
             document.Reader(
-                layout_reader=lambda *arguments: "invalid"  # type: ignore[return-value]
+                reader=lambda *arguments: "invalid"  # type: ignore[return-value]
             ),
             document.DocumentError,
             "layout_invalid_result",
@@ -173,7 +173,7 @@ def test_layout_source_digest_mismatch_fails_closed():
     layout = document.Layout(
         source="layout://run-2",
         provider="fixture-layout",
-        provider_version="1",
+        version="1",
         elements=(document.Element("text", 0, 7, 1),),
         source_digest="0" * 64,
     )
@@ -189,8 +189,8 @@ def test_curation_reports_source_traceability_without_inventing_citations():
 
     report = document.Dataset((sourced, in_memory)).curate()
 
-    assert report.source_traceability_coverage == 0.5
-    assert report.citation_count == len(sourced.citations())
+    assert report.traceability == 0.5
+    assert report.citations == len(sourced.citations())
     assert in_memory.citations() == ()
     assert report.to_dict()["traceability"] == 0.5
 
@@ -200,7 +200,7 @@ def test_partial_source_identity_is_visible_as_a_quality_finding():
     sample = document.Sample(
         "partial",
         "content",
-        source_uri="file:///tmp/partial.txt",
+        uri="file:///tmp/partial.txt",
     )
 
     report = document.Dataset((sample,)).curate()
@@ -216,8 +216,8 @@ def test_document_layout_records_ocr_and_table_provenance():
     layout = document.Layout(
         source="ocr://run-4",
         provider="layout-engine",
-        provider_version="3.2",
-        ocr_confidence=0.93,
+        version="3.2",
+        confidence=0.93,
         elements=(
             document.Element("heading", 0, 7, 1, 0.99),
             document.Element(
@@ -230,15 +230,15 @@ def test_document_layout_records_ocr_and_table_provenance():
     report = document.Dataset((sample,)).curate()
 
     assert sample.layout is layout
-    assert layout.table_count == 1
+    assert layout.tables == 1
     assert layout.to_dict()["version"] == "3.2"
     assert report.layout_coverage == 1.0
     assert report.layout_providers == ("layout-engine",)
     assert report.layout_element_count == 2
-    assert report.table_element_count == 1
+    assert report.tables == 1
     assert report.ocr_confidence_min == 0.93
     assert report.ocr_confidence_max == 0.93
-    assert report.release_ready
+    assert report.release
 
 
 def test_document_layout_confidence_and_offsets_fail_closed():
@@ -247,7 +247,7 @@ def test_document_layout_confidence_and_offsets_fail_closed():
     layout = document.Layout(
         source="ocr://run-5",
         provider="layout-engine",
-        provider_version="3.2",
+        version="3.2",
         elements=(document.Element("ocr", 0, len(content), 1),),
     )
     report = document.Dataset(
@@ -260,7 +260,7 @@ def test_document_layout_confidence_and_offsets_fail_closed():
     invalid_layout = document.Layout(
         source="ocr://run-6",
         provider="layout-engine",
-        provider_version="3.2",
+        version="3.2",
         elements=(document.Element("ocr", 0, 9, 1),),
     )
     with pytest.raises(document.DocumentError, match="exceeds"):
@@ -275,7 +275,7 @@ def test_document_sensitive_content_is_detected_without_leaking_values():
 
     assert document.pii(content) == {"email": 1, "ssn": 1}
     assert report.sensitive_match_counts == {"email": 1, "ssn": 1}
-    assert report.release_ready is False
+    assert report.release is False
     assert [finding.identifier for finding in report.risk_findings] == [
         "risk.document-sensitive-content",
     ]
@@ -310,7 +310,7 @@ def test_malformed_bytes_fixture_reports_encoding_offset(
 def test_size_validation_is_bounded_and_structured():
     """Oversized input is rejected before decoding."""
     with pytest.raises(document.DocumentError) as caught:
-        document.Reader(max_bytes=4).load(b"hello", document_id="large")
+        document.Reader(limit=4).load(b"hello", document_id="large")
 
     assert caught.value.details == {
         "code": "size_limit",
@@ -321,15 +321,12 @@ def test_size_validation_is_bounded_and_structured():
 
 def test_duplicate_fixture_is_deterministic(duplicate_dataset):
     """Identical content is grouped independently of sample order."""
-    assert duplicate_dataset.duplicate_groups() == (("first", "second"),)
+    assert duplicate_dataset.group() == (("first", "second"),)
     reversed_dataset = document.Dataset(
         tuple(reversed(duplicate_dataset.samples))
     )
-    assert (
-        reversed_dataset.duplicate_groups()
-        == duplicate_dataset.duplicate_groups()
-    )
-    assert reversed_dataset.content_hash == duplicate_dataset.content_hash
+    assert reversed_dataset.group() == duplicate_dataset.group()
+    assert reversed_dataset.digest == duplicate_dataset.digest
 
 
 def test_profile_is_bounded_and_uses_a_conservative_language_heuristic():
@@ -357,7 +354,7 @@ def test_shifted_fixture_splits_by_document_id_without_leakage(shifted_dataset):
         seed=17,
     )
 
-    assignments = first.document_ids()
+    assignments = first.index()
     all_partition_ids = [set(ids) for ids in assignments.values()]
     assert sum("doc-a" in ids for ids in all_partition_ids) == 1
     assert set().union(*all_partition_ids) == {
@@ -392,7 +389,7 @@ def test_pdf_without_optional_reader_has_structured_dependency_error():
 def test_injected_pdf_reader_provides_page_provenance():
     """An optional parser can be supplied without adding a core dependency."""
     reader = document.Reader(
-        pdf_reader=lambda raw_bytes: ("first page", "second page")
+        pdf=lambda raw_bytes: ("first page", "second page")
     )
 
     sample = reader.load(b"%PDF-1.7", document_id="pdf", document_format="pdf")
@@ -428,10 +425,10 @@ def test_curation_reports_composition_duplicates_and_bounded_profiles(
     """Curation makes document understanding reviewable before modelling."""
     report = duplicate_dataset.curate(max_characters=5, max_tokens=1)
 
-    assert report.dataset_hash == duplicate_dataset.content_hash
-    assert report.sample_count == 3
-    assert report.document_count == 3
-    assert report.duplicate_groups == (("first", "second"),)
+    assert report.dataset_hash == duplicate_dataset.digest
+    assert report.samples == 3
+    assert report.documents == 3
+    assert report.duplicates == (("first", "second"),)
     assert report.language_counts == {"en": 3}
     assert report.format_counts == {"text": 3}
     assert report.label_counts == {"unlabeled": 3}
@@ -458,12 +455,12 @@ def test_curation_blocks_identical_content_with_conflicting_labels():
 
     report = dataset.curate()
 
-    assert report.release_ready is False
+    assert report.release is False
     assert [finding.identifier for finding in report.risk_findings] == [
         "risk.conflicting-duplicate-labels",
         "risk.mixed-label-state",
     ]
-    assert report.unresolved_blocking_findings[0].scope == {
+    assert report.blockers[0].scope == {
         "document_ids": ["negative", "positive"]
     }
 

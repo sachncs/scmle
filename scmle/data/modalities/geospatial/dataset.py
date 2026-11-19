@@ -9,9 +9,9 @@ from typing import Self
 from scmle.contracts import errors
 from scmle.data.modalities.geospatial.evidence import Join
 from scmle.data.modalities.geospatial.evidence import Provenance
-from scmle.data.modalities.geospatial.geometry import canonical_source
 from scmle.data.modalities.geospatial.geometry import CoordinateTransformer
 from scmle.data.modalities.geospatial.geometry import GeometryError
+from scmle.data.modalities.geospatial.geometry import identify
 from scmle.data.modalities.geospatial.geometry import Placemark
 from scmle.data.modalities.geospatial.geometry import placemarks
 from scmle.data.modalities.geospatial.geometry import SpatialJoinPredicate
@@ -28,14 +28,14 @@ class Dataset(Splits):
         features: The features of the dataset, with unique IDs.
         crs: Declared CRS, stripped of surrounding whitespace; may be empty.
         source: Canonical source identifier.
-        content_hash: SHA-256 hex digest over the CRS and the feature
+        digest: SHA-256 hex digest over the CRS and the feature
             identities, independent of feature order.
     """
 
     features: tuple[Placemark, ...]
     crs: str = ""
     source: str = "memory://"
-    content_hash: str = dataclasses.field(init=False)
+    digest: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
         """Rejects duplicate identities and derive CRS-bound content.
@@ -54,15 +54,14 @@ class Dataset(Splits):
         if not isinstance(self.crs, str):
             raise errors.KindError("crs must be a string")
         canonical_crs_value = self.crs.strip()
-        ids = [feature.feature_id for feature in normalized]
+        ids = [feature.identifier for feature in normalized]
         if len(ids) != len(set(ids)):
             raise GeometryError(
                 "geospatial dataset contains duplicate feature IDs",
                 {"code": "duplicate_feature_id"},
             )
         feature_identities = sorted(
-            f"{feature.feature_id}\0{feature.content_hash}"
-            for feature in normalized
+            f"{feature.identifier}\0{feature.digest}" for feature in normalized
         )
         identity_payload = f"crs:{canonical_crs_value}\n" + "\n".join(
             feature_identities
@@ -70,11 +69,11 @@ class Dataset(Splits):
         digest = hashlib.sha256(identity_payload.encode("utf-8")).hexdigest()
         object.__setattr__(self, "features", normalized)
         object.__setattr__(self, "crs", canonical_crs_value)
-        object.__setattr__(self, "source", canonical_source(self.source))
-        object.__setattr__(self, "content_hash", digest)
+        object.__setattr__(self, "source", identify(self.source))
+        object.__setattr__(self, "digest", digest)
 
     @classmethod
-    def from_geojson(
+    def parse(
         cls,
         document: Mapping[str, Any],
         source: str = "memory://",
@@ -150,7 +149,7 @@ class Dataset(Splits):
                 },
             )
 
-    def spatial_join(
+    def join(
         self,
         other: "Dataset",
         predicate: SpatialJoinPredicate,
@@ -208,25 +207,25 @@ class Dataset(Splits):
             predicate_name,
             match_limit,
         )
-        matched_left = {match.left_feature_id for match in matches}
-        matched_right = {match.right_feature_id for match in matches}
+        matched_left = {match.left for match in matches}
+        matched_right = {match.right for match in matches}
         return Join(
-            left_dataset_hash=self.content_hash,
-            right_dataset_hash=other.content_hash,
+            left_dataset_hash=self.digest,
+            right_dataset_hash=other.digest,
             crs=self.crs.strip(),
-            predicate_name=predicate_name.strip(),
+            predicate=predicate_name.strip(),
             left_feature_count=len(self.features),
             right_feature_count=len(other.features),
-            comparison_count=total_comparisons,
-            match_count=len(matches),
+            comparisons=total_comparisons,
+            matched=len(matches),
             unmatched_left_count=len(
-                {feature.feature_id for feature in self.features} - matched_left
+                {feature.identifier for feature in self.features} - matched_left
             ),
             unmatched_right_count=len(
-                {feature.feature_id for feature in other.features}
+                {feature.identifier for feature in other.features}
                 - matched_right
             ),
-            comparison_limit=comparison_limit,
+            limit=comparison_limit,
             match_limit=match_limit,
             matches=tuple(matches),
         )
@@ -291,12 +290,12 @@ class Dataset(Splits):
             source=self.source,
         )
         report = Provenance(
-            source_dataset_hash=self.content_hash,
-            target_dataset_hash=dataset.content_hash,
+            source_dataset_hash=self.digest,
+            target_dataset_hash=dataset.digest,
             source_crs=self.crs,
             target_crs=canonical_target_crs,
-            transformer_name=transformer_name.strip(),
-            feature_count=len(transformed_features),
+            transformer=transformer_name.strip(),
+            features=len(transformed_features),
         )
         return Reprojection(dataset=dataset, report=report)
 
@@ -320,7 +319,7 @@ class Reprojection:
             ValueError: If the report's target hash or CRS differs from the
                 dataset's.
         """
-        if self.report.target_dataset_hash != self.dataset.content_hash:
+        if self.report.target_dataset_hash != self.dataset.digest:
             raise errors.InputError(
                 "reprojection report must match the transformed dataset"
             )
@@ -337,7 +336,7 @@ class Reprojection:
             mapping.
         """
         return {
-            "dataset_hash": self.dataset.content_hash,
+            "dataset_hash": self.dataset.digest,
             "crs": self.dataset.crs,
             "report": self.report.to_dict(),
         }

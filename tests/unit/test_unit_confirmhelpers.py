@@ -34,13 +34,13 @@ def ledger():
         alpha_confirm=Fraction(1, 20),
         seed=3,
     )
-    explore.run_exploration(book, x, y, explore.hypothesize(x, explore.NUMERIC))
+    explore.explore(book, x, y, explore.hypothesize(x, explore.NUMERIC))
     book.freeze()
     return book
 
 
 def test_withdraw_writes_an_unverified_claim_with_the_reason(ledger):
-    identity = ledger.survivor_set.hypothesis_ids[0]
+    identity = ledger.remaining.hypotheses[0]
     claims = evaluation.withdraw(ledger, {identity: "too fragile"})
     claim = claims[identity]
     spec = ledger.hypotheses[identity].spec
@@ -58,9 +58,9 @@ def test_withdraw_writes_an_unverified_claim_with_the_reason(ledger):
 
 
 def test_measure_runs_each_statistic_on_its_column(ledger):
-    ids = list(ledger.survivor_set.hypothesis_ids)
+    ids = list(ledger.remaining.hypotheses)
     x, y = world(300, 9)
-    codes = evaluation.default_encoding(y)
+    codes = evaluation.encode(y)
     outcomes = evaluation.measure(ledger, ids, x, codes)
     assert len(outcomes) == len(ids)
     for identity, outcome in zip(ids, outcomes, strict=True):
@@ -71,11 +71,9 @@ def test_measure_runs_each_statistic_on_its_column(ledger):
 
 
 def test_examine_builds_a_confirmed_or_unverified_check(ledger):
-    identity = ledger.survivor_set.hypothesis_ids[0]
+    identity = ledger.remaining.hypotheses[0]
     x, y = world(300, 9)
-    [outcome] = evaluation.measure(
-        ledger, [identity], x, evaluation.default_encoding(y)
-    )
+    [outcome] = evaluation.measure(ledger, [identity], x, evaluation.encode(y))
     passed = evaluation.examine(ledger, identity, 2, outcome, True)
     spec = ledger.hypotheses[identity].spec
     assert passed.identifier == f"{identity}:C"
@@ -160,5 +158,5 @@ def test_crash_gives_a_pipeline_failure_with_unverified_claims(ledger):
         "the confirmation failed while testing on C (ValueError: x); C is "
         "spent and all claims stay unverified (failure policy: unconfirmed)"
     )
-    assert len(claims) == len(ledger.survivor_set.hypothesis_ids)
+    assert len(claims) == len(ledger.remaining.hypotheses)
     assert all(c.tier is qualification.Tier.UNVERIFIED for c in claims)

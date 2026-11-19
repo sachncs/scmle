@@ -17,7 +17,7 @@ from scmle.causal.identification import select
 from scmle.contracts import errors
 from tests.unit.test_identification_run import observational
 
-BUDGET = budget.ErrorBudget.create(0.05, 0.1)
+BUDGET = budget.Alpha.create(0.05, 0.1)
 ASSUMPTIONS = ("unconfoundedness_given:a,b", "positivity", "no_interference")
 KEY = "attestor-key"
 SCOPE = "ab" * 32
@@ -92,7 +92,7 @@ def test_a_registration_hashes_the_frozen_claim():
         "alpha_confirm": str(BUDGET.confirmation.alpha_confirm),
         "exploration_rows": 120,
     }
-    assert found.claim_id == "causal_primary_theta_zero"
+    assert found.identifier == "causal_primary_theta_zero"
     assert found.kind == "causal_primary"
     assert found.statement == (
         "ATE of t on y differs from zero, by backdoor_aipw, under the "

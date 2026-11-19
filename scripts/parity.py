@@ -36,9 +36,9 @@ def survey() -> dict[str, object]:
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()
         for path in sorted(scmle.certificates.DIRECTORY.glob("*.json"))
     }
-    detectors = qualify.load_store(qualify.F5_STORE)
-    robustness = qualify.load_store("f6_certificates.json")
-    leakage = screen.load_store()
+    detectors = qualify.load(qualify.F5_STORE)
+    robustness = qualify.load("f6_certificates.json")
+    leakage = screen.load()
     return {
         "stores": stores,
         "detectors": detectors.note or "loaded",
@@ -46,10 +46,10 @@ def survey() -> dict[str, object]:
         "screen": (
             "missing"
             if leakage is None
-            else str(leakage.state(screen.DETECTOR_ID, screen.code_digest()))
+            else str(leakage.state(screen.DETECTOR_ID, screen.fingerprint()))
         ),
         "identification": sorted(certified.certificated()),
-        "slices": str(coverage_slices.flag_gate().status),
+        "slices": str(coverage_slices.flag().status),
         "tasks": task_gate.load(),
     }
 

@@ -30,7 +30,7 @@ from scmle.assurance.ingest.synthesize.grammar import MAX
 from scmle.assurance.ingest.synthesize.grammar import MEAN
 from scmle.assurance.ingest.synthesize.grammar import MIN
 from scmle.assurance.ingest.synthesize.grammar import Nest
-from scmle.assurance.ingest.synthesize.grammar import nested_features
+from scmle.assurance.ingest.synthesize.grammar import nest
 from scmle.assurance.ingest.synthesize.grammar import NESTED_INNER
 from scmle.assurance.ingest.synthesize.grammar import NESTED_OUTER
 from scmle.assurance.ingest.synthesize.grammar import NUMERIC_ONLY
@@ -93,7 +93,7 @@ __all__ = [
     "fingerprint",
     "fold",
     "lineage",
-    "nested_features",
+    "nest",
     "outcomes",
     "plurality",
     "propose",

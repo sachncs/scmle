@@ -1,7 +1,7 @@
 """The declared specification grid and a cached, resumable runner.
 
 The charter declares the defensible analysis choices before any result
-exists (`AnalysisCharter.multiverse`); its hash covers them, so adding an
+exists (`Charter.multiverse`); its hash covers them, so adding an
 option after exploration changes the charter hash. This module enumerates the
 declared grid, picks a seeded subset when the grid is larger than the size
 the run can afford, and evaluates a function over the specifications.
@@ -70,7 +70,7 @@ class Specification:
         return dict(self.values)
 
 
-def declaration_sha256(choices: Sequence[contracts.Choice]) -> str:
+def fingerprint(choices: Sequence[contracts.Choice]) -> str:
     """Hashes the declared choices.
 
     Args:
@@ -117,13 +117,13 @@ class Grid:
         specs: The default specification first, then the others in a fixed
             seeded order.
         total: Size of the full declared grid.
-        declaration_sha256: Hash of the declared choices.
+        digest: Hash of the declared choices.
         subset: Whether `specs` is a seeded subset of the full grid.
     """
 
     specs: tuple[Specification, ...]
     total: int
-    declaration_sha256: str
+    digest: str
     subset: bool
 
     @property
@@ -169,7 +169,7 @@ def universe(
     return Grid(
         chosen,
         len(everything),
-        declaration_sha256(ordered),
+        fingerprint(ordered),
         len(chosen) < len(everything),
     )
 
@@ -285,7 +285,7 @@ class Sweep:
     seconds: float
 
 
-def run_grid(
+def sweep(
     grid: Grid,
     evaluate: Callable[[Specification], Mapping[str, float]],
     *,

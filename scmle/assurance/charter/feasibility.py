@@ -40,7 +40,7 @@ class Verdict(enum.StrEnum):
     INFEASIBLE = "infeasible"
 
 
-def open_unit(value: float, name: str, low: float = 0.0) -> float:
+def confine(value: float, name: str, low: float = 0.0) -> float:
     """Checks that a number lies strictly inside `(low, 1)`.
 
     Args:
@@ -66,7 +66,7 @@ def open_unit(value: float, name: str, low: float = 0.0) -> float:
     return float(value)
 
 
-def positive_delta(value: float, name: str) -> float:
+def require(value: float, name: str) -> float:
     """Checks that a number is finite and strictly greater than zero.
 
     Args:
@@ -115,12 +115,12 @@ def countable(k_max: int) -> int:
     return k_max
 
 
-def z_sum(alpha: float, k_max: int, power: float) -> float:
+def combine(alpha: float, k_max: int, power: float) -> float:
     """Computes `z_{1-alpha/(2K)} + z_{power}`, shared by both formulas.
 
     Both quantiles are standard normal. `alpha` and `power` must lie
     strictly in (0, 1) and `k_max` must be an integer of at least 1;
-    otherwise the checks in `open_unit` and `countable` raise `ValueError`.
+    otherwise the checks in `confine` and `countable` raise `ValueError`.
 
     Args:
         alpha: Family-wise level of the final claims.
@@ -130,8 +130,8 @@ def z_sum(alpha: float, k_max: int, power: float) -> float:
     Returns:
         The sum of the two standard normal quantiles.
     """
-    open_unit(alpha, "alpha")
-    open_unit(power, "power")
+    confine(alpha, "alpha")
+    confine(power, "power")
     countable(k_max)
     return float(
         stats.norm.ppf(1 - alpha / (2 * k_max)) + stats.norm.ppf(power)
@@ -143,8 +143,8 @@ def n_required_mean(
 ) -> int:
     """Computes the rows needed to detect a standardised mean effect.
 
-    The result is `ceil((z_sum / delta) ** 2)` (see `z_sum`). `delta` must
-    be finite and positive and the other inputs valid for `z_sum`;
+    The result is `ceil((z_sum / delta) ** 2)` (see `combine`). `delta` must
+    be finite and positive and the other inputs valid for `combine`;
     otherwise `ValueError` is raised by those checks.
 
     Args:
@@ -156,14 +156,14 @@ def n_required_mean(
     Returns:
         The smallest number of rows `n`.
     """
-    positive_delta(delta, "delta")
-    return math.ceil((z_sum(alpha, k_max, power) / delta) ** 2)
+    require(delta, "delta")
+    return math.ceil((combine(alpha, k_max, power) / delta) ** 2)
 
 
-def mde_mean(n: int, *, alpha: float, k_max: int, power: float) -> float:
+def detect(n: int, *, alpha: float, k_max: int, power: float) -> float:
     """Computes the minimum detectable standardised mean effect.
 
-    The result is `z_sum / sqrt(n)` (see `z_sum`, whose checks raise
+    The result is `z_sum / sqrt(n)` (see `combine`, whose checks raise
     `ValueError` for invalid `alpha`, `k_max` or `power` when `n >= 1`).
 
     Args:
@@ -178,7 +178,7 @@ def mde_mean(n: int, *, alpha: float, k_max: int, power: float) -> float:
     """
     if n < 1:
         return math.nan
-    return z_sum(alpha, k_max, power) / math.sqrt(n)
+    return combine(alpha, k_max, power) / math.sqrt(n)
 
 
 def detectability(delta: float, n: int, *, alpha: float, k_max: int) -> float:
@@ -198,8 +198,8 @@ def detectability(delta: float, n: int, *, alpha: float, k_max: int) -> float:
         The probability, in [0, 1], of rejecting at level `alpha / K` when
         the true effect is `delta`.
     """
-    positive_delta(delta, "delta")
-    open_unit(alpha, "alpha")
+    require(delta, "delta")
+    confine(alpha, "alpha")
     countable(k_max)
     critical = stats.norm.ppf(1 - alpha / (2 * k_max))
     return float(stats.norm.cdf(delta * math.sqrt(max(n, 0)) - critical))
@@ -210,9 +210,9 @@ def n_required_correlation(
 ) -> int:
     """Computes the rows needed to detect a correlation (Fisher z).
 
-    The result is `ceil((z_sum / atanh(|r|)) ** 2 + 3)` (see `z_sum`).
+    The result is `ceil((z_sum / atanh(|r|)) ** 2 + 3)` (see `combine`).
     `|r|` must lie strictly in (0, 1); otherwise `ValueError` is raised by
-    `open_unit`, as it is for invalid `alpha`, `k_max` or `power`.
+    `confine`, as it is for invalid `alpha`, `k_max` or `power`.
 
     Args:
         r: Correlation to detect; only its absolute value matters.
@@ -223,14 +223,16 @@ def n_required_correlation(
     Returns:
         The smallest number of rows `n`.
     """
-    open_unit(abs(r), "r")
-    return math.ceil((z_sum(alpha, k_max, power) / math.atanh(abs(r))) ** 2 + 3)
+    confine(abs(r), "r")
+    return math.ceil(
+        (combine(alpha, k_max, power) / math.atanh(abs(r))) ** 2 + 3
+    )
 
 
 def resolution(n: int, *, alpha: float, k_max: int, power: float) -> float:
     """Computes the minimum detectable correlation.
 
-    The result is `tanh(z_sum / sqrt(n - 3))` (see `z_sum`, whose checks
+    The result is `tanh(z_sum / sqrt(n - 3))` (see `combine`, whose checks
     raise `ValueError` for invalid `alpha`, `k_max` or `power` when
     `n > 3`).
 
@@ -247,7 +249,7 @@ def resolution(n: int, *, alpha: float, k_max: int, power: float) -> float:
     if n <= FISHER_Z_OFFSET:
         return math.nan
     return math.tanh(
-        z_sum(alpha, k_max, power) / math.sqrt(n - FISHER_Z_OFFSET)
+        combine(alpha, k_max, power) / math.sqrt(n - FISHER_Z_OFFSET)
     )
 
 
@@ -272,12 +274,12 @@ def n_required_two_proportions(
         ValueError: If `p1` or `p2` is not strictly in (0, 1), if they are
             equal, or if `alpha`, `power` or `k_max` is invalid.
     """
-    open_unit(p1, "p1")
-    open_unit(p2, "p2")
+    confine(p1, "p1")
+    confine(p2, "p2")
     if p1 == p2:
         raise errors.InputError("p1 and p2 must differ")
-    open_unit(alpha, "alpha")
-    open_unit(power, "power")
+    confine(alpha, "alpha")
+    confine(power, "power")
     countable(k_max)
     pooled = (p1 + p2) / 2
     root = stats.norm.ppf(1 - alpha / (2 * k_max)) * math.sqrt(
@@ -411,7 +413,7 @@ def assess(
     required = n_required_mean(
         min_effect, alpha=alpha, k_max=k_max, power=power
     )
-    mde = mde_mean(n_confirmation, alpha=alpha, k_max=k_max, power=power)
+    mde = detect(n_confirmation, alpha=alpha, k_max=k_max, power=power)
     achieved = detectability(
         min_effect, n_confirmation, alpha=alpha, k_max=k_max
     )

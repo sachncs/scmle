@@ -174,8 +174,8 @@ def manifest(
 ):
     return types.SimpleNamespace(
         folds=[(list(a), list(b)) for a, b in folds],
-        train_ids=list(train),
-        test_ids=list(test),
+        training=list(train),
+        test=list(test),
         fingerprint="fp",
         strategy="random",
     )

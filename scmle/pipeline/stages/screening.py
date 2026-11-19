@@ -126,9 +126,7 @@ class Screening(surveying.Surveying):
         """
         data = board.services.spec.data
         path = board.services.spec.charter_path
-        block = (
-            sealing.read_verified(str(path)).charter.ingest if path else None
-        )
+        block = sealing.read(str(path)).charter.ingest if path else None
         if not data.ingest_plan:
             if block is not None:
                 raise errors.ConfigError(

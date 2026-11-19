@@ -29,7 +29,7 @@ class Sidecar:
         return self.path.with_name(f"{self.path.name}.lock")
 
     @property
-    def pending_acknowledgement_path(self) -> pathlib.Path:
+    def pending(self) -> pathlib.Path:
         """The durable sidecar file holding an undelivered acknowledgement."""
         return self.path.with_name(f"{self.path.name}.ack")
 

@@ -31,14 +31,14 @@ def test_the_shipped_store_is_inside_the_package():
 
 
 def test_the_stored_certificate_is_for_the_current_code():
-    state = stored().state(screen.DETECTOR_ID, screen.code_digest())
+    state = stored().state(screen.DETECTOR_ID, screen.fingerprint())
     assert state is certificates.Freshness.CURRENT
     assert screen_certify.problems(stored()) == []
 
 
 @pytest.mark.parametrize("kind", screen_certify.KINDS)
 def test_every_leak_type_of_every_mechanism_has_an_outcome_on_file(kind):
-    (cert,) = stored().current(screen.DETECTORS[kind], screen.code_digest())
+    (cert,) = stored().current(screen.DETECTORS[kind], screen.fingerprint())
     types = {o.certificate.defect for o in cert.outcomes}
     wanted = {d for ds in screen.MECHANISM_DEFECTS.values() for d in ds}
     assert types == wanted == set(screen_certify.DEFECTS)
@@ -75,16 +75,14 @@ def test_measurements_agree_with_the_certificate(kind):
     document = json.loads(
         screen_certify.MEASUREMENTS_PATH.read_text(encoding="utf-8")
     )[kind]
-    (cert,) = stored().current(screen.DETECTORS[kind], screen.code_digest())
+    (cert,) = stored().current(screen.DETECTORS[kind], screen.fingerprint())
     for outcome in cert.outcomes:
         c = outcome.certificate
         assert c.alarms == document["suspect_false_alarms"]
         assert c.detected == document["recall"][c.defect]["detected"]
         assert c.clean == document["clean_worlds"]
         assert c.planted == document["plant_replicates_per_type"]
-    assert document["settings"]["skill_ceiling"] == (
-        leakage.CERTIFIED.skill_ceiling
-    )
+    assert document["settings"]["skill_ceiling"] == (leakage.CERTIFIED.skill)
     assert document["rule"] == "benjamini-yekutieli"
     assert document["alpha"] == leakage.CERTIFIED.alpha
 

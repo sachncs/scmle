@@ -48,7 +48,7 @@ def test_few_rows_cannot_confirm():
 
 def test_the_registration_hash_depends_on_the_claim_and_the_choice():
     first = coverage_confirm.registration("a" * 64, CHOICE)
-    assert first.claim_id == "coverage_nominal" and first.kind == "coverage"
+    assert first.identifier == "coverage_nominal" and first.kind == "coverage"
     assert (
         first.sha256 == coverage_confirm.registration("a" * 64, CHOICE).sha256
     )
@@ -97,9 +97,7 @@ def test_no_calibration_or_no_interval_task_gives_no_runner():
 
     assert coverage_confirm.rig(Bare(), "regression", "c" * 64) is None
     assert coverage_confirm.rig(Band(), "ranking", "c" * 64) is None
-    assert (
-        coverage_confirm.not_evaluated("x")["status"] == confirm.NOT_EVALUATED
-    )
+    assert coverage_confirm.abstain("x")["status"] == confirm.NOT_EVALUATED
 
 
 def run_band_rows():

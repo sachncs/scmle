@@ -93,7 +93,7 @@ class Dataset:
         path = pathlib.Path(source)
         if not path.is_file():
             raise errors.InputError(f"no such data file: {path}")
-        frame = tabular.read_table(path)
+        frame = tabular.read(path)
         return cls((tabular.data_hash(frame), tabular.raw_source_hash(path)))
 
     def describe(self) -> records.Layout:
@@ -195,7 +195,7 @@ class Subject(Dataset):
                 f"no row of {self.source.name} has one of the identifiers in "
                 f"'{self.column}'"
             )
-        frame = tabular.read_table(self.source)
+        frame = tabular.read(self.source)
         current = {
             tabular.data_hash(frame),
             tabular.raw_source_hash(self.source),

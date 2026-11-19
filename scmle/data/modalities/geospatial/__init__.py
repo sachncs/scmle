@@ -12,12 +12,11 @@ from scmle.data.modalities.geospatial.evidence import Partition
 from scmle.data.modalities.geospatial.evidence import Profile
 from scmle.data.modalities.geospatial.evidence import Provenance
 from scmle.data.modalities.geospatial.geometry import autocorrelate
-from scmle.data.modalities.geospatial.geometry import canonical_observation_time
-from scmle.data.modalities.geospatial.geometry import canonical_source
 from scmle.data.modalities.geospatial.geometry import CoordinateTransformer
 from scmle.data.modalities.geospatial.geometry import flatten
 from scmle.data.modalities.geospatial.geometry import GEOMETRY_TYPES
 from scmle.data.modalities.geospatial.geometry import GeometryError
+from scmle.data.modalities.geospatial.geometry import identify
 from scmle.data.modalities.geospatial.geometry import MIN_COORDINATE_VALUES
 from scmle.data.modalities.geospatial.geometry import MIN_OBSERVATIONS
 from scmle.data.modalities.geospatial.geometry import Placemark
@@ -25,6 +24,7 @@ from scmle.data.modalities.geospatial.geometry import SHA256_HEX_LENGTH
 from scmle.data.modalities.geospatial.geometry import SpatialJoinPredicate
 from scmle.data.modalities.geospatial.geometry import substitute
 from scmle.data.modalities.geospatial.geometry import TemporalError
+from scmle.data.modalities.geospatial.geometry import timestamp
 from scmle.data.modalities.geospatial.geometry import unpack
 from scmle.data.modalities.geospatial.geometry import verify
 from scmle.data.modalities.geospatial.linkage import probe
@@ -60,12 +60,12 @@ __all__ = [
     "TemporalError",
     "Tile",
     "autocorrelate",
-    "canonical_observation_time",
-    "canonical_source",
     "flatten",
+    "identify",
     "permutation_p_value",
     "probe",
     "substitute",
+    "timestamp",
     "unpack",
     "verify",
 ]

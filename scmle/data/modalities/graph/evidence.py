@@ -15,19 +15,19 @@ class Degrees:
     """Summary statistics for graph nodes and their degrees.
 
     Attributes:
-        node_count: Number of nodes.
-        isolated_node_count: Number of nodes with degree zero.
-        labeled_node_count: Number of nodes with a label.
-        feature_dimension: Longest feature vector among the nodes.
+        nodes: Number of nodes.
+        isolated: Number of nodes with degree zero.
+        labeled: Number of nodes with a label.
+        dimension: Longest feature vector among the nodes.
         degree_min: Smallest degree; 0 for an empty graph.
         degree_max: Largest degree; 0 for an empty graph.
         degree_mean: Mean degree; 0.0 for an empty graph.
     """
 
-    node_count: int
-    isolated_node_count: int
-    labeled_node_count: int
-    feature_dimension: int
+    nodes: int
+    isolated: int
+    labeled: int
+    dimension: int
     degree_min: int
     degree_max: int
     degree_mean: float
@@ -64,18 +64,18 @@ class Connectivity:
     """Summary statistics for graph edges and weights.
 
     Attributes:
-        edge_count: Number of edges.
-        duplicate_edge_count: Number of edges beyond the first for each
+        edges: Number of edges.
+        duplicates: Number of edges beyond the first for each
             duplicate-detection key.
-        self_loop_count: Number of edges whose source equals the target.
+        loops: Number of edges whose source equals the target.
         weight_min: Smallest weight, or None without edges.
         weight_max: Largest weight, or None without edges.
         weight_mean: Mean weight, or None without edges.
     """
 
-    edge_count: int
-    duplicate_edge_count: int
-    self_loop_count: int
+    edges: int
+    duplicates: int
+    loops: int
     weight_min: float | None
     weight_max: float | None
     weight_mean: float | None
@@ -111,16 +111,16 @@ class Profile:
     """Combined graph, node, and edge profile.
 
     Attributes:
-        graph_identity: SHA-256 identity of the graph content.
+        identity: SHA-256 identity of the graph content.
         directed: Whether the graph is directed.
-        component_count: Number of weakly connected components.
+        components: Number of weakly connected components.
         node: Node profile.
         edge: Edge profile.
     """
 
-    graph_identity: str
+    identity: str
     directed: bool
-    component_count: int
+    components: int
     node: Degrees
     edge: Connectivity
 
@@ -139,9 +139,9 @@ class Profile:
         """
         return self.KEYS.upgrade(
             {
-                "graph_identity": self.graph_identity,
+                "graph_identity": self.identity,
                 "directed": self.directed,
-                "component_count": self.component_count,
+                "component_count": self.components,
                 "node": self.node.to_dict(),
                 "edge": self.edge.to_dict(),
             }
@@ -200,7 +200,7 @@ class Features:
         """The number of nodes and the number of features, as a pair."""
         return (len(self.node_ids), len(self.feature_names))
 
-    def to_numpy(self) -> numpy.ndarray:
+    def materialize(self) -> numpy.ndarray:
         """Returns a writable copy of the prepared feature matrix.
 
         Returns:

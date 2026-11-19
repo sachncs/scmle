@@ -384,13 +384,13 @@ def test_a_short_or_stale_document_is_not_measured():
 def test_the_digest_covers_the_catalog_and_the_thresholds(monkeypatch):
     before = nulls.digest()
     calls = []
-    real = nulls.certificates.code_hash
+    real = nulls.certificates.fingerprint
 
     def spy(*objects):
         calls.append(objects)
         return real(*objects)
 
-    monkeypatch.setattr(nulls.certificates, "code_hash", spy)
+    monkeypatch.setattr(nulls.certificates, "fingerprint", spy)
     assert nulls.digest() == before
     assert calls == [(nulls, quality, acceptance)]
 

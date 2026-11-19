@@ -11,8 +11,8 @@ class StreamingError(errors.DataError):
 
     Attributes:
         code: Short machine-readable failure code.
-        source_identity: Identity of the source involved.
-        details: Evidence mapping holding `code`, `source_identity` and
+        identity: Identity of the source involved.
+        details: Evidence mapping holding `code`, `identity` and
             any extra detail supplied.
     """
 
@@ -33,7 +33,7 @@ class StreamingError(errors.DataError):
                 source identity.
         """
         self.code = code
-        self.source_identity = source_identity
+        self.identity = source_identity
         self.details = {
             "code": code,
             "source_identity": source_identity,

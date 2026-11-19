@@ -26,7 +26,7 @@ class Chain:
         self.rule: online_fdr.Tester | None = None
         self.config: online_fdr.Settings | None = None
         self.state = online_fdr.State()
-        self.survivor_set: records.Selection | None = None
+        self.remaining: records.Selection | None = None
         self.control: dict[str, Any] | None = None
         self.diagnostics: list[qualification.Check] = []
         self.confirmation: dict[str, Any] | None = None
@@ -46,7 +46,7 @@ class Chain:
     @property
     def frozen(self) -> bool:
         """Whether the survivors were frozen (no more hypotheses)."""
-        return self.survivor_set is not None
+        return self.remaining is not None
 
     def tester(self) -> online_fdr.Tester:
         """Returns the online rule, which exists once the `open` row is in.
@@ -69,10 +69,10 @@ class Chain:
         Raises:
             LedgerError: If the survivors are frozen.
         """
-        if self.survivor_set is not None:
+        if self.remaining is not None:
             raise records.LedgerError("survivors are frozen: no new hypotheses")
 
-    def apply_open(self, body: Mapping[str, Any]) -> None:
+    def apply(self, body: Mapping[str, Any]) -> None:
         """Reads the header and builds the rule.
 
         Args:
@@ -122,7 +122,7 @@ class Chain:
             )
         self.hypotheses[hypothesis_id] = records.Hypothesis(hypothesis_id, spec)
 
-    def apply_result(self, body: Mapping[str, Any]) -> None:
+    def replay(self, body: Mapping[str, Any]) -> None:
         """Replays one result through the rule and stores it.
 
         Args:
@@ -186,7 +186,7 @@ class Chain:
         ):
             raise records.LedgerError(f"invalid decision for {hypothesis_id}")
         self.results[hypothesis_id] = records.Outcome(
-            hypothesis_id=hypothesis_id,
+            hypothesis=hypothesis_id,
             check=check,
             e_value=body["e_value"],
             level=step.level,
@@ -311,7 +311,7 @@ class Replay(Chain):
             )
         if body["sha256"] != records.fingerprint(ids, specs):
             raise records.LedgerError("survivor hash does not match")
-        self.survivor_set = records.Selection(ids, str(body["sha256"]))
+        self.remaining = records.Selection(ids, str(body["sha256"]))
 
     def conclude(self, body: Mapping[str, Any]) -> None:
         """Seals the ledger with the confirmation outcome.
@@ -325,9 +325,9 @@ class Replay(Chain):
                 ``claims`` mapping does not name exactly the registered
                 claims.
         """
-        if self.survivor_set is None:
+        if self.remaining is None:
             raise records.LedgerError("confirmation needs frozen survivors")
-        if body.get("survivors_sha256") != self.survivor_set.sha256:
+        if body.get("survivors_sha256") != self.remaining.sha256:
             raise records.LedgerError("confirmation names different survivors")
         if self.claims:
             recorded = body.get("claims")
@@ -401,9 +401,9 @@ class Replay(Chain):
         if self.confirmation is not None:
             raise records.LedgerError("no row may follow the confirmation")
         handlers: dict[str, Callable[[Mapping[str, Any]], None]] = {
-            records.OPEN: self.apply_open,
+            records.OPEN: self.apply,
             records.REGISTER: self.enrol,
-            records.RESULT: self.apply_result,
+            records.RESULT: self.replay,
             records.CONTROL: self.benchmark,
             records.DIAGNOSTIC: self.diagnose,
             records.CLAIM: self.lodge,

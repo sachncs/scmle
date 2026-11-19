@@ -56,7 +56,7 @@ def test_stored_floors_are_recomputed_from_counts():
             for name in ("promotions", "false_rollbacks", "false_promotions")
             if name in entry
         )
-        low, high = certificates.wilson_interval(hits, entry["replicates"])
+        low, high = certificates.bound(hits, entry["replicates"])
         assert entry["interval"] == pytest.approx([low, high])
         assert entry["passed"] == (hits / entry["replicates"] <= entry["bound"])
 

@@ -27,7 +27,7 @@ Each attempt targets one control while the condition it guards holds:
   after editing its configuration; rerunning a charter, into the same
   output folder, into another and after deleting its `.confirmations`;
   resuming a confirmed charter run.
-* `charter.verify` (not in gates.toml; `sealing.read_verified`): a signed
+* `charter.verify` (not in gates.toml; `sealing.read`): a signed
   charter edited, with and without its hash recomputed, with and without the
   key.
 * `bundle.authenticate` (not in gates.toml; `Bundle.load`): unsigned and
@@ -115,7 +115,7 @@ SCOPE = (
 UNREGISTERED = {
     "bundle.authenticate": "scmle.artifacts.bundle:Bundle.load",
     "envelope.authenticate": "scmle.envelope:read",
-    "charter.verify": "scmle.assurance.charter.sealing:read_verified",
+    "charter.verify": "scmle.assurance.charter.sealing:read",
 }
 OUTCOMES = ("blocked", "override", "bypass", "error")
 # Policy: training budget of a run that should train, in seconds.
@@ -1743,7 +1743,7 @@ def plugin(lab: Lab) -> Callable[[], dict[str, Any]]:
             return "peek at the locked test rows"
 
         def execute(self, board: Any) -> None:
-            locked = board.get(profiling.Partition).split.locked_test
+            locked = board.get(profiling.Partition).split.test
             locked.bind("peek")
             seen["rows"] = len(locked.open(locked.mint(), "peek")[1])
 
@@ -1771,7 +1771,7 @@ REGISTER = (
 PLUGIN = (
     "scmle/pipeline/stages/defaults.py: default_stages runs enrolled stages "
     "with the board, whose profiling.Partition holds the raw locked test set "
-    "(split.locked_test); only assessment.py FinalEvaluationStage.execute "
+    "(split.test); only assessment.py FinalEvaluationStage.execute "
     "wraps it in journal.Custodian, so an earlier bind and open is neither "
     "refused nor journaled"
 )
@@ -2700,7 +2700,7 @@ def digest() -> str:
     Returns:
         The combined source hash.
     """
-    return certificates.code_hash(sys.modules[__name__])
+    return certificates.fingerprint(sys.modules[__name__])
 
 
 def measure(workers: int = WORKERS) -> dict[str, Any]:

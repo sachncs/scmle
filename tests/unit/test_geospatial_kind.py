@@ -244,9 +244,9 @@ def test_the_splitter_records_the_block_design_in_the_manifest(tmp_path):
     split = splitter.split(frame)
     assert split.manifest.strategy == "group"
     assert any("spatial blocks of" in note for note in split.manifest.notes)
-    assert rows.KEY not in split.dev_features.columns
-    assert rows.KEY not in split.locked_test.features.columns
-    assert len(split.dev_features) + len(split.locked_test.features) == 240
+    assert rows.KEY not in split.features.columns
+    assert rows.KEY not in split.test.features.columns
+    assert len(split.features) + len(split.test.features) == 240
 
 
 def test_too_few_distinct_places_refuse_the_spatial_split(tmp_path):
@@ -286,8 +286,8 @@ def test_a_declared_time_column_keeps_the_temporal_split_and_says_so(
 
 def sides(split, count):
     side = numpy.full(count, "", dtype=object)
-    side[list(split.manifest.train_ids)] = "dev"
-    side[list(split.manifest.test_ids)] = "test"
+    side[list(split.manifest.training)] = "dev"
+    side[list(split.manifest.test)] = "test"
     return side
 
 
@@ -331,7 +331,7 @@ def test_no_block_duplicate_or_group_straddles_a_split(seed, count, duplicates):
         side_of.clear()
         for row, value in enumerate(key):
             assert side_of.setdefault(value, side[row]) == side[row]
-    development = numpy.asarray(split.manifest.train_ids)
+    development = numpy.asarray(split.manifest.training)
     for train, valid in split.manifest.folds:
         seen = set(places[development[list(train)]])
         assert seen.isdisjoint(places[development[list(valid)]])

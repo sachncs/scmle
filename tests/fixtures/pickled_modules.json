@@ -1,5 +1,5 @@
 {
-  "bundle_format": 4,
+  "bundle_format": 5,
   "modules": [
     "scmle.data.validation.columns",
     "scmle.models.sklearn.trees"

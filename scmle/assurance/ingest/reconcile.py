@@ -45,13 +45,13 @@ class Cardinality:
 
     Attributes:
         name: Join label.
-        left_rows: Rows entering the join.
-        output_rows: Rows leaving it.
+        rows: Rows entering the join.
+        output: Rows leaving it.
     """
 
     name: str
-    left_rows: int
-    output_rows: int
+    rows: int
+    output: int
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -76,7 +76,7 @@ class Report:
 
     Attributes:
         result: The ordinary reconciliation.
-        not_reconciled: Names of quantities whose source total was zero or
+        unreconciled: Names of quantities whose source total was zero or
             null, so no gap ratio exists; they are `unverified`.
         migrations: The written layout's version steps, oldest first;
             version 2 spells `not_reconciled` as `unreconciled`.
@@ -87,23 +87,23 @@ class Report:
     )
 
     result: reconciliation.Reconciliation
-    not_reconciled: tuple[str, ...]
+    unreconciled: tuple[str, ...]
 
     @property
     def passed(self) -> bool:
         """Whether there is no unexplained gap and nothing unreconciled."""
-        return self.result.passed and not self.not_reconciled
+        return self.result.passed and not self.unreconciled
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the reconciliation, for `reconciliation.json`.
 
         Returns:
-            The ordinary reconciliation mapping plus `not_reconciled` and
+            The ordinary reconciliation mapping plus `unreconciled` and
             the overall `passed`.
         """
         return {
             **self.result.to_dict(),
-            "unreconciled": list(self.not_reconciled),
+            "unreconciled": list(self.unreconciled),
             "passed": self.passed,
         }
 
@@ -171,7 +171,7 @@ def crosscheck(
             total,
         )
     for join in joins:
-        add(f"fanout.{join.name}", join.output_rows, join.left_rows)
+        add(f"fanout.{join.name}", join.output, join.rows)
     for total_check in feature_totals:
         add(
             f"feature_total.{total_check.name}",
@@ -186,13 +186,13 @@ def crosscheck(
     return Report(result, tuple(skipped))
 
 
-def code_digest() -> str:
+def fingerprint() -> str:
     """Hashes this module's source, the key of its certificate.
 
     Returns:
-        The code hash computed by `certificates.code_hash`.
+        The code hash computed by `certificates.fingerprint`.
     """
-    return certificates.code_hash(sys.modules[__name__])
+    return certificates.fingerprint(sys.modules[__name__])
 
 
 def blocks(report: Report) -> bool:

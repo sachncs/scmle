@@ -124,51 +124,51 @@ class DbApiConnector(adapter.Adapter):
     The query is checked against a read-only allow-list at construction
     (``readonly``) and, for ``sqlite3`` connections, the session is put
     in ``query_only`` mode while it runs. Other drivers can pass
-    ``read_only_statement`` (for example ``SET TRANSACTION READ ONLY``),
+    ``preamble`` (for example ``SET TRANSACTION READ ONLY``),
     which runs before the query. A database role without write privilege is
     still the only complete control.
 
     Batches re-execute the query. Every batch carries a digest of the rows
-    before its offset in ``Bookmark.content_sha256`` and the next
+    before its offset in ``Bookmark.digest`` and the next
     batch refuses to continue (``source_changed``) when the rows it skips no
     longer hash to that digest. Use an ``ORDER BY`` so the order is total.
 
     Attributes:
         query: The read-only SQL query whose rows form the source.
-        connection_factory: Callable returning a fresh DB-API connection.
-        read_only: Whether the allow-list and read-only session are
+        factory: Callable returning a fresh DB-API connection.
+        guarded: Whether the allow-list and read-only session are
             enforced.
-        read_only_statement: Statement run before the query, or None.
-        snapshot_query: Query whose result identifies the source state, or
+        preamble: Statement run before the query, or None.
+        probe: Query whose result identifies the source state, or
             None.
     """
 
-    supported_schemes = ("dbapi", "sqlite")
+    schemes = ("dbapi", "sqlite")
 
     def __init__(
         self,
         source_uri: str,
         query: str,
-        connection_factory: Callable[[], Any],
+        factory: Callable[[], Any],
         retry_budget: failure.Retries | None = None,
-        read_only: bool = True,
-        read_only_statement: str | None = None,
-        snapshot_query: str | None = None,
+        guarded: bool = True,
+        preamble: str | None = None,
+        probe: str | None = None,
     ) -> None:
         """Initializes a DB-API connector.
 
         Args:
             source_uri: Logical ``dbapi://`` or ``sqlite://`` source URI.
             query: Read-only SQL query whose rows form the source.
-            connection_factory: Callable returning a fresh DB-API connection.
+            factory: Callable returning a fresh DB-API connection.
             retry_budget: Per-operation retry policy.
-            read_only: Enforce the read-only allow-list (a statement that
+            guarded: Enforce the read-only allow-list (a statement that
                 fails it is refused with ``ConnectorError``) and the
                 ``sqlite3`` ``query_only`` session mode. When False,
                 neither is applied.
-            read_only_statement: Optional statement run before the query to
+            preamble: Optional statement run before the query to
                 start a read-only transaction on drivers that support it.
-            snapshot_query: Optional cheap query whose result identifies the
+            probe: Optional cheap query whose result identifies the
                 state of the source (a version counter, a maximum id). Without
                 it the token is a digest of the whole query result.
 
@@ -176,37 +176,35 @@ class DbApiConnector(adapter.Adapter):
             SchemeError: If the URI scheme is not ``dbapi``
                 or ``sqlite``.
             ValueError: If `query` is blank.
-            TypeError: If `connection_factory` is not callable.
+            TypeError: If `factory` is not callable.
         """
         value = source_uri.strip()
         parsed = urlsplit(value)
         scheme = parsed.scheme.lower()
-        if scheme not in self.supported_schemes:
-            raise failure.SchemeError(value, scheme, self.supported_schemes)
+        if scheme not in self.schemes:
+            raise failure.SchemeError(value, scheme, self.schemes)
         if not query.strip():
             raise errors.InputError("query must not be empty")
-        if not callable(connection_factory):
-            raise errors.KindError("connection_factory must be callable")
-        if read_only:
+        if not callable(factory):
+            raise errors.KindError("factory must be callable")
+        if guarded:
             readonly(query, value)
-            if snapshot_query is not None:
-                readonly(snapshot_query, value)
+            if probe is not None:
+                readonly(probe, value)
         self.query = query
-        self.connection_factory = connection_factory
-        self.read_only = read_only
-        self.read_only_statement = read_only_statement
-        self.snapshot_query = snapshot_query
+        self.factory = factory
+        self.guarded = guarded
+        self.preamble = preamble
+        self.probe = probe
         super().__init__(value, retry_budget)
-        self.source_identity = locator.source_identity(
-            f"{self.source_uri}|query={self.query}"
-        )
+        self.identity = locator.identify(f"{self.uri}|query={self.query}")
 
     @contextlib.contextmanager
     def session(self, sql: str) -> Generator[Any, None, None]:
         """Opens a connection and executes ``sql`` on a cursor.
 
         The cursor and connection are closed on exit, ignoring errors from
-        closing. The session is read-only as configured by `read_only`.
+        closing. The session is read-only as configured by `guarded`.
 
         Args:
             sql: Statement to execute before yielding.
@@ -214,14 +212,14 @@ class DbApiConnector(adapter.Adapter):
         Yields:
             The DB-API cursor positioned on the result of ``sql``.
         """
-        connection = self.connection_factory()
+        connection = self.factory()
         cursor: Any = None
         try:
-            if self.read_only and isinstance(connection, sqlite3.Connection):
+            if self.guarded and isinstance(connection, sqlite3.Connection):
                 connection.execute("PRAGMA query_only = ON")
             cursor = connection.cursor()
-            if self.read_only_statement:
-                cursor.execute(self.read_only_statement)
+            if self.preamble:
+                cursor.execute(self.preamble)
             cursor.execute(sql)
             yield cursor
         finally:
@@ -237,8 +235,8 @@ class DbApiConnector(adapter.Adapter):
         return failure.persevere(
             self.introspect,
             "schema",
-            self.source_uri,
-            self.retry_budget,
+            self.uri,
+            self.budget,
         )
 
     def introspect(self) -> layout.Columns:
@@ -250,10 +248,10 @@ class DbApiConnector(adapter.Adapter):
         with self.session(self.query) as cursor:
             return self.translate(cursor.description)
 
-    def snapshot_token(self) -> str:
+    def snapshot(self) -> str:
         """Returns a token that changes when the source content changes.
 
-        With ``snapshot_query`` the token digests that query's rows; without
+        With ``probe`` the token digests that query's rows; without
         it, every row of the main query (a full scan).
 
         Returns:
@@ -263,8 +261,8 @@ class DbApiConnector(adapter.Adapter):
         return failure.persevere(
             self.fingerprint,
             "snapshot_token",
-            self.source_uri,
-            self.retry_budget,
+            self.uri,
+            self.budget,
         )
 
     def fingerprint(self) -> str:
@@ -274,12 +272,12 @@ class DbApiConnector(adapter.Adapter):
             The SHA-256 hex digest over every row the token query yields.
         """
         hasher = hashlib.sha256()
-        with self.session(self.snapshot_query or self.query) as cursor:
+        with self.session(self.probe or self.query) as cursor:
             while rows := cursor.fetchmany(10_000):
                 feed(hasher, rows)
         return hasher.hexdigest()
 
-    def read_rows(
+    def read(
         self, checkpoint: locator.Bookmark | None = None, limit: int = 1_000
     ) -> layout.Page:
         """Reads DB-API rows using portable offset/cursor checkpoints.
@@ -298,13 +296,13 @@ class DbApiConnector(adapter.Adapter):
             advanced by the rows returned and carrying the digest of all
             rows up to it, and whether more rows remain.
         """
-        self.validate_limit(limit)
+        self.validate(limit)
         value = self.rebind(checkpoint)
         return failure.persevere(
             lambda: self.fetch(value, limit),
             "read_rows",
-            self.source_uri,
-            self.retry_budget,
+            self.uri,
+            self.budget,
         )
 
     def fetch(self, checkpoint: locator.Bookmark, limit: int) -> layout.Page:
@@ -326,10 +324,10 @@ class DbApiConnector(adapter.Adapter):
             schema = self.translate(cursor.description)
             hasher = hashlib.sha256()
             self.skip(cursor, checkpoint.offset, limit, hasher)
-            expected = checkpoint.content_sha256
+            expected = checkpoint.digest
             if expected is not None and hasher.hexdigest() != expected:
                 raise failure.CheckpointError(
-                    self.source_uri,
+                    self.uri,
                     "source_changed",
                     "rows before the checkpoint changed since the last batch",
                     {"offset": checkpoint.offset},
@@ -339,13 +337,13 @@ class DbApiConnector(adapter.Adapter):
             feed(hasher, rows)
             next_checkpoint = dataclasses.replace(
                 checkpoint.advance(len(rows)),
-                content_sha256=hasher.hexdigest(),
+                digest=hasher.hexdigest(),
             )
             return layout.Page(
                 schema=schema,
                 rows=rows,
                 checkpoint=next_checkpoint,
-                has_more=len(fetched) > limit,
+                more=len(fetched) > limit,
             )
 
     def translate(
@@ -398,7 +396,7 @@ class DbApiConnector(adapter.Adapter):
             skipped = cursor.fetchmany(min(remaining, batch_size))
             if not skipped:
                 raise failure.CheckpointError(
-                    self.source_uri,
+                    self.uri,
                     "source_changed",
                     "source has fewer rows than the checkpoint offset",
                     {"offset": offset, "missing": remaining},

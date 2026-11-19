@@ -17,15 +17,15 @@ def frame():
 def test_csv_and_parquet_roundtrip(tmp_path, frame):
     frame.to_csv(tmp_path / "d.csv", index=False)
     frame.to_parquet(tmp_path / "d.parquet")
-    assert tabular.read_table(tmp_path / "d.csv").shape == (3, 3)
-    assert tabular.read_table(tmp_path / "d.parquet").shape == (3, 3)
+    assert tabular.read(tmp_path / "d.csv").shape == (3, 3)
+    assert tabular.read(tmp_path / "d.parquet").shape == (3, 3)
 
 
 @pytest.mark.parametrize("suffix", [".tsv", ".tab"])
 def test_delimited_text_roundtrip(tmp_path, frame, suffix):
     frame.to_csv(tmp_path / f"d{suffix}", sep="\t", index=False)
     pandas.testing.assert_frame_equal(
-        tabular.read_table(tmp_path / f"d{suffix}"), frame
+        tabular.read(tmp_path / f"d{suffix}"), frame
     )
 
 
@@ -33,10 +33,10 @@ def test_json_and_json_lines_roundtrip(tmp_path, frame):
     frame.to_json(tmp_path / "records.json", orient="records")
     frame.to_json(tmp_path / "records.jsonl", orient="records", lines=True)
     pandas.testing.assert_frame_equal(
-        tabular.read_table(tmp_path / "records.json"), frame
+        tabular.read(tmp_path / "records.json"), frame
     )
     pandas.testing.assert_frame_equal(
-        tabular.read_table(tmp_path / "records.jsonl"), frame
+        tabular.read(tmp_path / "records.jsonl"), frame
     )
 
 
@@ -45,19 +45,19 @@ def test_compressed_text_and_json_lines_roundtrip(tmp_path, frame):
     jsonl_path = tmp_path / "records.jsonl.gz"
     frame.to_csv(csv_path, index=False, compression="gzip")
     frame.to_json(jsonl_path, orient="records", lines=True, compression="gzip")
-    pandas.testing.assert_frame_equal(tabular.read_table(csv_path), frame)
-    pandas.testing.assert_frame_equal(tabular.read_table(jsonl_path), frame)
+    pandas.testing.assert_frame_equal(tabular.read(csv_path), frame)
+    pandas.testing.assert_frame_equal(tabular.read(jsonl_path), frame)
 
 
 def test_missing_file(tmp_path):
     with pytest.raises(errors.DataError, match="not found"):
-        tabular.read_table(tmp_path / "nope.csv")
+        tabular.read(tmp_path / "nope.csv")
 
 
 def test_unsupported_suffix(tmp_path):
     (tmp_path / "d.xml").write_text("x")
     with pytest.raises(errors.DataError, match="unsupported"):
-        tabular.read_table(tmp_path / "d.xml")
+        tabular.read(tmp_path / "d.xml")
 
 
 def test_excel_is_registered_as_an_optional_format():
@@ -73,17 +73,17 @@ def test_excel_roundtrip_when_optional_dependency_is_installed(tmp_path, frame):
         sheet.append(list(row))
     path = tmp_path / "records.xlsx"
     workbook.save(path)
-    pandas.testing.assert_frame_equal(tabular.read_table(path), frame)
+    pandas.testing.assert_frame_equal(tabular.read(path), frame)
 
 
 def test_empty_file(tmp_path):
     (tmp_path / "e.csv").write_text("a,b\n")
     with pytest.raises(errors.DataError, match="no rows"):
-        tabular.read_table(tmp_path / "e.csv")
+        tabular.read(tmp_path / "e.csv")
 
 
 def test_duplicate_columns(tmp_path):
-    class DuplicatingReader(tabular.TableReader):
+    class DuplicatingReader(tabular.Reader):
         suffixes = (".csv",)
 
         def load(self, path):
@@ -96,7 +96,7 @@ def test_duplicate_columns(tmp_path):
 
 
 def test_custom_reader_is_dispatched_by_suffix(tmp_path):
-    class Tsv(tabular.TableReader):
+    class Tsv(tabular.Reader):
         suffixes = (".tsv",)
 
         def load(self, path):

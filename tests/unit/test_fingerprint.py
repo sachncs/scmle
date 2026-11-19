@@ -30,9 +30,9 @@ def test_entropy_of_known_distributions():
 
 def test_outlier_rate_uses_tukey_fences():
     values = pandas.Series([*range(1, 101), 10_000.0, -10_000.0])
-    assert columns.outlier_rate(values) == pytest.approx(2 / 102)
-    assert columns.outlier_rate(pandas.Series([5.0] * 20)) == 0.0
-    assert columns.outlier_rate(pandas.Series([1.0, 2.0])) == 0.0
+    assert columns.rate(values) == pytest.approx(2 / 102)
+    assert columns.rate(pandas.Series([5.0] * 20)) == 0.0
+    assert columns.rate(pandas.Series([1.0, 2.0])) == 0.0
 
 
 def test_redundant_pairs_detects_near_duplicates_only():

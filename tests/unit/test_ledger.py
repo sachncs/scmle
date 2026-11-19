@@ -179,7 +179,7 @@ def test_the_file_reloads_replays_and_continues(tmp_path):
         k: v.decision for k, v in first.results.items()
     }
     extra = again.register(spec("signal", name="signal~y second"))
-    assert extra.hypothesis_id == "h000004"
+    assert extra.identifier == "h000004"
     scmle.assurance.ledger.ledger.Ledger.load(path)
 
 
@@ -349,7 +349,7 @@ def test_survivors_freeze_before_confirmation_and_block_new_hypotheses():
     explore(ledger, features, target)
     ledger.negatives({"observed": 1})
     frozen = ledger.freeze()
-    assert frozen.hypothesis_ids == ("h000001",)
+    assert frozen.hypotheses == ("h000001",)
     assert ledger.freeze() is frozen
     with pytest.raises(
         scmle.assurance.ledger.ledger.LedgerError, match="frozen"

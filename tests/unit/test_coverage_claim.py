@@ -20,7 +20,7 @@ def make_claim(**overrides):
         "charter_hash": None,
     }
     values.update(overrides)
-    return coverage_run.claim_document(**values)
+    return coverage_run.claim(**values)
 
 
 def test_the_claim_names_levels_methods_and_the_rule_and_hashes_stably():
@@ -63,7 +63,7 @@ def test_the_report_carries_the_hash_of_the_claim():
     import pandas
 
     features = pandas.DataFrame({"a": range(40)})
-    report = coverage_run.run_report(
+    report = coverage_run.report(
         FakeBundle(), features, numpy.zeros(40), (0.5,), claim_sha256="f" * 64
     )
     assert report["claim_sha256"] == "f" * 64

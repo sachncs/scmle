@@ -37,15 +37,15 @@ class Plan:
     Attributes:
         specs: One specification per usable feature, in column order.
         skipped: (column, reason) for each feature not tested.
-        target_kind: `numeric`, `binary` or `multiclass`.
+        task: `numeric`, `binary` or `multiclass`.
     """
 
     specs: tuple[scmle.assurance.ledger.ledger.Test, ...]
     skipped: tuple[tuple[str, str], ...]
-    target_kind: str
+    task: str
 
 
-def target_kind(target: pandas.Series, classification: bool) -> str:
+def classify(target: pandas.Series, classification: bool) -> str:
     """Decides how the target is treated.
 
     Args:
@@ -152,7 +152,7 @@ def hypothesize(
     return Plan(tuple(specs), tuple(skipped), kind)
 
 
-def run_exploration(
+def explore(
     ledger: scmle.assurance.ledger.ledger.Ledger,
     features: pandas.DataFrame,
     codes: pandas.Series,
@@ -182,7 +182,7 @@ def tally(
     """Counts the rejections of the whole exploration on the given data.
 
     It applies the same statistics and the same online rule as
-    `run_exploration`, without writing a ledger; the negative controls call it
+    `explore`, without writing a ledger; the negative controls call it
     once per re-run.
 
     Args:
@@ -204,7 +204,7 @@ def tally(
             p = 1.0
         else:
             column = features[spec.column].to_numpy(dtype=float)
-            p = bivariate.run_statistic(
+            p = bivariate.calculate(
                 spec.statistic, column, target, spec.direction
             ).p
         step = rule.step(state, online_fdr.Evidence(p=p))

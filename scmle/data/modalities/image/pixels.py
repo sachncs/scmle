@@ -7,7 +7,7 @@ import numpy
 
 from scmle.contracts import errors
 from scmle.data.modalities import image
-from scmle.data.modalities.image.failures import ImageValidationError
+from scmle.data.modalities.image.failures import ViolationError
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -55,14 +55,14 @@ class Pixels:
 
     Attributes:
         source: Source label or URI of the sample.
-        encoded_bytes: The encoded image payload.
+        encoded: The encoded image payload.
         mode: Pillow mode of the stored image.
     """
 
     __slots__ = ()
 
     source: str
-    encoded_bytes: bytes
+    encoded: bytes
     mode: str
 
     def fingerprint(self, hash_size: int = 8) -> str:
@@ -109,7 +109,7 @@ class Pixels:
         Raises:
             ValueError: If the mode is unsupported or ``target_size`` is not
                 two positive integers.
-            ImageValidationError: If the stored bytes cannot be decoded.
+            ViolationError: If the stored bytes cannot be decoded.
         """
         image_library = image.pillow("image decoding")
         selected_mode = mode or self.mode
@@ -121,14 +121,14 @@ class Pixels:
         if target_size is not None:
             configure(target_size, selected_mode)
         try:
-            with image_library.open(io.BytesIO(self.encoded_bytes)) as opened:
+            with image_library.open(io.BytesIO(self.encoded)) as opened:
                 converted = opened.convert(selected_mode)
                 if target_size is not None:
                     resampling = image_library.Resampling.BILINEAR
                     converted = converted.resize(target_size, resampling)
                 pixels = numpy.asarray(converted, dtype=numpy.uint8)
         except Exception as error:
-            raise ImageValidationError(
+            raise ViolationError(
                 f"could not decode validated image: {error}",
                 code="decode_failure",
                 source=self.source,

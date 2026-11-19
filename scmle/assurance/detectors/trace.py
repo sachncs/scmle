@@ -147,7 +147,7 @@ def digest(*entries: Any) -> str:
         if key in parts:
             continue
         source = textwrap.dedent(inspect.getsource(item))
-        parts[key] = certificates.hash_source(source)
+        parts[key] = certificates.digest(source)
         scope = vars(inspect.getmodule(item))
         for dotted in sorted(references(ast.parse(source))):
             for value in resolve(scope, dotted):

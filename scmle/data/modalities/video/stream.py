@@ -166,8 +166,8 @@ def probe(path: pathlib.Path) -> Metadata:
         format=str(found.get("format", {}).get("format_name") or "unknown"),
         width=int(stream.get("width") or 0),
         height=int(stream.get("height") or 0),
-        frame_count=count,
-        frames_per_second=rate,
+        frames=count,
+        rate=rate,
         codec=str(stream.get("codec_name") or "unknown"),
     )
 
@@ -188,7 +188,7 @@ def frames(path: pathlib.Path, metadata: Metadata) -> numpy.ndarray:
         VideoError: If no frame decodes.
     """
     side = descriptor.WORK
-    step = max(1, metadata.frame_count // COUNT)
+    step = max(1, metadata.frames // COUNT)
     source = str(path)
     output = execute(
         [
@@ -209,7 +209,7 @@ def frames(path: pathlib.Path, metadata: Metadata) -> numpy.ndarray:
             "rgb24",
             "-",
         ],
-        STARTUP + metadata.frame_count / RATE,
+        STARTUP + metadata.frames / RATE,
         source,
     )
     size = side * side * 3
@@ -265,8 +265,8 @@ def describe(path: pathlib.Path) -> numpy.ndarray:
                 float(motion.mean()),
                 float(motion.std()),
                 float(numpy.max(motion)),
-                metadata.duration_seconds,
-                metadata.frames_per_second,
+                metadata.seconds,
+                metadata.rate,
             ],
         ]
     )

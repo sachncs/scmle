@@ -37,7 +37,7 @@ class Status(enum.StrEnum):
     NOT_YET_WRITTEN = "not_yet_written"
 
 
-def to_seconds(values: pandas.Series) -> numpy.ndarray:
+def convert(values: pandas.Series) -> numpy.ndarray:
     """Converts times to float seconds; datetimes count from the Unix epoch.
 
     Args:
@@ -63,7 +63,7 @@ def to_seconds(values: pandas.Series) -> numpy.ndarray:
     raise errors.InputError("times must be datetimes or numbers")
 
 
-def point_in_time(
+def recall(
     rows: pandas.DataFrame,
     log: pandas.DataFrame,
     key: str,
@@ -79,7 +79,7 @@ def point_in_time(
             the order the changes were applied.
         key: Join key present in both tables.
         moment: Column of `rows` holding the prediction moment (datetimes
-            or numbers; see `to_seconds`).
+            or numbers; see `convert`).
         written_at: Column of `log` holding the write time.
         value: Column of `log` holding the written value.
 
@@ -92,11 +92,11 @@ def point_in_time(
     left = pandas.DataFrame(
         {
             "k": rows[key].to_numpy(),
-            "t": to_seconds(rows[moment]),
+            "t": convert(rows[moment]),
             "i": numpy.arange(len(rows)),
         }
     )
-    times = to_seconds(log[written_at])
+    times = convert(log[written_at])
     right = pandas.DataFrame(
         {
             "k": log[key].to_numpy(),
@@ -154,7 +154,7 @@ def classify(stored: pandas.Series, joined: pandas.DataFrame) -> pandas.Series:
 
     Args:
         stored: The stored value of each row.
-        joined: Output of `point_in_time`, aligned to `stored`.
+        joined: Output of `recall`, aligned to `stored`.
 
     Returns:
         A series of `Status` values (as strings) on the index of
@@ -183,7 +183,7 @@ def disagree(
 
     Args:
         rows: Cases with `key`, `moment` and the stored column.
-        log: Change log (see `point_in_time`).
+        log: Change log (see `recall`).
         key: Join key.
         moment: Prediction-moment column of `rows`.
         stored: Column of `rows` that holds the stored value.
@@ -194,7 +194,7 @@ def disagree(
         A boolean series aligned to `rows`; True for every row that is not
         a `match` (overwritten or not yet written).
     """
-    joined = point_in_time(rows, log, key, moment, written_at, value)
+    joined = recall(rows, log, key, moment, written_at, value)
     status = classify(rows[stored], joined)
     return pandas.Series(
         (status != Status.MATCH.value).to_numpy(),
@@ -210,8 +210,8 @@ class Audit:
     Attributes:
         field: Field name.
         status: Status of every row.
-        log_check: Counts and tolerance, for the provenance record.
-        as_of: Derived rule: the smallest lead over matching rows, or
+        tally: Counts and tolerance, for the provenance record.
+        lead: Derived rule: the smallest lead over matching rows, or
             unknown when no row matches.
         interval: Wilson interval for the mismatch share.
         check: The ledger record.
@@ -219,8 +219,8 @@ class Audit:
 
     field: str
     status: pandas.Series
-    log_check: provenance.Reconstruction
-    as_of: provenance.Lead
+    tally: provenance.Reconstruction
+    lead: provenance.Lead
     interval: tuple[float, float]
     check: qualification.Check
 

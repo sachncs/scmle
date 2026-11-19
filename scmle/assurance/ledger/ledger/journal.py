@@ -89,15 +89,15 @@ class Journal(chain.Replay):
             LedgerError: If it is not registered in this ledger or has
                 already been tested.
         """
-        known = self.hypotheses.get(hypothesis.hypothesis_id)
+        known = self.hypotheses.get(hypothesis.identifier)
         if known is None or known != hypothesis:
             raise records.LedgerError(
-                f"hypothesis {hypothesis.hypothesis_id} is not registered: "
+                f"hypothesis {hypothesis.identifier} is not registered: "
                 "registration must precede evaluation"
             )
-        if hypothesis.hypothesis_id in self.results:
+        if hypothesis.identifier in self.results:
             raise records.LedgerError(
-                f"hypothesis {hypothesis.hypothesis_id} was already tested"
+                f"hypothesis {hypothesis.identifier} was already tested"
             )
 
     def test(
@@ -130,7 +130,7 @@ class Journal(chain.Replay):
             )
         spec = hypothesis.spec
         column = features[spec.column] if spec.column else features.iloc[:, 0]
-        outcome = bivariate.run_statistic(
+        outcome = bivariate.calculate(
             spec.statistic,
             column.to_numpy(dtype=float),
             target.to_numpy(dtype=float),
@@ -156,7 +156,7 @@ class Journal(chain.Replay):
         index = len(self.results)
         decision = records.REJECT if step.rejected else records.RETAIN
         check = qualification.Check(
-            identifier=f"{hypothesis.hypothesis_id}:X",
+            identifier=f"{hypothesis.identifier}:X",
             null=hypothesis.spec.null,
             statistic=outcome.statistic,
             p_value=outcome.p,
@@ -225,7 +225,7 @@ class Journal(chain.Replay):
         self.commit(
             records.RESULT,
             {
-                "hypothesis_id": hypothesis.hypothesis_id,
+                "hypothesis_id": hypothesis.identifier,
                 "check": None if check is None else check.to_dict(),
                 "evidence": {"p": p, "e": step.e_value},
                 "e_value": step.e_value,
@@ -237,7 +237,7 @@ class Journal(chain.Replay):
                 "reason": reason,
             },
         )
-        return self.results[hypothesis.hypothesis_id]
+        return self.results[hypothesis.identifier]
 
     def decision(self, hypothesis: records.Hypothesis) -> records.Outcome:
         """Looks up the recorded result of a hypothesis.
@@ -251,10 +251,10 @@ class Journal(chain.Replay):
         Raises:
             LedgerError: If it has not been tested.
         """
-        result = self.results.get(hypothesis.hypothesis_id)
+        result = self.results.get(hypothesis.identifier)
         if result is None:
             raise records.LedgerError(
-                f"{hypothesis.hypothesis_id} has no result yet"
+                f"{hypothesis.identifier} has no result yet"
             )
         return result
 
@@ -384,7 +384,7 @@ class Ledger(Journal):
 
         Args:
             run_dir: Run directory; the file is `hypothesis_ledger.jsonl`.
-            charter: The `AnalysisCharter` governing the run. Its
+            charter: The `Charter` governing the run. Its
                 exploration wealth is the FDR level of the online rule and its
                 confirmation level is recorded in the `open` row of a new
                 ledger.
@@ -412,7 +412,7 @@ class Ledger(Journal):
         )
         if path.exists():
             ledger = cls.load(path)
-            if ledger.header["charter_hash"] != charter.charter_hash:
+            if ledger.header["charter_hash"] != charter.digest:
                 raise records.LedgerError(
                     "ledger belongs to a different charter"
                 )
@@ -424,7 +424,7 @@ class Ledger(Journal):
         directory.mkdir(parents=True, exist_ok=True)
         return cls.create(
             path,
-            charter_hash=charter.charter_hash,
+            charter_hash=charter.digest,
             config=config,
             alpha_confirm=charter.budget.confirmation.alpha_confirm,
             seed=charter.seed,
@@ -441,9 +441,7 @@ class Ledger(Journal):
             {**summary, "sha256": records.digest(dict(summary))},
         )
 
-    def record_diagnostic(
-        self, check: qualification.Check, source: str
-    ) -> None:
+    def inspect(self, check: qualification.Check, source: str) -> None:
         """Logs a detector check run on `X`; call before `freeze`.
 
         Args:
@@ -467,19 +465,19 @@ class Ledger(Journal):
             LedgerError: If the freeze row was written but the set was not
                 recorded (a defect, not a data error).
         """
-        frozen = self.survivor_set
+        frozen = self.remaining
         if frozen is not None:
             return frozen
         kept = self.survivors()
-        ids = tuple(h.hypothesis_id for h in kept)
-        specs = {h.hypothesis_id: h.spec for h in kept}
+        ids = tuple(h.identifier for h in kept)
+        specs = {h.identifier: h.spec for h in kept}
         self.commit(
             records.SURVIVORS,
             {"ids": list(ids), "sha256": records.fingerprint(ids, specs)},
         )
-        if self.survivor_set is None:  # pragma: no cover - ingest sets it
+        if self.remaining is None:  # pragma: no cover - ingest sets it
             raise records.LedgerError("survivors were not frozen")
-        return self.survivor_set
+        return self.remaining
 
     def seal(self, body: Mapping[str, Any]) -> None:
         """Appends the confirmation row; nothing may follow it.
@@ -492,11 +490,11 @@ class Ledger(Journal):
                 refuses the row (for example, registered claims without an
                 outcome in ``body["claims"]``).
         """
-        if self.survivor_set is None:
+        if self.remaining is None:
             raise records.LedgerError("freeze the survivors before confirming")
         self.commit(
             records.CONFIRMATION,
-            {**body, "survivors_sha256": self.survivor_set.sha256},
+            {**body, "survivors_sha256": self.remaining.sha256},
         )
 
     def verify(self) -> None:

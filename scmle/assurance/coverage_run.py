@@ -9,7 +9,7 @@ interval, the tier and, for sets, the coverage within each true class. The
 rows are read once, by the evaluation that already opened them; this module
 asks for nothing more of custody.
 
-The claim is fixed first. `claim_document` states, before the rows are
+The claim is fixed first. `claim` states, before the rows are
 released, the levels, the methods, the tolerance and the rule; its hash
 (its `ledger.digest`) is registered by the run (the
 custody log of a charter run, the event log always) and the report carries it,
@@ -44,7 +44,7 @@ REPORT_FILE = "coverage_report.json"
 REGISTRATION_EVENT = "coverage_claim_registered"
 
 
-def claim_document(
+def claim(
     *,
     task: str,
     levels: Sequence[float],
@@ -92,7 +92,7 @@ def claim_document(
     }
 
 
-def declared_slices(
+def declare(
     inside: numpy.ndarray,
     sizes: numpy.ndarray,
     labels: Mapping[str, Any],
@@ -169,7 +169,7 @@ def regressions(
                 inside, widths, level
             )
             if slices:
-                by_level[f"{level:g}"]["declared_slices"] = declared_slices(
+                by_level[f"{level:g}"]["declared_slices"] = declare(
                     inside, widths, slices, level
                 )
         if by_level:
@@ -214,14 +214,14 @@ def classwise(
                 inside, sizes, level, true_classes=[str(t) for t in truth]
             )
             if slices:
-                by_level[f"{level:g}"]["declared_slices"] = declared_slices(
+                by_level[f"{level:g}"]["declared_slices"] = declare(
                     inside, sizes, slices, level
                 )
         reports["pooled" if mode is None else "class_conditional"] = by_level
     return reports
 
 
-def run_report(
+def report(
     bundle: Any,
     features: pandas.DataFrame,
     target: Any,
@@ -234,7 +234,7 @@ def run_report(
     `claim_sha256` is the hash of the claim registered before the rows were
     read; the report repeats it. `slices` maps each declared slice column to
     the slice label of every row (or None when it cannot be sliced); each
-    level then also gets `declared_slices`, descriptive only.
+    level then also gets `declare`, descriptive only.
 
     Args:
         bundle: The frozen bundle, calibration included.

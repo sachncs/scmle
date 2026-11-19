@@ -36,7 +36,7 @@ VAULT_LEVEL = "vault process"
 PROTOCOL_LEVEL = "in-process protocol"
 
 
-def binding_digest(claims_hash: str, ledger_hash: str) -> str:
+def digest(claims_hash: str, ledger_hash: str) -> str:
     """Digests the claim set and the ledger state a release is bound to.
 
     Args:
@@ -223,7 +223,7 @@ class Locker:
             locked: The locked set (a vault-backed one for real custody).
             log: The custody log.
         """
-        self.set_id = set_id
+        self.identifier = set_id
         self.locked = locked
         self.log = log
         self.binding: str | None = None
@@ -246,7 +246,7 @@ class Locker:
             The token that `open` requires.
         """
         token = self.locked.mint()
-        self.log.append(self.set_id, "token_issued", ORCHESTRATOR)
+        self.log.append(self.identifier, "token_issued", ORCHESTRATOR)
         return token
 
     @property
@@ -271,11 +271,11 @@ class Locker:
         Returns:
             The binding digest.
         """
-        binding = binding_digest(claims_hash, ledger_hash)
+        binding = digest(claims_hash, ledger_hash)
         self.locked.bind(binding)
         self.binding = binding
         self.log.append(
-            self.set_id,
+            self.identifier,
             "bound",
             ORCHESTRATOR,
             {"claims_hash": claims_hash, "ledger_hash": ledger_hash},
@@ -307,7 +307,7 @@ class Locker:
                 refusal is logged as `denied`.
         """
         offered = (
-            binding_digest(claims_hash, ledger_hash)
+            digest(claims_hash, ledger_hash)
             if claims_hash is not None and ledger_hash is not None
             else None
         )
@@ -315,10 +315,10 @@ class Locker:
             rows = self.locked.open(token, offered)
         except errors.LeakageError as error:
             self.log.append(
-                self.set_id, "denied", actor, {"reason": str(error)}
+                self.identifier, "denied", actor, {"reason": str(error)}
             )
             raise
-        self.log.append(self.set_id, "open", actor, {"rows": len(rows[0])})
+        self.log.append(self.identifier, "open", actor, {"rows": len(rows[0])})
         return rows
 
 
@@ -408,11 +408,11 @@ class View:
         target: Exploration labels.
         ids: Row ids of the exploration rows.
         folds: Cross-validation folds over positions in these rows.
-        manifest_sha256: Hash of the governing split manifest.
+        digest: Hash of the governing split manifest.
     """
 
     features: pandas.DataFrame
     target: pandas.Series
     ids: tuple[int, ...]
     folds: tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]
-    manifest_sha256: str
+    digest: str

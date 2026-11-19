@@ -103,10 +103,10 @@ class Candidate:
     Attributes:
         columns: Column names in table order.
         g3: Fraction of rows to delete for uniqueness, in [0, 1].
-        null_rate: Share of rows with a null in any column.
+        nulls: Share of rows with a null in any column.
         distinct: Distinct non-null combinations.
         rows: Rows in the table.
-        small_n: True when the table is small enough for accidental keys.
+        small: True when the table is small enough for accidental keys.
         migrations: The written layout's version steps, oldest first;
             version 2 writes `nulls` and `small`.
     """
@@ -117,10 +117,10 @@ class Candidate:
 
     columns: tuple[str, ...]
     g3: float
-    null_rate: float
+    nulls: float
     distinct: int
     rows: int
-    small_n: bool
+    small: bool
 
     def rank(self) -> tuple[Any, ...]:
         """Builds the sort key: fewer columns, lower g3, fewer nulls.
@@ -128,7 +128,7 @@ class Candidate:
         Returns:
             A tuple of column count, g3, null rate and the columns.
         """
-        return (len(self.columns), self.g3, self.null_rate, self.columns)
+        return (len(self.columns), self.g3, self.nulls, self.columns)
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the candidate.
@@ -149,10 +149,10 @@ class Scan:
         rows: Row count.
         keys: Minimal approximate keys, ranked.
         measured: g3 and null rate of every set that was queried or derived.
-        levels_done: Largest lattice level that finished.
+        done: Largest lattice level that finished.
         partial: True when the budget stopped the search.
         eps_key: Largest g3 accepted as a key.
-        eps_null: Largest null rate accepted in a key.
+        null: Largest null rate accepted in a key.
         migrations: The written layout's version steps, oldest first;
             version 2 writes `levels`, `tolerances.{key, null}` and
             the keys at their version 2.
@@ -170,10 +170,10 @@ class Scan:
     rows: int
     keys: list[Candidate]
     measured: dict[tuple[str, ...], tuple[float, float]]
-    levels_done: int
+    done: int
     partial: bool
     eps_key: float
-    eps_null: float
+    null: float
 
     def ties(self) -> list[list[tuple[str, ...]]]:
         """Finds keys that tie, to be put to a person.
@@ -198,9 +198,9 @@ class Scan:
             "rows": self.rows,
             "keys": [k.to_dict() for k in self.keys],
             "ties": [[list(c) for c in g] for g in self.ties()],
-            "levels": self.levels_done,
+            "levels": self.done,
             "partial": self.partial,
-            "tolerances": {"key": self.eps_key, "null": self.eps_null},
+            "tolerances": {"key": self.eps_key, "null": self.null},
         }
 
 
@@ -215,7 +215,7 @@ def is_key(g3: float, null_rate: float, scan: Scan) -> bool:
     Returns:
         True if `g3` and `null_rate` are within `eps_key` and `eps_null`.
     """
-    return g3 <= scan.eps_key and null_rate <= scan.eps_null
+    return g3 <= scan.eps_key and null_rate <= scan.null
 
 
 def measure(
@@ -284,7 +284,7 @@ def feasible(
         capacity *= max(table.column(name).distinct, 1)
         if capacity >= need:
             break
-    smallest = min(table.column(name).non_null for name in columns)
+    smallest = min(table.column(name).present for name in columns)
     return capacity >= need and smallest >= need
 
 
@@ -306,13 +306,13 @@ def sweep(
     for name in usable:
         column = table.column(name)
         g3 = (n - column.distinct) / n if n else 1.0
-        nulls = (n - column.non_null) / n if n else 0.0
+        nulls = (n - column.present) / n if n else 0.0
         scan.measured[(name,)] = (g3, nulls)
         if is_key(g3, nulls, scan):
             scan.keys.append(
                 Candidate((name,), g3, nulls, column.distinct, n, n < SMALL_N)
             )
-        elif nulls <= scan.eps_null:
+        elif nulls <= scan.null:
             nonkey.add((name,))
     return nonkey
 
@@ -389,7 +389,7 @@ def levels(
                     Candidate(cols, g3, nulls, distinct, n, n < SMALL_N)
                 )
                 continue
-            if nulls > scan.eps_null:
+            if nulls > scan.null:
                 continue
         found.add(cols)
     return found
@@ -432,16 +432,14 @@ def keysearch(
         rows=table.rows,
         keys=[],
         measured={},
-        levels_done=0,
+        done=0,
         partial=False,
         eps_key=eps_key,
-        eps_null=eps_null,
+        null=eps_null,
     )
-    usable = [
-        c.name for c in table.columns if c.distinct > 1 and c.non_null > 0
-    ]
+    usable = [c.name for c in table.columns if c.distinct > 1 and c.present > 0]
     nonkey = sweep(table, usable, scan)
-    scan.levels_done = 1
+    scan.done = 1
     for size in range(2, max_size + 1):
         candidates, runnable = layer(usable, nonkey, size, table, eps_key)
         budget = source.meter
@@ -458,7 +456,7 @@ def keysearch(
             scan.partial = True
             break
         nonkey = levels(source, table, candidates, runnable, scan)
-        scan.levels_done = size
+        scan.done = size
         if not nonkey:
             break
     scan.keys.sort(key=Candidate.rank)
@@ -466,13 +464,13 @@ def keysearch(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class UnitVerdict:
+class Verdict:
     """Comparison of the charter unit with the table's grain.
 
     Attributes:
         verdict: `match`, `finer`, `coarser` or `unknown`.
         unit: The unit text.
-        unit_columns: Columns the unit text was matched to.
+        columns: Columns the unit text was matched to.
         reason: Why, in one sentence.
         questions: Things a person must settle, if any.
         migrations: The written layout's version steps, oldest first;
@@ -485,7 +483,7 @@ class UnitVerdict:
 
     verdict: str
     unit: str
-    unit_columns: tuple[str, ...]
+    columns: tuple[str, ...]
     reason: str
     questions: tuple[str, ...] = ()
 
@@ -505,7 +503,7 @@ class UnitVerdict:
         """
         layout = {
             **dataclasses.asdict(self),
-            "unit_columns": list(self.unit_columns),
+            "columns": list(self.columns),
             "questions": list(self.questions),
             "blocks": self.blocks,
         }
@@ -555,7 +553,7 @@ def shrink(
     unit: str,
     columns: tuple[str, ...],
     identifies: Callable[[tuple[str, ...]], bool | None],
-) -> UnitVerdict | None:
+) -> Verdict | None:
     """Looks for a strict subset of the unit columns that is already a key.
 
     Args:
@@ -572,7 +570,7 @@ def shrink(
         for subset in itertools.combinations(columns, size):
             state = identifies(subset)
             if state is None:
-                return UnitVerdict(
+                return Verdict(
                     UNKNOWN,
                     unit,
                     columns,
@@ -580,7 +578,7 @@ def shrink(
                     ("raise the ingest budget",),
                 )
             if state:
-                return UnitVerdict(
+                return Verdict(
                     COARSER,
                     unit,
                     columns,
@@ -590,12 +588,12 @@ def shrink(
     return None
 
 
-def unit_verdict(
+def judge(
     source: profile.Sql,
     table: profile.Census,
     unit: str,
     scan: Scan,
-) -> UnitVerdict:
+) -> Verdict:
     """Compares the unit text with the table's measured grain.
 
     Rules, in order. Unit words that do not each match one column give
@@ -616,7 +614,7 @@ def unit_verdict(
     """
     columns, questions = align(unit, table)
     if not columns:
-        return UnitVerdict(
+        return Verdict(
             UNKNOWN,
             unit,
             (),
@@ -642,7 +640,7 @@ def unit_verdict(
         return coarser
     state = identifies(columns)
     if state is None:
-        return UnitVerdict(
+        return Verdict(
             UNKNOWN,
             unit,
             columns,
@@ -650,16 +648,16 @@ def unit_verdict(
             ("raise the ingest budget",),
         )
     if state:
-        return UnitVerdict(MATCH, unit, columns, "unit columns are a key")
+        return Verdict(MATCH, unit, columns, "unit columns are a key")
     if scan.keys:
-        return UnitVerdict(
+        return Verdict(
             FINER,
             unit,
             columns,
             f"unit columns repeat; the table is keyed by "
             f"{list(scan.keys[0].columns)}, so aggregation is needed",
         )
-    return UnitVerdict(
+    return Verdict(
         UNKNOWN,
         unit,
         columns,

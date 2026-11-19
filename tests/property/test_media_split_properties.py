@@ -117,14 +117,14 @@ def test_no_copy_edited_copy_or_group_is_on_both_sides(
     joined = declared and (not timed or entities == "unseen")
     family = families(parents, frame["group"].to_numpy() if joined else None)
     manifest = split.manifest
-    assert not straddles(family, manifest.train_ids, manifest.test_ids)
-    development = numpy.asarray(manifest.train_ids)
+    assert not straddles(family, manifest.training, manifest.test)
+    development = numpy.asarray(manifest.training)
     for fit, check in manifest.folds:
         assert not straddles(
             family, development[list(fit)], development[list(check)]
         )
-    assert rows.KEY not in split.dev_features.columns
-    assert rows.KEY not in split.locked_test.features.columns
+    assert rows.KEY not in split.features.columns
+    assert rows.KEY not in split.test.features.columns
 
 
 def test_without_cohorts_the_declared_protocol_applies_unchanged():

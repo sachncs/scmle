@@ -66,7 +66,7 @@ def finish(
     Raises:
         LedgerError: If the survivors have not been frozen.
     """
-    survivors = ledger.survivor_set
+    survivors = ledger.remaining
     if survivors is None:
         raise scmle.assurance.ledger.ledger.LedgerError(
             "freeze the survivors first"
@@ -93,12 +93,12 @@ def finish(
         claims=claims,
         checks=checks,
         rule=rule.value,
-        alpha_confirm=alpha,
+        confirm=alpha,
         survivors_sha256=survivors.sha256,
         ledger_head=ledger.head,
-        custody_head=custody_head,
+        head=custody_head,
         control=ledger.control,
-        stage_two=None if stage_two is None else dict(stage_two),
+        second=None if stage_two is None else dict(stage_two),
         registered=registered,
         documents=documents,
     )
@@ -126,10 +126,10 @@ def account(
     statuses = {} if ran is None else dict(ran.statuses)
     documents = {} if ran is None else dict(ran.documents)
     registered: dict[str, dict[str, str]] = {
-        item.claim_id: {
+        item.identifier: {
             "kind": item.kind,
             "sha256": item.sha256,
-            "status": statuses.get(item.claim_id, records.NOT_EVALUATED),
+            "status": statuses.get(item.identifier, records.NOT_EVALUATED),
         }
         for item in runner.registered
     }
@@ -188,7 +188,7 @@ def confirm(
     policy: str = records.UNCONFIRMED,
     require_control: bool = True,
     custody_log: records.Log | None = None,
-    encode: Callable[[pandas.Series], Any] = evaluation.default_encoding,
+    encode: Callable[[pandas.Series], Any] = evaluation.encode,
     withdrawal: records.Withdrawal | None = None,
     claim_runner: records.Docket | None = None,
     register: usage.Register | None = None,
@@ -279,12 +279,12 @@ def enter(
     """
     if claim_runner is not None:
         for item in claim_runner.registered:
-            ledger.enroll(item.claim_id, item.kind, item.statement, item.sha256)
+            ledger.enroll(
+                item.identifier, item.kind, item.statement, item.sha256
+            )
     ledger.freeze()
     return (
-        None
-        if withdrawal is None
-        else evaluation.stage_two_record(ledger, withdrawal)
+        None if withdrawal is None else evaluation.account(ledger, withdrawal)
     )
 
 
@@ -405,7 +405,7 @@ def preregister(
         records.ACTOR,
         {
             "survivors_sha256": survivors.sha256,
-            "survivors": len(survivors.hypothesis_ids),
+            "survivors": len(survivors.hypotheses),
             "ledger_head": ledger.head,
             "rule": rule.value,
             **(
@@ -420,7 +420,7 @@ def preregister(
             **(
                 {}
                 if not registered
-                else {"registered_claims": [i.claim_id for i in registered]}
+                else {"registered_claims": [i.identifier for i in registered]}
             ),
         },
     )
@@ -431,7 +431,7 @@ def preregister(
         claims_hash = scmle.assurance.ledger.ledger.digest(
             {
                 "family": claims_hash,
-                "registered": [[i.claim_id, i.sha256] for i in registered],
+                "registered": [[i.identifier, i.sha256] for i in registered],
             }
         )
     return str(claims_hash)
@@ -530,7 +530,7 @@ def evaluate(
         if isinstance(failure, errors.LeakageError):
             raise
         return records.Output(
-            {i.claim_id: records.FAILED for i in runner.registered},
+            {i.identifier: records.FAILED for i in runner.registered},
             {},
         )
 

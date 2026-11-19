@@ -217,9 +217,7 @@ def explored():
         alpha_confirm=ALPHA,
         seed=3,
     )
-    explore.run_exploration(
-        ledger, x, y, explore.hypothesize(x, explore.NUMERIC)
-    )
+    explore.explore(ledger, x, y, explore.hypothesize(x, explore.NUMERIC))
     summary = controls.summarize("permuted_target", "strata", 6, (0,) * 20)
     ledger.negatives(summary.to_dict())
     return ledger, x, y

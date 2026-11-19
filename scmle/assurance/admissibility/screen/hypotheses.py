@@ -14,20 +14,20 @@ import numpy
 import pandas
 
 from scmle.assurance.admissibility import leakage
+from scmle.assurance.admissibility.screen.association import assay
 from scmle.assurance.admissibility.screen.association import cramer
 from scmle.assurance.admissibility.screen.association import dominance
-from scmle.assurance.admissibility.screen.association import purity_statistic
 from scmle.assurance.admissibility.screen.association import resample
 from scmle.assurance.admissibility.screen.fitting import aucs
 from scmle.assurance.admissibility.screen.fitting import basis
+from scmle.assurance.admissibility.screen.fitting import fit
 from scmle.assurance.admissibility.screen.fitting import line
-from scmle.assurance.admissibility.screen.fitting import oof_fit
 from scmle.assurance.admissibility.screen.fitting import pair
 from scmle.assurance.admissibility.screen.fitting import pairs
 from scmle.assurance.admissibility.screen.fitting import predict
 from scmle.assurance.admissibility.screen.fitting import Problem
-from scmle.assurance.admissibility.screen.fitting import skill_bound
-from scmle.assurance.admissibility.screen.fitting import skill_statistic
+from scmle.assurance.admissibility.screen.fitting import quantify
+from scmle.assurance.admissibility.screen.fitting import temper
 from scmle.assurance.admissibility.screen.settings import BINARY_CLASSES
 from scmle.assurance.admissibility.screen.settings import DUPLICATION
 from scmle.assurance.admissibility.screen.settings import ECHO
@@ -51,7 +51,7 @@ class Pending:
         observed: Observed statistic.
         statistic: Function of a batch of permuted labels, or None when the
             p-value is analytic.
-        uses_binned: Whether the statistic reads the binned outcome.
+        binned: Whether the statistic reads the binned outcome.
         p_value: Analytic p-value, when there is no statistic.
         exceed: Permutations with a statistic at least the observed one.
         drawn: Permutations drawn for it.
@@ -69,7 +69,7 @@ class Pending:
     mechanism: str
     observed: float
     statistic: Statistic | None
-    uses_binned: bool
+    binned: bool
     p_value: float | None = None
     exceed: int = 0
     drawn: int = 0
@@ -181,7 +181,7 @@ def reflect(problem: Problem, data: numpy.ndarray) -> Statistic:
             share: numpy.ndarray = (labels == data[None, :]).mean(axis=1)
             return share
         squares = ((labels - data[None, :]) ** 2).sum(axis=1)
-        efficiency: numpy.ndarray = 1.0 - squares / problem.total_squares
+        efficiency: numpy.ndarray = 1.0 - squares / problem.total
         return efficiency
 
     return compute
@@ -256,7 +256,7 @@ def gauge(
     """
     if phi.shape[1] <= 1:
         return []
-    statistic = skill_statistic(problem, phi)
+    statistic = quantify(problem, phi)
     observed = float(statistic(problem.y[None, :])[0])
     return [
         Pending(
@@ -264,7 +264,7 @@ def gauge(
             SKILL,
             observed,
             statistic,
-            uses_binned=False,
+            binned=False,
             data=phi,
             columns=columns or (name,),
         )
@@ -329,7 +329,7 @@ def propose(
                     ECHO,
                     observed,
                     statistic,
-                    uses_binned=False,
+                    binned=False,
                     data=data,
                 )
             )
@@ -443,13 +443,13 @@ def rival(
     for outcome in targets:
         row = outcome[None, :]
         stack = numpy.column_stack(
-            [oof_fit(row, part[1], problem.splits)[0] for part in others]
+            [fit(row, part[1], problem.splits)[0] for part in others]
         )
-        fitted = oof_fit(row, stack, problem.splits)
+        fitted = fit(row, stack, problem.splits)
         stacked.append(fitted[0])
         if problem.task == "regression":
             squares = float(((outcome - fitted[0]) ** 2).sum())
-            scores.append(1.0 - squares / problem.total_squares)
+            scores.append(1.0 - squares / problem.total)
         else:
             scores.append(float(aucs(fitted, row > 0, tests)[0]))
     skill, design = max(others, key=lambda part: part[0])
@@ -492,7 +492,7 @@ def reading(
         design = line(frame[named[h.columns[0]]])
     if design is None:
         return smooth
-    score = float(skill_statistic(problem, design)(problem.y[None, :])[0])
+    score = float(quantify(problem, design)(problem.y[None, :])[0])
     return predict(problem, design) if score > h.observed else smooth
 
 
@@ -532,10 +532,10 @@ def caps(cfg: leakage.Config) -> dict[str, float]:
     # fit (agreement, or unfitted R^2), so it shares the association
     # ceiling: no new threshold.
     return {
-        SKILL: cfg.skill_ceiling,
-        MISSING: cfg.association_ceiling,
-        PURITY: cfg.association_ceiling,
-        ECHO: cfg.association_ceiling,
+        SKILL: cfg.skill,
+        MISSING: cfg.ceiling,
+        PURITY: cfg.ceiling,
+        ECHO: cfg.ceiling,
         ENCODING: NATURAL,
         DUPLICATION: NATURAL,
     }
@@ -574,30 +574,30 @@ def hypothesize(
     if missing.all() or not missing.any() or len(totals) < MIN_CLASSES:
         return []
     recorded = ~missing
-    pure = purity_statistic(recorded)
+    pure = assay(recorded)
     found = [
         Pending(
             name,
             PURITY,
             float(pure(class_codes[None, :])[0]),
             pure,
-            uses_binned=True,
+            binned=True,
         )
     ]
     if structured:
         stat = cramer(missing, totals)
         observed = float(stat(class_codes[None, :])[0])
-        found.append(Pending(name, MISSING, observed, stat, uses_binned=True))
+        found.append(Pending(name, MISSING, observed, stat, binned=True))
         return found
-    test = leakage.missingness_test(series, outcome, task, cfg)
+    test = leakage.test(series, outcome, task, cfg)
     if test is not None:
         found.append(
             Pending(
                 name,
                 MISSING,
-                test.cramers_v,
+                test.association,
                 None,
-                uses_binned=True,
+                binned=True,
                 p_value=test.p_value,
                 active=False,
             )
@@ -632,9 +632,9 @@ def floor(
     if h.bound is not None:
         return h.bound
     path = f"leakage.screen.{h.mechanism}.{h.feature}"
-    rng = randomness.component_rng(cfg.run_seed, path, 0)
+    rng = randomness.component_rng(cfg.seed, path, 0)
     if h.mechanism == SKILL and h.data is not None:
-        return skill_bound(problem, h.data, cfg, groups, rng)
+        return temper(problem, h.data, cfg, groups, rng)
     if h.mechanism == ECHO and h.data is not None:
         return hedge(problem, h.data, cfg, groups, rng)
     if h.mechanism == PURITY:

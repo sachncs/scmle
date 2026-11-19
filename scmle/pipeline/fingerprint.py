@@ -484,7 +484,7 @@ def aim(target: pandas.Series, task: tasks.Task) -> records.Layout:
         values = target.astype(float)
         target_block |= {
             "skew": float(numpy.nan_to_num(values.agg("skew"))),
-            "outlier_rate": columns.outlier_rate(values),
+            "outlier_rate": columns.rate(values),
         }
     return target_block
 

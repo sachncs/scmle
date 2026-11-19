@@ -53,7 +53,7 @@ def test_a_detector_that_finds_the_plants_is_certified():
     result = certify.certify_detector(
         "dup",
         standins.duplicate_standin,
-        certificates.code_hash(standins.duplicate_standin),
+        certificates.fingerprint(standins.duplicate_standin),
         frame,
         [duplicate_plan()],
         seeds=(0, 1),
@@ -65,9 +65,9 @@ def test_a_detector_that_finds_the_plants_is_certified():
     assert outcome.certificate.alarms == 0
     # Clean rows are counted once even with two seeds (no pseudo-replication).
     assert outcome.certificate.clean == len(frame)
-    assert result.certified_defect_types == ("duplicate_exact",)
+    assert result.certified == ("duplicate_exact",)
     assert result.seeds == (0, 1)
-    assert result.digests["corpus"] == certificates.corpus_hash(
+    assert result.digests["corpus"] == certificates.checksum(
         [certify.frame_digest(frame)]
     )
 
@@ -79,14 +79,14 @@ def test_a_detector_that_finds_nothing_is_not_certified():
     result = certify.certify_detector(
         "silent",
         silent,
-        certificates.code_hash(silent),
+        certificates.fingerprint(silent),
         small_frame(),
         [duplicate_plan()],
         seeds=(0,),
         policy=POLICY,
     )
     assert result.outcomes[0].certificate.recall == 0.0
-    assert result.certified_defect_types == ()
+    assert result.certified == ()
 
 
 def test_a_detector_that_flags_everything_is_not_certified():
@@ -96,7 +96,7 @@ def test_a_detector_that_flags_everything_is_not_certified():
     result = certify.certify_detector(
         "alarmist",
         alarmist,
-        certificates.code_hash(alarmist),
+        certificates.fingerprint(alarmist),
         small_frame(),
         [duplicate_plan()],
         seeds=(0,),

@@ -133,7 +133,7 @@ class StandIn:
         Returns:
             The code hash that certificates are filed under.
         """
-        return certificates.code_hash(self.detector, *self.helpers)
+        return certificates.fingerprint(self.detector, *self.helpers)
 
 
 STANDINS: dict[str, StandIn] = {

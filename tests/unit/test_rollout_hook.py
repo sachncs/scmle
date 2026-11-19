@@ -216,7 +216,7 @@ def test_the_budget_survives_in_the_ledger_rows(tmp_path):
     hook = env.hook
     hook.start("exp-1")
     row = next(r for r in ledger.rows if r["kind"] == "rollout_experiment")
-    restored = budget.DecisionBudget.from_dict(row["body"]["budget"])
+    restored = budget.Decision.from_dict(row["body"]["budget"])
     assert restored == hook.budget
 
 

@@ -240,7 +240,7 @@ def test_validation_rejects_bad_graphs():
     available = {"a", "b", "t", "y"}
 
     def check(nodes, **data):
-        feature_graph.validate_graph(
+        feature_graph.validate(
             tasks.Derivation(nodes=nodes), available, data_spec(**data)
         )
 

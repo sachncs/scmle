@@ -16,19 +16,19 @@ def test_a_charter_without_the_field_serialises_and_hashes_as_before():
     assert "purpose" not in charter.to_dict()
     assert charter.format_version == 2
     record = json.loads(json.dumps(charter.to_dict()))
-    again = contracts.AnalysisCharter.from_dict(record)
-    assert again.charter_hash == charter.charter_hash
+    again = contracts.Charter.from_dict(record)
+    assert again.digest == charter.digest
 
 
 def test_the_field_changes_the_hash_round_trips_and_needs_format_six():
     base = make_charter()
     charter = make_charter(purpose=contracts.NEW_ENTITY)
-    assert charter.charter_hash != base.charter_hash
+    assert charter.digest != base.digest
     assert charter.format_version == 6
     record = json.loads(json.dumps(charter.to_dict()))
-    assert contracts.AnalysisCharter.from_dict(record) == charter
+    assert contracts.Charter.from_dict(record) == charter
     other = make_charter(purpose=contracts.KNOWN_ENTITY_FUTURE)
-    assert other.charter_hash != charter.charter_hash
+    assert other.digest != charter.digest
 
 
 def test_an_unknown_unit_is_refused():
@@ -44,10 +44,10 @@ def test_the_field_in_an_older_format_is_refused(tmp_path):
     path = tmp_path / "charter.json"
     path.write_text(json.dumps(wrapper))
     with pytest.raises(errors.ConfigError, match="purpose"):
-        sealing.read_verified(path, signing_key="k")
+        sealing.read(path, signing_key="k")
 
 
 def test_a_format_six_charter_is_read_back(tmp_path):
     charter = make_charter(purpose=contracts.KNOWN_ENTITY_FUTURE)
     path = sealing.inscribe(tmp_path / "charter.json", charter, "k")
-    assert sealing.read_verified(path, signing_key="k").charter == charter
+    assert sealing.read(path, signing_key="k").charter == charter

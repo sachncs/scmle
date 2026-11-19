@@ -18,8 +18,8 @@ class IncrementalError(errors.DataError):
 
     Attributes:
         code: Short machine-readable failure code.
-        source_uri: URI (or source identity) of the source involved.
-        details: Evidence mapping holding `code`, `source_uri` and any
+        uri: URI (or source identity) of the source involved.
+        details: Evidence mapping holding `code`, `uri` and any
             extra detail supplied.
     """
 
@@ -40,7 +40,7 @@ class IncrementalError(errors.DataError):
                 source URI.
         """
         self.code = code
-        self.source_uri = source_uri
+        self.uri = source_uri
         self.details = {
             "code": code,
             "source_uri": source_uri,
@@ -63,7 +63,7 @@ class Lateness(enum.StrEnum):
     REJECT = "reject"
 
 
-def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
+def parse(value: str, field_name: str) -> datetime.datetime:
     """Parses a timezone-aware ISO-8601 timestamp.
 
     Args:
@@ -145,9 +145,9 @@ class Event:
             raise errors.KindError("sequence must be an integer")
         if self.sequence < 1:
             raise errors.InputError("sequence must be a positive integer")
-        parse_timestamp(self.occurred, "occurred")
+        parse(self.occurred, "occurred")
         if self.ingested:
-            parse_timestamp(self.ingested, "ingested")
+            parse(self.ingested, "ingested")
         if not isinstance(self.payload, Mapping):
             raise errors.KindError("payload must be a mapping")
         object.__setattr__(self, "payload", dict(self.payload))
@@ -234,7 +234,7 @@ class Checkpoint:
         if self.sequence < 0:
             raise errors.InputError("sequence must be a non-negative integer")
         if self.watermark:
-            parse_timestamp(self.watermark, "watermark")
+            parse(self.watermark, "watermark")
 
     def bind(self, source_identity: str) -> "Checkpoint":
         """Binds an uninitialized checkpoint to exactly one source.
@@ -287,23 +287,23 @@ class Batch:
     """Events selected for processing and the checkpoint they can advance.
 
     Attributes:
-        source_identity: Identity of the source.
+        identity: Identity of the source.
         events: The selected events, in the order they were selected.
-        next_checkpoint: The checkpoint to persist once the batch is
+        checkpoint: The checkpoint to persist once the batch is
             committed.
-        duplicate_event_ids: Sorted, unique identities of events skipped as
+        duplicates: Sorted, unique identities of events skipped as
             already seen or repeated.
-        late_event_ids: Sorted, unique identities of events at or behind
+        late: Sorted, unique identities of events at or behind
             the checkpoint's sequence.
-        has_more: Whether eligible events remain beyond the selected ones.
+        more: Whether eligible events remain beyond the selected ones.
     """
 
-    source_identity: str
+    identity: str
     events: tuple[Event, ...]
-    next_checkpoint: Checkpoint
-    duplicate_event_ids: tuple[str, ...] = ()
-    late_event_ids: tuple[str, ...] = ()
-    has_more: bool = False
+    checkpoint: Checkpoint
+    duplicates: tuple[str, ...] = ()
+    late: tuple[str, ...] = ()
+    more: bool = False
 
     def __post_init__(self) -> None:
         """Validates batch identity and deterministic event collections.
@@ -314,23 +314,21 @@ class Batch:
             TypeError: If `events` holds something other than Event
                 values.
         """
-        if self.next_checkpoint.source != self.source_identity:
+        if self.checkpoint.source != self.identity:
             raise errors.InputError(
                 "batch and checkpoint source identities differ"
             )
         if any(not isinstance(event, Event) for event in self.events):
             raise errors.KindError("events must contain Event values")
-        if tuple(sorted(set(self.duplicate_event_ids))) != (
-            self.duplicate_event_ids
-        ):
+        if tuple(sorted(set(self.duplicates))) != (self.duplicates):
             raise errors.InputError(
                 "duplicate_event_ids must be sorted and unique"
             )
-        if tuple(sorted(set(self.late_event_ids))) != self.late_event_ids:
+        if tuple(sorted(set(self.late))) != self.late:
             raise errors.InputError("late_event_ids must be sorted and unique")
 
     @property
-    def event_ids(self) -> tuple[str, ...]:
+    def identities(self) -> tuple[str, ...]:
         """The identities of the selected events, in the order of `events`."""
         return tuple(event.identifier for event in self.events)
 
@@ -348,11 +346,9 @@ def horizon(events: Sequence[Event], watermark: str) -> str:
         The latest time as an ISO-8601 UTC string, or empty when there are
         no events and no watermark.
     """
-    timestamps = [
-        parse_timestamp(event.occurred, "occurred") for event in events
-    ]
+    timestamps = [parse(event.occurred, "occurred") for event in events]
     if watermark:
-        timestamps.append(parse_timestamp(watermark, "watermark"))
+        timestamps.append(parse(watermark, "watermark"))
     latest = max(timestamps, default=None)
     return latest.isoformat() if latest else ""
 

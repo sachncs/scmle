@@ -41,7 +41,7 @@ class DocumentPreparer(curators.Preparer):
     @property
     def digest(self) -> str:
         """The document corpus identity."""
-        return self.dataset.content_hash
+        return self.dataset.digest
 
     @property
     def samples(self) -> tuple[document.Sample, ...]:
@@ -73,13 +73,13 @@ class DocumentPreparer(curators.Preparer):
             result.test,
             {
                 "train": tuple(
-                    sorted({sample.document_id for sample in result.train})
+                    sorted({sample.identifier for sample in result.train})
                 ),
                 "validation": tuple(
-                    sorted({sample.document_id for sample in result.validation})
+                    sorted({sample.identifier for sample in result.validation})
                 ),
                 "test": tuple(
-                    sorted({sample.document_id for sample in result.test})
+                    sorted({sample.identifier for sample in result.test})
                 ),
             },
         )
@@ -117,7 +117,7 @@ class DocumentPreparer(curators.Preparer):
         Returns:
             The document ID and content hash joined by a colon.
         """
-        return f"{sample.document_id}:{sample.content_hash}"
+        return f"{sample.identifier}:{sample.content_hash}"
 
     def label(self, sample: document.Sample) -> object | None:
         """Gives the document label.
@@ -158,9 +158,9 @@ class DocumentPreparer(curators.Preparer):
         return {
             "status": "available",
             "method": "document_span_provenance",
-            "document_id": sample.document_id,
-            "source_uri": sample.source_uri,
-            "source_digest": sample.source_digest,
+            "document_id": sample.identifier,
+            "source_uri": sample.uri,
+            "source_digest": sample.digest,
             "format": sample.format.value,
             "content_hash": sample.content_hash,
             "citations": [
@@ -219,12 +219,12 @@ class DocumentPreparer(curators.Preparer):
             if not masked_content.strip():
                 masked_content = "."
             masked_sample = document.Sample(
-                document_id=sample.document_id,
+                identifier=sample.identifier,
                 content=masked_content,
                 format=sample.format,
-                source_uri=sample.source_uri,
+                uri=sample.uri,
                 encoding=sample.encoding,
-                source_digest=sample.source_digest,
+                digest=sample.digest,
                 label=sample.label,
                 provenance=sample.provenance,
             )

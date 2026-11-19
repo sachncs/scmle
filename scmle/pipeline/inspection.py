@@ -179,7 +179,7 @@ class Inspection:
                 continue
             series = frame[name]
             kind = (
-                columns.TextKind()
+                columns.Text()
                 if name in self.texts
                 else columns.categorize(series)
             )

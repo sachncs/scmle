@@ -36,8 +36,8 @@ EXAMPLES = settings(
 
 def sides(manifest, rows):
     """Each held-out side of a split as sets of row positions."""
-    train = numpy.asarray(manifest.train_ids)
-    found = [set(manifest.test_ids)]
+    train = numpy.asarray(manifest.training)
+    found = [set(manifest.test)]
     found += [set(train[list(fold[1])].tolist()) for fold in manifest.folds]
     return [side & rows for side in found]
 
@@ -88,7 +88,7 @@ def test_documents_keep_groups_and_near_duplicates_on_one_side(
     )
     frame = document.DOCUMENT.read(spec)[0]
     split = document.DOCUMENT.constrain(spec, tasks.Task.BINARY).split(frame)
-    assert rows.KEY not in split.dev_features.columns
+    assert rows.KEY not in split.features.columns
     for pair in twins:
         assert together(split.manifest, pair)
     for team in {name for name in teams if name}:
@@ -141,7 +141,7 @@ def test_graphs_never_train_on_a_node_seen_after_a_held_out_one(
     frame = graph.GRAPH.read(spec)[0]
     seen = frame[rows.KEY].to_numpy()
     split = graph.GRAPH.constrain(spec, tasks.Task.BINARY).split(frame)
-    train = numpy.asarray(split.manifest.train_ids)
-    assert seen[train].max() < seen[list(split.manifest.test_ids)].min()
+    train = numpy.asarray(split.manifest.training)
+    assert seen[train].max() < seen[list(split.manifest.test)].min()
     for fit, check in split.manifest.folds:
         assert seen[train[list(fit)]].max() < seen[train[list(check)]].min()

@@ -20,7 +20,7 @@ def text_adapter() -> modality_lifecycle.Plaintext:
     """Build a small labelled text corpus for the public API test."""
     samples = tuple(
         document.Sample(
-            document_id=f"text-{index}",
+            identifier=f"text-{index}",
             content=("alpha signal " if index % 2 else "beta signal ")
             * (index + 2),
             label="alpha" if index % 2 else "beta",
@@ -180,7 +180,7 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
     """
     samples = tuple(
         document.Sample(
-            document_id=f"unlabelled-{index}",
+            identifier=f"unlabelled-{index}",
             content=f"raw record {index}",
         )
         for index in range(3)
@@ -257,7 +257,7 @@ def test_modality_curation_project_rejects_identity_conflict_without_overwrite(
     original_bytes = Path(first.path).read_bytes()
     samples = list(text_adapter().dataset.samples)
     samples[0] = document.Sample(
-        document_id=samples[0].document_id,
+        identifier=samples[0].identifier,
         content="different source content",
         label=samples[0].label,
     )
@@ -307,7 +307,7 @@ def test_extension_curation_adapter_accepts_arbitrary_records_without_model_hook
     report = curation.Curation(
         modality=extension.value,
         dataset_hash=dataset_hash,
-        sample_count=len(records),
+        samples=len(records),
         profile={"record_type": "point", "dimensions": 2},
     )
     adapter = scmle.pipeline.modality_lifecycle.ExtensionCurator(
@@ -339,7 +339,7 @@ def test_extension_curation_adapter_rejects_detached_report():
     report = curation.Curation(
         modality=extension.value,
         dataset_hash="different-snapshot",
-        sample_count=1,
+        samples=1,
         profile={},
     )
     adapter = scmle.pipeline.modality_lifecycle.ExtensionCurator(
@@ -385,7 +385,7 @@ def test_extension_curation_adapter_accepts_empty_raw_snapshot(tmp_path):
         curation_callback=lambda: curation.Curation(
             modality=extension.value,
             dataset_hash=dataset_hash,
-            sample_count=0,
+            samples=0,
             profile={"record_type": "event", "empty": True},
         ),
         limitations=("The caller owns source availability checks.",),

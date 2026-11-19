@@ -21,12 +21,12 @@ class Dataset(Survey):
 
     Attributes:
         samples: The samples, in caller order.
-        content_hash: SHA-256 hex digest of the sources and file hashes, in
+        digest: SHA-256 hex digest of the sources and file hashes, in
             sample order; set on construction.
     """
 
     samples: tuple[Sample, ...]
-    content_hash: str = dataclasses.field(init=False)
+    digest: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
         """Rejects duplicate source identities and derive dataset identity.
@@ -53,9 +53,9 @@ class Dataset(Survey):
             ).encode("utf-8")
         ).hexdigest()
         object.__setattr__(self, "samples", normalized)
-        object.__setattr__(self, "content_hash", digest)
+        object.__setattr__(self, "digest", digest)
 
-    def prepare_features(
+    def prepare(
         self,
         max_frames: int = 100_000,
         start_frame: int = 0,
@@ -111,12 +111,12 @@ class Dataset(Survey):
                     f"'{sample.source}'"
                 )
             signal_values, observed = extract(
-                sample.encoded_bytes, max_frames, start_frame
+                sample.encoded, max_frames, start_frame
             )
             rows.append(
                 (
                     *signal_values,
-                    sample.metadata.duration_seconds,
+                    sample.metadata.seconds,
                     float(sample.metadata.sample_rate),
                     float(sample.metadata.channels),
                     float(sample.metadata.sample_width or 0),
@@ -126,10 +126,10 @@ class Dataset(Survey):
             frames_truncated.append(observed < sample.metadata.frame_count)
         return Features(
             sources=tuple(sample.source for sample in self.samples),
-            feature_names=feature_names,
+            names=feature_names,
             values=tuple(rows),
-            frames_observed=tuple(frames_observed),
-            frames_truncated=tuple(frames_truncated),
+            observed=tuple(frames_observed),
+            truncated=tuple(frames_truncated),
         )
 
     def split(
@@ -161,9 +161,7 @@ class Dataset(Survey):
         proportions(validation_fraction, test_fraction)
         grouped: dict[str, list[Sample]] = {}
         for sample in self.samples:
-            grouped.setdefault(sample.group_id or sample.source, []).append(
-                sample
-            )
+            grouped.setdefault(sample.group or sample.source, []).append(sample)
         validation_groups, test_groups = allocate(
             grouped, validation_fraction, test_fraction, seed
         )
@@ -172,18 +170,18 @@ class Dataset(Survey):
             return tuple(
                 sample
                 for sample in self.samples
-                if (sample.group_id or sample.source) not in excluded
+                if (sample.group or sample.source) not in excluded
             )
 
         validation = tuple(
             sample
             for sample in self.samples
-            if (sample.group_id or sample.source) in validation_groups
+            if (sample.group or sample.source) in validation_groups
         )
         test = tuple(
             sample
             for sample in self.samples
-            if (sample.group_id or sample.source) in test_groups
+            if (sample.group or sample.source) in test_groups
         )
         return Split(
             train=sieve(test_groups | validation_groups),

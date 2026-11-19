@@ -59,8 +59,8 @@ def test_dependency_error_is_structured_when_dependency_is_disabled(
 @PILLOW_SKIP
 def test_sample_has_file_and_content_identity():
     payload = png_bytes((10, 20, 30))
-    first = image.Sample.from_bytes(payload, "first.png")
-    second = image.Sample.from_bytes(payload, "second.png")
+    first = image.Sample.parse(payload, "first.png")
+    second = image.Sample.parse(payload, "second.png")
 
     assert first.file_hash == second.file_hash
     assert first.content_hash == second.content_hash
@@ -80,8 +80,8 @@ def test_empty_and_corrupt_payloads_are_structured():
         (b"", "empty_payload"),
         (b"not an image", "corrupt_payload"),
     ]:
-        with pytest.raises(image.ImageValidationError) as raised:
-            image.Sample.from_bytes(payload)
+        with pytest.raises(image.ViolationError) as raised:
+            image.Sample.parse(payload)
         assert raised.value.code == code
         assert raised.value.details["source"] == "memory://"
 
@@ -90,12 +90,12 @@ def test_empty_and_corrupt_payloads_are_structured():
 def test_oversized_payload_and_pixel_limits_are_rejected():
     # Enforces website/src/pages/docs/extensions.astro:199.
     payload = png_bytes((1, 2, 3), size=(10, 10))
-    with pytest.raises(image.ImageValidationError, match="bytes") as by_bytes:
-        image.Sample.from_bytes(payload, max_bytes=len(payload) - 1)
+    with pytest.raises(image.ViolationError, match="bytes") as by_bytes:
+        image.Sample.parse(payload, max_bytes=len(payload) - 1)
     assert by_bytes.value.code == "encoded_size_limit"
 
-    with pytest.raises(image.ImageValidationError, match="pixels") as by_pixels:
-        image.Sample.from_bytes(payload, max_pixels=99)
+    with pytest.raises(image.ViolationError, match="pixels") as by_pixels:
+        image.Sample.parse(payload, max_pixels=99)
     assert by_pixels.value.code == "pixel_count_limit"
 
 
@@ -111,19 +111,19 @@ def test_dataset_deduplication_is_content_based_and_order_independent(tmp_path):
 
     left = image.Dataset(
         tuple(
-            image.Sample.from_path(path)
+            image.Sample.load(path)
             for path in [first_path, second_path, unique_path]
         )
     ).deduplicate()
     right = image.Dataset(
         tuple(
-            image.Sample.from_path(path)
+            image.Sample.load(path)
             for path in [unique_path, second_path, first_path]
         )
     ).deduplicate()
 
     assert left == right
-    assert left.sample_count == 2
+    assert left.size == 2
     assert any(sample.source.endswith("a.png") for sample in left.samples)
 
 
@@ -131,18 +131,18 @@ def test_dataset_deduplication_is_content_based_and_order_independent(tmp_path):
 def test_profile_is_bounded_and_detects_shift():
     dataset = image.Dataset(
         (
-            image.Sample.from_bytes(png_bytes((0, 0, 0)), "dark.png"),
-            image.Sample.from_bytes(png_bytes((255, 255, 255)), "light.png"),
+            image.Sample.parse(png_bytes((0, 0, 0)), "dark.png"),
+            image.Sample.parse(png_bytes((255, 255, 255)), "light.png"),
         )
     )
     profile = dataset.profile(max_samples=1, profile_size=(2, 2))
 
-    assert profile.dataset_count == 2
-    assert profile.profiled_count == 1
+    assert profile.samples == 2
+    assert profile.profiled == 1
     assert profile.truncated is True
     assert profile.mean_pixel == (0.0, 0.0, 0.0)
     shifted = image.Dataset(
-        (image.Sample.from_bytes(png_bytes((255, 255, 255)), "shifted.png"),)
+        (image.Sample.parse(png_bytes((255, 255, 255)), "shifted.png"),)
     ).profile(profile_size=(2, 2))
     assert all(
         before < after
@@ -158,8 +158,8 @@ def test_curation_reports_duplicate_and_sampling_findings():
     payload = png_bytes((0, 0, 0))
     dataset = image.Dataset(
         (
-            image.Sample.from_bytes(payload, "first.png"),
-            image.Sample.from_bytes(payload, "second.png"),
+            image.Sample.parse(payload, "first.png"),
+            image.Sample.parse(payload, "second.png"),
         )
     )
 
@@ -168,7 +168,7 @@ def test_curation_reports_duplicate_and_sampling_findings():
     assert report.modality == "image"
     assert report.profile["duplicates"] == 0
     assert report.profile["truncated"] is True
-    assert [finding.identifier for finding in report.quality_findings] == [
+    assert [finding.identifier for finding in report.findings] == [
         "quality.image-profile-truncated",
     ]
     assert report.profile["label_counts"] == {"unlabeled": 2}
@@ -177,12 +177,12 @@ def test_curation_reports_duplicate_and_sampling_findings():
 @PILLOW_SKIP
 def test_near_duplicate_and_augmentation_provenance_are_explicit():
     """Curation records visual similarity and declared transformation lineage."""
-    original = image.Sample.from_bytes(patterned_png(), "original.png")
-    augmented = image.Sample.from_bytes(
+    original = image.Sample.parse(patterned_png(), "original.png")
+    augmented = image.Sample.parse(
         patterned_png(1),
         "augmented.png",
         augmentation=image.Augmentation(
-            parent_source="original.png",
+            source="original.png",
             operation="color_jitter",
             parameters={"brightness": 0.1},
             tool="fixture-transform/1",
@@ -192,7 +192,7 @@ def test_near_duplicate_and_augmentation_provenance_are_explicit():
 
     report = dataset.curate()
 
-    assert report.dataset_hash == dataset.content_hash
+    assert report.dataset_hash == dataset.digest
     assert report.profile["near_duplicate_groups"] == [
         sorted([original.source, augmented.source])
     ]
@@ -203,7 +203,7 @@ def test_near_duplicate_and_augmentation_provenance_are_explicit():
         "external_parent_sources": [],
     }
     assert "quality.image-near-duplicate-content" in {
-        finding.identifier for finding in report.quality_findings
+        finding.identifier for finding in report.findings
     }
 
 
@@ -211,10 +211,10 @@ def test_near_duplicate_and_augmentation_provenance_are_explicit():
 def test_augmentation_provenance_changes_dataset_identity():
     """Transformation lineage is part of the image dataset identity."""
     payload = patterned_png()
-    plain = image.Dataset((image.Sample.from_bytes(payload, "source.png"),))
+    plain = image.Dataset((image.Sample.parse(payload, "source.png"),))
     transformed = image.Dataset(
         (
-            image.Sample.from_bytes(
+            image.Sample.parse(
                 payload,
                 "source.png",
                 augmentation=image.Augmentation("raw.png", "resize"),
@@ -222,7 +222,7 @@ def test_augmentation_provenance_changes_dataset_identity():
         )
     )
 
-    assert plain.content_hash != transformed.content_hash
+    assert plain.digest != transformed.digest
 
 
 @PILLOW_SKIP
@@ -230,10 +230,10 @@ def test_curation_reports_mixed_label_state():
     """Image curation makes an unlabeled training boundary visible."""
     report = image.Dataset(
         (
-            image.Sample.from_bytes(
+            image.Sample.parse(
                 png_bytes((0, 0, 0)), "labelled.png", label="dark"
             ),
-            image.Sample.from_bytes(png_bytes((255, 255, 255)), "raw.png"),
+            image.Sample.parse(png_bytes((255, 255, 255)), "raw.png"),
         )
     ).curate()
 
@@ -255,13 +255,13 @@ def test_curation_blocks_conflicting_duplicate_labels():
     payload = png_bytes((10, 20, 30))
     report = image.Dataset(
         (
-            image.Sample.from_bytes(payload, "first.png", label="object"),
-            image.Sample.from_bytes(payload, "second.png", label="background"),
+            image.Sample.parse(payload, "first.png", label="object"),
+            image.Sample.parse(payload, "second.png", label="background"),
         )
     ).curate()
 
     assert report.profile["conflicting_label_groups"]
-    assert report.release_ready is False
+    assert report.release is False
     assert [finding.identifier for finding in report.risk_findings] == [
         "risk.image-conflicting-duplicate-labels",
     ]
@@ -283,11 +283,11 @@ def test_curation_blocks_sensitive_exif_metadata():
     output = io.BytesIO()
     canvas.save(output, format="JPEG", exif=exif)
 
-    sample = image.Sample.from_bytes(output.getvalue(), "private.jpg")
+    sample = image.Sample.parse(output.getvalue(), "private.jpg")
     report = image.Dataset((sample,)).curate()
 
     assert report.profile["sensitive_metadata"] == ["artist", "gps_info"]
-    assert report.release_ready is False
+    assert report.release is False
     assert [finding.identifier for finding in report.risk_findings] == [
         "risk.image-sensitive-metadata",
     ]
@@ -300,7 +300,7 @@ def test_split_keeps_explicit_capture_groups_together():
     Also enforces website/src/pages/docs/modalities.astro:42.
     """
     samples = tuple(
-        image.Sample.from_bytes(
+        image.Sample.parse(
             png_bytes((index * 20, 0, 0)),
             source=f"image-{index}.png",
             label="red",
@@ -327,7 +327,7 @@ def test_split_keeps_explicit_capture_groups_together():
 @PILLOW_SKIP
 def test_features_are_flattened_with_stable_shape_and_normalization():
     dataset = image.Dataset(
-        (image.Sample.from_bytes(png_bytes((255, 0, 128)), "sample.png"),)
+        (image.Sample.parse(png_bytes((255, 0, 128)), "sample.png"),)
     )
 
     features = dataset.flatten((2, 2), "RGB")

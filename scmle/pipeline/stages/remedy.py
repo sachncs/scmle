@@ -68,11 +68,11 @@ class Remedy(examination.Examination):
         split = partition.split
         probabilities, positions = self.outfold(board, selected)
         actual = (
-            split.dev_target.iloc[positions] == pipeline.classes_[1]
+            split.target.iloc[positions] == pipeline.classes_[1]
         ).to_numpy()
-        assigner = thresholds.Grouper.fit(split.dev_features[column])
+        assigner = thresholds.Grouper.fit(split.features[column])
         groups = assigner.assign(
-            split.dev_features[column].iloc[positions]
+            split.features[column].iloc[positions]
         ).reset_index(drop=True)
         base_cut = decision["threshold"] if decision else 0.5
         result = mitigation.judge(
@@ -130,8 +130,8 @@ class Remedy(examination.Examination):
                 selected.params,
                 featurise=board.get(ingestion.Intake).kind.featurise,
             ),
-            split.dev_features,
-            split.dev_target,
+            split.features,
+            split.target,
             split.manifest.folds,
         )
 

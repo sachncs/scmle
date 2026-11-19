@@ -81,7 +81,7 @@ def vectorize(y: pandas.Series, task: str) -> numpy.ndarray:
     return codes.astype("int64")
 
 
-def permute_within(
+def permute(
     values: numpy.ndarray,
     rng: numpy.random.Generator,
     groups: numpy.ndarray | None,
@@ -156,7 +156,7 @@ def carve(
     return list(KFold(folds, shuffle=True, random_state=seed).split(rows))
 
 
-def out_of_fold(
+def predict(
     x: numpy.ndarray,
     y: numpy.ndarray,
     task: str,
@@ -227,7 +227,7 @@ def predictiveness(pred: numpy.ndarray, y: numpy.ndarray, task: str) -> float:
     """Measures the skill of out-of-fold predictions: AUC or R^2.
 
     Args:
-        pred: Output of `out_of_fold`.
+        pred: Output of `predict`.
         y: The encoded target.
         task: `classification` or `regression`.
 
@@ -280,10 +280,10 @@ def crossfit(
 
     Returns:
         A pair (skill, out-of-fold predictions), the predictions being the
-        output of `out_of_fold`.
+        output of `predict`.
     """
     splits = carve(y, task, cfg.folds, groups, block_size, seed)
-    pred = out_of_fold(x, y, task, splits, cfg, seed)
+    pred = predict(x, y, task, splits, cfg, seed)
     return predictiveness(pred, y, task), pred
 
 
@@ -297,7 +297,7 @@ def rescore(
     """Computes the skill on one bootstrap resample.
 
     Args:
-        pred: Output of `out_of_fold`.
+        pred: Output of `predict`.
         y: The encoded target.
         task: `classification` or `regression`.
         members: Row positions of each group, so whole groups are resampled,
@@ -321,7 +321,7 @@ def rescore(
         return None
 
 
-def lower_bound(
+def hedge(
     pred: numpy.ndarray,
     y: numpy.ndarray,
     task: str,
@@ -336,7 +336,7 @@ def lower_bound(
     constant) are skipped; if every draw is skipped the bound is -inf.
 
     Args:
-        pred: Output of `out_of_fold`.
+        pred: Output of `predict`.
         y: The encoded target.
         task: `classification` or `regression`.
         cfg: Settings (`bootstrap`, `confidence`).
@@ -431,9 +431,9 @@ def measure(
         The observed skill, its out-of-fold predictions, and the skill of
         each of `cfg.permutations` permuted fits.
     """
-    seed = randomness.derive_int_seed(cfg.run_seed, path, 0)
+    seed = randomness.derive_int_seed(cfg.seed, path, 0)
     skill, pred = crossfit(x, y, task, cfg, groups, block_size, seed)
-    rng = randomness.component_rng(cfg.run_seed, path, 1)
+    rng = randomness.component_rng(cfg.seed, path, 1)
     null = list(
         map(
             operator.call,
@@ -475,7 +475,7 @@ def sufficient(y: numpy.ndarray, task: str, cfg: Config) -> bool:
         classification, the smallest class has fewer than `folds` rows;
         True otherwise.
     """
-    if len(y) < cfg.min_rows:
+    if len(y) < cfg.minimum:
         return False
     if task == "classification":
         return min(numpy.bincount(y).tolist()) >= cfg.folds  # type: ignore[no-any-return, unused-ignore]  # Any on older NumPy stubs; editing code would stale the shipped certificate

@@ -43,7 +43,7 @@ class ImagePreparer(curators.Preparer):
     @property
     def digest(self) -> str:
         """The image corpus identity."""
-        return self.dataset.content_hash
+        return self.dataset.digest
 
     @property
     def samples(self) -> tuple[image.Sample, ...]:

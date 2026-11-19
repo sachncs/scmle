@@ -38,14 +38,14 @@ def variant(effect, low, high, sha="s"):
 
 def test_assess_needs_matching_lengths():
     with pytest.raises(errors.InputError, match="one entry per row"):
-        assessment.assess_finding(
+        assessment.assess(
             "f", numpy.zeros(3), numpy.zeros(4), grid(), 0, bootstrap=2
         )
 
 
 def test_a_strong_finding_is_stable_and_passes():
     x, y = data()
-    out = assessment.assess_finding("f", x, y, grid(), 0, bootstrap=20)
+    out = assessment.assess("f", x, y, grid(), 0, bootstrap=20)
     assert out.status == estimation.STABLE
     assert out.name == "f"
     assert out.headline is not None
@@ -69,7 +69,7 @@ def test_a_strong_finding_is_stable_and_passes():
 
 def test_a_curve_test_runs_only_when_asked():
     x, y = data()
-    out = assessment.assess_finding(
+    out = assessment.assess(
         "f", x, y, grid(), 0, bootstrap=5, curve_permutations=20
     )
     assert out.curve is not None
@@ -78,7 +78,7 @@ def test_a_curve_test_runs_only_when_asked():
 
 def test_too_few_rows_are_not_evaluable_without_a_check():
     x, y = data(rows=8)
-    out = assessment.assess_finding(
+    out = assessment.assess(
         "f", x, y, grid(), 0, bootstrap=5, curve_permutations=10
     )
     assert out.status == estimation.NOT_EVALUABLE
@@ -178,9 +178,9 @@ def test_to_dict_writes_non_finite_numbers_as_none():
 
 
 def test_code_digest_is_a_stable_sha256():
-    digest = assessment.code_digest()
+    digest = assessment.fingerprint()
     assert len(digest) == 64
-    assert digest == assessment.code_digest()
+    assert digest == assessment.fingerprint()
 
 
 class Fake:

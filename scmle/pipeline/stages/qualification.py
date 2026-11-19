@@ -108,7 +108,7 @@ class Qualification(screening.Screening):
         self,
         board: engine.Board,
         task: tasks.Task,
-        charter: contracts.AnalysisCharter,
+        charter: contracts.Charter,
         view: Any,
         survivors: tuple[str, ...],
     ) -> scmle.assurance.robustness.qualify.Robustness:
@@ -134,11 +134,9 @@ class Qualification(screening.Screening):
         plan = board.get(surveying.Portrait).profile.feature_plan
         candidates = [*plan.numeric, *plan.categorical]
         codes = explore.vectorize(view.target, task.is_classification)
-        kind = explore.target_kind(view.target, task.is_classification)
+        kind = explore.classify(view.target, task.is_classification)
         reference = (
-            tabular.read_table(data.reference_uri)
-            if data.reference_uri
-            else None
+            tabular.read(data.reference_uri) if data.reference_uri else None
         )
         rules = charter.rules
         found = scmle.assurance.robustness.qualify.run(
@@ -149,7 +147,7 @@ class Qualification(screening.Screening):
             choices=charter.multiverse,
             seed=charter.seed,
             permutations=charter.budget.permutations,
-            strata=governed.strata_labels(
+            strata=governed.stratify(
                 view.features, data.group_column, data.time_column
             ),
             reference=reference,
@@ -196,9 +194,9 @@ class Qualification(screening.Screening):
         stability_document = scmle.assurance.robustness.report.stability_report(
             found, stage.note if stage.requested else None
         )
-        shift_document = scmle.assurance.robustness.report.shift_report(found)
+        shift_document = scmle.assurance.robustness.report.report(found)
         scmle.assurance.robustness.report.conform(stability_document)
-        scmle.assurance.robustness.report.validate_shift(shift_document)
+        scmle.assurance.robustness.report.validate(shift_document)
         board.journal.write_json("stability_report.json", stability_document)
         board.journal.write_json("shift_report.json", shift_document)
         board.journal.write_text(
@@ -213,7 +211,7 @@ class Qualification(screening.Screening):
                 "stability": stability_document["status"],
                 "stability_counts": stability_document["counts"],
                 "fragile": list(found.fragile),
-                "stability_gate": found.stability_gate.value,
+                "stability_gate": found.gate.value,
                 "stability_filter": stage.note,
                 "shift": shift_document["status"],
                 "shift_reason": shift_document["reason"],
@@ -223,7 +221,7 @@ class Qualification(screening.Screening):
         return Robustness(
             stability_document["status"],
             shift_document["status"],
-            found.stability_gate.value,
+            found.gate.value,
             found.forward.status,
             tuple(found.fragile),
         )

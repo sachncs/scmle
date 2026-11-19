@@ -202,7 +202,7 @@ def test_sequential_operations_compute_within_groups():
     spread = sequences.Volatility().compute(grouped, {"window": 2}).tolist()
     assert numpy.isnan(spread[0]) and numpy.isnan(spread[3])
     assert spread[1] == pytest.approx(numpy.sqrt(2.0))
-    expanding = sequences.ExpandingMean().compute(grouped, {}).tolist()
+    expanding = sequences.Mean().compute(grouped, {}).tolist()
     assert expanding == [1.0, 2.0, 10 / 3, 10.0, 15.0]
 
 
@@ -211,7 +211,7 @@ def test_sequential_lookbacks():
     assert sequences.Diff().lookback({"k": 2}) == 2
     assert sequences.Rolling().lookback({"window": 4}) == 4
     assert sequences.Volatility().lookback({"window": 5}) == 5
-    assert sequences.ExpandingMean().lookback({}) is None
+    assert sequences.Mean().lookback({}) is None
 
 
 def test_segregate_splits_ordered_from_row_wise_nodes():
@@ -231,7 +231,7 @@ def test_validate_graph_accepts_a_sound_graph():
     graph = tasks.Derivation(
         nodes=[node("l", "lag", ["a"]), node("s", "sqrt", ["l"])]
     )
-    registry.validate_graph(graph, {"a", "y"}, spec(time_column="t"))
+    registry.validate(graph, {"a", "y"}, spec(time_column="t"))
 
 
 @pytest.mark.parametrize(
@@ -252,7 +252,7 @@ def test_validate_graph_accepts_a_sound_graph():
 def test_validate_graph_rejects_unsound_graphs(nodes, data, message):
     graph = tasks.Derivation(nodes=nodes)
     with pytest.raises(errors.ConfigError, match=message):
-        registry.validate_graph(graph, {"a", "y"}, spec(**data))
+        registry.validate(graph, {"a", "y"}, spec(**data))
 
 
 def test_roots_lists_raw_inputs_in_first_use_order():

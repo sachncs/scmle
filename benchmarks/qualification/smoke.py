@@ -304,14 +304,14 @@ def check_shift(seed: int) -> list[SmokeCheck]:
         and rejection of the squared (liberal) p-values.
     """
     null = [
-        shift.mmd_test(
+        shift.distinguish(
             *shift_pair(seed * 1000 + k, 0.0),
             seed + k,
             permutations=SHIFT_PERMUTATIONS,
         ).p_value
         for k in range(SHIFT_RUNS)
     ]
-    planted = shift.mmd_test(
+    planted = shift.distinguish(
         *shift_pair(seed, 1.5), seed, permutations=SHIFT_PERMUTATIONS
     )
     values = [float(p or 1.0) for p in null]
@@ -366,7 +366,7 @@ def check_oracles() -> SmokeCheck:
         require_current_generators()
         for case in oracles.load_oracle("wilson_interval").cases:
             given = case["inputs"]
-            low, high = certificates.wilson_interval(
+            low, high = certificates.bound(
                 given["successes"], given["n"], given["confidence"]
             )
             oracles.assert_agrees(

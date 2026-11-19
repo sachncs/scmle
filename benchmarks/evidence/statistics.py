@@ -1269,7 +1269,7 @@ def association(case: Case, flavour: str) -> Values:
 
 def tested(case: Case) -> Values:
     """The product's `missingness_test` on the case."""
-    found = leakage.missingness_test(
+    found = leakage.test(
         case.data["feature"],
         case.data["target"],
         case.data["task"],
@@ -1277,7 +1277,7 @@ def tested(case: Case) -> Values:
     )
     if found is None:
         raise errors.InputError(f"{case.name}: no missingness test is formed")
-    return {"p_value": found.p_value, "cramers_v": found.cramers_v}
+    return {"p_value": found.p_value, "cramers_v": found.association}
 
 
 def holes(
@@ -1517,7 +1517,7 @@ def recount(case: Case, flavour: str) -> Values:
     """
     data = case.data
     cfg, found, task = data["cfg"], data["report"], data["task"]
-    rows = planning.subsample(len(data["frame"]), None, None, cfg.run_seed)[0]
+    rows = planning.subsample(len(data["frame"]), None, None, cfg.seed)[0]
     sample = data["frame"].iloc[rows].reset_index(drop=True)
     problem = fitting.encode(sample["target"], task, cfg, None, None)
     codes = report.tally(sample["target"], task)[0]
@@ -1563,7 +1563,7 @@ def recount(case: Case, flavour: str) -> Values:
         codes,
         found.permutations,
         Fraction(str(cfg.alpha)),
-        cfg.run_seed,
+        cfg.seed,
     )
     return conclude(
         family, found.permutations, sample, problem, codes, cfg, flavour
@@ -1682,7 +1682,7 @@ def bound(
         )[0]
         return standard(float(limit), base[chosen], size)
     path = f"leakage.screen.{f.mechanism}.{f.feature}"
-    rng = randomness.component_rng(cfg.run_seed, path, 0)
+    rng = randomness.component_rng(cfg.seed, path, 0)
     replicate = resampler(h, sample, problem, codes, flavour)
     values = []
     for _ in range(cfg.bootstrap):
@@ -1818,12 +1818,8 @@ def findings(case: Case) -> Values:
             out[f"{key}|statistic"], out[f"{key}|p"] = f.statistic, f.p_value
         out[f"{key}|adjusted"] = f.adjusted_p
         out[f"{key}|significant"] = float(f.significant)
-        if (
-            f.significant
-            and f.mechanism in RECOUNTED
-            and f.lower_bound is not None
-        ):
-            out[f"{key}|bound"] = f.lower_bound
+        if f.significant and f.mechanism in RECOUNTED and f.lower is not None:
+            out[f"{key}|bound"] = f.lower
     return out
 
 

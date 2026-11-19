@@ -128,7 +128,7 @@ class Draft:
         checks: Data-side checks.
         questions: Tipping-point questions for a person.
         robust: Unknowns whose plausible range leaves the verdict unchanged.
-        open_items: Slots left at a placeholder, to be answered.
+        pending: Slots left at a placeholder, to be answered.
         baseline: The baseline measured on `X`, if a decision column exists.
         refusal: Why the draft was refused, if it was.
         llm: Model id, prompt, raw samples, hash and ambiguity, if used.
@@ -143,12 +143,12 @@ class Draft:
     )
 
     status: str
-    charter: contracts.AnalysisCharter | None
+    charter: contracts.Charter | None
     fields: dict[str, provenance.Filling]
     checks: tuple[Probe, ...]
     questions: tuple[scmle.assurance.framing.questions.Question, ...]
     robust: tuple[dict[str, Any], ...]
-    open_items: tuple[str, ...]
+    pending: tuple[str, ...]
     baseline: dict[str, Any] | None
     refusal: dict[str, Any] | None
     llm: dict[str, Any] | None
@@ -168,11 +168,11 @@ class Draft:
             "status": self.status,
             "charter": None if self.charter is None else self.charter.to_dict(),
             "charter_hash": (
-                None if self.charter is None else self.charter.charter_hash
+                None if self.charter is None else self.charter.digest
             ),
             "fields": {k: v.value for k, v in sorted(self.fields.items())},
             "checks": [c.to_dict() for c in self.checks],
-            "pending": list(self.open_items),
+            "pending": list(self.pending),
             "llm": self.llm,
             "discarded": list(self.discarded),
             "label": (
@@ -186,7 +186,7 @@ class Draft:
         """The SHA-256 hex digest of the draft document, anchored at version 1.
 
         The document enters in its version-1 layout (`anchor`) and the
-        charter in its own (`AnalysisCharter.anchor`), so renaming a draft,
+        charter in its own (`Charter.anchor`), so renaming a draft,
         charter or cost-model key leaves the digest of a registered draft
         unchanged.
         """
@@ -200,7 +200,7 @@ class Draft:
 
         Returns:
             The `framing_draft.json` document as version 1 wrote it
-            (`open_items`), with `schema_version` 1.
+            (`pending`), with `schema_version` 1.
         """
         current = self.to_dict()
         del current[records.KEY]

@@ -240,7 +240,7 @@ class Manifest:
             "final_test": self.sets.final,
         }
 
-    def verify_rows(self, frame: pandas.DataFrame) -> None:
+    def verify(self, frame: pandas.DataFrame) -> None:
         """Checks the content of the rows against the recorded roots.
 
         Args:
@@ -349,8 +349,8 @@ def restore(
         v1 = splitters.Manifest(
             strategy=record["strategy"],
             seed=record["seed"],
-            train_ids=tuple(ids["train_ids"]),
-            test_ids=tuple(ids["test_ids"]),
+            training=tuple(ids["train_ids"]),
+            test=tuple(ids["test_ids"]),
             folds=tuple(
                 (tuple(f["train"]), tuple(f["val"])) for f in record["folds"]
             ),

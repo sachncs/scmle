@@ -20,16 +20,16 @@ class Dataset(Survey):
         edges: Edges, sorted by source, target, relation, weight and event
             time.
         directed: Whether edges are directed.
-        feature_names: Names of the node feature columns; when given, they
+        features: Names of the node feature columns; when given, they
             match the populated feature length.
-        source_uri: URI the graph was loaded from.
+        uri: URI the graph was loaded from.
     """
 
     nodes: tuple[Node, ...] = ()
     edges: tuple[Edge, ...] = ()
     directed: bool = True
-    feature_names: tuple[str, ...] = ()
-    source_uri: str = "memory://"
+    features: tuple[str, ...] = ()
+    uri: str = "memory://"
 
     def __post_init__(self) -> None:
         """Normalizes collections and checks basic shape invariants.
@@ -39,7 +39,7 @@ class Dataset(Survey):
                 vectors differ in length, feature_names does not match that
                 length, or a feature name is blank.
         """
-        nodes = tuple(sorted(self.nodes, key=lambda node: node.node_id))
+        nodes = tuple(sorted(self.nodes, key=lambda node: node.identifier))
         edges = tuple(
             sorted(
                 self.edges,
@@ -48,11 +48,11 @@ class Dataset(Survey):
                     edge.target,
                     edge.relation,
                     edge.weight,
-                    edge.event_time.isoformat() if edge.event_time else "",
+                    edge.time.isoformat() if edge.time else "",
                 ),
             )
         )
-        if len({node.node_id for node in nodes}) != len(nodes):
+        if len({node.identifier for node in nodes}) != len(nodes):
             raise errors.InputError("node identifiers must be unique")
         dimensions = {len(node.features) for node in nodes if node.features}
         if len(dimensions) > 1:
@@ -60,20 +60,20 @@ class Dataset(Survey):
                 "all populated node feature vectors must have equal length"
             )
         if (
-            self.feature_names
+            self.features
             and dimensions
-            and len(self.feature_names) != next(iter(dimensions))
+            and len(self.features) != next(iter(dimensions))
         ):
             raise errors.InputError(
                 "feature_names must match the node feature dimension"
             )
-        if any(not name.strip() for name in self.feature_names):
+        if any(not name.strip() for name in self.features):
             raise errors.InputError(
                 "feature_names must not contain empty names"
             )
         object.__setattr__(self, "nodes", nodes)
         object.__setattr__(self, "edges", edges)
-        object.__setattr__(self, "feature_names", tuple(self.feature_names))
+        object.__setattr__(self, "features", tuple(self.features))
 
     @classmethod
     def connect(
@@ -119,12 +119,12 @@ class Dataset(Survey):
             nodes=node_values,
             edges=edge_values,
             directed=directed,
-            feature_names=tuple(feature_names),
-            source_uri=source_uri,
+            features=tuple(feature_names),
+            uri=source_uri,
         )
 
     @classmethod
-    def from_edge_file(
+    def load(
         cls,
         path: str | Path,
         nodes: Iterable[Node | str] | None = None,

@@ -579,7 +579,7 @@ def current() -> str:
         The combined hash of this module's practice and resume code and of
         the product code they run (`product`).
     """
-    own = certificates.code_hash(
+    own = certificates.fingerprint(
         allowance,
         settings,
         project,
@@ -887,7 +887,7 @@ def realcode() -> str:
         The combined hash of this module's measuring code and of the
         product code it runs (`product`).
     """
-    own = certificates.code_hash(
+    own = certificates.fingerprint(
         allowance,
         allot,
         tables,

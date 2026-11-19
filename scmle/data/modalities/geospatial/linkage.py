@@ -83,7 +83,7 @@ def pairs(
         for second in right:
             result = probe(predicate, first, second, predicate_name)
             if bool(result):
-                matches.append(Match(first.feature_id, second.feature_id))
+                matches.append(Match(first.identifier, second.identifier))
                 if len(matches) > match_limit:
                     raise GeometryError(
                         "spatial join exceeds the match limit; provide a "
@@ -141,16 +141,16 @@ def transform(
                 },
             )
         if (
-            transformed.feature_id != feature.feature_id
+            transformed.identifier != feature.identifier
             or dict(transformed.properties) != dict(feature.properties)
             or transformed.label != feature.label
-            or transformed.observation_time != feature.observation_time
+            or transformed.time != feature.time
         ):
             raise GeometryError(
                 "coordinate transformation changed feature metadata",
                 {
                     "code": "transformer_metadata_changed",
-                    "feature_id": feature.feature_id,
+                    "feature_id": feature.identifier,
                 },
             )
         transformed_features.append(transformed)

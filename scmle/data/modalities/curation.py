@@ -85,9 +85,9 @@ class Curation:
     Attributes:
         modality: Name of the modality the report describes.
         dataset_hash: Order-independent digest of the sample identities.
-        sample_count: Number of samples profiled.
+        samples: Number of samples profiled.
         profile: Modality-specific summary statistics, JSON-native.
-        quality_findings: Findings about data quality.
+        findings: Findings about data quality.
         risk_findings: Findings about risk (leakage, privacy, bias).
         schema_version: Version of the serialised report layout.
         migrations: Version steps of the stored report; version 2 writes
@@ -99,14 +99,14 @@ class Curation:
 
     modality: str
     dataset_hash: str
-    sample_count: int
+    samples: int
     profile: Mapping[str, Any]
-    quality_findings: tuple[data.Finding, ...] = ()
+    findings: tuple[data.Finding, ...] = ()
     risk_findings: tuple[data.Finding, ...] = ()
     schema_version: int = records.ORIGIN + len(migrations)
 
     @property
-    def unresolved_blocking_findings(
+    def blockers(
         self,
     ) -> tuple[data.Finding, ...]:
         """The blocking findings without a safe review disposition.
@@ -121,14 +121,14 @@ class Curation:
         }
         return tuple(
             finding
-            for finding in (*self.quality_findings, *self.risk_findings)
+            for finding in (*self.findings, *self.risk_findings)
             if finding.blocking and finding.disposition not in safe_dispositions
         )
 
     @property
-    def release_ready(self) -> bool:
+    def release(self) -> bool:
         """Whether curation has no unresolved blocking finding."""
-        return not self.unresolved_blocking_findings
+        return not self.blockers
 
     def to_dict(self) -> dict[str, Any]:
         """Serialises the report to a stable JSON-compatible mapping.
@@ -141,18 +141,17 @@ class Curation:
         layout = {
             "modality": self.modality,
             "dataset_hash": self.dataset_hash,
-            "sample_count": self.sample_count,
+            "sample_count": self.samples,
             "profile": dict(self.profile),
             "quality_findings": [
-                finding.to_dict() for finding in self.quality_findings
+                finding.to_dict() for finding in self.findings
             ],
             "risk_findings": [
                 finding.to_dict() for finding in self.risk_findings
             ],
-            "release_ready": self.release_ready,
+            "release_ready": self.release,
             "unresolved_blocking_findings": [
-                finding.identifier
-                for finding in self.unresolved_blocking_findings
+                finding.identifier for finding in self.blockers
             ],
         }
         return {
@@ -178,7 +177,7 @@ def proofread(
         limitations: Known limitations of the dataset.
 
     Raises:
-        ValueError: If `modality`, `dataset_hash` or `intended_use` is
+        ValueError: If `modality`, `digest` or `intended_use` is
             blank, `sample_count` is negative or a bool, or `limitations` is
             empty or holds a blank item.
     """
@@ -445,11 +444,11 @@ class Datasheet:
     Attributes:
         modality: Name of the modality the card describes.
         dataset_hash: Order-independent digest of the sample identities.
-        sample_count: Number of samples; never negative.
+        samples: Number of samples; never negative.
         curation: The curation report as a JSON-native mapping, at either
             version. Its dataset digest and sample count must equal the
             card's.
-        intended_use: Statement of what the data may be used for.
+        use: Statement of what the data may be used for.
         limitations: Non-empty tuple of known limitations.
         provenance: Non-empty mapping of provenance status fields.
         privacy: Non-empty mapping of privacy status fields.
@@ -465,9 +464,9 @@ class Datasheet:
 
     modality: str
     dataset_hash: str
-    sample_count: int
+    samples: int
     curation: Mapping[str, Any]
-    intended_use: str
+    use: str
     limitations: tuple[str, ...]
     provenance: Mapping[str, str]
     privacy: Mapping[str, str]
@@ -490,8 +489,8 @@ class Datasheet:
         proofread(
             self.modality,
             self.dataset_hash,
-            self.sample_count,
-            self.intended_use,
+            self.samples,
+            self.use,
             self.limitations,
         )
         object.__setattr__(self, "curation", roundtrip(self.curation))
@@ -500,7 +499,7 @@ class Datasheet:
             raise errors.InputError(
                 "curation report does not match dataset_hash"
             )
-        if samples != self.sample_count:
+        if samples != self.samples:
             raise errors.InputError(
                 "curation report does not match sample_count"
             )
@@ -510,12 +509,12 @@ class Datasheet:
             audit(
                 self.manifest,
                 self.dataset_hash,
-                self.sample_count,
+                self.samples,
                 self.modality,
             )
 
     @classmethod
-    def from_report(
+    def draft(
         cls,
         modality: str,
         report: Mapping[str, Any],
@@ -547,7 +546,7 @@ class Datasheet:
 
         Raises:
             ValueError: If the report lacks a string `dataset_hash` or an
-                int `sample_count`, if the manifest disagrees with the
+                int `samples`, if the manifest disagrees with the
                 report on dataset hash, sample count or modality, or on any
                 validation failure of the card itself.
         """
@@ -579,9 +578,9 @@ class Datasheet:
         return cls(
             modality=modality,
             dataset_hash=dataset_hash_value,
-            sample_count=sample_count_value,
+            samples=sample_count_value,
             curation=dict(report),
-            intended_use="bounded lifecycle validation and baseline comparison",
+            use="bounded lifecycle validation and baseline comparison",
             limitations=tuple(limitations),
             provenance=declared_provenance,
             privacy=declared_privacy,
@@ -599,9 +598,9 @@ class Datasheet:
         layout = {
             "modality": self.modality,
             "dataset_hash": self.dataset_hash,
-            "sample_count": self.sample_count,
+            "sample_count": self.samples,
             "curation": dict(self.curation),
-            "intended_use": self.intended_use,
+            "intended_use": self.use,
             "limitations": list(self.limitations),
             "provenance": dict(sorted(self.provenance.items())),
             "privacy": dict(sorted(self.privacy.items())),
@@ -615,7 +614,7 @@ class Datasheet:
         }
 
 
-def dataset_hash(identities: Iterable[str]) -> str:
+def digest(identities: Iterable[str]) -> str:
     """Computes an order-independent digest of sample identities.
 
     Args:
@@ -628,7 +627,7 @@ def dataset_hash(identities: Iterable[str]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def label_counts(labels: Iterable[Any]) -> dict[str, int]:
+def tally(labels: Iterable[Any]) -> dict[str, int]:
     """Counts labels in stable buckets without interpreting task semantics.
 
     Args:
@@ -647,7 +646,7 @@ def label_counts(labels: Iterable[Any]) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
-def conflicting_label_groups(
+def conflict(
     items: Iterable[tuple[str, str, Any]],
 ) -> tuple[dict[str, object], ...]:
     """Returns duplicate identities carrying more than one known label.
@@ -668,7 +667,7 @@ def conflicting_label_groups(
     for identity, source, label in items:
         if label is None:
             continue
-        bucket = next(iter(label_counts((label,))))
+        bucket = next(iter(tally((label,))))
         record = grouped.setdefault(
             identity, {"sources": set(), "labels": set()}
         )
@@ -733,10 +732,10 @@ __all__ = [
     "Curation",
     "Datasheet",
     "allocate",
-    "conflicting_label_groups",
-    "dataset_hash",
+    "conflict",
+    "digest",
     "findings",
     "flaw",
     "identify",
-    "label_counts",
+    "tally",
 ]

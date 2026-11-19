@@ -51,7 +51,7 @@ def test_intercurrent_event_fields_are_named(field):
 @pytest.mark.parametrize("field", ["population", "target", "moment", "summary"])
 def test_estimand_text_fields_are_named(field):
     values = {**ESTIMAND, field: ""}
-    assert message(partial(contracts.AnalysisEstimand, **values)) == (
+    assert message(partial(contracts.Estimand, **values)) == (
         f"{field} must not be empty"
     )
 
@@ -60,7 +60,7 @@ def test_estimand_events_must_be_a_non_empty_tuple():
     assert (
         message(
             partial(
-                contracts.AnalysisEstimand,
+                contracts.Estimand,
                 **{**ESTIMAND, "intercurrent": []},
             )
         )
@@ -68,7 +68,7 @@ def test_estimand_events_must_be_a_non_empty_tuple():
     )
     assert message(
         partial(
-            contracts.AnalysisEstimand,
+            contracts.Estimand,
             **{**ESTIMAND, "intercurrent": ()},
         )
     ) == (
@@ -91,17 +91,17 @@ def test_decision_row_fields_are_named(field):
 
 
 def test_set_sizes_bounds_and_messages():
-    contracts.SetSizes(confirmation=contracts.MAX_CONFIRMATION_FRACTION)
+    contracts.Sizes(confirmation=contracts.MAX_CONFIRMATION_FRACTION)
     bound = (
         "confirmation must be in (0, "
         f"{contracts.MAX_CONFIRMATION_FRACTION}] so exploration keeps a majority"
     )
     for bad in (0.0, contracts.MAX_CONFIRMATION_FRACTION + 0.01, -0.1):
-        assert message(partial(contracts.SetSizes, confirmation=bad)) == bound
-    assert message(partial(contracts.SetSizes, confirmation=float("nan"))) == (
+        assert message(partial(contracts.Sizes, confirmation=bad)) == bound
+    assert message(partial(contracts.Sizes, confirmation=float("nan"))) == (
         "confirmation must be a finite number"
     )
-    assert message(partial(contracts.SetSizes, 0.25, -1)) == (
+    assert message(partial(contracts.Sizes, 0.25, -1)) == (
         "embargo must be non-negative"
     )
 
@@ -200,9 +200,9 @@ def test_the_template_is_pinned():
 def test_a_charter_with_and_without_a_cost_model_round_trips():
     plain = make_charter()
     assert plain.costs is None
-    assert contracts.AnalysisCharter.from_dict(plain.to_dict()).costs is None
+    assert contracts.Charter.from_dict(plain.to_dict()).costs is None
     priced = make_charter(costs=cost_model())
-    again = contracts.AnalysisCharter.from_dict(priced.to_dict())
+    again = contracts.Charter.from_dict(priced.to_dict())
     assert again.costs == cost_model()
     assert again == priced
 

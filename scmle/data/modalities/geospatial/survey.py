@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from scmle.contracts import data
 from scmle.data.modalities.curation import Curation
 from scmle.data.modalities.curation import flaw
-from scmle.data.modalities.curation import label_counts
+from scmle.data.modalities.curation import tally
 from scmle.data.modalities.geospatial.evidence import Profile
 from scmle.data.modalities.geospatial.geometry import GeometryError
 from scmle.data.modalities.geospatial.geometry import MIN_OBSERVATIONS
@@ -33,9 +33,9 @@ def timeline(features: Sequence[Placemark]) -> dict[str, str | int]:
         counts when only some are, and ``"absent"`` when none is.
     """
     observation_times = tuple(
-        cast("datetime", feature.observation_time)
+        cast("datetime", feature.time)
         for feature in features
-        if feature.observation_time is not None
+        if feature.time is not None
     )
     if observation_times and len(observation_times) == len(features):
         return {
@@ -60,7 +60,7 @@ def findings(
     Args:
         survey: The dataset being curated.
         profile: Its curation profile, with ``temporal``, ``geometries``
-            and ``label_counts``.
+            and ``tally``.
 
     Returns:
         The quality findings (mixed temporal state, missing CRS, mixed
@@ -131,7 +131,7 @@ class Survey(Topology):
     __slots__ = ()
 
     source: str
-    content_hash: str
+    digest: str
 
     def profile(self) -> Profile:
         """Returns geometry counts, bounds, CRS, and immutable identity.
@@ -144,9 +144,9 @@ class Survey(Topology):
             value for feature in self.features for value in feature.bounds
         )
         return Profile(
-            feature_count=len(self.features),
-            geometry_types=tuple(
-                sorted({feature.geometry_type for feature in self.features})
+            features=len(self.features),
+            geometries=tuple(
+                sorted({feature.kind for feature in self.features})
             ),
             crs=self.crs,
             bounds=(
@@ -155,7 +155,7 @@ class Survey(Topology):
                 max(bounds[2::4]),
                 max(bounds[3::4]),
             ),
-            content_hash=self.content_hash,
+            content_hash=self.digest,
         )
 
     def curate(self) -> Curation:
@@ -172,7 +172,7 @@ class Survey(Topology):
             A curation report for the geospatial modality.
         """
         profile_data = self.profile().to_dict()
-        profile_data["label_counts"] = label_counts(
+        profile_data["label_counts"] = tally(
             feature.label for feature in self.features
         )
         profile_data["temporal"] = timeline(self.features)
@@ -197,7 +197,7 @@ class Survey(Topology):
         else:
             try:
                 profile_data["spatial_autocorrelation"] = (
-                    self.spatial_autocorrelation().to_dict()
+                    self.autocorrelate().to_dict()
                 )
             except GeometryError as error:
                 # MM-9: labels without variation have no statistic.
@@ -210,9 +210,9 @@ class Survey(Topology):
         quality_findings, risk_findings = findings(self, profile_data)
         return Curation(
             modality="geospatial",
-            dataset_hash=self.content_hash,
-            sample_count=len(self.features),
+            dataset_hash=self.digest,
+            samples=len(self.features),
             profile=profile_data,
-            quality_findings=quality_findings,
+            findings=quality_findings,
             risk_findings=risk_findings,
         )

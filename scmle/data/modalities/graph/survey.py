@@ -9,7 +9,7 @@ import numpy
 from scmle.contracts import data
 from scmle.data.modalities.curation import Curation
 from scmle.data.modalities.curation import flaw
-from scmle.data.modalities.curation import label_counts
+from scmle.data.modalities.curation import tally
 from scmle.data.modalities.graph.elements import Edge
 from scmle.data.modalities.graph.evidence import Connectivity
 from scmle.data.modalities.graph.evidence import Degrees
@@ -28,11 +28,9 @@ def timeline(edges: Sequence[Edge]) -> dict[str, str | int]:
         every edge is timed, ``"mixed"`` with the timed and untimed counts
         when only some are, and ``"absent"`` when none is.
     """
-    temporal_edges = [edge for edge in edges if edge.event_time is not None]
+    temporal_edges = [edge for edge in edges if edge.time is not None]
     event_times = tuple(
-        edge.event_time
-        for edge in temporal_edges
-        if edge.event_time is not None
+        edge.time for edge in temporal_edges if edge.time is not None
     )
     if event_times and len(event_times) == len(edges):
         return {
@@ -75,42 +73,42 @@ def findings(
             flaw(
                 "quality.graph-mixed-temporal-state",
                 data.FindingSeverity.WARNING,
-                {"source": graph.source_uri},
+                {"source": graph.uri},
                 {"temporal": temporal},
                 "Supply event times for every edge or explicitly use a "
                 "non-temporal graph capability.",
                 blocking=False,
             )
         )
-    if profile.edge.duplicate_edge_count:
+    if profile.edge.duplicates:
         quality_findings.append(
             flaw(
                 "quality.graph-duplicate-edges",
                 data.FindingSeverity.WARNING,
-                {"source": graph.source_uri},
-                {"duplicate_edge_count": (profile.edge.duplicate_edge_count)},
+                {"source": graph.uri},
+                {"duplicate_edge_count": (profile.edge.duplicates)},
                 "Declare whether parallel edges are valid or deduplicate them.",
                 blocking=False,
             )
         )
-    if profile.node.isolated_node_count:
+    if profile.node.isolated:
         quality_findings.append(
             flaw(
                 "quality.graph-isolated-nodes",
                 data.FindingSeverity.WARNING,
-                {"source": graph.source_uri},
-                {"isolated_node_count": profile.node.isolated_node_count},
+                {"source": graph.uri},
+                {"isolated_node_count": profile.node.isolated},
                 "Confirm isolated nodes are valid for the intended task.",
                 blocking=False,
             )
         )
-    if not graph.feature_names:
+    if not graph.features:
         quality_findings.append(
             flaw(
                 "quality.graph-no-declared-features",
                 data.FindingSeverity.INFO,
-                {"source": graph.source_uri},
-                {"node_count": profile.node.node_count},
+                {"source": graph.uri},
+                {"node_count": profile.node.nodes},
                 "Declare node features or select a topology-only model "
                 "explicitly.",
                 blocking=False,
@@ -121,7 +119,7 @@ def findings(
             flaw(
                 "risk.graph-mixed-label-state",
                 data.FindingSeverity.WARNING,
-                {"source": graph.source_uri},
+                {"source": graph.uri},
                 {"label_counts": labels},
                 "Declare whether unlabeled nodes are valid for the "
                 "intended graph task before training.",
@@ -140,7 +138,7 @@ class Survey(Structure):
 
     __slots__ = ()
 
-    source_uri: str
+    uri: str
 
     def census(self) -> Degrees:
         """Profiles node counts, labels, features, and undirected degree.
@@ -150,7 +148,7 @@ class Survey(Structure):
         Returns:
             The node profile.
         """
-        degrees = dict.fromkeys(self.node_ids, 0)
+        degrees = dict.fromkeys(self.identifiers, 0)
         for edge in self.edges:
             if edge.source in degrees:
                 degrees[edge.source] += 1
@@ -158,12 +156,10 @@ class Survey(Structure):
                 degrees[edge.target] += 1
         degree_values = tuple(degrees.values())
         return Degrees(
-            node_count=len(self.nodes),
-            isolated_node_count=sum(value == 0 for value in degree_values),
-            labeled_node_count=sum(
-                node.label is not None for node in self.nodes
-            ),
-            feature_dimension=max(
+            nodes=len(self.nodes),
+            isolated=sum(value == 0 for value in degree_values),
+            labeled=sum(node.label is not None for node in self.nodes),
+            dimension=max(
                 (len(node.features) for node in self.nodes), default=0
             ),
             degree_min=min(degree_values, default=0),
@@ -173,7 +169,7 @@ class Survey(Structure):
             else 0.0,
         )
 
-    def profile_edges(self) -> Connectivity:
+    def inspect(self) -> Connectivity:
         """Profiles edge counts, duplicate edges, loops, and weights.
 
         Returns:
@@ -184,11 +180,9 @@ class Survey(Structure):
             max(0, count - 1) for count in self.tally().values()
         )
         return Connectivity(
-            edge_count=len(self.edges),
-            duplicate_edge_count=duplicate_count,
-            self_loop_count=sum(
-                edge.source == edge.target for edge in self.edges
-            ),
+            edges=len(self.edges),
+            duplicates=duplicate_count,
+            loops=sum(edge.source == edge.target for edge in self.edges),
             weight_min=min(weights) if weights else None,
             weight_max=max(weights) if weights else None,
             weight_mean=float(numpy.mean(weights)) if weights else None,
@@ -213,11 +207,11 @@ class Survey(Structure):
             and edge profiles.
         """
         return Profile(
-            graph_identity=self.identity,
+            identity=self.identity,
             directed=self.directed,
-            component_count=len(self.components()),
+            components=len(self.components()),
             node=self.census(),
-            edge=self.profile_edges(),
+            edge=self.inspect(),
         )
 
     def curate(self) -> Curation:
@@ -232,7 +226,7 @@ class Survey(Structure):
             unlabelled nodes.
         """
         profile = self.profile()
-        labels = label_counts(node.label for node in self.nodes)
+        labels = tally(node.label for node in self.nodes)
         profile_data = profile.to_dict()
         profile_data["node"]["label_counts"] = labels
         profile_data["temporal"] = timeline(self.edges)
@@ -242,8 +236,8 @@ class Survey(Structure):
         return Curation(
             modality="graph",
             dataset_hash=self.identity,
-            sample_count=len(self.nodes),
+            samples=len(self.nodes),
             profile=profile_data,
-            quality_findings=quality_findings,
+            findings=quality_findings,
             risk_findings=risk_findings,
         )

@@ -52,8 +52,8 @@ def test_a_missing_store_is_descriptive_and_the_survivor_is_assessed(tmp_path):
     found = run(frame, codes, tmp_path)
 
     assert found.store_note and "descriptive" in found.store_note
-    assert found.stability_gate is certificates.Authority.DESCRIPTIVE
-    assert found.c2st_gate is certificates.Authority.DESCRIPTIVE
+    assert found.gate is certificates.Authority.DESCRIPTIVE
+    assert found.classifier is certificates.Authority.DESCRIPTIVE
     (finding,) = found.findings
     assert finding.name == "a" and finding.status == stability.STABLE
     assert len(finding.specs) == 12 and found.grid.total == 18
@@ -72,8 +72,8 @@ def test_the_shipped_certificates_are_found_from_a_checkout():
         permutations=20,
     )
     assert found.store_note == ""
-    assert found.c2st_gate is certificates.Authority.GATING
-    assert found.stability_gate is certificates.Authority.GATING
+    assert found.classifier is certificates.Authority.GATING
+    assert found.gate is certificates.Authority.GATING
 
 
 def test_nothing_to_vary_or_nothing_found_gives_a_reason_not_a_verdict(
@@ -151,10 +151,10 @@ def test_the_reports_validate_and_carry_the_curve_and_attribution(tmp_path):
         json.dumps(report.stability_report(found), allow_nan=False)
     )
     shift_document = json.loads(
-        json.dumps(report.shift_report(found), allow_nan=False)
+        json.dumps(report.report(found), allow_nan=False)
     )
     report.conform(stability_document)
-    report.validate_shift(shift_document)
+    report.validate(shift_document)
     assert stability_document["status"] == "evaluated"
     assert stability_document["counts"]["stable"] == 1
     finding = stability_document["findings"][0]
@@ -186,13 +186,13 @@ def test_validators_reject_missing_keys_wrong_versions_and_unearned_passes(
     odd["findings"][0]["status"] = "robust"
     with pytest.raises(ValueError, match="finding"):
         report.conform(odd)
-    shifted = report.shift_report(found)
+    shifted = report.report(found)
     with pytest.raises(ValueError, match="pass needs"):
-        report.validate_shift({**shifted, "status": "pass"})
+        report.validate({**shifted, "status": "pass"})
     with pytest.raises(ValueError, match="status"):
-        report.validate_shift({**shifted, "status": "ok"})
+        report.validate({**shifted, "status": "ok"})
     with pytest.raises(ValueError, match="missing"):
-        report.validate_shift({"schema_version": 1})
+        report.validate({"schema_version": 1})
 
 
 def test_a_stability_report_without_findings_says_why(tmp_path):

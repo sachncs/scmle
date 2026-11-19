@@ -92,7 +92,7 @@ def purge(
     return numpy.where(whole, 0.0, 1.0 - (1.0 - share) * spread / safe)
 
 
-def purity_statistic(recorded: numpy.ndarray) -> Statistic:
+def assay(recorded: numpy.ndarray) -> Statistic:
     """Builds the record-purity statistic.
 
     Args:
@@ -125,7 +125,7 @@ def dominance(
     cfg: leakage.Config,
     groups: numpy.ndarray | None,
 ) -> float:
-    """One-sided lower bound of the record purity (`purity_statistic`).
+    """One-sided lower bound of the record purity (`assay`).
 
     The class is the one whose standardized share is largest; its share
     among recorded rows is bounded by Clopper-Pearson and standardized to

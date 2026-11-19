@@ -86,14 +86,12 @@ class Impounding(exploration.Exploration):
             )
             return
         levels = (
-            reweighing.discretise(split.dev_target)
+            reweighing.discretise(split.target)
             if task is tasks.Task.REGRESSION
-            else split.dev_target
+            else split.target
         )
-        weights = reweighing.weigh(
-            split.dev_features[column].astype(str), levels
-        )
-        split.dev_features[tasks.FAIRNESS_WEIGHT] = weights
+        weights = reweighing.weigh(split.features[column].astype(str), levels)
+        split.features[tasks.FAIRNESS_WEIGHT] = weights
         board.amend(
             board.services.spec.model_copy(
                 update={
@@ -146,7 +144,7 @@ class Impounding(exploration.Exploration):
                 and the data spec has no group column.
         """
         path = str(board.services.spec.charter_path)
-        verified = sealing.read_verified(path)
+        verified = sealing.read(path)
         charter = verified.charter
         if (
             charter.purpose == contracts.NEW_ENTITY
@@ -226,7 +224,7 @@ class Impounding(exploration.Exploration):
                 "custody_log.jsonl",
             ),
             {
-                "charter_hash": verified.charter.charter_hash,
+                "charter_hash": verified.charter.digest,
                 "charter_signed": verified.signed,
                 "manifest_sha256": outcome.manifest.sha256,
                 "scope": outcome.manifest.scope,
@@ -240,7 +238,7 @@ class Impounding(exploration.Exploration):
     def check_known_entity(
         self,
         board: engine.Board,
-        charter: contracts.AnalysisCharter,
+        charter: contracts.Charter,
         split: splitters.Split,
     ) -> str | None:
         """Requires the data a known-entity-future charter needs.

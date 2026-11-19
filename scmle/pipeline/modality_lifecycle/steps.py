@@ -154,14 +154,11 @@ class Curating(state.Stage):
                 findings.
         """
         report = board.get(state.Profile).report
-        if report is None or not report.release_ready:
+        if report is None or not report.release:
             findings = (
                 []
                 if report is None
-                else [
-                    finding.identifier
-                    for finding in report.unresolved_blocking_findings
-                ]
+                else [finding.identifier for finding in report.blockers]
             )
             raise errors.InputError(
                 f"unresolved blocking curation findings: {findings}"
@@ -654,7 +651,7 @@ class Documentation(state.Stage):
         """
         plan = board.plan
         adapter = plan.adapter
-        dataset_card = curation.Datasheet.from_report(
+        dataset_card = curation.Datasheet.draft(
             modalities.serialise(adapter.modality),
             board.get(state.Profile).report.to_dict(),
             adapter.remarks(),

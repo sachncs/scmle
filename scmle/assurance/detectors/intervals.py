@@ -16,7 +16,7 @@ from scmle.evaluation import coverage
 METHODS = ("wilson", "exact")
 
 
-def wilson_interval(
+def bound(
     successes: int, n: int, confidence: float = qualification.DEFAULT_CONFIDENCE
 ) -> tuple[float, float]:
     """Two-sided Wilson score interval for a binomial proportion.
@@ -71,4 +71,4 @@ def interval(
         return coverage.clopper_pearson(successes, n, confidence)
     if method != "wilson":
         raise errors.InputError(f"method must be one of {METHODS}")
-    return wilson_interval(successes, n, confidence)
+    return bound(successes, n, confidence)

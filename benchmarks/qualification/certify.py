@@ -102,7 +102,7 @@ def certify_detector(
     Args:
         detector_id: Name the certificate is filed under.
         detector: Maps a frame to one boolean flag per row.
-        code_digest: `certificates.code_hash` of the detector's code.
+        code_digest: `certificates.fingerprint` of the detector's code.
         frame: Clean real data to plant into.
         plans: One plan per defect type.
         seeds: Run seeds; counts are pooled over them.
@@ -154,7 +154,7 @@ def certify_detector(
     return certificates.certify(
         detector_id,
         code_digest,
-        certificates.corpus_hash([frame_digest(frame)]),
+        certificates.checksum([frame_digest(frame)]),
         seeds,
         results,
         policy,

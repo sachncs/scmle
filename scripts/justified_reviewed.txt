@@ -18,7 +18,7 @@ scmle/data/readers/tabular.py load passthrough required TableReader hook called 
 scmle/data/readers/tabular.py load passthrough required TableReader hook called through the reader classes
 scmle/data/readers/tabular.py load passthrough required TableReader hook called through the reader classes
 scmle/data/readers/tabular.py load passthrough required TableReader hook called through the reader classes
-scmle/data/readers/tabular.py read_table passthrough builds the default Loader for seven production callers; inlining would spread that default
+scmle/data/readers/tabular.py read passthrough builds the default Loader for seven production callers; inlining would spread that default
 scmle/data/splitting/inner_cv.py get_n_splits getter scikit-learn calls it by name
 scmle/data/splitting/splitters/lockbox.py mint getter member of the Source protocol, satisfied by splitters and the vault
 scmle/data/validation/columns.py matches passthrough required Family hook, called as kind.matches

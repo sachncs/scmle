@@ -43,7 +43,7 @@ scmle/pipeline/stages/selecting.py frontier single-use the Pareto-dominance rule
 scmle/assurance/admissibility/asof.py agrees single-use tests/unit/test_admissibility_asof.py:207 calls it directly for the missing-equals-missing case
 scmle/assurance/admissibility/independence.py entail single-use tests/unit/test_admissibility_independence.py (lines 172 and 187) call it directly
 scmle/assurance/admissibility/leakage/fitting.py rescore single-use called from a lambda inside itertools.repeat and operator.call in lower_bound; its try/except and index construction are statements that cannot sit in the lambda
-scmle/assurance/admissibility/leakage/fitting.py out_of_fold single-use the docstrings of predictiveness (line 365) and rescore (line 418) refer to its output by name, and the helper is a 43-line classification/regression cross-fit loop
+scmle/assurance/admissibility/leakage/fitting.py predict single-use the docstrings of predictiveness (line 365) and rescore (line 418) refer to its output by name, and the helper is a 43-line classification/regression cross-fit loop
 scmle/assurance/admissibility/qualify.py waiver single-use tests/unit/test_admissibility_attestations.py (lines 182 and 186) call it directly
 scmle/assurance/admissibility/qualify.py screened single-use builds a 12-field Check with the certificates.demote branch; its call is the element of a list comprehension in the 164-line Qualification run, which cannot hold the branch, so inlining needs a loop and temporaries
 scmle/assurance/admissibility/rules.py adjudicate single-use tests/unit/test_admissibility_rules.py:167 calls it directly
@@ -51,6 +51,6 @@ scmle/assurance/admissibility/screen/fitting.py aucs single-use tests/unit/test_
 scmle/assurance/admissibility/screen/fitting.py crossfit single-use tests/unit/test_leakage_screen.py:547 calls it directly
 scmle/assurance/admissibility/screen.py gate_statuses single-use tests/unit/test_leakage_screen.py (lines 455 to 466) call it directly and patch it by name
 scmle/assurance/admissibility/screen/fitting.py predict single-use replicate's docstring at screen.py:464 refers to its output by name, and skill_bound is already at complexity 6 with six branches
-scmle/assurance/admissibility/screen/association.py purity_statistic single-use one of three statistic factories (purity, skill, missingness) returning a Statistic closure; skill_statistic is tested directly and the set is kept parallel, so a nested def in hypothesize would break the pattern
+scmle/assurance/admissibility/screen/association.py assay single-use one of three statistic factories (purity, skill, missingness) returning a Statistic closure; skill_statistic is tested directly and the set is kept parallel, so a nested def in hypothesize would break the pattern
 scmle/assurance/admissibility/screen/permutation.py resamples single-use tests/unit/test_leakage_screen.py (lines 153, 157, 232) call it directly; scan is already at complexity 10
-scmle/assurance/admissibility/screen/fitting.py skill_statistic single-use tests/unit/test_leakage_screen.py:552 calls it directly; scan is already at complexity 10 and 45 statements
+scmle/assurance/admissibility/screen/fitting.py quantify single-use tests/unit/test_leakage_screen.py:552 calls it directly; scan is already at complexity 10 and 45 statements

@@ -574,7 +574,7 @@ def drift_world(
     """
     x = numpy.cumsum(rng.normal(size=(rows, columns)), axis=0)
     y = numpy.cumsum(rng.normal(size=rows))
-    labels = controls.block_labels(
+    labels = controls.block(
         numpy.arange(rows, dtype=float), max(2, rows // blocks)
     )
     return x, y, labels

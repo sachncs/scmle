@@ -31,7 +31,7 @@ def profile(rows=2000, seed=99):
         features={
             "age": reference.Deciles.fit(base["age"]),
             "balance": reference.Deciles.fit(base["balance"]),
-            "plan": reference.CategoricalReference.fit(base["plan"]),
+            "plan": reference.Frequencies.fit(base["plan"]),
         },
         output=reference.Deciles.fit(score),
         name="score",

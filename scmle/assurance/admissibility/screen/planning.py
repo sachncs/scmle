@@ -88,7 +88,7 @@ def subsample(
     return numpy.sort(rng.choice(n, MAX_ROWS, replace=False)), block_size
 
 
-def load_store(
+def load(
     path: Path | None = None,
 ) -> certificates.Store | None:
     """Loads the certificates of the screen.
@@ -118,7 +118,7 @@ def bundled() -> certificates.Store | None:
         The store, or None if it is missing or unreadable. The result is
         cached for the process.
     """
-    return load_store()
+    return load()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -413,7 +413,7 @@ def ready(
     if not known or any(c not in frame.columns or c == target for c in names):
         return None
     values = None if groups is None else groups.to_numpy()
-    rows, blocks = subsample(len(frame), values, block_size, cfg.run_seed)
+    rows, blocks = subsample(len(frame), values, block_size, cfg.seed)
     sample = frame.iloc[rows].reset_index(drop=True)
     grouping = None if values is None else values[rows]
     # The scan abstains where `encode` fails: no folds (one group, or fewer

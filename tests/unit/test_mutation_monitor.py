@@ -19,13 +19,13 @@ class Profile:
 
     Attributes:
         value: The noise-adjusted PSI it reports.
-        missing_rate: The training missing share.
+        missing: The training missing share.
         unseen: The unseen-category share it reports.
     """
 
     def __init__(self, value: float, unseen: float = 0.0) -> None:
         self.value = value
-        self.missing_rate = 0.25
+        self.missing = 0.25
         self.unseen = unseen
 
     def adjust(self, values: pandas.Series) -> float:
@@ -38,7 +38,7 @@ class Profile:
         assert len(values)
         return self.value + 0.01
 
-    def unseen_rate(self, values: pandas.Series) -> float:
+    def rate(self, values: pandas.Series) -> float:
         """Returns the fixed unseen-category share."""
         assert len(values)
         return self.unseen

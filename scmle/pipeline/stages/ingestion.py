@@ -123,7 +123,7 @@ class IngestStage(interface.Stage):
         if stream is not None:
             totals = stream[1]
             notes.append(
-                f"streamed {totals.rows} rows; {totals.development_sample} "
+                f"streamed {totals.rows} rows; {totals.sample} "
                 f"development rows kept in memory, {totals.locked} rows locked"
             )
         frame = self.graph(board, frame)
@@ -152,7 +152,7 @@ class IngestStage(interface.Stage):
         graph = board.services.spec.feature_graph
         if not graph.nodes:
             return frame
-        feature_graph.validate_graph(graph, set(frame.columns), data)
+        feature_graph.validate(graph, set(frame.columns), data)
         ordered = feature_graph.segregate(graph)[0]
         frame = feature_graph.Temporal(
             ordered, data.group_column, data.time_column
@@ -199,7 +199,7 @@ class IngestStage(interface.Stage):
         if board.services.store is not None:
             saved = board.services.store.path("source_registry.json")
             if saved.exists():
-                registry = scmle.data.readers.registry.Sources.from_json(
+                registry = scmle.data.readers.registry.Sources.parse(
                     saved.read_text(encoding="utf-8")
                 )
         compatibility = registry.compatibility(snapshot)

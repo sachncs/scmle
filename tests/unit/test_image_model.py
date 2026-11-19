@@ -34,7 +34,7 @@ def png_bytes(color, size=(4, 4)):
 
 def sample(source: str, color, label: str) -> image.Sample:
     """Create a labelled image fixture."""
-    return image.Sample.from_bytes(png_bytes(color), source, label=label)
+    return image.Sample.parse(png_bytes(color), source, label=label)
 
 
 @pytest.fixture
@@ -116,9 +116,7 @@ def test_image_classifier_rejects_unsafe_training_data(training_data):
     """Training refuses missing labels, duplicates, and one-class data."""
     with pytest.raises(ValueError, match="every training image"):
         make_classifier().fit(
-            image.Dataset(
-                (image.Sample.from_bytes(png_bytes((1, 2, 3)), "raw"),)
-            )
+            image.Dataset((image.Sample.parse(png_bytes((1, 2, 3)), "raw"),))
         )
 
     with pytest.raises(ValueError, match="duplicate content"):

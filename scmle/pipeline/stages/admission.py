@@ -34,7 +34,7 @@ class Admission(identification.Identification):
         self,
         board: engine.Board,
         task: tasks.Task,
-        charter: contracts.AnalysisCharter,
+        charter: contracts.Charter,
         view: Any,
         structure: tuple[str, ...],
         *,
@@ -90,8 +90,8 @@ class Admission(identification.Identification):
         classes = sorted(view.target.dropna().unique(), key=str)
         rule = self.solidify(board, charter, view, structure, classes)
         selection = select(board, view, column)
-        ceiling, why = scmle.assurance.framing.claim.source_ceiling(
-            data.framing_draft, charter.charter_hash, model, signed=signed
+        ceiling, why = scmle.assurance.framing.claim.cap(
+            data.framing_draft, charter.digest, model, signed=signed
         )
         board.journal.write_json(scmle.assurance.framing.claim.PROVENANCE, why)
         return scmle.assurance.framing.claim.rig(
@@ -111,7 +111,7 @@ class Admission(identification.Identification):
         self,
         board: engine.Board,
         task: tasks.Task,
-        charter: contracts.AnalysisCharter,
+        charter: contracts.Charter,
         view: Any,
         structure: tuple[str, ...],
         graph: Any = None,
@@ -161,7 +161,7 @@ class Admission(identification.Identification):
             cutoff=spec.data.cutoff,
             known=spec.data.known,
             attestations=given,
-            scope=charter.charter_hash,
+            scope=charter.digest,
             causal=charter.estimand.causal,
             dag=graph,
             declared=() if ingest is None else ingest.records,
@@ -184,7 +184,7 @@ class Admission(identification.Identification):
     def solidify(
         self,
         board: engine.Board,
-        charter: contracts.AnalysisCharter,
+        charter: contracts.Charter,
         view: Any,
         structure: tuple[str, ...],
         classes: list[Any],
@@ -269,9 +269,9 @@ def register(board: engine.Board, found: qualify.Qualification) -> list[str]:
             "admissibility_table.json", found.table.to_dict()
         )
         written.append("admissibility_table.json")
-    if found.f5_store is not None:
+    if found.store is not None:
         board.journal.write_json(
-            "detector_certificates.json", found.f5_store.to_dict()
+            "detector_certificates.json", found.store.to_dict()
         )
         written.append("detector_certificates.json")
     return written
@@ -296,7 +296,7 @@ def select(board: engine.Board, view: Any, column: str) -> Any:
         extra = unlabeled[column].to_numpy(dtype=float)
         decisions = numpy.concatenate([decisions, extra])
         seen = numpy.concatenate([seen, numpy.zeros(len(extra), dtype=bool)])
-    return scmle.assurance.framing.baseline.selective_labels(seen, decisions)
+    return scmle.assurance.framing.baseline.screen(seen, decisions)
 
 
 def attested(spec: tasks.Config) -> Any:
@@ -378,7 +378,7 @@ def announce(
         "admissibility and detectors ran on the exploration set",
         written,
         {
-            "leakage_gate": found.leakage_gate.value,
+            "leakage_gate": found.gate.value,
             "quarantined": found.quarantined,
             "suspects": sorted(found.suspects),
             "detector_status": {

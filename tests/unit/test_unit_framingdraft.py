@@ -395,7 +395,7 @@ def test_frame_issues_a_draft_with_questions():
     assert draft.charter.unit == "customer_id"
     assert draft.fields["target"] is provenance.Filling.TEMPLATE
     assert draft.fields["deployment_population"] is provenance.Filling.TEMPLATE
-    assert "baseline_decision_column" in draft.open_items
+    assert "baseline_decision_column" in draft.pending
 
 
 def test_frame_takes_human_slots_over_the_rules():

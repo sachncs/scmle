@@ -27,7 +27,7 @@ def report(frame):
         "survived",
         "classification",
         [c for c in frame.columns if c != "survived"],
-        leakage.CERTIFIED.run_seed,
+        leakage.CERTIFIED.seed,
     )
 
 

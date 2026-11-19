@@ -40,9 +40,7 @@ def hold_run(root, marker, release):
             time.sleep(0.02)
         return failpoints.upper(frame)
 
-    processor = processing.IncrementalProcessor(
-        store, failpoints.CONTRACT, waiting
-    )
+    processor = processing.Processor(store, failpoints.CONTRACT, waiting)
     processor.run()
 
 

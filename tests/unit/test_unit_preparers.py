@@ -37,7 +37,7 @@ def label(index):
 def documents(kind=document.DocumentPreparer):
     samples = tuple(
         modalities.document.Sample(
-            document_id=f"document-{index}",
+            identifier=f"document-{index}",
             content=("alpha signal " if index % 2 else "beta signal ")
             * (index + 2),
             label=label(index),
@@ -57,7 +57,7 @@ def png(value):
 
 def images():
     samples = tuple(
-        modalities.image.Sample.from_bytes(
+        modalities.image.Sample.parse(
             png(20 + index * 15),
             source=f"image-{index}.png",
             label=label(index),
@@ -81,7 +81,7 @@ def wav(amplitude, frames=40):
 
 def sounds():
     samples = tuple(
-        modalities.audio.Sample.from_bytes(
+        modalities.audio.Sample.decode(
             wav(500 + index * 300),
             source=f"audio-{index}.wav",
             label=label(index),
@@ -94,7 +94,7 @@ def sounds():
 
 def clips(decoded=False):
     samples = tuple(
-        modalities.video.Sample.from_bytes(
+        modalities.video.Sample.decode(
             bytes([index + 1]) * 16,
             modalities.video.Metadata(
                 "fixture", 16 + index, 16, 8 + index, 8.0, "fixture-codec"
@@ -121,7 +121,7 @@ def clips(decoded=False):
 def nodes():
     made = tuple(
         modalities.graph.Node(
-            node_id=f"node-{index}",
+            identifier=f"node-{index}",
             features=(float(index), float(index % 3)),
             label=label(index),
         )
@@ -133,7 +133,7 @@ def nodes():
     )
     return graph.GraphPreparer(
         modalities.graph.Dataset(
-            nodes=made, edges=edges, feature_names=("position", "remainder")
+            nodes=made, edges=edges, features=("position", "remainder")
         )
     )
 
@@ -141,7 +141,7 @@ def nodes():
 def placemarks():
     features = tuple(
         modalities.geospatial.Placemark(
-            feature_id=f"feature-{index}",
+            identifier=f"feature-{index}",
             geometry={"type": "Point", "coordinates": [float(index), 0.0]},
             label=label(index),
         )
@@ -162,8 +162,8 @@ def tiles():
         samples.append(
             modalities.geospatial.Tile(
                 source=source,
-                encoded_bytes=payload,
-                file_hash=hashlib.sha256(payload).hexdigest(),
+                encoded=payload,
+                digest=hashlib.sha256(payload).hexdigest(),
                 width=32,
                 height=32,
                 bands=3,
@@ -335,13 +335,13 @@ def test_the_raster_summary_is_mean_std_min_max_per_band():
 def test_video_groups_fall_back_to_the_source():
     samples = clips().samples[:2]
     assert video.groups(samples) == ("camera-0", "camera-1")
-    loose = modalities.video.Sample.from_bytes(
+    loose = modalities.video.Sample.decode(
         b"\x01" * 16,
         modalities.video.Metadata("fixture", 16, 16, 8, 8.0, "fixture-codec"),
         source="z.fixture",
     )
     assert video.groups((loose, samples[0])) == ("camera-0", loose.source)
-    assert loose.group_id is None
+    assert loose.group is None
 
 
 def test_video_occlusion_zeroes_five_statistics_per_frame():
@@ -399,7 +399,7 @@ def test_graph_knockouts_zero_each_feature_in_turn():
     assert [f["feature"] for f in found] == ["position", "remainder"]
     assert [f["feature_index"] for f in found] == [0, 1]
     masked = modalities.graph.Node(
-        node_id=sample.node_id,
+        identifier=sample.identifier,
         features=(0.0, *sample.features[1:]),
         label=sample.label,
     )
@@ -431,20 +431,20 @@ def test_geospatial_axes_mask_x_then_y_at_the_midpoint():
 
 def test_audio_mute_silences_only_the_window():
     sample = sounds().samples[0]
-    with wave.open(io.BytesIO(sample.encoded_bytes), "rb") as reader:
+    with wave.open(io.BytesIO(sample.encoded), "rb") as reader:
         parameters = reader.getparams()
         frames = bytearray(reader.readframes(reader.getnframes()))
     masked = audio.mute(sample, parameters, frames, (2, 5))
-    with wave.open(io.BytesIO(masked.encoded_bytes), "rb") as reader:
+    with wave.open(io.BytesIO(masked.encoded), "rb") as reader:
         values = numpy.frombuffer(reader.readframes(80), dtype="<i2")
     original = numpy.frombuffer(bytes(frames), dtype="<i2")
     assert values[2:5].tolist() == [0, 0, 0]
     assert values[:2].tolist() == original[:2].tolist()
     assert values[5:].tolist() == original[5:].tolist()
-    assert (masked.source, masked.label, masked.group_id) == (
+    assert (masked.source, masked.label, masked.group) == (
         sample.source,
         sample.label,
-        sample.group_id,
+        sample.group,
     )
     assert frames == bytearray(original.tobytes())
 

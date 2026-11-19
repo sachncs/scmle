@@ -921,7 +921,7 @@ def digest() -> str:
     Returns:
         The `code_hash` of `Project`, the runner helpers and this module.
     """
-    return certificates.code_hash(
+    return certificates.fingerprint(
         scmle.api.project.Project,
         scmle_runner.score,
         scmle_runner.seed_for,

@@ -201,8 +201,7 @@ def old_rule(
         column = columns.categorize(frame[name])
         flagged[name] = (
             column.association(frame[name], target, task) >= OLD_ASSOCIATION
-            or column.missingness_association(frame[name], target, task)
-            >= OLD_MISSINGNESS
+            or column.discriminate(frame[name], target, task) >= OLD_MISSINGNESS
         )
     return flagged
 
@@ -221,7 +220,7 @@ def run_screen(
     Returns:
         The screen report.
     """
-    cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=seed)
+    cfg = dataclasses.replace(leakage.CERTIFIED, seed=seed)
     return screen.screen(
         frame, f4_certify.TARGET, TABLES[kind][1], cfg, groups=groups
     )
@@ -378,7 +377,7 @@ def wilson(successes: int, trials: int) -> tuple[float, float]:
     Returns:
         The lower and upper bounds.
     """
-    return certificates.wilson_interval(successes, trials, 0.95)
+    return certificates.bound(successes, trials, 0.95)
 
 
 def band_99(alpha: float, runs: int) -> tuple[float, float]:
@@ -458,8 +457,8 @@ def measure(kind: str, workers: int = 1) -> tuple[Any, dict[str, Any]]:
         )
     cert = certificates.certify(
         screen.DETECTORS[kind],
-        screen.code_digest(),
-        certificates.corpus_hash([certify.frame_digest(frame)]),
+        screen.fingerprint(),
+        certificates.checksum([certify.frame_digest(frame)]),
         [0],
         results,
         f4_certify.LEAK_POLICY,
@@ -588,7 +587,7 @@ def measure_dated() -> tuple[Any, dict[str, Any]]:
     cert = certificates.certify(
         screen.DATED_ID,
         screen.dated_digest(),
-        certificates.corpus_hash(
+        certificates.checksum(
             [certify.frame_digest(TABLES[kind][0]()) for kind in KINDS]
         ),
         [0],
@@ -635,7 +634,7 @@ def problems(store: certificates.Store) -> list[str]:
         certificate is missing or stale; empty when all are current.
     """
     found = []
-    digest = screen.code_digest()
+    digest = screen.fingerprint()
     for kind in KINDS:
         detector = screen.DETECTORS[kind]
         for defect in DEFECTS:
@@ -664,7 +663,7 @@ def uncertified(store: certificates.Store) -> list[str]:
         `kind/defect` for every pair whose status is not gating, and
         `dated/leak_dated` when the dated check's is not.
     """
-    digest = screen.code_digest()
+    digest = screen.fingerprint()
     found = [
         f"{kind}/{defect}"
         for kind in KINDS

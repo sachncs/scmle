@@ -138,7 +138,7 @@ class File(Source):
         Yields:
             Each row's number and its record.
         """
-        frame = tabular.read_table(self.path)
+        frame = tabular.read(self.path)
         column = self.columns.time
         if column in frame.columns and not pandas.api.types.is_numeric_dtype(
             frame[column]

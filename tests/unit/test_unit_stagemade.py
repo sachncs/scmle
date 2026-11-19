@@ -237,7 +237,7 @@ def test_surveying_curates_into_a_portrait():
     stage = profiling.ProfileStage()
     made = stage.execute(board)
     try:
-        development = made.split.dev_features.assign(y=made.split.dev_target)
+        development = made.split.features.assign(y=made.split.target)
         portrait = stage.curate(board, made.frame, development, made.profile)
         assert isinstance(portrait, surveying.Portrait)
         assert portrait.profile is made.profile
@@ -260,8 +260,8 @@ def test_a_failure_after_the_split_closes_the_locked_rows(monkeypatch):
 
     def spy(*arguments):
         made = divide(*arguments)
-        originals.append(type(made[0].locked_test).close)
-        monkeypatch.setattr(type(made[0].locked_test), "close", shut)
+        originals.append(type(made[0].test).close)
+        monkeypatch.setattr(type(made[0].test), "close", shut)
         return made
 
     def refuse(*arguments):
@@ -280,15 +280,15 @@ def test_closing_the_board_closes_the_partitions_locked_rows(monkeypatch):
     board = start()
     ingestion.IngestStage().execute(board)
     made = profiling.ProfileStage().execute(board)
-    original = type(made.split.locked_test).close
+    original = type(made.split.test).close
 
     def shut(box):
         closed.append(box)
         original(box)
 
-    monkeypatch.setattr(type(made.split.locked_test), "close", shut)
+    monkeypatch.setattr(type(made.split.test), "close", shut)
     board.close()
-    assert closed == [made.split.locked_test]
+    assert closed == [made.split.test]
 
 
 def test_a_resolution_is_held_by_type_with_its_own_field_names():

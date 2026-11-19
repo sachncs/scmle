@@ -239,7 +239,7 @@ def assemble(
     slots: Mapping[str, Any],
     request: records.Request,
     cost_model: costs.Tariff | None,
-) -> tuple[contracts.AnalysisCharter, list[str]]:
+) -> tuple[contracts.Charter, list[str]]:
     """Builds the unsigned charter, filling blanks with placeholders.
 
     Args:
@@ -289,11 +289,11 @@ def assemble(
         record["costs"] = cost_model.to_dict()
     else:
         open_items.append("cost_model")
-    return contracts.AnalysisCharter.from_dict(record), open_items
+    return contracts.Charter.from_dict(record), open_items
 
 
 def linkage(
-    charter: contracts.AnalysisCharter, columns: Sequence[str]
+    charter: contracts.Charter, columns: Sequence[str]
 ) -> dict[str, Any]:
     """Reports whether the charter's words name real columns, descriptively.
 

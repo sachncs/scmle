@@ -84,10 +84,10 @@ class Ledger(sidecar.Sidecar):
 
     Attributes:
         path: JSON file holding the committed state.
-        source_identity: Identity of the one source the ledger serves.
+        identity: Identity of the one source the ledger serves.
     """
 
-    source_identity: str
+    identity: str
 
     def load(self) -> evidence.Settlement:
         """Loads committed state or initialize an empty source state.
@@ -104,21 +104,19 @@ class Ledger(sidecar.Sidecar):
                 state belongs to another source.
         """
         if not self.path.exists():
-            return evidence.Settlement(
-                timeline.Checkpoint(self.source_identity)
-            )
+            return evidence.Settlement(timeline.Checkpoint(self.identity))
         record = json.loads(self.path.read_text(encoding="utf-8"))
         state = evidence.Settlement.from_dict(record)
-        if state.checkpoint.source != self.source_identity:
+        if state.checkpoint.source != self.identity:
             raise timeline.IncrementalError(
                 "state_source_mismatch",
                 "durable state belongs to another source",
-                self.source_identity,
+                self.identity,
                 {"state_source_identity": state.checkpoint.source},
             )
         return state
 
-    def read_batch(
+    def read(
         self, source: sources.Source, limit: int = 1_000
     ) -> timeline.Batch:
         """Reads an uncommitted batch using the durable deduplication state.
@@ -128,24 +126,24 @@ class Ledger(sidecar.Sidecar):
             limit: Maximum number of new events to return.
 
         Returns:
-            The batch selected by `source.read_events` from the durable
+            The batch selected by `source.read` from the durable
             checkpoint, skipping already committed event identities.
 
         Raises:
             IncrementalError: With code "source_mismatch" if the source's
                 identity differs from the ledger's.
         """
-        if source.source_identity != self.source_identity:
+        if source.identity != self.identity:
             raise timeline.IncrementalError(
                 "source_mismatch",
                 "source does not match ingestion ledger",
-                self.source_identity,
-                {"source_identity": source.source_identity},
+                self.identity,
+                {"source_identity": source.identity},
             )
         state = self.load()
-        return source.read_events(state.checkpoint, state.seen, limit)
+        return source.read(state.checkpoint, state.seen, limit)
 
-    def write_atomically(self, state: evidence.Settlement) -> None:
+    def write(self, state: evidence.Settlement) -> None:
         """Publishes state with a durable temporary-file replacement.
 
         Callers that combine a read and write must hold ``lock``. This method
@@ -160,16 +158,16 @@ class Ledger(sidecar.Sidecar):
             IncrementalError: With code "state_source_mismatch" if the state's
                 checkpoint belongs to another source.
         """
-        if state.checkpoint.source != self.source_identity:
+        if state.checkpoint.source != self.identity:
             raise timeline.IncrementalError(
                 "state_source_mismatch",
                 "state does not match ingestion ledger",
-                self.source_identity,
+                self.identity,
                 {"state_source_identity": state.checkpoint.source},
             )
         publish(self.path, state.to_dict())
 
-    def earmark(self, acknowledgement: evidence.EventAcknowledgement) -> None:
+    def earmark(self, acknowledgement: evidence.Acknowledgement) -> None:
         """Stage an acknowledgement with durable atomic replacement.
 
         If writing fails, the temporary file is removed and the error
@@ -182,16 +180,16 @@ class Ledger(sidecar.Sidecar):
             IncrementalError: With code "acknowledgement_source_mismatch" if
                 the acknowledgement belongs to another source.
         """
-        if acknowledgement.source != self.source_identity:
+        if acknowledgement.source != self.identity:
             raise timeline.IncrementalError(
                 "acknowledgement_source_mismatch",
                 "acknowledgement does not match ingestion ledger",
-                self.source_identity,
+                self.identity,
                 {"ack_source_identity": acknowledgement.source},
             )
-        publish(self.pending_acknowledgement_path, acknowledgement.to_dict())
+        publish(self.pending, acknowledgement.to_dict())
 
-    def reclaim(self) -> evidence.EventAcknowledgement | None:
+    def reclaim(self) -> evidence.Acknowledgement | None:
         """Loads the acknowledgement that still needs transport delivery.
 
         Returns:
@@ -202,25 +200,23 @@ class Ledger(sidecar.Sidecar):
                 (code "invalid_pending_acknowledgement"), or it belongs to
                 another source (code "acknowledgement_source_mismatch").
         """
-        if not self.pending_acknowledgement_path.exists():
+        if not self.pending.exists():
             return None
         try:
-            record = json.loads(
-                self.pending_acknowledgement_path.read_text(encoding="utf-8")
-            )
-            acknowledgement = evidence.EventAcknowledgement.from_dict(record)
+            record = json.loads(self.pending.read_text(encoding="utf-8"))
+            acknowledgement = evidence.Acknowledgement.from_dict(record)
         except (OSError, TypeError, ValueError, json.JSONDecodeError) as error:
             raise timeline.IncrementalError(
                 "invalid_pending_acknowledgement",
                 "pending acknowledgement is not valid JSON evidence",
-                self.source_identity,
-                {"path": str(self.pending_acknowledgement_path)},
+                self.identity,
+                {"path": str(self.pending)},
             ) from error
-        if acknowledgement.source != self.source_identity:
+        if acknowledgement.source != self.identity:
             raise timeline.IncrementalError(
                 "acknowledgement_source_mismatch",
                 "pending acknowledgement belongs to another source",
-                self.source_identity,
+                self.identity,
                 {"ack_source_identity": acknowledgement.source},
             )
         return acknowledgement
@@ -230,8 +226,8 @@ class Ledger(sidecar.Sidecar):
 
         Nothing is removed if no acknowledgement is staged.
         """
-        self.pending_acknowledgement_path.unlink(missing_ok=True)
-        durability.sync_directory(self.pending_acknowledgement_path.parent)
+        self.pending.unlink(missing_ok=True)
+        durability.sync_directory(self.pending.parent)
 
     def commit(self, batch: timeline.Batch) -> evidence.Settlement:
         """Atomically publishes a processed batch's IDs and checkpoint.
@@ -250,45 +246,44 @@ class Ledger(sidecar.Sidecar):
                 the committed one (code "checkpoint_regression"), or the
                 stored state belongs to another source.
         """
-        if batch.source_identity != self.source_identity:
+        if batch.identity != self.identity:
             raise timeline.IncrementalError(
                 "batch_source_mismatch",
                 "batch does not match ingestion ledger",
-                self.source_identity,
-                {"batch_source_identity": batch.source_identity},
+                self.identity,
+                {"batch_source_identity": batch.identity},
             )
         with self.lock():
             current = self.load()
-            candidate_ids = set(batch.event_ids)
+            candidate_ids = set(batch.identities)
             current_ids = set(current.seen)
             if (
                 candidate_ids <= current_ids
-                and batch.next_checkpoint.sequence
-                <= current.checkpoint.sequence
+                and batch.checkpoint.sequence <= current.checkpoint.sequence
             ):
                 return current
-            if batch.next_checkpoint.sequence < current.checkpoint.sequence:
+            if batch.checkpoint.sequence < current.checkpoint.sequence:
                 raise timeline.IncrementalError(
                     "checkpoint_regression",
                     "batch checkpoint moves backwards",
-                    self.source_identity,
+                    self.identity,
                     {
                         "current": current.checkpoint.to_dict(),
-                        "candidate": batch.next_checkpoint.to_dict(),
+                        "candidate": batch.checkpoint.to_dict(),
                     },
                 )
             state = evidence.Settlement(
-                batch.next_checkpoint,
-                tuple(sorted(set(current.seen) | set(batch.event_ids))),
+                batch.checkpoint,
+                tuple(sorted(set(current.seen) | set(batch.identities))),
             )
-            self.write_atomically(state)
+            self.write(state)
             return state
 
     def finalize(
         self,
         events: Iterable[timeline.Event],
         writer: Callable[[tuple[timeline.Event, ...]], None],
-        acknowledgement: evidence.EventAcknowledgement | None = None,
+        acknowledgement: evidence.Acknowledgement | None = None,
     ) -> evidence.Ack:
         """Writes unseen events and commit their IDs under one ledger lock.
 
@@ -329,12 +324,12 @@ class Ledger(sidecar.Sidecar):
             raise errors.KindError("writer must be callable")
         if (
             acknowledgement is not None
-            and acknowledgement.source != self.source_identity
+            and acknowledgement.source != self.identity
         ):
             raise timeline.IncrementalError(
                 "acknowledgement_source_mismatch",
                 "acknowledgement does not match ingestion ledger",
-                self.source_identity,
+                self.identity,
                 {"ack_source_identity": acknowledgement.source},
             )
         with self.lock():
@@ -346,15 +341,13 @@ class Ledger(sidecar.Sidecar):
                 writer(tuple(accepted))
                 checkpoint = timeline.forward(checkpoint, accepted)
                 seen = {*current.seen, *accepted_ids}
-                self.write_atomically(
-                    evidence.Settlement(checkpoint, tuple(sorted(seen)))
-                )
+                self.write(evidence.Settlement(checkpoint, tuple(sorted(seen))))
             if acknowledgement is not None and acknowledgement.events:
                 self.earmark(
                     dataclasses.replace(acknowledgement, checkpoint=checkpoint)
                 )
             return evidence.Ack(
-                self.source_identity,
+                self.identity,
                 tuple(sorted(accepted_ids)),
                 tuple(sorted(duplicates)),
                 checkpoint,

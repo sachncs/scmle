@@ -178,7 +178,7 @@ def torn_code() -> str:
         The code hash of the consistent-read check and the connector batch
         check.
     """
-    return certificates.code_hash(
+    return certificates.fingerprint(
         profile.untorn,
         profile.slurp,
         profile.deterministic,
@@ -218,7 +218,7 @@ def torn_certificate(
     cert = certificates.certify(
         TORN_ID,
         torn_code(),
-        certificates.corpus_hash(
+        certificates.checksum(
             [digest({"kinds": ingest_worlds.TORN_KINDS, "batch_rows": 5})]
         ),
         [offset],
@@ -309,8 +309,8 @@ def reconcile_certificate(
         )
     cert = certificates.certify(
         reconcile.DETECTOR_ID,
-        reconcile.code_digest(),
-        certificates.corpus_hash(
+        reconcile.fingerprint(),
+        certificates.checksum(
             [
                 digest(
                     {
@@ -421,7 +421,7 @@ def unit_pair(seed: int) -> tuple[str, str, str, str]:
 
     Returns:
         The unit, the table's true shape, the verdict that follows from the
-        construction and the verdict of `grain.unit_verdict`.
+        construction and the verdict of `grain.judge`.
     """
     combos = [(u, s) for u in ingest_worlds.UNITS for s in ingest_worlds.SHAPES]
     unit, shape = combos[seed % len(combos)]
@@ -430,7 +430,7 @@ def unit_pair(seed: int) -> tuple[str, str, str, str]:
     profiled = profile.survey(source, table)
     assert profiled is not None
     scan = grain.keysearch(source, profiled)
-    verdict = grain.unit_verdict(source, profiled, unit, scan)
+    verdict = grain.judge(source, profiled, unit, scan)
     return (
         unit,
         shape,
@@ -489,7 +489,7 @@ def unit_verdicts(offset: int, workers: int) -> dict[str, Any]:
         and coarser_as_match == 0
         and flips["exact"]
     )
-    lo, hi = certificates.wilson_interval(correct, UNIT_PAIRS)
+    lo, hi = certificates.bound(correct, UNIT_PAIRS)
     return judged(
         ok,
         None,
@@ -548,8 +548,8 @@ def join_discovery(offset: int, workers: int) -> dict[str, Any]:
     true_accepted = sum(r[1] for r in rows)
     truth = sum(r[2] for r in rows)
     spurious_worlds = sum(r[0] != r[1] for r in rows)
-    precision = certificates.wilson_interval(true_accepted, max(accepted, 1))
-    recall = certificates.wilson_interval(true_accepted, max(truth, 1))
+    precision = certificates.bound(true_accepted, max(accepted, 1))
+    recall = certificates.bound(true_accepted, max(truth, 1))
     return judged(
         spurious_worlds == 0,
         None,
@@ -604,11 +604,11 @@ def er_world(seed: int) -> dict[str, Any]:
     pairs = entities.pairing(frame, ER_PASSES)[0]
     quality = entities.grade(truth.tolist(), result, pairs)
     return {
-        "true_pairs": quality.true_pairs,
-        "compared_true": round(quality.pair_completeness * quality.true_pairs),
-        "grouped_pairs": quality.grouped_pairs,
-        "false_group_pairs": int(quality.false_group_pairs),
-        "reduction_ratio": result.reduction_ratio,
+        "true_pairs": quality.matches,
+        "compared_true": round(quality.completeness * quality.matches),
+        "grouped_pairs": quality.pairs,
+        "false_group_pairs": int(quality.spurious),
+        "reduction_ratio": result.reduction,
         "precision_estimate": list(result.estimate.precision)
         if result.estimate
         else None,
@@ -634,7 +634,7 @@ def entity_resolution(offset: int, workers: int) -> dict[str, Any]:
     grouped = sum(r["grouped_pairs"] for r in rows)
     completeness = compared / truth
     recall = grouped / truth
-    interval = certificates.wilson_interval(grouped, truth)
+    interval = certificates.bound(grouped, truth)
     return judged(
         completeness >= ER_FLOOR and recall >= ER_FLOOR,
         None,
@@ -667,8 +667,8 @@ def budget_run(seed: int, directory: Path) -> tuple[bool, list[dict[str, str]]]:
     """
     rng = randomness.component_rng(seed, "ingest.certify.budget", 0)
     limit = budget.Budget(
-        max_queries=int(rng.integers(0, 800)),
-        max_rows_scanned=int(rng.integers(0, 150_000)),
+        queries=int(rng.integers(0, 800)),
+        scanned=int(rng.integers(0, 150_000)),
     )
     world = ingest_worlds.surrogate_world(0)
     plan = scmle.assurance.ingest.plan.Plan(
@@ -677,12 +677,12 @@ def budget_run(seed: int, directory: Path) -> tuple[bool, list[dict[str, str]]]:
         scmle.assurance.ingest.plan.Config(tables=tuple(world.tables)),
         limit,
     )
-    plan.run_all()
+    plan.execute()
     meter = plan.meter
     within = (
-        meter.queries <= (limit.max_queries or 0)
-        and meter.rows <= (limit.max_rows_scanned or 0)
-        and plan.source.queries <= (limit.max_queries or 0)
+        meter.queries <= (limit.queries or 0)
+        and meter.rows <= (limit.scanned or 0)
+        and plan.source.queries <= (limit.queries or 0)
     )
     return within, [stop.to_dict() for stop in meter.stops]
 
@@ -750,12 +750,9 @@ def multiplicity(offset: int) -> dict[str, Any]:
             seed=seed,
         )
         synthesize.enlist(ledger, found)
-        equal += (
-            synthesize.plurality(found.declared_family_size, ledger)
-            == found.declared_family_size
-        )
+        equal += synthesize.plurality(found.family, ledger) == found.family
         try:
-            synthesize.plurality(found.declared_family_size + 1, ledger)
+            synthesize.plurality(found.family + 1, ledger)
         except synthesize.MultiplicityError:
             mismatch_caught += 1
     return judged(
@@ -775,17 +772,17 @@ def code_hashes() -> dict[str, str]:
     """
     return {
         "torn_read": torn_code(),
-        "reconcile": reconcile.code_digest(),
-        "point_in_time": certificates.code_hash(
+        "reconcile": reconcile.fingerprint(),
+        "point_in_time": certificates.fingerprint(
             asof_view,
             synthesize,
             scmle.assurance.ingest.synthesize.grammar,
             scmle.assurance.ingest.synthesize.evaluation,
             scmle.assurance.ingest.synthesize.selection,
         ),
-        "grain": certificates.code_hash(grain),
-        "joins": certificates.code_hash(joins),
-        "entities": certificates.code_hash(
+        "grain": certificates.fingerprint(grain),
+        "joins": certificates.fingerprint(joins),
+        "entities": certificates.fingerprint(
             entities,
             scmle.assurance.ingest.entities.similarity,
             scmle.assurance.ingest.entities.blocking,
@@ -793,7 +790,7 @@ def code_hashes() -> dict[str, str]:
             scmle.assurance.ingest.entities.sampling,
             scmle.assurance.ingest.entities.resolution,
         ),
-        "budget": certificates.code_hash(budget, scmle.assurance.ingest.plan),
+        "budget": certificates.fingerprint(budget, scmle.assurance.ingest.plan),
     }
 
 
@@ -842,7 +839,7 @@ def current_digests() -> dict[str, str]:
     """
     return {
         TORN_ID: torn_code(),
-        reconcile.DETECTOR_ID: reconcile.code_digest(),
+        reconcile.DETECTOR_ID: reconcile.fingerprint(),
     }
 
 

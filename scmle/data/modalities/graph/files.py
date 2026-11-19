@@ -197,7 +197,7 @@ def link(
                     target=str(target),
                     weight=weight,
                     relation=str(relation_value),
-                    event_time=event_time,
+                    time=event_time,
                 )
             )
         except (TypeError, ValueError) as error:

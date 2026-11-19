@@ -209,10 +209,10 @@ def test_tablelike_detects_in_memory_tables():
 
 def test_to_pandas_converts_each_supported_form():
     frame = pandas.DataFrame({"a": [1, 2]})
-    copied = interchange.to_pandas(frame)
+    copied = interchange.frame(frame)
     assert copied.equals(frame)
     assert copied is not frame
-    assert interchange.to_pandas(pyarrow.table({"a": [1, 2]})).equals(frame)
+    assert interchange.frame(pyarrow.table({"a": [1, 2]})).equals(frame)
 
     class Streamed:
         def __arrow_c_stream__(self, requested_schema=None):
@@ -220,25 +220,25 @@ def test_to_pandas_converts_each_supported_form():
                 requested_schema
             )
 
-    assert interchange.to_pandas(Streamed()).equals(frame)
+    assert interchange.frame(Streamed()).equals(frame)
 
     class Convertible:
         def to_pandas(self):
             return frame
 
-    assert interchange.to_pandas(Convertible()) is frame
+    assert interchange.frame(Convertible()) is frame
 
     class Lazy:
         def collect(self):
             return pyarrow.table({"a": [1, 2]})
 
-    assert interchange.to_pandas(Lazy()).equals(frame)
+    assert interchange.frame(Lazy()).equals(frame)
 
 
 def test_to_pandas_refuses_paths_and_other_objects(tmp_path):
     with pytest.raises(errors.DataError, match="dataset loader"):
-        interchange.to_pandas("data.csv")
+        interchange.frame("data.csv")
     with pytest.raises(errors.DataError, match="dataset loader"):
-        interchange.to_pandas(tmp_path)
+        interchange.frame(tmp_path)
     with pytest.raises(errors.DataError, match="unsupported table type list"):
-        interchange.to_pandas([1])
+        interchange.frame([1])

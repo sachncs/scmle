@@ -8,8 +8,8 @@ from scmle.assurance.ledger import budget
 from scmle.contracts import errors
 
 
-def fresh(horizon: int | None = None) -> budget.DecisionBudget:
-    return budget.DecisionBudget(Fraction(1, 20), Fraction(1, 20), horizon)
+def fresh(horizon: int | None = None) -> budget.Decision:
+    return budget.Decision(Fraction(1, 20), Fraction(1, 20), horizon)
 
 
 def test_a_horizon_of_one_gives_the_first_experiment_everything() -> None:

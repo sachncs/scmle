@@ -181,15 +181,15 @@ EXTENSION_SURFACES = {
     ),
     "scmle.data.store.snapshot": (
         snapshot,
-        ("DataContract", "ReadLog", "SnapshotReader", "SnapshotRecord"),
+        ("Contract", "Log", "Reader", "Record"),
     ),
     "scmle.data.store.quality": (
         quality,
         (
             "Assessment",
             "Severity",
-            "QualityGate",
-            "QualityGateError",
+            "Gate",
+            "GateError",
             "Check",
             "Stage",
         ),
@@ -246,7 +246,7 @@ EXTENSION_SURFACES = {
     "scmle.data.modalities.audio.wav": (wav, ("pcm",)),
     "scmle.data.store.processing": (
         processing,
-        ("Checkpoint", "IncrementalProcessor", "Processing"),
+        ("Checkpoint", "Processor", "Processing"),
     ),
     "scmle.operations.signals": (
         signals,

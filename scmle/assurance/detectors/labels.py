@@ -86,13 +86,13 @@ class Noise:
     """Result of the two-detector label-noise check.
 
     Attributes:
-        confident_learning: Row positions flagged by confident learning.
+        candidates: Row positions flagged by confident learning.
         margin: Row positions flagged by the margin detector.
         suspects: Row positions flagged by both, ascending.
         agreement: Jaccard overlap of the two flag sets (1.0 if both empty).
-        rows_checked: Rows used after the cap.
-        input_rows: Rows given.
-        sampling_bound: Hoeffding half-width of a rate estimated from the
+        checked: Rows used after the cap.
+        received: Rows given.
+        bound: Hoeffding half-width of a rate estimated from the
             capped sample (0.0 when no sampling happened).
         rate: Noise-rate estimate for the suspects.
         thresholds: Confident-learning class thresholds.
@@ -112,13 +112,13 @@ class Noise:
         ),
     )
 
-    confident_learning: tuple[int, ...]
+    candidates: tuple[int, ...]
     margin: tuple[int, ...]
     suspects: tuple[int, ...]
     agreement: float
-    rows_checked: int
-    input_rows: int
-    sampling_bound: float
+    checked: int
+    received: int
+    bound: float
     rate: Rate
     thresholds: tuple[float, ...]
 
@@ -420,7 +420,7 @@ def noisiness(
             ),
             audited=len(audit),
         )
-    low, high = certificates.wilson_interval(int(flags.sum()), n, confidence)
+    low, high = certificates.bound(int(flags.sum()), n, confidence)
     return Rate(
         estimate=float(flags.mean()),
         interval=(low, high),
@@ -507,13 +507,13 @@ def detect(
     agreement = 1.0 if union == 0 else float(both.sum()) / union
     capped = input_rows > len(features)
     return Noise(
-        confident_learning=tuple(int(i) for i in numpy.flatnonzero(cl_flags)),
+        candidates=tuple(int(i) for i in numpy.flatnonzero(cl_flags)),
         margin=tuple(int(i) for i in numpy.flatnonzero(aum_flags)),
         suspects=tuple(int(i) for i in numpy.flatnonzero(both)),
         agreement=agreement,
-        rows_checked=len(features),
-        input_rows=input_rows,
-        sampling_bound=hoeffding(len(features)) if capped else 0.0,
+        checked=len(features),
+        received=input_rows,
+        bound=hoeffding(len(features)) if capped else 0.0,
         rate=noisiness(both, audit),
         thresholds=tuple(float(t) for t in thresholds),
     )

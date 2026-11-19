@@ -296,7 +296,7 @@ def circularity(
 
     Compares next-period features of cases whose decision bypassed the model
     (randomized, logged) with those of model-decided cases, with a kernel
-    two-sample test (`scmle.assurance.robustness.shift.mmd_test`). A small
+    two-sample test (`scmle.assurance.robustness.shift.distinguish`). A small
     p-value is evidence that the model's decisions change the data it will see.
 
     Args:
@@ -309,7 +309,7 @@ def circularity(
     Returns:
         The check from the two-sample test.
     """
-    return shift.mmd_test(
+    return shift.distinguish(
         model_features,
         bypass_features,
         seed,

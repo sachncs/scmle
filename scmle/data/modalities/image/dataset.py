@@ -7,7 +7,7 @@ import numpy
 
 from scmle.contracts import errors
 from scmle.data.modalities.curation import allocate
-from scmle.data.modalities.curation import dataset_hash
+from scmle.data.modalities.curation import digest
 from scmle.data.modalities.curation import proportions
 from scmle.data.modalities.image.evidence import Split
 from scmle.data.modalities.image.pixels import configure
@@ -21,12 +21,12 @@ class Dataset(Survey):
 
     Attributes:
         samples: The samples, in caller order.
-        content_hash: Order-independent digest of the sources, content hashes
+        digest: Order-independent digest of the sources, content hashes
             and augmentation identities; set on construction.
     """
 
     samples: tuple[Sample, ...] = ()
-    content_hash: str = dataclasses.field(init=False)
+    digest: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
         """Normalizes samples to an immutable tuple and validates types.
@@ -47,10 +47,10 @@ class Dataset(Survey):
             )
             for sample in normalized
         )
-        object.__setattr__(self, "content_hash", dataset_hash(identities))
+        object.__setattr__(self, "digest", digest(identities))
 
     @property
-    def sample_count(self) -> int:
+    def size(self) -> int:
         """The number of samples in the dataset."""
         return len(self.samples)
 
@@ -153,9 +153,7 @@ class Dataset(Survey):
         proportions(validation_fraction, test_fraction)
         grouped: dict[str, list[Sample]] = {}
         for sample in self.samples:
-            grouped.setdefault(sample.group_id or sample.source, []).append(
-                sample
-            )
+            grouped.setdefault(sample.group or sample.source, []).append(sample)
         validation_groups, test_groups = allocate(
             grouped, validation_fraction, test_fraction, seed
         )
@@ -164,18 +162,18 @@ class Dataset(Survey):
             return tuple(
                 sample
                 for sample in self.samples
-                if (sample.group_id or sample.source) not in excluded
+                if (sample.group or sample.source) not in excluded
             )
 
         validation = tuple(
             sample
             for sample in self.samples
-            if (sample.group_id or sample.source) in validation_groups
+            if (sample.group or sample.source) in validation_groups
         )
         test = tuple(
             sample
             for sample in self.samples
-            if (sample.group_id or sample.source) in test_groups
+            if (sample.group or sample.source) in test_groups
         )
         return Split(
             train=sieve(test_groups | validation_groups),

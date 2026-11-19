@@ -226,7 +226,7 @@ class Volatility(Sequential):
         return int(params["window"])
 
 
-class ExpandingMean(Sequential):
+class Mean(Sequential):
     """Mean of all rows up to and including the current one."""
 
     name = "expanding_mean"

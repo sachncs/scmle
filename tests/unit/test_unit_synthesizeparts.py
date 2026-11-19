@@ -111,7 +111,7 @@ def test_roll_lists_aggregates_per_window_in_order():
     assert names[11] == "t__count__all"
     assert {s.source for s in specs} == {2}
     assert specs[0].value is None
-    assert specs[11].window_days is None
+    assert specs[11].window is None
 
 
 def test_propose_gives_lookups_for_a_parent():

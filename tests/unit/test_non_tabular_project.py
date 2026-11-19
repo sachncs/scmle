@@ -22,7 +22,7 @@ def text_adapter() -> modality_lifecycle.Plaintext:
     """Build a small deterministic labelled text dataset."""
     samples = tuple(
         document.Sample(
-            document_id=f"document-{index}",
+            identifier=f"document-{index}",
             content=("alpha signal " if index % 2 else "beta signal ")
             * (index + 2),
             label="alpha" if index % 2 else "beta",
@@ -35,7 +35,7 @@ def text_adapter() -> modality_lifecycle.Plaintext:
 def metadata_video_adapter() -> modality_lifecycle.Footage:
     """Build a video adapter that uses its declared metadata representation."""
     samples = tuple(
-        video.Sample.from_bytes(
+        video.Sample.decode(
             bytes([index + 1]) * 16,
             video.Metadata(
                 "fixture",
@@ -59,7 +59,7 @@ def image_adapter() -> modality_lifecycle.ImagePreparer:
     image_library = pytest.importorskip("PIL.Image")
     output = io.BytesIO()
     image_library.new("RGB", (4, 4), (32, 64, 96)).save(output, format="PNG")
-    sample = image.Sample.from_bytes(
+    sample = image.Sample.parse(
         output.getvalue(), source="image.png", label="alpha", group_id="one"
     )
     return modality_lifecycle.ImagePreparer(image.Dataset((sample,)))
@@ -75,7 +75,7 @@ def audio_adapter() -> modality_lifecycle.AudioPreparer:
         opened.writeframes(
             numpy.asarray([200, -200] * 8, dtype="<i2").tobytes()
         )
-    sample = audio.Sample.from_bytes(
+    sample = audio.Sample.decode(
         output.getvalue(), source="audio.wav", label="alpha", group_id="one"
     )
     return modality_lifecycle.AudioPreparer(audio.Dataset((sample,)))
@@ -86,7 +86,7 @@ def graph_adapter() -> modality_lifecycle.GraphPreparer:
     dataset = graph.Dataset(
         nodes=(graph.Node("node-1", (1.0, 2.0), "alpha"),),
         edges=(),
-        feature_names=("x", "y"),
+        features=("x", "y"),
     )
     return modality_lifecycle.GraphPreparer(dataset)
 
@@ -96,7 +96,7 @@ def geospatial_adapter() -> modality_lifecycle.GeospatialPreparer:
     dataset = geospatial.Dataset(
         features=(
             geospatial.Placemark(
-                feature_id="feature-1",
+                identifier="feature-1",
                 geometry={"type": "Point", "coordinates": [1.0, 2.0]},
                 label="alpha",
             ),
@@ -112,8 +112,8 @@ def raster_adapter() -> modality_lifecycle.Imagery:
     payload = b"raster"
     sample = geospatial.Tile(
         source="memory://raster-1",
-        encoded_bytes=payload,
-        file_hash=hashlib.sha256(payload).hexdigest(),
+        encoded=payload,
+        digest=hashlib.sha256(payload).hexdigest(),
         width=2,
         height=2,
         bands=1,

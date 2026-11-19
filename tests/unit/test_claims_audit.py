@@ -23,9 +23,7 @@ KEY = "audit-key"
 
 def withdraw_f1(survivors):
     reasons = {
-        h.hypothesis_id: "fragile on X"
-        for h in survivors
-        if h.spec.column == "f1"
+        h.identifier: "fragile on X" for h in survivors if h.spec.column == "f1"
     }
     return confirm.Withdrawal(reasons, {"name": "test", "requested": True})
 
@@ -49,7 +47,7 @@ def make_run(tmp_path, withdraw=True, rules=None):
             "rule": rules.ledger,
             "confirmation_rule": confirm.budget.Correction(rules.confirmation),
         }
-    return governed.run_governed(
+    return governed.govern(
         charter=charter,
         features=features,
         target=target,

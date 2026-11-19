@@ -20,7 +20,7 @@ and 2 to 7 rows; each column holds integers in [-999, 999] or words of
 The expected table is the cells as drawn, an empty cell as missing.
 
 Every file is read with the product's reader,
-`scmle.data.readers.tabular.read_table`, and the outcome is one of:
+`scmle.data.readers.tabular.read`, and the outcome is one of:
 
 * `correct`: the table equals the expected one;
 * `refused`: the reader raised `DataError` (acceptable for every file; a
@@ -67,7 +67,7 @@ resolves the task and `Splitter(spec, task).split` makes the holdout and
 the folds. Every pair of sides (development against test, and each fold's
 training against its validation rows) is checked for a shared value of
 the declared `group_column` (entity), a shared duplicate record (the
-product's own `duplicates.duplicate_groups` over the splitter's feature
+product's own `duplicates.group` over the splitter's feature
 columns; reported only), a shared duplicate record of one declared entity
 (the same duplicate group and the same `group_column` value on both sides;
 `copy`) and a shared value of the declared `time_column`. A column that is
@@ -643,7 +643,7 @@ def read(case: Case, directory: Path, tolerance: float) -> dict[str, Any]:
         "expects_table": case.columns is not None,
     }
     try:
-        frame = tabular.read_table(path)
+        frame = tabular.read(path)
     except errors.DataError as error:
         return outcome | {"outcome": "refused", "reason": str(error)[:200]}
     reason = judge(case, frame, tolerance)
@@ -779,17 +779,17 @@ def hygiene(
         "grouped": bool(data.group_column),
     }
     try:
-        task = scmle.data.validation.target.TaskResolver(spec).resolve(
+        task = scmle.data.validation.target.Resolver(spec).resolve(
             rows[data.target]
         )
         splitter = splitters.Splitter(spec, task)
-        record["strategy"] = splitter.strategy_name
+        record["strategy"] = splitter.strategy
         manifest = splitter.split(rows).manifest
     except (errors.BlockedError, errors.DataError) as error:
         record["refused"] = f"{type(error).__name__}: {error}"[:300]
         return record
     record["strategy"] = manifest.strategy
-    groups = duplicates.duplicate_groups(rows, splitter.feature_columns(rows))
+    groups = duplicates.group(rows, splitter.select(rows))
     copies = groups.astype(object)
     copies[groups == duplicates.NOT_DUPLICATED] = None
     columns = {
@@ -808,8 +808,8 @@ def hygiene(
         ],
         dtype=object,
     )
-    development = numpy.asarray(manifest.train_ids)
-    sides = [(development, numpy.asarray(manifest.test_ids))] + [
+    development = numpy.asarray(manifest.training)
+    sides = [(development, numpy.asarray(manifest.test))] + [
         (development[list(fit)], development[list(held)])
         for fit, held in manifest.folds
     ]
@@ -903,7 +903,7 @@ def digest() -> str:
     Returns:
         A SHA-256 hex digest.
     """
-    code = certificates.code_hash(
+    code = certificates.fingerprint(
         tabular,
         synthesize,
         scmle.assurance.ingest.synthesize.evaluation,

@@ -55,7 +55,7 @@ NOISE_LIMITATIONS = (
 )
 PROBED = 100_000
 """Frames the noise probe decodes: the features it scores read the first
-100,000 frames (`audio.Dataset.prepare_features`), so later frames cannot
+100,000 frames (`audio.Dataset.prepare`), so later frames cannot
 move its score, and decoding them only cost memory (register row MM-18)."""
 SILENCE_LIMITATIONS = (
     ("The model consumes bounded aggregate signal features after masking."),
@@ -97,7 +97,7 @@ class AudioPreparer(curators.Preparer):
     @property
     def digest(self) -> str:
         """The audio corpus identity."""
-        return self.dataset.content_hash
+        return self.dataset.digest
 
     @property
     def samples(self) -> tuple[audio.Sample, ...]:
@@ -136,9 +136,9 @@ class AudioPreparer(curators.Preparer):
         Returns:
             Batch with one row per sample, identified by its source.
         """
-        prepared = audio.Dataset(tuple(samples)).prepare_features()
+        prepared = audio.Dataset(tuple(samples)).prepare()
         return containers.Batch(
-            tuple(prepared.sources), prepared.feature_names, prepared.to_numpy()
+            tuple(prepared.sources), prepared.names, prepared.materialize()
         )
 
     def sample_id(self, sample: audio.Sample) -> str:
@@ -289,7 +289,7 @@ class AudioPreparer(curators.Preparer):
             raise errors.InputError(
                 "snr_db values must be finite and in [0, 120]"
             )
-        parameters, values = audio.pcm(sample.encoded_bytes, PROBED)
+        parameters, values = audio.pcm(sample.encoded, PROBED)
         signal_rms = float(numpy.sqrt(numpy.mean(numpy.square(values))))
         if signal_rms <= 0.0:
             return curators.unavailable(
@@ -341,7 +341,7 @@ class AudioPreparer(curators.Preparer):
                 "raw_wav_waveform_window_occlusion",
                 "sample width is required to mask PCM frames",
             )
-        with wave.open(io.BytesIO(sample.encoded_bytes), "rb") as opened:
+        with wave.open(io.BytesIO(sample.encoded), "rb") as opened:
             parameters = opened.getparams()
             raw_frames = bytearray(
                 opened.readframes(sample.metadata.frame_count)
@@ -404,22 +404,22 @@ def timeline(
     full_score = float(full_decision.reshape(-1)[0])
     windows: list[Span] = []
     for start_frame in range(0, sample.metadata.frame_count, window_frames):
-        prepared = audio.Dataset((sample,)).prepare_features(
+        prepared = audio.Dataset((sample,)).prepare(
             max_frames=window_frames,
             start_frame=start_frame,
         )
-        values = prepared.to_numpy()[0]
+        values = prepared.materialize()[0]
         decision = numpy.asarray(model.decision_function(values[None]))
         windows.append(
             {
                 "start_seconds": start_frame / sample.metadata.sample_rate,
                 "end_seconds": min(
                     sample.metadata.frame_count,
-                    start_frame + prepared.frames_observed[0],
+                    start_frame + prepared.observed[0],
                 )
                 / sample.metadata.sample_rate,
                 "start_frame": start_frame,
-                "frames_observed": prepared.frames_observed[0],
+                "frames_observed": prepared.observed[0],
                 "score": float(decision.reshape(-1)[0]),
                 "score_delta_from_full": float(
                     decision.reshape(-1)[0] - full_score
@@ -455,12 +455,12 @@ def scenario(
     noise_rms = signal_rms / (10.0 ** (requested_snr / 20.0))
     mixed = values + randomizer.normal(0.0, noise_rms, size=values.shape)
     clipping_fraction = float(numpy.mean(numpy.abs(mixed) > 1.0))
-    payload = audio.wav_payload_from_pcm(parameters, mixed)
-    perturbed = audio.Sample.from_bytes(
+    payload = audio.encode(parameters, mixed)
+    perturbed = audio.Sample.decode(
         payload,
         source=f"{sample.source}#noise-{requested_snr:g}",
         label=sample.label,
-        group_id=sample.group_id,
+        group_id=sample.group,
         transcript=sample.transcript,
     )
     features = preparer.features((perturbed,)).values
@@ -510,9 +510,9 @@ def mute(
     with wave.open(payload, "wb") as writer:
         writer.setparams(parameters)
         writer.writeframes(bytes(masked_frames))
-    return audio.Sample.from_bytes(
+    return audio.Sample.decode(
         payload.getvalue(),
         source=sample.source,
         label=sample.label,
-        group_id=sample.group_id,
+        group_id=sample.group,
     )

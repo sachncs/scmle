@@ -56,8 +56,8 @@ def test_the_registry_offers_both_new_strategies():
 
 def test_grouped_temporal_holds_out_the_latest_groups_whole():
     part = grouped(weeks())
-    assert part.test_ids.tolist() == list(range(100, 120))
-    assert part.dev_ids.tolist() == list(range(100))
+    assert part.test.tolist() == list(range(100, 120))
+    assert part.development.tolist() == list(range(100))
 
 
 def test_grouped_temporal_folds_validate_later_runs_of_groups():
@@ -75,10 +75,10 @@ def test_grouped_temporal_never_puts_a_group_on_both_sides():
     part = grouped(frame)
     labels = frame["g"].to_numpy()
     times = frame["t"].to_numpy()
-    assert not set(labels[part.test_ids]) & set(labels[part.dev_ids])
-    assert times[part.dev_ids].max() < times[part.test_ids].min()
-    local = labels[part.dev_ids]
-    clock = times[part.dev_ids]
+    assert not set(labels[part.test]) & set(labels[part.development])
+    assert times[part.development].max() < times[part.test].min()
+    local = labels[part.development]
+    clock = times[part.development]
     for fit, held in part.folds:
         assert not set(local[fit]) & set(local[held])
         assert clock[fit].max() < clock[held].min()
@@ -89,15 +89,15 @@ def test_grouped_temporal_leaves_out_rows_that_overlap_the_test_window():
     # Group 3 also has a row stamped inside the test window.
     frame.loc[35, "t"] = frame.loc[110, "t"] + pandas.Timedelta(minutes=30)
     part = grouped(frame)
-    assert 35 not in part.dev_ids.tolist()
-    assert 35 not in part.test_ids.tolist()
-    assert len(part.dev_ids) == 99
+    assert 35 not in part.development.tolist()
+    assert 35 not in part.test.tolist()
+    assert len(part.development) == 99
     assert any("1 row(s) of development groups" in n for n in part.notes)
 
 
 def test_grouped_temporal_embargo_trims_the_latest_training_rows():
     part = grouped(weeks(), embargo=4)
-    assert part.dev_ids.tolist() == list(range(96))
+    assert part.development.tolist() == list(range(96))
     assert part.folds[-1][0].tolist() == list(range(26))
 
 
@@ -106,7 +106,7 @@ def test_grouped_temporal_embargoes_a_horizon_of_one_series_for_back_to_back_gro
     assert strategy.concurrency(weeks()) == 1
     assert strategy.embargo(weeks()) == 3
     part = strategy.partition(weeks())
-    assert part.dev_ids.tolist() == list(range(97))
+    assert part.development.tolist() == list(range(97))
     shapes = [(fit.tolist(), held.tolist()) for fit, held in part.folds]
     assert shapes == [
         (list(range(77)), list(range(80, 97))),
@@ -165,7 +165,7 @@ def test_the_splitter_applies_grouped_temporal_end_to_end():
     split = chosen.split(weeks())
     assert split.manifest.strategy == "grouped_temporal"
     assert split.manifest.entities is None
-    assert len(split.manifest.test_ids) == 20
+    assert len(split.manifest.test) == 20
     assert len(split.manifest.folds) == 3
 
 
@@ -196,14 +196,14 @@ def test_spatial_blocks_keep_every_block_on_one_side():
     points = frame[["easting", "northing"]].to_numpy()
     side = strategy.side(frame)
     places = blocks.label(points, side)
-    assert not set(places[part.test_ids]) & set(places[part.dev_ids])
-    local = places[part.dev_ids]
+    assert not set(places[part.test]) & set(places[part.development])
+    local = places[part.development]
     validated = numpy.concatenate([fold[1] for fold in part.folds])
-    assert sorted(validated.tolist()) == list(range(len(part.dev_ids)))
+    assert sorted(validated.tolist()) == list(range(len(part.development)))
     assert len(part.folds) == 4
     for fit, held in part.folds:
         assert not set(local[fit]) & set(local[held])
-        assert len(fit) + len(held) == len(part.dev_ids)
+        assert len(fit) + len(held) == len(part.development)
 
 
 def test_spatial_block_side_is_derived_from_the_label():
@@ -218,8 +218,8 @@ def test_spatial_block_side_is_derived_from_the_label():
 def test_spatial_blocks_hold_at_least_the_test_share():
     frame = field(names=("longitude", "latitude"))
     part = tiled().partition(frame)
-    assert len(part.test_ids) >= round(0.2 * len(frame))
-    assert len(part.test_ids) + len(part.dev_ids) == len(frame)
+    assert len(part.test) >= round(0.2 * len(frame))
+    assert len(part.test) + len(part.development) == len(frame)
     assert part.notes[0].startswith("spatial blocks of side ")
 
 
@@ -274,6 +274,6 @@ def test_the_splitter_applies_spatial_block_end_to_end():
     points = frame[["lon", "lat"]].to_numpy()
     strategy = spatial.Tiling(settings, tasks.Task.BINARY)
     places = blocks.label(points, strategy.side(frame))
-    tested = set(places[list(manifest.test_ids)])
-    assert not tested & set(places[list(manifest.train_ids)])
-    assert len(manifest.test_ids) + len(manifest.train_ids) == len(frame)
+    tested = set(places[list(manifest.test)])
+    assert not tested & set(places[list(manifest.training)])
+    assert len(manifest.test) + len(manifest.training) == len(frame)

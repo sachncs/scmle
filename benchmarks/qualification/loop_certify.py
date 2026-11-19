@@ -979,7 +979,7 @@ def current_digests() -> dict[str, str]:
     Returns:
         Mapping of gate key to its current code hash.
     """
-    return {k: certificates.code_hash(*v) for k, v in sources().items()}
+    return {k: certificates.fingerprint(*v) for k, v in sources().items()}
 
 
 def certify_all() -> dict[str, Any]:
@@ -993,7 +993,7 @@ def certify_all() -> dict[str, Any]:
     document: dict[str, Any] = {
         "version": 1,
         "dev_seed_base": DEV_SEED_BASE,
-        "simulator_hash": certificates.code_hash(streams),
+        "simulator_hash": certificates.fingerprint(streams),
         "charter_inputs": {
             "reference_risk": R_REF,
             "tolerance": DELTA,
@@ -1037,7 +1037,7 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
             return ["loop_certificates.json is missing"]
         document = json.loads(STORE_PATH.read_text(encoding="utf-8"))
     found = []
-    if document.get("simulator_hash") != certificates.code_hash(streams):
+    if document.get("simulator_hash") != certificates.fingerprint(streams):
         found.append("simulator: stale (streams.py changed since measurement)")
     digests = current_digests()
     for name in GATES:

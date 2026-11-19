@@ -60,9 +60,9 @@ class Config:
     """Pre-registered settings of the leakage tests.
 
     Attributes:
-        skill_ceiling: Highest skill (AUC or R^2) plausible for a legitimate
+        skill: Highest skill (AUC or R^2) plausible for a legitimate
             single feature in this domain. Set by the charter; no default.
-        association_ceiling: Cramer's V of missingness against the target
+        ceiling: Cramer's V of missingness against the target
             above which missingness is suspect. Set by the charter.
         alpha: Level of the permutation tests.
         permutations: `B`; at least `budget.MIN_PERMUTATIONS` and at least
@@ -70,25 +70,25 @@ class Config:
         folds: Cross-fitting folds.
         confidence: Level of the one-sided lower bound.
         bootstrap: Bootstrap draws for the lower bound.
-        min_rows: Fewer rows than this is reported as low power.
+        minimum: Fewer rows than this is reported as low power.
         max_leaf_nodes: Size of the small tree.
         min_samples_leaf: Smallest leaf of the small tree.
-        n_strata: Leaves of the tree that defines strata.
-        run_seed: Run seed for every random stream.
+        strata: Leaves of the tree that defines strata.
+        seed: Run seed for every random stream.
     """
 
-    skill_ceiling: float
-    association_ceiling: float
+    skill: float
+    ceiling: float
     alpha: float = 0.05
     permutations: int = 199
     folds: int = 5
     confidence: float = 0.95
     bootstrap: int = 200
-    min_rows: int = 100
+    minimum: int = 100
     max_leaf_nodes: int = 8
     min_samples_leaf: int = 5
-    n_strata: int = 8
-    run_seed: int = 0
+    strata: int = 8
+    seed: int = 0
 
     def __post_init__(self) -> None:
         """Validates the settings.
@@ -99,8 +99,11 @@ class Config:
                 to reach `alpha` (`permutations + 1 < 1 / alpha`), or a
                 count is not an integer at or above its minimum.
         """
-        for name in ("skill_ceiling", "association_ceiling"):
-            value = qualification.finite(getattr(self, name), name)
+        for name, ceiling in (
+            ("skill_ceiling", self.skill),
+            ("association_ceiling", self.ceiling),
+        ):
+            value = qualification.finite(ceiling, name)
             if not 0.0 < value <= 1.0:
                 raise errors.InputError(f"{name} must be within (0, 1]")
         for name in ("alpha", "confidence"):
@@ -116,11 +119,11 @@ class Config:
             )
         qualification.count(self.folds, "folds", minimum=2)
         qualification.count(self.bootstrap, "bootstrap", minimum=2)
-        qualification.count(self.min_rows, "min_rows", minimum=1)
+        qualification.count(self.minimum, "min_rows", minimum=1)
         qualification.count(self.max_leaf_nodes, "max_leaf_nodes", minimum=2)
         qualification.count(self.min_samples_leaf, "min_samples_leaf", 1)
-        qualification.count(self.n_strata, "n_strata", minimum=2)
-        qualification.count(self.run_seed, "run_seed")
+        qualification.count(self.strata, "n_strata", minimum=2)
+        qualification.count(self.seed, "run_seed")
 
 
-CERTIFIED = Config(skill_ceiling=0.95, association_ceiling=0.9)
+CERTIFIED = Config(skill=0.95, ceiling=0.9)

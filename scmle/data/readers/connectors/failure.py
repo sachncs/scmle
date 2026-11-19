@@ -19,9 +19,9 @@ class ConnectorError(errors.DataError):
 
     Attributes:
         code: Stable machine-readable failure code.
-        source_uri: Canonical source URI associated with the failure.
+        uri: Canonical source URI associated with the failure.
         details: Structured context; always includes ``code`` and
-            ``source_uri`` plus any caller-supplied entries.
+            ``uri`` plus any caller-supplied entries.
     """
 
     def __init__(
@@ -40,7 +40,7 @@ class ConnectorError(errors.DataError):
             details: Additional structured context for callers and logs.
         """
         self.code = code
-        self.source_uri = source_uri
+        self.uri = source_uri
         self.details = {
             "code": code,
             "source_uri": source_uri,
@@ -48,19 +48,19 @@ class ConnectorError(errors.DataError):
         }
         super().__init__(message, self.details)
 
-    def as_dict(self) -> dict[str, Any]:
+    def serialize(self) -> dict[str, Any]:
         """Serializes the failure.
 
         Returns:
             A JSON-compatible mapping with the error ``category``,
-            ``code``, ``message``, ``source_uri`` and a copy of
+            ``code``, ``message``, ``uri`` and a copy of
             ``details``.
         """
         return {
             "category": self.category,
             "code": self.code,
             "message": str(self),
-            "source_uri": self.source_uri,
+            "source_uri": self.uri,
             "details": dict(self.details),
         }
 
@@ -70,7 +70,7 @@ class SchemeError(ConnectorError):
 
     Attributes:
         scheme: The rejected scheme (empty for a bare path).
-        supported_schemes: The schemes the connector accepts.
+        schemes: The schemes the connector accepts.
     """
 
     def __init__(
@@ -92,7 +92,7 @@ class SchemeError(ConnectorError):
             {"scheme": scheme, "supported_schemes": list(supported)},
         )
         self.scheme = scheme
-        self.supported_schemes = supported
+        self.schemes = supported
 
 
 class RetryError(ConnectorError):
@@ -101,7 +101,7 @@ class RetryError(ConnectorError):
     Attributes:
         operation: Name of the failed operation.
         attempts: Number of attempts made.
-        last_error: The exception raised by the final attempt.
+        error: The exception raised by the final attempt.
     """
 
     def __init__(
@@ -132,7 +132,7 @@ class RetryError(ConnectorError):
         )
         self.operation = operation
         self.attempts = attempts
-        self.last_error = last_error
+        self.error = last_error
 
 
 class CheckpointError(ConnectorError):
@@ -161,31 +161,31 @@ class Retries:
     """Retry limits applied independently to each connector operation.
 
     Attributes:
-        max_retries: Number of retries after the initial attempt.
-        delay_seconds: Delay between attempts. Zero is recommended for tests.
+        limit: Number of retries after the initial attempt.
+        delay: Delay between attempts. Zero is recommended for tests.
     """
 
-    max_retries: int = 2
-    delay_seconds: float = 0.0
+    limit: int = 2
+    delay: float = 0.0
 
     def __post_init__(self) -> None:
         """Validates retry settings before a connector uses them.
 
         Raises:
-            ValueError: If `max_retries` is negative or `delay_seconds` is
+            ValueError: If `limit` is negative or `delay` is
                 negative or not finite.
         """
-        if self.max_retries < 0:
+        if self.limit < 0:
             raise errors.InputError("max_retries must be non-negative")
-        if not math.isfinite(self.delay_seconds) or self.delay_seconds < 0:
+        if not math.isfinite(self.delay) or self.delay < 0:
             raise errors.InputError(
                 "delay_seconds must be finite and non-negative"
             )
 
     @property
-    def max_attempts(self) -> int:
+    def attempts(self) -> int:
         """The total number of attempts: the initial attempt plus retries."""
-        return self.max_retries + 1
+        return self.limit + 1
 
 
 def persevere(
@@ -216,16 +216,16 @@ def persevere(
             raising, which cannot happen because the budget allows at least
             one attempt.
     """
-    for attempt in range(1, retry_budget.max_attempts + 1):
+    for attempt in range(1, retry_budget.attempts + 1):
         try:
             return operation()
         except ConnectorError:
             raise
         except Exception as error:
-            if attempt == retry_budget.max_attempts:
+            if attempt == retry_budget.attempts:
                 raise RetryError(
                     source_uri, operation_name, attempt, error
                 ) from error
-            if retry_budget.delay_seconds:
-                time.sleep(retry_budget.delay_seconds)
+            if retry_budget.delay:
+                time.sleep(retry_budget.delay)
     raise AssertionError("retry loop must return or raise")

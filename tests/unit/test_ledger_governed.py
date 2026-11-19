@@ -45,12 +45,12 @@ def test_count_discoveries_matches_the_ledger_on_the_same_data():
     )
     ledger = scmle.assurance.ledger.ledger.Ledger.create(
         None,
-        charter_hash=charter.charter_hash,
+        charter_hash=charter.digest,
         config=config,
         alpha_confirm=charter.budget.confirmation.alpha_confirm,
         seed=1,
     )
-    results = explore.run_exploration(ledger, features, target, plan)
+    results = explore.explore(ledger, features, target, plan)
     assert sum(r.rejected for r in results) == explore.tally(
         config, plan, features, target
     )
@@ -61,7 +61,7 @@ def test_a_planted_signal_is_found_controlled_and_confirmed(tmp_path):
     features, target = build()
     cfeatures, ctarget = build(rows=400, seed=9)
     source = locate(cfeatures, ctarget)
-    run = governed.run_governed(
+    run = governed.govern(
         charter=make_charter(),
         features=features,
         target=target,
@@ -99,7 +99,7 @@ def test_a_pure_noise_target_is_not_promoted():
     features, target = build(effect=0.0)
     cfeatures, ctarget = build(rows=400, seed=9, effect=0.0)
     source = locate(cfeatures, ctarget)
-    run = governed.run_governed(
+    run = governed.govern(
         charter=make_charter(),
         features=features,
         target=target,
@@ -118,7 +118,7 @@ def test_a_pure_noise_target_is_not_promoted():
 def test_binary_labels_are_coded_consistently_for_c():
     features, target = build(kind="binary")
     cfeatures, ctarget = build(rows=400, seed=9, kind="binary")
-    run = governed.run_governed(
+    run = governed.govern(
         charter=make_charter(),
         features=features,
         target=target,
@@ -142,9 +142,9 @@ def test_multiclass_targets_use_the_kruskal_statistic():
             features["a"], [-9, -0.5, 0.5, 9], labels=["lo", "mid", "hi"]
         )
     ).astype(str)
-    plan = explore.hypothesize(features, explore.target_kind(target, True))
+    plan = explore.hypothesize(features, explore.classify(target, True))
     assert {s.statistic for s in plan.specs} == {"kruskal"}
-    run = governed.run_governed(
+    run = governed.govern(
         charter=make_charter(),
         features=features,
         target=target,
@@ -155,7 +155,7 @@ def test_multiclass_targets_use_the_kruskal_statistic():
     assert run.confirmation.outcome == confirm.NO_CONFIRMATION_SET
     assert "a" in {
         run.ledger.hypotheses[i].spec.column
-        for i in run.ledger.survivor_set.hypothesis_ids
+        for i in run.ledger.remaining.hypotheses
     }
 
 
@@ -177,19 +177,19 @@ def test_strata_come_from_groups_then_time_blocks():
     frame = pandas.DataFrame(
         {"g": [1, 1, 2, 2, 3, 3], "t": [5.0, 1.0, 3.0, 2.0, 6.0, 4.0]}
     )
-    groups = governed.strata_labels(frame, "g", "t")
+    groups = governed.stratify(frame, "g", "t")
     assert list(groups) == ["1", "1", "2", "2", "3", "3"]
-    blocks = governed.strata_labels(frame, None, "t", blocks=3)
+    blocks = governed.stratify(frame, None, "t", blocks=3)
     assert len(set(blocks)) == 3
     assert blocks[1] == 0 and blocks[0] == 4 // 2  # lowest time -> block 0
-    assert governed.strata_labels(frame, None, None) is None
-    assert governed.strata_labels(frame, "missing", None) is None
+    assert governed.stratify(frame, None, None) is None
+    assert governed.stratify(frame, "missing", None) is None
 
 
 def test_a_grouped_target_control_reports_strata_scope():
     features, target = build(rows=300)
     strata = numpy.repeat(numpy.arange(30), 10)
-    run = governed.run_governed(
+    run = governed.govern(
         charter=make_charter(),
         features=features,
         target=target,
@@ -208,7 +208,7 @@ def test_unavailable_failure_policies_are_refused_up_front(tmp_path):
         ("retry", "failure policy must be one of"),
     ):
         with pytest.raises(errors.ConfigError, match=message):
-            governed.run_governed(
+            governed.govern(
                 charter=make_charter(),
                 features=features,
                 target=target,
@@ -232,7 +232,7 @@ def test_a_reuse_session_reaches_the_confirmation(monkeypatch):
         return real(*args, **kwargs)
 
     monkeypatch.setattr(confirm, "confirm", spy)
-    governed.run_governed(
+    governed.govern(
         charter=make_charter(),
         features=features,
         target=target,

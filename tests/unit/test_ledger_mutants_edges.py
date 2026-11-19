@@ -9,9 +9,9 @@ from scmle.assurance.ledger import explore
 
 
 def test_the_quantile_index_never_goes_below_the_smallest_count():
-    assert controls.quantile_index(5, q=0.1) == 0
-    assert controls.quantile_index(20) == 19
-    assert controls.quantile_index(1) == 0
+    assert controls.rank(5, q=0.1) == 0
+    assert controls.rank(20) == 19
+    assert controls.rank(1) == 0
 
 
 def test_the_percentile_interval_reaches_the_ends_for_extreme_quantiles():
@@ -21,10 +21,10 @@ def test_the_percentile_interval_reaches_the_ends_for_extreme_quantiles():
 
 def test_missing_labels_do_not_make_a_binary_target_multiclass():
     target = pandas.Series([0.0, 1.0, numpy.nan, 1.0, 0.0])
-    assert explore.target_kind(target, True) == explore.BINARY
+    assert explore.classify(target, True) == explore.BINARY
     three = pandas.Series([0.0, 1.0, 2.0, numpy.nan])
-    assert explore.target_kind(three, True) == explore.MULTICLASS
-    assert explore.target_kind(target, False) == explore.NUMERIC
+    assert explore.classify(three, True) == explore.MULTICLASS
+    assert explore.classify(target, False) == explore.NUMERIC
 
 
 def test_a_text_regression_target_is_refused_in_full():

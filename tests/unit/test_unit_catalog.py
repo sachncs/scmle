@@ -367,7 +367,7 @@ def test_summarize_flags_a_constant_label_and_an_all_missing_label():
 
 def test_frame_content_lists_kind_shape_schema_and_rows():
     frame = pandas.DataFrame({"a": [1, 2], "b": [0.5, 1.5]})
-    assert inspection.frame_content(frame, "k", (2, 2)) == {
+    assert inspection.extract(frame, "k", (2, 2)) == {
         "data_kind": "k",
         "shape": [2, 2],
         "schema": [
@@ -382,33 +382,33 @@ def test_examine_reports_missing_and_duplicate_rows_as_blockers():
     # Enforces website/src/pages/docs/data.astro:74.
     frame = pandas.DataFrame({"a": [1, 1, None], "y": [0, 0, 1]})
     observed = inspection.examine(frame, "y", None)
-    assert observed.data_kind == "pandas_dataframe"
+    assert observed.kind == "pandas_dataframe"
     assert observed.shape == (3, 2)
-    assert observed.sample_count == 3
+    assert observed.samples == 3
     assert observed.limitations == (
         "missing_values_are_reported_not_repaired",
         "duplicate_rows_are_reported_not_removed",
     )
-    assert observed.release_blockers == (
+    assert observed.blockers == (
         "missingness_policy_not_declared",
         "duplicate_policy_not_declared",
     )
-    assert observed.content_identity.startswith("sha256:")
-    assert len(observed.content_identity) == 71
+    assert observed.identity.startswith("sha256:")
+    assert len(observed.identity) == 71
     again = inspection.examine(frame.copy(), "y", None)
-    assert again.content_identity == observed.content_identity
+    assert again.identity == observed.identity
 
 
 def test_examine_of_clean_data_has_no_quality_blockers():
     observed = inspection.examine({"a": [1, 2], "y": [0, 1]}, "y", None)
     assert observed.limitations == ()
-    assert observed.release_blockers == ()
+    assert observed.blockers == ()
     assert observed.label.status == "observed"
 
 
 def test_examine_uses_a_supplied_identity_in_normal_form():
     observed = inspection.examine([1, 2], None, DIGEST.upper())
-    assert observed.content_identity == f"sha256:{DIGEST}"
+    assert observed.identity == f"sha256:{DIGEST}"
     assert observed.limitations == (
         "label_was_not_declared",
         "content_identity_was_supplied_by_caller",
@@ -419,11 +419,9 @@ def test_examine_uses_a_supplied_identity_in_normal_form():
 
 def test_examine_digests_bytes_without_decoding_them():
     observed = inspection.examine(b"abc", None, None)
-    assert observed.content_identity == (
-        f"sha256:{hashlib.sha256(b'abc').hexdigest()}"
-    )
+    assert observed.identity == (f"sha256:{hashlib.sha256(b'abc').hexdigest()}")
     assert observed.schema == (evidence.Field("payload", "bytes"),)
-    assert observed.sample_count == 1
+    assert observed.samples == 1
     assert observed.shape == (3,)
     assert observed.missingness.status == "not_observed"
     assert observed.duplicates.method == "raw bytes have no row identity"
@@ -431,12 +429,12 @@ def test_examine_digests_bytes_without_decoding_them():
         "modality_specific_decoding_was_not_attempted",
         "label_was_not_declared",
     )
-    assert observed.release_blockers == (
+    assert observed.blockers == (
         "label_contract_not_declared_for_supervised_use",
         "modality_specific_decoder_not_declared",
     )
     supplied = inspection.examine(b"abc", "y", DIGEST)
-    assert supplied.content_identity == f"sha256:{DIGEST}"
+    assert supplied.identity == f"sha256:{DIGEST}"
     assert supplied.limitations[0] == "content_identity_was_supplied_by_caller"
     assert supplied.label.status == "not_observed"
 
@@ -452,7 +450,7 @@ def test_examine_needs_an_identity_for_opaque_data():
         "content_identity_was_supplied_by_caller",
         "label_was_not_declared",
     )
-    assert observed.release_blockers == (
+    assert observed.blockers == (
         "schema_adapter_not_declared",
         "label_contract_not_declared_for_supervised_use",
     )

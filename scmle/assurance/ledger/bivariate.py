@@ -200,7 +200,7 @@ STATISTICS: dict[str, Callable[..., Outcome]] = {
 }
 
 
-def code_hash(statistic: str) -> str:
+def fingerprint(statistic: str) -> str:
     """SHA-256 of the source of a registered statistic function.
 
     It identifies the code path that produced a p-value. It does not cover
@@ -238,7 +238,7 @@ def lookup(statistic: str) -> Callable[..., Outcome]:
     return STATISTICS[statistic]
 
 
-def run_statistic(
+def calculate(
     statistic: str,
     x: numpy.ndarray,
     y: numpy.ndarray,

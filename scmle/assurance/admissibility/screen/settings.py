@@ -212,7 +212,7 @@ FIT_SECONDS: Mapping[str, float] = {
 #   is rows x candidate columns x orders, 1.0e-8 to 1.33e-8 s each
 #   (semeion highest; Bioresponse's 1,776 x 1,776 x 2,000 took 63 s), so
 #   RECORD_SECONDS is 1.7e-8.
-# * Drawing (`permutation.draw_permutations`): each permutation drawn costs
+# * Drawing (`permutation.draw`): each permutation drawn costs
 #   4.2e-8 to 4.7e-8 s a row whatever reads it (DRAW_SECONDS 5.9e-8), and
 #   each active statistic without a fit (missingness, purity, echo) reads
 #   it in 0.7e-9 to 1.06e-9 s a row per class (quartile bin for a number),

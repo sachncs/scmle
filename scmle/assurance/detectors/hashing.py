@@ -57,7 +57,7 @@ def documentation(tree: ast.Module) -> set[int]:
     return lines
 
 
-def hash_source(source: str) -> str:
+def digest(source: str) -> str:
     """SHA-256 of source text with comments, docstrings and blanks removed.
 
     The text itself is hashed, not a syntax tree, so the value does not
@@ -87,7 +87,7 @@ def hash_source(source: str) -> str:
     return hashlib.sha256("\n".join(kept).encode("utf-8")).hexdigest()
 
 
-def code_hash(*objects: Any) -> str:
+def fingerprint(*objects: Any) -> str:
     """Combined hash of the source of functions, classes or modules.
 
     Only the given objects' own source is hashed, not what they call, so a
@@ -104,11 +104,11 @@ def code_hash(*objects: Any) -> str:
     """
     if not objects:
         raise errors.InputError("code_hash needs at least one object")
-    parts = [hash_source(inspect.getsource(item)) for item in objects]
+    parts = [digest(inspect.getsource(item)) for item in objects]
     return hashlib.sha256("\n".join(parts).encode("ascii")).hexdigest()
 
 
-def corpus_hash(parts: Iterable[str]) -> str:
+def checksum(parts: Iterable[str]) -> str:
     """Hashes the corpus file hashes a run used, ignoring their order.
 
     Args:
@@ -124,11 +124,11 @@ def corpus_hash(parts: Iterable[str]) -> str:
     if not members:
         raise errors.InputError("corpus_hash needs at least one part")
     for part in members:
-        require_digest(part, "corpus part")
+        require(part, "corpus part")
     return hashlib.sha256("\n".join(members).encode("ascii")).hexdigest()
 
 
-def require_digest(value: Any, name: str) -> str:
+def require(value: Any, name: str) -> str:
     """Returns `value` if it is a lowercase SHA-256 hex digest.
 
     Args:

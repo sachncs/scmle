@@ -27,7 +27,7 @@ LABELS = (
     "gate_write",
     "lock_release",
 )
-CONTRACT = snapshot.DataContract(
+CONTRACT = snapshot.Contract(
     "orders",
     "2",
     {"id": "int", "amount": "float", "region": "string"},
@@ -87,12 +87,8 @@ def output_key(key):
 
 
 def gate_for(store):
-    return quality.QualityGate(
-        [
-            quality.RangeCheck(
-                "amount", 0, 1000, policy=quality.Severity.QUARANTINE
-            )
-        ],
+    return quality.Gate(
+        [quality.Range("amount", 0, 1000, policy=quality.Severity.QUARANTINE)],
         store,
     )
 
@@ -101,7 +97,7 @@ def processor(store, gated=False, **options):
     options.setdefault("sleep", lambda seconds: None)
     if gated:
         options["gate"] = gate_for(store)
-    return processing.IncrementalProcessor(store, CONTRACT, upper, **options)
+    return processing.Processor(store, CONTRACT, upper, **options)
 
 
 def files_of(store, prefixes=RESULT_PREFIXES):
@@ -276,7 +272,7 @@ class FailpointStore(objectstore.Depot):
 
 def checkpoint_of(store):
     """The verified checkpoint stored in `store`."""
-    return processing.Checkpoint.from_bytes(store.get(STATE_KEY)[0])
+    return processing.Checkpoint.decode(store.get(STATE_KEY)[0])
 
 
 def all_ids(files):

@@ -64,25 +64,25 @@ from scmle.assurance.admissibility.leakage.assessment import Assessment
 from scmle.assurance.admissibility.leakage.assessment import Assessments
 from scmle.assurance.admissibility.leakage.conditional import Conditional
 from scmle.assurance.admissibility.leakage.conditional import scramble
-from scmle.assurance.admissibility.leakage.conditional import strata_labels
+from scmle.assurance.admissibility.leakage.conditional import stratify
 from scmle.assurance.admissibility.leakage.fitting import auc
 from scmle.assurance.admissibility.leakage.fitting import carve
 from scmle.assurance.admissibility.leakage.fitting import crossfit
 from scmle.assurance.admissibility.leakage.fitting import design
-from scmle.assurance.admissibility.leakage.fitting import lower_bound
+from scmle.assurance.admissibility.leakage.fitting import hedge
 from scmle.assurance.admissibility.leakage.fitting import measure
-from scmle.assurance.admissibility.leakage.fitting import out_of_fold
-from scmle.assurance.admissibility.leakage.fitting import permute_within
+from scmle.assurance.admissibility.leakage.fitting import permute
+from scmle.assurance.admissibility.leakage.fitting import predict
 from scmle.assurance.admissibility.leakage.fitting import predictiveness
 from scmle.assurance.admissibility.leakage.fitting import prepare
 from scmle.assurance.admissibility.leakage.fitting import rescore
 from scmle.assurance.admissibility.leakage.fitting import significance
 from scmle.assurance.admissibility.leakage.fitting import sufficient
 from scmle.assurance.admissibility.leakage.fitting import vectorize
+from scmle.assurance.admissibility.leakage.missingness import associate
 from scmle.assurance.admissibility.leakage.missingness import bucket
-from scmle.assurance.admissibility.leakage.missingness import cramers_v
 from scmle.assurance.admissibility.leakage.missingness import Missingness
-from scmle.assurance.admissibility.leakage.missingness import missingness_test
+from scmle.assurance.admissibility.leakage.missingness import test
 from scmle.assurance.admissibility.leakage.settings import BINARY_CLASSES
 from scmle.assurance.admissibility.leakage.settings import CERTIFIED
 from scmle.assurance.admissibility.leakage.settings import CONDITIONAL
@@ -127,26 +127,26 @@ __all__ = [
     "Missingness",
     "Skill",
     "Splits",
+    "associate",
     "auc",
     "bucket",
     "carve",
-    "cramers_v",
     "crossfit",
     "decide",
     "design",
-    "lower_bound",
+    "hedge",
     "measure",
-    "missingness_test",
-    "out_of_fold",
-    "permute_within",
+    "permute",
+    "predict",
     "predictiveness",
     "prepare",
     "rescore",
     "scramble",
     "significance",
-    "strata_labels",
+    "stratify",
     "sufficient",
     "summarize",
+    "test",
     "vectorize",
 ]
 
@@ -200,13 +200,13 @@ def probe(
         group_values,
         block_size,
         path,
-        lambda rng: (x, y[permute_within(y, rng, group_values, block_size)]),
+        lambda rng: (x, y[permute(y, rng, group_values, block_size)]),
     )
     p_value = significance(skill, null)
-    rng = randomness.component_rng(cfg.run_seed, path, 2)
-    bound = lower_bound(pred, y, task, cfg, group_values, rng)
+    rng = randomness.component_rng(cfg.seed, path, 2)
+    bound = hedge(pred, y, task, cfg, group_values, rng)
     powered = sufficient(y, task, cfg)
-    suspect = powered and p_value <= cfg.alpha and bound > cfg.skill_ceiling
+    suspect = powered and p_value <= cfg.alpha and bound > cfg.skill
     decision = decide(suspect, not powered, gate)
     result = (skill, null, bound, p_value)
     check = summarize(path, cfg, result, len(y), decision, set_id)
@@ -256,7 +256,7 @@ def condition(
         feature, target, task, groups, block_size
     )
     path = f"{CONDITIONAL}.{name}"
-    labels = strata_labels(feature, others, cfg)
+    labels = stratify(feature, others, cfg)
     members = [numpy.flatnonzero(labels == v) for v in numpy.unique(labels)]
     skill, ignored, null = measure(
         x,
@@ -287,7 +287,7 @@ def condition(
             else qualification.Decision.PASS
         ),
         subset=set_id,
-        seeds=randomness.seed_path(cfg.run_seed, path, 1),
+        seeds=randomness.seed_path(cfg.seed, path, 1),
         tier=qualification.Tier.UNVERIFIED,
     )
     return Conditional(
@@ -331,7 +331,7 @@ def assess(
         test, run for suspects only, finds it keeps its signal.
     """
     skill = probe(feature, target, task, cfg, groups, block_size, gate, set_id)
-    gaps = missingness_test(feature, target, task, cfg, gate, set_id)
+    gaps = test(feature, target, task, cfg, gate, set_id)
     suspect = skill.suspect or (gaps is not None and gaps.suspect)
     conditional = (
         condition(
@@ -340,7 +340,7 @@ def assess(
         if suspect
         else None
     )
-    escalated = conditional is not None and conditional.keeps_signal and suspect
+    escalated = conditional is not None and conditional.signal and suspect
     return Assessment(
         str(feature.name), skill, conditional, gaps, suspect, escalated
     )
@@ -426,9 +426,9 @@ def adjudication(
     """
     if task != "classification" or n_classes != BINARY_CLASSES:
         return certificates.Authority.DESCRIPTIVE
-    if dataclasses.replace(cfg, run_seed=CERTIFIED.run_seed) != CERTIFIED:
+    if dataclasses.replace(cfg, seed=CERTIFIED.seed) != CERTIFIED:
         return certificates.Authority.DESCRIPTIVE
-    digest = code_digest()
+    digest = fingerprint()
     for defect in LEAK_DEFECTS:
         if store.status(DETECTOR_ID, digest, defect) is not (
             certificates.Authority.GATING
@@ -437,14 +437,14 @@ def adjudication(
     return certificates.Authority.GATING
 
 
-def code_digest() -> str:
+def fingerprint() -> str:
     """Hashes this package's source, the key of its certificate.
 
     Returns:
         The code hash of the package and each of its modules, in name
-        order, as computed by `certificates.code_hash`.
+        order, as computed by `certificates.fingerprint`.
     """
-    return certificates.code_hash(
+    return certificates.fingerprint(
         *(
             sys.modules[name]
             for name in sorted(sys.modules)

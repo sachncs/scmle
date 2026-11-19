@@ -176,7 +176,7 @@ class Strata(splitters.splits.Group):
                 notes,
             )
         labels = frame[self.data.target].to_numpy()[dev_ids]
-        chosen = self.class_complete_folds(labels, dev_groups, count, notes)
+        chosen = self.fold(labels, dev_groups, count, notes)
         return splitters.Partition(dev_ids, test_ids, chosen, notes)
 
 
@@ -197,8 +197,8 @@ def purge(split: splitters.Split, labels: numpy.ndarray) -> splitters.Split:
             part, or the development rows.
     """
     manifest = split.manifest
-    train = numpy.asarray(manifest.train_ids, dtype=int)
-    test = numpy.asarray(manifest.test_ids, dtype=int)
+    train = numpy.asarray(manifest.training, dtype=int)
+    test = numpy.asarray(manifest.test, dtype=int)
     keep = numpy.flatnonzero(~numpy.isin(labels[train], labels[test]))
     position = numpy.full(len(train), -1)
     position[keep] = numpy.arange(len(keep))
@@ -224,7 +224,7 @@ def purge(split: splitters.Split, labels: numpy.ndarray) -> splitters.Split:
     return splitters.Split(
         dataclasses.replace(
             manifest,
-            train_ids=splitters.tuplify(train[keep]),
+            training=splitters.tuplify(train[keep]),
             folds=tuple(folds),
             notes=(
                 *manifest.notes,
@@ -234,9 +234,9 @@ def purge(split: splitters.Split, labels: numpy.ndarray) -> splitters.Split:
                 ),
             ),
         ),
-        split.dev_features.iloc[keep].reset_index(drop=True),
-        split.dev_target.iloc[keep].reset_index(drop=True),
-        split.locked_test,
+        split.features.iloc[keep].reset_index(drop=True),
+        split.target.iloc[keep].reset_index(drop=True),
+        split.test,
     )
 
 
@@ -250,7 +250,7 @@ def strip(split: splitters.Split, notes: list[str]) -> splitters.Split:
     Returns:
         The split without `KEY` in its development or locked rows.
     """
-    locked = split.locked_test
+    locked = split.test
     if isinstance(locked, lockbox.Resident):
         locked = dataclasses.replace(
             locked,
@@ -260,8 +260,8 @@ def strip(split: splitters.Split, notes: list[str]) -> splitters.Split:
         dataclasses.replace(
             split.manifest, notes=(*split.manifest.notes, *notes)
         ),
-        split.dev_features.drop(columns=[KEY], errors="ignore"),
-        split.dev_target,
+        split.features.drop(columns=[KEY], errors="ignore"),
+        split.target,
         locked,
     )
 
@@ -416,8 +416,8 @@ class Cohorts(splitters.Splitter):
         manifest = splitters.Manifest(
             strategy=Strata.name,
             seed=validation.seed,
-            train_ids=splitters.tuplify(part.dev_ids),
-            test_ids=splitters.tuplify(part.test_ids),
+            training=splitters.tuplify(part.development),
+            test=splitters.tuplify(part.test),
             folds=tuple(
                 (splitters.tuplify(fit), splitters.tuplify(held))
                 for fit, held in part.folds
@@ -428,12 +428,12 @@ class Cohorts(splitters.Splitter):
         features = marked.drop(columns=[data.target, KEY])
         return splitters.Split(
             manifest,
-            features.iloc[part.dev_ids].reset_index(drop=True),
-            target.iloc[part.dev_ids].reset_index(drop=True),
+            features.iloc[part.development].reset_index(drop=True),
+            target.iloc[part.development].reset_index(drop=True),
             lockbox.Resident(
-                features.iloc[part.test_ids].reset_index(drop=True),
-                target.iloc[part.test_ids].reset_index(drop=True),
-                manifest.test_ids,
+                features.iloc[part.test].reset_index(drop=True),
+                target.iloc[part.test].reset_index(drop=True),
+                manifest.test,
             ),
         )
 
@@ -454,7 +454,7 @@ def catalogue(path: pathlib.Path, column: str) -> pandas.DataFrame:
         The table.
 
     Raises:
-        DataError: If the file cannot be read (see `tabular.read_table`).
+        DataError: If the file cannot be read (see `tabular.read`).
     """
     if path.suffix.lower() in {".csv", ".tsv"}:
         try:
@@ -473,7 +473,7 @@ def catalogue(path: pathlib.Path, column: str) -> pandas.DataFrame:
                 f"failed to read {path.name}: {error}"
             ) from error
     else:
-        frame = tabular.read_table(path)
+        frame = tabular.read(path)
     if column in frame.columns:
         frame[column] = [
             value if value is None or pandas.isna(value) else str(value)

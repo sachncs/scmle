@@ -284,7 +284,7 @@ def digest() -> str:
         The combined hash of the product's interval, this module's trial
         and every file of the `PRODUCT` packages the trial runs.
     """
-    own = certificates.code_hash(
+    own = certificates.fingerprint(
         bootstrap.Uncertainty,
         bootstrap.redraw,
         bootstrap.Cache,

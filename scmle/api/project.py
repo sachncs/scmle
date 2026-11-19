@@ -418,7 +418,7 @@ class Project(Definition):
                 given.
         """
         frame = (
-            interchange.to_pandas(self.data)
+            interchange.frame(self.data)
             if interchange.tablelike(self.data)
             else None
         )

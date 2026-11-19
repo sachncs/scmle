@@ -95,15 +95,11 @@ def test_power_where_the_closed_form_allows_it():
 
 def test_selective_labels_flag_and_clean_worlds():
     flagged = sum(
-        baseline.selective_labels(
-            *framing_certify.label_world(True, 10_000 + s)
-        ).flagged
+        baseline.screen(*framing_certify.label_world(True, 10_000 + s)).flagged
         for s in range(60)
     )
     clean = sum(
-        baseline.selective_labels(
-            *framing_certify.label_world(False, 10_000 + s)
-        ).flagged
+        baseline.screen(*framing_certify.label_world(False, 10_000 + s)).flagged
         for s in range(60)
     )
     assert flagged == 60
@@ -111,7 +107,7 @@ def test_selective_labels_flag_and_clean_worlds():
 
 
 def test_selective_labels_small_arm_is_not_flagged():
-    got = baseline.selective_labels([1, 0, 1, 1], [1, 0, 1, 1])
+    got = baseline.screen([1, 0, 1, 1], [1, 0, 1, 1])
     assert not got.flagged and got.p_value == 1.0
 
 
@@ -133,7 +129,7 @@ def test_claim_is_issued_with_a_real_gain_and_only_once():
         qualification.Subset.CONFIRMATION
     }
     assert report.to_dict()["digests"]["registration"] == (
-        g.registration.registration_hash
+        g.registration.digest
     )
     with pytest.raises(baseline.BaselineError, match="already evaluated"):
         g.evaluate(y, a, b, group, rule=RULE, model=MODEL)

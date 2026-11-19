@@ -35,7 +35,7 @@ def resamples(family: int, alpha: Fraction) -> int:
     return max(0, math.floor(need))
 
 
-def draw_permutations(
+def draw(
     pending: Sequence[Pending],
     labels: numpy.ndarray,
     binned: numpy.ndarray,
@@ -74,7 +74,7 @@ def draw_permutations(
         for h in live:
             if not h.active or h.statistic is None:
                 continue
-            values = h.statistic(permuted_bins if h.uses_binned else permuted)
+            values = h.statistic(permuted_bins if h.binned else permuted)
             h.exceed += int((values >= h.observed - TOLERANCE).sum())
             h.drawn += count
             if Fraction(h.exceed + 1, total + 1) > ceiling:

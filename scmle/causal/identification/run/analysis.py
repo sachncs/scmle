@@ -74,7 +74,7 @@ ADAPTERS: dict[str, type[Estimator]] = {
 }
 
 
-def alphas(error_budget: budget.ErrorBudget) -> tuple[float, float]:
+def alphas(error_budget: budget.Alpha) -> tuple[float, float]:
     """Splits the confirmation level into the primary and falsification levels.
 
     Args:
@@ -399,7 +399,7 @@ def identify(
     spec: causal.Question,
     x: pandas.DataFrame,
     c: pandas.DataFrame,
-    error_budget: budget.ErrorBudget,
+    error_budget: budget.Alpha,
     attestors: Mapping[str, str] | None = None,
     dag: scmle.assurance.admissibility.dag.Dag | None = None,
     seed: int = 0,
@@ -484,7 +484,7 @@ NOT_ESTIMATED = (
 def design_only(
     spec: causal.Question,
     x: pandas.DataFrame,
-    error_budget: budget.ErrorBudget,
+    error_budget: budget.Alpha,
     dag: scmle.assurance.admissibility.dag.Dag | None = None,
     seed: int = 0,
     learner: str = "linear",

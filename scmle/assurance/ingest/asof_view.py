@@ -55,7 +55,7 @@ class HistoryError(ValueError):
     """A table without history was read where an as-of rule is required."""
 
 
-def to_days(values: pandas.Series) -> numpy.ndarray:
+def convert(values: pandas.Series) -> numpy.ndarray:
     """Converts times to float days.
 
     Datetimes are measured from the Unix epoch, numbers are taken as given,
@@ -112,34 +112,34 @@ class Timing:
 
     Attributes:
         mode: `transaction`, `event_delay` or `non_versioned`.
-        known_column: Column holding the recorded time (`transaction`).
-        delta_rec_days: Declared maximum recording delay, in days. Also the
+        recorded: Column holding the recorded time (`transaction`).
+        delay: Declared maximum recording delay, in days. Also the
             fallback for a missing recorded time within a transaction table.
         attestation: A named person's statement about the rule, if any.
-        log_check: Result of reconstructing a field from a change log.
+        check: Result of reconstructing a field from a change log.
     """
 
     mode: str
-    known_column: str | None = None
-    delta_rec_days: float | None = None
+    recorded: str | None = None
+    delay: float | None = None
     attestation: provenance.Attestation | None = None
-    log_check: provenance.Reconstruction | None = None
+    check: provenance.Reconstruction | None = None
 
     def __post_init__(self) -> None:
         """Validates the combination of fields.
 
         Raises:
-            ValueError: If `mode` is `transaction` without `known_column`,
-                is `event_delay` without `delta_rec_days`, is not one of
-                the three modes, or if `delta_rec_days` is negative.
+            ValueError: If `mode` is `transaction` without `recorded`,
+                is `event_delay` without `delay`, is not one of
+                the three modes, or if `delay` is negative.
         """
-        if self.mode == TRANSACTION and not self.known_column:
+        if self.mode == TRANSACTION and not self.recorded:
             raise errors.InputError("transaction mode needs known_column")
-        if self.mode == EVENT_DELAY and self.delta_rec_days is None:
+        if self.mode == EVENT_DELAY and self.delay is None:
             raise errors.InputError("event_delay mode needs delta_rec_days")
         if self.mode not in (TRANSACTION, EVENT_DELAY, NON_VERSIONED):
             raise errors.InputError(f"unknown mode: {self.mode}")
-        if self.delta_rec_days is not None and self.delta_rec_days < 0:
+        if self.delay is not None and self.delay < 0:
             raise errors.InputError("delta_rec_days must be non-negative")
 
     def tier(self, today: datetime.date | None = None) -> qualification.Tier:
@@ -163,8 +163,8 @@ class Timing:
         )
         if (
             self.mode == TRANSACTION
-            and self.log_check is not None
-            and self.log_check.passed
+            and self.check is not None
+            and self.check.passed
         ):
             return qualification.Tier.CONFIRMED
         if attested:
@@ -212,14 +212,14 @@ class View:
 
         Raises:
             ValueError: If the table uses a reserved column name, lacks a
-                needed column, or is versioned but has no `event_time`.
+                needed column, or is versioned but has no `time`.
         """
         clash = [c for c in RESERVED if c in frame.columns]
         if clash:
             raise errors.InputError(f"table uses reserved column(s): {clash}")
         needed = [key] + ([event_time] if event_time else [])
-        if rule.known_column:
-            needed.append(rule.known_column)
+        if rule.recorded:
+            needed.append(rule.recorded)
         missing = [c for c in needed if c not in frame.columns]
         if missing:
             raise errors.InputError(f"table lacks column(s): {missing}")
@@ -228,7 +228,7 @@ class View:
         self.name = name or key
         self.key = key
         self.rule = rule
-        self.event_time = event_time
+        self.time = event_time
         self.permissive = permissive
         self.columns = tuple(str(c) for c in frame.columns)
         self.reader = self.freeze(frame)
@@ -253,22 +253,22 @@ class View:
         """
         rows = frame.loc[frame[self.key].notna()].reset_index(drop=True)
         rows = rows.copy()
-        if self.event_time is not None:
-            event = to_days(rows[self.event_time])
+        if self.time is not None:
+            event = convert(rows[self.time])
         else:
             event = numpy.full(len(rows), numpy.nan)
         rows[EVENT_COLUMN] = event
         if self.rule.mode == NON_VERSIONED:
             known = numpy.full(len(rows), -numpy.inf)
         else:
-            delay = self.rule.delta_rec_days
+            delay = self.rule.delay
             fallback = event + (numpy.inf if delay is None else delay)
             if self.rule.mode == TRANSACTION:
-                if self.rule.known_column is None:
+                if self.rule.recorded is None:
                     raise errors.ScmleError(
                         "transaction rule has no known column"
                     )
-                recorded = to_days(rows[self.rule.known_column])
+                recorded = convert(rows[self.rule.recorded])
                 known = numpy.where(numpy.isnan(recorded), fallback, recorded)
             else:
                 known = fallback
@@ -325,7 +325,7 @@ class View:
         return {
             "table": self.name,
             "mode": self.rule.mode,
-            "known_column": self.rule.known_column,
-            "delta_rec_days": self.rule.delta_rec_days,
+            "known_column": self.rule.recorded,
+            "delta_rec_days": self.rule.delay,
             "tier": self.rule.tier(today).value,
         }

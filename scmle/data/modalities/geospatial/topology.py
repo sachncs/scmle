@@ -178,7 +178,7 @@ class Topology:
             )
         return numpy.asarray(raw_values, dtype=numpy.float64)
 
-    def spatial_autocorrelation(
+    def autocorrelate(
         self,
         values: Sequence[Real] | None = None,
         neighbor_count: int = 4,
@@ -236,16 +236,16 @@ class Topology:
             numeric, edges, statistic, permutations, seed
         )
         return Autocorrelation(
-            feature_count=len(self.features),
-            neighbor_count=effective_neighbor_count,
-            edge_count=len(edges),
+            features=len(self.features),
+            neighbors=effective_neighbor_count,
+            edges=len(edges),
             statistic=statistic,
-            permutation_count=permutations,
+            permutations=permutations,
             p_value=p_value,
             seed=seed,
         )
 
-    def prepare_features(self) -> Features:
+    def prepare(self) -> Features:
         """Prepares bounded geometry features without changing CRS units.
 
         The output is a geometry envelope and centroid representation. It does
@@ -300,7 +300,7 @@ class Topology:
                 {"code": "non_finite_features"},
             )
         return Features(
-            feature_ids=tuple(feature.feature_id for feature in self.features),
+            feature_ids=tuple(feature.identifier for feature in self.features),
             feature_names=feature_names,
             values=tuple(
                 tuple(float(value) for value in row) for row in values

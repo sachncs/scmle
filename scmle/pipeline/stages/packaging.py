@@ -122,7 +122,7 @@ class PackageStage(tracing.Tracing):
         uncertainty.equip(bundle)
         evaluation.update(uncertainty.entries())
         bundle.novelty = novelty.Strangeness.fit(
-            split.dev_features,
+            split.features,
             bundle.schema.numeric,
             bundle.schema.categorical,
             board.services.spec.validation.seed,
@@ -183,7 +183,7 @@ class PackageStage(tracing.Tracing):
         return scmle.artifacts.bundle.Bundle.create(
             exam.shipped if exam.shipped is not None else exam.final_pipeline,
             profile.feature_plan,
-            split.dev_features,
+            split.features,
             board.services.spec.data.target,
             partition.task.value,
             partition.metric.name,
@@ -205,7 +205,7 @@ class PackageStage(tracing.Tracing):
             dataset=intake.manifest.digests["data"],
             split=split.manifest.fingerprint,
             reference=scmle.data.reference.Baseline.build(
-                split.dev_features,
+                split.features,
                 profile.feature_plan,
                 products.require(readings.scores, "reference_scores"),
                 str(
@@ -265,14 +265,14 @@ class PackageStage(tracing.Tracing):
             board, store
         )
         evaluation["artifact_verification"] = bundle.roundtrip(
-            store.path("model"), split.dev_features.head(PARITY_ROWS)
+            store.path("model"), split.features.head(PARITY_ROWS)
         )
         store.write_json(
             "diagnostics/data_access.json",
             ledger.compose(
                 split,
                 board.journal.trials,
-                int(split.locked_test.opened),
+                int(split.test.opened),
                 evaluation["decision"] is not None,
             ),
         )

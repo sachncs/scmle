@@ -90,9 +90,7 @@ def test_document_explanations_preserve_source_citations():
     payload = explanation.to_dict()
 
     assert explanation.citations
-    assert payload["citations"][0]["digests"]["source"] == (
-        training[0].source_digest
-    )
+    assert payload["citations"][0]["digests"]["source"] == (training[0].digest)
 
 
 def test_document_term_ablation_rejects_invalid_configuration(
@@ -209,6 +207,6 @@ def test_document_monitor_detects_profile_shift(training_samples):
     report = Monitor(reference, threshold=0.1).observe(observed)
 
     assert report.reference_hash == reference.dataset_hash
-    assert report.observed_hash == observed.content_hash
+    assert report.observed_hash == observed.digest
     assert report.language_distance > 0.1
     assert report.shifted

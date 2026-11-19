@@ -68,7 +68,7 @@ def test_every_renamed_kind_is_at_version_two_and_injective():
         registry.Sources,
         timeline.Event,
         timeline.Checkpoint,
-        evidence.EventAcknowledgement,
+        evidence.Acknowledgement,
         evidence.Settlement,
         progress.Checkpoint,
         transaction.Acknowledgement,
@@ -94,7 +94,7 @@ def test_a_version_one_catalog_verifies_its_digest_then_migrates(tmp_path):
     assert layout["schema_version"] == 1
     path = tmp_path / "catalog.json"
     path.write_text(json.dumps(layout), encoding="utf-8")
-    loaded = catalog.Catalog.read_verified(path)
+    loaded = catalog.Catalog.read(path)
     assert loaded.schema_version == 3
     assert loaded.kind == layout["data_kind"]
     assert loaded.samples == layout["sample_count"]
@@ -111,7 +111,7 @@ def test_a_version_one_catalog_verifies_its_digest_then_migrates(tmp_path):
     assert loaded.duplicates.rows == layout["duplicates"]["duplicate_rows"]
     assert loaded.source.acquisition == "warehouse-export"
     loaded.write(path)
-    assert catalog.Catalog.read_verified(path) == loaded
+    assert catalog.Catalog.read(path) == loaded
 
 
 def test_a_tampered_version_one_catalog_is_refused(tmp_path):
@@ -120,7 +120,7 @@ def test_a_tampered_version_one_catalog_is_refused(tmp_path):
     path = tmp_path / "catalog.json"
     path.write_text(json.dumps(layout), encoding="utf-8")
     with pytest.raises(ValueError, match="catalog digest"):
-        catalog.Catalog.read_verified(path)
+        catalog.Catalog.read(path)
 
 
 def test_the_source_identity_is_anchored_at_version_one():
@@ -128,9 +128,9 @@ def test_the_source_identity_is_anchored_at_version_one():
     source = catalog.Source.from_dict(
         catalog.Source.migrations[0].upgrade(layout)
     )
-    assert source.source_identity == layout["source_identity"]
+    assert source.identity == layout["source_identity"]
     fields = {k: v for k, v in layout.items() if k != "source_identity"}
-    assert source.source_identity == canon.digest_value(fields)
+    assert source.identity == canon.fingerprint(fields)
 
 
 @hypothesis.given(samples=COUNT, kind=TEXT, owner=TEXT)
@@ -219,13 +219,13 @@ def test_version_one_incremental_state_and_acknowledgement_load():
     assert settled.seen == tuple(state["seen_event_ids"])
     assert settled.checkpoint.source == state["checkpoint"]["source_identity"]
     pending = stored("incremental_acknowledgement")
-    acknowledgement = evidence.EventAcknowledgement.from_dict(pending)
+    acknowledgement = evidence.Acknowledgement.from_dict(pending)
     assert (acknowledgement.consumer, acknowledgement.events) == (
         pending["consumer_group"],
         tuple(pending["event_ids"]),
     )
     assert back(evidence.Settlement, settled.to_dict()) == state
-    assert back(evidence.EventAcknowledgement, acknowledgement.to_dict()) == (
+    assert back(evidence.Acknowledgement, acknowledgement.to_dict()) == (
         pending
     )
 

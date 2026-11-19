@@ -98,13 +98,13 @@ class Governance:
             "survivors_sha256": self.confirmation.survivors_sha256,
             "withdrawn": (
                 None
-                if self.confirmation.stage_two is None
-                else len(self.confirmation.stage_two["withdrawn"])
+                if self.confirmation.second is None
+                else len(self.confirmation.second["withdrawn"])
             ),
         }
 
 
-def strata_labels(
+def stratify(
     features: pandas.DataFrame,
     group_column: str | None,
     time_column: str | None,
@@ -138,7 +138,7 @@ def strata_labels(
     if time_column and time_column in features.columns:
         order = pandas.to_numeric(features[time_column], errors="coerce")
         size = max(2, len(features) // max(blocks, 1))
-        return controls.block_labels(order.to_numpy(dtype=float), size)
+        return controls.block(order.to_numpy(dtype=float), size)
     return None
 
 
@@ -158,7 +158,7 @@ class Explored:
         charter: The governing charter.
         classification: Whether the target holds classes.
         classes: The target's classes in coding order, or None.
-        run_dir: Directory for the artifacts, or None.
+        directory: Directory for the artifacts, or None.
         data: Fingerprint of the exploration rows and target
             (`usage.fingerprint`), or None when nothing is recorded.
     """
@@ -171,11 +171,11 @@ class Explored:
     charter: Any
     classification: bool
     classes: tuple[Any, ...] | None
-    run_dir: str | Path | None
+    directory: str | Path | None
     data: str | None = None
 
 
-def run_governed(
+def govern(
     *,
     charter: Any,
     features: pandas.DataFrame,
@@ -201,14 +201,14 @@ def run_governed(
     """Explores `X` under the ledger, runs the control and confirms on `C`.
 
     Args:
-        charter: The governing `AnalysisCharter`.
+        charter: The governing `Charter`.
         features: Exploration features (never confirmation rows).
         target: Exploration target.
         classification: Whether the target holds classes.
         source: The sealed confirmation set, or None if none was carved.
         run_dir: Directory for the artifacts, or None to keep them in memory.
         exclude: Structure columns (group, time) that are not candidates.
-        strata: Permutation labels for the control (see `strata_labels`).
+        strata: Permutation labels for the control (see `stratify`).
         rule: Online rule for exploration.
         confirmation_rule: Multiplicity rule for the confirmation.
         policy: Failure policy of the confirmation.
@@ -270,7 +270,7 @@ def survey(
     """Opens the ledger, then runs the exploration and its negative control.
 
     Args:
-        charter: The governing `AnalysisCharter`.
+        charter: The governing `Charter`.
         run_dir: Directory of the ledger, or None to keep it in memory.
         rule: Online rule for exploration.
         diagnostics: (source, check) pairs from detectors run on `X`; they
@@ -290,7 +290,7 @@ def survey(
     if run_dir is None:
         ledger = scmle.assurance.ledger.ledger.Ledger.create(
             None,
-            charter_hash=charter.charter_hash,
+            charter_hash=charter.digest,
             config=online_fdr.Settings(
                 rule, charter.budget.exploration.initial
             ),
@@ -303,11 +303,11 @@ def survey(
         )
     if diagnostics and not ledger.diagnostics:
         for source_name, found in diagnostics:
-            ledger.record_diagnostic(found, source_name)
+            ledger.inspect(found, source_name)
     config = ledger.config
     if config is None:  # pragma: no cover - open() always sets it
         raise scmle.assurance.ledger.ledger.LedgerError("ledger has no rule")
-    results = explore.run_exploration(ledger, features, codes, plan)
+    results = explore.explore(ledger, features, codes, plan)
     observed = sum(1 for r in results if r.rejected)
 
     def discoveries(frame: pandas.DataFrame, shuffled: pandas.Series) -> int:
@@ -347,7 +347,7 @@ def withdraw(
         return None
     withdrawal = second_stage(ledger.survivors())
     for source_name, found in withdrawal.diagnostics:
-        ledger.record_diagnostic(found, source_name)
+        ledger.inspect(found, source_name)
     return withdrawal
 
 
@@ -368,15 +368,15 @@ def scout(
     ]
     | None = None,
 ) -> Explored:
-    """Runs the part of `run_governed` that precedes the opening of `C`.
+    """Runs the part of `govern` that precedes the opening of `C`.
 
-    The arguments are those of `run_governed` without the confirmation ones.
+    The arguments are those of `govern` without the confirmation ones.
     A caller that needs something computed after exploration (a selected
     model) before the registered claims are fixed calls this first and
     `finalise` later; `C` is not touched in between.
 
     Args:
-        charter: The governing `AnalysisCharter`.
+        charter: The governing `Charter`.
         features: Exploration features (never confirmation rows).
         target: Exploration target.
         classification: Whether the target holds classes.
@@ -404,7 +404,7 @@ def scout(
             `ConfigError`.
     """
     confirm.enforce(policy)
-    kind = explore.target_kind(target, classification)
+    kind = explore.classify(target, classification)
     codes = explore.vectorize(target, classification)
     classes = (
         tuple(sorted(target.dropna().unique(), key=str))
@@ -424,7 +424,7 @@ def scout(
         charter=charter,
         classification=classification,
         classes=classes,
-        run_dir=run_dir,
+        directory=run_dir,
         data=None if run_dir is None else usage.fingerprint(features, target),
     )
 
@@ -441,7 +441,7 @@ def finalise(
     registry: str | Path | None = None,
     reuse: thresholdout.Session | None = None,
 ) -> Governance:
-    """Freezes the survivors and tests once on `C` (see `run_governed`).
+    """Freezes the survivors and tests once on `C` (see `govern`).
 
     Args:
         explored: The state returned by `scout`.
@@ -484,8 +484,8 @@ def finalise(
         register=spend(explored, source, registry),
         reuse=reuse,
     )
-    if explored.run_dir is not None:
-        folder = Path(explored.run_dir)
+    if explored.directory is not None:
+        folder = Path(explored.directory)
         confirmation.write(folder / confirm.CLAIMS_FILE)
         (folder / CONTROL_FILE).write_text(
             json.dumps(explored.control.to_dict(), indent=2, sort_keys=True)
@@ -521,13 +521,13 @@ def spend(
     """
     if (
         registry is None
-        or explored.run_dir is None
+        or explored.directory is None
         or explored.data is None
         or source is None
     ):
         return None
-    folder = Path(explored.run_dir).resolve()
-    charter = explored.charter.charter_hash
+    folder = Path(explored.directory).resolve()
+    charter = explored.charter.digest
     return usage.Register(
         registry,
         usage.key(charter, explored.data, getattr(source, "ids", ())),
@@ -604,7 +604,9 @@ def replication(
         return found
 
     journal = (
-        None if explored.run_dir is None else Path(explored.run_dir) / JOURNAL
+        None
+        if explored.directory is None
+        else Path(explored.directory) / JOURNAL
     )
     return thresholdout.Session(
         (features, target),

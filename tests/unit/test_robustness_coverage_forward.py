@@ -79,7 +79,7 @@ def opens(vault):
 
 def test_f_is_opened_once_and_logged_under_the_forward_actor():
     vault, held = forward_set()
-    result = forward.forward_check(
+    result = forward.check(
         held, {"f": 0.5, "g": 0.0}, encode, temporal=True, seed=0, bootstrap=100
     )
     assert result.status == "checked" and result.opened
@@ -97,7 +97,7 @@ def test_f_is_opened_once_and_logged_under_the_forward_actor():
 
 def test_a_reversed_effect_is_labelled_unstable_over_time():
     held = forward_set(beta=-0.8)[1]
-    result = forward.forward_check(
+    result = forward.check(
         held, {"f": 0.5}, encode, temporal=True, seed=0, bootstrap=100
     )
     (finding,) = result.findings
@@ -107,7 +107,7 @@ def test_a_reversed_effect_is_labelled_unstable_over_time():
 
 def test_a_negative_effect_on_x_that_holds_forward_holds():
     held = forward_set(beta=-0.8)[1]
-    (finding,) = forward.forward_check(
+    (finding,) = forward.check(
         held, {"f": -0.5}, encode, temporal=True, seed=0, bootstrap=100
     ).findings
     assert finding.label == forward.HOLDS
@@ -120,19 +120,17 @@ def test_non_temporal_data_a_missing_set_and_no_findings_skip_without_opening():
         ({"temporal": True, "source": None}, "no forward set"),
     ):
         source = kwargs.pop("source", held)
-        result = forward.forward_check(
-            source, {"f": 0.5}, encode, seed=0, **kwargs
-        )
+        result = forward.check(source, {"f": 0.5}, encode, seed=0, **kwargs)
         assert result.status == "skipped" and not result.opened
         assert text in result.reason
-    empty = forward.forward_check(held, {}, encode, temporal=True, seed=0)
+    empty = forward.check(held, {}, encode, temporal=True, seed=0)
     assert empty.status == "skipped" and "not opened" in empty.reason
     assert opens(vault) == []
 
 
 def test_a_finding_whose_column_is_absent_is_inconclusive():
     held = forward_set()[1]
-    result = forward.forward_check(
+    result = forward.check(
         held, {"gone": 0.5}, encode, temporal=True, seed=0, bootstrap=20
     )
     assert result.findings[0].label == forward.INCONCLUSIVE

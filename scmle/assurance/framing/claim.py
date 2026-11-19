@@ -291,7 +291,7 @@ def solidify(
     )
 
 
-def source_ceiling(
+def cap(
     draft_path: str | None,
     charter_hash: str,
     model: costs.Tariff,
@@ -416,7 +416,7 @@ def rig(
         KIND,
         "net benefit of the frozen rule exceeds net benefit of the current "
         f"process over thresholds [{model.low:.4f}, {model.high:.4f}]",
-        registration.registration_hash,
+        registration.digest,
     )
 
     run = functools.partial(
@@ -540,7 +540,7 @@ def refused(
         "p_value_intersection_union": None,
         "endpoints": [],
         "selective_labels": dict(selection),
-        "digests": {"registration": registration.registration_hash},
+        "digests": {"registration": registration.digest},
         "checks": [],
         "claim": {
             "claim_id": baseline.CLAIM_ID,

@@ -74,9 +74,9 @@ def test_sets_never_overlap_and_units_never_straddle(scenario):
         assert kind != "plain", refusal
         assert "validation fold" in str(refusal)
         return
-    x = set(result.exploration_ids.tolist())
-    c = set(result.confirmation_ids.tolist())
-    e = set(result.embargo_ids.tolist())
+    x = set(result.exploration.tolist())
+    c = set(result.confirmation.tolist())
+    e = set(result.embargo.tolist())
     assert x | c | e == set(dev.tolist())
     assert not (x & c) and not (x & e) and not (c & e)
     position = {int(i): p for p, i in enumerate(dev)}
@@ -89,4 +89,4 @@ def test_sets_never_overlap_and_units_never_straddle(scenario):
             members = {i for i in dev if duplicates[position[int(i)]] == label}
             assert not (members & c and members & x)
     again = carve.divide(dev, folds, **arguments)
-    assert numpy.array_equal(again.confirmation_ids, result.confirmation_ids)
+    assert numpy.array_equal(again.confirmation, result.confirmation)

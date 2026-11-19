@@ -123,15 +123,15 @@ def test_raster_curation_decodes_each_tile_once():
         tiles.append(
             geospatial.Tile(
                 source=f"memory://tile-{index}",
-                encoded_bytes=payload,
-                file_hash=hashlib.sha256(payload).hexdigest(),
+                encoded=payload,
+                digest=hashlib.sha256(payload).hexdigest(),
                 width=4,
                 height=4,
                 bands=3,
                 dtype="float64",
                 crs="EPSG:3857",
                 transform=(),
-                nodata_value=0,
+                sentinel=0,
             )
         )
     preparer = modality_lifecycle.Imagery(
@@ -248,8 +248,8 @@ def test_a_block_never_straddles_the_split(tmp_path):
 
     split = raster.RASTER.constrain(spec, tasks.Task.BINARY).split(frame)
 
-    train = numpy.asarray(split.manifest.train_ids)
-    test = numpy.asarray(split.manifest.test_ids)
+    train = numpy.asarray(split.manifest.training)
+    test = numpy.asarray(split.manifest.test)
     assert not set(block[train]) & set(block[test])
     assert len(set(block[test])) >= 1
     for fit, held in split.manifest.folds:

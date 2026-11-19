@@ -30,14 +30,14 @@ def test_a_planted_mediator_known_before_the_moment_is_admitted():
     table = provenance.Dictionary(
         (make_field("M", lead=3600.0), make_field("T", lead=7200.0))
     )
-    out = rules.build_table(table, "predictive", graph=graph)
+    out = rules.build(table, "predictive", graph=graph)
     assert out.names(A) == ("M", "T")
     assert out.dag_hash is None  # a pure prediction task never reads roles
 
 
 def test_a_planted_post_outcome_field_is_quarantined():
     table = provenance.Dictionary((make_field("after", lead=-60.0),))
-    out = rules.build_table(table, "predictive", mode=rules.Mode.PERMISSIVE)
+    out = rules.build(table, "predictive", mode=rules.Mode.PERMISSIVE)
     assert out.names(Q) == ("after",)
     assert "less than the declared" in out.decisions[0].reasons[0]
 
@@ -78,12 +78,8 @@ def test_strict_quarantines_every_unverified_field_permissive_flags_it():
     # Enforces docs/READING_RESULTS.md:374.
     # Enforces website/src/learn/reading-results.html:199.
     table = provenance.Dictionary.covering(["a", "b"], [make_field("b")])
-    strict = rules.build_table(
-        table, "predictive", rules.Mode.STRICT, today=DAY
-    )
-    loose = rules.build_table(
-        table, "predictive", rules.Mode.PERMISSIVE, today=DAY
-    )
+    strict = rules.build(table, "predictive", rules.Mode.STRICT, today=DAY)
+    loose = rules.build(table, "predictive", rules.Mode.PERMISSIVE, today=DAY)
     assert strict.names(Q) == ("a",) and strict.names(A) == ("b",)
     assert loose.names(F) == ("a",) and loose.names(A) == ("b",)
     for d in strict.decisions + loose.decisions:
@@ -211,7 +207,7 @@ def test_without_a_valid_adjustment_set_covariates_are_flagged():
 
 def test_causal_table_records_the_graph_hash_and_set():
     fields = [make_field(n) for n in ("C", "K", "M", "P", "T", "Y")]
-    out = rules.build_table(
+    out = rules.build(
         provenance.Dictionary(tuple(fields)),
         "causal",
         graph=GRAPH,
@@ -220,7 +216,7 @@ def test_causal_table_records_the_graph_hash_and_set():
         today=DAY,
     )
     assert out.dag_hash == GRAPH.digest()
-    assert out.adjustment_set == GRAPH.adjustment_set("T", "Y")
+    assert out.adjustment == GRAPH.deconfound("T", "Y")
     assert out.names(Q) == ("K", "M")
     assert out.to_dict()["kind"] == "causal"
 
@@ -228,9 +224,9 @@ def test_causal_table_records_the_graph_hash_and_set():
 def test_arguments_of_the_table_are_validated():
     table = provenance.Dictionary((make_field("a"),))
     with pytest.raises(ValueError, match="kind"):
-        rules.build_table(table, "descriptive")
+        rules.build(table, "descriptive")
     with pytest.raises(ValueError, match="graph, treatment, outcome"):
-        rules.build_table(table, "causal")
+        rules.build(table, "causal")
     d = rules.forecastable(make_field("a"))
     with pytest.raises(ValueError, match="unique"):
         rules.Admissibility("predictive", rules.Mode.STRICT, (d, d), None, None)
@@ -247,7 +243,7 @@ def test_decisions_round_trip():
 
 def test_a_gate_per_field_blocks_only_the_field_it_names():
     table = provenance.Dictionary.covering(["a", "b"])
-    out = rules.build_table(
+    out = rules.build(
         table,
         "predictive",
         rules.Mode.PERMISSIVE,

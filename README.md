@@ -239,7 +239,7 @@ layers below it (`pyproject.toml`, checked by `lint-imports`).
 Extension points are polymorphic: add a `Family`, `Partitioner`, `Strategy`,
 `Model`, `Optimizer`, `Refiner`, `Selector`, `Diagnostic`, `Reviewer`,
 `Executor`, `Store`, `Server` or `Stage` subclass
-([`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)). A `TableReader` subclass is
+([`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)). A `tabular.Reader` subclass is
 the exception: `tabular.Loader` lists its readers in a fixed default tuple,
 and the CLI and `Project` build that default loader, so a new file format
 needs an edit to `scmle/data/readers/tabular.py` before they read it; only

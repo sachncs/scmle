@@ -30,15 +30,13 @@ def test_dataframe_observation_is_deterministic_and_reviewable():
         privacy="internal",
     )
 
-    first = catalog.Catalog.from_data(
-        frame, source=source, label_column="label"
-    )
-    second = catalog.Catalog.from_data(
+    first = catalog.Catalog.observe(frame, source=source, label_column="label")
+    second = catalog.Catalog.observe(
         frame.copy(), source=source, label_column="label"
     )
 
     assert first == second
-    assert first.source.source_identity.startswith("sha256:")
+    assert first.source.identity.startswith("sha256:")
     assert first.kind == "pandas_dataframe"
     assert first.shape == (3, 3)
     assert first.samples == 3
@@ -73,7 +71,7 @@ def test_common_caller_owned_shapes_are_cataloged(
     data, expected_kind, expected_shape
 ):
     """The entry point accepts several data shapes without a model claim."""
-    result = catalog.Catalog.from_data(data)
+    result = catalog.Catalog.observe(data)
 
     assert result.kind == expected_kind
     assert result.shape == expected_shape
@@ -84,7 +82,7 @@ def test_common_caller_owned_shapes_are_cataloged(
 def test_raw_bytes_report_decoder_boundary_and_direct_identity():
     """Raw bytes receive identity but no invented modality understanding."""
     payload = b"opaque dataset payload"
-    result = catalog.Catalog.from_data(payload)
+    result = catalog.Catalog.observe(payload)
 
     expected = f"sha256:{hashlib.sha256(payload).hexdigest()}"
     assert result.digests["content"] == expected
@@ -102,9 +100,9 @@ def test_opaque_data_requires_explicit_content_identity():
     identity = "sha256:" + "a" * 64
 
     with pytest.raises(TypeError, match="caller-supplied"):
-        catalog.Catalog.from_data(opaque)
+        catalog.Catalog.observe(opaque)
 
-    result = catalog.Catalog.from_data(opaque, content_identity=identity)
+    result = catalog.Catalog.observe(opaque, content_identity=identity)
 
     assert result.digests["content"] == identity
     assert result.kind == "object"
@@ -124,7 +122,7 @@ def test_source_metadata_removes_governance_blockers_for_clean_data():
         acquisition="approved-export",
         privacy="internal",
     )
-    result = catalog.Catalog.from_data(
+    result = catalog.Catalog.observe(
         {"x": [1, 2], "label": [0, 1]},
         source=source,
         label_column="label",
@@ -144,7 +142,7 @@ def test_source_metadata_removes_governance_blockers_for_clean_data():
 )
 def test_label_state_is_explicit_and_does_not_infer_task(data, label_status):
     """Label presence is described without deciding classification or regression."""
-    result = catalog.Catalog.from_data(data, label_column="label")
+    result = catalog.Catalog.observe(data, label_column="label")
 
     assert result.label.status == label_status
     assert result.label.field == "label"
@@ -155,25 +153,25 @@ def test_label_state_is_explicit_and_does_not_infer_task(data, label_status):
 
 def test_catalog_persists_atomically_and_verifies_read_back(tmp_path):
     """Persistence verifies both nested source identity and catalog digest."""
-    result = catalog.Catalog.from_data(
+    result = catalog.Catalog.observe(
         [{"text": "a"}, {"text": "b"}],
         source="file:///tmp/records.jsonl",
     )
     path = tmp_path / "catalog.json"
 
     result.write(path)
-    restored = catalog.Catalog.read_verified(path)
+    restored = catalog.Catalog.read(path)
 
     assert restored == result
     assert json.loads(path.read_text(encoding="utf-8"))["digest"] == (
-        result.catalog_digest
+        result.digest
     )
 
     tampered = json.loads(path.read_text(encoding="utf-8"))
     tampered["samples"] = 99
     path.write_text(json.dumps(tampered), encoding="utf-8")
     with pytest.raises(ValueError, match="catalog digest"):
-        catalog.Catalog.read_verified(path)
+        catalog.Catalog.read(path)
 
 
 def test_adapter_owned_observation_supports_unknown_shapes():
@@ -210,7 +208,7 @@ def test_catalog_is_a_pinned_public_name_of_its_module():
 def test_invalid_mapping_lengths_and_tampered_source_fail_closed():
     """Invalid structural input and source identity tampering are rejected."""
     with pytest.raises(ValueError, match="equal lengths"):
-        catalog.Catalog.from_data({"a": [1], "b": [1, 2]})
+        catalog.Catalog.observe({"a": [1], "b": [1, 2]})
 
     source = catalog.Source(uri="memory://source")
     record = source.to_dict()
@@ -269,9 +267,9 @@ def test_contract_components_reject_invalid_accounting():
 def test_scalar_series_and_nested_value_observers_cover_type_boundaries():
     """Common scalar and nested values remain deterministic and JSON-native."""
     series = pandas.Series([1, 2], name="score")
-    scalar = catalog.Catalog.from_data(numpy.asarray(4))
-    dated = catalog.Catalog.from_data(datetime.date(2026, 10, 23))
-    series_result = catalog.Catalog.from_data(series)
+    scalar = catalog.Catalog.observe(numpy.asarray(4))
+    dated = catalog.Catalog.observe(datetime.date(2026, 10, 23))
+    series_result = catalog.Catalog.observe(series)
 
     assert series_result.kind == "pandas_series"
     assert scalar.shape == () and scalar.samples == 1
@@ -292,11 +290,9 @@ def test_scalar_series_and_nested_value_observers_cover_type_boundaries():
 
 def test_label_and_source_boundaries_are_explicit():
     """Unavailable and ambiguous labels become reviewable evidence."""
-    unavailable = catalog.Catalog.from_data([1, 2], label_column="label")
+    unavailable = catalog.Catalog.observe([1, 2], label_column="label")
     duplicate_columns = pandas.DataFrame([[1, 2]], columns=["label", "label"])
-    ambiguous = catalog.Catalog.from_data(
-        duplicate_columns, label_column="label"
-    )
+    ambiguous = catalog.Catalog.observe(duplicate_columns, label_column="label")
     path_source = catalog.Source(uri="relative/catalog.json")
 
     assert unavailable.label.status == "not_observed"
@@ -309,10 +305,10 @@ def test_label_and_source_boundaries_are_explicit():
 def test_raw_and_opaque_identity_overrides_are_validated():
     """Caller identity overrides are accepted only as SHA-256 values."""
     identity = "a" * 64
-    raw = catalog.Catalog.from_data(
+    raw = catalog.Catalog.observe(
         b"payload", content_identity=identity, label_column="label"
     )
-    high_dimensional = catalog.Catalog.from_data(
+    high_dimensional = catalog.Catalog.observe(
         numpy.zeros((2, 2, 2)), content_identity=identity
     )
 
@@ -320,7 +316,7 @@ def test_raw_and_opaque_identity_overrides_are_validated():
     assert raw.label.status == "not_observed"
     assert high_dimensional.shape == (2, 2, 2)
     with pytest.raises(ValueError, match="SHA-256"):
-        catalog.Catalog.from_data(object(), content_identity="bad")
+        catalog.Catalog.observe(object(), content_identity="bad")
     with pytest.raises(ValueError, match="SHA-256"):
         catalog.Catalog.glean(
             source="memory://bad",
@@ -341,13 +337,13 @@ def test_verified_reader_rejects_malformed_envelopes(tmp_path):
     path = tmp_path / "catalog.json"
     path.write_text("not json", encoding="utf-8")
     with pytest.raises(ValueError, match="invalid JSON"):
-        catalog.Catalog.read_verified(path)
+        catalog.Catalog.read(path)
     path.write_text("[]", encoding="utf-8")
     with pytest.raises(ValueError, match="JSON object"):
-        catalog.Catalog.read_verified(path)
+        catalog.Catalog.read(path)
     path.write_text("{}", encoding="utf-8")
     with pytest.raises(ValueError, match="catalog_digest"):
-        catalog.Catalog.read_verified(path)
+        catalog.Catalog.read(path)
     path.write_text(json.dumps({"catalog_digest": "bad"}), encoding="utf-8")
     with pytest.raises(ValueError, match="schema is invalid"):
-        catalog.Catalog.read_verified(path)
+        catalog.Catalog.read(path)

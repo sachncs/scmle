@@ -42,7 +42,7 @@ def test_tipping_point_is_found_and_robust_unknowns_are_not_asked():
     steady = questions.Unknown("u", 0.0, 1.0, "a number", lambda v: "same")
     asked, robust = questions.ask([flips, steady])
     assert [q.slot for q in asked] == ["t"]
-    assert abs(asked[0].tipping_value - 0.3) < 1e-9
+    assert abs(asked[0].tipping - 0.3) < 1e-9
     assert asked[0].verdicts == ("a", "b")
     assert robust == [{"slot": "u", "low": 0.0, "high": 1.0, "verdict": "same"}]
 
@@ -60,4 +60,4 @@ def test_gain_sign_verdict_flips_with_the_threshold():
     found = questions.tipover(
         questions.Unknown("t", 0.05, 0.5, "x", questions.judge(y, a, b))
     )
-    assert found is not None and 0.05 < found.tipping_value < 0.5
+    assert found is not None and 0.05 < found.tipping < 0.5

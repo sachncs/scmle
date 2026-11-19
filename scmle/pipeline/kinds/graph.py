@@ -132,11 +132,7 @@ class Structure:
         inward: dict[str, list[float]] = {}
         weights: dict[str, list[tuple[float, float, str]]] = {}
         for edge in edges:
-            at = (
-                -math.inf
-                if edge.event_time is None
-                else moment(edge.event_time)
-            )
+            at = -math.inf if edge.time is None else moment(edge.time)
             outward.setdefault(edge.source, []).append(at)
             inward.setdefault(edge.target, []).append(at)
             weights.setdefault(edge.source, []).append(
@@ -310,7 +306,7 @@ class Graph(rows.Rows):
                     f"time column '{column}' has missing or unparseable values"
                 )
             return [stamp.to_pydatetime() for stamp in parsed]
-        if all(edge.event_time is None for edge in edges):
+        if all(edge.time is None for edge in edges):
             return [None] * len(listing)
         dataset = graph.Dataset.connect(edges, nodes=listing[IDENTITY].tolist())
         try:

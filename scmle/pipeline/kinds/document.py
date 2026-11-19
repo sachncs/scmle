@@ -145,7 +145,7 @@ class Document(rows.Rows):
                 `paginate`.
             kin: The near-duplicate clustering; the default thresholds.
         """
-        self.reader = reader or document.Reader(pdf_reader=paginate)
+        self.reader = reader or document.Reader(pdf=paginate)
         self.kin = kin or likeness.Resemblance()
 
     def load(
@@ -279,8 +279,8 @@ class Document(rows.Rows):
             if target in extra.columns
             else [None] * len(samples)
         )
-        conflicts = curation.conflicting_label_groups(
-            (sample.content_hash, sample.document_id, label)
+        conflicts = curation.conflict(
+            (sample.content_hash, sample.identifier, label)
             for sample, label in zip(samples, labels, strict=True)
             if label is not None and not pandas.isna(label)
         )
@@ -293,7 +293,7 @@ class Document(rows.Rows):
         key = rows.unite(
             len(samples),
             (),
-            [sample.document_id for sample in samples],
+            [sample.identifier for sample in samples],
             clusters,
         )
         frame = pandas.concat(

@@ -9,7 +9,7 @@ from scmle.data.modalities.graph.elements import Edge
 from scmle.data.modalities.graph.elements import Node
 
 
-def graph_identity(
+def identify(
     nodes: Iterable[Node],
     edges: Iterable[Edge],
     directed: bool = True,
@@ -32,7 +32,7 @@ def graph_identity(
     """
     node_records: list[dict[str, Any]] = [
         {
-            "node_id": node.node_id,
+            "node_id": node.identifier,
             "features": list(node.features),
             "label": node.label,
         }
@@ -44,9 +44,7 @@ def graph_identity(
             "target": edge.target,
             "weight": edge.weight,
             "relation": edge.relation,
-            "event_time": (
-                edge.event_time.isoformat() if edge.event_time else None
-            ),
+            "event_time": (edge.time.isoformat() if edge.time else None),
         }
         for edge in edges
     ]

@@ -18,11 +18,11 @@ class Skill:
     Attributes:
         feature: Feature name.
         skill: Observed out-of-fold skill.
-        null_mean: Mean skill over the permuted targets.
-        lower_bound: One-sided lower bound on the skill.
+        null: Mean skill over the permuted targets.
+        floor: One-sided lower bound on the skill.
         p_value: Permutation p-value.
         n: Rows.
-        low_power: Too few rows; the feature is never a suspect.
+        power: Too few rows; the feature is never a suspect.
         suspect: There are enough rows, p <= alpha and the lower bound is
             above the ceiling.
         check: Ledger record.
@@ -30,11 +30,11 @@ class Skill:
 
     feature: str
     skill: float
-    null_mean: float
-    lower_bound: float
+    null: float
+    floor: float
     p_value: float
     n: int
-    low_power: bool
+    power: bool
     suspect: bool
     check: qualification.Check
 
@@ -98,6 +98,6 @@ def summarize(
         n=n,
         decision=decision,
         subset=set_id,
-        seeds=randomness.seed_path(cfg.run_seed, path, 1),
+        seeds=randomness.seed_path(cfg.seed, path, 1),
         tier=qualification.Tier.UNVERIFIED,
     )

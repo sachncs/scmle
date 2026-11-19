@@ -41,12 +41,12 @@ def current_store(detector_ids=None, detected=300):
             continue
         results = [
             outcome_certificate(detector_id, defect, detected)
-            for defect in spec.defect_types
+            for defect in spec.types
         ]
         store.add(
             certificates.certify(
                 detector_id,
-                spec.code_hash(),
+                spec.digest(),
                 "c" * 64,
                 (0,),
                 results,
@@ -82,9 +82,9 @@ def test_provenance_pads_the_observed_range_by_ten_percent_of_the_span():
     )
     provenance = f5.provenance_for(frame)
     assert list(provenance) == f5.OUTLIER_COLUMNS
-    assert provenance["mean radius"].instrument_range == (9.0, 21.0)
-    assert provenance["mean texture"].instrument_range == (-5.0, 55.0)
-    assert provenance["mean perimeter"].instrument_range == (-6.0, 6.0)
+    assert provenance["mean radius"].instrument == (9.0, 21.0)
+    assert provenance["mean texture"].instrument == (-5.0, 55.0)
+    assert provenance["mean perimeter"].instrument == (-6.0, 6.0)
 
 
 def test_the_plan_catalogue_names_every_detector_and_defect_type():
@@ -239,10 +239,9 @@ def test_certify_missingness_counts_one_replicate_per_seed(demo):
             4, "certify.f5-missingness", 0
         )
     assert (
-        certificate.digests["code"]
-        == registry.SPECS["f5-missingness"].code_hash()
+        certificate.digests["code"] == registry.SPECS["f5-missingness"].digest()
     )
-    assert certificate.digests["corpus"] == certificates.corpus_hash(
+    assert certificate.digests["corpus"] == certificates.checksum(
         [f5.certify.frame_digest(base)]
     )
 
@@ -289,7 +288,7 @@ def test_certify_all_pools_row_counts_over_seeds_and_files_the_policy(demo):
         assert item.policy == f5.POLICY
         assert item.seeds in {(0, 1), (0,)}
         spec = registry.SPECS[item.detector]
-        assert item.digests["code"] == spec.code_hash()
+        assert item.digests["code"] == spec.digest()
     default_frame = f5.certify_all(seeds=(0,), only=["f5-sentinel"])
     assert (
         default_frame.certificates[0].digests["corpus"]
@@ -324,9 +323,9 @@ def test_problems_names_each_detector_that_is_not_current():
 def test_gating_lists_detector_hash_and_type_for_passing_outcomes_only():
     store = current_store()
     expected = sorted(
-        (detector_id, spec.code_hash(), defect)
+        (detector_id, spec.digest(), defect)
         for detector_id, spec in registry.SPECS.items()
-        for defect in spec.defect_types
+        for defect in spec.types
     )
     assert sorted(f5.gating(store)) == expected
     failing = current_store(detected=100)
@@ -335,7 +334,7 @@ def test_gating_lists_detector_hash_and_type_for_passing_outcomes_only():
         [
             certificates.certify(
                 "f5-duplicates",
-                registry.SPECS["f5-duplicates"].code_hash(),
+                registry.SPECS["f5-duplicates"].digest(),
                 "c" * 64,
                 (0,),
                 [
@@ -351,7 +350,7 @@ def test_gating_lists_detector_hash_and_type_for_passing_outcomes_only():
     assert f5.gating(mixed) == [
         (
             "f5-duplicates",
-            registry.SPECS["f5-duplicates"].code_hash(),
+            registry.SPECS["f5-duplicates"].digest(),
             "duplicate_exact",
         )
     ]

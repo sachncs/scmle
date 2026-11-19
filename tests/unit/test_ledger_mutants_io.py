@@ -233,7 +233,7 @@ def locate(features, target):
 def explored_ledger(alpha=TEN_PERCENT, control_observed=5):
     features, target = signal_data(600, 1)
     ledger = fresh(None, alpha)
-    explore.run_exploration(
+    explore.explore(
         ledger,
         features,
         target,
@@ -358,7 +358,7 @@ def test_non_rejected_survivors_pass_and_stay_unverified():
 def test_no_survivors_reason_and_crash_reasons():
     features, target = signal_data(300, 3)
     quiet = fresh(None, Fraction(1, 100))
-    explore.run_exploration(
+    explore.explore(
         quiet,
         features.assign(s=numpy.random.default_rng(0).normal(size=300)),
         target,
@@ -415,7 +415,7 @@ def test_a_custody_log_without_entries_gives_no_head():
         alpha_confirm=Fraction(1, 20),
         custody_log=Appender(),
     )
-    assert result.custody_head is None
+    assert result.head is None
     assert confirm.tip(object()) is None
 
 
@@ -445,7 +445,7 @@ def test_hypotheses_without_a_column_or_with_a_direction_run_on_c():
 
 def test_class_codes_sort_by_text_like_in_exploration():
     labels = pandas.Series([2, 10] * 5, dtype=object)
-    codes = confirm.default_encoding(labels)
+    codes = confirm.encode(labels)
     assert list(codes[:2]) == [1.0, 0.0]  # "10" sorts before "2"
     assert list(explore.vectorize(labels, True)[:2]) == [1.0, 0.0]
     assert list(explore.vectorize(labels, True, classes=(2, 10))[:2]) == [
@@ -480,7 +480,7 @@ def test_the_plan_keeps_going_after_a_skipped_column_and_names_the_null():
         plan.specs[0].null
         == "x is not monotonically associated with the target"
     )
-    assert plan.specs[0].family == "bivariate" and plan.target_kind == "numeric"
+    assert plan.specs[0].family == "bivariate" and plan.task == "numeric"
     kruskal_plan = explore.hypothesize(frame, explore.MULTICLASS, ("entity",))
     assert kruskal_plan.specs[0].statistic == "kruskal"
     assert (
@@ -490,14 +490,11 @@ def test_the_plan_keeps_going_after_a_skipped_column_and_names_the_null():
 
 
 def test_target_kinds():
-    assert explore.target_kind(pandas.Series([0, 1, 1]), True) == explore.BINARY
+    assert explore.classify(pandas.Series([0, 1, 1]), True) == explore.BINARY
     assert (
-        explore.target_kind(pandas.Series([0, 1, 2]), True)
-        == explore.MULTICLASS
+        explore.classify(pandas.Series([0, 1, 2]), True) == explore.MULTICLASS
     )
-    assert (
-        explore.target_kind(pandas.Series([0, 1, 2]), False) == explore.NUMERIC
-    )
+    assert explore.classify(pandas.Series([0, 1, 2]), False) == explore.NUMERIC
 
 
 def build(rows=500, seed=0):
@@ -511,7 +508,7 @@ def build(rows=500, seed=0):
 def test_a_governed_run_reports_exact_counts_and_artifacts(tmp_path):
     features, target = build()
     cfeatures, ctarget = build(400, 9)
-    run = governed.run_governed(
+    run = governed.govern(
         charter=make_charter(),
         features=features,
         target=target,
@@ -538,14 +535,14 @@ def test_a_governed_run_reports_exact_counts_and_artifacts(tmp_path):
 
 def test_strata_labels_edge_cases():
     frame = pandas.DataFrame({"t": [5.0, 1.0, 3.0, 2.0, 6.0, 4.0]})
-    two = governed.strata_labels(frame, None, "t", blocks=2)
+    two = governed.stratify(frame, None, "t", blocks=2)
     assert sorted(set(two)) == [0, 1]
     assert list(numpy.bincount(two)) == [3, 3]
-    one = governed.strata_labels(frame, None, "t", blocks=1)
+    one = governed.stratify(frame, None, "t", blocks=1)
     assert set(one) == {0}
-    assert governed.strata_labels(frame, None, "absent") is None
+    assert governed.stratify(frame, None, "absent") is None
     messy = pandas.DataFrame({"t": ["2020", "oops", "2022", "2021"]})
-    labels = governed.strata_labels(messy, None, "t", blocks=2)
+    labels = governed.stratify(messy, None, "t", blocks=2)
     assert len(labels) == 4
 
 
@@ -559,7 +556,7 @@ def two_signal_ledger():
     )
     target = pandas.Series(features["a"] + features["b"] + rng.normal(size=600))
     ledger = fresh(None, Fraction(1, 10))
-    explore.run_exploration(
+    explore.explore(
         ledger,
         features,
         target,
@@ -584,11 +581,11 @@ def test_unconfirmed_outcomes_carry_empty_checks_the_level_and_reasons():
             ledger, None, alpha_confirm=Fraction(1, 20), **kwargs
         )
         assert result.outcome == outcome and result.reason == reason
-        assert result.checks == () and result.alpha_confirm == Fraction(1, 20)
-        assert result.custody_head is None
+        assert result.checks == () and result.confirm == Fraction(1, 20)
+        assert result.head is None
     bare = fresh(None, Fraction(1, 10))
     features, target = signal_data()
-    explore.run_exploration(
+    explore.explore(
         bare,
         features,
         target,
@@ -600,11 +597,11 @@ def test_unconfirmed_outcomes_carry_empty_checks_the_level_and_reasons():
         result.reason
         == "no negative control was recorded; no claim is promoted"
     )
-    assert result.checks == () and result.alpha_confirm == Fraction(1, 20)
+    assert result.checks == () and result.confirm == Fraction(1, 20)
     failed = explored_ledger(control_observed=0)
     result = confirm.confirm(failed, None, alpha_confirm=Fraction(1, 20))
-    assert result.checks == () and result.alpha_confirm == Fraction(1, 20)
-    assert result.custody_head is None
+    assert result.checks == () and result.confirm == Fraction(1, 20)
+    assert result.head is None
 
 
 def test_a_crash_records_the_custody_head_and_the_level():
@@ -614,8 +611,8 @@ def test_a_crash_records_the_custody_head_and_the_level():
     result = confirm.confirm(
         ledger, source, alpha_confirm=Fraction(1, 20), encode=lambda y: 1 / 0
     )
-    assert result.custody_head == source.log.entries[-1]["hash"]
-    assert result.checks == () and result.alpha_confirm == Fraction(1, 20)
+    assert result.head == source.log.entries[-1]["hash"]
+    assert result.checks == () and result.confirm == Fraction(1, 20)
 
     class Dies:
         log = sealed.Journal()
@@ -631,8 +628,8 @@ def test_a_crash_records_the_custody_head_and_the_level():
     result = confirm.confirm(
         two_signal_ledger(), dying, alpha_confirm=Fraction(1, 20)
     )
-    assert result.custody_head == dying.log.entries[-1]["hash"]
-    assert result.checks == () and result.alpha_confirm == Fraction(1, 20)
+    assert result.head == dying.log.entries[-1]["hash"]
+    assert result.checks == () and result.confirm == Fraction(1, 20)
 
 
 def test_every_check_on_c_has_its_own_seed_index():
@@ -682,7 +679,7 @@ def test_notes_reach_the_stored_reason_and_survive_a_reload(tmp_path):
 def test_an_in_memory_governed_ledger_records_the_charter():
     features, target = build()
     charter = make_charter()
-    run = governed.run_governed(
+    run = governed.govern(
         charter=charter,
         features=features,
         target=target,
@@ -690,7 +687,7 @@ def test_an_in_memory_governed_ledger_records_the_charter():
         source=None,
         run_dir=None,
     )
-    assert run.ledger.header["charter_hash"] == charter.charter_hash
+    assert run.ledger.header["charter_hash"] == charter.digest
     assert run.ledger.header["alpha_confirm"] == str(
         charter.budget.confirmation.alpha_confirm
     )
@@ -707,7 +704,7 @@ def test_a_governed_multiclass_run_uses_kruskal_for_every_hypothesis():
             features["a"], [-9, -0.5, 0.5, 9], labels=["lo", "mid", "hi"]
         )
     ).astype(str)
-    run = governed.run_governed(
+    run = governed.govern(
         charter=make_charter(),
         features=features,
         target=target,
@@ -716,7 +713,7 @@ def test_a_governed_multiclass_run_uses_kruskal_for_every_hypothesis():
         run_dir=None,
     )
     assert {s.statistic for s in run.plan.specs} == {"kruskal"}
-    assert run.plan.target_kind == explore.MULTICLASS
+    assert run.plan.task == explore.MULTICLASS
 
 
 def test_missing_values_in_y_are_dropped_too():

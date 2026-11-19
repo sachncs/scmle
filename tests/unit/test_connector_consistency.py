@@ -41,13 +41,13 @@ def test_batches_are_disjoint_and_complete_on_static_data():
     conn = connectors.DbApiConnector(URI, QUERY, lambda: Shared(db))
     seen, checkpoint = [], None
     while True:
-        batch = conn.read_rows(checkpoint, limit=3)
+        batch = conn.read(checkpoint, limit=3)
         seen += [row[0] for row in batch.rows]
         checkpoint = batch.checkpoint
-        if not batch.has_more:
+        if not batch.more:
             break
     assert seen == list(range(10))
-    assert checkpoint.content_sha256 is not None
+    assert checkpoint.digest is not None
 
 
 @pytest.mark.parametrize(
@@ -61,33 +61,33 @@ def test_batches_are_disjoint_and_complete_on_static_data():
 def test_change_before_the_offset_is_refused(mutation):
     db = make_db(10)
     conn = connectors.DbApiConnector(URI, QUERY, lambda: Shared(db))
-    first = conn.read_rows(None, limit=3)
+    first = conn.read(None, limit=3)
     db.execute(mutation)
     db.commit()
     with pytest.raises(connectors.CheckpointError) as caught:
-        conn.read_rows(first.checkpoint, limit=3)
+        conn.read(first.checkpoint, limit=3)
     assert caught.value.code == "source_changed"
 
 
 def test_rows_deleted_below_the_offset_are_refused():
     db = make_db(10)
     conn = connectors.DbApiConnector(URI, QUERY, lambda: Shared(db))
-    first = conn.read_rows(None, limit=8)
+    first = conn.read(None, limit=8)
     db.execute("DELETE FROM t WHERE id >= 2")
     db.commit()
     with pytest.raises(connectors.CheckpointError) as caught:
-        conn.read_rows(first.checkpoint, limit=3)
+        conn.read(first.checkpoint, limit=3)
     assert caught.value.code == "source_changed"
 
 
 def test_snapshot_token_tracks_content():
     db = make_db(5)
     conn = connectors.DbApiConnector(URI, QUERY, lambda: Shared(db))
-    before = conn.snapshot_token()
-    assert conn.snapshot_token() == before
+    before = conn.snapshot()
+    assert conn.snapshot() == before
     db.execute("UPDATE t SET v = 7 WHERE id = 4")
     db.commit()
-    assert conn.snapshot_token() != before
+    assert conn.snapshot() != before
 
 
 def test_snapshot_query_is_the_token_source():
@@ -96,15 +96,15 @@ def test_snapshot_query_is_the_token_source():
         URI,
         QUERY,
         lambda: Shared(db),
-        snapshot_query="SELECT max(id) FROM t",
+        probe="SELECT max(id) FROM t",
     )
-    before = conn.snapshot_token()
+    before = conn.snapshot()
     db.execute("UPDATE t SET v = 7 WHERE id = 1")
     db.commit()
-    assert conn.snapshot_token() == before
+    assert conn.snapshot() == before
     db.execute("INSERT INTO t VALUES (50, 1)")
     db.commit()
-    assert conn.snapshot_token() != before
+    assert conn.snapshot() != before
 
 
 @pytest.mark.parametrize(
@@ -176,9 +176,9 @@ def test_read_only_statement_runs_before_the_query():
         URI,
         QUERY,
         lambda: Recording(db),
-        read_only_statement="SELECT 42",
+        preamble="SELECT 42",
     )
-    conn.read_rows(None, limit=2)
+    conn.read(None, limit=2)
     assert log[:2] == ["SELECT 42", QUERY]
 
 
@@ -197,11 +197,11 @@ def test_warehouse_snapshot_token_change_is_refused():
         reader,
         snapshot_reader=lambda query: token[0],
     )
-    first = conn.read_rows(None, limit=2)
-    assert conn.read_rows(first.checkpoint, limit=2).rows == ((2,), (3,))
+    first = conn.read(None, limit=2)
+    assert conn.read(first.checkpoint, limit=2).rows == ((2,), (3,))
     token[0] = "v2"
     with pytest.raises(connectors.CheckpointError):
-        conn.read_rows(first.checkpoint, limit=2)
+        conn.read(first.checkpoint, limit=2)
 
 
 def test_event_ingested_round_trips_and_is_validated():

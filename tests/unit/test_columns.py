@@ -51,14 +51,14 @@ def test_exclusion_rules():
         columns.Categorical().rationale(pandas.Series(list("ab" * 25))) is None
     )
     # Datetimes are kept: the profiler expands them into features.
-    assert columns.DatetimeKind().rationale(pandas.Series([1])) is None
+    assert columns.Datetime().rationale(pandas.Series([1])) is None
     assert columns.Quantitative().rationale(pandas.Series([1])) is None
 
 
 def test_transformers_exist_only_for_feature_kinds():
     assert columns.Quantitative().transformer(OPTIONS_SCALED) is not None
     assert columns.Categorical().transformer(OPTIONS_PLAIN) is not None
-    assert columns.DatetimeKind().transformer(OPTIONS_SCALED) is None
+    assert columns.Datetime().transformer(OPTIONS_SCALED) is None
 
 
 def test_scale_flag_controls_scaler():
@@ -131,7 +131,7 @@ def make_outcome_recorded_only_frame(rows=400):
 def test_missingness_leak_detected_when_recorded_for_one_outcome_only():
     target, informative = make_outcome_recorded_only_frame()
     kind = columns.Quantitative()
-    score = kind.missingness_association(informative, target, tasks.Task.BINARY)
+    score = kind.discriminate(informative, target, tasks.Task.BINARY)
     assert score >= 0.9
 
 
@@ -141,7 +141,7 @@ def test_one_sided_presence_is_flagged_even_when_mostly_missing():
     recorded = pandas.Series(numpy.nan, index=target.index)
     died = target.index[(target == 0)][:60]  # recorded only for outcome 0
     recorded[died] = 1.0
-    score = columns.Quantitative().missingness_association(
+    score = columns.Quantitative().discriminate(
         recorded, target, tasks.Task.BINARY
     )
     assert score == 1.0
@@ -153,23 +153,19 @@ def test_random_missingness_is_not_flagged():
     values = pandas.Series(rng.normal(size=500))
     values[rng.random(500) < 0.4] = numpy.nan
     kind = columns.Quantitative()
-    assert kind.missingness_association(values, target, tasks.Task.BINARY) < 0.2
+    assert kind.discriminate(values, target, tasks.Task.BINARY) < 0.2
 
 
 def test_rare_or_nearly_complete_features_are_not_judged():
     target = pandas.Series([0, 1] * 100)
     complete = pandas.Series(numpy.arange(200.0))
     assert (
-        columns.Quantitative().missingness_association(
-            complete, target, tasks.Task.BINARY
-        )
+        columns.Quantitative().discriminate(complete, target, tasks.Task.BINARY)
         == 0.0
     )
     sparse = pandas.Series([numpy.nan] * 190 + [1.0] * 10)
     assert (
-        columns.Quantitative().missingness_association(
-            sparse, target, tasks.Task.BINARY
-        )
+        columns.Quantitative().discriminate(sparse, target, tasks.Task.BINARY)
         == 0.0
     )
 
@@ -178,7 +174,7 @@ def test_regression_missingness_uses_rank_correlation():
     rng = numpy.random.default_rng(3)
     target = pandas.Series(rng.normal(size=400))
     values = pandas.Series(numpy.where(target > 0.5, 1.0, numpy.nan))
-    score = columns.Quantitative().missingness_association(
+    score = columns.Quantitative().discriminate(
         values, target, tasks.Task.REGRESSION
     )
     assert score > 0.5
@@ -241,7 +237,7 @@ def test_free_text_is_its_own_kind_and_short_labels_are_not():
 
 
 def test_the_text_transformer_learns_its_vocabulary_per_fit():
-    kind = columns.TextKind()
+    kind = columns.Text()
     train = pandas.DataFrame(
         {"t": ["good fast service"] * 20 + ["bad slow service"] * 20}
     )
@@ -258,7 +254,7 @@ def test_the_text_transformer_learns_its_vocabulary_per_fit():
 
 
 def test_text_statistics_report_words_per_value():
-    stats = columns.TextKind().statistics(sentences(40))
+    stats = columns.Text().statistics(sentences(40))
 
     assert stats["kind"] == "text" and stats["mean_words"] == 8.0
 

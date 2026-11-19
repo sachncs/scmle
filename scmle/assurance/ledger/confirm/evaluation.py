@@ -84,13 +84,13 @@ def disclaim(
     Raises:
         LedgerError: If the survivors have not been frozen.
     """
-    survivors = ledger.survivor_set
+    survivors = ledger.remaining
     if survivors is None:
         raise scmle.assurance.ledger.ledger.LedgerError(
             "freeze the survivors first"
         )
     claims = []
-    for hypothesis_id in survivors.hypothesis_ids:
+    for hypothesis_id in survivors.hypotheses:
         result = ledger.results[hypothesis_id]
         spec = ledger.hypotheses[hypothesis_id].spec
         claims.append(
@@ -147,7 +147,7 @@ def withdraw(
     return claims
 
 
-def stage_two_record(
+def account(
     ledger: scmle.assurance.ledger.ledger.Ledger, withdrawal: records.Withdrawal
 ) -> dict[str, Any]:
     """Builds the accounting of a withdrawal, hashed over the surviving family.
@@ -165,17 +165,15 @@ def stage_two_record(
         LedgerError: If a withdrawn id is not a frozen survivor.
     """
     survivors = ledger.freeze()
-    unknown = sorted(set(withdrawal.reasons) - set(survivors.hypothesis_ids))
+    unknown = sorted(set(withdrawal.reasons) - set(survivors.hypotheses))
     if unknown:
         raise scmle.assurance.ledger.ledger.LedgerError(
             f"withdrawn ids {unknown} are not frozen survivors"
         )
-    family = [
-        i for i in survivors.hypothesis_ids if i not in withdrawal.reasons
-    ]
+    family = [i for i in survivors.hypotheses if i not in withdrawal.reasons]
     return {
         "survivors_sha256": survivors.sha256,
-        "survivors": list(survivors.hypothesis_ids),
+        "survivors": list(survivors.hypotheses),
         "withdrawn": dict(sorted(withdrawal.reasons.items())),
         "family": family,
         "family_sha256": scmle.assurance.ledger.ledger.digest(
@@ -202,7 +200,7 @@ def verify(
         rule: Multiplicity rule.
         alpha: Confirmation level.
         encode: Target encoder.
-        stage_two: Accounting from `stage_two_record`; the survivors in its
+        stage_two: Accounting from `account`; the survivors in its
             ``withdrawn`` mapping are left out of the tested family and get
             unverified claims instead.
 
@@ -214,14 +212,14 @@ def verify(
     Raises:
         LedgerError: If the survivors have not been frozen.
     """
-    survivors = ledger.survivor_set
+    survivors = ledger.remaining
     if survivors is None:
         raise scmle.assurance.ledger.ledger.LedgerError(
             "freeze the survivors first"
         )
     features, target = rows
     withdrawn = {} if stage_two is None else dict(stage_two["withdrawn"])
-    ids = tuple(i for i in survivors.hypothesis_ids if i not in withdrawn)
+    ids = tuple(i for i in survivors.hypotheses if i not in withdrawn)
     codes = encode(target)
     outcomes = measure(ledger, ids, features, codes)
     adjustment = multiplicity.adjust([o.p for o in outcomes], rule, alpha)
@@ -248,7 +246,7 @@ def verify(
     if withdrawn:
         by_id = {c.identifier: c for c in claims}
         by_id.update(withdraw(ledger, withdrawn))
-        claims = [by_id[i] for i in survivors.hypothesis_ids]
+        claims = [by_id[i] for i in survivors.hypotheses]
     return tuple(claims), tuple(checks)
 
 
@@ -275,7 +273,7 @@ def measure(
         spec = ledger.hypotheses[hypothesis_id].spec
         column = features[spec.column] if spec.column else features.iloc[:, 0]
         outcomes.append(
-            bivariate.run_statistic(
+            bivariate.calculate(
                 spec.statistic,
                 column.to_numpy(dtype=float),
                 codes,
@@ -330,7 +328,7 @@ def examine(
     )
 
 
-def default_encoding(target: pandas.Series) -> Any:
+def encode(target: pandas.Series) -> Any:
     """Encodes the target as floats; classes are coded in sorted order.
 
     Args:
@@ -365,7 +363,7 @@ def block(
         sentence and the unverified claims.
     """
     survivors = ledger.freeze()
-    if not survivors.hypothesis_ids:
+    if not survivors.hypotheses:
         return (
             records.NO_SURVIVORS,
             "no hypothesis survived exploration; C was not opened",

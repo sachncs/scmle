@@ -19,9 +19,9 @@ def test_profile_counts_are_exact():
     assert table is not None
     assert table.rows == 4
     a = table.column("a")
-    assert (a.non_null, a.distinct, a.kind) == (3, 2, "number")
+    assert (a.present, a.distinct, a.kind) == (3, 2, "number")
     b = table.column("b")
-    assert (b.non_null, b.distinct, b.kind) == (3, 2, "text")
+    assert (b.present, b.distinct, b.kind) == (3, 2, "text")
     assert (b.minimum, b.maximum) == ("x", "y")
 
 
@@ -60,7 +60,7 @@ def test_budget_stops_profile_at_a_table_boundary():
     for name in ("t1", "t2"):
         db.execute(f"CREATE TABLE {name} (a INTEGER, b INTEGER)")
         db.execute(f"INSERT INTO {name} VALUES (?, ?)", [(1, 2), (3, 4)])
-    meter = budget.Meter(budget.Budget(max_queries=5))
+    meter = budget.Meter(budget.Budget(queries=5))
     source = profile.Sql(db.factory, meter)
     catalog = profile.inventory(source, ["t1", "t2"])
     assert catalog.partial
@@ -127,9 +127,7 @@ def test_read_without_a_token_is_marked_unverified():
 
 def test_budget_meter_is_deterministic_and_validates():
     def run():
-        meter = budget.Meter(
-            budget.Budget(max_rows_scanned=100, max_queries=10)
-        )
+        meter = budget.Meter(budget.Budget(scanned=100, queries=10))
         done = [meter.admit("s", f"u{k}", 30) for k in range(6)]
         return done, [s.to_dict() for s in meter.stops], meter.rows
 
@@ -139,14 +137,12 @@ def test_budget_meter_is_deterministic_and_validates():
     assert rows == 90
     assert len(stops) == 1
     with pytest.raises(ValueError):
-        budget.Budget(max_queries=-1)
+        budget.Budget(queries=-1)
 
 
 def test_wall_time_limit_uses_the_clock():
     ticks = iter(range(100))
-    meter = budget.Meter(
-        budget.Budget(max_seconds=3), lambda: float(next(ticks))
-    )
+    meter = budget.Meter(budget.Budget(seconds=3), lambda: float(next(ticks)))
     outcomes = [meter.admit("s", f"u{k}", 0) for k in range(5)]
     assert outcomes[0] and not outcomes[-1]
     assert meter.stops[0].reason == "seconds"

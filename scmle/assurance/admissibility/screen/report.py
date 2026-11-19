@@ -49,7 +49,7 @@ class Finding:
         adjusted_p: Benjamini-Yekutieli adjusted p-value (1.0 when stopped
             early or never drawn).
         significant: Rejected by the Benjamini-Yekutieli step.
-        lower_bound: One-sided lower confidence bound of the effect size,
+        lower: One-sided lower confidence bound of the effect size,
             computed for significant columns only.
         suspect: Significant and the bound exceeds the ceiling.
         complete: Whether all permutations were drawn.
@@ -63,7 +63,7 @@ class Finding:
     p_value: float
     adjusted_p: float
     significant: bool
-    lower_bound: float | None
+    lower: float | None
     suspect: bool
     complete: bool
     gate: certificates.Authority
@@ -101,7 +101,7 @@ class Finding:
                 "block); exclude it (unavailable_at_prediction) or correct "
                 "the declaration"
             )
-        bound = "n/a" if self.lower_bound is None else f"{self.lower_bound:.3f}"
+        bound = "n/a" if self.lower is None else f"{self.lower:.3f}"
         status = (
             "certified, may block"
             if self.blocking
@@ -233,9 +233,8 @@ class Screen:
                     "adjusted_p": f.adjusted_p,
                     "significant": f.significant,
                     "lower_bound": (
-                        f.lower_bound
-                        if f.lower_bound is not None
-                        and math.isfinite(f.lower_bound)
+                        f.lower
+                        if f.lower is not None and math.isfinite(f.lower)
                         else None
                     ),
                     "suspect": f.suspect,
@@ -543,7 +542,7 @@ def weigh(
         rest = rival(h, pending, problem, apart)
     if rest is not None and h.data is not None:
         path = f"leakage.screen.margin.{h.feature}"
-        rng = randomness.component_rng(cfg.run_seed, path, 0)
+        rng = randomness.component_rng(cfg.seed, path, 0)
         mine = reading(h, h.data, frame, problem)
         suspect = margin(problem, mine, rest, cfg, groups, rng) >= 0
     return bound, suspect
@@ -559,10 +558,10 @@ def faint(rows: int, cfg: leakage.Config) -> tuple[str, ...]:
     Returns:
         One note below `min_rows`, none otherwise.
     """
-    if rows >= cfg.min_rows:
+    if rows >= cfg.minimum:
         return ()
     note = (
-        f"low power: {rows} rows, fewer than {cfg.min_rows}; the probe "
+        f"low power: {rows} rows, fewer than {cfg.minimum}; the probe "
         "states which planted leaks these rows hide"
     )
     return (note,)

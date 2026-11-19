@@ -66,13 +66,13 @@ def slicers(
     path = board.services.spec.charter_path
     if not path:
         return ()
-    block = sealing.read_verified(str(path)).charter.uncertainty
+    block = sealing.read(str(path)).charter.uncertainty
     return () if block is None else block.slices
 
 
 def decisional(
     board: engine.Board,
-) -> contracts.AnalysisCharter | None:
+) -> contracts.Charter | None:
     """Returns the charter when it declares a decision layer, else None.
 
     Args:
@@ -85,7 +85,7 @@ def decisional(
     path = board.services.spec.charter_path
     if path is None:
         return None
-    charter = sealing.read_verified(str(path)).charter
+    charter = sealing.read(str(path)).charter
     if charter.decision is None or charter.costs is None:
         return None
     return charter
@@ -155,7 +155,7 @@ def appraise(
         "tier": "unverified"
         if decision["f11"]["tier"] == "unverified"
         else tier,
-        "cost_model_hash": model.model_hash,
+        "cost_model_hash": model.digest,
         "rule_hash": decision["f11"]["rule_hash"],
     }
 
@@ -242,7 +242,7 @@ def choose_decision_threshold(
             selected.params,
             featurise=board.get(ingestion.Intake).kind.featurise,
         ),
-        (split.dev_features, split.dev_target),
+        (split.features, split.target),
         split.manifest.folds,
         decision,
         chartered,

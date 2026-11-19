@@ -39,7 +39,7 @@ class Cell:
         rows: Sample rows in total.
         share: ``count / rows``.
         interval: Exact interval for the sample share.
-        deployment_share: Share in the deployment population, or None.
+        deployment: Share in the deployment population, or None.
         status: `pass`, `fail` or `unverifiable`.
         migrations: The written layout's version steps, oldest first;
             version 2 spells `deployment_share` as `deployment`.
@@ -55,7 +55,7 @@ class Cell:
     rows: int
     share: float
     interval: tuple[float, float]
-    deployment_share: float | None
+    deployment: float | None
     status: shift.Status
 
     def to_dict(self) -> dict[str, Any]:

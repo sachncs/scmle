@@ -52,20 +52,20 @@ def test_verify_accepts_only_lowercase_digests():
 
 
 def test_canonical_source_normalises_paths():
-    assert geometry.canonical_source(" ") == "memory://"
-    assert geometry.canonical_source("s3://x") == "s3://x"
-    assert geometry.canonical_source("f.json") == (
+    assert geometry.identify(" ") == "memory://"
+    assert geometry.identify("s3://x") == "s3://x"
+    assert geometry.identify("f.json") == (
         pathlib.Path("f.json").resolve().as_uri()
     )
 
 
 def test_observation_times_are_normalised_to_utc():
-    parsed = geometry.canonical_observation_time("2020-01-01T05:00:00+05:00")
+    parsed = geometry.timestamp("2020-01-01T05:00:00+05:00")
     assert parsed == datetime(2020, 1, 1, tzinfo=UTC)
     assert parsed.tzinfo is not None
-    assert geometry.canonical_observation_time("2020-01-01T00:00:00z") == parsed
+    assert geometry.timestamp("2020-01-01T00:00:00z") == parsed
     aware = datetime(2020, 1, 1, 1, tzinfo=timezone(timedelta(hours=1)))
-    assert geometry.canonical_observation_time(aware) == parsed
+    assert geometry.timestamp(aware) == parsed
 
 
 @pytest.mark.parametrize(
@@ -79,7 +79,7 @@ def test_observation_times_are_normalised_to_utc():
 )
 def test_bad_observation_times_are_rejected(value, code):
     with pytest.raises(geometry.TemporalError) as raised:
-        geometry.canonical_observation_time(value)
+        geometry.timestamp(value)
     assert raised.value.details["code"] == code
 
 
@@ -180,15 +180,15 @@ def test_a_placemark_hashes_its_canonical_geometry():
         point(1, 2), sort_keys=True, separators=(",", ":")
     ).encode()
     assert feature.geometry_hash == hashlib.sha256(payload).hexdigest()
-    assert feature.geometry_type == "Point"
+    assert feature.kind == "Point"
     assert feature.bounds == (1.0, 2.0, 1.0, 2.0)
     assert feature.centroid == (1.0, 2.0)
     assert dict(feature.properties) == {"k": 1}
     with pytest.raises(TypeError):
         feature.properties["k"] = 2
-    assert mark("a", 1, 2, label=4).content_hash != feature.content_hash
-    timed = mark("a", 1, 2, observation_time="2020-01-01T00:00:00Z")
-    assert timed.observation_time == datetime(2020, 1, 1, tzinfo=UTC)
+    assert mark("a", 1, 2, label=4).digest != feature.digest
+    timed = mark("a", 1, 2, time="2020-01-01T00:00:00Z")
+    assert timed.time == datetime(2020, 1, 1, tzinfo=UTC)
 
 
 def test_a_placemark_bounds_a_polygon():
@@ -201,7 +201,7 @@ def test_a_placemark_bounds_a_polygon():
     assert feature.centroid == (2.0, 1.0)
     moved = feature.substituted(0, 7)
     assert moved.bounds == (7.0, 0.0, 7.0, 2.0)
-    assert moved.feature_id == "p"
+    assert moved.identifier == "p"
 
 
 def test_a_placemark_with_elevation_bounds_only_x_and_y():
@@ -252,7 +252,7 @@ def test_placemarks_read_a_feature_collection():
         ],
     }
     features = geometry.placemarks(document)
-    assert [f.feature_id for f in features] == ["7", "1"]
+    assert [f.identifier for f in features] == ["7", "1"]
     assert dict(features[1].properties) == {"a": 1}
 
 
@@ -298,7 +298,7 @@ def test_pairs_enforces_the_match_limit():
     left = [mark("a", 0, 0), mark("b", 1, 1)]
     right = [mark("c", 0, 0)]
     matches = linkage.pairs(left, right, lambda a, b: True, "p", 2)
-    assert [(m.left_feature_id, m.right_feature_id) for m in matches] == [
+    assert [(m.left, m.right) for m in matches] == [
         ("a", "c"),
         ("b", "c"),
     ]
@@ -318,7 +318,7 @@ def test_transform_guards_feature_metadata():
     assert moved[0].bounds[0] == 9.0
 
     def rename(feature, source, target):
-        return dataclasses.replace(feature, feature_id="z")
+        return dataclasses.replace(feature, identifier="z")
 
     def relabel(feature, source, target):
         return dataclasses.replace(feature, label=1)
@@ -342,10 +342,10 @@ def test_a_dataset_hash_binds_crs_and_ignores_order():
     first, second = mark("a", 0, 0), mark("b", 1, 1)
     forward = dataset.Dataset((first, second), crs=" EPSG:4326 ")
     assert forward.crs == "EPSG:4326"
-    assert dataset.Dataset((second, first), crs="EPSG:4326").content_hash == (
-        forward.content_hash
+    assert dataset.Dataset((second, first), crs="EPSG:4326").digest == (
+        forward.digest
     )
-    assert dataset.Dataset((first, second)).content_hash != forward.content_hash
+    assert dataset.Dataset((first, second)).digest != forward.digest
     with pytest.raises(geometry.GeometryError, match="at least one"):
         dataset.Dataset(())
     with pytest.raises(geometry.GeometryError, match="duplicate"):
@@ -355,7 +355,7 @@ def test_a_dataset_hash_binds_crs_and_ignores_order():
 
 
 def test_from_geojson_builds_a_dataset():
-    built = dataset.Dataset.from_geojson(
+    built = dataset.Dataset.parse(
         {
             "type": "FeatureCollection",
             "features": [{"type": "Feature", "geometry": point(0, 0)}],
@@ -364,24 +364,22 @@ def test_from_geojson_builds_a_dataset():
         crs="EPSG:4326",
     )
     assert built.source == "s3://x"
-    assert built.features[0].feature_id == "0"
+    assert built.features[0].identifier == "0"
 
 
 def test_spatial_join_reports_matches_and_unmatched_counts():
     left = grid()
     right = dataset.Dataset((mark("r", 0, 0),), crs="EPSG:3857")
-    report = left.spatial_join(
-        right, lambda a, b: a.bounds == b.bounds, " near/v1 "
-    )
-    assert report.predicate_name == "near/v1"
-    assert report.comparison_count == 4
-    assert report.match_count == 1
+    report = left.join(right, lambda a, b: a.bounds == b.bounds, " near/v1 ")
+    assert report.predicate == "near/v1"
+    assert report.comparisons == 4
+    assert report.matched == 1
     assert report.unmatched_left_count == 3
     assert report.unmatched_right_count == 0
-    assert report.matches[0].left_feature_id == "0"
-    left.spatial_join(right, lambda a, b: False, "p", comparison_limit=4)
+    assert report.matches[0].left == "0"
+    left.join(right, lambda a, b: False, "p", comparison_limit=4)
     with pytest.raises(geometry.GeometryError, match="comparison limit"):
-        left.spatial_join(right, lambda a, b: False, "p", comparison_limit=3)
+        left.join(right, lambda a, b: False, "p", comparison_limit=3)
 
 
 def test_vet_rejects_bad_join_arguments():
@@ -408,9 +406,9 @@ def test_reproject_binds_source_and_target():
         "EPSG:4326", lambda f, s, t: f.substituted(1, 0), "flat/v1"
     )
     assert result.dataset.crs == "EPSG:4326"
-    assert result.report.source_dataset_hash == source.content_hash
-    assert result.report.feature_count == 4
-    assert result.to_dict()["dataset_hash"] == result.dataset.content_hash
+    assert result.report.source_dataset_hash == source.digest
+    assert result.report.features == 4
+    assert result.to_dict()["dataset_hash"] == result.dataset.digest
     assert result.to_dict()["crs"] == "EPSG:4326"
     with pytest.raises(errors.InputError, match="differ"):
         source.reproject("EPSG:3857", lambda f, s, t: f, "t")
@@ -430,7 +428,7 @@ def test_a_reprojection_must_match_its_report():
     with pytest.raises(errors.InputError, match="must match the transformed"):
         dataset.Reprojection(other, result.report)
     renamed = dataclasses.replace(
-        result.report, target_dataset_hash=other.content_hash
+        result.report, target_dataset_hash=other.digest
     )
     with pytest.raises(errors.InputError, match="CRS must match"):
         dataset.Reprojection(other, renamed)
@@ -438,14 +436,14 @@ def test_a_reprojection_must_match_its_report():
 
 def test_profile_spans_every_feature():
     profile = grid().profile()
-    assert profile.feature_count == 4
+    assert profile.features == 4
     assert profile.bounds == (0.0, 0.0, 3.0, 1.0)
-    assert profile.geometry_types == ("Point",)
+    assert profile.geometries == ("Point",)
 
 
 def test_timeline_reports_temporal_completeness():
-    first = mark("a", 0, 0, observation_time="2020-01-02T00:00:00Z")
-    second = mark("b", 0, 0, observation_time="2020-01-01T00:00:00Z")
+    first = mark("a", 0, 0, time="2020-01-02T00:00:00Z")
+    second = mark("b", 0, 0, time="2020-01-01T00:00:00Z")
     assert survey.timeline([first, second]) == {
         "status": "complete",
         "observation_time_min": "2020-01-01T00:00:00+00:00",
@@ -464,10 +462,10 @@ def test_curate_without_crs_blocks_and_skips_autocorrelation():
     assert report.profile["spatial_autocorrelation"] == {
         "status": "blocked_missing_crs"
     }
-    assert [f.identifier for f in report.quality_findings] == [
+    assert [f.identifier for f in report.findings] == [
         "quality.geospatial-missing-crs"
     ]
-    assert report.quality_findings[0].blocking
+    assert report.findings[0].blocking
     assert [f.identifier for f in report.risk_findings] == [
         "risk.geospatial-mixed-label-state"
     ]
@@ -479,7 +477,7 @@ def test_curate_measures_autocorrelation_for_numeric_labels():
     assert measured["features"] == 4
     assert measured["neighbors"] == 3
     assert measured["permutations"] == 99
-    assert report.quality_findings == ()
+    assert report.findings == ()
     text = grid(labels=["a", "b", "c", "d"]).curate()
     assert text.profile["spatial_autocorrelation"]["status"] == "not_applicable"
     few = dataset.Dataset((mark("a", 0, 0), mark("b", 1, 1)), crs="X").curate()
@@ -490,10 +488,10 @@ def test_findings_flag_mixed_geometry_and_temporal_state():
     line = geometry.Placemark(
         "l",
         {"type": "LineString", "coordinates": [[0, 0], [1, 1]]},
-        observation_time="2020-01-01T00:00:00Z",
+        time="2020-01-01T00:00:00Z",
     )
     data = dataset.Dataset((mark("a", 0, 0), line), crs="X")
-    names = [f.identifier for f in data.curate().quality_findings]
+    names = [f.identifier for f in data.curate().findings]
     assert names == [
         "quality.geospatial-mixed-temporal-state",
         "quality.geospatial-mixed-geometry",
@@ -528,25 +526,25 @@ def test_collect_checks_value_count_and_type():
 def test_spatial_autocorrelation_validates_and_is_seeded():
     data = grid()
     values = [1.0, 2.0, 3.0, 5.0]
-    first = data.spatial_autocorrelation(values, neighbor_count=9, seed=3)
-    assert first.neighbor_count == 3
-    assert first == data.spatial_autocorrelation(values, 9, 99, 3)
+    first = data.autocorrelate(values, neighbor_count=9, seed=3)
+    assert first.neighbors == 3
+    assert first == data.autocorrelate(values, 9, 99, 3)
     assert 0.0 < first.p_value <= 1.0
-    skipped = data.spatial_autocorrelation(values, permutations=0)
+    skipped = data.autocorrelate(values, permutations=0)
     assert skipped.p_value is None
-    data.spatial_autocorrelation(values, permutations=10_000 // 1000)
+    data.autocorrelate(values, permutations=10_000 // 1000)
     with pytest.raises(errors.InputError, match="permutations"):
-        data.spatial_autocorrelation(values, permutations=-1)
+        data.autocorrelate(values, permutations=-1)
     with pytest.raises(errors.InputError, match="permutations"):
-        data.spatial_autocorrelation(values, permutations=10_001)
+        data.autocorrelate(values, permutations=10_001)
     with pytest.raises(errors.InputError, match="neighbor_count"):
-        data.spatial_autocorrelation(values, neighbor_count=0)
+        data.autocorrelate(values, neighbor_count=0)
     with pytest.raises(geometry.GeometryError) as raised:
-        data.spatial_autocorrelation([1, 1, 1, 1])
+        data.autocorrelate([1, 1, 1, 1])
     assert raised.value.details["code"] == "statistic_not_estimable"
     two = dataset.Dataset((mark("a", 0, 0), mark("b", 1, 1)), crs="X")
     with pytest.raises(geometry.GeometryError, match="three features"):
-        two.spatial_autocorrelation([1, 2])
+        two.autocorrelate([1, 2])
     assert topology.MAX_PERMUTATIONS == 10_000
 
 
@@ -562,12 +560,12 @@ def test_prepare_features_lists_bounds_and_centroids():
     line = geometry.Placemark(
         "l", {"type": "LineString", "coordinates": [[0, 0], [2, 4]]}
     )
-    prepared = dataset.Dataset((line,), crs="X").prepare_features()
+    prepared = dataset.Dataset((line,), crs="X").prepare()
     assert prepared.values == ((0.0, 0.0, 2.0, 4.0, 2.0, 4.0, 1.0, 2.0, 4.0),)
     assert prepared.feature_names[-1] == "coordinate_value_count"
     assert prepared.crs == "X"
     with pytest.raises(geometry.GeometryError, match="CRS"):
-        dataset.Dataset((line,)).prepare_features()
+        dataset.Dataset((line,)).prepare()
 
 
 def test_envelop_and_straddle_count_blocks():
@@ -578,12 +576,10 @@ def test_envelop_and_straddle_count_blocks():
     data = dataset.Dataset((line, mark("p", 1, 0)), crs="X")
     assert data.envelop(1.0) == {"l": (0, 0, 2, 0), "p": (1, 0, 1, 0)}
     leakage = data.straddle(1.0, max_blocks_per_feature=2)
-    assert leakage.feature_block_counts == (("l", 3), ("p", 1))
-    assert leakage.crossing_feature_ids == ("l",)
-    assert leakage.truncated_feature_ids == ("l",)
-    assert (
-        data.straddle(1.0, max_blocks_per_feature=3).truncated_feature_ids == ()
-    )
+    assert leakage.blocks == (("l", 3), ("p", 1))
+    assert leakage.crossing == ("l",)
+    assert leakage.truncated == ("l",)
+    assert data.straddle(1.0, max_blocks_per_feature=3).truncated == ()
     with pytest.raises(errors.InputError, match="max_blocks_per_feature"):
         data.straddle(1.0, max_blocks_per_feature=0)
     with pytest.raises(errors.InputError, match="block_size"):
@@ -614,12 +610,12 @@ def test_tile_keeps_each_block_in_one_partition():
 
 
 def test_cutover_puts_the_cutoff_in_training():
-    early = mark("a", 0, 0, observation_time="2020-01-01T00:00:00Z")
-    late = mark("b", 0, 0, observation_time="2020-01-02T00:00:00Z")
+    early = mark("a", 0, 0, time="2020-01-01T00:00:00Z")
+    late = mark("b", 0, 0, time="2020-01-02T00:00:00Z")
     data = dataset.Dataset((early, late))
     chronology = data.cutover("2020-01-01T00:00:00+00:00")
-    assert [f.feature_id for f in chronology.train] == ["a"]
-    assert [f.feature_id for f in chronology.future] == ["b"]
+    assert [f.identifier for f in chronology.train] == ["a"]
+    assert [f.identifier for f in chronology.future] == ["b"]
     assert chronology.cutoff == datetime(2020, 1, 1, tzinfo=UTC)
     with pytest.raises(geometry.TemporalError, match="every feature"):
         dataset.Dataset((early, mark("c", 0, 0))).cutover("2020-01-01T00:00Z")
@@ -630,8 +626,8 @@ def payload_tile(**kwargs):
     raw = b"raster"
     arguments = {
         "source": "s",
-        "encoded_bytes": raw,
-        "file_hash": hashlib.sha256(raw).hexdigest(),
+        "encoded": raw,
+        "digest": hashlib.sha256(raw).hexdigest(),
         "width": 2,
         "height": 3,
         "bands": 1,
@@ -644,14 +640,14 @@ def payload_tile(**kwargs):
 
 def test_a_tile_validates_its_metadata():
     # Enforces website/src/pages/docs/data.astro:349.
-    tile = payload_tile(nodata_value=0)
-    assert tile.byte_size == 6
-    assert tile.nodata_value == 0.0
-    assert isinstance(tile.nodata_value, float)
-    assert tile.nodata_status == "declared"
-    assert payload_tile().nodata_status == "unknown"
-    assert payload_tile(nodata_fraction=0.0).nodata_status == "measured"
-    assert payload_tile(nodata_fraction=1.0).nodata_fraction == 1.0
+    tile = payload_tile(sentinel=0)
+    assert tile.size == 6
+    assert tile.sentinel == 0.0
+    assert isinstance(tile.sentinel, float)
+    assert tile.status == "declared"
+    assert payload_tile().status == "unknown"
+    assert payload_tile(nodata=0.0).status == "measured"
+    assert payload_tile(nodata=1.0).nodata == 1.0
 
 
 @pytest.mark.parametrize(
@@ -663,12 +659,12 @@ def test_a_tile_validates_its_metadata():
         ({"width": 0}, "must be positive"),
         ({"bands": 0}, "must be positive"),
         ({"transform": (1.0,)}, "transform must be empty"),
-        ({"nodata_value": True}, "must be numeric"),
-        ({"nodata_value": "0"}, "must be numeric"),
-        ({"nodata_value": float("inf")}, "must be finite"),
-        ({"nodata_fraction": 1.5}, r"in \[0, 1\]"),
-        ({"nodata_fraction": -0.1}, r"in \[0, 1\]"),
-        ({"file_hash": "0" * 64}, "does not match"),
+        ({"sentinel": True}, "must be numeric"),
+        ({"sentinel": "0"}, "must be numeric"),
+        ({"sentinel": float("inf")}, "must be finite"),
+        ({"nodata": 1.5}, r"in \[0, 1\]"),
+        ({"nodata": -0.1}, r"in \[0, 1\]"),
+        ({"digest": "0" * 64}, "does not match"),
     ],
 )
 def test_a_tile_rejects_invalid_metadata(kwargs, message):
@@ -678,7 +674,7 @@ def test_a_tile_rejects_invalid_metadata(kwargs, message):
 
 def test_an_empty_tile_payload_is_rejected():
     with pytest.raises(geometry.GeometryError, match="empty"):
-        payload_tile(encoded_bytes=b"", file_hash="0" * 64)
+        payload_tile(encoded=b"", digest="0" * 64)
 
 
 def test_extent_projects_the_window_boundaries():
@@ -745,10 +741,5 @@ def test_decode_enforces_its_arguments():
 
 def test_measured_nodata_fraction_counts_the_sentinel():
     pixels = numpy.array([[0, 1], [0, 0], [2, 3]])
-    assert (
-        payload_tile(nodata_value=0).measured_nodata_fraction(
-            lambda raw: pixels
-        )
-        == 0.5
-    )
-    assert payload_tile().measured_nodata_fraction(lambda raw: pixels) is None
+    assert payload_tile(sentinel=0).measure(lambda raw: pixels) == 0.5
+    assert payload_tile().measure(lambda raw: pixels) is None

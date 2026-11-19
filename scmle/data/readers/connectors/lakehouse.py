@@ -25,12 +25,12 @@ class Lakehouse(adapter.Adapter):
     Attributes:
         query: Versioned query or table expression used by the engine.
         schema_reader: Callback returning the schema for `query`.
-        batch_reader: Callback returning one batch for a query, offset and
+        reader: Callback returning one batch for a query, offset and
             limit.
         snapshot_reader: Callback returning a source-state token, or None.
     """
 
-    supported_schemes = ("warehouse", "lakehouse")
+    schemes = ("warehouse", "lakehouse")
 
     def __init__(
         self,
@@ -64,13 +64,13 @@ class Lakehouse(adapter.Adapter):
             SchemeError: If the scheme is neither
                 ``warehouse`` nor ``lakehouse``.
             ValueError: If `query` is blank.
-            TypeError: If `schema_reader` or `batch_reader` is not
+            TypeError: If `schema_reader` or `reader` is not
                 callable.
         """
         value = source_uri.strip()
         scheme = urlsplit(value).scheme.lower()
-        if scheme not in self.supported_schemes:
-            raise failure.SchemeError(value, scheme, self.supported_schemes)
+        if scheme not in self.schemes:
+            raise failure.SchemeError(value, scheme, self.schemes)
         if not query.strip():
             raise errors.InputError("query must not be empty")
         schema_candidate: object = schema_reader
@@ -81,12 +81,10 @@ class Lakehouse(adapter.Adapter):
             )
         self.query = query
         self.schema_reader = schema_reader
-        self.batch_reader = batch_reader
+        self.reader = batch_reader
         self.snapshot_reader = snapshot_reader
         super().__init__(value, retry_budget)
-        self.source_identity = locator.source_identity(
-            f"{self.source_uri}|query={self.query}"
-        )
+        self.identity = locator.identify(f"{self.uri}|query={self.query}")
 
     def schema(self) -> layout.Columns:
         """Reads and validates the schema without consuming a checkpoint.
@@ -99,11 +97,11 @@ class Lakehouse(adapter.Adapter):
         return failure.persevere(
             lambda: self.vet(self.schema_reader(self.query)),
             "schema",
-            self.source_uri,
-            self.retry_budget,
+            self.uri,
+            self.budget,
         )
 
-    def read_rows(
+    def read(
         self, checkpoint: locator.Bookmark | None = None, limit: int = 1_000
     ) -> layout.Page:
         """Reads one bounded batch from the injected warehouse engine.
@@ -121,18 +119,16 @@ class Lakehouse(adapter.Adapter):
             The validated batch with a checkpoint advanced by the rows
             returned.
         """
-        self.validate_limit(limit)
+        self.validate(limit)
         value = self.rebind(checkpoint)
         return failure.persevere(
-            lambda: self.read_batch(value, limit),
+            lambda: self.accept(value, limit),
             "read_rows",
-            self.source_uri,
-            self.retry_budget,
+            self.uri,
+            self.budget,
         )
 
-    def read_batch(
-        self, checkpoint: locator.Bookmark, limit: int
-    ) -> layout.Page:
+    def accept(self, checkpoint: locator.Bookmark, limit: int) -> layout.Page:
         """Validates one callback result and binds its next checkpoint.
 
         When a snapshot reader is configured, its token (hashed with
@@ -162,16 +158,16 @@ class Lakehouse(adapter.Adapter):
         )
         if (
             token is not None
-            and checkpoint.content_sha256 is not None
-            and checkpoint.content_sha256 != token
+            and checkpoint.digest is not None
+            and checkpoint.digest != token
         ):
             raise failure.CheckpointError(
-                self.source_uri,
+                self.uri,
                 "source_changed",
                 "warehouse snapshot token changed since the last batch",
                 {"offset": checkpoint.offset},
             )
-        schema, raw_rows, has_more = self.batch_reader(
+        schema, raw_rows, has_more = self.reader(
             self.query, checkpoint.offset, limit
         )
         schema = self.vet(schema)
@@ -179,7 +175,7 @@ class Lakehouse(adapter.Adapter):
             raise failure.ConnectorError(
                 "invalid_batch_more_flag",
                 "batch reader has_more must be bool",
-                self.source_uri,
+                self.uri,
                 {"value_type": type(has_more).__name__},
             )
         rows = tuple(tuple(row) for row in raw_rows)
@@ -187,7 +183,7 @@ class Lakehouse(adapter.Adapter):
             raise failure.ConnectorError(
                 "batch_limit_exceeded",
                 "batch reader returned more rows than requested",
-                self.source_uri,
+                self.uri,
                 {"limit": limit, "received": len(rows)},
             )
         width = len(schema.columns)
@@ -195,17 +191,17 @@ class Lakehouse(adapter.Adapter):
             raise failure.ConnectorError(
                 "row_width_mismatch",
                 "warehouse row width does not match its schema",
-                self.source_uri,
+                self.uri,
                 {"expected": width},
             )
         after = checkpoint.advance(len(rows))
         if token is not None:
-            after = dataclasses.replace(after, content_sha256=token)
+            after = dataclasses.replace(after, digest=token)
         return layout.Page(
             schema=schema,
             rows=rows,
             checkpoint=after,
-            has_more=has_more,
+            more=has_more,
         )
 
     def vet(self, schema: layout.Columns) -> layout.Columns:
@@ -225,7 +221,7 @@ class Lakehouse(adapter.Adapter):
             raise failure.ConnectorError(
                 "invalid_schema",
                 "schema reader must return Columns",
-                self.source_uri,
+                self.uri,
                 {"schema_type": type(schema).__name__},
             )
         return schema

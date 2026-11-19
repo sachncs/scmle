@@ -196,7 +196,7 @@ class Chronology(Partitioner):
             )
         return [text]
 
-    def chronological_holdout(
+    def withhold(
         self, frame: pandas.DataFrame
     ) -> tuple[numpy.ndarray, numpy.ndarray]:
         """Orders rows in time and holds out the latest for the final test.
@@ -269,7 +269,7 @@ class Chronology(Partitioner):
             BlockedError: If the time column cannot order the rows or there
                 are too few development rows for the folds and embargo.
         """
-        dev_ids, test_ids = self.chronological_holdout(frame)
+        dev_ids, test_ids = self.withhold(frame)
         embargo = self.embargo(frame)
         folds = self.validation.folds
         if len(dev_ids) < folds + 1 + embargo:
@@ -332,7 +332,7 @@ class Rolling(Chronology):
             BlockedError: If the time column cannot order the rows or fewer
                 than two windows fit.
         """
-        dev_ids, test_ids = self.chronological_holdout(frame)
+        dev_ids, test_ids = self.withhold(frame)
         validation = self.validation
         rows = len(dev_ids)
         horizon = validation.horizon_rows or max(

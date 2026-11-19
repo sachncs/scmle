@@ -50,6 +50,6 @@ def test_the_confirmation_stage_binds_the_release_before_it_opens_c():
     events = [entry["event"] for entry in source.log.entries]
     assert events.index("bound") < events.index("open")
     bound = source.log.entries[events.index("bound")]["detail"]
-    assert source.binding == sealed.binding_digest(
+    assert source.binding == sealed.digest(
         bound["claims_hash"], bound["ledger_hash"]
     )

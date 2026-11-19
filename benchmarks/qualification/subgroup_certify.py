@@ -346,7 +346,7 @@ def gate_hash() -> str:
     Returns:
         The code hash of the gate, its world, its helpers and its rules.
     """
-    return certificates.code_hash(
+    return certificates.fingerprint(
         gate_subgroup_holm,
         world,
         rejected_levels,

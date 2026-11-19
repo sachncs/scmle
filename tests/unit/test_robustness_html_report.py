@@ -88,4 +88,4 @@ def test_a_run_without_findings_still_renders_both_sections():
 
 def test_the_inputs_pass_the_report_validators():
     report.conform(stability([finding()]))
-    report.validate_shift(shift())
+    report.validate(shift())

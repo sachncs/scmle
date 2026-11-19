@@ -24,7 +24,7 @@ def withdraw_columns(*columns, seen=None, log=None):
         if seen is not None:
             seen["events_before"] = list(log.entries) if log else []
         reasons = {
-            h.hypothesis_id: "fragile on X"
+            h.identifier: "fragile on X"
             for h in survivors
             if h.spec.column in columns
         }
@@ -40,7 +40,7 @@ def run(second_stage, tmp_path=None, source=None, **world):
     features, target = build(**values)
     cfeatures, ctarget = build(rows=400, seed=9, effect=values["effect"])
     source = source or locate(cfeatures, ctarget)
-    return governed.run_governed(
+    return governed.govern(
         charter=make_charter(),
         features=features,
         target=target,
@@ -63,9 +63,7 @@ def test_a_withdrawn_survivor_is_not_tested_on_c_and_is_unverified(tmp_path):
     assert columns_of(result, confirmation.confirmed) == {"f0"}
     tested = {c.identifier.split(":")[0] for c in confirmation.checks}
     withdrawn = next(
-        h.hypothesis_id
-        for h in result.ledger.survivors()
-        if h.spec.column == "f1"
+        h.identifier for h in result.ledger.survivors() if h.spec.column == "f1"
     )
     assert withdrawn not in tested
     claim = next(c for c in confirmation.claims if c.identifier == withdrawn)
@@ -92,8 +90,8 @@ def test_the_accounting_is_in_the_claims_file_and_the_sealed_ledger(tmp_path):
         tmp_path / ledger.FILE_NAME, expected_head=result.ledger.head
     )
     assert reloaded.confirmation["stage_two"] == stage_two
-    assert reloaded.survivor_set.sha256 == stage_two["survivors_sha256"]
-    assert reloaded.survivor_set.hypothesis_ids == tuple(stage_two["survivors"])
+    assert reloaded.remaining.sha256 == stage_two["survivors_sha256"]
+    assert reloaded.remaining.hypotheses == tuple(stage_two["survivors"])
 
 
 def test_the_family_hash_is_logged_before_c_opens_and_x_only_ran_first():
@@ -111,7 +109,7 @@ def test_the_family_hash_is_logged_before_c_opens_and_x_only_ran_first():
     frozen = next(
         e for e in source.log.entries if e["event"] == "selection_frozen"
     )
-    stage_two = result.confirmation.stage_two
+    stage_two = result.confirmation.second
     assert frozen["detail"]["family_sha256"] == stage_two["family_sha256"]
     assert frozen["detail"]["withdrawn"] == 1
 
@@ -139,7 +137,7 @@ def test_without_a_withdrawal_nothing_changes(tmp_path):
     result = run(None, tmp_path)
     document = json.loads((tmp_path / confirm.CLAIMS_FILE).read_text())
     assert "stage_two" not in document
-    assert result.confirmation.stage_two is None
+    assert result.confirmation.second is None
     assert result.summary()["withdrawn"] is None
     assert columns_of(result, result.confirmation.confirmed) == {"f0", "f1"}
 
@@ -147,7 +145,7 @@ def test_without_a_withdrawal_nothing_changes(tmp_path):
 def test_an_empty_withdrawal_keeps_every_survivor():
     result = run(withdraw_columns())
     assert columns_of(result, result.confirmation.confirmed) == {"f0", "f1"}
-    assert result.confirmation.stage_two["withdrawn"] == {}
+    assert result.confirmation.second["withdrawn"] == {}
 
 
 def weak_world(seed):
@@ -168,7 +166,7 @@ def below_median_rule(features, target):
 
     def stage(survivors):
         effects = {
-            h.hypothesis_id: abs(
+            h.identifier: abs(
                 stats.spearmanr(features[h.spec.column], target)[0]
             )
             for h in survivors
@@ -196,7 +194,7 @@ def test_the_false_claim_rate_stays_below_alpha_with_an_x_only_withdrawal():
     for seed in range(reps):
         (features, target), (cfeatures, ctarget) = weak_world(seed)
         for name, values in proportions.items():
-            result = governed.run_governed(
+            result = governed.govern(
                 charter=make_charter(),
                 features=features,
                 target=target,
@@ -215,8 +213,8 @@ def test_the_false_claim_rate_stays_below_alpha_with_an_x_only_withdrawal():
                 for c in claims
             )
             values.append(false / max(len(claims), 1))
-            if name == "with" and result.confirmation.stage_two:
-                withdrawn += len(result.confirmation.stage_two["withdrawn"])
+            if name == "with" and result.confirmation.second:
+                withdrawn += len(result.confirmation.second["withdrawn"])
     assert withdrawn > 0
     for name, values in proportions.items():
         assert sum(values) / reps <= 0.05, name

@@ -299,7 +299,7 @@ def apply(
         `scope` or `today` falls outside its dates. A `today` that is not
         an ISO date is rejected with a `ValueError`.
     """
-    day = provenance.parse_date(today, "today")
+    day = provenance.parse(today, "today")
     valid: dict[str, Affidavit] = {}
     rejected: dict[str, str] = {}
     for item in attestations:

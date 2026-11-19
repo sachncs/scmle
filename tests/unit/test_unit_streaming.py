@@ -39,17 +39,17 @@ class Sink(transaction.Sink):
         self.receipt = receipt
 
     def commit(self, batch):
-        self.calls.append(batch.batch_id)
+        self.calls.append(batch.key)
         if self.receipt is not None:
             return self.receipt
         return transaction.Voucher(
-            batch.source_identity, batch.batch_id, batch.next_checkpoint, "ok"
+            batch.identity, batch.key, batch.checkpoint, "ok"
         )
 
 
 def ack(batch, group="g"):
     return transaction.Acknowledgement(
-        batch.source_identity, group, batch.batch_id, batch.next_checkpoint
+        batch.identity, group, batch.key, batch.checkpoint
     )
 
 
@@ -59,7 +59,7 @@ def ack(batch, group="g"):
 def test_a_streaming_error_carries_code_and_source():
     error = failure.StreamingError("c", "m", "src", {"k": 1})
     assert error.details == {"code": "c", "source_identity": "src", "k": 1}
-    assert (error.code, error.source_identity, str(error)) == ("c", "src", "m")
+    assert (error.code, error.identity, str(error)) == ("c", "src", "m")
     assert failure.StreamingError("c", "m", "s").details == {
         "code": "c",
         "source_identity": "s",
@@ -163,10 +163,10 @@ def test_pick_refuses_bad_frames_and_the_end_of_the_source():
 
 def test_a_resumed_read_with_another_batch_size_reports_rows_left(tmp_path):
     source = csv(tmp_path, 6)
-    first = source.read_batch(rows=3)
-    second = source.read_batch(first.next_checkpoint, rows=2)
+    first = source.read(rows=3)
+    second = source.read(first.checkpoint, rows=2)
     assert second.frame["a"].tolist() == [3, 4]
-    assert second.has_more
+    assert second.more
 
 
 def test_align_keeps_the_checkpoints_watermark_column(tmp_path):
@@ -184,35 +184,31 @@ def test_align_keeps_the_checkpoints_watermark_column(tmp_path):
 
 def test_read_batch_advances_offset_and_watermark(tmp_path):
     source = csv(tmp_path, 5)
-    first = source.read_batch(rows=2, watermark_column="t")
+    first = source.read(rows=2, watermark_column="t")
     assert first.frame["a"].tolist() == [0, 1]
-    assert first.start_offset == 0
-    assert first.has_more
-    assert first.next_checkpoint.offset == 2
-    assert first.next_checkpoint.watermark == "2026-01-02T00:00:00+00:00"
-    assert first.next_checkpoint.column == "t"
-    second = source.read_batch(
-        first.next_checkpoint, rows=2, watermark_column="t"
-    )
+    assert first.offset == 0
+    assert first.more
+    assert first.checkpoint.offset == 2
+    assert first.checkpoint.watermark == "2026-01-02T00:00:00+00:00"
+    assert first.checkpoint.column == "t"
+    second = source.read(first.checkpoint, rows=2, watermark_column="t")
     assert second.frame["a"].tolist() == [2, 3]
-    assert second.next_checkpoint.watermark == "2026-01-04T00:00:00+00:00"
-    last = source.read_batch(
-        second.next_checkpoint, rows=2, watermark_column="t"
-    )
+    assert second.checkpoint.watermark == "2026-01-04T00:00:00+00:00"
+    last = source.read(second.checkpoint, rows=2, watermark_column="t")
     assert last.frame["a"].tolist() == [4]
-    assert not last.has_more
+    assert not last.more
     with pytest.raises(failure.StreamingError) as raised:
-        source.read_batch(last.next_checkpoint, rows=2, watermark_column="t")
+        source.read(last.checkpoint, rows=2, watermark_column="t")
     assert raised.value.code == "end_of_source"
     with pytest.raises(errors.InputError, match="rows must be positive"):
-        source.read_batch(rows=0)
+        source.read(rows=0)
 
 
 def test_rebind_rejects_foreign_and_stale_checkpoints(tmp_path):
     source = csv(tmp_path, 3)
-    snapshot = source.snapshot_sha256()
+    snapshot = source.digest()
     fresh = source.rebind(None, snapshot)
-    assert (fresh.source, fresh.offset) == (source.source_identity(), 0)
+    assert (fresh.source, fresh.offset) == (source.identify(), 0)
     foreign = progress.Checkpoint("src_x", {"snapshot": snapshot})
     with pytest.raises(failure.StreamingError) as raised:
         source.rebind(foreign, snapshot)
@@ -227,16 +223,16 @@ def test_snapshot_reports_an_unreadable_file(tmp_path):
     source = csv(tmp_path, 1)
     source.path.unlink()
     with pytest.raises(failure.StreamingError) as raised:
-        source.snapshot_sha256()
+        source.digest()
     assert raised.value.code == "source_unreadable"
 
 
 def test_read_batch_detects_a_change_during_the_read(tmp_path, monkeypatch):
     source = csv(tmp_path, 3)
     digests = iter(["a" * 64, "b" * 64])
-    monkeypatch.setattr(source, "snapshot_sha256", lambda: next(digests))
+    monkeypatch.setattr(source, "digest", lambda: next(digests))
     with pytest.raises(failure.StreamingError) as raised:
-        source.read_batch(rows=1)
+        source.read(rows=1)
     assert raised.value.code == "source_snapshot_changed"
     assert raised.value.details["final_snapshot_sha256"] == "b" * 64
 
@@ -246,10 +242,10 @@ def test_read_batch_detects_a_change_during_the_read(tmp_path, monkeypatch):
 
 def test_row_hash_is_deterministic_and_seeded():
     positions = numpy.arange(1000)
-    first = sampling.row_hash(positions, 0)
-    assert first.tolist() == sampling.row_hash(positions, 0).tolist()
+    first = sampling.scramble(positions, 0)
+    assert first.tolist() == sampling.scramble(positions, 0).tolist()
     assert ((first >= 0) & (first < 1)).all()
-    assert first.tolist() != sampling.row_hash(positions, 1).tolist()
+    assert first.tolist() != sampling.scramble(positions, 1).tolist()
     assert 0.45 < first.mean() < 0.55
     assert len(set(first.tolist())) == 1000
 
@@ -259,7 +255,7 @@ def test_allot_locks_rows_below_the_fraction():
     sides = sampling.allot(positions, 0.2, 3)
     assert set(sides.tolist()) == {0, 1}
     assert 0.18 < sides.mean() < 0.22
-    expected = (sampling.row_hash(positions, 3) < 0.2).astype(int)
+    expected = (sampling.scramble(positions, 3) < 0.2).astype(int)
     assert sides.tolist() == expected.tolist()
     assert sampling.allot(positions, 0.0, 3).sum() == 0
     assert sampling.allot(positions, 1.0, 3).sum() == 10_000
@@ -284,14 +280,14 @@ def test_sweep_splits_one_pass_into_two_samples(tmp_path):
     source = csv(tmp_path, 200)
     kept, totals = sampling.sweep(source, 1_000, 1_000, 0.3, seed=1)
     assert totals.rows == 200
-    assert totals.development_sample + totals.locked_sample == 200
+    assert totals.sample + totals.locked_sample == 200
     assert totals.locked == totals.locked_sample
     sides = sampling.allot(numpy.arange(200), 0.3, 1)
     assert totals.locked == int(sides.sum())
     assert "priority" not in kept.columns
     assert set(kept[sampling.SPLIT_COLUMN]) == {0, 1}
     capped, totals = sampling.sweep(source, 10, 5, 0.3, seed=1)
-    assert (totals.development_sample, totals.locked_sample) == (10, 5)
+    assert (totals.sample, totals.locked_sample) == (10, 5)
     assert len(capped) == 15
     with pytest.raises(errors.DataError, match="too small to split"):
         sampling.sweep(csv(tmp_path, 1, "one.csv"), 10, 10, 0.5, seed=0)
@@ -305,12 +301,12 @@ def test_an_archive_starts_empty_and_round_trips_state(tmp_path):
     ledger = book(tmp_path, source)
     state = ledger.load()
     assert state.checkpoint.offset == 0
-    assert state.checkpoint.digests == {"snapshot": source.snapshot_sha256()}
-    batch = ledger.read_batch(rows=2)
-    ledger.write_atomically(journal.settle(state, batch))
+    assert state.checkpoint.digests == {"snapshot": source.digest()}
+    batch = ledger.read(rows=2)
+    ledger.write(journal.settle(state, batch))
     reloaded = ledger.load()
     assert reloaded.checkpoint.offset == 2
-    assert reloaded.committed == (batch.batch_id,)
+    assert reloaded.committed == (batch.key,)
 
 
 def test_an_archive_fails_closed_on_bad_state(tmp_path):
@@ -322,26 +318,24 @@ def test_an_archive_fails_closed_on_bad_state(tmp_path):
     assert raised.value.code == "invalid_state"
     other = csv(tmp_path, 3, "other.csv")
     foreign = transaction.Settlement(
-        progress.Checkpoint(
-            other.source_identity(), {"snapshot": other.snapshot_sha256()}
-        )
+        progress.Checkpoint(other.identify(), {"snapshot": other.digest()})
     )
     ledger.path.write_text(json.dumps(foreign.to_dict()))
     with pytest.raises(failure.StreamingError) as raised:
         ledger.load()
     assert raised.value.code == "checkpoint_source_mismatch"
     with pytest.raises(failure.StreamingError) as raised:
-        ledger.write_atomically(foreign)
+        ledger.write(foreign)
     assert raised.value.code == "checkpoint_source_mismatch"
     stale = transaction.Settlement(
-        progress.Checkpoint(source.source_identity(), {"snapshot": "c" * 64})
+        progress.Checkpoint(source.identify(), {"snapshot": "c" * 64})
     )
     ledger.path.write_text(json.dumps(stale.to_dict()))
     with pytest.raises(failure.StreamingError) as raised:
         ledger.load()
     assert raised.value.code == "source_snapshot_changed"
     with pytest.raises(failure.StreamingError) as raised:
-        ledger.write_atomically(stale)
+        ledger.write(stale)
     assert raised.value.code == "source_snapshot_changed"
 
 
@@ -349,8 +343,8 @@ def test_confine_checks_identity_then_snapshot(tmp_path):
     source = csv(tmp_path, 1)
     archive.confine(
         source,
-        source.source_identity(),
-        source.snapshot_sha256(),
+        source.identify(),
+        source.digest(),
         "c",
         ("x", "y"),
     )
@@ -358,9 +352,7 @@ def test_confine_checks_identity_then_snapshot(tmp_path):
         archive.confine(source, "src_z", "a" * 64, "c", ("x", "y"))
     assert raised.value.code == "c"
     with pytest.raises(failure.StreamingError, match="y") as raised:
-        archive.confine(
-            source, source.source_identity(), "a" * 64, "c", ("x", "y")
-        )
+        archive.confine(source, source.identify(), "a" * 64, "c", ("x", "y"))
     assert raised.value.code == "source_snapshot_changed"
 
 
@@ -368,13 +360,13 @@ def test_staged_acknowledgements_round_trip(tmp_path):
     source = csv(tmp_path, 3)
     ledger = book(tmp_path, source)
     assert ledger.reclaim() is None
-    batch = ledger.read_batch(rows=1)
+    batch = ledger.read(rows=1)
     ledger.earmark(ack(batch))
     assert ledger.reclaim() == ack(batch)
     ledger.retract()
     assert ledger.reclaim() is None
     ledger.retract()
-    ledger.pending_acknowledgement_path.write_text("nope")
+    ledger.pending.write_text("nope")
     with pytest.raises(failure.StreamingError) as raised:
         ledger.reclaim()
     assert raised.value.code == "invalid_acknowledgement"
@@ -383,26 +375,26 @@ def test_staged_acknowledgements_round_trip(tmp_path):
 def test_vouch_and_attest_compare_with_the_batch(tmp_path):
     source = csv(tmp_path, 3)
     ledger = book(tmp_path, source)
-    batch = ledger.read_batch(rows=1)
-    other = source.read_batch(batch.next_checkpoint, rows=1)
+    batch = ledger.read(rows=1)
+    other = source.read(batch.checkpoint, rows=1)
     ledger.vouch(batch, ack(batch))
     with pytest.raises(failure.StreamingError) as raised:
         ledger.vouch(batch, ack(other))
     assert raised.value.code == "acknowledgement_batch_mismatch"
     shifted = transaction.Acknowledgement(
-        batch.source_identity, "g", batch.batch_id, other.next_checkpoint
+        batch.identity, "g", batch.key, other.checkpoint
     )
     with pytest.raises(failure.StreamingError) as raised:
         ledger.vouch(batch, shifted)
     assert raised.value.code == "acknowledgement_checkpoint_mismatch"
     voucher = transaction.Voucher(
-        batch.source_identity, other.batch_id, batch.next_checkpoint, "r"
+        batch.identity, other.key, batch.checkpoint, "r"
     )
     with pytest.raises(failure.StreamingError) as raised:
         ledger.attest(batch, voucher)
     assert raised.value.code == "sink_receipt_batch_mismatch"
     moved = transaction.Voucher(
-        batch.source_identity, batch.batch_id, other.next_checkpoint, "r"
+        batch.identity, batch.key, other.checkpoint, "r"
     )
     with pytest.raises(failure.StreamingError) as raised:
         ledger.attest(batch, moved)
@@ -412,26 +404,26 @@ def test_vouch_and_attest_compare_with_the_batch(tmp_path):
 def test_finalize_commits_once_and_stages_the_acknowledgement(tmp_path):
     source = csv(tmp_path, 3)
     ledger = book(tmp_path, source)
-    batch = ledger.read_batch(rows=2)
+    batch = ledger.read(rows=2)
     written = []
     receipt = ledger.finalize(
         batch, lambda frame, key: written.append(key), ack(batch)
     )
     assert receipt.accepted and not receipt.duplicate
-    assert receipt.checkpoint == batch.next_checkpoint
-    assert written == [batch.batch_id]
-    assert ledger.reclaim().checkpoint == batch.next_checkpoint
+    assert receipt.checkpoint == batch.checkpoint
+    assert written == [batch.key]
+    assert ledger.reclaim().checkpoint == batch.checkpoint
     again = ledger.finalize(batch, lambda frame, key: written.append(key))
     assert again.duplicate and not again.accepted
-    assert written == [batch.batch_id]
-    assert ledger.load().committed == (batch.batch_id,)
+    assert written == [batch.key]
+    assert ledger.load().committed == (batch.key,)
 
 
 def test_finalize_refuses_mismatches(tmp_path):
     source = csv(tmp_path, 4)
     ledger = book(tmp_path, source)
-    first = ledger.read_batch(rows=1)
-    later = source.read_batch(first.next_checkpoint, rows=1)
+    first = ledger.read(rows=1)
+    later = source.read(first.checkpoint, rows=1)
     with pytest.raises(failure.StreamingError) as raised:
         ledger.finalize(later, lambda frame, key: None)
     assert raised.value.code == "checkpoint_mismatch"
@@ -453,36 +445,36 @@ def test_commit_transaction_records_and_replays_evidence(tmp_path):
     # Enforces website/src/pages/docs/data.astro:118.
     source = csv(tmp_path, 3)
     ledger = book(tmp_path, source)
-    batch = ledger.read_batch(rows=2)
+    batch = ledger.read(rows=2)
     sink = Sink()
-    receipt = ledger.commit_transaction(batch, sink, ack(batch))
+    receipt = ledger.commit(batch, sink, ack(batch))
     assert receipt.accepted
-    assert receipt.sink_receipt.receipt == "ok"
-    retry = ledger.commit_transaction(batch, sink, ack(batch))
+    assert receipt.receipt.receipt == "ok"
+    retry = ledger.commit(batch, sink, ack(batch))
     assert retry.duplicate
-    assert retry.sink_receipt == receipt.sink_receipt
-    assert sink.calls == [batch.batch_id]
+    assert retry.receipt == receipt.receipt
+    assert sink.calls == [batch.key]
     with pytest.raises(failure.StreamingError) as raised:
-        ledger.commit_transaction(batch, sink, ack(batch, "other"))
+        ledger.commit(batch, sink, ack(batch, "other"))
     assert raised.value.code == "acknowledgement_mismatch"
     state = ledger.load()
-    assert [c.batch for c in state.commitments] == [batch.batch_id]
+    assert [c.batch for c in state.commitments] == [batch.key]
 
 
 def test_commit_transaction_validates_its_parts(tmp_path):
     source = csv(tmp_path, 3)
     ledger = book(tmp_path, source)
-    batch = ledger.read_batch(rows=1)
+    batch = ledger.read(rows=1)
     with pytest.raises(errors.KindError, match="Sink"):
-        ledger.commit_transaction(batch, object(), ack(batch))
+        ledger.commit(batch, object(), ack(batch))
     with pytest.raises(errors.KindError, match="Acknowledgement"):
-        ledger.commit_transaction(batch, Sink(), "ack")
+        ledger.commit(batch, Sink(), "ack")
     with pytest.raises(failure.StreamingError) as raised:
-        ledger.commit_transaction(batch, Sink(receipt="x"), ack(batch))
+        ledger.commit(batch, Sink(receipt="x"), ack(batch))
     assert raised.value.code == "invalid_sink_receipt"
     ledger.finalize(batch, lambda frame, key: None)
     with pytest.raises(failure.StreamingError) as raised:
-        ledger.commit_transaction(batch, Sink(), ack(batch))
+        ledger.commit(batch, Sink(), ack(batch))
     assert raised.value.code == "transaction_evidence_missing"
 
 
@@ -490,11 +482,11 @@ def test_settle_adds_the_batch_and_sorted_evidence(tmp_path):
     source = csv(tmp_path, 3)
     ledger = book(tmp_path, source)
     state = ledger.load()
-    batch = ledger.read_batch(rows=1)
+    batch = ledger.read(rows=1)
     settled = journal.settle(state, batch)
-    assert settled.committed == (batch.batch_id,)
+    assert settled.committed == (batch.key,)
     assert settled.commitments == ()
-    assert settled.checkpoint == batch.next_checkpoint
+    assert settled.checkpoint == batch.checkpoint
 
 
 def test_a_consumer_validates_its_configuration(tmp_path):
@@ -519,10 +511,10 @@ def test_a_consumer_commits_then_acknowledges(tmp_path):
     first = reader.consume(rows=2)
     assert first.accepted
     assert written == [[0, 1]]
-    assert delivered == [first.batch_id]
+    assert delivered == [first.batch]
     second = reader.consume(rows=2)
     assert written == [[0, 1], [2]]
-    assert delivered == [first.batch_id, second.batch_id]
+    assert delivered == [first.batch, second.batch]
     assert ledger.reclaim() is None
     assert reader.handoff() is None
 
@@ -553,7 +545,7 @@ def test_a_consumer_refuses_another_groups_acknowledgement(tmp_path):
     # Enforces website/src/pages/docs/data.astro:17.
     # Enforces website/src/pages/docs/data.astro:117.
     ledger = book(tmp_path, csv(tmp_path, 3))
-    batch = ledger.read_batch(rows=1)
+    batch = ledger.read(rows=1)
     ledger.earmark(ack(batch, "other"))
     reader = consumer.Consumer(ledger, "g", print, print)
     with pytest.raises(failure.StreamingError) as raised:

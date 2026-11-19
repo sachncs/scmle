@@ -8,7 +8,7 @@ unrelated tables include each other by chance. So a link is accepted
 automatically only when (a) a foreign key is declared, or (b) containment is
 exact and the names corroborate it and no other parent competes. Every other
 link that clears the containment floor stays `candidate` and is asked, not
-joined. Links where neither side is a key are `many_to_many`: reported, never
+joined. Links where neither side is a key are `overlap`: reported, never
 joined.
 """
 
@@ -71,12 +71,12 @@ class Link:
         parent: Parent table.
         parent_columns: Parent columns `B`.
         containment: Share of distinct child values found in the parent.
-        child_distinct: Distinct non-null values of `A`.
-        cardinality: `many_to_one`, `one_to_one` or `many_to_many`.
+        distinct: Distinct non-null values of `A`.
+        cardinality: `many_to_one`, `one_to_one` or `overlap`.
         declared: Whether a schema declared it.
-        name_support: Whether the names corroborate it.
+        named: Whether the names corroborate it.
         score: Ranking aid, never a probability.
-        decision: `accepted`, `candidate`, `many_to_many`, `declared_violated`.
+        decision: `accepted`, `candidate`, `overlap`, `declared_violated`.
         why: One sentence on the decision.
         migrations: The written layout's version steps, oldest first;
             version 2 writes `columns.{child, parent}`, `distinct` and
@@ -100,10 +100,10 @@ class Link:
     parent: str
     parent_columns: tuple[str, ...]
     containment: float
-    child_distinct: int
+    distinct: int
     cardinality: str
     declared: bool
-    name_support: bool
+    named: bool
     score: float
     decision: str
     why: str
@@ -542,7 +542,7 @@ def arbitrate(links: Sequence[Link]) -> list[Link]:
     return sorted(out, key=lambda item: (-item.score, item.child, item.parent))
 
 
-def many_to_many(
+def overlap(
     source: profile.Sql,
     catalog: profile.Catalog,
     scans: Mapping[str, grain.Scan],
@@ -553,7 +553,7 @@ def many_to_many(
     The pairs are reported, never joined.
 
     Each column pair is charged to the budget (the rows of both tables and two
-    queries) under the stage `many_to_many` before it is measured. When the
+    queries) under the stage `overlap` before it is measured. When the
     budget cannot cover the next pair the search stops at that pair, the
     boundary is on the meter, and the pairs found so far are returned.
 
@@ -564,7 +564,7 @@ def many_to_many(
         eps_fk: Largest share of left values allowed to lack a match.
 
     Returns:
-        One `many_to_many` link per overlapping pair, where neither column
+        One `overlap` link per overlapping pair, where neither column
         is a key and the kinds match.
     """
     found: list[Link] = []
@@ -604,7 +604,7 @@ def many_to_many(
                             distinct,
                             MANY_TO_MANY,
                             declared=False,
-                            name_support=True,
+                            named=True,
                             score=containment,
                             decision=MANY_TO_MANY,
                             why="neither side is a key; reported, never joined",

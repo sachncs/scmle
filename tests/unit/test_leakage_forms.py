@@ -13,8 +13,8 @@ from scmle.assurance.ledger import multiplicity
 
 CLS = "classification"
 FAST = leakage.Config(
-    skill_ceiling=0.95,
-    association_ceiling=0.9,
+    skill=0.95,
+    ceiling=0.9,
     permutations=199,
     bootstrap=100,
 )

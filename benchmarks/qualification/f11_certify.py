@@ -335,7 +335,7 @@ def wilson(hits: int, runs: int) -> list[float]:
     Returns:
         The lower and upper bounds.
     """
-    low, high = certificates.wilson_interval(hits, runs, 0.95)
+    low, high = certificates.bound(hits, runs, 0.95)
     return [low, high]
 
 
@@ -500,7 +500,7 @@ def gate_a2(runs: int, base: int = 0) -> dict[str, Any]:
         )
         t = fp / (fp + fn)
         lhs = costs.net_benefit(y, a, t)
-        rhs = (fn * y.mean() - costs.expected_cost(y, a, model)) / fn
+        rhs = (fn * y.mean() - costs.price(y, a, model)) / fn
         worst = max(worst, abs(lhs - rhs))
     cut, prevalence, delta, t = 0.8, 0.2, 1.5, 0.2
     truth = float(
@@ -1711,7 +1711,7 @@ def gate_b5(runs: int, base: int = 0) -> dict[str, Any]:
             if rng.random() < OPEN_HORIZON_SHARE
             else int(rng.integers(1, 30))
         )
-        budget = scmle.assurance.ledger.budget.DecisionBudget(
+        budget = scmle.assurance.ledger.budget.Decision(
             alpha, scmle.assurance.ledger.budget.exact(0.01, "b"), horizon
         )
         total = Fraction(0)
@@ -1732,7 +1732,7 @@ def gate_b5(runs: int, base: int = 0) -> dict[str, Any]:
             violations += 1
         except scmle.assurance.ledger.budget.ExhaustedError:
             pass
-        rebuilt = scmle.assurance.ledger.budget.DecisionBudget.from_dict(
+        rebuilt = scmle.assurance.ledger.budget.Decision.from_dict(
             json.loads(json.dumps(budget.to_dict()))
         )
         if rebuilt != budget:
@@ -2308,7 +2308,7 @@ def sources() -> dict[str, list[Any]]:
             f11_generators.calibration_world,
         ],
         "A1c": [threshold.hosmer, gate_a1c],
-        "A2": [costs.net_benefit, costs.expected_cost, gate_a2],
+        "A2": [costs.net_benefit, costs.price, gate_a2],
         "A3": [
             netbenefit.lowerband,
             netbenefit.redraw,
@@ -2394,7 +2394,7 @@ def sources() -> dict[str, list[Any]]:
         ],
         "B5": [
             scmle.assurance.ledger.budget.enroll,
-            scmle.assurance.ledger.budget.DecisionBudget,
+            scmle.assurance.ledger.budget.Decision,
             gate_b5,
         ],
         "B6": [design.srm_log_bayes_factor, design.mismatch, gate_b6],
@@ -2446,7 +2446,7 @@ def current_digests() -> dict[str, str]:
     Returns:
         Mapping of gate key to its current code hash.
     """
-    return {k: certificates.code_hash(*v) for k, v in sources().items()}
+    return {k: certificates.fingerprint(*v) for k, v in sources().items()}
 
 
 def certify_all(

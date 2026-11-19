@@ -13,7 +13,7 @@ def resolve(request, values):
     # whose configuration needs more fields (targets, a time column) are
     # resolved the same way as the rest.
     spec = tasks.Config(data=tasks.Dataset(uri="m", target="y"))
-    resolver = target.TaskResolver(spec)
+    resolver = target.Resolver(spec)
     resolver.request = request
     return resolver.resolve(pandas.Series(values, name="y"))
 

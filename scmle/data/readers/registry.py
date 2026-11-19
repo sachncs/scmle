@@ -156,7 +156,7 @@ class Observation:
         """
         uri = connectors.canonicalize(manifest.uri or "memory://")
         return cls(
-            source=connectors.source_identity(uri),
+            source=connectors.identify(uri),
             uri=uri,
             snapshot=manifest.snapshot,
             digests={
@@ -540,7 +540,7 @@ class Sources:
         return registry
 
     @classmethod
-    def from_json(cls, serialized: str) -> Self:
+    def parse(cls, serialized: str) -> Self:
         """Rebuilds a source registry from canonical JSON.
 
         Args:
@@ -576,7 +576,7 @@ class Registry:
         """
         if not self.path.exists():
             return Sources()
-        return Sources.from_json(self.path.read_text(encoding="utf-8"))
+        return Sources.parse(self.path.read_text(encoding="utf-8"))
 
     def save(self, registry: Sources) -> None:
         """Atomically publishes a complete registry snapshot.

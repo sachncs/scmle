@@ -114,13 +114,13 @@ class StreamingObjectStoreConnector(adapter.Adapter):
     CSV records and binary containers need a format-specific streaming adapter.
 
     Attributes:
-        read_range: Caller-owned byte-range transport.
-        size_bytes: Caller-owned object-size lookup.
-        chunk_bytes: Maximum bytes requested per range call.
-        max_record_bytes: Maximum buffered line size.
+        transport: Caller-owned byte-range transport.
+        size: Caller-owned object-size lookup.
+        chunk: Maximum bytes requested per range call.
+        limit: Maximum buffered line size.
     """
 
-    supported_schemes = bucket.Bucket.supported_schemes
+    schemes = bucket.Bucket.schemes
 
     def __init__(
         self,
@@ -128,8 +128,8 @@ class StreamingObjectStoreConnector(adapter.Adapter):
         read_range: RangeReader,
         size_bytes: SizeReader,
         retry_budget: failure.Retries | None = None,
-        chunk_bytes: int = 1024 * 1024,
-        max_record_bytes: int = 64 * 1024 * 1024,
+        chunk: int = 1024 * 1024,
+        limit: int = 64 * 1024 * 1024,
     ) -> None:
         """Initializes a range-backed object connector.
 
@@ -138,22 +138,22 @@ class StreamingObjectStoreConnector(adapter.Adapter):
             read_range: Caller-owned byte-range transport.
             size_bytes: Caller-owned object-size lookup.
             retry_budget: Per-operation retry policy.
-            chunk_bytes: Maximum bytes requested per range call.
-            max_record_bytes: Maximum buffered line size.
+            chunk: Maximum bytes requested per range call.
+            limit: Maximum buffered line size.
 
         Raises:
             SchemeError: If the scheme is not one of the
                 object-store schemes.
             ConnectorError: ``unsupported_stream_format`` if the name does
                 not end in ``.jsonl`` or ``.ndjson``.
-            TypeError: If `read_range` or `size_bytes` is not callable.
-            ValueError: If `chunk_bytes` or `max_record_bytes` is below 1.
+            TypeError: If `transport` or `size` is not callable.
+            ValueError: If `chunk` or `limit` is below 1.
         """
         value = source_uri.strip()
         scheme = urlsplit(value).scheme.lower()
         suffix = pathlib.PurePosixPath(urlsplit(value).path).name.lower()
-        if scheme not in self.supported_schemes:
-            raise failure.SchemeError(value, scheme, self.supported_schemes)
+        if scheme not in self.schemes:
+            raise failure.SchemeError(value, scheme, self.schemes)
         if not suffix.endswith((".jsonl", ".ndjson")):
             raise failure.ConnectorError(
                 "unsupported_stream_format",
@@ -165,14 +165,14 @@ class StreamingObjectStoreConnector(adapter.Adapter):
         size_candidate: object = size_bytes
         if not callable(range_candidate) or not callable(size_candidate):
             raise errors.KindError("read_range and size_bytes must be callable")
-        if chunk_bytes < 1:
-            raise errors.InputError("chunk_bytes must be positive")
-        if max_record_bytes < 1:
-            raise errors.InputError("max_record_bytes must be positive")
-        self.read_range = read_range
-        self.size_bytes = size_bytes
-        self.chunk_bytes = chunk_bytes
-        self.max_record_bytes = max_record_bytes
+        if chunk < 1:
+            raise errors.InputError("chunk must be positive")
+        if limit < 1:
+            raise errors.InputError("limit must be positive")
+        self.transport = read_range
+        self.size = size_bytes
+        self.chunk = chunk
+        self.limit = limit
         super().__init__(value, retry_budget)
 
     def measure(self) -> int:
@@ -186,21 +186,21 @@ class StreamingObjectStoreConnector(adapter.Adapter):
                 return a non-negative integer.
         """
         size: object = failure.persevere(
-            lambda: self.size_bytes(self.source_uri),
+            lambda: self.size(self.uri),
             "head_object",
-            self.source_uri,
-            self.retry_budget,
+            self.uri,
+            self.budget,
         )
         if isinstance(size, bool) or not isinstance(size, int) or size < 0:
             raise failure.ConnectorError(
                 "invalid_object_size",
                 "object size reader must return a non-negative integer",
-                self.source_uri,
+                self.uri,
                 {"size_type": type(size).__name__, "size": size},
             )
         return size
 
-    def read_bytes(self, start: int, end: int) -> bytes:
+    def fetch(self, start: int, end: int) -> bytes:
         """Reads one validated half-open byte range.
 
         Args:
@@ -217,16 +217,16 @@ class StreamingObjectStoreConnector(adapter.Adapter):
                 than requested.
         """
         payload = failure.persevere(
-            lambda: self.read_range(self.source_uri, start, end),
+            lambda: self.transport(self.uri, start, end),
             "read_range",
-            self.source_uri,
-            self.retry_budget,
+            self.uri,
+            self.budget,
         )
         if not isinstance(payload, bytes):
             raise failure.ConnectorError(
                 "invalid_range_payload",
                 "range reader must return bytes",
-                self.source_uri,
+                self.uri,
                 {"payload_type": type(payload).__name__},
             )
         requested = end - start
@@ -234,7 +234,7 @@ class StreamingObjectStoreConnector(adapter.Adapter):
             raise failure.ConnectorError(
                 "range_overread",
                 "range reader returned more bytes than requested",
-                self.source_uri,
+                self.uri,
                 {"requested": requested, "received": len(payload)},
             )
         return payload
@@ -248,16 +248,16 @@ class StreamingObjectStoreConnector(adapter.Adapter):
         Raises:
             ConnectorError: ``empty_object`` if the object has no records.
         """
-        batch = self.read_rows(limit=1)
+        batch = self.read(limit=1)
         if not batch.rows:
             raise failure.ConnectorError(
                 "empty_object",
                 "streaming object contains no JSON records",
-                self.source_uri,
+                self.uri,
             )
         return batch.schema
 
-    def read_rows(
+    def read(
         self, checkpoint: locator.Bookmark | None = None, limit: int = 1_000
     ) -> layout.Page:
         """Reads JSON records from a byte checkpoint without full download.
@@ -282,12 +282,12 @@ class StreamingObjectStoreConnector(adapter.Adapter):
             CheckpointError: ``checkpoint_beyond_object`` if the
                 checkpoint offset exceeds the current object size.
         """
-        self.validate_limit(limit)
+        self.validate(limit)
         value = self.rebind(checkpoint)
         total = self.measure()
         if value.offset > total:
             raise failure.CheckpointError(
-                self.source_uri,
+                self.uri,
                 "checkpoint_beyond_object",
                 "checkpoint offset is beyond the current object size",
                 {"offset": value.offset, "size": total},
@@ -298,19 +298,19 @@ class StreamingObjectStoreConnector(adapter.Adapter):
                 schema=layout.Columns((layout.Field("record", "object"),)),
                 rows=(),
                 checkpoint=value,
-                has_more=False,
+                more=False,
             )
         selected = records[:limit]
-        schema, rows = interpret(selected, self.source_uri)
+        schema, rows = interpret(selected, self.uri)
         next_offset = selected[-1][1]
-        next_checkpoint = value.bind(self.source_identity).advance(
+        next_checkpoint = value.bind(self.identity).advance(
             next_offset - value.offset
         )
         return layout.Page(
             schema=schema,
             rows=rows,
             checkpoint=next_checkpoint,
-            has_more=len(records) > limit,
+            more=len(records) > limit,
         )
 
     def scan(
@@ -334,7 +334,7 @@ class StreamingObjectStoreConnector(adapter.Adapter):
         Raises:
             ConnectorError: ``range_no_progress`` if the transport returns
                 no bytes before the object end; ``record_too_large`` if
-                buffered bytes exceed `max_record_bytes` without a
+                buffered bytes exceed `limit` without a
                 complete line.
         """
         records: list[tuple[bytes, int]] = []
@@ -342,13 +342,13 @@ class StreamingObjectStoreConnector(adapter.Adapter):
         buffer_origin = start
         position = start
         while position < total and len(records) < required_records:
-            end = min(total, position + self.chunk_bytes)
-            payload = self.read_bytes(position, end)
+            end = min(total, position + self.chunk)
+            payload = self.fetch(position, end)
             if not payload:
                 raise failure.ConnectorError(
                     "range_no_progress",
                     "range reader returned no bytes before object end",
-                    self.source_uri,
+                    self.uri,
                     {"offset": position, "requested_end": end},
                 )
             buffer += payload
@@ -361,13 +361,13 @@ class StreamingObjectStoreConnector(adapter.Adapter):
                 buffer_origin = line_end
                 if line:
                     records.append((line, line_end))
-            if len(buffer) > self.max_record_bytes:
+            if len(buffer) > self.limit:
                 raise failure.ConnectorError(
                     "record_too_large",
                     "a JSON record exceeds max_record_bytes",
-                    self.source_uri,
+                    self.uri,
                     {
-                        "max_record_bytes": self.max_record_bytes,
+                        "max_record_bytes": self.limit,
                         "offset": buffer_origin,
                     },
                 )

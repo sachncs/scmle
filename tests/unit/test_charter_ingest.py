@@ -17,27 +17,25 @@ PINNED_HASH = "df685532bd1c21ef568e17997220f2b97da7c38d0a7a9752b9dcfecea49fa158"
 
 def test_a_charter_without_the_block_keeps_its_hash_and_format():
     charter = make_charter()
-    assert charter.charter_hash == PINNED_HASH
+    assert charter.digest == PINNED_HASH
     assert "ingest" not in charter.to_dict()
     assert charter.format_version == 2
     record = json.loads(json.dumps(charter.to_dict()))
-    assert (
-        contracts.AnalysisCharter.from_dict(record).charter_hash == PINNED_HASH
-    )
+    assert contracts.Charter.from_dict(record).digest == PINNED_HASH
 
 
 def test_a_signed_older_charter_still_verifies(tmp_path):
     path = tmp_path / "charter.json"
     sealing.inscribe(path, make_charter(), signing_key="k")
-    assert sealing.read_verified(path, signing_key="k").signed
+    assert sealing.read(path, signing_key="k").signed
 
 
 def test_the_block_changes_the_hash_round_trips_and_needs_format_seven():
     charter = make_charter(ingest=ingest.Ingestion(features=50, lag=1.0))
-    assert charter.charter_hash != PINNED_HASH
+    assert charter.digest != PINNED_HASH
     assert charter.format_version == 7
     record = json.loads(json.dumps(charter.to_dict()))
-    assert contracts.AnalysisCharter.from_dict(record) == charter
+    assert contracts.Charter.from_dict(record) == charter
 
 
 def test_the_block_in_an_older_format_is_refused(tmp_path):
@@ -48,7 +46,7 @@ def test_the_block_in_an_older_format_is_refused(tmp_path):
     wrapper["format"] = 6
     path.write_text(json.dumps(wrapper))
     with pytest.raises(errors.ConfigError, match="ingest"):
-        sealing.read_verified(path, signing_key="k")
+        sealing.read(path, signing_key="k")
 
 
 @pytest.mark.parametrize(
@@ -96,7 +94,7 @@ def entity_block():
 def test_a_format_seven_ingest_charter_keeps_hash_and_signature():
     # Enforces docs/API_STABILITY.md:88.
     charter = make_charter(ingest=ingest.Ingestion(features=50, lag=1.0))
-    assert charter.charter_hash == FORMAT_SEVEN_HASH
+    assert charter.digest == FORMAT_SEVEN_HASH
     assert charter.format_version == 7
     assert "entity" not in charter.to_dict()["ingest"]
     assert sealing.envelope(charter, "k")["signature"] == FORMAT_SEVEN_SIGNATURE
@@ -108,9 +106,9 @@ def test_the_entity_block_needs_format_eight_and_round_trips():
     spec = ingest.Ingestion(features=50, lag=1.0, entity=entity_block())
     charter = make_charter(ingest=spec)
     assert charter.format_version == 8
-    assert charter.charter_hash != FORMAT_SEVEN_HASH
+    assert charter.digest != FORMAT_SEVEN_HASH
     record = json.loads(json.dumps(charter.to_dict()))
-    assert contracts.AnalysisCharter.from_dict(record) == charter
+    assert contracts.Charter.from_dict(record) == charter
 
 
 def test_the_entity_block_in_format_seven_is_refused(tmp_path):
@@ -121,7 +119,7 @@ def test_the_entity_block_in_format_seven_is_refused(tmp_path):
     wrapper["format"] = 7
     path.write_text(json.dumps(wrapper))
     with pytest.raises(errors.ConfigError, match="entity"):
-        sealing.read_verified(path, signing_key="k")
+        sealing.read(path, signing_key="k")
 
 
 @pytest.mark.parametrize(
@@ -147,7 +145,7 @@ def test_an_invalid_entity_block_is_refused(build):
 def reconcile_block():
     return ingest.Expectation(
         (
-            ingest.TableTotals(
+            ingest.Totals(
                 "orders",
                 rows=100,
                 sums=(ingest.Total("amount", 5000.0),),
@@ -164,12 +162,12 @@ def test_the_reconcile_block_needs_format_eight_and_round_trips():
     spec = ingest.Ingestion(reconcile=reconcile_block())
     charter = make_charter(ingest=spec)
     assert charter.format_version == 8
-    assert charter.charter_hash != FORMAT_SEVEN_HASH
+    assert charter.digest != FORMAT_SEVEN_HASH
     record = json.loads(json.dumps(charter.to_dict()))
-    assert contracts.AnalysisCharter.from_dict(record) == charter
+    assert contracts.Charter.from_dict(record) == charter
     plain = make_charter(ingest=ingest.Ingestion(features=50, lag=1.0))
     assert "reconcile" not in plain.to_dict()["ingest"]
-    assert plain.charter_hash == FORMAT_SEVEN_HASH
+    assert plain.digest == FORMAT_SEVEN_HASH
 
 
 def test_the_reconcile_block_in_format_seven_is_refused(tmp_path):
@@ -180,21 +178,21 @@ def test_the_reconcile_block_in_format_seven_is_refused(tmp_path):
     wrapper["format"] = 7
     path.write_text(json.dumps(wrapper))
     with pytest.raises(errors.ConfigError, match="reconcile"):
-        sealing.read_verified(path, signing_key="k")
+        sealing.read(path, signing_key="k")
 
 
 @pytest.mark.parametrize(
     "build",
     [
         lambda: ingest.Expectation(()),
-        lambda: ingest.TableTotals("t"),
-        lambda: ingest.TableTotals("t", rows=-1),
-        lambda: ingest.TableTotals("t", column="k"),
-        lambda: ingest.TableTotals("t", checksum="ab" * 32),
-        lambda: ingest.TableTotals("t", column="k", checksum="zz"),
+        lambda: ingest.Totals("t"),
+        lambda: ingest.Totals("t", rows=-1),
+        lambda: ingest.Totals("t", column="k"),
+        lambda: ingest.Totals("t", checksum="ab" * 32),
+        lambda: ingest.Totals("t", column="k", checksum="zz"),
         lambda: ingest.Total("a", float("nan")),
         lambda: ingest.Expectation(
-            (ingest.TableTotals("t", rows=1), ingest.TableTotals("t", rows=2))
+            (ingest.Totals("t", rows=1), ingest.Totals("t", rows=2))
         ),
     ],
 )

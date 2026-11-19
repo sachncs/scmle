@@ -112,7 +112,7 @@ class ProcessorMachine(RuleBasedStateMachine):
             assert checkpoint.seen == set(ids)
         else:
             assert not self.store.exists(failpoints.STATE_KEY)
-        parts = (*result.processed, *result.skipped, *result.duplicate_objects)
+        parts = (*result.processed, *result.skipped, *result.duplicates)
         assert sorted(parts) == sorted(self.objects)
         assert not self.store.exists(failpoints.LOCK_KEY)
 
@@ -149,7 +149,7 @@ class ProcessorMachine(RuleBasedStateMachine):
             result = self.make_processor().run()
             self.check_after_success(result)
             again = self.make_processor().run()
-            assert again.processed == () and again.duplicate_objects == ()
+            assert again.processed == () and again.duplicates == ()
             assert self.outputs() == reference_outputs(self.objects)
 
     @precondition(lambda self: not self.corrupt and not self.stale_lock)
@@ -175,7 +175,7 @@ class ProcessorMachine(RuleBasedStateMachine):
     def resume(self):
         with pytest.raises(processing.LockError):
             self.make_processor().run()
-        self.make_processor().break_lock()
+        self.make_processor().lock()
         self.stale_lock = False
         result = self.make_processor().run()
         self.check_after_success(result)

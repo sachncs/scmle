@@ -32,35 +32,35 @@ class Payload:
     """Bounded raw object bytes with a stable content identity.
 
     Attributes:
-        source_uri: Canonical URI the bytes were read from.
+        uri: Canonical URI the bytes were read from.
         payload: The raw object bytes.
-        content_sha256: SHA-256 hex digest of `payload`, derived on
+        digest: SHA-256 hex digest of `payload`, derived on
             construction.
-        byte_size: Length of `payload` in bytes, derived on construction.
+        size: Length of `payload` in bytes, derived on construction.
     """
 
-    source_uri: str
+    uri: str
     payload: bytes = dataclasses.field(repr=False)
-    content_sha256: str = dataclasses.field(init=False)
-    byte_size: int = dataclasses.field(init=False)
+    digest: str = dataclasses.field(init=False)
+    size: int = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
         """Derives the digest and size used by checkpoints.
 
         Raises:
-            ValueError: If `source_uri` is blank.
+            ValueError: If `uri` is blank.
             TypeError: If `payload` is not ``bytes``.
         """
-        if not self.source_uri.strip():
+        if not self.uri.strip():
             raise errors.InputError("source_uri must not be empty")
         if not isinstance(self.payload, bytes):
             raise errors.KindError("payload must be bytes")
         object.__setattr__(
             self,
-            "content_sha256",
+            "digest",
             hashlib.sha256(self.payload).hexdigest(),
         )
-        object.__setattr__(self, "byte_size", len(self.payload))
+        object.__setattr__(self, "size", len(self.payload))
 
 
 def unpack(source_uri: str, payload: bytes) -> pandas.DataFrame:
@@ -123,23 +123,23 @@ class Bucket(adapter.Adapter):
     ingestion, but does not claim range reads or streaming-scale semantics.
 
     Attributes:
-        read_bytes: Caller-owned transport returning the object bytes.
-        max_bytes: Maximum object size accepted.
+        transport: Caller-owned transport returning the object bytes.
+        limit: Maximum object size accepted.
         decoder: Callable decoding the object bytes into a DataFrame.
-        decoder_name: Stable decoder name and version, part of the source
+        codec: Stable decoder name and version, part of the source
             identity.
     """
 
-    supported_schemes = ("s3", "gs", "az", "abfs", "http", "https")
+    schemes = ("s3", "gs", "az", "abfs", "http", "https")
 
     def __init__(
         self,
         source_uri: str,
         read_bytes: Callable[[str], bytes],
         retry_budget: failure.Retries | None = None,
-        max_bytes: int = 256 * 1024 * 1024,
+        limit: int = 256 * 1024 * 1024,
         decoder: ObjectDecoder | None = None,
-        decoder_name: str | None = None,
+        codec: str | None = None,
     ) -> None:
         """Initializes an object connector with explicit boundaries.
 
@@ -147,48 +147,44 @@ class Bucket(adapter.Adapter):
             source_uri: Object-store URI.
             read_bytes: Caller-owned transport that returns the object bytes.
             retry_budget: Per-operation retry policy.
-            max_bytes: Maximum object size loaded into memory.
+            limit: Maximum object size loaded into memory.
             decoder: Optional caller-owned decoder returning a DataFrame.
-            decoder_name: Stable decoder name and version for source
+            codec: Stable decoder name and version for source
                 identity. Required with a custom decoder and not allowed
                 without one (the default decoder is ``tabular-auto-v1``).
 
         Raises:
             SchemeError: If the scheme is not one of
                 ``s3``, ``gs``, ``az``, ``abfs``, ``http`` or ``https``.
-            ValueError: If `max_bytes` is below 1, `decoder_name` is given
+            ValueError: If `limit` is below 1, `codec` is given
                 without a decoder, or a custom decoder has a blank name.
             TypeError: If a decoder or transport is not callable.
         """
         value = source_uri.strip()
         scheme = urlsplit(value).scheme.lower()
-        if scheme not in self.supported_schemes:
-            raise failure.SchemeError(value, scheme, self.supported_schemes)
+        if scheme not in self.schemes:
+            raise failure.SchemeError(value, scheme, self.schemes)
         if not callable(read_bytes):
             raise errors.KindError("read_bytes must be callable")
-        if max_bytes < 1:
-            raise errors.InputError("max_bytes must be positive")
+        if limit < 1:
+            raise errors.InputError("limit must be positive")
         if decoder is not None and not callable(decoder):
             raise errors.KindError("decoder must be callable")
         if decoder is None:
-            if decoder_name is not None:
-                raise errors.InputError(
-                    "decoder_name requires a caller-owned decoder"
-                )
+            if codec is not None:
+                raise errors.InputError("codec requires a caller-owned decoder")
             decoder = unpack
-            decoder_name = "tabular-auto-v1"
-        elif not decoder_name or not decoder_name.strip():
+            codec = "tabular-auto-v1"
+        elif not codec or not codec.strip():
             raise errors.InputError(
-                "decoder_name must identify a caller-owned decoder and version"
+                "codec must identify a caller-owned decoder and version"
             )
-        self.read_bytes = read_bytes
-        self.max_bytes = max_bytes
+        self.transport = read_bytes
+        self.limit = limit
         self.decoder = decoder
-        self.decoder_name = decoder_name.strip()
+        self.codec = codec.strip()
         super().__init__(value, retry_budget)
-        self.source_identity = locator.source_identity(
-            f"{self.source_uri}|decoder={self.decoder_name}"
-        )
+        self.identity = locator.identify(f"{self.uri}|decoder={self.codec}")
 
     def load(self) -> pandas.DataFrame:
         """Downloads and decodes the bounded object once.
@@ -196,9 +192,9 @@ class Bucket(adapter.Adapter):
         Returns:
             The decoded table.
         """
-        return self.deserialize(self.read_object())
+        return self.deserialize(self.fetch())
 
-    def read_object(self) -> Payload:
+    def fetch(self) -> Payload:
         """Reads bounded raw bytes and derives their content identity.
 
         Returns:
@@ -207,29 +203,29 @@ class Bucket(adapter.Adapter):
         Raises:
             ConnectorError: ``invalid_object_payload`` if the transport
                 does not return ``bytes``; ``object_too_large`` if the
-                payload exceeds `max_bytes` (checked after the read).
+                payload exceeds `limit` (checked after the read).
         """
         payload = failure.persevere(
-            lambda: self.read_bytes(self.source_uri),
+            lambda: self.transport(self.uri),
             "read_object",
-            self.source_uri,
-            self.retry_budget,
+            self.uri,
+            self.budget,
         )
         if not isinstance(payload, bytes):
             raise failure.ConnectorError(
                 "invalid_object_payload",
                 "object reader must return bytes",
-                self.source_uri,
+                self.uri,
                 {"payload_type": type(payload).__name__},
             )
-        if len(payload) > self.max_bytes:
+        if len(payload) > self.limit:
             raise failure.ConnectorError(
                 "object_too_large",
-                f"object is larger than max_bytes={self.max_bytes}",
-                self.source_uri,
-                {"bytes": len(payload), "max_bytes": self.max_bytes},
+                f"object is larger than max_bytes={self.limit}",
+                self.uri,
+                {"bytes": len(payload), "max_bytes": self.limit},
             )
-        return Payload(self.source_uri, payload)
+        return Payload(self.uri, payload)
 
     def deserialize(self, object_payload: Payload) -> pandas.DataFrame:
         """Decodes one observed object while preserving its raw identity.
@@ -247,16 +243,16 @@ class Bucket(adapter.Adapter):
                 DataFrame.
         """
         try:
-            frame = self.decoder(self.source_uri, object_payload.payload)
+            frame = self.decoder(self.uri, object_payload.payload)
         except failure.ConnectorError:
             raise
         except Exception as error:
             raise failure.ConnectorError(
                 "decoder_failed",
                 f"object decoder failed: {error}",
-                self.source_uri,
+                self.uri,
                 {
-                    "decoder": self.decoder_name,
+                    "decoder": self.codec,
                     "error_type": type(error).__name__,
                 },
             ) from error
@@ -264,9 +260,9 @@ class Bucket(adapter.Adapter):
             raise failure.ConnectorError(
                 "invalid_decoded_object",
                 "object decoder must return a pandas DataFrame",
-                self.source_uri,
+                self.uri,
                 {
-                    "decoder": self.decoder_name,
+                    "decoder": self.codec,
                     "result_type": type(frame).__name__,
                 },
             )
@@ -278,9 +274,9 @@ class Bucket(adapter.Adapter):
         Returns:
             The schema of the decoded table.
         """
-        return layout.Columns.from_frame(self.load())
+        return layout.Columns.infer(self.load())
 
-    def read_rows(
+    def read(
         self, checkpoint: locator.Bookmark | None = None, limit: int = 1_000
     ) -> layout.Page:
         """Reads a bounded row batch from an object checkpoint.
@@ -304,23 +300,23 @@ class Bucket(adapter.Adapter):
             ConnectorError: ``source_snapshot_changed`` if the object
                 differs from the one the checkpoint was bound to.
         """
-        self.validate_limit(limit)
+        self.validate(limit)
         value = self.rebind(checkpoint)
-        object_payload = self.read_object()
+        object_payload = self.fetch()
         try:
-            value = value.seal(object_payload.content_sha256)
+            value = value.seal(object_payload.digest)
         except ValueError as error:
             raise failure.ConnectorError(
                 "source_snapshot_changed",
                 "object content changed since the checkpoint was created",
-                self.source_uri,
+                self.uri,
                 {
-                    "checkpoint_content_sha256": value.content_sha256,
-                    "observed_content_sha256": object_payload.content_sha256,
+                    "checkpoint_content_sha256": value.digest,
+                    "observed_content_sha256": object_payload.digest,
                 },
             ) from error
         frame = self.deserialize(object_payload)
-        schema = layout.Columns.from_frame(frame)
+        schema = layout.Columns.infer(frame)
         selected = frame.iloc[value.offset : value.offset + limit]
         rows = tuple(selected.itertuples(index=False, name=None))
         next_checkpoint = value.advance(len(rows))
@@ -328,6 +324,6 @@ class Bucket(adapter.Adapter):
             schema=schema,
             rows=rows,
             checkpoint=next_checkpoint,
-            has_more=value.offset + len(rows) < len(frame),
-            content_sha256=object_payload.content_sha256,
+            more=value.offset + len(rows) < len(frame),
+            digest=object_payload.digest,
         )

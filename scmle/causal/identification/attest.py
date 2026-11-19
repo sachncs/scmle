@@ -99,8 +99,8 @@ class Attestation:
             "scope",
         ):
             evidence.require_text(getattr(self, name), name)
-        issued = provenance.parse_date(self.date, "date")
-        if provenance.parse_date(self.expires, "expires") < issued:
+        issued = provenance.parse(self.date, "date")
+        if provenance.parse(self.expires, "expires") < issued:
             raise errors.InputError("expires must not precede date")
 
     def payload(self) -> dict[str, Any]:
@@ -268,7 +268,7 @@ def apply(
         The accepted attestors by assumption, the accepted records and a
         reason for every needed assumption that has none.
     """
-    day = provenance.parse_date(today, "today")
+    day = provenance.parse(today, "today")
     allowed = {a.name: set(a.assumptions) for a in attestors}
     by_assumption = {a.assumption: a for a in given}
     accepted: dict[str, str] = {}
@@ -292,9 +292,9 @@ def apply(
                 f"scope {item.scope!r} is not this charter ({scope!r})"
             )
         elif not (
-            provenance.parse_date(item.date, "date")
+            provenance.parse(item.date, "date")
             <= day
-            <= provenance.parse_date(item.expires, "expires")
+            <= provenance.parse(item.expires, "expires")
         ):
             rejected[assumption] = (
                 f"valid {item.date} to {item.expires}, not on {today}"

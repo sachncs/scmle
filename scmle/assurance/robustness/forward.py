@@ -226,7 +226,7 @@ def evaluate(
     return Finding(name, effect_x, effect, label, check)
 
 
-def forward_check(
+def check(
     source: confirm.Source | None,
     effects: Mapping[str, float],
     encode: Callable[[pandas.Series], numpy.ndarray],

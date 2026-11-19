@@ -20,7 +20,7 @@ from scmle.data.readers.connectors import layout
 from scmle.data.readers.connectors import locator
 from scmle.data.readers.connectors import stream
 
-NO_RETRY = failure.Retries(max_retries=0)
+NO_RETRY = failure.Retries(limit=0)
 
 
 def columns(*names):
@@ -33,7 +33,7 @@ def columns(*names):
 def test_a_connector_error_serialises_its_context():
     error = failure.ConnectorError("c", "m", "u", {"k": 1})
     assert error.details == {"code": "c", "source_uri": "u", "k": 1}
-    assert error.as_dict() == {
+    assert error.serialize() == {
         "category": "data",
         "code": "c",
         "message": "m",
@@ -51,7 +51,7 @@ def test_scheme_and_retry_errors_describe_the_failure():
     assert str(scheme) == (
         "unsupported URI scheme '<path>'; supported schemes: ('file',)"
     )
-    assert scheme.supported_schemes == ("file",)
+    assert scheme.schemes == ("file",)
     assert scheme.details["supported_schemes"] == ["file"]
     named = failure.SchemeError("x", "ftp", ("s3",))
     assert "'ftp'" in str(named)
@@ -65,15 +65,15 @@ def test_scheme_and_retry_errors_describe_the_failure():
 
 
 def test_retries_validate_and_count_attempts():
-    assert failure.Retries().max_attempts == 3
-    assert failure.Retries(max_retries=0).max_attempts == 1
-    assert failure.Retries(delay_seconds=0.0).delay_seconds == 0.0
+    assert failure.Retries().attempts == 3
+    assert failure.Retries(limit=0).attempts == 1
+    assert failure.Retries(delay=0.0).delay == 0.0
     with pytest.raises(errors.InputError, match="max_retries"):
-        failure.Retries(max_retries=-1)
+        failure.Retries(limit=-1)
     with pytest.raises(errors.InputError, match="delay_seconds"):
-        failure.Retries(delay_seconds=-0.1)
+        failure.Retries(delay=-0.1)
     with pytest.raises(errors.InputError, match="delay_seconds"):
-        failure.Retries(delay_seconds=float("inf"))
+        failure.Retries(delay=float("inf"))
 
 
 def test_persevere_retries_until_success():
@@ -100,7 +100,7 @@ def test_persevere_gives_up_after_the_budget():
         failure.persevere(broken, "op", "u", failure.Retries(1))
     assert raised.value.attempts == 2
     assert len(calls) == 2
-    assert isinstance(raised.value.last_error, OSError)
+    assert isinstance(raised.value.error, OSError)
 
 
 def test_persevere_does_not_retry_connector_errors():
@@ -120,7 +120,7 @@ def test_persevere_sleeps_between_attempts(monkeypatch):
     monkeypatch.setattr(failure.time, "sleep", pauses.append)
     with pytest.raises(failure.RetryError):
         failure.persevere(
-            lambda: 1 / 0, "op", "u", failure.Retries(2, delay_seconds=0.5)
+            lambda: 1 / 0, "op", "u", failure.Retries(2, delay=0.5)
         )
     assert pauses == [0.5, 0.5]
 
@@ -143,7 +143,7 @@ def test_canonicalize_lowercases_schemes_and_resolves_paths():
 
 def test_source_identity_hashes_the_canonical_uri():
     expected = hashlib.sha256(b"s3://b/k").hexdigest()
-    assert locator.source_identity("S3://b/k") == f"src_{expected}"
+    assert locator.identify("S3://b/k") == f"src_{expected}"
 
 
 def test_bookmark_round_trips_through_unwrap():
@@ -185,36 +185,36 @@ def test_unwrap_rejects_empty_identities_and_negative_offsets():
 def test_a_bookmark_fills_fields_from_its_cursor():
     cursor = locator.bookmark("src_a", 5)
     mark = locator.Bookmark(cursor=cursor)
-    assert (mark.offset, mark.source_identity) == (5, "src_a")
+    assert (mark.offset, mark.identity) == (5, "src_a")
     assert locator.Bookmark(5, cursor, "src_a").offset == 5
     with pytest.raises(errors.InputError, match="identity does not match"):
-        locator.Bookmark(cursor=cursor, source_identity="src_b")
+        locator.Bookmark(cursor=cursor, identity="src_b")
     with pytest.raises(errors.InputError, match="offset does not match"):
         locator.Bookmark(offset=4, cursor=cursor)
     with pytest.raises(errors.InputError, match="non-negative"):
         locator.Bookmark(offset=-1)
     with pytest.raises(errors.InputError, match="content_sha256"):
-        locator.Bookmark(content_sha256="A" * 64)
+        locator.Bookmark(digest="A" * 64)
     with pytest.raises(errors.InputError, match="content_sha256"):
-        locator.Bookmark(content_sha256="a" * 63)
+        locator.Bookmark(digest="a" * 63)
 
 
 def test_bind_seal_and_advance():
     bound = locator.Bookmark(offset=2).bind("src_a")
-    assert bound.source_identity == "src_a"
+    assert bound.identity == "src_a"
     assert bound.cursor == locator.bookmark("src_a", 2)
     assert bound.bind("src_a") == bound
     with pytest.raises(errors.InputError, match="different source"):
         bound.bind("src_b")
     sealed = bound.seal("a" * 64)
-    assert sealed.content_sha256 == "a" * 64
+    assert sealed.digest == "a" * 64
     assert sealed.seal("a" * 64) == sealed
     with pytest.raises(errors.InputError, match="content digest"):
         sealed.seal("b" * 64)
     moved = sealed.advance(3)
     assert moved.offset == 5
     assert moved.cursor == locator.bookmark("src_a", 5)
-    assert moved.content_sha256 == "a" * 64
+    assert moved.digest == "a" * 64
     assert sealed.advance(0).offset == 2
     with pytest.raises(errors.InputError, match="non-negative"):
         sealed.advance(-1)
@@ -234,7 +234,7 @@ def test_fields_and_columns_validate_names():
         layout.Columns(())
     with pytest.raises(errors.InputError, match="duplicate"):
         columns("a", "a")
-    assert columns("a", "b").as_dict() == {
+    assert columns("a", "b").serialize() == {
         "columns": [
             {"name": "a", "type_name": "int"},
             {"name": "b", "type_name": "int"},
@@ -244,7 +244,7 @@ def test_fields_and_columns_validate_names():
 
 def test_columns_describe_a_frame():
     frame = pandas.DataFrame({"a": [1], 2: [1.5]})
-    assert layout.Columns.from_frame(frame).as_dict() == {
+    assert layout.Columns.infer(frame).serialize() == {
         "columns": [
             {"name": "a", "type_name": "int64"},
             {"name": "2", "type_name": "float64"},
@@ -259,28 +259,28 @@ class Fixed(adapter.Adapter):
     def schema(self):
         return columns("a")
 
-    def read_rows(self, checkpoint=None, limit=1_000):
+    def read(self, checkpoint=None, limit=1_000):
         return None
 
 
 def test_an_adapter_binds_checkpoints_to_its_source():
     connector = Fixed("S3://b/k")
-    assert connector.source_uri == "s3://b/k"
-    assert connector.source_identity == locator.source_identity("s3://b/k")
-    assert connector.retry_budget == failure.Retries()
+    assert connector.uri == "s3://b/k"
+    assert connector.identity == locator.identify("s3://b/k")
+    assert connector.budget == failure.Retries()
     mark = connector.checkpoint(4)
     assert mark.offset == 4
-    assert mark.source_identity == connector.source_identity
+    assert mark.identity == connector.identity
     assert connector.rebind(None).offset == 0
-    assert connector.rebind(None).source_identity == connector.source_identity
+    assert connector.rebind(None).identity == connector.identity
     foreign = Fixed("s3://other").checkpoint(1)
     with pytest.raises(failure.CheckpointError) as raised:
         connector.rebind(foreign)
     assert raised.value.code == "checkpoint_mismatch"
     assert raised.value.details["offset"] == 1
-    connector.validate_limit(1)
+    connector.validate(1)
     with pytest.raises(errors.InputError, match="limit must be positive"):
-        connector.validate_limit(0)
+        connector.validate(0)
 
 
 # filesystem
@@ -300,21 +300,21 @@ def test_filesystem_reads_pages_and_resumes(tmp_path):
     path = tmp_path / "t.csv"
     path.write_text("a,b\n1,x\n2,y\n3,z\n")
     connector = filesystem.Filesystem(path, NO_RETRY)
-    assert connector.schema().as_dict()["columns"][0] == {
+    assert connector.schema().serialize()["columns"][0] == {
         "name": "a",
         "type_name": "int64",
     }
-    first = connector.read_rows(limit=2)
+    first = connector.read(limit=2)
     assert first.rows == ((1, "x"), (2, "y"))
-    assert first.has_more
-    assert first.content_sha256 == hashlib.sha256(path.read_bytes()).hexdigest()
-    second = connector.read_rows(first.checkpoint, limit=2)
+    assert first.more
+    assert first.digest == hashlib.sha256(path.read_bytes()).hexdigest()
+    second = connector.read(first.checkpoint, limit=2)
     assert second.rows == ((3, "z"),)
-    assert not second.has_more
+    assert not second.more
     assert second.checkpoint.offset == 3
     path.write_text("a,b\n9,q\n9,q\n9,q\n")
     with pytest.raises(failure.ConnectorError) as raised:
-        connector.read_rows(first.checkpoint)
+        connector.read(first.checkpoint)
     assert raised.value.code == "source_snapshot_changed"
 
 
@@ -331,7 +331,7 @@ def test_filesystem_accepts_file_uris_and_rejects_others(tmp_path):
     assert raised.value.scheme == "s3"
     with pytest.raises(failure.SchemeError) as raised:
         filesystem.Filesystem("file://remote/x.csv")
-    assert raised.value.supported_schemes == ("file",)
+    assert raised.value.schemes == ("file",)
 
 
 def test_filesystem_detects_a_change_during_the_read(tmp_path, monkeypatch):
@@ -339,16 +339,16 @@ def test_filesystem_detects_a_change_during_the_read(tmp_path, monkeypatch):
     path.write_text("a\n1\n")
     connector = filesystem.Filesystem(path, NO_RETRY)
     digests = iter(["a" * 64, "b" * 64])
-    monkeypatch.setattr(connector, "content_sha256", lambda: next(digests))
+    monkeypatch.setattr(connector, "digest", lambda: next(digests))
     with pytest.raises(failure.ConnectorError) as raised:
-        connector.read_rows()
+        connector.read()
     assert raised.value.details["initial_content_sha256"] == "a" * 64
 
 
 def test_filesystem_retries_a_missing_file(tmp_path):
     connector = filesystem.Filesystem(tmp_path / "missing.csv", NO_RETRY)
     with pytest.raises(failure.RetryError) as raised:
-        connector.read_rows()
+        connector.read()
     assert raised.value.operation == "read_rows"
     with pytest.raises(failure.RetryError):
         connector.schema()
@@ -359,8 +359,8 @@ def test_filesystem_retries_a_missing_file(tmp_path):
 
 def test_a_payload_derives_its_identity():
     record = bucket.Payload("s3://b/k", b"abc")
-    assert record.content_sha256 == hashlib.sha256(b"abc").hexdigest()
-    assert record.byte_size == 3
+    assert record.digest == hashlib.sha256(b"abc").hexdigest()
+    assert record.size == 3
     with pytest.raises(errors.InputError, match="source_uri"):
         bucket.Payload(" ", b"")
     with pytest.raises(errors.KindError, match="bytes"):
@@ -392,23 +392,23 @@ def test_a_bucket_validates_its_configuration():
         bucket.Bucket("ftp://b/k.csv", reader)
     with pytest.raises(errors.KindError, match="read_bytes"):
         bucket.Bucket("s3://b/k.csv", None)
-    with pytest.raises(errors.InputError, match="max_bytes"):
-        bucket.Bucket("s3://b/k.csv", reader, max_bytes=0)
+    with pytest.raises(errors.InputError, match="limit"):
+        bucket.Bucket("s3://b/k.csv", reader, limit=0)
     with pytest.raises(errors.KindError, match="decoder must be callable"):
-        bucket.Bucket("s3://b/k.csv", reader, decoder=1, decoder_name="d")
+        bucket.Bucket("s3://b/k.csv", reader, decoder=1, codec="d")
     with pytest.raises(errors.InputError, match="requires a caller-owned"):
-        bucket.Bucket("s3://b/k.csv", reader, decoder_name="d")
+        bucket.Bucket("s3://b/k.csv", reader, codec="d")
     with pytest.raises(errors.InputError, match="identify a caller-owned"):
         bucket.Bucket("s3://b/k.csv", reader, decoder=bucket.unpack)
     default = bucket.Bucket(" S3://b/k.csv ", reader)
-    assert default.decoder_name == "tabular-auto-v1"
-    assert default.source_identity == locator.source_identity(
+    assert default.codec == "tabular-auto-v1"
+    assert default.identity == locator.identify(
         "s3://b/k.csv|decoder=tabular-auto-v1"
     )
     custom = bucket.Bucket(
-        "s3://b/k.csv", reader, decoder=bucket.unpack, decoder_name=" mine "
+        "s3://b/k.csv", reader, decoder=bucket.unpack, codec=" mine "
     )
-    assert custom.decoder_name == "mine"
+    assert custom.codec == "mine"
 
 
 def test_a_bucket_reads_pages_bound_to_content():
@@ -416,23 +416,23 @@ def test_a_bucket_reads_pages_bound_to_content():
     connector = bucket.Bucket(
         "s3://b/k.csv", lambda uri: store["payload"], NO_RETRY
     )
-    first = connector.read_rows(limit=2)
+    first = connector.read(limit=2)
     assert first.rows == ((1,), (2,))
-    assert first.has_more
-    second = connector.read_rows(first.checkpoint, limit=5)
+    assert first.more
+    second = connector.read(first.checkpoint, limit=5)
     assert second.rows == ((3,),)
-    assert not second.has_more
-    assert connector.schema().as_dict()["columns"][0]["name"] == "a"
+    assert not second.more
+    assert connector.schema().serialize()["columns"][0]["name"] == "a"
     store["payload"] = b"a\n7\n"
     with pytest.raises(failure.ConnectorError) as raised:
-        connector.read_rows(first.checkpoint)
+        connector.read(first.checkpoint)
     assert raised.value.code == "source_snapshot_changed"
 
 
 def test_a_bucket_checks_payloads_and_decoders():
-    too_big = bucket.Bucket("s3://b/k.csv", lambda uri: b"abcd", max_bytes=3)
+    too_big = bucket.Bucket("s3://b/k.csv", lambda uri: b"abcd", limit=3)
     with pytest.raises(failure.ConnectorError) as raised:
-        too_big.read_object()
+        too_big.fetch()
     assert raised.value.details == {
         "code": "object_too_large",
         "source_uri": "s3://b/k.csv",
@@ -440,28 +440,26 @@ def test_a_bucket_checks_payloads_and_decoders():
         "max_bytes": 3,
     }
     assert (
-        bucket.Bucket("s3://b/k.csv", lambda uri: b"abc", max_bytes=3)
-        .read_object()
-        .byte_size
+        bucket.Bucket("s3://b/k.csv", lambda uri: b"abc", limit=3).fetch().size
         == 3
     )
     text = bucket.Bucket("s3://b/k.csv", lambda uri: "a")
     with pytest.raises(failure.ConnectorError) as raised:
-        text.read_object()
+        text.fetch()
     assert raised.value.details["payload_type"] == "str"
 
     def failing(uri, payload):
         raise ValueError("nope")
 
     broken = bucket.Bucket(
-        "s3://b/k", lambda uri: b"x", decoder=failing, decoder_name="d"
+        "s3://b/k", lambda uri: b"x", decoder=failing, codec="d"
     )
     with pytest.raises(failure.ConnectorError) as raised:
         broken.load()
     assert raised.value.code == "decoder_failed"
     assert raised.value.details["error_type"] == "ValueError"
     wrong = bucket.Bucket(
-        "s3://b/k", lambda uri: b"x", decoder=lambda u, p: [1], decoder_name="d"
+        "s3://b/k", lambda uri: b"x", decoder=lambda u, p: [1], codec="d"
     )
     with pytest.raises(failure.ConnectorError) as raised:
         wrong.load()
@@ -544,18 +542,18 @@ def test_a_database_connector_reads_pages_and_detects_changes():
     connector = database.DbApiConnector(
         "sqlite://mem", "select a from t order by a", factory(), NO_RETRY
     )
-    assert connector.schema().as_dict() == {
+    assert connector.schema().serialize() == {
         "columns": [{"name": "a", "type_name": "unknown"}]
     }
-    first = connector.read_rows(limit=2)
+    first = connector.read(limit=2)
     assert first.rows == ((1,), (2,))
-    assert first.has_more
+    assert first.more
     hasher = hashlib.sha256()
     database.feed(hasher, [(1,), (2,)])
-    assert first.checkpoint.content_sha256 == hasher.hexdigest()
-    second = connector.read_rows(first.checkpoint, limit=2)
+    assert first.checkpoint.digest == hasher.hexdigest()
+    second = connector.read(first.checkpoint, limit=2)
     assert second.rows == ((3,),)
-    assert not second.has_more
+    assert not second.more
     changed = database.DbApiConnector(
         "sqlite://mem",
         "select a from t order by a",
@@ -563,13 +561,13 @@ def test_a_database_connector_reads_pages_and_detects_changes():
         NO_RETRY,
     )
     with pytest.raises(failure.CheckpointError) as raised:
-        changed.read_rows(first.checkpoint)
+        changed.read(first.checkpoint)
     assert raised.value.code == "source_changed"
     shrunk = database.DbApiConnector(
         "sqlite://mem", "select a from t order by a", factory((1,)), NO_RETRY
     )
     with pytest.raises(failure.CheckpointError) as raised:
-        shrunk.read_rows(first.checkpoint)
+        shrunk.read(first.checkpoint)
     assert raised.value.details["missing"] == 1
 
 
@@ -584,15 +582,13 @@ def test_a_database_connector_validates_its_configuration():
         database.DbApiConnector("dbapi://x", "delete from t", factory())
     with pytest.raises(failure.ConnectorError):
         database.DbApiConnector(
-            "dbapi://x", "select 1", factory(), snapshot_query="drop table t"
+            "dbapi://x", "select 1", factory(), probe="drop table t"
         )
     loose = database.DbApiConnector(
-        "dbapi://x", "delete from t", factory(), read_only=False
+        "dbapi://x", "delete from t", factory(), guarded=False
     )
-    assert not loose.read_only
-    assert loose.source_identity == locator.source_identity(
-        "dbapi://x|query=delete from t"
-    )
+    assert not loose.guarded
+    assert loose.identity == locator.identify("dbapi://x|query=delete from t")
 
 
 def test_a_read_only_sqlite_session_refuses_writes():
@@ -605,7 +601,7 @@ def test_a_read_only_sqlite_session_refuses_writes():
     ):
         pass
     loose = database.DbApiConnector(
-        "sqlite://mem", "select a from t", factory(), NO_RETRY, read_only=False
+        "sqlite://mem", "select a from t", factory(), NO_RETRY, guarded=False
     )
     with loose.session("insert into t values (9)"):
         pass
@@ -615,23 +611,23 @@ def test_snapshot_tokens_digest_the_chosen_query():
     plain = database.DbApiConnector("sqlite://m", "select a from t", factory())
     hasher = hashlib.sha256()
     database.feed(hasher, [(1,), (2,), (3,)])
-    assert plain.snapshot_token() == hasher.hexdigest()
+    assert plain.snapshot() == hasher.hexdigest()
     counted = database.DbApiConnector(
         "sqlite://m",
         "select a from t",
         factory(),
-        snapshot_query="select count(*) from t",
-        read_only_statement="select 1",
+        probe="select count(*) from t",
+        preamble="select 1",
     )
     hasher = hashlib.sha256()
     database.feed(hasher, [(3,)])
-    assert counted.snapshot_token() == hasher.hexdigest()
+    assert counted.snapshot() == hasher.hexdigest()
 
 
 def test_translate_reads_cursor_descriptions():
     connector = database.DbApiConnector("dbapi://x", "select 1", factory())
     schema = connector.translate([("a", "INT"), ("b",), ("c", None)])
-    assert schema.as_dict()["columns"] == [
+    assert schema.serialize()["columns"] == [
         {"name": "a", "type_name": "INT"},
         {"name": "b", "type_name": "unknown"},
         {"name": "c", "type_name": "unknown"},
@@ -664,19 +660,19 @@ def test_a_lakehouse_reads_pages_and_tracks_snapshots():
     state = {"token": "v1"}
     connector = warehouse([[1], [2], [3]], lambda query: state["token"])
     assert connector.schema() == columns("a")
-    first = connector.read_rows(limit=2)
+    first = connector.read(limit=2)
     assert first.rows == ((1,), (2,))
-    assert first.has_more
-    assert first.checkpoint.content_sha256 == hashlib.sha256(b"v1").hexdigest()
-    second = connector.read_rows(first.checkpoint, limit=2)
+    assert first.more
+    assert first.checkpoint.digest == hashlib.sha256(b"v1").hexdigest()
+    second = connector.read(first.checkpoint, limit=2)
     assert second.rows == ((3,),)
-    assert not second.has_more
+    assert not second.more
     state["token"] = "v2"
     with pytest.raises(failure.CheckpointError) as raised:
-        connector.read_rows(first.checkpoint)
+        connector.read(first.checkpoint)
     assert raised.value.code == "source_changed"
-    untracked = warehouse([[1]]).read_rows()
-    assert untracked.checkpoint.content_sha256 is None
+    untracked = warehouse([[1]]).read()
+    assert untracked.checkpoint.digest is None
 
 
 def test_a_lakehouse_validates_callback_results():
@@ -688,7 +684,7 @@ def test_a_lakehouse_validates_callback_results():
     ):
         connector = warehouse([], batch=lambda q, o, n, r=result: r)
         with pytest.raises(failure.ConnectorError) as raised:
-            connector.read_rows(limit=1)
+            connector.read(limit=1)
         assert raised.value.code == code
 
 
@@ -703,9 +699,7 @@ def test_a_lakehouse_validates_its_configuration():
     with pytest.raises(errors.KindError, match="callable"):
         lakehouse.Lakehouse("lakehouse://x", "q", reader, None)
     built = lakehouse.Lakehouse("LAKEHOUSE://x", "q", reader, reader)
-    assert built.source_identity == locator.source_identity(
-        "lakehouse://x|query=q"
-    )
+    assert built.identity == locator.identify("lakehouse://x|query=q")
 
 
 # stream
@@ -722,7 +716,7 @@ def test_interpret_builds_schema_and_rows():
     schema, rows = stream.interpret(
         [(b'{"a": 1, "b": "x"}', 10), (b'{"a": 2, "b": null}', 20)], "u"
     )
-    assert schema.as_dict()["columns"] == [
+    assert schema.serialize()["columns"] == [
         {"name": "a", "type_name": "int"},
         {"name": "b", "type_name": "str"},
     ]
@@ -744,7 +738,7 @@ def ranged(content, chunk=4, **kwargs):
         lambda uri, start, end: content[start:end],
         lambda uri: len(content),
         NO_RETRY,
-        chunk_bytes=chunk,
+        chunk=chunk,
         **kwargs,
     )
 
@@ -752,19 +746,19 @@ def ranged(content, chunk=4, **kwargs):
 def test_a_stream_reads_records_by_byte_offset():
     content = b'{"a": 1}\r\n\n{"a": 2}\n{"a": 3}'
     connector = ranged(content)
-    first = connector.read_rows(limit=1)
+    first = connector.read(limit=1)
     assert first.rows == ((1,),)
     assert first.checkpoint.offset == 10
-    assert first.has_more
-    second = connector.read_rows(first.checkpoint, limit=5)
+    assert first.more
+    second = connector.read(first.checkpoint, limit=5)
     assert second.rows == ((2,), (3,))
     assert second.checkpoint.offset == len(content)
-    assert not second.has_more
-    done = connector.read_rows(second.checkpoint)
+    assert not second.more
+    done = connector.read(second.checkpoint)
     assert done.rows == ()
     assert done.checkpoint == second.checkpoint
-    assert done.schema.as_dict()["columns"][0]["name"] == "record"
-    assert connector.schema().as_dict()["columns"][0]["name"] == "a"
+    assert done.schema.serialize()["columns"][0]["name"] == "record"
+    assert connector.schema().serialize()["columns"][0]["name"] == "a"
 
 
 def test_a_stream_rejects_bad_objects_and_transports():
@@ -774,28 +768,28 @@ def test_a_stream_rejects_bad_objects_and_transports():
         ranged(b"").schema()
     assert raised.value.code == "empty_object"
     with pytest.raises(failure.CheckpointError) as raised:
-        ranged(b"{}\n").read_rows(ranged(b"{}\n").checkpoint(5))
+        ranged(b"{}\n").read(ranged(b"{}\n").checkpoint(5))
     assert raised.value.code == "checkpoint_beyond_object"
     with pytest.raises(failure.ConnectorError) as raised:
-        ranged(b'{"a": 12345}\n', chunk=2, max_record_bytes=3).read_rows()
+        ranged(b'{"a": 12345}\n', chunk=2, limit=3).read()
     assert raised.value.code == "record_too_large"
     stalled = stream.StreamingObjectStoreConnector(
         "s3://b/k.jsonl", lambda u, s, e: b"", lambda u: 5, NO_RETRY
     )
     with pytest.raises(failure.ConnectorError) as raised:
-        stalled.read_rows()
+        stalled.read()
     assert raised.value.code == "range_no_progress"
     greedy = stream.StreamingObjectStoreConnector(
         "s3://b/k.jsonl", lambda u, s, e: b"x" * 10, lambda u: 5, NO_RETRY
     )
     with pytest.raises(failure.ConnectorError) as raised:
-        greedy.read_bytes(0, 2)
+        greedy.fetch(0, 2)
     assert raised.value.details["received"] == 10
     text = stream.StreamingObjectStoreConnector(
         "s3://b/k.jsonl", lambda u, s, e: "x", lambda u: 5, NO_RETRY
     )
     with pytest.raises(failure.ConnectorError) as raised:
-        text.read_bytes(0, 2)
+        text.fetch(0, 2)
     assert raised.value.code == "invalid_range_payload"
 
 
@@ -819,13 +813,13 @@ def test_a_stream_validates_its_configuration():
     assert raised.value.code == "unsupported_stream_format"
     with pytest.raises(errors.KindError, match="callable"):
         stream.StreamingObjectStoreConnector("s3://b/k.ndjson", None, size)
-    with pytest.raises(errors.InputError, match="chunk_bytes"):
+    with pytest.raises(errors.InputError, match="chunk"):
         stream.StreamingObjectStoreConnector(
-            "s3://b/k.jsonl", reader, size, chunk_bytes=0
+            "s3://b/k.jsonl", reader, size, chunk=0
         )
-    with pytest.raises(errors.InputError, match="max_record_bytes"):
+    with pytest.raises(errors.InputError, match="limit"):
         stream.StreamingObjectStoreConnector(
-            "s3://b/k.jsonl", reader, size, max_record_bytes=0
+            "s3://b/k.jsonl", reader, size, limit=0
         )
 
 

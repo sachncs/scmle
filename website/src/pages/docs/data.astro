@@ -18,7 +18,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
     <div class="doc-card"><small>RANGE READS</small><h3>Bounded object scans</h3><p>Range-backed JSONL and NDJSON sources read only the requested byte windows and resume from byte checkpoints. Record-size limits, invalid JSON, and in-object schema changes fail with structured errors; arbitrary binary formats still require an explicit decoder or streaming adapter.</p></div>
     <div class="doc-card"><small>OBJECT BYTES</small><h3>Bring a versioned decoder</h3><p><code>Bucket</code> accepts bounded bytes from any object store and a caller-owned decoder that returns a DataFrame. The decoder name and version become part of source identity, so checkpoints cannot mix decoding semantics.</p></div>
     <div class="doc-card"><small>DOCUMENTS</small><h3>Curate before NLP</h3><p>Document collections preserve content hashes, page and section provenance, bounded language profiles, duplicate groups, label composition, and conflicting-label findings before a tokenizer or model is chosen.</p></div>
-    <div class="doc-card"><small>EXTENSION</small><h3>Custom readers</h3><p>Register a <code>TableReader</code> when your source needs a domain-specific parser before it becomes a table.</p></div>
+    <div class="doc-card"><small>EXTENSION</small><h3>Custom readers</h3><p>Register a <code>tabular.Reader</code> when your source needs a domain-specific parser before it becomes a table.</p></div>
   </div>
 
   <h2>Declare before you ingest</h2>

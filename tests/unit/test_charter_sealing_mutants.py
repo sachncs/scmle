@@ -11,12 +11,12 @@ from tests.unit.test_charter_contracts import make_charter
 
 
 def accepted(record):
-    sealing.check_format("c.json", record)
+    sealing.check("c.json", record)
 
 
 def refused(record):
     with pytest.raises(errors.ConfigError) as caught:
-        sealing.check_format("c.json", record)
+        sealing.check("c.json", record)
     return str(caught.value)
 
 

@@ -26,13 +26,13 @@ class Dataset(Review):
 
     Attributes:
         samples: The samples, in caller order.
-        content_hash: SHA-256 hex digest of the sorted document ids and
+        digest: SHA-256 hex digest of the sorted document ids and
             content hashes, so independent of sample order; set on
             construction.
     """
 
     samples: tuple[Sample, ...]
-    content_hash: str = dataclasses.field(init=False)
+    digest: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
         """Validates the collection and derives order-independent identity.
@@ -50,16 +50,16 @@ class Dataset(Review):
         if any(not isinstance(sample, Sample) for sample in normalized_samples):
             raise errors.KindError("samples must contain only Sample values")
         identities = sorted(
-            f"{sample.document_id}\0{sample.content_hash}"
+            f"{sample.identifier}\0{sample.content_hash}"
             for sample in normalized_samples
         )
         dataset_hash = hashlib.sha256(
             "\n".join(identities).encode()
         ).hexdigest()
         object.__setattr__(self, "samples", normalized_samples)
-        object.__setattr__(self, "content_hash", dataset_hash)
+        object.__setattr__(self, "digest", dataset_hash)
 
-    def duplicate_groups(self) -> tuple[tuple[str, ...], ...]:
+    def group(self) -> tuple[tuple[str, ...], ...]:
         """Returns deterministic groups of samples with identical content.
 
         Returns:
@@ -68,7 +68,7 @@ class Dataset(Review):
         """
         groups: defaultdict[str, list[str]] = defaultdict(list)
         for sample in self.samples:
-            groups[sample.content_hash].append(sample.document_id)
+            groups[sample.content_hash].append(sample.identifier)
         duplicate_groups = [
             tuple(sorted(document_ids))
             for document_ids in groups.values()
@@ -123,7 +123,7 @@ class Dataset(Review):
         if max_characters < 1 or max_tokens < 1:
             raise errors.InputError("curation bounds must be positive")
         profiles = self.profile(max_characters, max_tokens)
-        duplicate_groups = self.duplicate_groups()
+        duplicate_groups = self.group()
         language_counts: dict[str, int] = defaultdict(int)
         format_counts: dict[str, int] = defaultdict(int)
         label_counts: dict[str, int] = defaultdict(int)
@@ -148,30 +148,28 @@ class Dataset(Review):
         traceable_samples = tuple(
             sample
             for sample in self.samples
-            if sample.source_uri.strip() and sample.source_digest is not None
+            if sample.uri.strip() and sample.digest is not None
         )
         return Curation(
-            dataset_hash=self.content_hash,
-            sample_count=len(self.samples),
-            document_count=len({sample.document_id for sample in self.samples}),
+            dataset_hash=self.digest,
+            samples=len(self.samples),
+            documents=len({sample.identifier for sample in self.samples}),
             profiles=profiles,
-            duplicate_groups=duplicate_groups,
+            duplicates=duplicate_groups,
             language_counts=dict(sorted(language_counts.items())),
             format_counts=dict(sorted(format_counts.items())),
             label_counts=dict(sorted(label_counts.items())),
             layout_coverage=len(layouts) / len(self.samples),
             **layering(layouts),
             sensitive_match_counts=dict(sorted(sensitive_counts.items())),
-            source_traceability_coverage=(
-                len(traceable_samples) / len(self.samples)
-            ),
-            citation_count=sum(
+            traceability=(len(traceable_samples) / len(self.samples)),
+            citations=sum(
                 len(sample.citations()) for sample in traceable_samples
             ),
             quality_findings=tuple(quality_findings),
             risk_findings=tuple(risk_findings),
-            max_characters=max_characters,
-            max_tokens=max_tokens,
+            characters=max_characters,
+            tokens=max_tokens,
         )
 
     def split(
@@ -208,7 +206,7 @@ class Dataset(Review):
                 sum to 1 or more.
         """
         curation.proportions(validation_fraction, test_fraction)
-        keys = [sample.document_id for sample in self.samples]
+        keys = [sample.identifier for sample in self.samples]
         labels = None
         if kin is not None:
             clusters = kin.cluster([sample.content for sample in self.samples])

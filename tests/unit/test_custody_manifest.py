@@ -106,8 +106,8 @@ def test_v1_manifest_is_still_readable_and_verified():
     v1 = splitters.Manifest(
         strategy="random",
         seed=3,
-        train_ids=(0, 1, 2),
-        test_ids=(3,),
+        training=(0, 1, 2),
+        test=(3,),
         folds=(((0, 1), (2,)),),
         notes=("n",),
     )
@@ -169,7 +169,7 @@ def test_the_roots_are_hashed_and_round_trip():
 
 
 def test_verify_rows_passes_on_the_original_rows():
-    rooted().verify_rows(table())
+    rooted().verify(table())
 
 
 @pytest.mark.parametrize(
@@ -181,7 +181,7 @@ def test_a_changed_value_inside_a_row_is_caught_though_ids_are_equal(row, name):
     edited.loc[row, "a"] += 0.001
     assert manifest.sha256 == rooted().sha256
     with pytest.raises(errors.ArtifactError, match=name):
-        manifest.verify_rows(edited)
+        manifest.verify(edited)
 
 
 def test_a_change_in_the_embargo_rows_is_not_covered():
@@ -192,4 +192,4 @@ def test_a_change_in_the_embargo_rows_is_not_covered():
 
 def test_verify_rows_refuses_a_manifest_with_no_roots():
     with pytest.raises(errors.ArtifactError, match="no row content"):
-        make().verify_rows(table())
+        make().verify(table())

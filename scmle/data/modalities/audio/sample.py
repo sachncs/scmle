@@ -18,7 +18,7 @@ from scmle.data.modalities.audio.wav import parse
 AudioProbe = Callable[[bytes], Metadata]
 
 
-def canonical_source(source: str | pathlib.Path) -> str:
+def identify(source: str | pathlib.Path) -> str:
     """Returns a stable source identifier for a path or URI-like value.
 
     Args:
@@ -42,23 +42,23 @@ class Sample:
 
     Attributes:
         source: Non-blank source label or URI.
-        encoded_bytes: The non-empty encoded payload.
+        encoded: The non-empty encoded payload.
         file_hash: SHA-256 hex digest of the payload.
         metadata: Metadata observed at ingestion.
         label: Optional task label.
-        group_id: Optional identity used to keep related clips in one split.
+        group: Optional identity used to keep related clips in one split.
         transcript: Optional transcript; no segment may end after the audio.
-        byte_size: Length of the payload; set on construction.
+        size: Length of the payload; set on construction.
     """
 
     source: str
-    encoded_bytes: bytes = dataclasses.field(repr=False)
+    encoded: bytes = dataclasses.field(repr=False)
     file_hash: str
     metadata: Metadata
     label: str | int | float | bool | None = None
-    group_id: str | None = None
+    group: str | None = None
     transcript: Transcript | None = None
-    byte_size: int = dataclasses.field(init=False)
+    size: int = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
         """Validates bytes, source identity, and hash integrity.
@@ -69,14 +69,14 @@ class Sample:
             ValidationError: If a transcript segment ends after the
                 audio does, or the payload is empty.
         """
-        raw = bytes(self.encoded_bytes)
-        object.__setattr__(self, "encoded_bytes", raw)
+        raw = bytes(self.encoded)
+        object.__setattr__(self, "encoded", raw)
         if not self.source.strip():
             raise errors.InputError("source must not be empty")
-        if self.group_id is not None and not self.group_id.strip():
+        if self.group is not None and not self.group.strip():
             raise errors.InputError("group_id must not be empty when provided")
         if self.transcript is not None and any(
-            segment.end_seconds > self.metadata.duration_seconds + 1e-9
+            segment.end_seconds > self.metadata.seconds + 1e-9
             for segment in self.transcript.segments
         ):
             raise ValidationError(
@@ -93,10 +93,10 @@ class Sample:
             raise errors.InputError("file_hash must be a SHA-256 hex digest")
         if hashlib.sha256(raw).hexdigest() != self.file_hash:
             raise errors.InputError("file_hash does not match encoded_bytes")
-        object.__setattr__(self, "byte_size", len(raw))
+        object.__setattr__(self, "size", len(raw))
 
     @classmethod
-    def from_bytes(
+    def decode(
         cls,
         encoded_bytes: bytes,
         source: str = "memory://",
@@ -114,7 +114,7 @@ class Sample:
 
         Args:
             encoded_bytes: The encoded audio payload.
-            source: Source label or URI, normalised with `canonical_source`.
+            source: Source label or URI, normalised with `identify`.
             probe: Function that reads metadata from the payload. When None
                 the payload must be WAV.
             max_bytes: Largest payload size in bytes, or None for no limit.
@@ -158,14 +158,14 @@ class Sample:
             raise DecoderError(
                 "the supplied audio probe could not decode the payload"
             ) from error
-        stable_source = canonical_source(source)
+        stable_source = identify(source)
         return cls(
             source=stable_source,
-            encoded_bytes=raw,
+            encoded=raw,
             file_hash=hashlib.sha256(raw).hexdigest(),
             metadata=metadata,
             label=label,
-            group_id=group_id,
+            group=group_id,
             transcript=transcript,
         )
 
@@ -181,8 +181,8 @@ class Sample:
             sample_rate=self.metadata.sample_rate,
             channels=self.metadata.channels,
             frame_count=self.metadata.frame_count,
-            duration_seconds=self.metadata.duration_seconds,
-            byte_size=self.byte_size,
+            duration_seconds=self.metadata.seconds,
+            byte_size=self.size,
             transcript_present=self.transcript is not None,
             transcript_segment_count=(
                 len(self.transcript.segments) if self.transcript else 0

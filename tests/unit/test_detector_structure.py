@@ -39,7 +39,7 @@ def test_near_flags_find_jittered_copies_but_not_distinct_rows():
     frame = table(300)
     copies = frame.iloc[:30].copy() + 1e-3
     both = pandas.concat([frame, copies], ignore_index=True)
-    flags = duplicates.near_flags(both, list(both.columns), 0.01)
+    flags = duplicates.approximate(both, list(both.columns), 0.01)
     assert flags[300:].all() and not flags[:300].any()
 
 
@@ -48,8 +48,8 @@ def test_near_flags_cut_boundary_is_inclusive_in_rms_units():
     pair = pandas.DataFrame({"a": [100.0, 101.0]})
     both = pandas.concat([frame, pair], ignore_index=True)
     gap = 1.0 / both["a"].std(ddof=0)  # the pair's distance in column sds
-    assert duplicates.near_flags(both, ["a"], gap * (1 + 1e-9))[-1]
-    assert not duplicates.near_flags(both, ["a"], gap * (1 - 1e-6))[-1]
+    assert duplicates.approximate(both, ["a"], gap * (1 + 1e-9))[-1]
+    assert not duplicates.approximate(both, ["a"], gap * (1 - 1e-6))[-1]
 
 
 def test_text_columns_block_comparisons():
@@ -60,24 +60,24 @@ def test_text_columns_block_comparisons():
         }
     )
     cols = ["k", "v"]
-    flags = duplicates.near_flags(frame, cols, 0.001)
+    flags = duplicates.approximate(frame, cols, 0.001)
     assert list(numpy.flatnonzero(flags)) == [
         20
     ]  # row 21 differs in k from row 0
-    assert not duplicates.near_flags(frame[["k"]], ["k"], 0.1).any()
+    assert not duplicates.approximate(frame[["k"]], ["k"], 0.1).any()
 
 
 def test_near_flags_validate_the_cut():
     for bad in (0.0, -1.0, float("nan"), float("inf")):
         with pytest.raises(ValueError, match="cut"):
-            duplicates.near_flags(table(5), ["a"], bad)
+            duplicates.approximate(table(5), ["a"], bad)
 
 
 def test_duplicate_flags_combine_exact_and_near():
     frame = table(100)
     frame.loc[100] = frame.loc[1]
     frame.loc[101] = frame.loc[2] + 1e-4
-    flags = duplicates.duplicate_flags(frame)
+    flags = duplicates.flag(frame)
     assert flags[100] and flags[101] and flags.sum() == 2
     assert flags.index.equals(frame.index)
 
@@ -91,21 +91,21 @@ def test_assess_duplicates_report_and_exact_interval():
     both = pandas.concat([frame, extra, conflict], ignore_index=True)
     report = duplicates.assess(both, columns=["a", "b", "c"], target="y")
     assert report.rows == 106 and report.exact_extra == 6 and report.groups == 6
-    assert report.label_conflicts == 1
+    assert report.conflicts == 1
     assert report.exact_rate == pytest.approx(6 / 106)
     ref = stats.binomtest(6, 106).proportion_ci(0.95)
     assert report.exact_interval == pytest.approx((ref.low, ref.high))
-    assert report.near_extra == 0 and report.cut == duplicates.DEFAULT_CUT
+    assert report.near == 0 and report.cut == duplicates.DEFAULT_CUT
     assert report.to_dict()["groups"] == 6
     plain = duplicates.assess(both)
-    assert plain.label_conflicts == 0
+    assert plain.conflicts == 0
 
 
 def test_robust_z_by_hand():
     series = pandas.Series([1.0, 2.0, 3.0, 4.0, 100.0])
-    z = outliers.robust_z(series)
+    z = outliers.standardize(series)
     assert z.iloc[4] == pytest.approx(97.0 / (1.4826 * 1.0))
-    assert outliers.robust_z(pandas.Series([2.0] * 5)).sum() == 0.0
+    assert outliers.standardize(pandas.Series([2.0] * 5)).sum() == 0.0
 
 
 def triage_frame():
@@ -124,9 +124,9 @@ def test_triage_assigns_class_only_from_provenance():
     frame = triage_frame()
     info = {
         "v": outliers.Pedigree(
-            instrument_range=(-100.0, 100.0),
-            population_range=(0.0, 60.0),
-            extremes_possible=True,
+            instrument=(-100.0, 100.0),
+            population=(0.0, 60.0),
+            possible=True,
         )
     }
     result = outliers.triage(frame, info, {"neg": lambda f: f["v"] < -10})
@@ -153,11 +153,11 @@ def test_range_violation_is_an_error_even_when_not_a_ranked_candidate():
     frame = pandas.DataFrame({"v": numpy.linspace(0, 100, 101)})
     frame.loc[5, "v"] = 100.5
     result = outliers.triage(
-        frame, {"v": outliers.Pedigree(instrument_range=(0, 100))}
+        frame, {"v": outliers.Pedigree(instrument=(0, 100))}
     )
     assert result.classes[5] == "error" and not result.candidates[5]
     flags = outliers.misrecorded(
-        frame, {"v": outliers.Pedigree(instrument_range=(0, 100))}
+        frame, {"v": outliers.Pedigree(instrument=(0, 100))}
     )
     assert list(numpy.flatnonzero(flags)) == [5]
 
@@ -170,11 +170,7 @@ def test_range_bounds_are_inclusive_and_missing_is_ignored():
 
 def test_extremes_possible_false_keeps_candidates_unclassified():
     frame = triage_frame()
-    info = {
-        "v": outliers.Pedigree(
-            instrument_range=(-100.0, 100.0), extremes_possible=False
-        )
-    }
+    info = {"v": outliers.Pedigree(instrument=(-100.0, 100.0), possible=False)}
     assert outliers.triage(frame, info).classes[1] == "unclassified"
 
 
@@ -194,7 +190,7 @@ def test_triage_without_provenance_is_unverified():
 def test_registry_hashes_whole_modules_and_covers_every_detector():
     assert set(registry.SPECS) == set(registry.EXECUTION_ORDER)
     assert registry.EXECUTION_ORDER[0] == "f5-sentinel"
-    hashes = {s.code_hash() for s in registry.SPECS.values()}
+    hashes = {s.digest() for s in registry.SPECS.values()}
     assert len(hashes) == len(registry.SPECS)
     assert all(len(h) == 64 for h in hashes)
 
@@ -216,9 +212,9 @@ def test_pipeline_runs_sentinels_first_and_recodes_before_later_detectors():
     frame = sentinel_table()
     result = pipeline.run(frame, target="y", seed=0)
     assert result.order == registry.EXECUTION_ORDER
-    assert result.recode_log and result.recode_log[0]["recoded"] == 30
+    assert result.log and result.log[0]["recoded"] == 30
     # missingness saw the recoded gaps; the raw table has none
-    assert result.results["f5-missingness"].rows_checked == 200
+    assert result.results["f5-missingness"].checked == 200
     assert any(
         i.column == "a" for i in result.results["f5-missingness"].indicators
     )
@@ -250,7 +246,7 @@ def passing_store(detector_id, defect):
     return certificates.Store(
         [
             certificates.certify(
-                detector_id, spec.code_hash(), "c" * 64, (0,), [cert], policy
+                detector_id, spec.digest(), "c" * 64, (0,), [cert], policy
             )
         ]
     )
@@ -285,5 +281,5 @@ def test_a_missing_text_value_does_not_break_the_block_key():
             "v": [*numpy.arange(20.0), 0.0, 1.0],
         }
     )
-    flags = duplicates.near_flags(frame, ["k", "v"], 0.01)
+    flags = duplicates.approximate(frame, ["k", "v"], 0.01)
     assert flags[-2:].all() and not flags[:20].any()

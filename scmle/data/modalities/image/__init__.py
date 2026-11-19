@@ -18,7 +18,7 @@ from scmle.data.modalities.image.evidence import Profile
 from scmle.data.modalities.image.evidence import Split
 from scmle.data.modalities.image.failures import DependencyError
 from scmle.data.modalities.image.failures import ImageError
-from scmle.data.modalities.image.failures import ImageValidationError
+from scmle.data.modalities.image.failures import ViolationError
 from scmle.data.modalities.image.pixels import configure
 from scmle.data.modalities.image.pixels import IMAGE_SIZE_DIMENSIONS
 from scmle.data.modalities.image.pixels import MATRIX_DIMENSIONS
@@ -27,10 +27,10 @@ from scmle.data.modalities.image.pixels import MIN_HASH_SIZE
 from scmle.data.modalities.image.pixels import SUPPORTED_FEATURE_MODES
 from scmle.data.modalities.image.sample import Augmentation
 from scmle.data.modalities.image.sample import bounds
-from scmle.data.modalities.image.sample import canonical_source
 from scmle.data.modalities.image.sample import DEFAULT_MAX_BYTES
 from scmle.data.modalities.image.sample import DEFAULT_MAX_PIXELS
 from scmle.data.modalities.image.sample import DEFAULT_PROFILE_SIZE
+from scmle.data.modalities.image.sample import identify
 from scmle.data.modalities.image.sample import imprint
 from scmle.data.modalities.image.sample import Sample
 from scmle.data.modalities.image.sample import SENSITIVE_METADATA_TAGS
@@ -82,14 +82,14 @@ __all__ = [
     "Dataset",
     "DependencyError",
     "ImageError",
-    "ImageValidationError",
     "PillowModule",
     "Profile",
     "Sample",
     "Split",
+    "ViolationError",
     "bounds",
-    "canonical_source",
     "configure",
+    "identify",
     "imprint",
     "islands",
     "pillow",

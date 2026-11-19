@@ -36,7 +36,7 @@ def bounds(
 
 
 def test_no_shared_column_is_not_evaluated() -> None:
-    found = representativeness.assess_representativeness(
+    found = representativeness.assess(
         pandas.DataFrame({"a": [1.0, 2.0]}),
         pandas.DataFrame({"b": [1.0]}),
         seed=7,
@@ -59,7 +59,7 @@ def test_no_shared_column_is_not_evaluated() -> None:
 
 
 def test_too_few_rows_is_not_evaluated_with_the_error() -> None:
-    found = representativeness.assess_representativeness(
+    found = representativeness.assess(
         pandas.DataFrame({"a": [1.0, 2.0], "c": ["x", "y"]}),
         pandas.DataFrame({"a": [1.0, 2.0, 3.0]}),
         seed=3,
@@ -88,7 +88,7 @@ def test_too_few_rows_is_not_evaluated_with_the_error() -> None:
 def test_quality_evidence_of_a_flagged_comparison() -> None:
     gap = representativeness.Gap("a", 0.5, 0.01)
     report = representativeness.Representativeness(0.9, False, (gap,))
-    found = report.quality_evidence(100, 80, 100, 60, 5, ("a", "b"))
+    found = report.attest(100, 80, 100, 60, 5, ("a", "b"))
     assert found == {
         "observation": "representativeness",
         "status": "flagged",
@@ -108,7 +108,7 @@ def test_quality_evidence_of_a_flagged_comparison() -> None:
 
 def test_quality_evidence_of_a_clear_comparison() -> None:
     report = representativeness.Representativeness(0.5, True, ())
-    found = report.quality_evidence(10, 10, 10, 10, 0, ())
+    found = report.attest(10, 10, 10, 10, 0, ())
     assert found["status"] == "clear"
     assert found["sample_bounds"]["truncated"] is False
 
@@ -121,9 +121,7 @@ def test_distinguishable_rows_name_the_largest_gap() -> None:
     reference = pandas.DataFrame(
         {"a": rng.normal(size=60) + 5, "b": rng.normal(size=60)}
     )
-    found = representativeness.assess_representativeness(
-        sample, reference, seed=2
-    )
+    found = representativeness.assess(sample, reference, seed=2)
     assert found.note is not None
     assert found.note.endswith("the largest gap is in 'a'")
     evidence = found.evidence

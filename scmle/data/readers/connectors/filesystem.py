@@ -42,7 +42,7 @@ class Filesystem(adapter.Adapter):
         path: Absolute resolved path of the local file.
     """
 
-    supported_schemes = ("", "file")
+    schemes = ("", "file")
 
     def __init__(
         self,
@@ -67,10 +67,8 @@ class Filesystem(adapter.Adapter):
             if len(parsed.scheme) == 1 and value[1:2] == ":"
             else parsed.scheme
         )
-        if scheme.lower() not in self.supported_schemes:
-            raise failure.SchemeError(
-                value, scheme.lower(), self.supported_schemes
-            )
+        if scheme.lower() not in self.schemes:
+            raise failure.SchemeError(value, scheme.lower(), self.schemes)
         if scheme:
             if parsed.netloc not in ("", "localhost"):
                 raise failure.SchemeError(
@@ -91,14 +89,14 @@ class Filesystem(adapter.Adapter):
             The schema of the parsed file.
         """
         frame = failure.persevere(
-            lambda: tabular.read_table(self.path),
+            lambda: tabular.read(self.path),
             "schema",
-            self.source_uri,
-            self.retry_budget,
+            self.uri,
+            self.budget,
         )
-        return layout.Columns.from_frame(frame)
+        return layout.Columns.infer(frame)
 
-    def content_sha256(self) -> str:
+    def digest(self) -> str:
         """Hashes the local source file as it is now.
 
         Returns:
@@ -106,7 +104,7 @@ class Filesystem(adapter.Adapter):
         """
         return checksum(self.path)
 
-    def read_rows(
+    def read(
         self, checkpoint: locator.Bookmark | None = None, limit: int = 1_000
     ) -> layout.Page:
         """Reads a bounded local-file batch from an offset checkpoint.
@@ -129,18 +127,18 @@ class Filesystem(adapter.Adapter):
             advanced by the rows returned, whether rows remain, and the
             file's content digest.
         """
-        self.validate_limit(limit)
+        self.validate(limit)
         value = self.rebind(checkpoint)
 
         def read() -> layout.Page:
-            initial_content_sha256 = self.content_sha256()
-            frame = tabular.read_table(self.path)
-            observed_content_sha256 = self.content_sha256()
+            initial_content_sha256 = self.digest()
+            frame = tabular.read(self.path)
+            observed_content_sha256 = self.digest()
             if initial_content_sha256 != observed_content_sha256:
                 raise failure.ConnectorError(
                     "source_snapshot_changed",
                     "local file content changed while it was being read",
-                    self.source_uri,
+                    self.uri,
                     {
                         "initial_content_sha256": initial_content_sha256,
                         "observed_content_sha256": observed_content_sha256,
@@ -153,13 +151,13 @@ class Filesystem(adapter.Adapter):
                     "source_snapshot_changed",
                     "local file content changed since the checkpoint was "
                     "created",
-                    self.source_uri,
+                    self.uri,
                     {
-                        "checkpoint_content_sha256": value.content_sha256,
+                        "checkpoint_content_sha256": value.digest,
                         "observed_content_sha256": observed_content_sha256,
                     },
                 ) from error
-            schema = layout.Columns.from_frame(frame)
+            schema = layout.Columns.infer(frame)
             start = bound_value.offset
             selected = frame.iloc[start : start + limit]
             rows = tuple(selected.itertuples(index=False, name=None))
@@ -168,13 +166,13 @@ class Filesystem(adapter.Adapter):
                 schema=schema,
                 rows=rows,
                 checkpoint=next_checkpoint,
-                has_more=start + len(rows) < len(frame),
-                content_sha256=observed_content_sha256,
+                more=start + len(rows) < len(frame),
+                digest=observed_content_sha256,
             )
 
         return failure.persevere(
             read,
             "read_rows",
-            self.source_uri,
-            self.retry_budget,
+            self.uri,
+            self.budget,
         )

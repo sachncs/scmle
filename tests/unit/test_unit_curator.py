@@ -16,7 +16,7 @@ KEY = "curation-key"
 def adapter(count=6):
     samples = tuple(
         modalities.document.Sample(
-            document_id=f"document-{index}",
+            identifier=f"document-{index}",
             content=("alpha " if index % 2 else "beta ") * (index + 2),
             label="alpha" if index % 2 else "beta",
         )

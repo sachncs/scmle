@@ -126,7 +126,7 @@ def test_factorize_codes_in_sorted_order_and_counts_clusters():
 def test_selective_labels_reports_every_field_in_the_flagged_direction():
     observed = [True] * 10 + [False] * 10 + [True] * 18 + [False] * 2
     base = [0] * 20 + [1] * 20
-    got = baseline.selective_labels(observed, base)
+    got = baseline.screen(observed, base)
     assert got.missing_rate_b0 == 0.5 and got.missing_rate_b1 == 0.1
     assert got.difference == pytest.approx(0.4)
     expected = stats.fisher_exact([[10, 10], [2, 18]], alternative="greater")[1]
@@ -146,7 +146,7 @@ def test_selective_labels_reports_every_field_in_the_flagged_direction():
 def test_selective_labels_flags_the_other_direction_too():
     observed = [True] * 18 + [False] * 2 + [True] * 10 + [False] * 10
     base = [0] * 20 + [1] * 20
-    got = baseline.selective_labels(observed, base)
+    got = baseline.screen(observed, base)
     assert got.difference == pytest.approx(-0.4)
     expected = stats.fisher_exact([[2, 18], [10, 10]], alternative="less")[1]
     assert got.p_value == pytest.approx(expected)
@@ -155,7 +155,7 @@ def test_selective_labels_flags_the_other_direction_too():
 
 def test_selective_labels_needs_both_the_size_and_the_significance():
     wide = [True] * 3 + [False] * 2 + [True] * 5 + [False] * 0
-    small = baseline.selective_labels(wide, [0] * 5 + [1] * 5)
+    small = baseline.screen(wide, [0] * 5 + [1] * 5)
     assert small.difference == pytest.approx(0.4)
     assert small.p_value > baseline.LABEL_ALPHA and small.flagged is False
     big = 1000
@@ -165,14 +165,14 @@ def test_selective_labels_needs_both_the_size_and_the_significance():
         + [True] * (big - 100)
         + [False] * 100
     )
-    mild = baseline.selective_labels(observed, [0] * big + [1] * big)
+    mild = baseline.screen(observed, [0] * big + [1] * big)
     assert mild.difference == pytest.approx(0.05)
     assert mild.p_value < baseline.LABEL_ALPHA and mild.flagged is False
 
 
 def test_selective_labels_flags_exactly_at_the_tolerance():
     observed = [True] * 600 + [False] * 400 + [True] * 800 + [False] * 200
-    got = baseline.selective_labels(observed, [0] * 1000 + [1] * 1000)
+    got = baseline.screen(observed, [0] * 1000 + [1] * 1000)
     assert got.difference == pytest.approx(0.2)
     assert got.p_value < baseline.LABEL_ALPHA
     assert got.flagged is True
@@ -183,12 +183,12 @@ def test_selective_labels_flags_when_p_equals_the_level(monkeypatch):
         stats, "fisher_exact", lambda table, alternative: (1.0, 0.01)
     )
     observed = [True] * 10 + [False] * 10 + [True] * 18 + [False] * 2
-    got = baseline.selective_labels(observed, [0] * 20 + [1] * 20)
+    got = baseline.screen(observed, [0] * 20 + [1] * 20)
     assert got.p_value == 0.01 and got.flagged is True
 
 
 def test_selective_labels_with_a_small_arm_says_nothing():
-    got = baseline.selective_labels([1, 0, 1, 1], [1, 0, 1, 1])
+    got = baseline.screen([1, 0, 1, 1], [1, 0, 1, 1])
     assert got.flagged is False and got.p_value == 1.0
     assert got.difference == 0.0
     assert math.isnan(got.missing_rate_b0) and math.isnan(got.missing_rate_b1)
@@ -197,17 +197,17 @@ def test_selective_labels_with_a_small_arm_says_nothing():
 
 def test_an_arm_of_exactly_the_minimum_size_is_assessed():
     observed = [False] * 5 + [True] * 5 + [True] * 5
-    got = baseline.selective_labels(observed, [0] * 5 + [1] * 5 + [1] * 5)
+    got = baseline.screen(observed, [0] * 5 + [1] * 5 + [1] * 5)
     assert got.missing_rate_b0 == 1.0 and got.missing_rate_b1 == 0.0
     assert got.p_value < 1.0
-    other = baseline.selective_labels(
+    other = baseline.screen(
         [False] * 5 + [True] * 5 + [True] * 5, [1] * 5 + [0] * 5 + [0] * 5
     )
     assert other.missing_rate_b1 == 1.0 and other.missing_rate_b0 == 0.0
     assert other.p_value < 1.0
-    four = baseline.selective_labels([True] * 9, [0] * 4 + [1] * 5)
+    four = baseline.screen([True] * 9, [0] * 4 + [1] * 5)
     assert math.isnan(four.missing_rate_b0)
-    four = baseline.selective_labels([True] * 9, [0] * 5 + [1] * 4)
+    four = baseline.screen([True] * 9, [0] * 5 + [1] * 4)
     assert math.isnan(four.missing_rate_b0)
 
 
@@ -215,9 +215,9 @@ def test_selective_labels_errors():
     with pytest.raises(
         ValueError, match=r"^observed and b must have the same length$"
     ):
-        baseline.selective_labels([True, False], [1, 0, 1])
+        baseline.screen([True, False], [1, 0, 1])
     with pytest.raises(ValueError, match=r"^b must hold only 0 and 1$"):
-        baseline.selective_labels([True, False], [2, 0])
+        baseline.screen([True, False], [2, 0])
 
 
 def profile_world():
@@ -310,23 +310,21 @@ def test_registration_hash_covers_every_field_and_the_rule_digest_is_sha256():
     registration = baseline.register(MODEL, RULE, 0.05)
     assert registration.alpha == 0.05
     assert (registration.t_lo, registration.t_hi) == (0.1, 0.4)
-    assert registration.cost_model_hash == MODEL.model_hash
+    assert registration.cost_model_hash == MODEL.digest
     expected_rule = hashlib.sha256(signing.canonicalise(RULE)).hexdigest()
     assert registration.rule_hash == expected_rule == baseline.fingerprint(RULE)
     payload = {
-        "cost_model_hash": MODEL.model_hash,
+        "cost_model_hash": MODEL.digest,
         "rule_hash": expected_rule,
         "alpha": 0.05,
         "t_lo": 0.1,
         "t_hi": 0.4,
     }
     assert (
-        registration.registration_hash
+        registration.digest
         == hashlib.sha256(signing.canonicalise(payload)).hexdigest()
     )
-    assert baseline.register(MODEL, RULE, 0.06).registration_hash != (
-        registration.registration_hash
-    )
+    assert baseline.register(MODEL, RULE, 0.06).digest != (registration.digest)
 
 
 def test_the_level_must_be_strictly_inside_the_unit_interval():
@@ -427,7 +425,7 @@ def test_an_issued_claim_carries_every_check_and_the_claim_fields():
         "outcomes observed independently of the baseline decision",
         "the action rule was frozen on X before C was opened",
         "cluster-robust standard error, asymptotic in the clusters",
-        f"cost model {MODEL.model_hash[:12]} fixed before C",
+        f"cost model {MODEL.digest[:12]} fixed before C",
     )
 
 
@@ -442,9 +440,7 @@ def test_the_report_document_states_the_guarantee():
     assert document["p_value_intersection_union"] == report.p_value
     assert [e["clusters"] for e in document["endpoints"]] == [30, 30]
     assert document["selective_labels"] == report.selectivity.to_dict()
-    assert document["digests"] == {
-        "registration": g.registration.registration_hash
-    }
+    assert document["digests"] == {"registration": g.registration.digest}
     assert [c["identifier"] for c in document["checks"]] == [
         c.identifier for c in report.checks
     ]
@@ -616,7 +612,7 @@ def test_object_outcomes_with_missing_entries_are_read_as_floats():
 
 def test_equal_missing_rates_use_the_greater_tail_of_the_exact_test():
     observed = [True] * 8 + [False] * 2 + [True] * 16 + [False] * 4
-    got = baseline.selective_labels(observed, [0] * 10 + [1] * 20)
+    got = baseline.screen(observed, [0] * 10 + [1] * 20)
     assert got.difference == 0.0
     greater = stats.fisher_exact([[2, 8], [4, 16]], alternative="greater")[1]
     less = stats.fisher_exact([[2, 8], [4, 16]], alternative="less")[1]

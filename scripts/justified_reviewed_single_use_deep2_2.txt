@@ -1,14 +1,14 @@
 scmle/assurance/admissibility/screen/fitting.py stratify single-use three assertions in test_leakage_screen pin its group, time-block and single-stratum cases, and the screen driver that calls it once is already a long function of hypothesis bookkeeping
 scmle/assurance/admissibility/screen/settings.py allowance single-use formula time_budget_seconds * SCREEN_SHARE * FITS_PER_SECOND is quoted by name in the module comment above the constants and in two docstrings, and test_screen_budget pins 450_000 and 6_750_000
-scmle/data/catalog/canon.py canonical_collection single-use canonicalize already has six returns, the ruff limit, so inlining the mapping, sequence and set returns would break PLR0911
+scmle/data/catalog/canon.py convert single-use canonicalize already has six returns, the ruff limit, so inlining the mapping, sequence and set returns would break PLR0911
 scmle/data/catalog/inspection.py dedupe single-use sibling of tally, describe and summarize that examine calls in a row; the try/except inlined between them would add 17 lines to a function that already runs past 80
-scmle/data/catalog/inspection.py frame_content single-use builds the canonical rows and schema that feed digest_value, so the content identity has one named definition; inlined it would put a nested comprehension into examine after its other evidence steps
+scmle/data/catalog/inspection.py extract single-use builds the canonical rows and schema that feed digest_value, so the content identity has one named definition; inlined it would put a nested comprehension into examine after its other evidence steps
 scmle/data/catalog/inspection.py tabulate single-use coerce already has six returns, so the four array-dimension returns here would break PLR0911; the 0-d, 1-d, 2-d and higher cases are one named step
 scmle/data/catalog/inspection.py coerce single-use dispatcher whose return contract and ValueError are documented and which examine calls once; inlined it would bury examine's frame-less branches under an isinstance chain
 scmle/data/catalog/inspection.py frame_for_mapping single-use coerce already has six returns, and the columns-versus-record rule with its equal-length ValueError is a separate documented step
 scmle/data/catalog/identity.py normalize single-use body carries the documented rule that a one-letter scheme before a colon is a Windows drive and so a path, which the Source validator should not repeat inside its field loop
 scmle/assurance/charter/contracts/specification.py peek single-use public reader called by cli and by tests/unit/test_charter_contracts and test_charter_rules_sealing_mutants, which assert the wrapped and bare charter forms
-scmle/assurance/charter/feasibility.py mde_mean single-use public closed form named by six tests in test_charter_feasibility and test_charter_feasibility_mutants, including the n below 1 NaN case
+scmle/assurance/charter/feasibility.py detect single-use public closed form named by six tests in test_charter_feasibility and test_charter_feasibility_mutants, including the n below 1 NaN case
 scmle/assurance/charter/feasibility.py n_required_mean single-use public closed form named by fourteen tests including tests/statistics/test_power_formulas and by benchmarks/qualification/framing_certify.py
 scmle/assurance/charter/feasibility.py detectability single-use public closed form named by tests/statistics/test_power_formulas and eight unit assertions in the feasibility tests
 scmle/assurance/charter/sealing.py inscribe single-use public writer called by cli and by sixty tests that seal charters
@@ -20,7 +20,7 @@ scmle/assurance/custody/carve.py pick single-use named by test_custody_mutants_d
 scmle/assurance/custody/carve.py restrict single-use raises the ConfigError that the carve docstring names, and test_custody_carve, test_custody_mutants_data and MUTANTS_custody.md call it directly
 scmle/assurance/custody/carve.py unitize single-use union-find with two nested closures (find, union) that MUTANTS_custody.md names; inlined into carve it would add to a function whose decision points are time-block versus stratified draw and the too-few-units note
 scmle/assurance/custody/merkle.py combine single-use tagged parent hash tested directly by ten assertions in test_custody_merkle, test_custody_mutants and test_reliability_contracts
-scmle/assurance/custody/merkle.py merkle_root single-use named by test_custody_merkle, test_custody_mutants and MUTANTS_custody.md, which pin the odd-level carry and EMPTY_ROOT
+scmle/assurance/custody/merkle.py fold single-use named by test_custody_merkle, test_custody_mutants and MUTANTS_custody.md, which pin the odd-level carry and EMPTY_ROOT
 scmle/assurance/custody/merkle.py fingerprints single-use named by test_custody_mutants and MUTANTS_custody.md, which pin the ascending-id ordering before hashing
 scmle/assurance/detectors/certificates.py documentation single-use AST scan that keeps a docstring sharing a line with another statement; test_qualification_certificates pins the resulting hash_source behaviour, and the scan is non-obvious next to hash_source's tokenizer loop
 scmle/assurance/detectors/labels.py assign single-use tested directly in test_detector_labels, which pins the -1 result where no class reaches its threshold
@@ -28,9 +28,9 @@ scmle/assurance/detectors/labels.py mislabeled single-use tested directly in tes
 scmle/assurance/detectors/labels.py hoeffding single-use formula tested directly in test_detector_labels against the closed form
 scmle/assurance/detectors/labels.py margins single-use tested directly in test_detector_labels, and its docstring states the MARGIN_LEAVES rationale for the area under the margin rule
 scmle/assurance/detectors/labels.py noisiness single-use public interval with a documented audit contract (ValueError on duplicate audit positions), tested directly in test_detector_labels
-scmle/assurance/detectors/missingness.py fit_one single-use named in test_detector_missingness, which asserts the imputer sees train rows only
+scmle/assurance/detectors/missingness.py fit single-use named in test_detector_missingness, which asserts the imputer sees train rows only
 scmle/assurance/detectors/missingness.py imputers single-use named in test_detector_missingness, which asserts per-fold state depends only on the train rows
-scmle/assurance/detectors/missingness.py make_imputer single-use test_detector_missingness asserts its ValueError for an unknown strategy
+scmle/assurance/detectors/missingness.py provision single-use test_detector_missingness asserts its ValueError for an unknown strategy
 scmle/assurance/detectors/sentinels.py nullify single-use tested directly in test_detector_sentinels, which pins the integer-to-float recode and the log record
 scmle/assurance/framing/draft/filling.py linkage single-use tested directly in test_framing_draft, which pins the resolved and unresolved statuses and the gating False flag
 scmle/assurance/framing/provenance.py claim_tier single-use named by claim.py and baseline.py docstrings and by four tests in test_framing_provenance_questions that pin the unsigned LLM and data-derived cost ceilings
@@ -46,7 +46,7 @@ scmle/causal/identification/run/analysis.py caveats single-use tested directly i
 scmle/causal/identification/run/strata.py subgroup_results single-use tested directly in test_identification_run_mutants (five references), which pin that adapter.weak is restored
 scmle/causal/identification/tier.py evidence_shortfalls single-use inlined into decide it gives complexity 14 and 13 branches against limits of 10 and 12 (checked with ruff)
 scmle/causal/identification/tier.py assess single-use its five keys are the CONDITIONS tuple that decide and Assignment report, so the name documents the tier rule; inlined it fits ruff but puts a twenty line boolean table into decide
-scmle/assurance/ingest/declared.py reconcile_source single-use named in the ingest stage and declared.py module docstrings and tested directly in test_ingest_declared; its caller is pipeline/ingest_stage
+scmle/assurance/ingest/declared.py survey single-use named in the ingest stage and declared.py module docstrings and tested directly in test_ingest_declared; its caller is pipeline/ingest_stage
 scmle/assurance/ingest/entities/blocking.py pairing single-use tested by five references in test_ingest_entities and used by benchmarks/qualification/ingest_certify.py, which read the skipped-block count
 scmle/assurance/ingest/entities/similarity.py jarowinkler single-use tested against the standard value in test_ingest_entities
 scmle/assurance/ingest/entities/sampling.py cutoffs single-use the cumulative-precision scan for t_match and the half-rate scan for t_group is non-obvious, and resolve calls it in the labelled branch opposite the weakest calculation of the unlabelled branch

@@ -18,7 +18,7 @@ def grid() -> multiverse.Grid:
 
 def test_the_sweep_reports_the_seconds_between_its_clock_readings() -> None:
     ticks = iter([10.0, 17.5])
-    run = multiverse.run_grid(
+    run = multiverse.sweep(
         grid(),
         lambda spec: {"effect": 1.0},
         finding="a",

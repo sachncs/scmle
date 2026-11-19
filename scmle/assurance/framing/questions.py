@@ -53,7 +53,7 @@ class Question:
         form: The closed form of the answer.
         low: Lowest plausible value.
         high: Highest plausible value.
-        tipping_value: Value at which the verdict changes.
+        tipping: Value at which the verdict changes.
         verdicts: The verdict at each end of the range.
         migrations: The written layout's version steps, oldest first;
             version 2 spells `tipping_value` as `tipping`.
@@ -67,7 +67,7 @@ class Question:
     form: str
     low: float
     high: float
-    tipping_value: float
+    tipping: float
     verdicts: tuple[str, str]
 
     def to_dict(self) -> dict[str, Any]:

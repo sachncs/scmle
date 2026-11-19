@@ -35,7 +35,7 @@ def coverage(reruns, seed):
 def test_the_reported_coverage_with_twenty_re_runs_is_the_measured_one():
     support_statistics.assert_rate_near(
         coverage(20, seed=2),
-        controls.interval_coverage(20),
+        controls.cover(20),
         RUNS,
         "p95 interval, normal draws, B=20",
     )
@@ -44,7 +44,7 @@ def test_the_reported_coverage_with_twenty_re_runs_is_the_measured_one():
 def test_the_reported_coverage_with_thirty_re_runs_is_the_measured_one():
     support_statistics.assert_rate_near(
         coverage(30, seed=3),
-        controls.interval_coverage(30),
+        controls.cover(30),
         RUNS,
         "p95 interval, normal draws, B=30",
     )
@@ -57,17 +57,17 @@ def test_a_hundred_re_runs_cover_what_the_interval_claims():
         RUNS,
         "p95 interval, normal draws, B=100",
     )
-    assert controls.interval_coverage(100) >= controls.INTERVAL_CONFIDENCE
+    assert controls.cover(100) >= controls.INTERVAL_CONFIDENCE
 
 
 def test_few_re_runs_cannot_reach_the_nominal_confidence():
-    assert controls.interval_coverage(20) < controls.INTERVAL_CONFIDENCE - 0.2
-    assert controls.interval_coverage(30) < controls.INTERVAL_CONFIDENCE - 0.1
+    assert controls.cover(20) < controls.INTERVAL_CONFIDENCE - 0.2
+    assert controls.cover(30) < controls.INTERVAL_CONFIDENCE - 0.1
 
 
 def test_the_coverage_of_a_non_positive_number_of_re_runs_is_refused():
     try:
-        controls.interval_coverage(0)
+        controls.cover(0)
     except ValueError:
         return
     raise AssertionError("interval_coverage(0) did not raise")

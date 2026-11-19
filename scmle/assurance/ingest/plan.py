@@ -37,22 +37,22 @@ class Config:
     Attributes:
         tables: Tables to profile, in order.
         unit: Charter unit text, or None to skip the unit verdict.
-        target_table: Table the unit is compared with.
-        eps_key: Largest `g3` accepted as a key.
-        eps_null: Largest null rate accepted in a key.
-        eps_fk: Largest share of child values without a parent for a
+        target: Table the unit is compared with.
+        violation: Largest `g3` accepted as a key.
+        null: Largest null rate accepted in a key.
+        orphans: Largest share of child values without a parent for a
             candidate link.
-        max_key_size: Largest key size searched, `L`.
+        width: Largest key size searched, `L`.
         declared: Foreign keys the schema declares.
     """
 
     tables: tuple[str, ...]
     unit: str | None = None
-    target_table: str | None = None
-    eps_key: float = 0.0
-    eps_null: float = 0.0
-    eps_fk: float = 0.0
-    max_key_size: int = grain.LEVELS
+    target: str | None = None
+    violation: float = 0.0
+    null: float = 0.0
+    orphans: float = 0.0
+    width: int = grain.LEVELS
     declared: tuple[joins.Reference, ...] = ()
 
     def __post_init__(self) -> None:
@@ -60,11 +60,11 @@ class Config:
 
         Raises:
             ValueError: If `tables` is empty, or a unit is given and
-                `target_table` is not one of `tables`.
+                `target` is not one of `tables`.
         """
         if not self.tables:
             raise errors.InputError("tables must not be empty")
-        if self.unit is not None and self.target_table not in self.tables:
+        if self.unit is not None and self.target not in self.tables:
             raise errors.InputError("target_table must be one of tables")
 
 
@@ -111,7 +111,7 @@ class Plan:
             clock: Wall-time source for the budget meter; the meter's
                 default clock when None.
         """
-        self.run_dir = pathlib.Path(run_dir)
+        self.directory = pathlib.Path(run_dir)
         self.settings = settings
         limits = budget or scmle.assurance.ingest.budget.Budget()
         self.meter = (
@@ -122,17 +122,17 @@ class Plan:
         self.source = profile.Sql(connection_factory, self.meter)
         self.catalog: profile.Catalog | None = None
         self.scans: dict[str, grain.Scan] = {}
-        self.verdict: grain.UnitVerdict | None = None
+        self.verdict: grain.Verdict | None = None
         self.graph: joins.Joins | None = None
 
-    def run_profile(self) -> profile.Catalog:
+    def profile(self) -> profile.Catalog:
         """Profiles the tables and writes `ingest_catalog.json`.
 
         Returns:
             The catalog of the profiled tables.
         """
         self.catalog = profile.inventory(self.source, self.settings.tables)
-        persist(self.run_dir, CATALOG, self.catalog.to_dict())
+        persist(self.directory, CATALOG, self.catalog.to_dict())
         return self.catalog
 
     def infer(self) -> dict[str, grain.Scan]:
@@ -148,15 +148,15 @@ class Plan:
                 `target_table` is None and yet `None` is among the scanned
                 table names.
         """
-        catalog = self.catalog or self.run_profile()
+        catalog = self.catalog or self.profile()
         self.scans = {}
         for table in catalog.tables:
             self.scans[table.name] = grain.keysearch(
                 self.source,
                 table,
-                self.settings.eps_key,
-                self.settings.eps_null,
-                self.settings.max_key_size,
+                self.settings.violation,
+                self.settings.null,
+                self.settings.width,
             )
         document: dict[str, Any] = {
             "tables": {n: s.to_dict() for n, s in self.scans.items()},
@@ -164,9 +164,9 @@ class Plan:
             or any(s.partial for s in self.scans.values()),
             "verdict": None,
         }
-        target = self.settings.target_table
+        target = self.settings.target
         if self.settings.unit is not None and target in self.scans:
-            self.verdict = grain.unit_verdict(
+            self.verdict = grain.judge(
                 self.source,
                 catalog.table(target),
                 self.settings.unit,
@@ -174,7 +174,7 @@ class Plan:
             )
             document["verdict"] = self.verdict.to_dict()
         elif self.settings.unit is not None:
-            self.verdict = grain.UnitVerdict(
+            self.verdict = grain.Verdict(
                 grain.UNKNOWN,
                 self.settings.unit,
                 (),
@@ -182,7 +182,7 @@ class Plan:
                 ("raise the ingest budget",),
             )
             document["verdict"] = self.verdict.to_dict()
-        persist(self.run_dir, GRAIN, document)
+        persist(self.directory, GRAIN, document)
         return self.scans
 
     def link(self) -> joins.Joins:
@@ -193,7 +193,7 @@ class Plan:
         Returns:
             The join graph over the tables that have a key scan.
         """
-        catalog = self.catalog or self.run_profile()
+        catalog = self.catalog or self.profile()
         if not self.scans:
             self.infer()
         keyed = profile.Catalog(
@@ -205,18 +205,18 @@ class Plan:
             keyed,
             self.scans,
             self.settings.declared,
-            self.settings.eps_fk,
+            self.settings.orphans,
         )
-        persist(self.run_dir, JOINS, self.graph.to_dict())
+        persist(self.directory, JOINS, self.graph.to_dict())
         return self.graph
 
-    def run_all(self) -> dict[str, Any]:
+    def execute(self) -> dict[str, Any]:
         """Runs every stage and writes `ingest_budget.json`.
 
         Returns:
             The summary from `finish`.
         """
-        self.run_profile()
+        self.profile()
         self.infer()
         self.link()
         return self.finish()
@@ -231,7 +231,7 @@ class Plan:
         """
         document = self.meter.to_dict()
         document["source_queries"] = self.source.queries
-        persist(self.run_dir, BUDGET, document)
+        persist(self.directory, BUDGET, document)
         return {
             "partial": self.meter.partial,
             "source_queries": self.source.queries,

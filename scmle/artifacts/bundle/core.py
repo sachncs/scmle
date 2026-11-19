@@ -79,7 +79,7 @@ class Core:
         # `tilt`.
         self.shift_weights: shift_weights.StoredShiftWeights | None = None
         # Measured coverage of the stored intervals or sets on the final test
-        # rows (`coverage_run.run_report`), set by the run.
+        # rows (`coverage_run.report`), set by the run.
         self.coverage_report: dict[str, Any] | None = None
         # Serializes `remember`, which rewrites `history` from itself.
         self.history_lock = threading.RLock()
@@ -107,8 +107,8 @@ class Core:
             The data as a pandas frame (a copy for pandas input).
         """
         if isinstance(data, (str, pathlib.Path)):
-            return tabular.read_table(data)
-        return interchange.to_pandas(data)
+            return tabular.read(data)
+        return interchange.frame(data)
 
     def validate(
         self,

@@ -101,8 +101,8 @@ class Provenance(workspace.Workspace):
                 "duplicate_event",
                 "the same event identity was submitted twice",
                 {
-                    "first": first.accepted_event_ids,
-                    "second": second.duplicate_event_ids,
+                    "first": first.accepted,
+                    "second": second.duplicates,
                 },
             ),
             self.artifact(

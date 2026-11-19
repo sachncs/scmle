@@ -24,13 +24,13 @@ from typing import Any
 from typing import ClassVar
 from typing import Self
 
-from scmle.assurance.detectors.hashing import code_hash
-from scmle.assurance.detectors.hashing import corpus_hash
-from scmle.assurance.detectors.hashing import hash_source
-from scmle.assurance.detectors.hashing import require_digest
+from scmle.assurance.detectors.hashing import checksum
+from scmle.assurance.detectors.hashing import digest
+from scmle.assurance.detectors.hashing import fingerprint
+from scmle.assurance.detectors.hashing import require
+from scmle.assurance.detectors.intervals import bound
 from scmle.assurance.detectors.intervals import interval
 from scmle.assurance.detectors.intervals import METHODS
-from scmle.assurance.detectors.intervals import wilson_interval
 from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
@@ -54,16 +54,16 @@ __all__ = [
     "Standard",
     "Store",
     "audit",
+    "bound",
     "certify",
-    "code_hash",
-    "corpus_hash",
+    "checksum",
     "demote",
+    "digest",
+    "fingerprint",
     "flatten",
-    "hash_source",
     "interval",
     "nest",
-    "require_digest",
-    "wilson_interval",
+    "require",
 ]
 
 SCHEMA_VERSION = 1
@@ -327,7 +327,7 @@ def nest(layout: records.Layout) -> records.Layout:
         layout: The certificate after its other keys were renamed.
 
     Returns:
-        The certificate with ``code_hash`` and ``corpus_hash`` nested as
+        The certificate with ``fingerprint`` and ``checksum`` nested as
         ``digests.code`` and ``digests.corpus``. The policy and outcomes
         carry their own versions and are not touched.
     """
@@ -403,8 +403,8 @@ class Certification:
         evidence.require_text(self.detector, "detector")
         if set(self.digests) != {"code", "corpus"}:
             raise errors.InputError("digests must hold code and corpus")
-        require_digest(self.digests["code"], "code digest")
-        require_digest(self.digests["corpus"], "corpus digest")
+        require(self.digests["code"], "code digest")
+        require(self.digests["corpus"], "corpus digest")
         object.__setattr__(self, "digests", dict(self.digests))
         qualification.tupled(self.seeds, "seeds")
         if not self.seeds:
@@ -434,7 +434,7 @@ class Certification:
         )
 
     @property
-    def certified_defect_types(self) -> tuple[str, ...]:
+    def certified(self) -> tuple[str, ...]:
         """The defect types whose outcome passed the policy."""
         return tuple(o.certificate.defect for o in self.outcomes if o.passed)
 
@@ -498,8 +498,8 @@ def certify(
 
     Args:
         detector_id: Detector that was measured.
-        code_digest: `code_hash` of the measured code.
-        corpus_digest: `corpus_hash` of the data used.
+        code_digest: `fingerprint` of the measured code.
+        corpus_digest: `checksum` of the data used.
         seeds: Run seeds of the injections.
         results: One measured `Certificate` per defect type.
         policy: Pre-registered floors.
@@ -577,14 +577,14 @@ class Store:
         Args:
             items: Certificates to add, in order.
         """
-        self.by_key: dict[tuple[Any, ...], Certification] = {}
+        self.index: dict[tuple[Any, ...], Certification] = {}
         for item in items:
             self.add(item)
 
     @property
     def certificates(self) -> tuple[Certification, ...]:
         """The stored certificates, ordered by key."""
-        return tuple(self.by_key[key] for key in sorted(self.by_key))
+        return tuple(self.index[key] for key in sorted(self.index))
 
     def add(self, item: Certification) -> None:
         """Stores a certificate, replacing one with the same key.
@@ -592,7 +592,7 @@ class Store:
         Args:
             item: The certificate to store.
         """
-        self.by_key[item.key] = item
+        self.index[item.key] = item
 
     def current(
         self, detector_id: str, code_digest: str
@@ -645,7 +645,7 @@ class Store:
             `defect_type`, otherwise `descriptive`.
         """
         for item in self.current(detector_id, code_digest):
-            if defect_type in item.certified_defect_types:
+            if defect_type in item.certified:
                 return Authority.GATING
         return Authority.DESCRIPTIVE
 

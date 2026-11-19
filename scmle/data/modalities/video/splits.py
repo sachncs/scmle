@@ -6,9 +6,9 @@ from scmle.data.modalities.curation import allocate
 from scmle.data.modalities.curation import proportions
 from scmle.data.modalities.video.evidence import Chronology
 from scmle.data.modalities.video.evidence import Split
-from scmle.data.modalities.video.sample import canonical_observation_time
 from scmle.data.modalities.video.sample import Sample
-from scmle.data.modalities.video.sample import VideoTemporalError
+from scmle.data.modalities.video.sample import TemporalError
+from scmle.data.modalities.video.sample import timestamp
 
 
 class Splits:
@@ -51,9 +51,7 @@ class Splits:
         proportions(validation_fraction, test_fraction)
         grouped: dict[str, list[Sample]] = {}
         for sample in self.samples:
-            grouped.setdefault(sample.group_id or sample.source, []).append(
-                sample
-            )
+            grouped.setdefault(sample.group or sample.source, []).append(sample)
         validation_groups, test_groups = allocate(
             grouped, validation_fraction, test_fraction, seed
         )
@@ -62,18 +60,18 @@ class Splits:
             return tuple(
                 sample
                 for sample in self.samples
-                if (sample.group_id or sample.source) not in excluded
+                if (sample.group or sample.source) not in excluded
             )
 
         validation = tuple(
             sample
             for sample in self.samples
-            if (sample.group_id or sample.source) in validation_groups
+            if (sample.group or sample.source) in validation_groups
         )
         test = tuple(
             sample
             for sample in self.samples
-            if (sample.group_id or sample.source) in test_groups
+            if (sample.group or sample.source) in test_groups
         )
         return Split(
             train=sieve(test_groups | validation_groups),
@@ -95,12 +93,12 @@ class Splits:
             The split, with the cutoff in UTC.
 
         Raises:
-            VideoTemporalError: If any video has no observation time, or the
-                cutoff is invalid (see `canonical_observation_time`).
+            TemporalError: If any video has no observation time, or the
+                cutoff is invalid (see `timestamp`).
         """
-        cutoff_time = canonical_observation_time(cutoff)
-        if any(sample.observation_time is None for sample in self.samples):
-            raise VideoTemporalError(
+        cutoff_time = timestamp(cutoff)
+        if any(sample.time is None for sample in self.samples):
+            raise TemporalError(
                 "temporal splitting requires an observation time on every "
                 "video",
                 {"code": "incomplete_observation_times"},
@@ -108,14 +106,12 @@ class Splits:
         train = tuple(
             sample
             for sample in self.samples
-            if isinstance(sample.observation_time, datetime)
-            and sample.observation_time <= cutoff_time
+            if isinstance(sample.time, datetime) and sample.time <= cutoff_time
         )
         future = tuple(
             sample
             for sample in self.samples
-            if isinstance(sample.observation_time, datetime)
-            and sample.observation_time > cutoff_time
+            if isinstance(sample.time, datetime) and sample.time > cutoff_time
         )
         return Chronology(
             cutoff=cutoff_time,

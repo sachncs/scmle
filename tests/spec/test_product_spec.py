@@ -410,14 +410,14 @@ def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
     )  # ingestion: input immutable
     spec = project.spec
     manifest = tabular.manifested(frame, "y")
-    task = scmle.data.validation.target.TaskResolver(spec).resolve(frame["y"])
+    task = scmle.data.validation.target.Resolver(spec).resolve(frame["y"])
     profiler.Profiler(spec).profile(frame, manifest, task)
     pandas.testing.assert_frame_equal(
         frame, before
     )  # profiling: no fitted state, no mutation
     split = splitters.Splitter(spec, task).split(frame)
-    assert not set(split.manifest.train_ids) & set(
-        split.manifest.test_ids
+    assert not set(split.manifest.training) & set(
+        split.manifest.test
     )  # splitting
     assert {t.status for t in result.trials} >= {experiments.Termination.OK}
     assert result.selected_model  # selector: defined policy
@@ -850,9 +850,7 @@ def test_l421_l437_leakage_invariants(run, frame, tmp_path):
         make_frame(200)
     )
     with pytest.raises(errors.LeakageError):
-        split.locked_test.open(
-            "guess"
-        )  # 4 locked test evaluator / restricted handle
+        split.test.open("guess")  # 4 locked test evaluator / restricted handle
     kinds = {e["kind"] for e in events_of(result)}
     assert {
         "split.created",
@@ -1027,7 +1025,7 @@ def test_core_deliverables_are_observable(frame, tmp_path):
     """Core lifecycle deliverables remain observable behaviours."""
     from scmle.data.readers import tabular
 
-    assert tabular.read_table
+    assert tabular.read
     result = support.make_project(frame, "y", output_dir=tmp_path).run()
     assert result.predict(frame.drop(columns="y")).shape[0] == len(frame)
     assert len({t.model_name for t in result.trials}) > 3

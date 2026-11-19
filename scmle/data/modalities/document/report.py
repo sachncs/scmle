@@ -53,10 +53,10 @@ class Curation:
 
     Attributes:
         dataset_hash: Order-independent digest of the dataset.
-        sample_count: Number of samples.
-        document_count: Number of distinct document identities.
+        samples: Number of samples.
+        documents: Number of distinct document identities.
         profiles: One profile per sample, in sample order.
-        duplicate_groups: Groups of document ids with identical content.
+        duplicates: Groups of document ids with identical content.
         language_counts: Samples per language code, sorted by code.
         format_counts: Samples per document format, sorted by name.
         label_counts: Samples per label bucket (``unlabeled`` or
@@ -64,18 +64,18 @@ class Curation:
         quality_findings: Findings about data quality.
         risk_findings: Findings about risk such as sensitive content and
             conflicting labels.
-        max_characters: Character bound used for profiling.
-        max_tokens: Token bound used for profiling.
+        characters: Character bound used for profiling.
+        tokens: Token bound used for profiling.
         layout_coverage: Share of samples with layout evidence.
         layout_providers: Sorted names of the layout providers.
         layout_element_count: Total number of layout elements.
-        table_element_count: Total number of table elements.
+        tables: Total number of table elements.
         ocr_confidence_min: Smallest OCR confidence, or None.
         ocr_confidence_max: Largest OCR confidence, or None.
         sensitive_match_counts: Matches per sensitive-value pattern.
-        source_traceability_coverage: Share of samples with both a source URI
+        traceability: Share of samples with both a source URI
             and a source digest.
-        citation_count: Number of citations over the traceable samples.
+        citations: Number of citations over the traceable samples.
         migrations: Version steps of the stored report; version 2 writes
             single-word keys (`digests.dataset`, `samples`, `documents`,
             `duplicates`, `counts.{languages, formats, labels, sensitive}`,
@@ -88,31 +88,31 @@ class Curation:
     migrations: ClassVar[tuple[records.Migration, ...]] = (CURATION,)
 
     dataset_hash: str
-    sample_count: int
-    document_count: int
+    samples: int
+    documents: int
     profiles: tuple[Profile, ...]
-    duplicate_groups: tuple[tuple[str, ...], ...]
+    duplicates: tuple[tuple[str, ...], ...]
     language_counts: dict[str, int]
     format_counts: dict[str, int]
     label_counts: dict[str, int]
     quality_findings: tuple[data.Finding, ...]
     risk_findings: tuple[data.Finding, ...]
-    max_characters: int
-    max_tokens: int
+    characters: int
+    tokens: int
     layout_coverage: float = 0.0
     layout_providers: tuple[str, ...] = ()
     layout_element_count: int = 0
-    table_element_count: int = 0
+    tables: int = 0
     ocr_confidence_min: float | None = None
     ocr_confidence_max: float | None = None
     sensitive_match_counts: dict[str, int] = dataclasses.field(
         default_factory=dict
     )
-    source_traceability_coverage: float = 0.0
-    citation_count: int = 0
+    traceability: float = 0.0
+    citations: int = 0
 
     @property
-    def unresolved_blocking_findings(
+    def blockers(
         self,
     ) -> tuple[data.Finding, ...]:
         """The blocking findings without a safe review disposition.
@@ -132,9 +132,9 @@ class Curation:
         )
 
     @property
-    def release_ready(self) -> bool:
+    def release(self) -> bool:
         """Whether no unresolved blocking finding remains."""
-        return not self.unresolved_blocking_findings
+        return not self.blockers
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-native evidence for a dataset card or run artifact.
@@ -147,14 +147,12 @@ class Curation:
         """
         layout = {
             "dataset_hash": self.dataset_hash,
-            "sample_count": self.sample_count,
-            "document_count": self.document_count,
+            "sample_count": self.samples,
+            "document_count": self.documents,
             "profiles": [
                 dataclasses.asdict(profile) for profile in self.profiles
             ],
-            "duplicate_groups": [
-                list(group) for group in self.duplicate_groups
-            ],
+            "duplicate_groups": [list(group) for group in self.duplicates],
             "language_counts": dict(self.language_counts),
             "format_counts": dict(self.format_counts),
             "label_counts": dict(self.label_counts),
@@ -164,21 +162,20 @@ class Curation:
             "risk_findings": [
                 finding.to_dict() for finding in self.risk_findings
             ],
-            "max_characters": self.max_characters,
-            "max_tokens": self.max_tokens,
+            "max_characters": self.characters,
+            "max_tokens": self.tokens,
             "layout_coverage": self.layout_coverage,
             "layout_providers": list(self.layout_providers),
             "layout_element_count": self.layout_element_count,
-            "table_element_count": self.table_element_count,
+            "table_element_count": self.tables,
             "ocr_confidence_min": self.ocr_confidence_min,
             "ocr_confidence_max": self.ocr_confidence_max,
             "sensitive_match_counts": dict(self.sensitive_match_counts),
-            "source_traceability_coverage": self.source_traceability_coverage,
-            "citation_count": self.citation_count,
-            "release_ready": self.release_ready,
+            "source_traceability_coverage": self.traceability,
+            "citation_count": self.citations,
+            "release_ready": self.release,
             "unresolved_blocking_findings": [
-                finding.identifier
-                for finding in self.unresolved_blocking_findings
+                finding.identifier for finding in self.blockers
             ],
         }
         return {

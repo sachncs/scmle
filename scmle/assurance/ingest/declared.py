@@ -12,7 +12,7 @@ agreement of aggregates: offsetting row errors pass, and the declared numbers
 are only as good as whoever owns the source system (a person's statement, tier
 `attested` at best).
 
-`reconcile_source` is the second, independent check: for every declared view
+`survey` is the second, independent check: for every declared view
 it queries the source database itself (`reconcile.crosscheck`: row
 count and column sums; plus the key checksum) and compares the answers with
 the frame that was extracted, so a short, duplicated or altered extract is
@@ -230,7 +230,7 @@ def compare(
     view: str,
     frame: pandas.DataFrame,
     table: str,
-    totals: ingest.TableTotals,
+    totals: ingest.Totals,
     source: profile.Sql,
     tolerance: float,
 ) -> list[dict[str, Any]]:
@@ -305,7 +305,7 @@ def compare(
     return checks
 
 
-def reconcile_source(
+def survey(
     frames: Mapping[str, pandas.DataFrame],
     tables: Mapping[str, str],
     spec: ingest.Expectation,

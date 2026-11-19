@@ -955,7 +955,7 @@ def measure(
         The document written to `RESULTS_PATH`.
     """
     started = time.monotonic()
-    code = certificates.code_hash(
+    code = certificates.fingerprint(
         fences,
         blocks,
         deliberate,

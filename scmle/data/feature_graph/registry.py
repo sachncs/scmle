@@ -17,8 +17,8 @@ from scmle.data.feature_graph.operations import Square
 from scmle.data.feature_graph.operations import Standardize
 from scmle.data.feature_graph.operations import Sum
 from scmle.data.feature_graph.sequences import Diff
-from scmle.data.feature_graph.sequences import ExpandingMean
 from scmle.data.feature_graph.sequences import Lag
+from scmle.data.feature_graph.sequences import Mean
 from scmle.data.feature_graph.sequences import Rolling
 from scmle.data.feature_graph.sequences import Volatility
 
@@ -42,7 +42,7 @@ OPS: dict[str, Operation] = {
         Diff(),
         Rolling(),
         Volatility(),
-        ExpandingMean(),
+        Mean(),
     )
 }
 
@@ -83,7 +83,7 @@ def segregate(
     return ordered, rowwise
 
 
-def validate_graph(
+def validate(
     spec: tasks.Derivation,
     available: set[str],
     data: tasks.Dataset,

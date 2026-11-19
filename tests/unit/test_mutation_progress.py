@@ -34,7 +34,7 @@ def test_advance_reports_a_missing_column_with_its_source():
     with pytest.raises(failure.StreamingError) as caught:
         progress.advance(pandas.DataFrame({"x": [1]}), "at", "", "src")
 
-    assert caught.value.source_identity == "src"
+    assert caught.value.identity == "src"
     assert caught.value.details == {
         "code": "watermark_column_missing",
         "source_identity": "src",
@@ -51,7 +51,7 @@ def test_advance_reports_invalid_timestamps_exactly():
     assert caught.value.args[0] == (
         "watermark column 'at' contains invalid timestamps"
     )
-    assert caught.value.source_identity == "src"
+    assert caught.value.identity == "src"
     assert caught.value.details == {
         "code": "invalid_watermark",
         "source_identity": "src",
@@ -79,19 +79,19 @@ def test_checkpoint_names_a_malformed_watermark():
     ("changes", "message"),
     [
         (
-            {"snapshot_sha256": "b" * 64},
+            {"snapshot": "b" * 64},
             "batch and checkpoint snapshots differ",
         ),
-        ({"start_offset": -1}, "start_offset must be non-negative"),
+        ({"offset": -1}, "start_offset must be non-negative"),
     ],
 )
 def test_batch_errors_are_exact(changes, message):
     fields = {
-        "source_identity": "src",
-        "snapshot_sha256": DIGEST,
-        "start_offset": 0,
+        "identity": "src",
+        "snapshot": DIGEST,
+        "offset": 0,
         "frame": pandas.DataFrame({"x": [1, 2]}),
-        "next_checkpoint": checkpoint(),
+        "checkpoint": checkpoint(),
     }
     fields.update(changes)
 

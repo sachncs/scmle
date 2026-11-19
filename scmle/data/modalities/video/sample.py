@@ -22,7 +22,7 @@ class VideoError(errors.DataError):
     category = "video_validation"
 
 
-class VideoTemporalError(VideoError):
+class TemporalError(VideoError):
     """Temporal video evidence is incomplete or invalid."""
 
 
@@ -34,28 +34,28 @@ class Metadata:
         format: Non-empty container name.
         width: Frame width in pixels; positive.
         height: Frame height in pixels; positive.
-        frame_count: Number of frames; positive.
-        frames_per_second: Frame rate; positive.
+        frames: Number of frames; positive.
+        rate: Frame rate; positive.
         codec: Non-empty video codec name.
-        audio_tracks: Number of audio tracks; not negative.
+        tracks: Number of audio tracks; not negative.
         audio_duration_seconds: Measured audio duration, or None. Positive
             and finite when given; needs at least one audio track.
-        sync_offset_seconds: Measured audio/video offset, or None. Finite
+        offset: Measured audio/video offset, or None. Finite
             when given; needs at least one audio track.
-        sync_tolerance_seconds: Allowed absolute offset, or None. Finite and
+        tolerance: Allowed absolute offset, or None. Finite and
             not negative when given; needs at least one audio track.
     """
 
     format: str
     width: int
     height: int
-    frame_count: int
-    frames_per_second: float
+    frames: int
+    rate: float
     codec: str
-    audio_tracks: int = 0
+    tracks: int = 0
     audio_duration_seconds: float | None = None
-    sync_offset_seconds: float | None = None
-    sync_tolerance_seconds: float | None = None
+    offset: float | None = None
+    tolerance: float | None = None
 
     def __post_init__(self) -> None:
         """Validates dimensions, timing, and track counts.
@@ -72,16 +72,16 @@ class Metadata:
             raise errors.InputError("format and codec must not be empty")
         if self.width < 1 or self.height < 1:
             raise errors.InputError("video dimensions must be positive")
-        if self.frame_count < 1 or self.frames_per_second <= 0:
+        if self.frames < 1 or self.rate <= 0:
             raise errors.InputError("video frame timing must be positive")
-        if self.audio_tracks < 0:
+        if self.tracks < 0:
             raise errors.InputError("audio_tracks must not be negative")
-        if self.audio_tracks == 0 and any(
+        if self.tracks == 0 and any(
             value is not None
             for value in (
                 self.audio_duration_seconds,
-                self.sync_offset_seconds,
-                self.sync_tolerance_seconds,
+                self.offset,
+                self.tolerance,
             )
         ):
             raise errors.InputError(
@@ -92,22 +92,19 @@ class Metadata:
             or self.audio_duration_seconds <= 0
         ):
             raise errors.InputError("audio_duration_seconds must be positive")
-        if self.sync_offset_seconds is not None and not math.isfinite(
-            self.sync_offset_seconds
-        ):
+        if self.offset is not None and not math.isfinite(self.offset):
             raise errors.InputError("sync_offset_seconds must be finite")
-        if self.sync_tolerance_seconds is not None and (
-            not math.isfinite(self.sync_tolerance_seconds)
-            or self.sync_tolerance_seconds < 0
+        if self.tolerance is not None and (
+            not math.isfinite(self.tolerance) or self.tolerance < 0
         ):
             raise errors.InputError(
                 "sync_tolerance_seconds must not be negative"
             )
 
     @property
-    def duration_seconds(self) -> float:
+    def seconds(self) -> float:
         """The duration in seconds implied by frame count and rate."""
-        return self.frame_count / self.frames_per_second
+        return self.frames / self.rate
 
     @property
     def synchrony(self) -> str:
@@ -117,10 +114,10 @@ class Metadata:
         duration, offset or tolerance missing), ``out_of_tolerance`` (the
         absolute offset exceeds the tolerance) or ``within_tolerance``.
         """
-        if self.audio_tracks == 0:
+        if self.tracks == 0:
             return "not_applicable"
-        sync_offset = self.sync_offset_seconds
-        sync_tolerance = self.sync_tolerance_seconds
+        sync_offset = self.offset
+        sync_tolerance = self.tolerance
         if self.audio_duration_seconds is None:
             return "unknown"
         if sync_offset is None or sync_tolerance is None:
@@ -140,16 +137,16 @@ class Profile:
         codec: Video codec name.
         width: Frame width in pixels.
         height: Frame height in pixels.
-        frame_count: Number of frames.
-        frames_per_second: Frame rate.
-        duration_seconds: Duration in seconds.
-        audio_tracks: Number of audio tracks.
-        byte_size: Size of the encoded payload in bytes.
+        frames: Number of frames.
+        rate: Frame rate.
+        duration: Duration in seconds.
+        tracks: Number of audio tracks.
+        size: Size of the encoded payload in bytes.
         audio_duration_seconds: Measured audio duration, if any.
-        sync_offset_seconds: Measured audio/video offset, if any.
-        sync_tolerance_seconds: Allowed absolute offset, if any.
+        offset: Measured audio/video offset, if any.
+        tolerance: Allowed absolute offset, if any.
         synchrony: Synchronization state of the metadata.
-        observation_time: UTC time the clip was observed, if known.
+        time: UTC time the clip was observed, if known.
     """
 
     source: str
@@ -157,23 +154,23 @@ class Profile:
     codec: str
     width: int
     height: int
-    frame_count: int
-    frames_per_second: float
-    duration_seconds: float
-    audio_tracks: int
-    byte_size: int
+    frames: int
+    rate: float
+    duration: float
+    tracks: int
+    size: int
     audio_duration_seconds: float | None = None
-    sync_offset_seconds: float | None = None
-    sync_tolerance_seconds: float | None = None
+    offset: float | None = None
+    tolerance: float | None = None
     synchrony: str = "not_applicable"
-    observation_time: datetime | None = None
+    time: datetime | None = None
 
 
 VideoProbe = Callable[[bytes], Metadata]
 VideoFrameDecoder = Callable[[bytes, int], numpy.ndarray]
 
 
-def canonical_source(source: str | pathlib.Path) -> str:
+def identify(source: str | pathlib.Path) -> str:
     """Returns a stable source identifier for a path or URI-like value.
 
     Args:
@@ -191,7 +188,7 @@ def canonical_source(source: str | pathlib.Path) -> str:
     return pathlib.Path(value).expanduser().resolve(strict=False).as_uri()
 
 
-def canonical_observation_time(value: datetime | str) -> datetime:
+def timestamp(value: datetime | str) -> datetime:
     """Parses and normalizes a timezone-aware observation time to UTC.
 
     Args:
@@ -201,7 +198,7 @@ def canonical_observation_time(value: datetime | str) -> datetime:
         The same instant as a UTC datetime.
 
     Raises:
-        VideoTemporalError: If the text is not ISO 8601, the value is
+        TemporalError: If the text is not ISO 8601, the value is
             neither datetime nor text, or the time has no timezone.
     """
     if isinstance(value, str):
@@ -211,19 +208,19 @@ def canonical_observation_time(value: datetime | str) -> datetime:
         try:
             parsed = datetime.fromisoformat(normalized)
         except ValueError as error:
-            raise VideoTemporalError(
+            raise TemporalError(
                 f"invalid observation time: {value!r}",
                 {"code": "invalid_observation_time"},
             ) from error
     elif isinstance(value, datetime):
         parsed = value
     else:
-        raise VideoTemporalError(
+        raise TemporalError(
             "observation time must be datetime or text",
             {"code": "invalid_observation_time"},
         )
     if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise VideoTemporalError(
+        raise TemporalError(
             "observation time must be timezone-aware",
             {"code": "timezone_required"},
         )
@@ -236,23 +233,23 @@ class Sample:
 
     Attributes:
         source: Non-blank source label or URI.
-        encoded_bytes: The non-empty encoded payload.
+        encoded: The non-empty encoded payload.
         file_hash: SHA-256 hex digest of the payload.
         metadata: Metadata observed by the probe.
         label: Optional task label.
-        group_id: Optional identity used to keep related clips in one split.
-        observation_time: UTC time the clip was observed, if known.
-        byte_size: Length of the payload; set on construction.
+        group: Optional identity used to keep related clips in one split.
+        time: UTC time the clip was observed, if known.
+        size: Length of the payload; set on construction.
     """
 
     source: str
-    encoded_bytes: bytes = dataclasses.field(repr=False)
+    encoded: bytes = dataclasses.field(repr=False)
     file_hash: str
     metadata: Metadata
     label: str | int | float | bool | None = None
-    group_id: str | None = None
-    observation_time: datetime | None = None
-    byte_size: int = dataclasses.field(init=False)
+    group: str | None = None
+    time: datetime | None = None
+    size: int = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
         """Validates the payload and its content identity.
@@ -262,17 +259,17 @@ class Sample:
                 a lowercase SHA-256 hex digest of the payload.
             VideoError: If the payload is empty.
         """
-        raw = bytes(self.encoded_bytes)
-        object.__setattr__(self, "encoded_bytes", raw)
+        raw = bytes(self.encoded)
+        object.__setattr__(self, "encoded", raw)
         if not self.source.strip():
             raise errors.InputError("source must not be empty")
-        if self.group_id is not None and not self.group_id.strip():
+        if self.group is not None and not self.group.strip():
             raise errors.InputError("group_id must not be empty when provided")
-        if self.observation_time is not None:
+        if self.time is not None:
             object.__setattr__(
                 self,
-                "observation_time",
-                canonical_observation_time(self.observation_time),
+                "time",
+                timestamp(self.time),
             )
         if not raw:
             raise VideoError(
@@ -284,10 +281,10 @@ class Sample:
             raise errors.InputError("file_hash must be a SHA-256 hex digest")
         if hashlib.sha256(raw).hexdigest() != self.file_hash:
             raise errors.InputError("file_hash does not match encoded_bytes")
-        object.__setattr__(self, "byte_size", len(raw))
+        object.__setattr__(self, "size", len(raw))
 
     @classmethod
-    def from_bytes(
+    def decode(
         cls,
         encoded_bytes: bytes,
         metadata: Metadata,
@@ -305,7 +302,7 @@ class Sample:
         Args:
             encoded_bytes: The encoded video payload.
             metadata: Metadata produced by the caller's probe.
-            source: Source label or URI, normalised with `canonical_source`.
+            source: Source label or URI, normalised with `identify`.
             max_bytes: Largest payload size in bytes, or None for no limit.
             label: Optional task label.
             group_id: Optional identity used to prevent split leakage.
@@ -334,14 +331,14 @@ class Sample:
                 },
             )
         return cls(
-            source=canonical_source(source),
-            encoded_bytes=raw,
+            source=identify(source),
+            encoded=raw,
             file_hash=hashlib.sha256(raw).hexdigest(),
             metadata=metadata,
             label=label,
-            group_id=group_id,
-            observation_time=(
-                canonical_observation_time(observation_time)
+            group=group_id,
+            time=(
+                timestamp(observation_time)
                 if observation_time is not None
                 else None
             ),
@@ -359,14 +356,14 @@ class Sample:
             codec=self.metadata.codec,
             width=self.metadata.width,
             height=self.metadata.height,
-            frame_count=self.metadata.frame_count,
-            frames_per_second=self.metadata.frames_per_second,
-            duration_seconds=self.metadata.duration_seconds,
-            audio_tracks=self.metadata.audio_tracks,
-            byte_size=self.byte_size,
+            frames=self.metadata.frames,
+            rate=self.metadata.rate,
+            duration=self.metadata.seconds,
+            tracks=self.metadata.tracks,
+            size=self.size,
             audio_duration_seconds=self.metadata.audio_duration_seconds,
-            sync_offset_seconds=self.metadata.sync_offset_seconds,
-            sync_tolerance_seconds=self.metadata.sync_tolerance_seconds,
+            offset=self.metadata.offset,
+            tolerance=self.metadata.tolerance,
             synchrony=self.metadata.synchrony,
-            observation_time=self.observation_time,
+            time=self.time,
         )

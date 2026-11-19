@@ -445,7 +445,7 @@ class Tabular:
         """
         data = spec.data
         if not self.overflows(data):
-            return tabular.read_table(data.uri), None
+            return tabular.read(data.uri), None
         source = streaming.locate(data.uri)
         development, locked = streaming.budgets(
             source.shape()[1],

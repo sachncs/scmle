@@ -83,13 +83,13 @@ class Source:
 
     Attributes:
         view: The as-of view of the table; the only way to read it.
-        target_key: Column of the target frame joined to `view.key`.
+        anchor: Column of the target frame joined to `view.key`.
         role: `child` (one-to-many, aggregated) or `parent` (many-to-one
             lookup of the latest visible version).
     """
 
     view: asof_view.View
-    target_key: str
+    anchor: str
     role: str = CHILD
 
     def __post_init__(self) -> None:
@@ -109,12 +109,12 @@ class Nest:
     Attributes:
         mid: The child table of the target.
         leaf: As-of view of the grandchild table, joined on its `key`.
-        mid_id: Column of the mid table the leaf rows link to.
+        link: Column of the mid table the leaf rows link to.
     """
 
     mid: Source
     leaf: asof_view.View
-    mid_id: str
+    link: str
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -129,7 +129,7 @@ class Feature:
         primitive: Primitive over the table (outer primitive for `nested`).
         inner: Inner primitive of a `nested` feature.
         value: Value column, or None for a value-free primitive.
-        window_days: Window in days, or None for all visible rows.
+        window: Window in days, or None for all visible rows.
     """
 
     name: str
@@ -137,7 +137,7 @@ class Feature:
     source: int
     primitive: str
     value: str | None
-    window_days: float | None
+    window: float | None
     nest: int | None = None
     inner: str | None = None
 
@@ -147,7 +147,7 @@ class Feature:
         Returns:
             The primitive, value column and window as a readable expression.
         """
-        window = "all" if self.window_days is None else f"{self.window_days:g}d"
+        window = "all" if self.window is None else f"{self.window:g}d"
         if self.kind == "nested":
             return (
                 f"{self.primitive}(per-row {self.inner}({self.value}) "
@@ -185,8 +185,8 @@ def sift(source: Source) -> tuple[list[str], list[str]]:
     frame = view.reader()
     skip = {
         view.key,
-        view.event_time,
-        view.rule.known_column,
+        view.time,
+        view.rule.recorded,
         *asof_view.RESERVED,
     }
     numeric, other = [], []
@@ -262,7 +262,7 @@ def roll(
     return specs
 
 
-def nested_features(
+def nest(
     sources: Sequence[Source],
     nests: Sequence[Nest],
     windows: Sequence[float | None],
@@ -343,5 +343,5 @@ def propose(
             )
             continue
         specs.extend(roll(index, table, numeric, other, windows))
-    specs.extend(nested_features(sources, nests, windows))
+    specs.extend(nest(sources, nests, windows))
     return specs

@@ -72,7 +72,7 @@ class Stability:
         }
 
 
-def assess_finding(
+def assess(
     name: str,
     x: numpy.ndarray,
     y: numpy.ndarray,
@@ -118,7 +118,7 @@ def assess_finding(
     if len(values) != len(codes):
         raise errors.InputError("x and y must have one entry per row")
     options = {} if clock is None else {"clock": clock}
-    ran = multiverse.run_grid(
+    ran = multiverse.sweep(
         grid,
         lambda spec: estimation.estimate(
             values, codes, spec, seed, name, strata, bootstrap
@@ -273,7 +273,7 @@ def certify(
     )
 
 
-def code_digest() -> str:
+def fingerprint() -> str:
     """Hashes the multiverse and stability sources.
 
     The stability sources are its estimation, permutation and assessment
@@ -282,7 +282,7 @@ def code_digest() -> str:
     Returns:
         The code hash that keys the stability certificates.
     """
-    return certificates.code_hash(
+    return certificates.fingerprint(
         multiverse, estimation, permutation, sys.modules[__name__]
     )
 
@@ -302,7 +302,7 @@ def adjudication(
     """
     if store is None:
         return certificates.Authority.DESCRIPTIVE
-    digest = code_digest()
+    digest = fingerprint()
     for defect in estimation.DEFECT_TYPES:
         if store.status(estimation.DETECTOR_ID, digest, defect) is not (
             certificates.Authority.GATING

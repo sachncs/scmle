@@ -42,9 +42,7 @@ def explored(effect=0.8, control=True, exceeds=True):
         alpha_confirm=ALPHA,
         seed=3,
     )
-    explore.run_exploration(
-        ledger, x, y, explore.hypothesize(x, explore.NUMERIC)
-    )
+    explore.explore(ledger, x, y, explore.hypothesize(x, explore.NUMERIC))
     if control:
         observed = 6 if exceeds else 0
         summary = controls.summarize(
@@ -117,7 +115,7 @@ def test_merged_runners_share_one_frame_and_isolate_a_crash():
     merged = records.merge(
         docket("a", "a.json"), docket("b", fail=True), docket("c", "c.json")
     )
-    assert [c.claim_id for c in merged.registered] == ["a", "b", "c"]
+    assert [c.identifier for c in merged.registered] == ["a", "b", "c"]
     out = merged.run(pandas.DataFrame(), pandas.Series([1, 2]))
     assert out.statuses == {"a": "pass", "b": "failed", "c": "pass"}
     assert out.documents == {"a.json": {"rows": 2}, "c.json": {"rows": 2}}
@@ -161,10 +159,10 @@ def test_a_confirmation_lists_confirmed_claims_and_serializes(tmp_path):
         ),
         checks=(),
         rule="by",
-        alpha_confirm=Fraction(1, 20),
+        confirm=Fraction(1, 20),
         survivors_sha256="s" * 64,
         ledger_head="l" * 64,
-        custody_head=None,
+        head=None,
         control=None,
         documents={"d.json": {"x": 1}},
     )
@@ -201,11 +199,11 @@ def test_assumptions_list_the_rule_and_a_withdrawal():
 
 
 def test_default_encoding_codes_labels_in_text_order():
-    assert evaluation.default_encoding(pandas.Series([3, 1])).tolist() == [
+    assert evaluation.encode(pandas.Series([3, 1])).tolist() == [
         3.0,
         1.0,
     ]
-    codes = evaluation.default_encoding(pandas.Series(["b", None, "a", "b"]))
+    codes = evaluation.encode(pandas.Series(["b", None, "a", "b"]))
     assert codes[[0, 2, 3]].tolist() == [1.0, 0.0, 1.0]
     assert numpy.isnan(codes[1])
 
@@ -224,13 +222,13 @@ def test_disclaim_and_verify_need_frozen_survivors():
             world(10, 0),
             budget.Correction.BY,
             ALPHA,
-            evaluation.default_encoding,
+            evaluation.encode,
         )
 
 
 def test_disclaim_gives_one_unverified_claim_per_survivor():
     ledger = explored()
-    survivors = ledger.freeze().hypothesis_ids
+    survivors = ledger.freeze().hypotheses
     claims = evaluation.disclaim(ledger, "because")
     assert [c.identifier for c in claims] == list(survivors)
     assert {c.tier for c in claims} == {qualification.Tier.UNVERIFIED}
@@ -257,9 +255,9 @@ def test_block_applies_the_gates_in_order():
 
 def test_stage_two_record_accounts_the_remaining_family():
     ledger = explored()
-    survivors = ledger.freeze().hypothesis_ids
+    survivors = ledger.freeze().hypotheses
     first = survivors[0]
-    record = evaluation.stage_two_record(
+    record = evaluation.account(
         ledger, records.Withdrawal({first: "unstable"}, {"name": "stability"})
     )
     assert record["withdrawn"] == {first: "unstable"}
@@ -270,18 +268,18 @@ def test_stage_two_record_accounts_the_remaining_family():
     with pytest.raises(
         scmle.assurance.ledger.ledger.LedgerError, match="not frozen survivors"
     ):
-        evaluation.stage_two_record(ledger, records.Withdrawal({"zz": "x"}, {}))
+        evaluation.account(ledger, records.Withdrawal({"zz": "x"}, {}))
 
 
 def test_verify_confirms_the_signal_on_fresh_rows():
     ledger = explored()
-    survivors = ledger.freeze().hypothesis_ids
+    survivors = ledger.freeze().hypotheses
     claims, checks = evaluation.verify(
         ledger,
         world(400, 2),
         budget.Correction.BY,
         ALPHA,
-        evaluation.default_encoding,
+        evaluation.encode,
     )
     assert [c.identifier for c in claims] == list(survivors)
     assert len(checks) == len(survivors)
@@ -303,8 +301,8 @@ def test_verify_confirms_the_signal_on_fresh_rows():
 
 def test_verify_leaves_withdrawn_survivors_untested():
     ledger = explored()
-    survivors = ledger.freeze().hypothesis_ids
-    record = evaluation.stage_two_record(
+    survivors = ledger.freeze().hypotheses
+    record = evaluation.account(
         ledger, records.Withdrawal({survivors[0]: "why"}, {})
     )
     claims, checks = evaluation.verify(
@@ -312,7 +310,7 @@ def test_verify_leaves_withdrawn_survivors_untested():
         world(400, 2),
         budget.Correction.BY,
         ALPHA,
-        evaluation.default_encoding,
+        evaluation.encode,
         record,
     )
     assert [c.identifier for c in claims] == list(survivors)
@@ -379,7 +377,7 @@ def test_confirm_without_c_records_no_confirmation_set():
     result = opening.confirm(ledger, None, alpha_confirm=ALPHA)
     assert result.outcome == records.NO_CONFIRMATION_SET
     assert result.reason == "no confirmation set exists for this run"
-    assert result.custody_head is None
+    assert result.head is None
     assert result.checks == ()
     assert ledger.confirmation is not None
     with pytest.raises(errors.LeakageError, match="already used"):
@@ -392,7 +390,7 @@ def test_confirm_tests_once_and_denies_a_second_attempt():
     result = opening.confirm(ledger, source, alpha_confirm=ALPHA)
     assert result.outcome == records.CONFIRMED
     assert result.reason.endswith("survivors confirmed on C by by at 0.05")
-    assert result.custody_head == source.log.entries[-1]["hash"]
+    assert result.head == source.log.entries[-1]["hash"]
     events = [e["event"] for e in source.log.entries]
     assert "selection_frozen" in events
     with pytest.raises(errors.LeakageError):
@@ -441,7 +439,7 @@ def test_a_failing_encoder_gives_a_pipeline_failure():
 
 def test_withdrawing_every_survivor_keeps_c_shut():
     ledger = explored()
-    survivors = ledger.freeze().hypothesis_ids
+    survivors = ledger.freeze().hypotheses
     source = locker(*world(50, 2))
     result = opening.confirm(
         ledger,
@@ -451,7 +449,7 @@ def test_withdrawing_every_survivor_keeps_c_shut():
     )
     assert result.outcome == records.ALL_WITHDRAWN
     assert not source.opened
-    assert result.stage_two["family"] == []
+    assert result.second["family"] == []
 
 
 def test_preregister_hashes_the_family_and_registered_claims():

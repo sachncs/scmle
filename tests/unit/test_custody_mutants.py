@@ -61,7 +61,7 @@ def test_every_lifecycle_event_is_logged_with_its_exact_fields():
         ),
         ("C", "open", "confirmation", {"rows": 3}),
     ]
-    assert held.set_id == "C"
+    assert held.identifier == "C"
 
 
 def test_a_denied_open_records_the_reason_of_the_refusal():
@@ -79,7 +79,7 @@ def test_the_binding_digest_is_the_sha256_of_its_canonical_json():
     expected = hashlib.sha256(
         b'{"claims_hash":"a","ledger_hash":"b"}'
     ).hexdigest()
-    assert sealed.binding_digest("a", "b") == expected
+    assert sealed.digest("a", "b") == expected
 
 
 def test_the_mac_is_a_real_hmac_of_the_entry_hash(tmp_path):
@@ -236,11 +236,11 @@ def test_a_vault_that_is_gone_says_so_in_full():
 
 
 def test_merkle_pairs_are_adjacent_and_an_odd_leaf_is_carried_up():
-    a, b, c, d, e = (merkle.row_hash(i, [("v", i)]) for i in range(5))
-    assert merkle.merkle_root([a, b, c, d]) == merkle.combine(
+    a, b, c, d, e = (merkle.digest(i, [("v", i)]) for i in range(5))
+    assert merkle.fold([a, b, c, d]) == merkle.combine(
         merkle.combine(a, b), merkle.combine(c, d)
     )
-    assert merkle.merkle_root([a, b, c, d, e]) == merkle.combine(
+    assert merkle.fold([a, b, c, d, e]) == merkle.combine(
         merkle.combine(merkle.combine(a, b), merkle.combine(c, d)), e
     )
 
@@ -248,6 +248,4 @@ def test_merkle_pairs_are_adjacent_and_an_odd_leaf_is_carried_up():
 def test_row_hashes_reject_a_misaligned_row_instead_of_truncating():
     frame = pandas.DataFrame({"a": [1.0, 2.0]})
     assert len(merkle.fingerprints(frame, [0, 1])) == 2
-    assert merkle.fingerprints(frame, [1])[0] == merkle.row_hash(
-        1, [("a", 2.0)]
-    )
+    assert merkle.fingerprints(frame, [1])[0] == merkle.digest(1, [("a", 2.0)])

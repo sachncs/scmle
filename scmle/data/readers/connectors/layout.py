@@ -17,21 +17,21 @@ class Field:
 
     Attributes:
         name: Column name.
-        type_name: Type name as reported by the source.
+        kind: Type name as reported by the source.
     """
 
     name: str
-    type_name: str
+    kind: str
 
     def __post_init__(self) -> None:
         """Validates column identity.
 
         Raises:
-            ValueError: If `name` or `type_name` is empty.
+            ValueError: If `name` or `kind` is empty.
         """
         if not self.name:
             raise errors.InputError("column name must not be empty")
-        if not self.type_name:
+        if not self.kind:
             raise errors.InputError("column type_name must not be empty")
 
 
@@ -62,7 +62,7 @@ class Columns:
                 "source schema contains duplicate column names"
             )
 
-    def as_dict(self) -> dict[str, Any]:
+    def serialize(self) -> dict[str, Any]:
         """Serializes the schema.
 
         Returns:
@@ -71,13 +71,13 @@ class Columns:
         """
         return {
             "columns": [
-                {"name": column.name, "type_name": column.type_name}
+                {"name": column.name, "type_name": column.kind}
                 for column in self.columns
             ]
         }
 
     @classmethod
-    def from_frame(cls, frame: pandas.DataFrame) -> "Columns":
+    def infer(cls, frame: pandas.DataFrame) -> "Columns":
         """Builds a source schema from a pandas frame.
 
         Args:
@@ -99,7 +99,7 @@ class Columns:
 class Page:
     """A bounded row result and its resume checkpoint.
 
-    ``content_sha256`` is populated when the connector can observe the raw
+    ``digest`` is populated when the connector can observe the raw
     source bytes without adding a second read. A resumed checkpoint can bind
     to that digest and reject a changed source snapshot.
 
@@ -107,13 +107,13 @@ class Page:
         schema: Schema of the batch.
         rows: The rows of the batch, as tuples in schema order.
         checkpoint: Checkpoint from which to read the next batch.
-        has_more: Whether more rows remain after this batch.
-        content_sha256: Digest of the raw source bytes observed, or None if
+        more: Whether more rows remain after this batch.
+        digest: Digest of the raw source bytes observed, or None if
             the connector did not compute one.
     """
 
     schema: Columns
     rows: tuple[Row, ...]
     checkpoint: locator.Bookmark
-    has_more: bool
-    content_sha256: str | None = None
+    more: bool
+    digest: str | None = None

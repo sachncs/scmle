@@ -132,10 +132,10 @@ def check_resume(root, references, label, phase, index, gated):
     if lock_remains(label, phase):
         with pytest.raises(processing.LockError):
             failpoints.processor(store, gated).run()
-        failpoints.processor(store, gated).break_lock()
+        failpoints.processor(store, gated).lock()
     committed = committed_before(label, phase, index)
     stored = (
-        processing.Checkpoint.from_bytes(store.get(failpoints.STATE_KEY)[0])
+        processing.Checkpoint.decode(store.get(failpoints.STATE_KEY)[0])
         if committed
         else processing.Checkpoint()
     )
@@ -150,7 +150,7 @@ def check_resume(root, references, label, phase, index, gated):
     assert result.retries == ()
     assert result.skipped == tuple(KEYS[:committed])
     assert result.processed == tuple(real)
-    assert result.duplicate_objects == (
+    assert result.duplicates == (
         (failpoints.copy_key(),) if failpoints.copy_key() in pending else ()
     )
     assert result.outputs == tuple(failpoints.output_key(k) for k in real)
@@ -168,7 +168,7 @@ def check_resume(root, references, label, phase, index, gated):
 
     again = failpoints.processor(store, gated).run()
     assert again.processed == () and again.skipped == tuple(KEYS)
-    assert again.duplicate_objects == () and again.outputs == ()
+    assert again.duplicates == () and again.outputs == ()
     assert failpoints.files_of(store) == reference.files
 
 
@@ -188,7 +188,7 @@ def test_the_reference_run_reports_what_the_plan_expects(references):
     result = references[False].result
     plan = failpoints.expected_plan()
     assert result.processed == tuple(REAL)
-    assert result.duplicate_objects == (failpoints.copy_key(),)
+    assert result.duplicates == (failpoints.copy_key(),)
     assert result.duplicate_rows == sum(drop for drop, written in plan.values())
     assert result.rows_out == sum(written for drop, written in plan.values())
 

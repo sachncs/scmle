@@ -1,7 +1,7 @@
 """The checks of a claims audit, module by module.
 
 The ledger is stood in for by a plain namespace with the attributes each
-check reads (`head`, `header`, `confirmation`, `survivor_set`, `claims`,
+check reads (`head`, `header`, `confirmation`, `remaining`, `claims`,
 `control`), so each branch is driven directly.
 """
 
@@ -34,7 +34,7 @@ def ledger(**fields):
         "head": "abcdef0123456789",
         "header": {"rule": {"rule": "holm"}, "charter_hash": "c"},
         "confirmation": None,
-        "survivor_set": None,
+        "remaining": None,
         "claims": {},
         "control": None,
     }
@@ -366,7 +366,7 @@ def test_ruled_compares_the_rules_used_with_the_charter():
 
 
 def survivors(*ids):
-    return types.SimpleNamespace(sha256="s", hypothesis_ids=ids)
+    return types.SimpleNamespace(sha256="s", hypotheses=ids)
 
 
 def test_compare_names_each_differing_header_field():
@@ -403,7 +403,7 @@ def test_crosscheck_agrees_on_ids_and_the_confirmed_set():
             "alpha_confirm": "1/20",
             "confirmed": ["h1"],
         },
-        survivor_set=survivors("h1", "h2"),
+        remaining=survivors("h1", "h2"),
     )
     document = {
         "digests": {"survivors": "s"},
@@ -520,7 +520,7 @@ def test_tally_checks_the_withdrawal_accounting():
         "checks": [{"identifier": "h2:C"}],
         "claims": [{"identifier": "h1", "tier": "suggestive"}],
     }
-    sealed = ledger(survivor_set=frozen_set)
+    sealed = ledger(remaining=frozen_set)
     assert seal.tally(document, sealed) == verdict.Finding(
         name, verdict.PASS, "1 tested, 1 withdrawn before C opened"
     )

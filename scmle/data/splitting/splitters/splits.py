@@ -40,7 +40,7 @@ class Random(Partitioner):
         """
         return None
 
-    def cross_validation_folds(
+    def fold(
         self,
         frame: pandas.DataFrame,  # noqa: ARG002 -- hook that subclasses override and read the frame in
         dev_ids: numpy.ndarray,
@@ -118,7 +118,7 @@ class Random(Partitioner):
         )
         dev_ids, test_ids = numpy.sort(dev_ids), numpy.sort(test_ids)
         notes: list[str] = []
-        folds = self.cross_validation_folds(frame, dev_ids, notes)
+        folds = self.fold(frame, dev_ids, notes)
         return Partition(dev_ids, test_ids, folds, notes)
 
 
@@ -126,7 +126,7 @@ class Stratified(Random):
     """Class-proportion preserving split for classification."""
 
     name = "stratified"
-    supported_tasks = frozenset({tasks.Task.BINARY, tasks.Task.MULTICLASS})
+    scope = frozenset({tasks.Task.BINARY, tasks.Task.MULTICLASS})
 
     def stratifier(self, frame: pandas.DataFrame) -> pandas.Series:
         """Stratifies on the target; every class needs two examples.
@@ -147,7 +147,7 @@ class Stratified(Random):
             )
         return labels
 
-    def cross_validation_folds(
+    def fold(
         self, frame: pandas.DataFrame, dev_ids: numpy.ndarray, notes: list[str]
     ) -> list[Fold]:
         """Stratified K-fold, shrinking K to the rarest class if needed.
@@ -187,7 +187,7 @@ class Events(Random):
     """Keeps the share of observed events equal across splits (survival)."""
 
     name = "stratified_events"
-    supported_tasks = frozenset({tasks.Task.SURVIVAL})
+    scope = frozenset({tasks.Task.SURVIVAL})
 
     def events(self, frame: pandas.DataFrame) -> pandas.Series:
         """Selects the 0/1 event column.
@@ -219,7 +219,7 @@ class Events(Random):
             )
         return events
 
-    def cross_validation_folds(
+    def fold(
         self, frame: pandas.DataFrame, dev_ids: numpy.ndarray, notes: list[str]
     ) -> list[Fold]:
         """Stratified K-fold on events, so every fold has events to rank.
@@ -258,7 +258,7 @@ class Multilabel(Random):
     """Keeps every label's share steady across splits (multi-label)."""
 
     name = "multilabel_stratified"
-    supported_tasks = frozenset({tasks.Task.MULTILABEL})
+    scope = frozenset({tasks.Task.MULTILABEL})
 
     def stack(self, frame: pandas.DataFrame) -> numpy.ndarray:
         """Collects all label columns into one matrix.
@@ -290,10 +290,10 @@ class Multilabel(Random):
         dev_ids = numpy.flatnonzero(side == 0)
         test_ids = numpy.flatnonzero(side == 1)
         notes: list[str] = []
-        folds = self.cross_validation_folds(frame, dev_ids, notes)
+        folds = self.fold(frame, dev_ids, notes)
         return Partition(dev_ids, test_ids, folds, notes)
 
-    def cross_validation_folds(
+    def fold(
         self, frame: pandas.DataFrame, dev_ids: numpy.ndarray, notes: list[str]
     ) -> list[Fold]:
         """Iteratively stratified folds over the development rows.
@@ -338,7 +338,7 @@ class Treatment(Random):
     """Keeps treatment and outcome shares equal across splits (uplift)."""
 
     name = "treatment_stratified"
-    supported_tasks = frozenset({tasks.Task.UPLIFT})
+    scope = frozenset({tasks.Task.UPLIFT})
 
     def cells(self, frame: pandas.DataFrame) -> pandas.Series:
         """Combines the treatment arm with a binary outcome.
@@ -375,7 +375,7 @@ class Treatment(Random):
             )
         return cells
 
-    def cross_validation_folds(
+    def fold(
         self, frame: pandas.DataFrame, dev_ids: numpy.ndarray, notes: list[str]
     ) -> list[Fold]:
         """Stratified K-fold on the cells, shrinking K for rare ones.
@@ -444,7 +444,7 @@ class Preset(Random):
             )
             parts = list(splitter.split(numpy.arange(len(dev_ids)), labels))
         else:
-            parts = self.cross_validation_folds(frame, dev_ids, notes)
+            parts = self.fold(frame, dev_ids, notes)
         return Partition(dev_ids, test_ids, parts, notes)
 
 
@@ -504,10 +504,10 @@ class Group(Partitioner):
                 notes,
             )
         labels = frame[self.data.target].to_numpy()[dev_ids]
-        chosen = self.class_complete_folds(labels, dev_groups, folds, notes)
+        chosen = self.fold(labels, dev_groups, folds, notes)
         return Partition(dev_ids, test_ids, chosen, notes)
 
-    def class_complete_folds(
+    def fold(
         self,
         labels: numpy.ndarray,
         groups: numpy.ndarray,

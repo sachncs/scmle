@@ -207,11 +207,11 @@ def test_the_split_keeps_near_duplicates_and_drops_the_key(tmp_path):
         splitter = document.DOCUMENT.constrain(seeded, tasks.Task.BINARY)
         split = splitter.split(frame)
         assert split.manifest.strategy == "group"
-        assert rows.KEY not in split.dev_features.columns
-        assert rows.KEY not in split.locked_test.features.columns
-        test = set(split.manifest.test_ids)
+        assert rows.KEY not in split.features.columns
+        assert rows.KEY not in split.test.features.columns
+        test = set(split.manifest.test)
         assert twins <= test or not twins & test
-        kept = numpy.asarray(split.manifest.train_ids)
+        kept = numpy.asarray(split.manifest.training)
         for fold in split.manifest.folds:
             inner = set(kept[list(fold[1])].tolist())
             assert twins <= inner or not twins & inner

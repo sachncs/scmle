@@ -69,7 +69,7 @@ def tagged(value: Any) -> str:
     return f"s:{value}"
 
 
-def row_hash(row_id: int, cells: Sequence[tuple[str, Any]]) -> str:
+def digest(row_id: int, cells: Sequence[tuple[str, Any]]) -> str:
     """Hashes one row from its id and every `(column, value)` pair.
 
     Args:
@@ -100,7 +100,7 @@ def fingerprints(frame: pandas.DataFrame, ids: Sequence[int]) -> list[str]:
     names = [str(c) for c in frame.columns]
     columns = [frame.iloc[ordered, k].tolist() for k in range(len(names))]
     return [
-        row_hash(row_id, list(zip(names, cells, strict=True)))
+        digest(row_id, list(zip(names, cells, strict=True)))
         for row_id, cells in zip(
             ordered, zip(*columns, strict=True), strict=True
         )
@@ -122,7 +122,7 @@ def combine(left: str, right: str) -> str:
     ).hexdigest()
 
 
-def merkle_root(leaves: Sequence[str]) -> str:
+def fold(leaves: Sequence[str]) -> str:
     """Folds leaf hashes into a Merkle root.
 
     Args:
@@ -154,4 +154,4 @@ def merkleize(frame: pandas.DataFrame, ids: Sequence[int]) -> str:
     Returns:
         The root hex digest of the rows in ascending id order.
     """
-    return merkle_root(fingerprints(frame, ids))
+    return fold(fingerprints(frame, ids))

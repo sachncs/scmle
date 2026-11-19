@@ -38,7 +38,7 @@ def tone(values, rate=8):
 
 
 def clip(values, source, label=None, group=None, transcript=None):
-    return sample.Sample.from_bytes(
+    return sample.Sample.decode(
         tone(values),
         source=source,
         label=label,
@@ -52,7 +52,7 @@ def text(confidence=None, segments=()):
         text="hi",
         source="s",
         provider="p",
-        provider_version="1",
+        version="1",
         language="en",
         segments=segments,
         confidence=confidence,
@@ -140,7 +140,7 @@ def test_pcm_round_trips_through_the_encoder():
     for width in (1, 2, 3, 4):
         parameters = (1, width, 8, 3, "NONE", "not compressed")
         values = numpy.array([[0.5], [-0.5], [0.0]])
-        payload = wav.wav_payload_from_pcm(parameters, values)
+        payload = wav.encode(parameters, values)
         decoded_parameters, decoded = wav.pcm(payload)
         assert decoded_parameters[:3] == (1, width, 8)
         assert decoded_parameters[3] == 3
@@ -149,10 +149,10 @@ def test_pcm_round_trips_through_the_encoder():
 
 def test_the_encoder_clips_and_rounds_to_the_width():
     parameters = (2, 2, 8, 1, "NONE", "not compressed")
-    payload = wav.wav_payload_from_pcm(parameters, numpy.array([[2.0, -2.0]]))
+    payload = wav.encode(parameters, numpy.array([[2.0, -2.0]]))
     decoded = wav.pcm(payload)[1]
     assert decoded.tolist() == [[32767 / 32768, -32767 / 32768]]
-    one = wav.wav_payload_from_pcm(
+    one = wav.encode(
         (1, 1, 8, 1, "NONE", "not compressed"), numpy.array([[1.0]])
     )
     assert wav.pcm(one)[1].tolist() == [[127 / 128]]
@@ -161,30 +161,28 @@ def test_the_encoder_clips_and_rounds_to_the_width():
 def test_the_encoder_rejects_bad_matrices_and_widths():
     parameters = (1, 2, 8, 1, "NONE", "not compressed")
     with pytest.raises(errors.InputError, match="frame-by-channel"):
-        wav.wav_payload_from_pcm(parameters, numpy.array([0.0]))
+        wav.encode(parameters, numpy.array([0.0]))
     with pytest.raises(errors.InputError, match="frame-by-channel"):
-        wav.wav_payload_from_pcm(parameters, numpy.array([[numpy.inf]]))
+        wav.encode(parameters, numpy.array([[numpy.inf]]))
     with pytest.raises(ValidationError, match="unsupported"):
-        wav.wav_payload_from_pcm(
-            (1, 5, 8, 1, "NONE", "x"), numpy.array([[0.0]])
-        )
+        wav.encode((1, 5, 8, 1, "NONE", "x"), numpy.array([[0.0]]))
     with pytest.raises(ValidationError, match="not a readable"):
         wav.pcm(b"junk")
 
 
 def test_canonical_source_normalises_paths_and_uris():
-    assert sample.canonical_source("  ") == "memory://"
-    assert sample.canonical_source(" s3://b/k ") == "s3://b/k"
-    assert sample.canonical_source("a.wav") == (
+    assert sample.identify("  ") == "memory://"
+    assert sample.identify(" s3://b/k ") == "s3://b/k"
+    assert sample.identify("a.wav") == (
         pathlib.Path("a.wav").resolve().as_uri()
     )
 
 
 def test_from_bytes_builds_a_hashed_sample():
     payload = tone([0, 1, 2, 3])
-    built = sample.Sample.from_bytes(payload, source="mem://a", label=1)
+    built = sample.Sample.decode(payload, source="mem://a", label=1)
     assert built.file_hash == hashlib.sha256(payload).hexdigest()
-    assert built.byte_size == len(payload)
+    assert built.size == len(payload)
     assert built.metadata.frame_count == 4
     assert built.label == 1
     profile = built.profile()
@@ -197,31 +195,31 @@ def test_from_bytes_builds_a_hashed_sample():
 def test_from_bytes_enforces_its_limits():
     payload = tone([0, 1])
     with pytest.raises(ValidationError, match="empty"):
-        sample.Sample.from_bytes(b"")
+        sample.Sample.decode(b"")
     with pytest.raises(ValidationError, match="byte limit"):
-        sample.Sample.from_bytes(payload, max_bytes=len(payload) - 1)
+        sample.Sample.decode(payload, max_bytes=len(payload) - 1)
     with pytest.raises(ValidationError, match="byte limit"):
-        sample.Sample.from_bytes(payload, max_bytes=0)
-    assert sample.Sample.from_bytes(payload, max_bytes=len(payload))
-    assert sample.Sample.from_bytes(payload, max_bytes=None)
+        sample.Sample.decode(payload, max_bytes=0)
+    assert sample.Sample.decode(payload, max_bytes=len(payload))
+    assert sample.Sample.decode(payload, max_bytes=None)
 
 
 def test_from_bytes_needs_a_probe_for_other_containers():
     with pytest.raises(DecoderError, match="explicit codec probe"):
-        sample.Sample.from_bytes(b"OggS....")
+        sample.Sample.decode(b"OggS....")
 
     def broken(raw):
         raise RuntimeError(raw)
 
     with pytest.raises(DecoderError, match="could not decode"):
-        sample.Sample.from_bytes(b"OggS", probe=broken)
+        sample.Sample.decode(b"OggS", probe=broken)
 
     def refusing(raw):
         raise ValidationError("bad", {"code": "x"})
 
     with pytest.raises(ValidationError, match="bad"):
-        sample.Sample.from_bytes(b"OggS", probe=refusing)
-    built = sample.Sample.from_bytes(
+        sample.Sample.decode(b"OggS", probe=refusing)
+    built = sample.Sample.decode(
         b"OggS", probe=lambda raw: Metadata("ogg", 10, 1, 5)
     )
     assert built.metadata.format == "ogg"
@@ -234,7 +232,7 @@ def test_a_sample_validates_its_identity():
     with pytest.raises(errors.InputError, match="source"):
         sample.Sample(" ", payload, digest, metadata)
     with pytest.raises(errors.InputError, match="group_id"):
-        sample.Sample("s", payload, digest, metadata, group_id=" ")
+        sample.Sample("s", payload, digest, metadata, group=" ")
     with pytest.raises(errors.InputError, match="SHA-256 hex digest"):
         sample.Sample("s", payload, digest.upper(), metadata)
     with pytest.raises(errors.InputError, match="SHA-256 hex digest"):
@@ -260,7 +258,7 @@ def test_features_report_their_shape_and_a_writable_copy():
         ("a",), ("x", "y"), ((1.0, 2.0),), (1,), (False,)
     )
     assert features.shape == (1, 2)
-    matrix = features.to_numpy()
+    matrix = features.materialize()
     matrix[0, 0] = 9.0
     assert features.values == ((1.0, 2.0),)
 
@@ -291,35 +289,35 @@ def test_a_dataset_hash_depends_on_order_and_content():
     expected = hashlib.sha256(
         f"mem://a\0{first.file_hash}\nmem://b\0{second.file_hash}".encode()
     ).hexdigest()
-    assert forward.content_hash == expected
-    assert dataset.Dataset((second, first)).content_hash != expected
+    assert forward.digest == expected
+    assert dataset.Dataset((second, first)).digest != expected
 
 
 def test_prepare_features_appends_metadata_and_truncation():
     data = dataset.Dataset((clip([0, 16384, 0, 0], "mem://a"),))
-    features = data.prepare_features(max_frames=2)
+    features = data.prepare(max_frames=2)
     assert features.shape == (1, 13)
-    assert features.feature_names[0] == "mean_amplitude"
-    assert features.feature_names[-1] == "sample_width"
+    assert features.names[0] == "mean_amplitude"
+    assert features.names[-1] == "sample_width"
     row = features.values[0]
     assert row[7] == 2.0
     assert row[9:] == (0.5, 8.0, 1.0, 2.0)
-    assert features.frames_observed == (2,)
-    assert features.frames_truncated == (True,)
-    full = data.prepare_features()
-    assert full.frames_truncated == (False,)
+    assert features.observed == (2,)
+    assert features.truncated == (True,)
+    full = data.prepare()
+    assert full.truncated == (False,)
     with pytest.raises(errors.InputError, match="max_frames"):
-        data.prepare_features(max_frames=0)
+        data.prepare(max_frames=0)
     with pytest.raises(errors.InputError, match="start_frame"):
-        data.prepare_features(start_frame=-1)
+        data.prepare(start_frame=-1)
 
 
 def test_prepare_features_needs_wav():
-    other = sample.Sample.from_bytes(
+    other = sample.Sample.decode(
         b"OggS", source="mem://o", probe=lambda raw: Metadata("ogg", 1, 1, 1)
     )
     with pytest.raises(DecoderError, match="mem://o"):
-        dataset.Dataset((other,)).prepare_features()
+        dataset.Dataset((other,)).prepare()
 
 
 def test_split_keeps_groups_whole_and_is_seeded():
@@ -343,15 +341,15 @@ def test_curate_profiles_a_clean_dataset():
     )
     report = data.curate()
     assert report.modality == "audio"
-    assert report.sample_count == 2
-    assert report.dataset_hash == data.content_hash
+    assert report.samples == 2
+    assert report.dataset_hash == data.digest
     assert report.profile["formats"] == ["wav"]
     assert report.profile["duration_min_seconds"] == 0.25
     assert report.profile["duration_max_seconds"] == 0.5
     assert report.profile["duration_mean_seconds"] == 0.375
     assert report.profile["transcript_coverage"] == 0.0
     assert report.profile["transcript_confidence_min"] is None
-    assert report.quality_findings == ()
+    assert report.findings == ()
     assert [f.identifier for f in report.risk_findings] == [
         "risk.audio-mixed-label-state"
     ]

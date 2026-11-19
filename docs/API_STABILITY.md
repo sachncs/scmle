@@ -30,7 +30,7 @@ pinned or documented as a contract.
 The data-qualification records and helpers live below the pinned top-level API
 and are extension surfaces until promoted: `scmle.contracts.qualification`
 (`Check`, `Claim`, `Certificate`, `Tier`, `Decision`, `Subset`),
-`scmle.assurance.ledger.budget` (`ErrorBudget` and the budget functions) and
+`scmle.assurance.ledger.budget` (`Alpha`, the error budget, and the budget functions) and
 `scmle.runtime.randomness` (keyed random streams). Rule: new qualification names
 are added without touching any entry in `tests/fixtures/public_api.json`, and
 a name is pinned only deliberately, with a changelog entry (a review rule) and
@@ -108,7 +108,7 @@ Charter format 11 adds the optional `coverage_on_confirmation` field (stored
 as `confirmatory` since Stage B) of the `uncertainty` block (an extension
 surface, `scmle.assurance.charter.uncertainty.Uncertainty`; a format 10 charter
 keeps its hash and signature, both pinned). `scmle.assurance.coverage_confirm`,
-`coverage.undercovered`, `coverage_slices.flag_gate` and `FlagGate` are additions (extension
+`coverage.undercovered`, `coverage_slices.flag` and `FlagGate` are additions (extension
 surfaces); the per-slice records of `coverage_report.json` gained `flag`,
 `flag_p_value` and `flag_certified`, and the slice summary `flagged`,
 `flag_margin` and `flag_gate`. `claims verify` gained the step "coverage claim
@@ -171,7 +171,7 @@ method `attach` and the optional `guard_detail` of `promote`; without a
 guard behaviour is unchanged.
 
 Causal identification (F10). No entry of the pinned surface changed.
-`scmle.assurance.charter.contracts.AnalysisEstimand` gained the optional field
+`scmle.assurance.charter.contracts.Estimand` gained the optional field
 `causal` (`scmle.assurance.charter.causal.Question`, with `Control` and
 `Confounding`); it is omitted from the record when unset, so charters of
 format 1 to 3 keep their hash and signature, and a charter that carries it is
@@ -189,7 +189,8 @@ cost model when the charter has a decision block and the task is binary, even
 if `decision.threshold_objective` is `none`; without a block it behaves as
 before. `evaluation.json` gained the keys `net_benefit` (null without a block)
 and, inside `decision`, `f11`. `scmle.assurance.ledger.budget` gained
-`DecisionBudget`, `enroll` and `start_rollback_monitor`.
+`Decision` (then `DecisionBudget`), `enroll` and `watch` (then
+`start_rollback_monitor`).
 
 ## Deployment contract
 
@@ -223,6 +224,21 @@ snapshot's `surfaces` block. Pinned
 signatures avoid function-valued defaults (a `None` default is resolved in the
 body), because a function's repr carries an address and would make the
 snapshot differ between runs.
+
+Phase 6 renamed the pinned data-store names to single words, with no alias:
+
+| Old name | New name |
+|---|---|
+| `snapshot.DataContract` | `snapshot.Contract` |
+| `snapshot.ReadLog` | `snapshot.Log` |
+| `snapshot.SnapshotReader` | `snapshot.Reader` |
+| `snapshot.SnapshotRecord` | `snapshot.Record` |
+| `quality.QualityGate` | `quality.Gate` |
+| `quality.QualityGateError` | `quality.GateError` |
+| `processing.IncrementalProcessor` | `processing.Processor` |
+
+The fields of `processing.Processing` and `quality.Assessment` changed with
+them; [RENAMES](RENAMES.md) lists every renamed member.
 
 ## Training runners
 
@@ -276,10 +292,11 @@ security, and operational evidence is complete.
 
 ## Bundle migration
 
-Bundle format 4 is the current format. The package layering (format 4) and
-the class renames before it (format 3) changed the module path and class
-name stored inside every bundle, so a bundle written by an earlier build
-(format 3, 2 or 1) cannot be loaded or migrated: `Bundle.load` refuses it
+Bundle format 5 is the current format. The single-word class names of
+phase 6 (format 5), the package layering (format 4) and the class renames
+before it (format 3) changed the module path and class name stored inside
+every bundle, so a bundle written by an earlier build (format 4, 3, 2 or 1)
+cannot be loaded or migrated: `Bundle.load` refuses it
 with an error that says to retrain and save again. A bundle whose pickled
 members name a module or class this build does not have is refused the same
 way, with `ArtifactError`. The

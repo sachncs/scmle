@@ -7,10 +7,10 @@ from scmle.contracts import data
 from scmle.data.modalities.audio.metadata import Profile
 from scmle.data.modalities.audio.metadata import Transcript
 from scmle.data.modalities.audio.sample import Sample
-from scmle.data.modalities.curation import conflicting_label_groups
+from scmle.data.modalities.curation import conflict
 from scmle.data.modalities.curation import Curation
 from scmle.data.modalities.curation import flaw
-from scmle.data.modalities.curation import label_counts
+from scmle.data.modalities.curation import tally
 
 
 def confidence(
@@ -203,7 +203,7 @@ class Survey:
     __slots__ = ()
 
     samples: tuple[Sample, ...]
-    content_hash: str
+    digest: str
 
     def profiles(self) -> tuple[Profile, ...]:
         """Returns profiles in sample order for deterministic curation.
@@ -228,8 +228,8 @@ class Survey:
         sample_rates = sorted({profile.sample_rate for profile in profiles})
         channels = sorted({profile.channels for profile in profiles})
         durations = [profile.duration_seconds for profile in profiles]
-        labels = label_counts(sample.label for sample in self.samples)
-        conflicts = conflicting_label_groups(
+        labels = tally(sample.label for sample in self.samples)
+        conflicts = conflict(
             (sample.file_hash, sample.source, sample.label)
             for sample in self.samples
         )
@@ -244,8 +244,8 @@ class Survey:
         )
         return Curation(
             modality="audio",
-            dataset_hash=self.content_hash,
-            sample_count=len(self.samples),
+            dataset_hash=self.digest,
+            samples=len(self.samples),
             profile={
                 "formats": formats,
                 "sample_rates": sample_rates,
@@ -258,6 +258,6 @@ class Survey:
                 "conflicting_label_groups": list(conflicts),
                 **transcription(transcripts, len(self.samples)),
             },
-            quality_findings=tuple(quality_findings),
-            risk_findings=tuple(risks(self.content_hash, labels, conflicts)),
+            findings=tuple(quality_findings),
+            risk_findings=tuple(risks(self.digest, labels, conflicts)),
         )

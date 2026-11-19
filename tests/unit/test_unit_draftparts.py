@@ -121,7 +121,7 @@ def test_the_draft_digest_covers_the_charter_anchor():
     draft = framer.frame(request(), sample())
     assert draft.charter is not None
     document = draft.to_dict()
-    assert document["charter_hash"] == draft.charter.charter_hash
+    assert document["charter_hash"] == draft.charter.digest
     assert document["fields"] == dict(sorted(document["fields"].items()))
     other = framer.frame(request("Predict `churned` per customer"), sample())
     assert other.sha != draft.sha
@@ -360,7 +360,7 @@ def test_frame_issues_a_draft_with_questions_from_the_template():
     assert draft.charter.estimand.target == "churned"
     assert draft.fields["target"] is provenance.Filling.TEMPLATE
     assert draft.fields["cost_model"] is provenance.Filling.TEMPLATE
-    assert "baseline_decision_column" in draft.open_items
+    assert "baseline_decision_column" in draft.pending
     assert draft.llm is None and draft.refusal is None
 
 
@@ -380,7 +380,7 @@ def test_frame_refuses_when_critical_slots_are_unfilled():
 
 
 class Replay:
-    model_id = "replay"
+    model = "replay"
 
     def __init__(self, proposal):
         self.proposal = proposal
@@ -465,7 +465,7 @@ def test_emit_writes_the_draft_and_its_companions(tmp_path):
     questions = json.loads(
         (tmp_path / "out" / "framing_questions.json").read_text()
     )
-    assert questions["open_items"] == list(issued.open_items)
+    assert questions["open_items"] == list(issued.pending)
     refused = framer.refused("why", {})
     assert framer.emit(refused, tmp_path / "r") == [
         "framing_draft.json",

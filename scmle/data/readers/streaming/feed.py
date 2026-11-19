@@ -173,16 +173,16 @@ class Feed(abc.ABC):
             return self.path.stat().st_size * CSV_EXPANSION
         return rows * columns * BYTES_PER_CELL
 
-    def source_identity(self) -> str:
+    def identify(self) -> str:
         """Returns the stable identity of this source URI.
 
         Returns:
             The string "src_" followed by the SHA-256 hex digest of the
             canonical URI of the file.
         """
-        return connectors.source_identity(self.path)
+        return connectors.identify(self.path)
 
-    def snapshot_sha256(self) -> str:
+    def digest(self) -> str:
         """Returns the digest of the raw source snapshot.
 
         The digest is intentionally over the source bytes, not the decoded
@@ -203,11 +203,11 @@ class Feed(abc.ABC):
             raise failure.StreamingError(
                 "source_unreadable",
                 f"cannot fingerprint streaming source: {self.path}",
-                self.source_identity(),
+                self.identify(),
                 {"path": str(self.path)},
             ) from error
 
-    def read_batch(
+    def read(
         self,
         checkpoint: progress.Checkpoint | None = None,
         rows: int = BATCH_ROWS,
@@ -244,8 +244,8 @@ class Feed(abc.ABC):
         """
         if rows <= 0:
             raise errors.InputError("rows must be positive")
-        identity = self.source_identity()
-        observed_snapshot = self.snapshot_sha256()
+        identity = self.identify()
+        observed_snapshot = self.digest()
         current = self.rebind(checkpoint, observed_snapshot)
         effective_watermark_column = align(
             checkpoint, current, watermark_column, identity
@@ -253,7 +253,7 @@ class Feed(abc.ABC):
         selected, has_more = pick(
             self.batches(rows), current.offset, rows, identity
         )
-        final_snapshot = self.snapshot_sha256()
+        final_snapshot = self.digest()
         if final_snapshot != observed_snapshot:
             raise failure.StreamingError(
                 "source_snapshot_changed",
@@ -303,7 +303,7 @@ class Feed(abc.ABC):
             StreamingError: If the checkpoint belongs to another source or was
                 taken on a different snapshot of the file.
         """
-        identity = self.source_identity()
+        identity = self.identify()
         if checkpoint is None:
             return progress.Checkpoint(identity, {"snapshot": snapshot})
         if checkpoint.source != identity:

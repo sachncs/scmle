@@ -46,9 +46,7 @@ def random_world(seed, n=60, entries=120):
 @pytest.mark.parametrize("seed", range(12))
 def test_join_matches_brute_force_on_random_logs(seed):
     rows, log = random_world(seed)
-    joined = asof.point_in_time(
-        rows, log, "key", "moment", "written_at", "value"
-    )
+    joined = asof.recall(rows, log, "key", "moment", "written_at", "value")
     expected = brute_force(rows, log)
     got = list(zip(joined["reconstructed"], joined["known_at"], strict=True))
     for (gv, gt), (ev, et) in zip(got, expected, strict=True):
@@ -67,9 +65,7 @@ def test_an_entry_written_exactly_at_the_moment_is_used():
     log = pandas.DataFrame(
         {"key": [1, 1], "written_at": [5.0, 10.0], "value": [1.0, 2.0]}
     )
-    joined = asof.point_in_time(
-        rows, log, "key", "moment", "written_at", "value"
-    )
+    joined = asof.recall(rows, log, "key", "moment", "written_at", "value")
     assert joined["reconstructed"].tolist() == [2.0]
 
 
@@ -78,9 +74,7 @@ def test_an_entry_just_after_the_moment_is_not_used():
     log = pandas.DataFrame(
         {"key": [1, 1], "written_at": [5.0, 10.000001], "value": [1.0, 2.0]}
     )
-    joined = asof.point_in_time(
-        rows, log, "key", "moment", "written_at", "value"
-    )
+    joined = asof.recall(rows, log, "key", "moment", "written_at", "value")
     assert joined["reconstructed"].tolist() == [1.0]
 
 
@@ -89,9 +83,7 @@ def test_equal_write_times_go_to_the_later_log_entry():
     log = pandas.DataFrame(
         {"key": [1, 1, 1], "written_at": [4.0, 4.0, 4.0], "value": [7, 8, 9]}
     )
-    joined = asof.point_in_time(
-        rows, log, "key", "moment", "written_at", "value"
-    )
+    joined = asof.recall(rows, log, "key", "moment", "written_at", "value")
     assert joined["reconstructed"].tolist() == [9]
 
 
@@ -111,13 +103,11 @@ def test_datetime_columns_agree_with_numeric_seconds():
             "value": [10, 11, 12],
         }
     )
-    joined = asof.point_in_time(
-        rows, log, "key", "moment", "written_at", "value"
-    )
+    joined = asof.recall(rows, log, "key", "moment", "written_at", "value")
     assert joined["reconstructed"].iloc[0] == 10
     assert not joined["has_entry"].iloc[1]
     assert joined["known_at"].iloc[0] == pytest.approx(
-        asof.to_seconds(pandas.Series([base - pandas.Timedelta(hours=2)]))[0]
+        asof.convert(pandas.Series([base - pandas.Timedelta(hours=2)]))[0]
     )
 
 
@@ -126,18 +116,18 @@ def test_timezone_aware_times_are_accepted():
         pandas.to_datetime(["2026-01-01"]).tz_localize("UTC")
     )
     assert (
-        asof.to_seconds(series)[0]
-        == asof.to_seconds(pandas.Series(pandas.to_datetime(["2026-01-01"])))[0]
+        asof.convert(series)[0]
+        == asof.convert(pandas.Series(pandas.to_datetime(["2026-01-01"])))[0]
     )
 
 
 def test_times_must_be_present_and_numeric_or_datetime():
     with pytest.raises(ValueError, match="missing"):
-        asof.to_seconds(pandas.Series([1.0, numpy.nan]))
+        asof.convert(pandas.Series([1.0, numpy.nan]))
     with pytest.raises(ValueError, match="datetimes or numbers"):
-        asof.to_seconds(pandas.Series(["a", "b"]))
+        asof.convert(pandas.Series(["a", "b"]))
     with pytest.raises(ValueError, match="datetimes or numbers"):
-        asof.to_seconds(pandas.Series([True, False]))
+        asof.convert(pandas.Series([True, False]))
 
 
 def make_clean(n=40, seed=0):
@@ -161,9 +151,7 @@ def make_clean(n=40, seed=0):
 
 
 def statuses(rows, log):
-    joined = asof.point_in_time(
-        rows, log, "key", "moment", "written_at", "value"
-    )
+    joined = asof.recall(rows, log, "key", "moment", "written_at", "value")
     return asof.classify(rows["stored"], joined)
 
 

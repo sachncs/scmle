@@ -47,7 +47,7 @@ def test_block_stops_a_flagged_column_even_with_a_stale_certificate(
     # Enforces website/src/pages/docs/artifacts.astro:15.
     # Enforces website/src/pages/docs/qualification.astro:22.
     # Enforces website/src/pages/index.astro:149.
-    monkeypatch.setattr(screen, "code_digest", lambda: "0" * 64)
+    monkeypatch.setattr(screen, "fingerprint", lambda: "0" * 64)
     with pytest.raises(errors.BlockedError, match="leak") as raised:
         build(tmp_path, "block", table(leak=True)).run()
     assert raised.value.details["leakage"]["blocking"] == ["leak"]

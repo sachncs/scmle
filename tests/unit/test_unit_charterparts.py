@@ -24,7 +24,7 @@ def make_estimand(**changes):
         "summary": "ROC AUC",
     }
     values.update(changes)
-    return parts.AnalysisEstimand(**values)
+    return parts.Estimand(**values)
 
 
 def make_trigger(check="leakage.skill", certificate="cert"):
@@ -44,18 +44,18 @@ def make_charter(**changes):
         "population": "all subscribers",
         "gates": ("leakage.skill",),
         "triggers": (make_trigger(),),
-        "sets": parts.SetSizes(confirmation=0.25),
+        "sets": parts.Sizes(confirmation=0.25),
         "effect": 0.2,
         "quota": 10,
         "power": 0.8,
-        "budget": budget.ErrorBudget.create(0.05, 0.1),
+        "budget": budget.Alpha.create(0.05, 0.1),
         "multiverse": (
             parts.Choice("imputation", ("median", "mice"), "median"),
         ),
         "seed": 7,
     }
     values.update(changes)
-    return specification.AnalysisCharter(**values)
+    return specification.Charter(**values)
 
 
 # ---- parts ------------------------------------------------------------------
@@ -100,7 +100,7 @@ def test_an_estimand_serialises_without_an_absent_causal_block():
         "intercurrent": [{"event": "closed", "strategy": "treat as outcome"}],
         "summary": "ROC AUC",
     }
-    assert parts.AnalysisEstimand.from_dict(record) == estimand
+    assert parts.Estimand.from_dict(record) == estimand
 
 
 def test_an_estimand_reads_its_old_key_names():
@@ -112,7 +112,7 @@ def test_an_estimand_reads_its_old_key_names():
         "intercurrent_events": [{"event": "e", "strategy": "s"}],
         "summary_measure": "auc",
     }
-    estimand = parts.AnalysisEstimand.from_dict(old)
+    estimand = parts.Estimand.from_dict(old)
     assert (estimand.moment, estimand.summary) == ("m", "auc")
     assert estimand.intercurrent == (parts.Event("e", "s"),)
 
@@ -181,19 +181,19 @@ def test_an_invalid_trigger_is_refused():
 
 
 def test_set_sizes_accept_the_half_and_refuse_beyond():
-    assert parts.SetSizes(0.5).to_dict() == {"confirmation": 0.5, "embargo": 0}
-    assert parts.SetSizes.from_dict(
+    assert parts.Sizes(0.5).to_dict() == {"confirmation": 0.5, "embargo": 0}
+    assert parts.Sizes.from_dict(
         {"confirmation_fraction": 0.1, "embargo_rows": 3}
-    ) == (parts.SetSizes(0.1, 3))
+    ) == (parts.Sizes(0.1, 3))
     for bad in (0.0, 0.5000001, -0.1):
         with pytest.raises(
             errors.InputError, match=r"confirmation must be in \(0, 0.5\]"
         ):
-            parts.SetSizes(bad)
+            parts.Sizes(bad)
     with pytest.raises(errors.InputError, match="embargo must be non-negative"):
-        parts.SetSizes(0.2, -1)
+        parts.Sizes(0.2, -1)
     with pytest.raises(errors.InputError, match="finite number"):
-        parts.SetSizes(float("nan"))
+        parts.Sizes(float("nan"))
 
 
 def test_a_choice_round_trips_and_validates_its_options():
@@ -234,7 +234,7 @@ def test_a_charter_round_trips_through_json():
     charter = make_charter()
     record = json.loads(json.dumps(charter.to_dict()))
     assert record[records.KEY] == 2
-    assert specification.AnalysisCharter.from_dict(record) == charter
+    assert specification.Charter.from_dict(record) == charter
     assert set(record) == {
         records.KEY,
         "question",
@@ -259,16 +259,16 @@ def test_the_hash_covers_the_version_one_layout():
     assert records.KEY not in anchor
     assert "gating_checks" in anchor and "gates" not in anchor
     assert anchor["decision_map"][0]["check_id"] == "leakage.skill"
-    assert len(charter.charter_hash) == 64
-    assert charter.charter_hash != make_charter(seed=8).charter_hash
+    assert len(charter.digest) == 64
+    assert charter.digest != make_charter(seed=8).digest
 
 
 def test_a_version_one_record_loads_and_keeps_its_hash():
     charter = make_charter()
     old = charter.anchor()
-    rebuilt = specification.AnalysisCharter.from_dict(old)
+    rebuilt = specification.Charter.from_dict(old)
     assert rebuilt == charter
-    assert rebuilt.charter_hash == charter.charter_hash
+    assert rebuilt.digest == charter.digest
 
 
 @pytest.mark.parametrize(
@@ -354,7 +354,7 @@ def test_optional_blocks_serialise_only_when_set():
     assert record["purpose"] == "new_entity"
     assert "rules" in record and "uncertainty" in record
     assert "costs" not in record and "decision" not in record
-    assert specification.AnalysisCharter.from_dict(record) == charter
+    assert specification.Charter.from_dict(record) == charter
 
 
 def test_revive_skips_an_absent_block():
@@ -378,7 +378,7 @@ def test_the_template_is_a_current_skeleton_that_fails_validation():
         0,
     )
     assert record["estimand"]["kind"] == "predictive"
-    assert record["budget"] == budget.ErrorBudget.create(0.05, 0.1).to_dict()
+    assert record["budget"] == budget.Alpha.create(0.05, 0.1).to_dict()
     with pytest.raises(errors.ConfigError, match="invalid analysis charter"):
         specification.parse(record)
 

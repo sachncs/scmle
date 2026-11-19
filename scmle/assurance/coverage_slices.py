@@ -52,13 +52,13 @@ NOTE = (
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FlagGate:
+class Gate:
     """Whether the per-slice coverage flag is certified.
 
     Attributes:
         status: `gating` or `descriptive`.
         reason: One sentence saying why.
-        min_rows: Smallest slice (rows) at which detection was certified.
+        rows: Smallest slice (rows) at which detection was certified.
         migrations: The written layout's version steps, oldest first;
             version 2 spells `min_rows` as `rows`.
     """
@@ -69,13 +69,13 @@ class FlagGate:
 
     status: str
     reason: str
-    min_rows: int | None = None
+    rows: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the JSON-ready record.
 
         Returns:
-            A mapping of `status`, `reason` and `min_rows`.
+            A mapping of `status`, `reason` and `rows`.
         """
         return records.upgrade(
             self.migrations, dataclasses.asdict(self), records.ORIGIN
@@ -89,14 +89,14 @@ def fingerprint() -> str:
         The code hash of `coverage.undercovered`, `coverage.stepdown`
         and `coverage.deficit`.
     """
-    return certificates.code_hash(
+    return certificates.fingerprint(
         coverage.undercovered,
         coverage.stepdown,
         coverage.deficit,
     )
 
 
-def flag_gate(path: Path | None = None) -> FlagGate:
+def flag(path: Path | None = None) -> Gate:
     """Whether the stored slice-flag certificate is current and passing.
 
     The certificate file ships with the package; without it the
@@ -113,23 +113,23 @@ def flag_gate(path: Path | None = None) -> FlagGate:
     """
     target = STORE_PATH if path is None else path
     if not target.exists():
-        return FlagGate(DESCRIPTIVE, "no coverage certificate file")
+        return Gate(DESCRIPTIVE, "no coverage certificate file")
     entry = (
         json.loads(target.read_text(encoding="utf-8"))
         .get("gates", {})
         .get(GATE)
     )
     if entry is None:
-        return FlagGate(DESCRIPTIVE, "no certificate for the slice flag")
+        return Gate(DESCRIPTIVE, "no certificate for the slice flag")
     if entry.get("method_hash") != fingerprint():
-        return FlagGate(
+        return Gate(
             DESCRIPTIVE, "stale: the code changed since it was measured"
         )
     if not entry.get("passed"):
-        return FlagGate(
+        return Gate(
             DESCRIPTIVE, "the certificate missed its pre-registered floor"
         )
-    return FlagGate(
+    return Gate(
         GATING,
         "false-flag rate and detection met their pre-registered floors",
         entry.get("min_certified_rows"),
@@ -180,7 +180,7 @@ def summary(
     labels: Sequence[Any],
     nominal: float,
     level: float = 0.95,
-    gate: FlagGate | None = None,
+    gate: Gate | None = None,
 ) -> dict[str, Any]:
     """Coverage, mean size and the margin flag of each slice level.
 
@@ -201,7 +201,7 @@ def summary(
         of skipped slices and a note; `descriptive` is True unless the gate
         is gating.
     """
-    gate = flag_gate() if gate is None else gate
+    gate = flag() if gate is None else gate
     flags_found = coverage.undercovered(inside, labels, nominal)
     gating = gate.status == GATING
     flags = numpy.asarray(inside, dtype=bool)
@@ -232,7 +232,7 @@ def summary(
                 "flag": bool(flags_found["slices"][name]["flagged"]),
                 "flag_p_value": flags_found["slices"][name]["p_value"],
                 "flag_certified": bool(
-                    gating and (gate.min_rows is None or rows >= gate.min_rows)
+                    gating and (gate.rows is None or rows >= gate.rows)
                 ),
             }
         )

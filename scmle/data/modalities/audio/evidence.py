@@ -13,25 +13,25 @@ class Features:
 
     Attributes:
         sources: Source identifier of each row.
-        feature_names: Name of each column.
+        names: Name of each column.
         values: One tuple of feature values per source.
-        frames_observed: Number of frames each row was computed from.
-        frames_truncated: Whether each row saw fewer frames than the clip
+        observed: Number of frames each row was computed from.
+        truncated: Whether each row saw fewer frames than the clip
             holds.
     """
 
     sources: tuple[str, ...]
-    feature_names: tuple[str, ...]
+    names: tuple[str, ...]
     values: tuple[tuple[float, ...], ...]
-    frames_observed: tuple[int, ...]
-    frames_truncated: tuple[bool, ...]
+    observed: tuple[int, ...]
+    truncated: tuple[bool, ...]
 
     @property
     def shape(self) -> tuple[int, int]:
         """The number of samples and the number of features, as a pair."""
-        return (len(self.sources), len(self.feature_names))
+        return (len(self.sources), len(self.names))
 
-    def to_numpy(self) -> numpy.ndarray:
+    def materialize(self) -> numpy.ndarray:
         """Returns a writable copy of the feature matrix.
 
         Returns:
@@ -64,7 +64,7 @@ class Split:
         """
         return {
             name: tuple(
-                sorted({sample.group_id or sample.source for sample in samples})
+                sorted({sample.group or sample.source for sample in samples})
             )
             for name, samples in (
                 ("train", self.train),

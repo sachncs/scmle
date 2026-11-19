@@ -81,9 +81,7 @@ class Surveying(labelling.Labelling):
             development frame, and for an uplift task how well the covariates
             predict treatment (else None).
         """
-        development = split.dev_features.assign(
-            **{spec.data.target: split.dev_target}
-        )
+        development = split.features.assign(**{spec.data.target: split.target})
         intake = board.get(ingestion.Intake)
         notes = board.get(labelling.Resolution).notes
         profile = intake.kind.survey(
@@ -104,10 +102,10 @@ class Surveying(labelling.Labelling):
         if task is not tasks.Task.UPLIFT:
             return profile, development, None
         propensity = uplift.randomised(
-            split.dev_features.drop(
+            split.features.drop(
                 columns=[spec.data.treatment_column], errors="ignore"
             ),
-            split.dev_features[spec.data.treatment_column].to_numpy(),
+            split.features[spec.data.treatment_column].to_numpy(),
             spec.validation.seed,
         )
         finding = f"treatment assignment: {propensity.note}"
@@ -234,8 +232,8 @@ class Surveying(labelling.Labelling):
                 notes.append(observation.note)
             evidence.append(observation.evidence)
         if spec.data.reference_uri:
-            reference = tabular.read_table(spec.data.reference_uri)
-            observation = representativeness.assess_representativeness(
+            reference = tabular.read(spec.data.reference_uri)
+            observation = representativeness.assess(
                 development[columns + categorical],
                 reference,
                 spec.validation.seed,

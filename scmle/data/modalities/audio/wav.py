@@ -295,7 +295,7 @@ def pcm(
     return parameters, values
 
 
-def wav_payload_from_pcm(
+def encode(
     parameters: tuple[int, int, int, int, str, str], values: numpy.ndarray
 ) -> bytes:
     """Encodes normalized PCM values with the supplied WAV parameters.

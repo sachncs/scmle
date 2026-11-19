@@ -100,7 +100,7 @@ class Event:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class AnalysisEstimand:
+class Estimand:
     """What the analysis estimates, in terms of the ICH E9 addendum.
 
     Attributes:
@@ -293,7 +293,7 @@ class Trigger:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SetSizes:
+class Sizes:
     """How the development rows are divided.
 
     Attributes:

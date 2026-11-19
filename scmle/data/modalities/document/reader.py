@@ -48,35 +48,35 @@ class Reader:
     """Reads UTF-8 text, Markdown, and optionally injected PDF pages.
 
     Attributes:
-        max_bytes: Largest encoded source size accepted.
-        pdf_reader: Optional callable that returns page text from PDF bytes.
-        layout_reader: Optional callable that returns layout evidence.
+        limit: Largest encoded source size accepted.
+        pdf: Optional callable that returns page text from PDF bytes.
+        reader: Optional callable that returns layout evidence.
     """
 
     def __init__(
         self,
-        max_bytes: int = 10_000_000,
-        pdf_reader: PdfPageReader | None = None,
-        layout_reader: LayoutReader | None = None,
+        limit: int = 10_000_000,
+        pdf: PdfPageReader | None = None,
+        reader: LayoutReader | None = None,
     ) -> None:
         """Initializes a bounded document reader.
 
         Args:
-            max_bytes: Maximum encoded source size accepted by the reader.
-            pdf_reader: Optional callable supplied by a PDF extra. It receives
+            limit: Maximum encoded source size accepted by the reader.
+            pdf: Optional callable supplied by a PDF extra. It receives
                 PDF bytes and returns page text in page order.
-            layout_reader: Optional caller-owned extractor. It receives raw
+            reader: Optional caller-owned extractor. It receives raw
                 bytes, the stable document ID, and the resolved format, and
                 returns layout/OCR/table provenance or ``None``.
 
         Raises:
-            ValueError: If ``max_bytes`` is not positive.
+            ValueError: If ``limit`` is not positive.
         """
-        if max_bytes < 1:
-            raise errors.InputError("max_bytes must be positive")
-        self.max_bytes = max_bytes
-        self.pdf_reader = pdf_reader
-        self.layout_reader = layout_reader
+        if limit < 1:
+            raise errors.InputError("limit must be positive")
+        self.limit = limit
+        self.pdf = pdf
+        self.reader = reader
 
     def sniff(
         self,
@@ -139,7 +139,7 @@ class Reader:
 
         Raises:
             DocumentError: If a path is not an existing file, the
-                size exceeds ``max_bytes``, the suffix is not recognised, or
+                size exceeds ``limit``, the suffix is not recognised, or
                 the bytes or content are invalid.
         """
         path: pathlib.Path | None = None
@@ -156,14 +156,14 @@ class Reader:
                     {"source": str(path)},
                 )
             resolved_format = self.sniff(path, document_format)
-            raw_bytes = slurp(path, self.max_bytes)
+            raw_bytes = slurp(path, self.limit)
             source_uri = path.resolve().as_uri()
 
-        if len(raw_bytes) > self.max_bytes:
+        if len(raw_bytes) > self.limit:
             raise DocumentError(
                 "document exceeds the configured size limit",
                 "size_limit",
-                {"actual_bytes": len(raw_bytes), "max_bytes": self.max_bytes},
+                {"actual_bytes": len(raw_bytes), "max_bytes": self.limit},
             )
         resolved_id = document_id or self.fingerprint(raw_bytes, path)
         if resolved_format is Format.PDF:
@@ -171,16 +171,16 @@ class Reader:
         else:
             content = self.unicode(raw_bytes, resolved_id)
         resolved_layout = layout
-        if resolved_layout is None and self.layout_reader is not None:
+        if resolved_layout is None and self.reader is not None:
             resolved_layout = self.overlay(
                 raw_bytes, resolved_id, resolved_format
             )
         return Sample(
-            document_id=resolved_id,
+            identifier=resolved_id,
             content=content,
             format=resolved_format,
-            source_uri=source_uri,
-            source_digest=hashlib.sha256(raw_bytes).hexdigest(),
+            uri=source_uri,
+            digest=hashlib.sha256(raw_bytes).hexdigest(),
             label=label,
             layout=resolved_layout,
         )
@@ -231,7 +231,7 @@ class Reader:
                 exception, returns no pages, or returns a page that is not
                 text.
         """
-        if self.pdf_reader is None:
+        if self.pdf is None:
             raise DependencyError(
                 "PDF input requires the optional document parser extra",
                 dependency="pypdf",
@@ -239,7 +239,7 @@ class Reader:
                 details={"format": Format.PDF.value},
             )
         try:
-            pages = tuple(self.pdf_reader(raw_bytes))
+            pages = tuple(self.pdf(raw_bytes))
         except ImportError as error:
             raise DependencyError(
                 "PDF input requires the optional document parser extra",
@@ -284,10 +284,10 @@ class Reader:
                 exception or returns something other than a Layout
                 or None.
         """
-        if self.layout_reader is None:
+        if self.reader is None:
             return None
         try:
-            layout = self.layout_reader(raw_bytes, document_id, document_format)
+            layout = self.reader(raw_bytes, document_id, document_format)
         except ImportError as error:
             raise DependencyError(
                 "document layout extraction requires its optional parser extra",

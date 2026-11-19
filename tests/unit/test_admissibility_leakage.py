@@ -19,8 +19,8 @@ from scmle.contracts.qualification import Tier
 
 CLS = "classification"
 FAST = leakage.Config(
-    skill_ceiling=0.95,
-    association_ceiling=0.9,
+    skill=0.95,
+    ceiling=0.9,
     permutations=39,
     bootstrap=100,
 )
@@ -85,28 +85,26 @@ def test_cramers_v_matches_scipy_association():
     expected = stats.contingency.association(
         table, method="cramer", correction=False
     )
-    assert leakage.cramers_v(table) == pytest.approx(expected)
+    assert leakage.associate(table) == pytest.approx(expected)
     wide = numpy.array([[10, 20, 30], [30, 20, 10]])
-    assert leakage.cramers_v(wide) == pytest.approx(
+    assert leakage.associate(wide) == pytest.approx(
         stats.contingency.association(wide, method="cramer", correction=False)
     )
-    assert leakage.cramers_v(numpy.zeros((2, 2))) == 0.0
+    assert leakage.associate(numpy.zeros((2, 2))) == 0.0
 
 
 def test_permute_within_keeps_groups_blocks_and_is_a_permutation():
     rng = numpy.random.default_rng(0)
     values = numpy.arange(12)
     groups = numpy.array(list("aaabbbbcccdd"))
-    order = leakage.permute_within(values, rng, groups, None)
+    order = leakage.permute(values, rng, groups, None)
     assert sorted(order) == list(range(12))
     assert (groups[order] == groups).all()
-    block = leakage.permute_within(values, numpy.random.default_rng(1), None, 5)
+    block = leakage.permute(values, numpy.random.default_rng(1), None, 5)
     assert sorted(block[:5]) == list(range(5))
     assert sorted(block[5:10]) == list(range(5, 10))
     assert sorted(block[10:]) == [10, 11]
-    free = leakage.permute_within(
-        values, numpy.random.default_rng(2), None, None
-    )
+    free = leakage.permute(values, numpy.random.default_rng(2), None, None)
     assert sorted(free) == list(range(12)) and list(free) != list(range(12))
 
 
@@ -167,7 +165,7 @@ def test_null_features_are_rarely_suspect_and_p_values_are_valid():
     suspects = 0
     for seed in range(runs):
         y, noise = binary_world(seed)
-        cfg = dataclasses.replace(FAST, run_seed=seed)
+        cfg = dataclasses.replace(FAST, seed=seed)
         out = leakage.probe(noise, y, CLS, cfg)
         small += out.p_value <= 0.05
         suspects += out.suspect
@@ -196,10 +194,10 @@ def planted(kind, seed, n=300):
 def test_planted_leaks_are_suspects(kind):
     for seed in range(6):
         x, y = planted(kind, seed)
-        out = leakage.probe(x, y, CLS, dataclasses.replace(FAST, run_seed=seed))
-        assert out.suspect, (kind, seed, out.skill, out.lower_bound)
+        out = leakage.probe(x, y, CLS, dataclasses.replace(FAST, seed=seed))
+        assert out.suspect, (kind, seed, out.skill, out.floor)
         assert out.p_value == pytest.approx(1 / 40)
-        assert out.lower_bound > FAST.skill_ceiling
+        assert out.floor > FAST.skill
 
 
 def test_a_strong_legitimate_predictor_below_the_ceiling_is_not_a_suspect():
@@ -215,13 +213,9 @@ def test_a_strong_legitimate_predictor_below_the_ceiling_is_not_a_suspect():
 
 def test_suspect_requires_the_p_value_and_a_strictly_higher_bound(monkeypatch):
     x, y = planted("copy", 0)
-    monkeypatch.setattr(
-        leakage, "lower_bound", lambda *a, **k: FAST.skill_ceiling
-    )
+    monkeypatch.setattr(leakage, "hedge", lambda *a, **k: FAST.skill)
     assert not leakage.probe(x, y, CLS, FAST).suspect  # bound == ceiling
-    monkeypatch.setattr(
-        leakage, "lower_bound", lambda *a, **k: FAST.skill_ceiling + 1e-9
-    )
+    monkeypatch.setattr(leakage, "hedge", lambda *a, **k: FAST.skill + 1e-9)
     assert leakage.probe(x, y, CLS, FAST).suspect
     monkeypatch.setattr(leakage, "significance", lambda *a, **k: FAST.alpha)
     assert leakage.probe(x, y, CLS, FAST).suspect  # p == alpha counts
@@ -234,16 +228,16 @@ def test_suspect_requires_the_p_value_and_a_strictly_higher_bound(monkeypatch):
 def test_few_rows_report_low_power_and_never_a_suspect():
     x, y = planted("copy", 0, n=99)
     out = leakage.probe(x, y, CLS, FAST)
-    assert out.low_power and not out.suspect
+    assert out.power and not out.suspect
     assert out.check.decision is Decision.WARN
     x, y = planted("copy", 0, n=100)
-    assert not leakage.probe(x, y, CLS, FAST).low_power
+    assert not leakage.probe(x, y, CLS, FAST).power
 
 
 def test_a_rare_class_is_low_power():
     y = pandas.Series([1] * 4 + [0] * 296)
     x = y.astype(float).rename("x")
-    assert leakage.probe(x, y, CLS, FAST).low_power  # 4 < 5 folds
+    assert leakage.probe(x, y, CLS, FAST).power  # 4 < 5 folds
 
 
 def test_the_decision_is_demoted_until_the_detector_is_certified():
@@ -260,15 +254,15 @@ def test_the_decision_is_demoted_until_the_detector_is_certified():
 
 def test_the_ledger_record_is_complete():
     x, y = planted("copy", 0)
-    cfg = dataclasses.replace(FAST, run_seed=11)
+    cfg = dataclasses.replace(FAST, seed=11)
     out = leakage.probe(x, y, CLS, cfg)
     check = out.check
     assert check.identifier == "leakage.skill.copy"
     assert check.subset is Subset.EXPLORATION and check.tier is Tier.UNVERIFIED
     assert check.p_value == out.p_value and check.n == 300
     assert check.seeds[0] == 11
-    assert check.interval is not None and check.interval[0] == out.lower_bound
-    assert check.effect == pytest.approx(out.skill - out.null_mean)
+    assert check.interval is not None and check.interval[0] == out.floor
+    assert check.effect == pytest.approx(out.skill - out.null)
     assert qualification.Check.from_dict(check.to_dict()) == check
 
 
@@ -276,16 +270,16 @@ def test_results_are_deterministic_and_seed_dependent():
     y, noise = binary_world(0)
     a = leakage.probe(noise, y, CLS, FAST)
     b = leakage.probe(noise, y, CLS, FAST)
-    c = leakage.probe(noise, y, CLS, dataclasses.replace(FAST, run_seed=5))
+    c = leakage.probe(noise, y, CLS, dataclasses.replace(FAST, seed=5))
     assert a == b
-    assert (a.p_value, a.lower_bound) != (c.p_value, c.lower_bound)
+    assert (a.p_value, a.floor) != (c.p_value, c.floor)
 
 
 def test_regression_target_is_supported():
     rng = numpy.random.default_rng(0)
     y = pandas.Series(rng.normal(size=300))
     leak = (y + rng.normal(scale=0.05, size=300)).rename("leak")
-    cfg = dataclasses.replace(FAST, skill_ceiling=0.9)
+    cfg = dataclasses.replace(FAST, skill=0.9)
     assert leakage.probe(leak, y, "regression", cfg).suspect
     noise = pandas.Series(rng.normal(size=300), name="n")
     assert not leakage.probe(noise, y, "regression", cfg).suspect
@@ -333,63 +327,60 @@ def missing_pair(table):
 
 
 def test_missingness_uses_fisher_for_small_2x2_and_chi2_otherwise():
-    cfg = dataclasses.replace(FAST, min_rows=1)
+    cfg = dataclasses.replace(FAST, minimum=1)
     small = numpy.array([[12, 3], [2, 8]])  # expected count below 5 in a cell
     f, y = missing_pair(small)
-    out = leakage.missingness_test(f, y, CLS, cfg)
+    out = leakage.test(f, y, CLS, cfg)
     assert out is not None and out.method == "fisher"
     assert out.p_value == pytest.approx(stats.fisher_exact(small.T).pvalue)
     big = numpy.array([[60, 40], [20, 80]])
     f, y = missing_pair(big)
-    out = leakage.missingness_test(f, y, CLS, cfg)
+    out = leakage.test(f, y, CLS, cfg)
     assert out is not None and out.method == "chi2"
     table = pandas.crosstab(f.isna(), y).to_numpy()
     assert out.p_value == pytest.approx(
         stats.chi2_contingency(table, correction=False)[1]
     )
-    assert out.cramers_v == pytest.approx(leakage.cramers_v(table))
-    assert out.n_missing == int(f.isna().sum())
+    assert out.association == pytest.approx(leakage.associate(table))
+    assert out.missing == int(f.isna().sum())
 
 
 def test_missingness_suspect_boundaries_are_inclusive(monkeypatch):
     f, y = missing_pair(numpy.array([[100, 0], [0, 100]]))
-    out = leakage.missingness_test(f, y, CLS, FAST)
+    out = leakage.test(f, y, CLS, FAST)
     assert (
-        out is not None and out.suspect and out.cramers_v == pytest.approx(1.0)
+        out is not None
+        and out.suspect
+        and out.association == pytest.approx(1.0)
     )
-    strict = dataclasses.replace(FAST, association_ceiling=1.0)
-    assert leakage.missingness_test(f, y, CLS, strict).suspect  # V == ceiling
+    strict = dataclasses.replace(FAST, ceiling=1.0)
+    assert leakage.test(f, y, CLS, strict).suspect  # V == ceiling
     f2, y2 = missing_pair(numpy.array([[100, 0], [40, 60]]))
-    out2 = leakage.missingness_test(f2, y2, CLS, FAST)
-    assert out2 is not None and out2.cramers_v < 0.9
+    out2 = leakage.test(f2, y2, CLS, FAST)
+    assert out2 is not None and out2.association < 0.9
     assert not out2.suspect
     assert out2.p_value < 1e-10
-    few = leakage.missingness_test(f.iloc[:50], y.iloc[:50], CLS, FAST)
+    few = leakage.test(f.iloc[:50], y.iloc[:50], CLS, FAST)
     assert few is None or not few.suspect
 
 
 def test_missingness_test_is_skipped_when_there_is_nothing_to_test():
     y = pandas.Series([0, 1] * 50)
+    assert leakage.test(pandas.Series(numpy.ones(100)), y, CLS, FAST) is None
     assert (
-        leakage.missingness_test(pandas.Series(numpy.ones(100)), y, CLS, FAST)
-        is None
-    )
-    assert (
-        leakage.missingness_test(
-            pandas.Series(numpy.nan, index=range(100)), y, CLS, FAST
-        )
+        leakage.test(pandas.Series(numpy.nan, index=range(100)), y, CLS, FAST)
         is None
     )
     with pytest.raises(ValueError, match="same length"):
-        leakage.missingness_test(pandas.Series([1.0]), y, CLS, FAST)
+        leakage.test(pandas.Series([1.0]), y, CLS, FAST)
 
 
 def test_missingness_with_a_continuous_target_is_binned():
     rng = numpy.random.default_rng(0)
     y = pandas.Series(rng.normal(size=400))
     f = pandas.Series(numpy.where(y > 0.5, numpy.nan, 1.0))
-    cfg = dataclasses.replace(FAST, association_ceiling=0.8)
-    out = leakage.missingness_test(f, y, "regression", cfg)
+    cfg = dataclasses.replace(FAST, ceiling=0.8)
+    out = leakage.test(f, y, "regression", cfg)
     assert out is not None and out.suspect
 
 
@@ -406,7 +397,7 @@ def test_conditional_test_explains_away_a_feature_carried_by_others():
     marginal = leakage.probe(x, y, CLS, FAST)
     assert marginal.skill > 0.85
     out = leakage.condition(x, others, y, CLS, FAST)
-    assert not out.keeps_signal and out.p_value > 0.05
+    assert not out.signal and out.p_value > 0.05
     assert out.strata >= 2
 
 
@@ -415,26 +406,26 @@ def test_conditional_test_keeps_the_signal_of_a_leak_given_the_others():
     others = pandas.DataFrame({"n": noise})
     leak = y.astype(float).rename("leak")
     out = leakage.condition(leak, others, y, CLS, FAST)
-    assert out.keeps_signal and out.p_value == pytest.approx(1 / 40)
+    assert out.signal and out.p_value == pytest.approx(1 / 40)
     assert out.check.decision is Decision.WARN
     nothing = leakage.condition(leak, others.iloc[:, :0], y, CLS, FAST)
-    assert nothing.strata == 1 and nothing.keeps_signal
+    assert nothing.strata == 1 and nothing.signal
 
 
 def test_strata_come_from_a_tree_on_the_other_features():
     rng = numpy.random.default_rng(0)
     z = pandas.DataFrame({"z": rng.normal(size=200)})
     num = pandas.Series(z["z"].to_numpy() * 2, name="x")
-    labels = leakage.strata_labels(num, z, FAST)
-    assert 2 <= len(numpy.unique(labels)) <= FAST.n_strata
+    labels = leakage.stratify(num, z, FAST)
+    assert 2 <= len(numpy.unique(labels)) <= FAST.strata
     cat = pandas.Series(numpy.where(z["z"] > 0, "hi", "lo"), name="c")
-    labels = leakage.strata_labels(cat, z, FAST)
+    labels = leakage.stratify(cat, z, FAST)
     assert len(numpy.unique(labels)) >= 2
-    assert set(leakage.strata_labels(num, z.iloc[:, :0], FAST)) == {0}
+    assert set(leakage.stratify(num, z.iloc[:, :0], FAST)) == {0}
     # missingness is not a stratum: the feature may move its gaps
     gappy = num.copy()
     gappy.iloc[:20] = numpy.nan
-    assert len(set(leakage.strata_labels(gappy, z, FAST))) <= FAST.n_strata
+    assert len(set(leakage.stratify(gappy, z, FAST))) <= FAST.strata
 
 
 def test_scan_reports_every_feature_and_never_claims_proof():
@@ -495,7 +486,7 @@ def store_for(digest, defects=leakage.LEAK_DEFECTS, passed=True):
 
 
 def test_gate_requires_current_passing_certificates_for_every_leak_type():
-    digest = leakage.code_digest()
+    digest = leakage.fingerprint()
     good = store_for(digest)
     assert (
         leakage.adjudication(good, leakage.CERTIFIED)
@@ -519,16 +510,16 @@ def test_gate_requires_current_passing_certificates_for_every_leak_type():
 
 
 def test_gate_requires_the_certified_settings_and_a_binary_target():
-    good = store_for(leakage.code_digest())
+    good = store_for(leakage.fingerprint())
     descriptive = certificates.Authority.DESCRIPTIVE
     assert (
         leakage.adjudication(
-            good, dataclasses.replace(leakage.CERTIFIED, run_seed=9)
+            good, dataclasses.replace(leakage.CERTIFIED, seed=9)
         )
         is certificates.Authority.GATING
     )
     for change in (
-        {"skill_ceiling": 0.96},
+        {"skill": 0.96},
         {"alpha": 0.1},
         {"permutations": 99},
         {"max_leaf_nodes": 4},
@@ -546,8 +537,8 @@ def test_gate_requires_the_certified_settings_and_a_binary_target():
 
 
 def test_code_digest_is_a_sha256_of_the_module_source():
-    assert len(leakage.code_digest()) == 64
-    assert leakage.code_digest() == leakage.code_digest()
+    assert len(leakage.fingerprint()) == 64
+    assert leakage.fingerprint() == leakage.fingerprint()
 
 
 def test_enough_rows_boundaries_are_exact():
@@ -569,17 +560,13 @@ def test_lower_bound_is_the_requested_bootstrap_quantile():
     pred = numpy.column_stack([1 - score, score])
     loose = dataclasses.replace(FAST, confidence=0.5)
     tight = dataclasses.replace(FAST, confidence=0.99)
-    mid = leakage.lower_bound(
-        pred, y, CLS, loose, None, numpy.random.default_rng(1)
-    )
-    low = leakage.lower_bound(
-        pred, y, CLS, tight, None, numpy.random.default_rng(1)
-    )
+    mid = leakage.hedge(pred, y, CLS, loose, None, numpy.random.default_rng(1))
+    low = leakage.hedge(pred, y, CLS, tight, None, numpy.random.default_rng(1))
     point = leakage.predictiveness(pred, y, CLS)
     assert low < mid <= point + 0.02
     # cluster bootstrap resamples whole groups
     groups = numpy.repeat(numpy.arange(20), 10)
-    by_group = leakage.lower_bound(
+    by_group = leakage.hedge(
         pred, y, CLS, tight, groups, numpy.random.default_rng(1)
     )
     assert by_group <= point
@@ -589,8 +576,6 @@ def test_a_target_with_one_class_in_every_draw_gives_no_bound():
     y = numpy.zeros(20, dtype=int)
     pred = numpy.column_stack([numpy.ones(20), numpy.zeros(20)])
     assert (
-        leakage.lower_bound(
-            pred, y, CLS, FAST, None, numpy.random.default_rng(0)
-        )
+        leakage.hedge(pred, y, CLS, FAST, None, numpy.random.default_rng(0))
         == -math.inf
     )

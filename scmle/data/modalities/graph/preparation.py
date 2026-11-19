@@ -83,11 +83,11 @@ def debut(graph: Dataset) -> dict[str, datetime]:
     """
     seen: dict[str, datetime] = {}
     for edge in graph.edges:
-        if edge.event_time is None:
+        if edge.time is None:
             continue
         for node in (edge.source, edge.target):
-            if node not in seen or edge.event_time < seen[node]:
-                seen[node] = edge.event_time
+            if node not in seen or edge.time < seen[node]:
+                seen[node] = edge.time
     return seen
 
 
@@ -104,20 +104,20 @@ def chronicle(graph: Dataset) -> list[str]:
         TemporalError: If only some edges are timed (the order of the
             others is unknown), or a node has no edge to be seen by.
     """
-    timed = sum(edge.event_time is not None for edge in graph.edges)
+    timed = sum(edge.time is not None for edge in graph.edges)
     if timed != len(graph.edges):
         raise TemporalError(
             f"graph is partly timed ({timed} of {len(graph.edges)} edges): "
             "a node split cannot order its nodes in time"
         )
     seen = debut(graph)
-    unseen = sorted(set(graph.node_ids) - set(seen))
+    unseen = sorted(set(graph.identifiers) - set(seen))
     if unseen:
         raise TemporalError(
             f"{len(unseen)} node(s) have no timed edge, so when they are "
             f"first seen is unknown: {unseen[:5]}"
         )
-    return sorted(graph.node_ids, key=lambda node: (seen[node], node))
+    return sorted(graph.identifiers, key=lambda node: (seen[node], node))
 
 
 def arrange(graph: Dataset, seed: int) -> numpy.ndarray:
@@ -131,9 +131,9 @@ def arrange(graph: Dataset, seed: int) -> numpy.ndarray:
         A timed graph's nodes earliest first seen first (`chronicle`), else
         the nodes shuffled with the seed.
     """
-    if any(edge.event_time is not None for edge in graph.edges):
+    if any(edge.time is not None for edge in graph.edges):
         return numpy.asarray(chronicle(graph), dtype=object)
-    node_ids = numpy.asarray(graph.node_ids, dtype=object)
+    node_ids = numpy.asarray(graph.identifiers, dtype=object)
     generator = numpy.random.default_rng(seed)
     return node_ids[generator.permutation(len(node_ids))]
 
@@ -229,7 +229,7 @@ def valence(graph: Dataset) -> dict[str, list[float]]:
         degree is the summed weight of incident edges. Edges with an
         endpoint outside the node set are not counted at that endpoint.
     """
-    degrees = {node_id: [0.0, 0.0, 0.0] for node_id in graph.node_ids}
+    degrees = {node_id: [0.0, 0.0, 0.0] for node_id in graph.identifiers}
     for edge in graph.edges:
         if edge.source in degrees:
             degrees[edge.source][0] += 1.0
@@ -271,7 +271,7 @@ def featurize(
     return tuple(tuple(float(value) for value in row) for row in matrix)
 
 
-def prepare_features(
+def prepare(
     graph: Dataset,
     max_nodes: int = 100_000,
     max_features: int = 512,
@@ -309,20 +309,20 @@ def prepare_features(
         )
     nodes = graph.nodes[:max_nodes]
     feature_dimension = max((len(node.features) for node in nodes), default=0)
-    names = list(graph.feature_names)
+    names = list(graph.features)
     if feature_dimension and not names:
         names = [f"feature_{index}" for index in range(feature_dimension)]
     rows = [list(node.features) for node in nodes]
     if include_structural:
         degrees = valence(graph)
         for index, node in enumerate(nodes):
-            rows[index].extend(degrees[node.node_id])
+            rows[index].extend(degrees[node.identifier])
         names.extend(("out_degree", "in_degree", "weighted_degree"))
     width = min(max_features, max((len(row) for row in rows), default=0))
     rows = [row[:width] for row in rows]
     names = names[:width]
     return Features(
-        node_ids=tuple(node.node_id for node in nodes),
+        node_ids=tuple(node.identifier for node in nodes),
         feature_names=tuple(names),
         values=featurize(rows, width, standardize=standardize),
         standardized=standardize,

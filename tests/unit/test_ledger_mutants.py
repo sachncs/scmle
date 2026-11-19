@@ -240,9 +240,9 @@ def test_multiplicity_messages_are_exact():
 
 
 def test_the_quantile_index_is_exact_when_q_times_b_plus_one_is_an_integer():
-    assert controls.quantile_index(99) == 94  # 0.95 * 100 = 95 -> the 95th
+    assert controls.rank(99) == 94  # 0.95 * 100 = 95 -> the 95th
     assert controls.percentile(tuple(range(99))) == 94
-    assert controls.quantile_index(100) == 95  # ceil(95.95) = 96 -> the 96th
+    assert controls.rank(100) == 95  # ceil(95.95) = 96 -> the 96th
 
 
 @pytest.mark.parametrize(
@@ -279,9 +279,7 @@ def test_permute_within_moves_values_inside_every_stratum():
     strata = numpy.repeat([0, 1, 2], 20)
     moved = {0: False, 1: False, 2: False}
     for seed in range(5):
-        out = controls.permute_within(
-            values, strata, numpy.random.default_rng(seed)
-        )
+        out = controls.permute(values, strata, numpy.random.default_rng(seed))
         for label in moved:
             inside = strata == label
             assert sorted(out[inside]) == sorted(values[inside])
@@ -292,20 +290,20 @@ def test_permute_within_moves_values_inside_every_stratum():
 def test_permute_within_accepts_unsorted_labels():
     values = numpy.arange(12.0)
     strata = numpy.array([2, 0, 1, 0, 2, 1, 0, 1, 2, 0, 1, 2])
-    out = controls.permute_within(values, strata, numpy.random.default_rng(3))
+    out = controls.permute(values, strata, numpy.random.default_rng(3))
     for label in (0, 1, 2):
         assert sorted(out[strata == label]) == sorted(values[strata == label])
 
 
 def test_block_labels_are_integers():
-    labels = controls.block_labels(numpy.arange(10.0), 5)
+    labels = controls.block(numpy.arange(10.0), 5)
     assert labels.dtype.kind == "i"
     assert list(labels) == [0] * 5 + [1] * 5
 
 
 def test_control_messages_are_exact():
     with raises(ValueError, "block_size must be at least 2"):
-        controls.block_labels(numpy.arange(4.0), 1)
+        controls.block(numpy.arange(4.0), 1)
     with raises(ValueError, "observed must be non-negative"):
         controls.summarize("x", "strata", -1, (0,) * 20)
     with raises(ValueError, "b must be at least 20"):
@@ -319,7 +317,7 @@ def test_control_messages_are_exact():
             strata=None,
         )
     with raises(ValueError, "b must be at least 20"):
-        controls.resampling_control(
+        controls.control(
             lambda f, t: 0,
             pandas.DataFrame({"a": [1.0, 2.0]}),
             pandas.Series([1.0, 2.0]),
@@ -328,7 +326,7 @@ def test_control_messages_are_exact():
             seed=0,
         )
     with raises(ValueError, "strata needs one label per row"):
-        controls.permute_within(
+        controls.permute(
             numpy.arange(3.0), numpy.array([0, 1]), numpy.random.default_rng()
         )
 
@@ -393,10 +391,10 @@ def test_default_random_streams_are_the_documented_ones():
     def count_columns(frame, y):
         return int(frame["a"].iloc[0] % 5)
 
-    one = controls.resampling_control(
+    one = controls.control(
         count_columns, features, target, observed=3, b=25, seed=4
     )
-    two = controls.resampling_control(
+    two = controls.control(
         count_columns,
         features,
         target,
@@ -425,8 +423,8 @@ def test_controls_keep_the_index_and_name_of_what_they_shuffle():
     controls.placebo(
         spy, features, target, observed=0, b=20, seed=1, strata=None
     )
-    controls.resampling_control(spy, features, target, observed=0, b=20, seed=1)
-    controls.resampling_control(
+    controls.control(spy, features, target, observed=0, b=20, seed=1)
+    controls.control(
         spy,
         features,
         target,
@@ -452,7 +450,7 @@ def test_resampling_modes_hand_the_right_frames_to_the_count_function():
         frames.append(frame.copy())
         return 0
 
-    controls.resampling_control(
+    controls.control(
         spy,
         features,
         target,
@@ -468,7 +466,7 @@ def test_resampling_modes_hand_the_right_frames_to_the_count_function():
             piece = values[start : start + 10]
             assert list(piece) == list(range(int(piece[0]), int(piece[0]) + 10))
     frames.clear()
-    result = controls.resampling_control(
+    result = controls.control(
         spy,
         features,
         target,
@@ -482,7 +480,7 @@ def test_resampling_modes_hand_the_right_frames_to_the_count_function():
         assert set(frame["a"][:20]) == set(range(20))  # shuffled within strata
     # With labels but the default mode, labels are ignored: columns mode runs.
     frames.clear()
-    controls.resampling_control(
+    controls.control(
         spy, features, target, observed=0, b=20, seed=2, blocks=blocks
     )
     assert any(
@@ -560,19 +558,19 @@ def test_run_statistic_passes_every_argument_through():
     rng = numpy.random.default_rng(1)
     x = rng.normal(size=50)
     y = x + rng.normal(size=50)
-    assert bivariate.run_statistic(
+    assert bivariate.calculate(
         "spearman", x, y, bivariate.GREATER
     ) == bivariate.spearman(x, y, bivariate.GREATER)
     assert (
-        bivariate.run_statistic("spearman", x, y).p
-        != bivariate.run_statistic("spearman", x, y, bivariate.LESS).p
+        bivariate.calculate("spearman", x, y).p
+        != bivariate.calculate("spearman", x, y, bivariate.LESS).p
     )
     labels = (y > numpy.median(y)).astype(float)
-    assert bivariate.run_statistic("kruskal", x, labels) == bivariate.kruskal(
+    assert bivariate.calculate("kruskal", x, labels) == bivariate.kruskal(
         x, labels
     )
     with raises(ValueError, "statistic must be one of ['kruskal', 'spearman']"):
-        bivariate.run_statistic("t", x, y)
+        bivariate.calculate("t", x, y)
     with raises(
         ValueError, "direction must be one of ('two-sided', 'greater', 'less')"
     ):
@@ -616,9 +614,7 @@ def test_permute_within_follows_the_stable_order_of_members():
     rng_seed = 7
     values = numpy.arange(400.0)
     strata = numpy.tile([3, 1, 2, 1, 3, 2, 2, 3], 50)
-    out = controls.permute_within(
-        values, strata, numpy.random.default_rng(rng_seed)
-    )
+    out = controls.permute(values, strata, numpy.random.default_rng(rng_seed))
     # Independent construction: members of each label in ascending position,
     # labels visited in ascending order, one permutation of positions each.
     rng = numpy.random.default_rng(rng_seed)
@@ -631,7 +627,7 @@ def test_permute_within_follows_the_stable_order_of_members():
 
 def test_block_labels_use_a_stable_rank_for_ties():
     order = numpy.array([1.0, 1.0, 1.0, 1.0, 0.0, 0.0] * 40)
-    labels = controls.block_labels(order, 10)
+    labels = controls.block(order, 10)
     zeros = numpy.flatnonzero(order == 0.0)
     assert list(labels[zeros][:10]) == [0] * 10  # ties keep row order
     ones = numpy.flatnonzero(order == 1.0)
@@ -664,11 +660,11 @@ def test_remaining_control_messages_and_streams_are_exact():
     features = pandas.DataFrame({"a": numpy.arange(30.0)})
     target = pandas.Series(numpy.arange(30.0))
     with raises(ValueError, "mode must be 'columns' or 'blocks'"):
-        controls.resampling_control(
+        controls.control(
             lambda f, t: 0, features, target, observed=0, b=20, seed=0, mode="x"
         )
     with raises(ValueError, "blocks mode needs block labels"):
-        controls.resampling_control(
+        controls.control(
             lambda f, t: 0,
             features,
             target,
@@ -678,7 +674,7 @@ def test_remaining_control_messages_and_streams_are_exact():
             mode="blocks",
         )
     firsts = []
-    controls.resampling_control(
+    controls.control(
         lambda f, t: firsts.append(float(f["a"].iloc[0])) or 0,
         features,
         target,
@@ -705,7 +701,7 @@ def test_a_block_label_array_does_not_switch_the_default_mode():
         broken.append(not runs)
         return 0
 
-    controls.resampling_control(
+    controls.control(
         spy, features, target, observed=0, b=20, seed=3, blocks=blocks
     )
     assert all(broken)  # columns mode shuffles single rows, never whole blocks
@@ -733,5 +729,6 @@ def test_code_hash_normalises_line_endings(monkeypatch):
 
     monkeypatch.setattr(bivariate.inspect, "getsource", lambda f: "a\r\nb\r\n")
     assert (
-        bivariate.code_hash("spearman") == hashlib.sha256(b"a\nb\n").hexdigest()
+        bivariate.fingerprint("spearman")
+        == hashlib.sha256(b"a\nb\n").hexdigest()
     )

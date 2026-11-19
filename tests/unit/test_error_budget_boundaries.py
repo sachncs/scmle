@@ -17,7 +17,7 @@ import scmle.assurance.ledger.budget
 def make_budget(**overrides):
     values = {"alpha_confirm": 0.05, "wealth_exploration": 0.1}
     values.update(overrides)
-    return scmle.assurance.ledger.budget.ErrorBudget.create(**values)
+    return scmle.assurance.ledger.budget.Alpha.create(**values)
 
 
 def message(text):
@@ -28,11 +28,11 @@ def message(text):
 
 
 def test_exploration_budget_accepts_the_closed_unit_interval_ends():
-    full = scmle.assurance.ledger.budget.ExplorationBudget(
+    full = scmle.assurance.ledger.budget.Exploration(
         initial=Fraction(1), wealth=Fraction(1)
     )
     assert full.initial == 1
-    empty = scmle.assurance.ledger.budget.ExplorationBudget(
+    empty = scmle.assurance.ledger.budget.Exploration(
         initial=Fraction(0), wealth=Fraction(0)
     )
     assert empty.wealth == 0
@@ -42,28 +42,28 @@ def test_exploration_budget_rejects_just_outside_the_unit_interval():
     with pytest.raises(
         ValueError, match=message("initial must be within [0, 1]")
     ):
-        scmle.assurance.ledger.budget.ExplorationBudget(
+        scmle.assurance.ledger.budget.Exploration(
             Fraction(10**9 + 1, 10**9), Fraction(0)
         )
     with pytest.raises(
         ValueError, match=message("initial must be within [0, 1]")
     ):
-        scmle.assurance.ledger.budget.ExplorationBudget(
+        scmle.assurance.ledger.budget.Exploration(
             Fraction(-1, 10**9), Fraction(0)
         )
 
 
 def test_exploration_wealth_may_equal_initial_but_not_exceed_it_or_go_negative():
-    assert scmle.assurance.ledger.budget.ExplorationBudget(
+    assert scmle.assurance.ledger.budget.Exploration(
         Fraction(1, 3), Fraction(1, 3)
     ).wealth == (Fraction(1, 3))
     text = "wealth must be between 0 and initial"
     with pytest.raises(ValueError, match=message(text)):
-        scmle.assurance.ledger.budget.ExplorationBudget(
+        scmle.assurance.ledger.budget.Exploration(
             Fraction(1, 3), Fraction(1, 3) + Fraction(1, 10**9)
         )
     with pytest.raises(ValueError, match=message(text)):
-        scmle.assurance.ledger.budget.ExplorationBudget(
+        scmle.assurance.ledger.budget.Exploration(
             Fraction(1, 3), Fraction(-1, 10**9)
         )
 
@@ -77,15 +77,15 @@ def test_confirmation_alpha_is_open_at_both_ends_and_tight_inside():
         Fraction(10**9 + 1, 10**9),
     ):
         with pytest.raises(ValueError, match=message(text)):
-            scmle.assurance.ledger.budget.ConfirmationBudget(bad)
+            scmle.assurance.ledger.budget.Confirmation(bad)
     assert (
-        scmle.assurance.ledger.budget.ConfirmationBudget(
+        scmle.assurance.ledger.budget.Confirmation(
             Fraction(1, 10**9)
         ).alpha_confirm
         > 0
     )
     assert (
-        scmle.assurance.ledger.budget.ConfirmationBudget(
+        scmle.assurance.ledger.budget.Confirmation(
             Fraction(10**9 - 1, 10**9)
         ).alpha_confirm
         < 1
@@ -148,7 +148,7 @@ def test_error_budget_validation_messages():
     )
     good = make_budget()
     with pytest.raises(ValueError, match=r"^tolerances must be a tuple$"):
-        scmle.assurance.ledger.budget.ErrorBudget(
+        scmle.assurance.ledger.budget.Alpha(
             good.confirmation,
             good.exploration,
             20,
@@ -170,7 +170,7 @@ def test_from_dict_names_the_unparseable_field():
         with pytest.raises(
             ValueError, match=f"^{key}: invalid fraction 'oops'$"
         ):
-            scmle.assurance.ledger.budget.ErrorBudget.from_dict(record)
+            scmle.assurance.ledger.budget.Alpha.from_dict(record)
 
 
 # --- spend ----------------------------------------------------------------
@@ -320,24 +320,24 @@ def test_harmonic_asymptotic_series_has_the_right_correction_terms():
 def test_confirmation_alpha_by_and_bonferroni_are_exact_at_rank_one():
     budget = make_budget()
     assert (
-        scmle.assurance.ledger.budget.confirmation_alpha(
+        scmle.assurance.ledger.budget.allot(
             budget, 1, scmle.assurance.ledger.budget.Correction.BY
         )
         == 0.05
     )
     assert (
-        scmle.assurance.ledger.budget.confirmation_alpha(
+        scmle.assurance.ledger.budget.allot(
             budget, 1, scmle.assurance.ledger.budget.Correction.BH
         )
         == 0.05
     )
     assert (
-        scmle.assurance.ledger.budget.confirmation_alpha(
+        scmle.assurance.ledger.budget.allot(
             budget, 2, scmle.assurance.ledger.budget.Correction.HOLM
         )
         == 0.025
     )
-    assert scmle.assurance.ledger.budget.confirmation_alpha(
+    assert scmle.assurance.ledger.budget.allot(
         budget, 2, scmle.assurance.ledger.budget.Correction.BY
     ) == pytest.approx(0.05 / 3)
 
@@ -346,7 +346,7 @@ def test_confirmation_alpha_never_exceeds_alpha_and_shrinks_with_survivors():
     budget = make_budget()
     for rule in scmle.assurance.ledger.budget.Correction:
         levels = [
-            scmle.assurance.ledger.budget.confirmation_alpha(budget, n, rule)
+            scmle.assurance.ledger.budget.allot(budget, n, rule)
             for n in range(12)
         ]
         assert levels[0] == 0.05
@@ -357,12 +357,12 @@ def test_confirmation_alpha_never_exceeds_alpha_and_shrinks_with_survivors():
 def test_confirmation_alpha_input_validation():
     budget = make_budget()
     with pytest.raises(ValueError, match=r"^n_survivors must be non-negative$"):
-        scmle.assurance.ledger.budget.confirmation_alpha(
+        scmle.assurance.ledger.budget.allot(
             budget, -1, scmle.assurance.ledger.budget.Correction.BH
         )
     with pytest.raises(ValueError, match=r"^n_survivors must be an integer$"):
-        scmle.assurance.ledger.budget.confirmation_alpha(
+        scmle.assurance.ledger.budget.allot(
             budget, 1.5, scmle.assurance.ledger.budget.Correction.BH
         )  # type: ignore[arg-type]
     with pytest.raises(ValueError, match=r"^rule must be a Correction$"):
-        scmle.assurance.ledger.budget.confirmation_alpha(budget, 1, "bh")  # type: ignore[arg-type]
+        scmle.assurance.ledger.budget.allot(budget, 1, "bh")  # type: ignore[arg-type]

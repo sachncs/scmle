@@ -104,10 +104,9 @@ class Estimator:
                 curation is blocking, or fewer than two classes are available.
         """
         report = training_data.curate()
-        if report.unresolved_blocking_findings:
+        if report.blockers:
             blocking_ids = tuple(
-                finding.identifier
-                for finding in report.unresolved_blocking_findings
+                finding.identifier for finding in report.blockers
             )
             detail = (
                 "duplicate content has conflicting labels"

@@ -184,7 +184,7 @@ def test_a_stale_lock_from_a_dead_process_is_released_only_by_break_lock(
     time.sleep(0.2)
     with pytest.raises(processing.LockError):
         failpoints.processor(store).run(max_objects=1)
-    failpoints.processor(store).break_lock()
+    failpoints.processor(store).lock()
     assert not store.exists(failpoints.LOCK_KEY)
     result = failpoints.processor(store).run()
     assert result.failed is None and len(result.processed) == 4
@@ -193,7 +193,7 @@ def test_a_stale_lock_from_a_dead_process_is_released_only_by_break_lock(
 
 def test_breaking_a_lock_that_is_not_there_is_harmless(tmp_path):
     store = objectstore.LocalObjectStore(tmp_path / "root")
-    failpoints.processor(store).break_lock()
+    failpoints.processor(store).lock()
     failpoints.seed(store)
     assert failpoints.processor(store).run().failed is None
 
@@ -261,7 +261,7 @@ def test_racing_processors_never_work_at_the_same_time(tmp_path):
         return failpoints.upper(frame)
 
     def race():
-        run = processing.IncrementalProcessor(
+        run = processing.Processor(
             objectstore.LocalObjectStore(root),
             failpoints.CONTRACT,
             slow_upper,
@@ -281,7 +281,7 @@ def test_racing_processors_never_work_at_the_same_time(tmp_path):
     assert inside["most"] == 1
     done = [o for o in outcomes if isinstance(o, processing.Processing)]
     assert done and sum(len(o.processed) for o in done) == 4
-    assert sum(len(o.duplicate_objects) for o in done) == 1
+    assert sum(len(o.duplicates) for o in done) == 1
     reference = failpoints.reference_run(tmp_path / "root2")
     assert failpoints.files_of(store, ("output/",)) == {
         k: v for k, v in reference.files.items() if k.startswith("output/")

@@ -136,8 +136,8 @@ class Tile:
 
     Attributes:
         source: Non-empty source identifier.
-        encoded_bytes: Encoded raster payload, which must not be empty.
-        file_hash: SHA-256 hex digest of ``encoded_bytes``.
+        encoded: Encoded raster payload, which must not be empty.
+        digest: SHA-256 hex digest of ``encoded``.
         width: Raster width in pixels.
         height: Raster height in pixels.
         bands: Number of bands.
@@ -145,24 +145,24 @@ class Tile:
         crs: Non-empty CRS identifier.
         transform: Empty, a six-value affine transform, or a nine-value
             row-major homogeneous matrix.
-        nodata_value: Declared nodata sentinel, stored as a float, or None.
-        nodata_fraction: Measured fraction of nodata pixels in ``[0, 1]``,
+        sentinel: Declared nodata sentinel, stored as a float, or None.
+        nodata: Measured fraction of nodata pixels in ``[0, 1]``,
             or None.
-        byte_size: Length of ``encoded_bytes``.
+        size: Length of ``encoded``.
     """
 
     source: str
-    encoded_bytes: bytes = dataclasses.field(repr=False)
-    file_hash: str
+    encoded: bytes = dataclasses.field(repr=False)
+    digest: str
     width: int
     height: int
     bands: int
     dtype: str
     crs: str
     transform: tuple[float, ...]
-    nodata_value: float | int | None = None
-    nodata_fraction: float | None = None
-    byte_size: int = dataclasses.field(init=False)
+    sentinel: float | int | None = None
+    nodata: float | None = None
+    size: int = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
         """Validates raster shape, CRS provenance, and source identity.
@@ -171,11 +171,11 @@ class Tile:
             ValueError: If the source, CRS, or dtype is empty, dimensions or
                 bands are not positive, the transform length is not 0, 6, or
                 9, nodata values are non-numeric, non-finite, or out of
-                range, or ``file_hash`` does not match the payload.
+                range, or ``digest`` does not match the payload.
             GeometryError: If the payload is empty.
         """
-        raw = bytes(self.encoded_bytes)
-        object.__setattr__(self, "encoded_bytes", raw)
+        raw = bytes(self.encoded)
+        object.__setattr__(self, "encoded", raw)
         if (
             not self.source.strip()
             or not self.crs.strip()
@@ -195,9 +195,9 @@ class Tile:
             raise GeometryError(
                 "raster payload is empty", {"code": "empty_payload"}
             )
-        if hashlib.sha256(raw).hexdigest() != self.file_hash:
+        if hashlib.sha256(raw).hexdigest() != self.digest:
             raise errors.InputError("file_hash does not match encoded_bytes")
-        object.__setattr__(self, "byte_size", len(raw))
+        object.__setattr__(self, "size", len(raw))
 
     def normalize(self) -> None:
         """Validates the nodata value and fraction, normalising the value.
@@ -206,29 +206,24 @@ class Tile:
             ValueError: If the nodata value is non-numeric or non-finite, or
                 the nodata fraction is non-finite or outside [0, 1].
         """
-        if self.nodata_value is not None:
-            nodata: object = self.nodata_value
+        if self.sentinel is not None:
+            nodata: object = self.sentinel
             if isinstance(nodata, bool) or not isinstance(nodata, Real):
                 raise errors.InputError("nodata_value must be numeric")
             if not math.isfinite(float(nodata)):
                 raise errors.InputError("nodata_value must be finite")
-            object.__setattr__(self, "nodata_value", float(nodata))
-        if (
-            self.nodata_fraction is not None
-            and not 0.0 <= float(self.nodata_fraction) <= 1.0
-        ):
+            object.__setattr__(self, "sentinel", float(nodata))
+        if self.nodata is not None and not 0.0 <= float(self.nodata) <= 1.0:
             raise errors.InputError("nodata_fraction must be in [0, 1]")
-        if self.nodata_fraction is not None and not math.isfinite(
-            float(self.nodata_fraction)
-        ):
+        if self.nodata is not None and not math.isfinite(float(self.nodata)):
             raise errors.InputError("nodata_fraction must be finite")
 
     @property
-    def nodata_status(self) -> str:
+    def status(self) -> str:
         """``"measured"``, ``"declared"``, or ``"unknown"`` nodata state."""
-        if self.nodata_fraction is not None:
+        if self.nodata is not None:
             return "measured"
-        if self.nodata_value is not None:
+        if self.sentinel is not None:
             return "declared"
         return "unknown"
 
@@ -316,7 +311,7 @@ class Tile:
         if max_pixels < 1:
             raise errors.InputError("max_pixels must be positive")
         try:
-            decoded = numpy.asarray(decoder(self.encoded_bytes))
+            decoded = numpy.asarray(decoder(self.encoded))
         except Exception as error:
             raise GeometryError(
                 "raster decoding failed",
@@ -339,7 +334,7 @@ class Tile:
         values.setflags(write=False)
         return values
 
-    def measured_nodata_fraction(
+    def measure(
         self,
         decoder: RasterDecoder,
         max_pixels: int = 4_000_000,
@@ -355,10 +350,10 @@ class Tile:
             value, or None when no nodata value is declared. Decoding errors
             are those of ``decode``.
         """
-        if self.nodata_value is None:
+        if self.sentinel is None:
             return None
         pixels = self.decode(decoder, max_pixels=max_pixels)
-        return float(numpy.equal(pixels, self.nodata_value).mean())
+        return float(numpy.equal(pixels, self.sentinel).mean())
 
 
 STRIP = 1024 * 1024

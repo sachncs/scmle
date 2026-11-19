@@ -26,12 +26,12 @@ class Resolution:
         groups: Group id per record (link-then-group); use as the group
             column for splitting.
         links: Pairs at or above the grouping threshold.
-        t_group: Weight threshold used for grouping.
+        group: Weight threshold used for grouping.
         t_match: Weight above which a pair is called a match.
         model: Fitted parameters.
         compared: Pairs compared after blocking.
-        reduction_ratio: Share of all `N(N-1)/2` pairs avoided.
-        skipped_blocks: Blocks too large to compare.
+        reduction: Share of all `N(N-1)/2` pairs avoided.
+        blocks: Blocks too large to compare.
         estimate: Clerical-sample estimate, or None when unlabelled.
         tier: `attested` with a named reviewer's sample, else `unverified`.
         migrations: The written layout's version steps, oldest first;
@@ -48,12 +48,12 @@ class Resolution:
 
     groups: list[int]
     links: tuple[Pair, ...]
-    t_group: float
+    group: float
     t_match: float
     model: Model
     compared: int
-    reduction_ratio: float
-    skipped_blocks: int
+    reduction: float
+    blocks: int
     estimate: Estimate | None
     tier: qualification.Tier
 
@@ -66,10 +66,10 @@ class Resolution:
         """
         return {
             "tier": self.tier.value,
-            "thresholds": {"group": self.t_group, "linkage": self.t_match},
+            "thresholds": {"group": self.group, "linkage": self.t_match},
             "compared_pairs": self.compared,
-            "reduction": self.reduction_ratio,
-            "skipped": self.skipped_blocks,
+            "reduction": self.reduction,
+            "skipped": self.blocks,
             "links": len(self.links),
             "groups": len(set(self.groups)),
             "records": len(self.groups),
@@ -125,20 +125,20 @@ class Quality:
     """Measures against known truth (benchmarks only).
 
     Attributes:
-        pair_completeness: Share of true-match pairs the blocking compared.
-        link_recall: Share of true-match pairs placed in one group.
-        link_recall_interval: Wilson interval of `link_recall`.
-        true_pairs: True-match pairs.
-        grouped_pairs: True-match pairs found in one group.
-        false_group_pairs: Non-match pairs placed in one group.
+        completeness: Share of true-match pairs the blocking compared.
+        recall: Share of true-match pairs placed in one group.
+        interval: Wilson interval of `recall`.
+        matches: True-match pairs.
+        pairs: True-match pairs found in one group.
+        spurious: Non-match pairs placed in one group.
     """
 
-    pair_completeness: float
-    link_recall: float
-    link_recall_interval: tuple[float, float]
-    true_pairs: int
-    grouped_pairs: int
-    false_group_pairs: int
+    completeness: float
+    recall: float
+    interval: tuple[float, float]
+    matches: int
+    pairs: int
+    spurious: int
 
 
 def grade(
@@ -177,11 +177,7 @@ def grade(
         for i, j in itertools.combinations(members, 2)
     )
     recall = grouped / len(truth) if truth else 1.0
-    interval = (
-        certificates.wilson_interval(grouped, len(truth))
-        if truth
-        else (0.0, 1.0)
-    )
+    interval = certificates.bound(grouped, len(truth)) if truth else (0.0, 1.0)
     return Quality(
         completeness, recall, interval, len(truth), grouped, false_pairs
     )

@@ -101,13 +101,10 @@ class Estimator:
             raise errors.InputError("training_samples must not be empty")
         dataset = document.Dataset(values)
         report = dataset.curate()
-        if report.unresolved_blocking_findings:
+        if report.blockers:
             raise errors.InputError(
                 "document curation has unresolved blocking findings: "
-                + ", ".join(
-                    finding.identifier
-                    for finding in report.unresolved_blocking_findings
-                )
+                + ", ".join(finding.identifier for finding in report.blockers)
             )
         if any(sample.label is None for sample in values):
             raise errors.InputError("every training document must have a label")

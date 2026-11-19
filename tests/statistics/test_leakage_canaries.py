@@ -24,8 +24,8 @@ from scmle.contracts import errors
 
 SEEDS = range(12)
 CONFIG = leakage.Config(
-    skill_ceiling=0.95,
-    association_ceiling=0.9,
+    skill=0.95,
+    ceiling=0.9,
     permutations=199,
     bootstrap=100,
 )

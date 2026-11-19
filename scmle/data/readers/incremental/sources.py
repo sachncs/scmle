@@ -14,9 +14,9 @@ class Source(abc.ABC):
     """Polymorphic contract for a source that yields ordered events.
 
     Attributes:
-        source_uri: Canonical URI of the source.
-        source_identity: Stable identity derived from the canonical URI.
-        late_data_policy: Action taken for events at or behind the
+        uri: Canonical URI of the source.
+        identity: Stable identity derived from the canonical URI.
+        lateness: Action taken for events at or behind the
             checkpoint's sequence.
     """
 
@@ -34,9 +34,9 @@ class Source(abc.ABC):
         """
         if not isinstance(late_data_policy, timeline.Lateness):
             late_data_policy = timeline.Lateness(late_data_policy)
-        self.source_uri = connectors.canonicalize(source_uri)
-        self.source_identity = connectors.source_identity(self.source_uri)
-        self.late_data_policy = late_data_policy
+        self.uri = connectors.canonicalize(source_uri)
+        self.identity = connectors.identify(self.uri)
+        self.lateness = late_data_policy
 
     @abc.abstractmethod
     def unconsumed(self) -> Iterable[timeline.Event]:
@@ -62,19 +62,19 @@ class Source(abc.ABC):
             IncrementalError: With code "checkpoint_mismatch" if the
                 checkpoint belongs to another source.
         """
-        current = checkpoint or timeline.Checkpoint(self.source_identity)
+        current = checkpoint or timeline.Checkpoint(self.identity)
         try:
-            current.bind(self.source_identity)
+            current.bind(self.identity)
         except ValueError as error:
             raise timeline.IncrementalError(
                 "checkpoint_mismatch",
                 str(error),
-                self.source_uri,
+                self.uri,
                 {"checkpoint": current.to_dict()},
             ) from error
         return current
 
-    def select_events(
+    def select(
         self,
         records: Iterable[timeline.Event],
         checkpoint: timeline.Checkpoint | None = None,
@@ -129,17 +129,17 @@ class Source(abc.ABC):
         )
         next_sequence = max(next_sequence, current.sequence)
         checkpoint_value = timeline.Checkpoint(
-            self.source_identity,
+            self.identity,
             next_sequence,
             timeline.horizon(selected, current.watermark),
         )
         return timeline.Batch(
-            self.source_identity,
+            self.identity,
             selected,
             checkpoint_value,
             tuple(sorted(duplicates)),
             tuple(sorted(late)),
-            has_more=len(eligible) > len(selected),
+            more=len(eligible) > len(selected),
         )
 
     def sift(
@@ -176,13 +176,13 @@ class Source(abc.ABC):
                 continue
             if event.sequence <= current.sequence:
                 late.add(event.identifier)
-                if self.late_data_policy is timeline.Lateness.DROP:
+                if self.lateness is timeline.Lateness.DROP:
                     continue
-                if self.late_data_policy is timeline.Lateness.REJECT:
+                if self.lateness is timeline.Lateness.REJECT:
                     raise timeline.IncrementalError(
                         "late_event",
                         f"event '{event.identifier}' is older than checkpoint",
-                        self.source_uri,
+                        self.uri,
                         {
                             "event_id": event.identifier,
                             "event_sequence": event.sequence,
@@ -193,7 +193,7 @@ class Source(abc.ABC):
             selected_ids.add(event.identifier)
         return eligible, duplicates, late
 
-    def read_events(
+    def read(
         self,
         checkpoint: timeline.Checkpoint | None = None,
         seen_event_ids: Iterable[str] = (),
@@ -201,7 +201,7 @@ class Source(abc.ABC):
     ) -> timeline.Batch:
         """Selects a bounded batch without committing its side effects.
 
-        Failures from `unconsumed` and from `select_events` (such as an
+        Failures from `unconsumed` and from `select` (such as an
         IncrementalError for a late event under the REJECT policy) propagate
         unchanged.
 
@@ -211,14 +211,12 @@ class Source(abc.ABC):
             limit: Maximum number of new events to return.
 
         Returns:
-            The selected batch, as described for `select_events`.
+            The selected batch, as described for `select`.
         """
-        return self.select_events(
-            self.unconsumed(), checkpoint, seen_event_ids, limit
-        )
+        return self.select(self.unconsumed(), checkpoint, seen_event_ids, limit)
 
 
-class SequenceEventSource(Source):
+class Replay(Source):
     """Deterministic source adapter for tests and local replay fixtures."""
 
     def __init__(
@@ -239,10 +237,10 @@ class SequenceEventSource(Source):
         """
         super().__init__(source_uri, late_data_policy)
         if callable(events):
-            self.event_factory = events
+            self.factory = events
         else:
             values = tuple(events)
-            self.event_factory = lambda: values
+            self.factory = lambda: values
 
     def unconsumed(self) -> Iterable[timeline.Event]:
         """Returns the current event view supplied by the transport seam.
@@ -250,7 +248,7 @@ class SequenceEventSource(Source):
         Returns:
             The events held or produced by the factory.
         """
-        return self.event_factory()
+        return self.factory()
 
 
 class Stream(Source):
@@ -262,12 +260,12 @@ class Stream(Source):
     durable ledger remains responsible for commit and downstream idempotency.
 
     Attributes:
-        supported_schemes: URI schemes the adapter accepts.
-        event_reader: The injected poll callback.
-        retry_budget: Retry policy applied to polling.
+        schemes: URI schemes the adapter accepts.
+        reader: The injected poll callback.
+        budget: Retry policy applied to polling.
     """
 
-    supported_schemes = (
+    schemes = (
         "eventhubs",
         "kafka",
         "kinesis",
@@ -284,7 +282,7 @@ class Stream(Source):
             [str, timeline.Checkpoint, int], Iterable[timeline.Event]
         ],
         late_data_policy: timeline.Lateness = timeline.Lateness.REJECT,
-        retry_budget: connectors.Retries | None = None,
+        budget: connectors.Retries | None = None,
     ) -> None:
         """Initializes a source around an injected broker poll callback.
 
@@ -292,39 +290,39 @@ class Stream(Source):
             source_uri: Broker URI identifying topic, stream, or subscription.
             event_reader: Callback receiving URI, checkpoint, and batch limit.
             late_data_policy: Policy applied to events behind the checkpoint.
-            retry_budget: Retry policy for transport polling; the default
+            budget: Retry policy for transport polling; the default
                 budget is used when None.
 
         Raises:
             SchemeError: If the URI scheme is not one of
-                `supported_schemes`.
-            TypeError: If `event_reader` is not callable.
+                `schemes`.
+            TypeError: If `reader` is not callable.
         """
         value = source_uri.strip()
         scheme = urlsplit(value).scheme.lower()
-        if scheme not in self.supported_schemes:
-            raise connectors.SchemeError(value, scheme, self.supported_schemes)
+        if scheme not in self.schemes:
+            raise connectors.SchemeError(value, scheme, self.schemes)
         if not callable(event_reader):
             raise errors.KindError("event_reader must be callable")
         super().__init__(value, late_data_policy)
-        self.event_reader = event_reader
-        self.retry_budget = retry_budget or connectors.Retries()
+        self.reader = event_reader
+        self.budget = budget or connectors.Retries()
 
     def unconsumed(self) -> Iterable[timeline.Event]:
         """Rejects unbounded polling without a checkpoint and limit.
 
         Raises:
             IncrementalError: Always, with code "bounded_poll_required";
-                callers must use `read_events`.
+                callers must use `read`.
         """
         raise timeline.IncrementalError(
             "bounded_poll_required",
             "event streams require read_events with a checkpoint and limit",
-            self.source_uri,
+            self.uri,
             {},
         )
 
-    def poll_events(
+    def poll(
         self, checkpoint: timeline.Checkpoint, limit: int
     ) -> tuple[timeline.Event, ...]:
         """Polls a bounded transport batch with retry evidence.
@@ -347,23 +345,21 @@ class Stream(Source):
         if limit <= 0:
             raise errors.InputError("limit must be positive")
         records = connectors.persevere(
-            lambda: tuple(
-                self.event_reader(self.source_uri, checkpoint, limit)
-            ),
+            lambda: tuple(self.reader(self.uri, checkpoint, limit)),
             "poll_events",
-            self.source_uri,
-            self.retry_budget,
+            self.uri,
+            self.budget,
         )
         if len(records) > limit:
             raise timeline.IncrementalError(
                 "batch_limit_exceeded",
                 "event reader returned more events than requested",
-                self.source_uri,
+                self.uri,
                 {"limit": limit, "received": len(records)},
             )
         return records
 
-    def read_events(
+    def read(
         self,
         checkpoint: timeline.Checkpoint | None = None,
         seen_event_ids: Iterable[str] = (),
@@ -380,6 +376,6 @@ class Stream(Source):
             The selected batch, as described for `select_events`.
         """
         current = self.rebind(checkpoint)
-        return self.select_events(
-            self.poll_events(current, limit), current, seen_event_ids, limit
+        return self.select(
+            self.poll(current, limit), current, seen_event_ids, limit
         )

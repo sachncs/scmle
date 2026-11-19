@@ -346,9 +346,7 @@ class Stacking(models.Model):
             )
             for index, member in enumerate(members)
         ]
-        inner = inner_cv.for_plan(
-            plan, task.is_classification, STACK_FOLDS, seed
-        )
+        inner = inner_cv.tailor(plan, task.is_classification, STACK_FOLDS, seed)
         meta = self.stacker(task, len(estimators))
         stack: models.Estimator
         if task.is_classification:

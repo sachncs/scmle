@@ -84,11 +84,11 @@ def run_pipeline(db, tmp_path):
         scmle.assurance.ingest.plan.Config(
             tables=("customers", "orders", "events"),
             unit="customer",
-            target_table="customers",
+            target="customers",
         ),
         scmle.assurance.ingest.budget.Budget(),
     )
-    summary = plan.run_all()
+    summary = plan.execute()
     note = provenance.Attestation(
         "A. Owner",
         "data owner",
@@ -157,7 +157,7 @@ def test_pipeline_artifacts_tiers_and_reconciliation(tmp_path):
     }
     assert ("orders", "customer_id", "customers") in accepted
     assert ("events", "order_id", "orders") in accepted
-    assert found.declared_family_size == len(found.frame.columns) > 20
+    assert found.family == len(found.frame.columns) > 20
     assert any(m["kind"] == "nested" and m["kept"] for m in found.manifest)
     tiers = table.tiers()
     kept = {m["name"]: m for m in found.kept()}

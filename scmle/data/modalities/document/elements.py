@@ -160,22 +160,22 @@ class Citation:
     """A source-backed locator for a document character span.
 
     Attributes:
-        document_id: Non-empty identity of the document.
-        source_uri: Non-empty URI of the raw source.
+        document: Non-empty identity of the document.
+        uri: Non-empty URI of the raw source.
         source_digest: Lowercase SHA-256 hex digest of the raw source.
         start: Offset of the first character; not negative.
         end: Offset after the last character; greater than ``start``.
         locator: Non-empty human-readable locator.
-        page_number: Optional one-based page number.
+        page: Optional one-based page number.
     """
 
-    document_id: str
-    source_uri: str
+    document: str
+    uri: str
     source_digest: str
     start: int
     end: int
     locator: str
-    page_number: int | None = None
+    page: int | None = None
 
     KEYS: ClassVar[records.Migration] = records.nest(
         {
@@ -195,9 +195,9 @@ class Citation:
                 source_digest is not a lowercase SHA-256 digest, the range is
                 empty or starts below zero, or page_number is below one.
         """
-        if not self.document_id.strip():
+        if not self.document.strip():
             raise errors.InputError("document_id must not be empty")
-        if not self.source_uri.strip():
+        if not self.uri.strip():
             raise errors.InputError("source_uri must not be empty")
         if not re.fullmatch(r"[0-9a-f]{64}", self.source_digest):
             raise errors.InputError(
@@ -209,7 +209,7 @@ class Citation:
             )
         if not self.locator.strip():
             raise errors.InputError("locator must not be empty")
-        if self.page_number is not None and self.page_number < 1:
+        if self.page is not None and self.page < 1:
             raise errors.InputError("page_number must be positive")
 
     def to_dict(self) -> dict[str, object]:
@@ -290,18 +290,18 @@ class Layout:
     Attributes:
         source: Non-blank identifier of the extracted source.
         provider: Non-blank name of the extraction provider.
-        provider_version: Non-blank version of the provider.
+        version: Non-blank version of the provider.
         elements: Extracted elements.
-        ocr_confidence: Optional overall OCR confidence in [0, 1].
+        confidence: Optional overall OCR confidence in [0, 1].
         source_digest: Optional SHA-256 hex digest of the raw source the
             layout was extracted from.
     """
 
     source: str
     provider: str
-    provider_version: str
+    version: str
     elements: tuple[Element, ...]
-    ocr_confidence: float | None = None
+    confidence: float | None = None
     source_digest: str | None = None
 
     KEYS: ClassVar[records.Migration] = records.nest(
@@ -322,7 +322,7 @@ class Layout:
         for field_name, value in (
             ("source", self.source),
             ("provider", self.provider),
-            ("provider_version", self.provider_version),
+            ("provider_version", self.version),
         ):
             if not value.strip():
                 raise errors.InputError(
@@ -332,10 +332,10 @@ class Layout:
             raise errors.KindError("document layout elements must be a tuple")
         if not all(isinstance(element, Element) for element in self.elements):
             raise errors.KindError("elements must contain Element values")
-        if self.ocr_confidence is not None and (
-            isinstance(self.ocr_confidence, bool)
-            or not math.isfinite(self.ocr_confidence)
-            or not 0.0 <= self.ocr_confidence <= 1.0
+        if self.confidence is not None and (
+            isinstance(self.confidence, bool)
+            or not math.isfinite(self.confidence)
+            or not 0.0 <= self.confidence <= 1.0
         ):
             raise errors.InputError("OCR confidence must be in [0, 1]")
         if self.source_digest is not None and not re.fullmatch(
@@ -346,7 +346,7 @@ class Layout:
             )
 
     @property
-    def table_count(self) -> int:
+    def tables(self) -> int:
         """The number of extracted table elements."""
         return sum(element.kind == "table" for element in self.elements)
 

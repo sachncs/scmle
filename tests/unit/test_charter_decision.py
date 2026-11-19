@@ -163,7 +163,7 @@ def test_a_charter_without_the_layer_keeps_its_hash_and_format():
 
     charter = make_charter()
     assert charter.decision is None
-    assert charter.charter_hash == FROZEN_HASH
+    assert charter.digest == FROZEN_HASH
     assert "decision" not in charter.to_dict()
     assert charter.format_version == 2
 
@@ -178,10 +178,10 @@ def test_the_layer_changes_the_hash_round_trips_and_needs_format_five():
 
     base = make_charter(costs=with_cost_model())
     charter = make_charter(costs=with_cost_model(), decision=layer())
-    assert charter.charter_hash != base.charter_hash
+    assert charter.digest != base.digest
     assert charter.format_version == 5
     record = json.loads(json.dumps(charter.to_dict()))
-    assert contracts.AnalysisCharter.from_dict(record) == charter
+    assert contracts.Charter.from_dict(record) == charter
     other = make_charter(
         costs=with_cost_model(),
         decision=scmle.assurance.charter.decision.Layer(
@@ -191,7 +191,7 @@ def test_the_layer_changes_the_hash_round_trips_and_needs_format_five():
             rollout=plan(),
         ),
     )
-    assert other.charter_hash != charter.charter_hash
+    assert other.digest != charter.digest
 
 
 def test_a_layer_without_a_cost_model_is_refused():
@@ -216,4 +216,4 @@ def test_a_layer_in_an_older_format_is_refused(tmp_path):
     path = tmp_path / "charter.json"
     path.write_text(json.dumps(wrapper))
     with pytest.raises(errors.ConfigError, match="decision"):
-        sealing.read_verified(path, signing_key="k")
+        sealing.read(path, signing_key="k")

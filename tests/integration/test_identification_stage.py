@@ -267,7 +267,7 @@ def write_attestations(tmp_path, key=KEY, skip=()):
     charter = charter_file(
         tmp_path, ASSUMPTIONS, attestors=ATTESTORS, signed=signed
     )
-    scope = sealing.read_verified(charter).charter_hash
+    scope = sealing.read(charter).digest
     items = []
     for number, assumption in enumerate(ASSUMPTIONS):
         if assumption in skip:

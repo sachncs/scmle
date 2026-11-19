@@ -31,7 +31,7 @@ from scmle.data.readers.streaming.progress import assay
 from scmle.data.readers.streaming.progress import Batch
 from scmle.data.readers.streaming.progress import Checkpoint
 from scmle.data.readers.streaming.progress import SHA256_HEX_LENGTH
-from scmle.data.readers.streaming.progress import validate_timestamp
+from scmle.data.readers.streaming.progress import validate
 from scmle.data.readers.streaming.sampling import allot
 from scmle.data.readers.streaming.sampling import budgets
 from scmle.data.readers.streaming.sampling import DEVELOPMENT
@@ -41,8 +41,8 @@ from scmle.data.readers.streaming.sampling import MIX
 from scmle.data.readers.streaming.sampling import MIX_A
 from scmle.data.readers.streaming.sampling import MIX_B
 from scmle.data.readers.streaming.sampling import retain
-from scmle.data.readers.streaming.sampling import row_hash
 from scmle.data.readers.streaming.sampling import SAMPLE_SHARE
+from scmle.data.readers.streaming.sampling import scramble
 from scmle.data.readers.streaming.sampling import SPLIT_COLUMN
 from scmle.data.readers.streaming.sampling import sweep
 from scmle.data.readers.streaming.sampling import Totals
@@ -97,7 +97,7 @@ __all__ = [
     "budgets",
     "locate",
     "retain",
-    "row_hash",
+    "scramble",
     "sweep",
-    "validate_timestamp",
+    "validate",
 ]

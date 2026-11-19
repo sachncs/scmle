@@ -43,12 +43,12 @@ def test_a_wall_time_is_kept_and_windows_must_be_a_tuple() -> None:
 
 def test_table_totals_refuse_by_lower_case_name_word_for_word() -> None:
     with pytest.raises(errors.InputError, match=r"^view must not be empty$"):
-        ingest.TableTotals(" ", rows=1)
+        ingest.Totals(" ", rows=1)
     with pytest.raises(errors.InputError, match=r"^rows must be non-negative$"):
-        ingest.TableTotals("v", rows=-1)
+        ingest.Totals("v", rows=-1)
     with pytest.raises(
         errors.InputError,
         match=r"^checksum must be 64 lower-case hex digits$",
     ):
-        ingest.TableTotals("v", column="id", checksum="A" * 64)
-    assert ingest.TableTotals("v", column="id", checksum=CHECKSUM).checksum
+        ingest.Totals("v", column="id", checksum="A" * 64)
+    assert ingest.Totals("v", column="id", checksum=CHECKSUM).checksum

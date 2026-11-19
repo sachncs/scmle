@@ -223,7 +223,7 @@ def test_profile_and_feature_plan_never_see_the_locked_test_rows(
     from scmle.data.splitting import splitters
 
     split = splitters.Splitter(base.spec, tasks.Task.BINARY).split(binary_frame)
-    test_positions = list(split.manifest.test_ids)
+    test_positions = list(split.manifest.test)
 
     altered = binary_frame.copy()
     altered.loc[altered.index[test_positions], "a"] = numpy.nan  # all missing
@@ -239,7 +239,7 @@ def test_profile_and_feature_plan_never_see_the_locked_test_rows(
         after.dataset_statistics
     )
     rows = before.dataset_statistics["shape"]
-    assert rows["rows"] == len(split.manifest.train_ids)
+    assert rows["rows"] == len(split.manifest.training)
     assert rows["total_rows"] == len(binary_frame)
     assert rows["rows"] + len(test_positions) == rows["total_rows"]
 
@@ -253,7 +253,7 @@ def test_a_leak_present_only_in_the_test_rows_is_not_a_profile_finding(
     split = splitters.Splitter(project.spec, tasks.Task.BINARY).split(
         binary_frame
     )
-    test_positions = list(split.manifest.test_ids)
+    test_positions = list(split.manifest.test)
     leaky = binary_frame.assign(
         late=numpy.random.default_rng(1).normal(size=500)
     )

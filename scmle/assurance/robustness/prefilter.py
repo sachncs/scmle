@@ -1,6 +1,6 @@
 """The stability filter as the pre-registered second stage of a charter run.
 
-`governed.run_governed` calls `Prefilter` after exploration and the
+`governed.govern` calls `Prefilter` after exploration and the
 negative control and before `C` is opened. The stage re-runs the survivors
 over the declared specification grid on the exploration set and, when the
 charter's `Procedure.stability_filter` is true and the verdicts are allowed to
@@ -173,7 +173,7 @@ class Prefilter:
         columns = tuple(h.spec.column for h in survivors if h.spec.column)
         found = self.compute(columns)
         self.found = found
-        gating = found.stability_gate is certificates.Authority.GATING
+        gating = found.gate is certificates.Authority.GATING
         self.applied = self.requested and gating
         fragile = set(found.fragile)
         reasons: dict[str, str] = {}
@@ -182,7 +182,7 @@ class Prefilter:
             for hypothesis in survivors:
                 name = hypothesis.spec.column
                 if name in fragile:
-                    reasons[hypothesis.hypothesis_id] = (
+                    reasons[hypothesis.identifier] = (
                         f"fragile across the declared grid: "
                         f"{by_name[name].reason}"
                     )
@@ -197,8 +197,8 @@ class Prefilter:
                 "current passing certificate for these thresholds, so "
                 "fragile verdicts are warnings"
                 + (
-                    f" ({found.rule_note or found.store_note})"
-                    if (found.rule_note or found.store_note)
+                    f" ({found.note or found.store_note})"
+                    if (found.note or found.store_note)
                     else ""
                 )
             )
@@ -212,7 +212,7 @@ class Prefilter:
             "name": FILTER_ID,
             "requested": self.requested,
             "applied": self.applied,
-            "gate": found.stability_gate.value,
+            "gate": found.gate.value,
             "thresholds": found.rule.to_dict(),
             "assessed": [f.name for f in found.findings],
             "fragile": sorted(fragile),

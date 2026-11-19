@@ -33,7 +33,7 @@ def canonize(value: Any) -> str:
     )
 
 
-def digest_value(value: Any) -> str:
+def fingerprint(value: Any) -> str:
     """Returns a SHA-256 identity for deterministic JSON content.
 
     Args:
@@ -76,11 +76,11 @@ def canonicalize(value: Any) -> Any:
     if isinstance(value, (datetime.datetime, datetime.date, datetime.time)):
         return value.isoformat()
     if isinstance(value, (Mapping, list, tuple, set, frozenset)):
-        return canonical_collection(value)
+        return convert(value)
     return normalise(value)
 
 
-def canonical_collection(
+def convert(
     value: Mapping[Any, Any]
     | list[Any]
     | tuple[Any, ...]

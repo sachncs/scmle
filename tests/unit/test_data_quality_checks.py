@@ -108,9 +108,7 @@ def test_representativeness_observation_retains_reproducible_evidence():
     reference = population(500, seed=2)
     sample["a"] = sample["a"] + 1.5
 
-    observation = representativeness.assess_representativeness(
-        sample, reference, seed=23
-    )
+    observation = representativeness.assess(sample, reference, seed=23)
 
     assert observation.note is not None
     assert observation.evidence["method"] == (

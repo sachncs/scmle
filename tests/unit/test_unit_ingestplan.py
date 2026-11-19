@@ -50,14 +50,14 @@ def test_a_config_needs_tables_and_a_profiled_target():
     with pytest.raises(
         errors.InputError, match="target_table must be one of tables"
     ):
-        plan.Config(("a",), unit="customer", target_table="b")
+        plan.Config(("a",), unit="customer", target="b")
     with pytest.raises(
         errors.InputError, match="target_table must be one of tables"
     ):
         plan.Config(("a",), unit="customer")
-    settings = plan.Config(("a",), target_table="zzz")
-    assert settings.max_key_size == grain.LEVELS
-    assert (settings.eps_key, settings.eps_null, settings.eps_fk) == (
+    settings = plan.Config(("a",), target="zzz")
+    assert settings.width == grain.LEVELS
+    assert (settings.violation, settings.null, settings.orphans) == (
         0.0,
         0.0,
         0.0,
@@ -100,10 +100,10 @@ def test_declarations_build_references_in_order():
 def test_run_all_writes_every_artifact(source, tmp_path):
     run = tmp_path / "run"
     settings = plan.Config(
-        ("customers", "orders"), unit="customer", target_table="customers"
+        ("customers", "orders"), unit="customer", target="customers"
     )
     stages = plan.Plan(run, plan.opener(source), settings, clock=lambda: 0.0)
-    summary = stages.run_all()
+    summary = stages.execute()
     for name in (plan.CATALOG, plan.GRAIN, plan.JOINS, plan.BUDGET):
         assert (run / name).is_file()
     assert set(stages.scans) == {"customers", "orders"}
@@ -144,13 +144,13 @@ def test_finish_before_any_stage_reports_nothing(source, tmp_path):
 
 def test_an_unprofiled_target_gets_an_unknown_verdict(source, tmp_path):
     settings = plan.Config(
-        ("customers", "orders"), unit="customer", target_table="orders"
+        ("customers", "orders"), unit="customer", target="orders"
     )
-    limits = budget.Budget(max_queries=4)
+    limits = budget.Budget(queries=4)
     stages = plan.Plan(tmp_path / "run", plan.opener(source), settings, limits)
     stages.infer()
     assert list(stages.scans) == ["customers"]
-    assert stages.verdict == grain.UnitVerdict(
+    assert stages.verdict == grain.Verdict(
         grain.UNKNOWN,
         "customer",
         (),

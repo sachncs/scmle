@@ -82,12 +82,10 @@ class Assessments:
                     "escalated": a.escalated,
                     "skill": a.skill.skill,
                     "skill_lower_bound": (
-                        a.skill.lower_bound
-                        if math.isfinite(a.skill.lower_bound)
-                        else None
+                        a.skill.floor if math.isfinite(a.skill.floor) else None
                     ),
                     "skill_p_value": a.skill.p_value,
-                    "low_power": a.skill.low_power,
+                    "low_power": a.skill.power,
                     "conditional_p_value": None
                     if a.conditional is None
                     else a.conditional.p_value,
@@ -96,7 +94,7 @@ class Assessments:
                     else a.missingness.p_value,
                     "missingness_cramers_v": None
                     if a.missingness is None
-                    else a.missingness.cramers_v,
+                    else a.missingness.association,
                 }
                 for a in self.assessments
             ],

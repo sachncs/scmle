@@ -225,7 +225,7 @@ class Sink(abc.ABC):
 
         Args:
             batch: The batch to commit; implementations deduplicate on
-                `batch.batch_id`.
+                `batch.key`.
 
         Returns:
             A receipt carrying the batch's source, batch and checkpoint
@@ -432,22 +432,22 @@ class Receipt:
     """Evidence from one idempotent streaming commit attempt.
 
     Attributes:
-        source_identity: Identity of the source.
-        batch_id: Identity of the batch.
+        identity: Identity of the source.
+        batch: Identity of the batch.
         accepted: True if this call committed the batch.
         duplicate: True if the batch had already been committed.
         checkpoint: Checkpoint after the batch.
-        sink_receipt: Receipt issued by the sink, when one is involved.
+        receipt: Receipt issued by the sink, when one is involved.
         acknowledgement: Acknowledgement bound to the batch, when one is
             involved.
     """
 
-    source_identity: str
-    batch_id: str
+    identity: str
+    batch: str
     accepted: bool
     duplicate: bool
     checkpoint: progress.Checkpoint
-    sink_receipt: Voucher | None = None
+    receipt: Voucher | None = None
     acknowledgement: Acknowledgement | None = None
 
     def __post_init__(self) -> None:
@@ -460,17 +460,17 @@ class Receipt:
         """
         if self.accepted == self.duplicate:
             raise errors.InputError("a commit must be accepted or duplicate")
-        if self.checkpoint.source != self.source_identity:
+        if self.checkpoint.source != self.identity:
             raise errors.InputError("receipt and checkpoint sources differ")
-        if self.sink_receipt is not None and (
-            self.sink_receipt.source != self.source_identity
-            or self.sink_receipt.batch != self.batch_id
-            or self.sink_receipt.checkpoint != self.checkpoint
+        if self.receipt is not None and (
+            self.receipt.source != self.identity
+            or self.receipt.batch != self.batch
+            or self.receipt.checkpoint != self.checkpoint
         ):
             raise errors.InputError("receipt does not match the commit")
         if self.acknowledgement is not None and (
-            self.acknowledgement.source != self.source_identity
-            or self.acknowledgement.batch != self.batch_id
+            self.acknowledgement.source != self.identity
+            or self.acknowledgement.batch != self.batch
             or self.acknowledgement.checkpoint != self.checkpoint
         ):
             raise errors.InputError("acknowledgement does not match the commit")

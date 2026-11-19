@@ -57,9 +57,7 @@ class Monitor:
         distance = float(
             numpy.mean(numpy.abs(current_mean - reference_mean)) / 255.0
         )
-        duplicate_rate = current.profile["duplicates"] / max(
-            current.sample_count, 1
-        )
+        duplicate_rate = current.profile["duplicates"] / max(current.samples, 1)
         return Drift(
             reference_hash=self.reference.dataset_hash,
             observed_hash=current.dataset_hash,

@@ -71,7 +71,7 @@ def test_three_sets_partition_every_row_and_c_is_sealed():
     final = set(manifest.sets.final)
     assert x | c | e | final == set(range(len(frame)))
     assert not (x & c) and not (x & final) and not (c & final)
-    assert final == set(original.manifest.test_ids)
+    assert final == set(original.manifest.test)
     assert outcome.feasibility.verdict is feasibility.Verdict.FEASIBLE
     assert manifest.scope == "confirmatory"
     assert set(vault.sets) == {"C"}
@@ -93,10 +93,10 @@ def test_the_development_data_is_exploration_only():
     ran = run(frame)
     outcome, vault = ran.outcome, ran.vault
     x = list(outcome.manifest.sets.exploration)
-    assert len(outcome.split.dev_features) == len(x)
-    assert outcome.split.manifest.train_ids == tuple(x)
+    assert len(outcome.split.features) == len(x)
+    assert outcome.split.manifest.training == tuple(x)
     assert numpy.allclose(
-        outcome.split.dev_features["x"].to_numpy(), frame["x"].iloc[x]
+        outcome.split.features["x"].to_numpy(), frame["x"].iloc[x]
     )
     assert outcome.view.ids == tuple(x)
     for fit, held in outcome.split.manifest.folds:
@@ -111,7 +111,7 @@ def test_too_few_rows_leave_no_confirmation_set():
     assert outcome.manifest.scope == "exploratory_unconfirmed"
     assert outcome.feasibility.verdict is feasibility.Verdict.INFEASIBLE
     assert set(outcome.manifest.sets.exploration) == set(
-        original.manifest.train_ids
+        original.manifest.training
     )
     assert not vault.sets
     vault.close()
@@ -182,9 +182,7 @@ def test_a_refused_carve_becomes_a_run_with_no_confirmation_set(monkeypatch):
     assert manifest.sets.confirmation == ()
     assert manifest.sets.embargo == ()
     assert manifest.scope == "exploratory_unconfirmed"
-    assert set(manifest.sets.exploration) == set(
-        ran.original.manifest.train_ids
-    )
+    assert set(manifest.sets.exploration) == set(ran.original.manifest.training)
     assert any("not carved" in note for note in manifest.notes)
     assert ran.outcome.split.manifest.folds == ran.original.manifest.folds
     assert not ran.vault.sets
@@ -199,11 +197,11 @@ def test_the_manifest_commits_to_the_row_content_of_each_set():
         "confirmation",
         "final_test",
     ]
-    manifest.verify_rows(frame)
+    manifest.verify(frame)
     edited = frame.copy()
     edited.loc[manifest.sets.confirmation[0], "x"] += 1e-9
     with pytest.raises(errors.ArtifactError, match="confirmation"):
-        manifest.verify_rows(edited)
+        manifest.verify(edited)
 
 
 def temporal_frame(phi, rows=1500):

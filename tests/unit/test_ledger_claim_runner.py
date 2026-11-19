@@ -30,7 +30,7 @@ def runner(calls, status="done", boom=False):
 def go(claim_runner, effect=0.7, source=True, **kwargs):
     features, target = build(rows=500, seed=0, effect=effect)
     cfeatures, ctarget = build(rows=400, seed=9, effect=effect)
-    return governed.run_governed(
+    return governed.govern(
         charter=make_charter(),
         features=features,
         target=target,
@@ -64,7 +64,7 @@ def test_the_claim_is_bound_into_the_release_and_c_opens_once():
     cfeatures, ctarget = build(rows=400, seed=9, effect=0.7)
     source = locate(cfeatures, ctarget)
     calls = []
-    governed.run_governed(
+    governed.govern(
         charter=make_charter(),
         features=features,
         target=target,
@@ -117,7 +117,7 @@ def new_ledger():
     charter = make_charter()
     return scmle.assurance.ledger.ledger.Ledger.create(
         None,
-        charter_hash=charter.charter_hash,
+        charter_hash=charter.digest,
         config=online_fdr.Settings("e-lond", 0.1),
         alpha_confirm=charter.budget.confirmation.alpha_confirm,
         seed=0,

@@ -99,15 +99,15 @@ def test_bad_arguments_are_refused():
     with pytest.raises(ValueError, match="equally long"):
         bivariate.spearman(numpy.arange(5.0), numpy.arange(4.0))
     with pytest.raises(ValueError, match="statistic"):
-        bivariate.run_statistic("t-test", numpy.arange(5.0), numpy.arange(5.0))
+        bivariate.calculate("t-test", numpy.arange(5.0), numpy.arange(5.0))
 
 
 def test_code_hash_is_a_stable_sha256_and_differs_by_statistic():
-    first = bivariate.code_hash("spearman")
-    assert len(first) == 64 and first == bivariate.code_hash("spearman")
-    assert first != bivariate.code_hash("kruskal")
+    first = bivariate.fingerprint("spearman")
+    assert len(first) == 64 and first == bivariate.fingerprint("spearman")
+    assert first != bivariate.fingerprint("kruskal")
     with pytest.raises(ValueError):
-        bivariate.code_hash("nope")
+        bivariate.fingerprint("nope")
 
 
 def test_null_p_values_are_uniform_by_a_ks_test():

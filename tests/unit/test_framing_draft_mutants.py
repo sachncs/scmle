@@ -451,7 +451,7 @@ def test_the_llm_record_holds_the_prompt_the_samples_and_the_scores():
         "model_id": "model-x",
         "prompt": prompt,
         "samples": samples,
-        "samples_hash": refusal.samples_hash("model-x", prompt, samples),
+        "samples_hash": refusal.digest("model-x", prompt, samples),
         "ambiguity": 0.0,
         "agreement": {
             "target": 1.0,
@@ -571,7 +571,7 @@ def test_the_cost_threshold_is_asked_only_when_the_verdict_can_change():
     assert question.low == 0.05 and question.high == 0.5
     assert question.form == "a threshold t = c_FP / (c_FP + c_FN) in (0, 1)"
     assert question.verdicts == ("model_better", "baseline_better")
-    assert 0.05 < question.tipping_value < 0.5
+    assert 0.05 < question.tipping < 0.5
 
 
 def test_a_robust_threshold_is_reported_and_closes_the_cost_item():
@@ -620,7 +620,7 @@ def test_a_full_draft_records_sources_checks_and_the_baseline():
         baseline_column="current_rule",
     )
     assert result.status == draft.WITH_QUESTIONS
-    assert result.open_items == (
+    assert result.pending == (
         "population",
         "deployment_population",
         "intercurrent_events",
@@ -656,7 +656,7 @@ def test_human_slots_override_every_other_source():
     assert result.charter.estimand.population == "region == 'n'"
     assert result.fields["target"] is provenance.Filling.HUMAN
     assert result.fields["population"] is provenance.Filling.HUMAN
-    assert "population" not in result.open_items
+    assert "population" not in result.pending
     assert "population_coverage" in [c.name for c in result.checks]
 
 
@@ -759,13 +759,13 @@ def test_a_draft_serialises_to_the_stored_document():
     assert document["schema_version"] == 2
     assert document["status"] == draft.WITH_QUESTIONS
     assert document["charter"] == result.charter.to_dict()
-    assert document["charter_hash"] == result.charter.charter_hash
+    assert document["charter_hash"] == result.charter.digest
     assert document["fields"] == {
         k: v.value for k, v in sorted(result.fields.items())
     }
     assert list(document["fields"]) == sorted(document["fields"])
     assert document["checks"] == [c.to_dict() for c in result.checks]
-    assert document["pending"] == list(result.open_items)
+    assert document["pending"] == list(result.pending)
     assert document["llm"] is None and document["discarded"] == []
     assert document["label"] == (
         "a drafted charter is a draft: nothing here shows it is correct; llm "
@@ -834,7 +834,7 @@ def test_the_artifacts_hold_the_documents_and_the_directory_is_created(
     assert questions == {
         "questions": [],
         "robust": [],
-        "open_items": list(result.open_items),
+        "open_items": list(result.pending),
     }
     assert (
         json.loads(
@@ -974,7 +974,7 @@ def test_blank_slot_values_are_placeholders_and_open_items():
 
 
 class Prompts:
-    model_id = "p"
+    model = "p"
 
     def __init__(self):
         self.prompts = []

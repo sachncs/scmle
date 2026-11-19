@@ -39,10 +39,10 @@ STEPS = (
             "unit_of_prediction": "purpose",
         },
         parts={
-            "estimand": parts.AnalysisEstimand.migrations[0],
+            "estimand": parts.Estimand.migrations[0],
             "triggers": parts.Trigger.migrations[0],
-            "sets": parts.SetSizes.migrations[0],
-            "budget": (scmle.assurance.ledger.budget.ErrorBudget.migrations[0]),
+            "sets": parts.Sizes.migrations[0],
+            "budget": (scmle.assurance.ledger.budget.Alpha.migrations[0]),
             "costs": scmle.assurance.framing.costs.Tariff.migrations[0],
             "rules": scmle.assurance.charter.rules.Procedure.migrations[0],
             "decision": scmle.assurance.charter.decision.Layer.migrations[0],
@@ -65,7 +65,7 @@ BLOCKS: dict[str, Callable[[Any], Any]] = {
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class AnalysisCharter:
+class Charter:
     """The signed specification of an analysis, fixed before any exploration.
 
     The charter is stored at schema version 2; a version 1 record (the keys
@@ -121,16 +121,16 @@ class AnalysisCharter:
     migrations: ClassVar[tuple[records.Migration, ...]] = STEPS
 
     question: str
-    estimand: parts.AnalysisEstimand
+    estimand: parts.Estimand
     unit: str
     population: str
     gates: tuple[str, ...]
     triggers: tuple[parts.Trigger, ...]
-    sets: parts.SetSizes
+    sets: parts.Sizes
     effect: float
     quota: int
     power: float
-    budget: scmle.assurance.ledger.budget.ErrorBudget
+    budget: scmle.assurance.ledger.budget.Alpha
     multiverse: tuple[parts.Choice, ...]
     seed: int
     costs: scmle.assurance.framing.costs.Tariff | None = None
@@ -219,7 +219,7 @@ class AnalysisCharter:
                 raise errors.InputError(f"unknown check {check} in the charter")
 
     @property
-    def charter_hash(self) -> str:
+    def digest(self) -> str:
         """SHA-256 of the canonical JSON of the version 1 charter (64 hex)."""
         return hashlib.sha256(signing.canonicalise(self.anchor())).hexdigest()
 
@@ -337,18 +337,18 @@ class AnalysisCharter:
         }
         return cls(
             question=record["question"],
-            estimand=parts.AnalysisEstimand.from_dict(record["estimand"]),
+            estimand=parts.Estimand.from_dict(record["estimand"]),
             unit=record["unit"],
             population=record["population"],
             gates=tuple(record["gates"]),
             triggers=tuple(
                 parts.Trigger.from_dict(r) for r in record["triggers"]
             ),
-            sets=parts.SetSizes.from_dict(record["sets"]),
+            sets=parts.Sizes.from_dict(record["sets"]),
             effect=record["effect"],
             quota=record["quota"],
             power=record["power"],
-            budget=scmle.assurance.ledger.budget.ErrorBudget.from_dict(
+            budget=scmle.assurance.ledger.budget.Alpha.from_dict(
                 record["budget"]
             ),
             multiverse=tuple(
@@ -383,10 +383,10 @@ def template() -> dict[str, Any]:
     budget created with levels 0.05 and 0.1, and seed 0.
 
     Returns:
-        A dict in the shape of `AnalysisCharter.to_dict`.
+        A dict in the shape of `Charter.to_dict`.
     """
     return {
-        records.KEY: records.ORIGIN + len(AnalysisCharter.migrations),
+        records.KEY: records.ORIGIN + len(Charter.migrations),
         "question": "",
         "estimand": {
             "kind": "predictive",
@@ -404,7 +404,7 @@ def template() -> dict[str, Any]:
         "effect": 0.2,
         "quota": 10,
         "power": 0.8,
-        "budget": scmle.assurance.ledger.budget.ErrorBudget.create(
+        "budget": scmle.assurance.ledger.budget.Alpha.create(
             0.05, 0.1
         ).to_dict(),
         "multiverse": [],
@@ -412,21 +412,21 @@ def template() -> dict[str, Any]:
     }
 
 
-def parse(record: Mapping[str, Any]) -> AnalysisCharter:
+def parse(record: Mapping[str, Any]) -> Charter:
     """Builds a charter from a record, reporting problems as `ConfigError`.
 
     Args:
-        record: A charter record as written by `AnalysisCharter.to_dict`.
+        record: A charter record as written by `Charter.to_dict`.
 
     Returns:
         The validated charter.
 
     Raises:
-        ConfigError: If `AnalysisCharter.from_dict` raises `ValueError`,
+        ConfigError: If `Charter.from_dict` raises `ValueError`,
             `KeyError` or `TypeError` for the record.
     """
     try:
-        return AnalysisCharter.from_dict(record)
+        return Charter.from_dict(record)
     except (ValueError, KeyError, TypeError) as error:
         raise errors.ConfigError(
             f"invalid analysis charter: {error}"
@@ -457,7 +457,7 @@ def deserialize(path: str | Path) -> dict[str, Any]:
     return record
 
 
-def peek(path: str | Path) -> AnalysisCharter:
+def peek(path: str | Path) -> Charter:
     """Reads a charter file without verifying its hash or signature.
 
     A file with a `charter` key is read as the signed wrapper and that

@@ -74,9 +74,9 @@ def test_statement_fills_each_placeholder():
 def test_source_defaults_and_overrides_reach_the_connector():
     db = ingest_worlds.new_database("pd")
     plain = profile.Sql(db.factory)
-    assert plain.connector.source_uri == "sqlite://ingest"
+    assert plain.connector.uri == "sqlite://ingest"
     assert plain.connector.query == "SELECT 1"
-    assert plain.connector.read_only_statement is None
+    assert plain.connector.preamble is None
     assert plain.meter is None
     assert plain.queries == 0
     custom = profile.Sql(
@@ -84,8 +84,8 @@ def test_source_defaults_and_overrides_reach_the_connector():
         uri="sqlite://other",
         read_only_statement="SELECT 2",
     )
-    assert custom.connector.source_uri == "sqlite://other"
-    assert custom.connector.read_only_statement == "SELECT 2"
+    assert custom.connector.uri == "sqlite://other"
+    assert custom.connector.preamble == "SELECT 2"
 
 
 def test_the_read_only_statement_runs_before_each_query():
@@ -98,11 +98,11 @@ def test_a_refused_write_names_the_source_uri():
     source = recorded_source(uri="sqlite://named")[0]
     with pytest.raises(connectors.ConnectorError) as caught:
         source.fetch("DELETE FROM t")
-    assert caught.value.source_uri == "sqlite://named"
+    assert caught.value.uri == "sqlite://named"
 
 
 def test_fetch_charges_the_stage_unit_and_rows_and_counts_queries():
-    meter = budget.Meter(budget.Budget(max_queries=2, max_rows_scanned=50))
+    meter = budget.Meter(budget.Budget(queries=2, scanned=50))
     source = recorded_source(meter=meter)[0]
     first = source.fetch("SELECT a FROM t ORDER BY a", "stg", "unit-1", 20)
     assert first == [(1,), (2,), (2,)]
@@ -117,7 +117,7 @@ def test_fetch_charges_the_stage_unit_and_rows_and_counts_queries():
 
 
 def test_fetch_without_a_stage_is_not_charged():
-    meter = budget.Meter(budget.Budget(max_queries=0))
+    meter = budget.Meter(budget.Budget(queries=0))
     source = recorded_source(meter=meter)[0]
     assert source.fetch("SELECT a FROM t ORDER BY a") == [(1,), (2,), (2,)]
     assert meter.queries == 0
@@ -126,7 +126,7 @@ def test_fetch_without_a_stage_is_not_charged():
 
 
 def test_scalar_defaults_to_no_stage_and_an_empty_unit():
-    meter = budget.Meter(budget.Budget(max_queries=0))
+    meter = budget.Meter(budget.Budget(queries=0))
     source = recorded_source(meter=meter)[0]
     assert source.scalar("SELECT COUNT(*) FROM t") == 3
     assert meter.queries == 0
@@ -152,7 +152,7 @@ def test_columns_reads_names_with_a_zero_row_query():
 
 
 def test_columns_charges_the_table_with_no_rows_and_stops_cleanly():
-    meter = budget.Meter(budget.Budget(max_queries=1, max_rows_scanned=0))
+    meter = budget.Meter(budget.Budget(queries=1, scanned=0))
     source = recorded_source(meter=meter)[0]
     assert source.columns("t") == ("a", "b")
     assert meter.queries == 0
@@ -160,7 +160,7 @@ def test_columns_charges_the_table_with_no_rows_and_stops_cleanly():
     assert meter.queries == 1
     assert source.columns("t", "stg") == ()
     assert (meter.stops[0].stage, meter.stops[0].unit) == ("stg", "t")
-    refusing = budget.Meter(budget.Budget(max_queries=0))
+    refusing = budget.Meter(budget.Budget(queries=0))
     other = recorded_source(meter=refusing)[0]
     assert other.columns("t", "stg") == ()
     assert other.queries == 0
@@ -168,7 +168,7 @@ def test_columns_charges_the_table_with_no_rows_and_stops_cleanly():
 
 
 def test_columns_cost_no_rows_even_when_rows_are_limited():
-    meter = budget.Meter(budget.Budget(max_rows_scanned=0))
+    meter = budget.Meter(budget.Budget(scanned=0))
     source = recorded_source(meter=meter)[0]
     assert source.columns("t", "stg") == ("a", "b")
     assert meter.stops == []
@@ -226,18 +226,18 @@ def test_the_profile_issues_these_exact_statements_and_charges():
 
 
 def test_the_profile_names_the_table_and_the_column_when_it_stops():
-    meter = budget.Meter(budget.Budget(max_queries=0))
+    meter = budget.Meter(budget.Budget(queries=0))
     source = recorded_source(meter=meter)[0]
     assert profile.survey(source, "t", "prof") is None
     assert (meter.stops[0].stage, meter.stops[0].unit) == ("prof", "t")
-    columns = budget.Meter(budget.Budget(max_queries=2))
+    columns = budget.Meter(budget.Budget(queries=2))
     other = recorded_source(meter=columns)[0]
     assert profile.survey(other, "t", "prof") is None
     assert (columns.stops[0].stage, columns.stops[0].unit) == ("prof", "t.a")
 
 
 def test_the_default_profile_stage_is_profile():
-    meter = budget.Meter(budget.Budget(max_queries=0))
+    meter = budget.Meter(budget.Budget(queries=0))
     source = recorded_source(meter=meter)[0]
     assert profile.survey(source, "t") is None
     assert meter.stops[0].stage == "profile"
@@ -247,7 +247,7 @@ def test_an_all_null_column_has_no_extremes_and_kind_empty():
     source = recorded_source(rows=[(None, None), (None, None)])[0]
     table = profile.survey(source, "t")
     only = table.column("a")
-    assert (only.kind, only.non_null, only.distinct) == ("empty", 0, 0)
+    assert (only.kind, only.present, only.distinct) == ("empty", 0, 0)
     assert (only.minimum, only.maximum) == (None, None)
     assert table.to_dict()["columns"][1]["minimum"] is None
 
@@ -312,7 +312,7 @@ def test_a_complete_catalog_is_not_partial_and_a_stopped_one_is():
     complete = profile.inventory(source, ["t"])
     assert complete.partial is False
     assert [t.name for t in complete.tables] == ["t"]
-    meter = budget.Meter(budget.Budget(max_queries=0))
+    meter = budget.Meter(budget.Budget(queries=0))
     stopped_source = recorded_source(meter=meter)[0]
     stopped = profile.inventory(stopped_source, ["t"], "custom")
     assert stopped.partial is True
@@ -334,7 +334,7 @@ def test_the_catalog_fingerprint_is_the_digest_of_sorted_json():
 def test_torn_read_error_records_the_attempts_and_the_reason():
     error = profile.TornError("sqlite://x", 3, "because")
     assert error.code == "torn_read"
-    assert error.source_uri == "sqlite://x"
+    assert error.uri == "sqlite://x"
     assert error.attempts == 3
     assert error.reason == "because"
     assert error.details == {
@@ -362,19 +362,19 @@ class Batch:
         )
         self.rows = rows
         self.checkpoint = checkpoint
-        self.has_more = more
+        self.more = more
 
 
 class Scripted:
     """A connector with no query attribute that serves scripted batches."""
 
-    source_uri = "scripted://x"
+    uri = "scripted://x"
 
     def __init__(self, scripts):
         self.scripts = list(scripts)
         self.seen = []
 
-    def read_rows(self, checkpoint, limit):
+    def read(self, checkpoint, limit):
         self.seen.append((checkpoint, limit))
         script = self.scripts[0]
         batch = script.pop(0)
@@ -412,12 +412,12 @@ def test_the_unordered_error_carries_the_message_and_uri():
     with pytest.raises(connectors.ConnectorError) as caught:
         profile.untorn(connector)
     assert caught.value.code == "unordered_query"
-    assert caught.value.source_uri == "sqlite://ordered"
+    assert caught.value.uri == "sqlite://ordered"
     assert caught.value.details == {
         "code": "unordered_query",
         "source_uri": "sqlite://ordered",
     }
-    assert caught.value.as_dict()["message"] == (
+    assert caught.value.serialize()["message"] == (
         "batched reads need an ORDER BY on a unique key"
     )
     assert profile.untorn(connector, require_order=False).frame.empty
@@ -444,7 +444,7 @@ def test_a_changing_token_gives_a_torn_read_with_the_reason_and_attempts():
         profile.untorn(connector, 4, token=lambda: str(next(ticks)), attempts=3)
     assert caught.value.reason == "snapshot token changed"
     assert caught.value.attempts == 3
-    assert caught.value.source_uri == "scripted://x"
+    assert caught.value.uri == "scripted://x"
     assert str(caught.value).endswith(
         "(snapshot token changed) after 3 attempt(s)"
     )

@@ -544,6 +544,6 @@ class Transformation(Strategy):
             regressor=preprocessing.instantiate(
                 plan, adapter, task, seed, params, featurise=featurise
             ),
-            transformer=transformers.AsinhTarget(),
+            transformer=transformers.Asinh(),
         )
         return transformed

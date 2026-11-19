@@ -133,7 +133,7 @@ def section(document: dict[str, Any]) -> str:
     return "".join(rows)
 
 
-def shift_section(document: dict[str, Any]) -> str:
+def depict(document: dict[str, Any]) -> str:
     """Renders the shift part of the page.
 
     Args:
@@ -175,6 +175,6 @@ def render(stability: dict[str, Any], shift: dict[str, Any]) -> str:
         "<title>SCMLE stability and shift report</title>"
         f"<style>{STYLE}</style></head><body>"
         "<h1>Stability and shift</h1>"
-        f"{section(stability)}{shift_section(shift)}"
+        f"{section(stability)}{depict(shift)}"
         "</body></html>"
     )

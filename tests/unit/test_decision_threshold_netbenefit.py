@@ -53,7 +53,7 @@ def test_the_net_benefit_identity_holds_on_random_tables():
         t = fp / (fp + fn)
         none = fn * y.mean()
         lhs = costs.net_benefit(y, a, t)
-        rhs = (none - costs.expected_cost(y, a, m)) / fn
+        rhs = (none - costs.price(y, a, m)) / fn
         assert lhs == pytest.approx(rhs, abs=1e-12)
 
 

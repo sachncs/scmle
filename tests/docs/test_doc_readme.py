@@ -112,7 +112,7 @@ def test_titanic_boat_and_body_are_flagged_by_the_documented_mechanisms():
         "survived",
         "classification",
         ["boat", "body"],
-        leakage.CERTIFIED.run_seed,
+        leakage.CERTIFIED.seed,
     )
     found = {}
     for finding in report.blocking:

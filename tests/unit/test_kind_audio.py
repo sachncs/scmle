@@ -70,7 +70,7 @@ def write(path, values, rate=RATE):
     matrix = values[:, None] if values.ndim == 1 else values
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(
-        modalities.audio.wav_payload_from_pcm(
+        modalities.audio.encode(
             (matrix.shape[1], 2, rate, len(matrix), "NONE", "not compressed"),
             matrix,
         )
@@ -127,15 +127,13 @@ def test_a_clip_is_described_whole_not_its_first_frames(tmp_path):
 
     old = modalities.audio.Dataset(
         (
-            modalities.audio.Sample.from_bytes(
-                first.read_bytes(), source="first"
-            ),
-            modalities.audio.Sample.from_bytes(
+            modalities.audio.Sample.decode(first.read_bytes(), source="first"),
+            modalities.audio.Sample.decode(
                 second.read_bytes(), source="second"
             ),
         )
-    ).prepare_features()
-    prefix = old.to_numpy()[:, :6]
+    ).prepare()
+    prefix = old.materialize()[:, :6]
     assert (prefix[0] == prefix[1]).all()  # the defect: only a prefix counts
 
     described = audio.AUDIO.describe([first, second])
@@ -280,8 +278,8 @@ def test_a_declared_group_joins_its_clips(tmp_path):
     split = audio.AUDIO.constrain(spec, tasks.Task.MULTICLASS).split(frame)
 
     speakers = frame["speaker"].to_numpy()
-    train = numpy.asarray(split.manifest.train_ids)
-    test = numpy.asarray(split.manifest.test_ids)
+    train = numpy.asarray(split.manifest.training)
+    test = numpy.asarray(split.manifest.test)
     assert not set(speakers[train]) & set(speakers[test])
     for fit, held in split.manifest.folds:
         assert not set(speakers[train[list(fit)]]) & set(
@@ -327,15 +325,15 @@ def test_no_cohort_straddles_the_locked_set_or_a_fold(
         return
 
     labels = numpy.asarray(cohort)
-    train = numpy.asarray(split.manifest.train_ids)
-    test = numpy.asarray(split.manifest.test_ids)
+    train = numpy.asarray(split.manifest.training)
+    test = numpy.asarray(split.manifest.test)
     assert not set(labels[train]) & set(labels[test])
     for fit, held in split.manifest.folds:
         assert not set(labels[train[list(fit)]]) & set(
             labels[train[list(held)]]
         )
-    assert rows.KEY not in split.dev_features.columns
-    assert rows.KEY not in split.locked_test.features.columns
+    assert rows.KEY not in split.features.columns
+    assert rows.KEY not in split.test.features.columns
 
 
 def test_a_protocol_that_could_split_a_cohort_becomes_the_group_split():
@@ -376,12 +374,12 @@ def test_the_noise_probe_decodes_only_the_frames_it_scores(tmp_path):
     """
     rng = numpy.random.default_rng(5)
     values = 0.1 * rng.standard_normal(2_000_000)
-    sample = modalities.audio.Sample.from_bytes(
+    sample = modalities.audio.Sample.decode(
         write(tmp_path / "long.wav", values).read_bytes(),
         source="long",
         label="a",
     )
-    other = modalities.audio.Sample.from_bytes(
+    other = modalities.audio.Sample.decode(
         write(tmp_path / "short.wav", values[:4_000] * 0.5).read_bytes(),
         source="short",
         label="b",

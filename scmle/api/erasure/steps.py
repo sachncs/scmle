@@ -470,7 +470,7 @@ class Retraining(Step):
         Returns:
             `run`: the new run directory.
         """
-        frame = tabular.read_table(self.source)
+        frame = tabular.read(self.source)
         run = pathlib.Path(self.target)
         orchestrator = scmle.pipeline.orchestrator.Orchestrator.reload(
             run, frame=frame

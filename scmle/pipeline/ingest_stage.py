@@ -58,7 +58,7 @@ so duplicates of one real-world entity under different keys never straddle
 development and test. With a `reconcile` block the extracted views are
 compared with the totals it declares and with the source database itself,
 which is queried for the row count, the declared column sums and the key
-checksum of each declared view (`declared.reconcile_source`, built on
+checksum of each declared view (`declared.survey`, built on
 `reconcile.crosscheck`), before anything is synthesized; a mismatch
 stops the run and names each quantity (`declared.require`).
 """
@@ -376,10 +376,10 @@ def configure(
     settings = scmle.assurance.ingest.plan.Config(
         tables=tuple(plan_document["tables"]),
         unit=plan_document.get("unit"),
-        target_table=plan_document.get("target_table"),
-        eps_key=spec.tolerances.key,
-        eps_null=spec.tolerances.null,
-        eps_fk=spec.tolerances.link,
+        target=plan_document.get("target_table"),
+        violation=spec.tolerances.key,
+        null=spec.tolerances.null,
+        orphans=spec.tolerances.link,
         declared=scmle.assurance.ingest.plan.declarations(
             plan_document.get("declared", [])
         ),
@@ -427,7 +427,7 @@ def reconcile(
         expectation,
         spec.reconciliation,
     )
-    report["source_checks"] = declared.reconcile_source(
+    report["source_checks"] = declared.survey(
         frames_by_name,
         tables_by_name,
         expectation,
@@ -498,11 +498,11 @@ def timing(view: asof_view.View) -> schema.Table | None:
     """
     rule = view.rule
     if rule.mode == asof_view.NON_VERSIONED:
-        return None if view.event_time else schema.Table(view.name)
-    if rule.delta_rec_days is None:
+        return None if view.time else schema.Table(view.name)
+    if rule.delay is None:
         return None
-    known = rule.known_column if rule.mode == asof_view.TRANSACTION else None
-    return schema.Table(view.name, view.event_time, known, rule.delta_rec_days)
+    known = rule.recorded if rule.mode == asof_view.TRANSACTION else None
+    return schema.Table(view.name, view.time, known, rule.delay)
 
 
 def reason(
@@ -568,7 +568,7 @@ def confirm(
             sources[f.source].view.name,
             PRIMITIVES[f.primitive],
             f.value,
-            f.window_days,
+            f.window,
         )
         for f in checked
     ]
@@ -576,9 +576,7 @@ def confirm(
     known = [(t, s, x) for t, s, x in named if t is not None]
     layout = schema.Schema(
         tuple(t for t, s, x in known),
-        tuple(
-            schema.Link(t.name, s.view.key, s.target_key) for t, s, x in known
-        ),
+        tuple(schema.Link(t.name, s.view.key, s.anchor) for t, s, x in known),
     )
     built = engine.Engine(layout, {t.name: x for t, s, x in known})
     computed = built.features(targets, moment, aggregates, spec.lag)
@@ -621,12 +619,12 @@ def deliver(
         documents[declared.FILE] = report
     return Output(
         found.frame,
-        found.declared_family_size,
+        found.family,
         table.fields,
         documents,
         {
             **summary,
-            "declared_family_size": found.declared_family_size,
+            "declared_family_size": found.family,
             "proposed": len(found.manifest),
         },
     )
@@ -701,7 +699,7 @@ def synthesis(
         plan = scmle.assurance.ingest.plan.Plan(
             folder, factory, settings, limits
         )
-        summary = plan.run_all()
+        summary = plan.execute()
     verdict = plan.verdict
     if verdict is not None and verdict.blocks:
         raise errors.BlockedError(

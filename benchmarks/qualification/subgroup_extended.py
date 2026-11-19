@@ -388,7 +388,7 @@ def code() -> str:
     Returns:
         The code hash of the designs, their worlds and the rules they use.
     """
-    return certificates.code_hash(
+    return certificates.fingerprint(
         gate_unequal,
         gate_overlap,
         unequal_world,

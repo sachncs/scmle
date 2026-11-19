@@ -45,10 +45,10 @@ class Reporting(relabelling.Relabelling):
         split = partition.split
         charter_hash = None
         if board.services.spec.charter_path:
-            charter_hash = sealing.read_verified(
+            charter_hash = sealing.read(
                 str(board.services.spec.charter_path)
-            ).charter_hash
-        claim = coverage_run.claim_document(
+            ).digest
+        claim = coverage_run.claim(
             task=partition.task.value,
             levels=scoring.COVERAGE_LEVELS,
             tolerance=coverage.DEFAULT_TOLERANCE,

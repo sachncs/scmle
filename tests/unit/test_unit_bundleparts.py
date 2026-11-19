@@ -80,7 +80,7 @@ def test_a_shasum_is_the_sha256_of_the_whole_file(tmp_path):
 
 
 def test_the_layout_names_the_format_and_every_member():
-    assert layout.BUNDLE_FORMAT == 4
+    assert layout.BUNDLE_FORMAT == 5
     assert layout.MODEL_FILE == "pipeline.joblib"
     assert layout.SCHEMA_FILE == "schema.json"
     assert layout.MANIFEST_FILE == "model_manifest.json"
@@ -464,7 +464,7 @@ def test_admit_refuses_another_format(binary, tmp_path):
     info, legacy = archive.admit(document, False, False)
     assert legacy is False
     assert info.model_name == "lr"
-    for value in (3, 5, None):
+    for value in (4, 6, None):
         with pytest.raises(errors.ArtifactError, match=f"format {value}"):
             archive.admit({**document, "format": value}, True, True)
 

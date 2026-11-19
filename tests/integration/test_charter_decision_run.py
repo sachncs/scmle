@@ -60,7 +60,7 @@ def test_the_charter_cost_model_sets_the_threshold(binary_frame, tmp_path):
     document = evaluation(result)
     decision = document["decision"]
     assert decision["objective"] == "chartered_cost"
-    assert decision["cost_model_hash"] == model.model_hash
+    assert decision["cost_model_hash"] == model.digest
     detail = decision["f11"]
     assert detail["path"] in ("bayes", "recalibrated", "grid")
     assert detail["rule_hash"]

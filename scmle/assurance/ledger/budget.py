@@ -69,7 +69,7 @@ def exact(value: Any, name: str) -> Fraction:
     raise errors.InputError(f"{name} must be a finite number")
 
 
-def parse_fraction(text: Any, name: str) -> Fraction:
+def parse(text: Any, name: str) -> Fraction:
     """Parses a serialized fraction such as ``"1/20"``.
 
     Args:
@@ -91,7 +91,7 @@ def parse_fraction(text: Any, name: str) -> Fraction:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ConfirmationBudget:
+class Confirmation:
     """Level spent once on the confirmation set.
 
     Attributes:
@@ -113,7 +113,7 @@ class ConfirmationBudget:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ExplorationBudget:
+class Exploration:
     """Alpha-wealth for the exploration phase.
 
     Attributes:
@@ -195,7 +195,7 @@ class Tolerance:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ErrorBudget:
+class Alpha:
     """Everything a run may spend, fixed in the charter.
 
     Attributes:
@@ -215,8 +215,8 @@ class ErrorBudget:
         ),
     )
 
-    confirmation: ConfirmationBudget
-    exploration: ExplorationBudget
+    confirmation: Confirmation
+    exploration: Exploration
     permutations: int
     tolerances: tuple[Tolerance, ...]
 
@@ -264,8 +264,8 @@ class ErrorBudget:
         if not 0 <= wealth <= 1:
             raise errors.InputError("wealth_exploration must be within [0, 1]")
         return cls(
-            confirmation=ConfirmationBudget(alpha),
-            exploration=ExplorationBudget(initial=wealth, wealth=wealth),
+            confirmation=Confirmation(alpha),
+            exploration=Exploration(initial=wealth, wealth=wealth),
             permutations=permutations,
             tolerances=tuple(tolerances),
         )
@@ -312,12 +312,12 @@ class ErrorBudget:
         if set(exploration) != {"initial", "wealth"}:
             raise errors.InputError("unexpected or missing exploration fields")
         return cls(
-            confirmation=ConfirmationBudget(
-                parse_fraction(confirmation["alpha_confirm"], "alpha_confirm")
+            confirmation=Confirmation(
+                parse(confirmation["alpha_confirm"], "alpha_confirm")
             ),
-            exploration=ExplorationBudget(
-                initial=parse_fraction(exploration["initial"], "initial"),
-                wealth=parse_fraction(exploration["wealth"], "wealth"),
+            exploration=Exploration(
+                initial=parse(exploration["initial"], "initial"),
+                wealth=parse(exploration["wealth"], "wealth"),
             ),
             permutations=record["permutations"],
             tolerances=tuple(
@@ -326,7 +326,7 @@ class ErrorBudget:
         )
 
 
-def remaining(budget: ErrorBudget) -> float:
+def remaining(budget: Alpha) -> float:
     """Reports the exploration wealth still unspent.
 
     Args:
@@ -338,7 +338,7 @@ def remaining(budget: ErrorBudget) -> float:
     return float(budget.exploration.wealth)
 
 
-def spend(budget: ErrorBudget, amount: Number) -> ErrorBudget:
+def spend(budget: Alpha, amount: Number) -> Alpha:
     """Spends exploration wealth and returns the new budget.
 
     Args:
@@ -364,15 +364,13 @@ def spend(budget: ErrorBudget, amount: Number) -> ErrorBudget:
         )
     return dataclasses.replace(
         budget,
-        exploration=ExplorationBudget(
+        exploration=Exploration(
             initial=budget.exploration.initial, wealth=left - cost
         ),
     )
 
 
-def apportion(
-    budget: ErrorBudget, weights: Mapping[str, Number]
-) -> dict[str, ErrorBudget]:
+def apportion(budget: Alpha, weights: Mapping[str, Number]) -> dict[str, Alpha]:
     """Divides a budget among hypothesis families in proportion to weights.
 
     The confirmation levels of the parts sum exactly to the original level,
@@ -404,10 +402,10 @@ def apportion(
         share = weight / total
         parts[name] = dataclasses.replace(
             budget,
-            confirmation=ConfirmationBudget(
+            confirmation=Confirmation(
                 budget.confirmation.alpha_confirm * share
             ),
-            exploration=ExplorationBudget(
+            exploration=Exploration(
                 initial=budget.exploration.initial * share,
                 wealth=budget.exploration.wealth * share,
             ),
@@ -430,9 +428,7 @@ def harmonic(n: int) -> float:
     return math.fsum(1.0 / k for k in range(1, n + 1))
 
 
-def confirmation_alpha(
-    budget: ErrorBudget, n_survivors: int, rule: Correction
-) -> float:
+def allot(budget: Alpha, n_survivors: int, rule: Correction) -> float:
     """Returns the smallest per-hypothesis level for `n_survivors`.
 
     This is the rank-1 threshold of the step rule, so a hypothesis with a
@@ -488,10 +484,10 @@ def gammas(index: int, horizon: int | None) -> Fraction:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DecisionBudget:
+class Decision:
     """Levels for sequential promote and rollback decisions.
 
-    It sits beside the `ErrorBudget` and shares no arithmetic with it: the
+    It sits beside the `Alpha` and shares no arithmetic with it: the
     promotion levels are spent by started experiments, and each promoted
     champion gets the whole rollback level for its own monitoring lifetime.
     Promotion levels follow the discount-only rule (valid by the union bound
@@ -614,15 +610,15 @@ class DecisionBudget:
             The budget described by the record. An unknown or missing
             field, an invalid fraction, a newer schema version or an
             overspent state raises a `ValueError` from `require`,
-            `parse_fraction` or the constructor.
+            `parse` or the constructor.
         """
         record = qualification.require(cls, record)
         return cls(
-            promotion=parse_fraction(record["promotion"], "promotion"),
-            rollback=parse_fraction(record["rollback"], "rollback"),
+            promotion=parse(record["promotion"], "promotion"),
+            rollback=parse(record["rollback"], "rollback"),
             horizon=record["horizon"],
             assigned=tuple(
-                (str(name), parse_fraction(level, "level"))
+                (str(name), parse(level, "level"))
                 for name, level in record["assigned"]
             ),
             monitored=tuple(str(name) for name in record["monitored"]),
@@ -630,10 +626,10 @@ class DecisionBudget:
 
 
 def enroll(
-    budget: DecisionBudget,
+    budget: Decision,
     experiment_id: str,
     level: Number | None = None,
-) -> tuple[DecisionBudget, Fraction]:
+) -> tuple[Decision, Fraction]:
     """Assigns a promotion level to an experiment before it has any traffic.
 
     Args:
@@ -678,9 +674,7 @@ def enroll(
     )
 
 
-def start_rollback_monitor(
-    budget: DecisionBudget, champion_id: str
-) -> tuple[DecisionBudget, Fraction]:
+def watch(budget: Decision, champion_id: str) -> tuple[Decision, Fraction]:
     """Starts the rollback monitor of a promoted champion.
 
     The rollback level is per champion and is not shared, so starting the

@@ -60,7 +60,7 @@ def check(value: Any, name: str) -> float:
     return number
 
 
-def open_unit(value: Any, name: str) -> float:
+def confine(value: Any, name: str) -> float:
     """Checks that a number is finite and strictly between 0 and 1.
 
     Args:
@@ -114,8 +114,8 @@ class Gates:
         """
         if self.clip is not None and check(self.clip, "clip") < 1:
             raise errors.InputError("clip must be at least 1")
-        open_unit(self.propensity, "propensity")
-        open_unit(self.ess, "ess")
+        confine(self.propensity, "propensity")
+        confine(self.ess, "ess")
         if qualification.finite(self.penalty, "penalty") < 0:
             raise errors.InputError("penalty must be non-negative")
 
@@ -192,7 +192,7 @@ class Policy:
                 raise errors.InputError(f"unknown baseline {name!r}")
         if self.cost is not None:
             qualification.finite(self.cost, "cost")
-        open_unit(self.calibration, "calibration")
+        confine(self.calibration, "calibration")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the model.
@@ -271,7 +271,7 @@ class Constraint:
         evidence.require_text(self.attribute, "attribute")
         if self.criterion not in CRITERIA:
             raise errors.InputError(f"unknown criterion {self.criterion!r}")
-        open_unit(self.gap, "gap")
+        confine(self.gap, "gap")
         if self.mechanism not in MECHANISMS:
             raise errors.InputError(f"unknown mechanism {self.mechanism!r}")
         if self.mechanism == "group_thresholds" and not (
@@ -459,7 +459,7 @@ class Experiment:
         evidence.require_text(self.unit, "unit")
         evidence.require_text(self.primary, "primary")
         evidence.require_text(self.salt, "salt")
-        open_unit(self.assignment, "assignment")
+        confine(self.assignment, "assignment")
         check(self.delta, "delta")
         check(self.tolerance, "tolerance")
         qualification.count(self.limit, "limit", minimum=2)
@@ -476,7 +476,7 @@ class Experiment:
             raise errors.InputError(
                 "delta must be smaller than the metric range"
             )
-        open_unit(self.srm, "srm")
+        confine(self.srm, "srm")
         qualification.tupled(self.guardrails, "guardrails")
         names = [g.name for g in self.guardrails]
         if len(set(names)) != len(names) or self.primary in names:
@@ -484,14 +484,14 @@ class Experiment:
                 "guardrail names must be distinct from each other"
             )
 
-    def budget(self) -> scmle.assurance.ledger.budget.DecisionBudget:
+    def budget(self) -> scmle.assurance.ledger.budget.Decision:
         """Builds a decision budget from the rollout's levels.
 
         Returns:
-            A new `DecisionBudget` with this rollout's `promotion`,
+            A new `budget.Decision` with this rollout's `promotion`,
             `rollback` and `horizon`.
         """
-        return scmle.assurance.ledger.budget.DecisionBudget(
+        return scmle.assurance.ledger.budget.Decision(
             promotion=self.promotion,
             rollback=self.rollback,
             horizon=self.horizon,
@@ -529,7 +529,7 @@ class Experiment:
         Keys other than the fields, and missing fields, are rejected with
         the `ValueError` of `qualification.require`; an alpha level
         that is not a valid fraction string raises `ValueError` from
-        `budget.parse_fraction`.
+        `budget.parse`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -545,10 +545,10 @@ class Experiment:
             delta=record["delta"],
             tolerance=record["tolerance"],
             limit=record["limit"],
-            promotion=scmle.assurance.ledger.budget.parse_fraction(
+            promotion=scmle.assurance.ledger.budget.parse(
                 record["promotion"], "promotion"
             ),
-            rollback=scmle.assurance.ledger.budget.parse_fraction(
+            rollback=scmle.assurance.ledger.budget.parse(
                 record["rollback"], "rollback"
             ),
             low=record["low"],
@@ -564,7 +564,7 @@ class Experiment:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Layer:
-    """The optional decision block of an `AnalysisCharter`.
+    """The optional decision block of an `Charter`.
 
     Attributes:
         model: How the chartered costs are used.

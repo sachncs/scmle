@@ -46,7 +46,7 @@ class Selection:
         frame: One column per kept feature, indexed like the targets.
         manifest: One record per proposed feature, kept or not, with the
             reason it was dropped.
-        declared_family_size: Number of kept features. Fixed here, before any
+        family: Number of kept features. Fixed here, before any
             feature meets the target.
         migrations: The written layout's version steps, oldest first;
             version 2 spells `declared_family_size` as `family`.
@@ -58,7 +58,7 @@ class Selection:
 
     frame: pandas.DataFrame
     manifest: tuple[dict[str, Any], ...]
-    declared_family_size: int
+    family: int
 
     def kept(self) -> list[dict[str, Any]]:
         """Selects the manifest records of the kept features.
@@ -76,7 +76,7 @@ class Selection:
             of proposals and the manifest.
         """
         return {
-            "family": self.declared_family_size,
+            "family": self.family,
             "proposed": len(self.manifest),
             "features": list(self.manifest),
         }
@@ -270,7 +270,7 @@ def lineage(
                 provenance=source,
                 availability=provenance.Availability.UNKNOWN,
                 attestation=attestation,
-                reconstruction=rule.log_check
+                reconstruction=rule.check
                 if tier is qualification.Tier.CONFIRMED
                 else None,
             )
@@ -308,7 +308,7 @@ def enlist(
         )
         for entry in features.kept()
     ]
-    plurality(features.declared_family_size, ledger)
+    plurality(features.family, ledger)
     return registered
 
 

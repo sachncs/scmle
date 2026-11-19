@@ -15,11 +15,11 @@ def clip(source):
         format="mp4",
         width=4,
         height=2,
-        frame_count=10,
-        frames_per_second=5.0,
+        frames=10,
+        rate=5.0,
         codec="h264",
     )
-    return sample.Sample.from_bytes(source.encode(), metadata, source=source)
+    return sample.Sample.decode(source.encode(), metadata, source=source)
 
 
 def test_a_future_clip_without_a_time_is_refused_exactly():

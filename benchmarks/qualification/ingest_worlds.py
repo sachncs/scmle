@@ -147,14 +147,14 @@ class MutatingConnector(connectors.DbApiConnector):
             db: The database to read.
             query: The query the connector reads.
             mutate: Function that changes the source, or None for no mutation.
-            at_call: Number of the `read_rows` call before which `mutate` runs.
+            at_call: Number of the `read` call before which `mutate` runs.
         """
         super().__init__(URI, query, db.factory)
         self.mutate = mutate
         self.at_call = at_call
         self.calls = 0
 
-    def read_rows(
+    def read(
         self,
         checkpoint: connectors.Bookmark | None = None,
         limit: int = 1_000,
@@ -172,7 +172,7 @@ class MutatingConnector(connectors.DbApiConnector):
         if self.mutate is not None and self.calls == self.at_call:
             self.mutate()
             self.mutate = None
-        return super().read_rows(checkpoint, limit)
+        return super().read(checkpoint, limit)
 
 
 def torn_world(

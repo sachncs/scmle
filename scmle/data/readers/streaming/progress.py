@@ -34,7 +34,7 @@ def assay(value: str, field_name: str) -> None:
         raise errors.InputError(f"{field_name} must be a SHA-256 hex digest")
 
 
-def validate_timestamp(value: str, field_name: str) -> datetime.datetime:
+def validate(value: str, field_name: str) -> datetime.datetime:
     """Parses a timezone-aware watermark timestamp.
 
     Args:
@@ -164,7 +164,7 @@ class Checkpoint:
         if self.column is not None and not self.column:
             raise errors.InputError("column must not be empty")
         if self.watermark:
-            validate_timestamp(self.watermark, "watermark")
+            validate(self.watermark, "watermark")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-compatible checkpoint evidence.
@@ -253,7 +253,7 @@ def advance(
     candidate = observed.max().to_pydatetime().astimezone(datetime.UTC)
     if not current:
         return candidate.isoformat()
-    return max(validate_timestamp(current, "watermark"), candidate).isoformat()
+    return max(validate(current, "watermark"), candidate).isoformat()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -261,25 +261,25 @@ class Batch:
     """A bounded frame plus the checkpoint it may advance.
 
     Attributes:
-        source_identity: Identity of the source the rows came from.
-        snapshot_sha256: Digest of the file snapshot the rows came from.
-        start_offset: Zero-based position of the frame's first row in the
+        identity: Identity of the source the rows came from.
+        snapshot: Digest of the file snapshot the rows came from.
+        offset: Zero-based position of the frame's first row in the
             source.
         frame: The rows; never empty.
-        next_checkpoint: The checkpoint to persist once the batch is
+        checkpoint: The checkpoint to persist once the batch is
             committed.
-        has_more: Whether rows remain after this batch.
-        batch_id: Idempotency key derived from the source, snapshot and
+        more: Whether rows remain after this batch.
+        key: Idempotency key derived from the source, snapshot and
             row range; set on construction.
     """
 
-    source_identity: str
-    snapshot_sha256: str
-    start_offset: int
+    identity: str
+    snapshot: str
+    offset: int
     frame: pandas.DataFrame = dataclasses.field(repr=False)
-    next_checkpoint: Checkpoint
-    has_more: bool = False
-    batch_id: str = dataclasses.field(init=False)
+    checkpoint: Checkpoint
+    more: bool = False
+    key: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
         """Validates the batch and derives its deterministic idempotency key.
@@ -290,25 +290,25 @@ class Batch:
                 not a DataFrame, or the checkpoint does not advance past the
                 start offset.
         """
-        if self.next_checkpoint.source != self.source_identity:
+        if self.checkpoint.source != self.identity:
             raise errors.InputError("batch and checkpoint sources differ")
-        if self.next_checkpoint.digests["snapshot"] != self.snapshot_sha256:
+        if self.checkpoint.digests["snapshot"] != self.snapshot:
             raise errors.InputError("batch and checkpoint snapshots differ")
-        if self.start_offset < 0:
+        if self.offset < 0:
             raise errors.InputError("start_offset must be non-negative")
         frame: object = self.frame
         if not isinstance(frame, pandas.DataFrame) or frame.empty:
             raise errors.InputError("frame must contain at least one row")
-        if self.next_checkpoint.offset <= self.start_offset:
+        if self.checkpoint.offset <= self.offset:
             raise errors.InputError(
                 "checkpoint must advance past the batch start"
             )
         # The key is stable for one source row range: it hashes the source,
         # the snapshot and both offsets.
         payload = (
-            f"{self.source_identity}:{self.snapshot_sha256}:"
-            f"{self.start_offset}:{self.next_checkpoint.offset}"
+            f"{self.identity}:{self.snapshot}:"
+            f"{self.offset}:{self.checkpoint.offset}"
         ).encode()
         object.__setattr__(
-            self, "batch_id", f"batch_{hashlib.sha256(payload).hexdigest()}"
+            self, "key", f"batch_{hashlib.sha256(payload).hexdigest()}"
         )

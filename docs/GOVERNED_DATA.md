@@ -32,35 +32,35 @@ backend.
 
 ## Snapshots
 
-`SnapshotReader.read(key, contract, parents)` returns the frame and a
-`SnapshotRecord` and appends the record to a `ReadLog` (optionally a JSON-lines
+`snapshot.Reader.read(key, contract, parents)` returns the frame and a
+`snapshot.Record` and appends the record to a `snapshot.Log` (optionally a JSON-lines
 file): URI, content hash, size, modification time, backend version, declared
 schema version, observed schema digest and whether it matches, row count,
 age against the contract's `max_age_seconds` (`fresh`, `stale`, `unknown`)
-and the ids of the snapshots it derives from. `snapshot_id` hashes URI,
-content and schema, so the same bytes give the same id. `ReadLog.trace(id)`
-walks the lineage. `connector_reader(store)` plugs a store into the ingestion
+and the ids of the snapshots it derives from. `identifier` hashes URI,
+content and schema, so the same bytes give the same id. `Log.trace(id)`
+walks the lineage. `adapt(store)` plugs a store into the ingestion
 `Bucket`.
 
 ## Quality gates
 
-`QualityGate(rules, store).run(frame, record, contract, stage)` for stage
+`quality.Gate(rules, store).run(frame, record, contract, stage)` for stage
 `train` or `inference`. Each rule declares its policy in advance:
 
 | Policy | Effect |
 | --- | --- |
-| `fail` | `QualityGateError` with the report; nothing continues |
-| `quarantine` | row-level rules remove the rows and write them under `quarantine/<snapshot id>/` (the report goes to `quality/`, as for every policy); dataset-level rules (`SchemaCheck`, `Freshness`, `MinRowsCheck`, `NullFractionCheck`) hold the whole snapshot: a marker is written, the run stops, and the same snapshot is refused until `release` |
+| `fail` | `GateError` with the report; nothing continues |
+| `quarantine` | row-level rules remove the rows and write them under `quarantine/<snapshot id>/` (the report goes to `quality/`, as for every policy); dataset-level rules (`Schema`, `Freshness`, `Rows`, `Nulls`) hold the whole snapshot: a marker is written, the run stops, and the same snapshot is refused until `release` |
 | `warn` | recorded in the report, data unchanged |
 
-Rules: `SchemaCheck`, `Freshness`, `MinRowsCheck`, `NullFractionCheck`,
-`Complete`, `UniqueKeyCheck`, `RangeCheck`, `Membership`, each
+Rules: `Schema`, `Freshness`, `Rows`, `Nulls`,
+`Complete`, `Keys`, `Range`, `Membership`, each
 limited to the stages it names. Every rule is evaluated before any action, and
 the report is written to `quality/` whatever the outcome.
 
 ## Incremental processing
 
-`IncrementalProcessor` processes new objects under an input prefix in sorted
+`processing.Processor` processes new objects under an input prefix in sorted
 key order, once each: dedup of repeated row keys and repeated uploads, a
 checkpoint with its own digest written after each object, transient errors
 retried under a `Retries` (reproducible backoff, no jitter), the output
@@ -73,7 +73,7 @@ run process that object again and rewrite the same bytes under the same key;
 the final outputs and checkpoint equal those of an uninterrupted run (tested).
 Exactly-once is not claimed: after such a crash the transform runs again on
 that object, so a transform with side effects beyond its output must be
-idempotent. A crashed run leaves its lock; `break_lock` is a person's
+idempotent. A crashed run leaves its lock; `lock` (breaking it) is a person's
 decision. The set of seen row keys lives in one JSON object, which is fine for
 millions of keys and not beyond.
 

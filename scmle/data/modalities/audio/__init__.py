@@ -16,15 +16,15 @@ from scmle.data.modalities.audio.metadata import SHA256_HEX_LENGTH
 from scmle.data.modalities.audio.metadata import Transcript
 from scmle.data.modalities.audio.metadata import ValidationError
 from scmle.data.modalities.audio.sample import AudioProbe
-from scmle.data.modalities.audio.sample import canonical_source
+from scmle.data.modalities.audio.sample import identify
 from scmle.data.modalities.audio.sample import Sample
 from scmle.data.modalities.audio.wav import CLIPPING_LEVEL
+from scmle.data.modalities.audio.wav import encode
 from scmle.data.modalities.audio.wav import extract
 from scmle.data.modalities.audio.wav import MATRIX_DIMENSIONS
 from scmle.data.modalities.audio.wav import parse
 from scmle.data.modalities.audio.wav import pcm
 from scmle.data.modalities.audio.wav import SILENCE_LEVEL
-from scmle.data.modalities.audio.wav import wav_payload_from_pcm
 from scmle.data.modalities.audio.wav import WIDTH_16_BIT
 from scmle.data.modalities.audio.wav import WIDTH_24_BIT
 from scmle.data.modalities.audio.wav import WIDTH_32_BIT
@@ -48,9 +48,9 @@ __all__ = [
     "Split",
     "Transcript",
     "ValidationError",
-    "canonical_source",
+    "encode",
     "extract",
+    "identify",
     "parse",
     "pcm",
-    "wav_payload_from_pcm",
 ]

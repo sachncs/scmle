@@ -13,7 +13,7 @@ def fresh(**overrides):
         "rollback": Fraction(1, 100),
     }
     values.update(overrides)
-    return scmle.assurance.ledger.budget.DecisionBudget(**values)
+    return scmle.assurance.ledger.budget.Decision(**values)
 
 
 def test_the_default_levels_follow_the_discount_exactly():
@@ -58,16 +58,12 @@ def test_the_original_budget_is_not_modified():
 
 def test_the_rollback_level_is_per_champion_and_leaves_promotion_alone():
     budget = fresh()
-    budget, level = scmle.assurance.ledger.budget.start_rollback_monitor(
-        budget, "v2"
-    )
-    budget, again = scmle.assurance.ledger.budget.start_rollback_monitor(
-        budget, "v3"
-    )
+    budget, level = scmle.assurance.ledger.budget.watch(budget, "v2")
+    budget, again = scmle.assurance.ledger.budget.watch(budget, "v3")
     assert level == again == Fraction(1, 100)
     assert budget.remaining == Fraction(1, 50)
     with pytest.raises(ValueError, match="already monitored"):
-        scmle.assurance.ledger.budget.start_rollback_monitor(budget, "v2")
+        scmle.assurance.ledger.budget.watch(budget, "v2")
 
 
 @pytest.mark.parametrize(
@@ -89,16 +85,12 @@ def test_invalid_budgets_are_refused(overrides):
 
 
 def test_floats_are_read_as_written_and_records_reject_extras():
-    budget = scmle.assurance.ledger.budget.DecisionBudget.create(0.02, 0.01)
+    budget = scmle.assurance.ledger.budget.Decision.create(0.02, 0.01)
     assert budget.promotion == Fraction(1, 50)
     record = budget.to_dict()
-    assert (
-        scmle.assurance.ledger.budget.DecisionBudget.from_dict(record) == budget
-    )
+    assert scmle.assurance.ledger.budget.Decision.from_dict(record) == budget
     with pytest.raises(ValueError, match="unexpected"):
-        scmle.assurance.ledger.budget.DecisionBudget.from_dict(
-            {**record, "extra": 1}
-        )
+        scmle.assurance.ledger.budget.Decision.from_dict({**record, "extra": 1})
 
 
 def test_discount_weights():

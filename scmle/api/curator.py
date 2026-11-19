@@ -223,7 +223,7 @@ class Curator:
         modality = modalities.serialise(self.adapter.modality)
         dataset_hash = self.adapter.digest
         curation_payload = self.examine(modality, dataset_hash, sample_count)
-        card = curation.Datasheet.from_report(
+        card = curation.Datasheet.draft(
             modality,
             curation_payload,
             self.adapter.remarks(),

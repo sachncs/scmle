@@ -414,7 +414,7 @@ def product(dataset: Dataset, folder: Path, table: Table) -> pandas.DataFrame:
         )
         return profile.untorn(connector, BATCH).frame
     if dataset.form == "csv":
-        return tabular.read_table(folder / table.name)
+        return tabular.read(folder / table.name)
     return pandas.read_xml(folder / table.name, parser="etree")
 
 

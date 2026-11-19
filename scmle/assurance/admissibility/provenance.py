@@ -162,7 +162,7 @@ class Lead:
         return cls(Cutoff(layout["kind"]), layout["seconds"])
 
 
-def parse_date(value: str, name: str) -> datetime.date:
+def parse(value: str, name: str) -> datetime.date:
     """Parses an ISO calendar date.
 
     Args:
@@ -230,8 +230,8 @@ class Attestation:
             if not isinstance(getattr(self, name), str):
                 raise errors.InputError(f"{name} must be text")
             evidence.require_text(getattr(self, name), name)
-        issued = parse_date(self.date, "date")
-        if parse_date(self.expires, "expires") < issued:
+        issued = parse(self.date, "date")
+        if parse(self.expires, "expires") < issued:
             raise errors.InputError("expires must not precede date")
 
     def effective(self, day: datetime.date) -> bool:
@@ -243,8 +243,8 @@ class Attestation:
         Returns:
             True if `day` lies between `date` and `expires`, both included.
         """
-        issued = parse_date(self.date, "date")
-        return issued <= day <= parse_date(self.expires, "expires")
+        issued = parse(self.date, "date")
+        return issued <= day <= parse(self.expires, "expires")
 
     def to_dict(self) -> dict[str, Any]:
         """Converts the record to a JSON-ready dict.

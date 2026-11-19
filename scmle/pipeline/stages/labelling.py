@@ -116,7 +116,7 @@ class Labelling(interface.Stage):
                 f"{len(unlabeled)} row(s) without a target were set aside "
                 f"(policy '{spec.data.unlabeled}')"
             )
-        task = scmle.data.validation.target.TaskResolver(spec).resolve(
+        task = scmle.data.validation.target.Resolver(spec).resolve(
             frame[spec.data.target]
         )
         if (
@@ -166,9 +166,7 @@ class Labelling(interface.Stage):
             task: The resolved task.
         """
         if task is tasks.Task.SURVIVAL:
-            scmle.data.validation.target.check_events(
-                frame, spec.data.event_column
-            )
+            scmle.data.validation.target.check(frame, spec.data.event_column)
         if task is tasks.Task.UPLIFT:
             scmle.data.validation.target.check_treatment(
                 frame, spec.data.treatment_column

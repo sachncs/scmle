@@ -114,7 +114,7 @@ def test_a_target_mean_with_gaps_is_tested_where_it_is_recorded():
             "y": y,
         }
     )
-    cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=0)
+    cfg = dataclasses.replace(leakage.CERTIFIED, seed=0)
     names = ["source", "encoded"]
     found = planning.ready(frame, "y", "classification", cfg, names, None, None)
     sample, problem = found[0], found[3]
@@ -137,7 +137,7 @@ def binary_table(rows=2000, columns=300, seed=0):
 def test_proposing_and_records_are_priced_from_the_shape_alone():
     frame = binary_table()
     names = [c for c in frame.columns if c != "y"]
-    cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=0)
+    cfg = dataclasses.replace(leakage.CERTIFIED, seed=0)
     before = planning.foresee(
         frame, "y", "classification", cfg, names, None, None
     )

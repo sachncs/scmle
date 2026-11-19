@@ -42,8 +42,8 @@ def commitment() -> transaction.Commitment:
 
 def receipt(**changes) -> transaction.Receipt:
     values = {
-        "source_identity": SOURCE,
-        "batch_id": BATCH,
+        "identity": SOURCE,
+        "batch": BATCH,
         "accepted": True,
         "duplicate": False,
         "checkpoint": checkpoint(),
@@ -104,11 +104,11 @@ def test_a_sink_receipt_for_another_batch_is_refused() -> None:
     with pytest.raises(
         errors.InputError, match=r"^receipt does not match the commit$"
     ):
-        receipt(sink_receipt=voucher(batch="batch_2"))
+        receipt(receipt=voucher(batch="batch_2"))
 
 
 def test_a_matching_acknowledgement_is_accepted() -> None:
-    found = receipt(sink_receipt=voucher(), acknowledgement=acknowledgement())
+    found = receipt(receipt=voucher(), acknowledgement=acknowledgement())
     assert found.acknowledgement == acknowledgement()
 
 

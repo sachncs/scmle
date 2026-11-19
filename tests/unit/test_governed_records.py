@@ -33,7 +33,7 @@ VERSION_ONE = FIXTURES / "records" / "v1" / "custody"
 TRAIL = FIXTURES / "trail_sample" / "trail" / "retained" / "run"
 KEY = b"r1-fixture-key"
 KINDS = {
-    "budget": budget.DecisionBudget,
+    "budget": budget.Decision,
     "control": controls.Control,
     "feasibility": feasibility.Feasibility,
     "test": scmle.assurance.ledger.ledger.records.Test,
@@ -81,17 +81,17 @@ def charters():
 
 @pytest.mark.parametrize("wrapper", charters(), ids=("rich", "trail"))
 def test_a_version_one_charter_keeps_its_hash(wrapper):
-    charter = contracts.AnalysisCharter.from_dict(wrapper["charter"])
+    charter = contracts.Charter.from_dict(wrapper["charter"])
     assert charter.anchor() == wrapper["charter"]
-    assert charter.charter_hash == wrapper["charter_hash"]
-    again = contracts.AnalysisCharter.from_dict(charter.to_dict())
+    assert charter.digest == wrapper["charter_hash"]
+    again = contracts.Charter.from_dict(charter.to_dict())
     assert again == charter
-    assert again.charter_hash == wrapper["charter_hash"]
+    assert again.digest == wrapper["charter_hash"]
 
 
 @pytest.mark.parametrize("wrapper", charters(), ids=("rich", "trail"))
 def test_the_charter_migration_is_invertible(wrapper):
-    step = contracts.AnalysisCharter.migrations[0]
+    step = contracts.Charter.migrations[0]
     old = copy.deepcopy(wrapper["charter"])
     new = step.upgrade(copy.deepcopy(old))
     assert step.downgrade(copy.deepcopy(new)) == old
@@ -99,7 +99,7 @@ def test_the_charter_migration_is_invertible(wrapper):
 
 
 def test_the_rich_charter_moves_every_renamed_key():
-    charter = contracts.AnalysisCharter.from_dict(stored("charter")["charter"])
+    charter = contracts.Charter.from_dict(stored("charter")["charter"])
     written = charter.to_dict()
     assert {"population", "gates", "triggers", "quota", "costs"} <= set(written)
     assert written["estimand"]["causal"]["sensitivity"]["multiple"] == 2.5
@@ -123,12 +123,12 @@ def test_the_rich_charter_moves_every_renamed_key():
 def test_a_signed_version_one_charter_still_verifies(tmp_path):
     path = tmp_path / "analysis_charter.json"
     path.write_text(json.dumps(stored("charter")), encoding="utf-8")
-    verified = sealing.read_verified(path, KEY, require_signature=True)
+    verified = sealing.read(path, KEY, require_signature=True)
     assert verified.signed
-    assert verified.charter_hash == stored("charter")["charter_hash"]
+    assert verified.digest == stored("charter")["charter_hash"]
     rewritten = sealing.inscribe(tmp_path / "again.json", verified.charter, KEY)
-    again = sealing.read_verified(rewritten, KEY, require_signature=True)
-    assert again.charter_hash == verified.charter_hash
+    again = sealing.read(rewritten, KEY, require_signature=True)
+    assert again.digest == verified.digest
     wrapper = json.loads(rewritten.read_text("utf-8"))
     assert wrapper["signature"] == stored("charter")["signature"]
     assert wrapper["charter"][records.KEY] == records.ORIGIN + 1
@@ -140,7 +140,7 @@ def test_an_edited_version_one_charter_is_refused(tmp_path):
     path = tmp_path / "analysis_charter.json"
     path.write_text(json.dumps(wrapper), encoding="utf-8")
     with pytest.raises(errors.ArtifactError, match="hash mismatch"):
-        sealing.read_verified(path, KEY)
+        sealing.read(path, KEY)
 
 
 def test_a_spent_version_one_confirmation_set_is_refused_by_new_code(
@@ -151,10 +151,10 @@ def test_a_spent_version_one_confirmation_set_is_refused_by_new_code(
     rows = stored("manifest")["confirmation_ids"]
     first = usage.key(wrapper["charter_hash"], "exploration-data", rows)
     assert usage.Register(tmp_path, first, "run-v1").record() is None
-    charter = contracts.AnalysisCharter.from_dict(wrapper["charter"])
+    charter = contracts.Charter.from_dict(wrapper["charter"])
     sealed = manifest.Manifest.from_dict(stored("manifest"))
     again = usage.key(
-        charter.charter_hash, "exploration-data", sealed.sets.confirmation
+        charter.digest, "exploration-data", sealed.sets.confirmation
     )
     assert again == first
     refusal = usage.Register(tmp_path, again, "run-v2").record()
@@ -226,11 +226,11 @@ fractions = strategies.fractions(
 
 @hypothesis.given(promotion=fractions, rollback=fractions)
 def test_decision_budget_round_trips(promotion, rollback):
-    record = budget.DecisionBudget(promotion=promotion, rollback=rollback)
+    record = budget.Decision(promotion=promotion, rollback=rollback)
     written = record.to_dict()
-    assert budget.DecisionBudget.from_dict(written) == record
+    assert budget.Decision.from_dict(written) == record
     old = records.downgrade(record.migrations, current(written))
-    assert budget.DecisionBudget.from_dict(old) == record
+    assert budget.Decision.from_dict(old) == record
 
 
 @hypothesis.given(

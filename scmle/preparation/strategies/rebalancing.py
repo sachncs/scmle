@@ -233,7 +233,7 @@ class Recalibration(Strategy):
         calibrated: models.Estimator = inner_cv.Calibrated(
             inner,
             method="sigmoid",
-            cv=inner_cv.for_plan(
+            cv=inner_cv.tailor(
                 plan, classification=True, folds=CALIBRATION_FOLDS, seed=seed
             ),
         )

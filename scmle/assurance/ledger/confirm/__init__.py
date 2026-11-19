@@ -80,11 +80,11 @@ for grouped or serial data); the family is exactly the frozen survivors.
 
 # `budget` stays reachable as `confirm.budget`, as it was from the module.
 from scmle.assurance.ledger import budget
+from scmle.assurance.ledger.confirm.evaluation import account
 from scmle.assurance.ledger.confirm.evaluation import assumptions
 from scmle.assurance.ledger.confirm.evaluation import block
-from scmle.assurance.ledger.confirm.evaluation import default_encoding
 from scmle.assurance.ledger.confirm.evaluation import disclaim
-from scmle.assurance.ledger.confirm.evaluation import stage_two_record
+from scmle.assurance.ledger.confirm.evaluation import encode
 from scmle.assurance.ledger.confirm.evaluation import statement
 from scmle.assurance.ledger.confirm.evaluation import verify
 from scmle.assurance.ledger.confirm.evaluation import withdraw
@@ -146,20 +146,20 @@ __all__ = [
     "Output",
     "Source",
     "Withdrawal",
+    "account",
     "assumptions",
     "block",
     "budget",
     "confirm",
-    "default_encoding",
     "deny",
     "disclaim",
+    "encode",
     "enforce",
     "finish",
     "match",
     "merge",
     "phrase",
     "preregister",
-    "stage_two_record",
     "statement",
     "tip",
     "unseal",

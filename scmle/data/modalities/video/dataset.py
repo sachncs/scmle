@@ -16,12 +16,12 @@ class Dataset(Survey, Frames, Splits):
 
     Attributes:
         samples: The samples, in caller order.
-        content_hash: SHA-256 hex digest of the sources, file hashes and
+        digest: SHA-256 hex digest of the sources, file hashes and
             observation times, in sample order; set on construction.
     """
 
     samples: tuple[Sample, ...]
-    content_hash: str = dataclasses.field(init=False)
+    digest: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
         """Rejects an empty or duplicate-source dataset and derives its hash.
@@ -46,12 +46,12 @@ class Dataset(Survey, Frames, Splits):
             "\n".join(
                 f"{sample.source}\0{sample.file_hash}"
                 + (
-                    f"\0{sample.observation_time.isoformat()}"
-                    if sample.observation_time is not None
+                    f"\0{sample.time.isoformat()}"
+                    if sample.time is not None
                     else ""
                 )
                 for sample in normalized
             ).encode("utf-8")
         ).hexdigest()
         object.__setattr__(self, "samples", normalized)
-        object.__setattr__(self, "content_hash", digest)
+        object.__setattr__(self, "digest", digest)

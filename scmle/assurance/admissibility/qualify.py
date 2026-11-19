@@ -64,7 +64,7 @@ class Shelf:
     note: str = ""
 
 
-def load_store(name: str, directory: Path | None = None) -> Shelf:
+def load(name: str, directory: Path | None = None) -> Shelf:
     """Reads a certificate store, or says why it could not be read.
 
     Args:
@@ -99,7 +99,7 @@ class Qualification:
         table: Admissibility decisions, or None when they were not run.
         leakage: The leakage screen report, or None when not run.
         detectors: Detector pipeline result.
-        f5_store: The detector certificates used, or None.
+        store: The detector certificates used, or None.
         notes: Plain statements of what was not run or not certified.
         diagnostics: Ledger records (source, check). For a predictive
             estimand: one per screen finding and one per attestation that
@@ -114,13 +114,13 @@ class Qualification:
     table: rules.Admissibility | None
     leakage: screen.Screen | None
     detectors: pipeline.Findings
-    f5_store: certificates.Store | None
+    store: certificates.Store | None
     notes: tuple[str, ...]
     diagnostics: tuple[tuple[str, qualification.Check], ...] = ()
     dag: dict[str, object] | None = None
 
     @property
-    def leakage_gate(self) -> certificates.Authority:
+    def gate(self) -> certificates.Authority:
         """`GATING` when any screen mechanism has a passing certificate."""
         if self.leakage is not None and any(
             g is certificates.Authority.GATING
@@ -367,7 +367,7 @@ def judge(
     records = provenance.Dictionary.covering([str(c) for c in candidates])
     members = scmle.assurance.charter.causal.adjusters(spec.assumptions) or ()
     try:
-        table: rules.Admissibility | None = rules.build_table(
+        table: rules.Admissibility | None = rules.build(
             records,
             "causal",
             rules.Mode.PERMISSIVE,
@@ -438,7 +438,7 @@ def probe(
             for o in found.outcomes
         ),
         "falsified": [o.statement.text() for o in found.falsified],
-        "skipped_nodes": list(found.skipped_nodes),
+        "skipped_nodes": list(found.nodes),
         "note": "a graph can only survive, never be confirmed",
     }
     if found.falsified:
@@ -648,7 +648,7 @@ def predict(
     used, records = vouch(sample, report, attestations, scope, declared)
     suspect_columns = {f.feature for f in report.suspects}
     gates = {f.feature: certificates.Authority.GATING for f in report.blocking}
-    table = rules.build_table(
+    table = rules.build(
         records,
         "predictive",
         rules.Mode.PERMISSIVE,
@@ -724,7 +724,7 @@ def run(
         structure,
         seed,
         today,
-        load_store(F5_STORE, directory),
+        load(F5_STORE, directory),
     )
     if kind != "predictive":
         return admit(sample, kind, causal, dag)

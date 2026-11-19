@@ -37,7 +37,7 @@ def test_the_event_rate_is_steady_across_test_and_folds():
     split = splitters.Splitter(spec(), tasks.Task.SURVIVAL).split(frame)
 
     overall = frame.event.mean()
-    test = frame.event.iloc[list(split.manifest.test_ids)].mean()
+    test = frame.event.iloc[list(split.manifest.test)].mean()
     assert test == pytest.approx(overall, abs=0.02)
     for fold in split.manifest.folds:
         rate = frame.event.iloc[list(fold[1])].mean()

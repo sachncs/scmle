@@ -95,9 +95,9 @@ def test_rows_with_near_copied_text_are_near_duplicates():
     flags = duplicates.resemble(frame, ["text", "stars"])
     assert flags.tolist() == [False, False, True, False]
     report = duplicates.assess(frame)
-    assert (report.exact_extra, report.near_extra, report.similar) == (0, 0, 1)
+    assert (report.exact_extra, report.near, report.similar) == (0, 0, 1)
     assert report.similarity == duplicates.DEFAULT_SIMILARITY
-    assert duplicates.duplicate_flags(frame).tolist() == [
+    assert duplicates.flag(frame).tolist() == [
         False, False, True, False,
     ]  # fmt: skip
     text = frame[["text"]]

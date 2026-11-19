@@ -186,8 +186,6 @@ def dimensions(
     target = frame[data.target].dropna()
     named = {data.target, *data.targets}
     columns = sum(1 for column in frame.columns if column not in named)
-    task = task or scmle.data.validation.target.TaskResolver(spec).resolve(
-        target
-    )
+    task = task or scmle.data.validation.target.Resolver(spec).resolve(target)
     classes = int(target.nunique()) if task.is_classification else 0
     return len(target), columns, classes

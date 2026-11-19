@@ -36,10 +36,10 @@ from scmle.data.feature_graph.registry import lookup
 from scmle.data.feature_graph.registry import OPS
 from scmle.data.feature_graph.registry import roots
 from scmle.data.feature_graph.registry import segregate
-from scmle.data.feature_graph.registry import validate_graph
+from scmle.data.feature_graph.registry import validate
 from scmle.data.feature_graph.sequences import Diff
-from scmle.data.feature_graph.sequences import ExpandingMean
 from scmle.data.feature_graph.sequences import Lag
+from scmle.data.feature_graph.sequences import Mean
 from scmle.data.feature_graph.sequences import Rolling
 from scmle.data.feature_graph.sequences import Sequential
 from scmle.data.feature_graph.sequences import Volatility
@@ -55,10 +55,10 @@ __all__ = [
     "Clip",
     "Diff",
     "Difference",
-    "ExpandingMean",
     "Inputs",
     "Lag",
     "Log1p",
+    "Mean",
     "Missingness",
     "Operation",
     "Params",
@@ -76,5 +76,5 @@ __all__ = [
     "lookup",
     "roots",
     "segregate",
-    "validate_graph",
+    "validate",
 ]

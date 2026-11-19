@@ -94,7 +94,7 @@ def test_agreement_helper_accepts_close_values_and_names_the_worst_offender():
 def test_the_wilson_interval_agrees_with_scipy_on_every_frozen_case():
     for case in oracles.load_oracle("wilson_interval").cases:
         given = case["inputs"]
-        low, high = certificates.wilson_interval(
+        low, high = certificates.bound(
             given["successes"], given["n"], given["confidence"]
         )
         oracles.assert_agrees(
@@ -135,12 +135,12 @@ def test_the_harmonic_number_agrees_with_the_digamma_identity():
 
 @pytest.mark.parametrize("n", [1, 2, 5, 20, 100, 1000])
 def test_the_rank_one_thresholds_reproduce_alpha_under_scipys_adjustment(n):
-    plan = budget.ErrorBudget.create(0.05, 0.1)
+    plan = budget.Alpha.create(0.05, 0.1)
     for rule, method in (
         (budget.Correction.BY, "by"),
         (budget.Correction.BH, "bh"),
     ):
-        level = budget.confirmation_alpha(plan, n, rule)
+        level = budget.allot(plan, n, rule)
         others = [1.0] * (n - 1)
         adjusted = stats.false_discovery_control(
             [level, *others], method=method

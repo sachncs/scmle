@@ -1,10 +1,10 @@
 """Draft charter, data-side checks and the framing result.
 
 `frame` turns a plain-language request and a source description into a draft
-`AnalysisCharter` (unsigned), reads only `X` rows, and records where every
+`Charter` (unsigned), reads only `X` rows, and records where every
 field came from. The deterministic drafter fills slots by rules; an optional
 LLM slot-filler may fill the rest, behind the refusal rule in `refusal`. Every
-LLM output must round-trip `AnalysisCharter.from_dict` and pass the data-side
+LLM output must round-trip `Charter.from_dict` and pass the data-side
 checks, or it is discarded and the deterministic result is used. Nothing here
 claims a drafted charter is correct.
 """

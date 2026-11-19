@@ -61,9 +61,9 @@ def wilson(given: Mapping[str, Any]) -> Any:
         given: Case inputs `successes`, `n` and `confidence`.
 
     Returns:
-        The lower and upper bounds from `certificates.wilson_interval`.
+        The lower and upper bounds from `certificates.bound`.
     """
-    low, high = certificates.wilson_interval(
+    low, high = certificates.bound(
         given["successes"], given["n"], given["confidence"]
     )
     return {"low": low, "high": high}
@@ -145,7 +145,7 @@ def harmonic(given: Mapping[str, Any]) -> Any:
 
 WIRED: Mapping[str, Wired] = {
     "wilson_interval": Wired(
-        "scmle.assurance.detectors.certificates.wilson_interval", wilson
+        "scmle.assurance.detectors.certificates.bound", wilson
     ),
     "clopper_pearson": Wired(
         "scmle.evaluation.coverage.clopper_pearson", clopper

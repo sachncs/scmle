@@ -40,17 +40,17 @@ class Pedigree:
     """What is known about one numeric field.
 
     Attributes:
-        instrument_range: (low, high) the instrument or write path can
+        instrument: (low, high) the instrument or write path can
             produce; None if unknown. Bounds are inclusive.
-        population_range: (low, high) that defines the target population;
+        population: (low, high) that defines the target population;
             None if unknown.
-        extremes_possible: True if a named source attests that genuine
+        possible: True if a named source attests that genuine
             extreme values occur; None if unknown.
     """
 
-    instrument_range: tuple[float, float] | None = None
-    population_range: tuple[float, float] | None = None
-    extremes_possible: bool | None = None
+    instrument: tuple[float, float] | None = None
+    population: tuple[float, float] | None = None
+    possible: bool | None = None
 
 
 Contract = Callable[[pandas.DataFrame], pandas.Series]
@@ -82,7 +82,7 @@ class Triage:
         return {name: int(counted.get(name, 0)) for name in CLASSES}
 
 
-def robust_z(series: pandas.Series) -> pandas.Series:
+def standardize(series: pandas.Series) -> pandas.Series:
     """Computes the absolute robust z-score of a series.
 
     Args:
@@ -152,7 +152,7 @@ def triage(
     # The largest robust z-score of each row; zeros without numeric columns.
     if numeric:
         scores = pandas.concat(
-            [robust_z(frame[c]) for c in numeric], axis=1
+            [standardize(frame[c]) for c in numeric], axis=1
         ).max(axis=1)
     else:
         scores = pandas.Series(0.0, index=frame.index)
@@ -163,12 +163,12 @@ def triage(
     for name, info in known.items():
         if name not in frame.columns:
             raise errors.InputError(f"provenance names unknown column '{name}'")
-        if info.instrument_range is not None:
-            error |= outside(frame[name], info.instrument_range)
-        if info.population_range is not None:
-            population |= outside(frame[name], info.population_range)
-        if info.extremes_possible:
-            z = robust_z(frame[name])
+        if info.instrument is not None:
+            error |= outside(frame[name], info.instrument)
+        if info.population is not None:
+            population |= outside(frame[name], info.population)
+        if info.possible:
+            z = standardize(frame[name])
             permitted |= z >= cutoff
     for check in (contracts or {}).values():
         violated: object = check(frame)

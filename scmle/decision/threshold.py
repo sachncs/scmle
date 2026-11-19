@@ -484,7 +484,7 @@ def operate(
     risk, labels = pair(p, y)
     first = hosmer(risk, labels, level)
     recheck = None
-    target = breakeven(model.c_fp, model.c_fn)
+    target = breakeven(model.alarm, model.miss)
     if first.calibrated:
         rule = Threshold(target, "bayes")
     else:
@@ -496,7 +496,7 @@ def operate(
             cut = thresholds.argmax(
                 risk,
                 labels.astype(bool),
-                thresholds.Costs(model.c_fp, model.c_fn),
+                thresholds.Costs(model.alarm, model.miss),
             )[0]
             rule = Threshold(cut, "grid")
     acts = rule.act(risk)
@@ -510,7 +510,7 @@ def operate(
         tier=tier,
         check=first,
         recheck=recheck,
-        expected_cost=costs.expected_cost(labels, acts, model),
+        expected_cost=costs.price(labels, acts, model),
         cost_interval=cost_interval(
             labels, acts, model, clusters, replicates, seed
         ),
@@ -522,7 +522,7 @@ def freeze(
     fitted: Any,
     probabilities: NDArray[numpy.float64],
     actual: NDArray[numpy.bool_],
-    charter: contracts.AnalysisCharter,
+    charter: contracts.Charter,
     seed: int,
     rows: int,
 ) -> tuple[Any, records.Layout]:
@@ -572,7 +572,7 @@ def freeze(
         "threshold": cut,
         "validation_rows": rows,
         "f11": chosen.to_dict(),
-        "cost_model_hash": model.model_hash,
+        "cost_model_hash": model.digest,
     }
     return thresholds.Classifier.around(fitted, cut), description
 
@@ -583,7 +583,7 @@ def choose(
     rows: "tuple[pandas.DataFrame, pandas.Series]",
     folds: Sequence[tuple[Sequence[int], Sequence[int]]],
     settings: tasks.Threshold,
-    charter: contracts.AnalysisCharter | None,
+    charter: contracts.Charter | None,
     seed: int,
 ) -> tuple[Any, records.Layout]:
     """Chooses the binary decision threshold on development data only.

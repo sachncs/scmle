@@ -47,7 +47,7 @@ def test_registry_round_trips_and_repeats_are_idempotent():
     registry_value.register(observed_again)
 
     serialized = registry_value.to_json()
-    restored = registry.Sources.from_json(serialized)
+    restored = registry.Sources.parse(serialized)
 
     assert len(restored.snapshots[source.source]) == 1
     assert json.loads(serialized) == json.loads(restored.to_json())

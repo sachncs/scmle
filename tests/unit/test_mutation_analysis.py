@@ -8,7 +8,7 @@ from scmle.assurance.ledger import budget
 from scmle.causal.identification.run import analysis
 from scmle.causal.identification.run import estimator
 
-BUDGET = budget.ErrorBudget.create(0.05, 0.1)
+BUDGET = budget.Alpha.create(0.05, 0.1)
 
 
 def block(**changes):

@@ -90,7 +90,7 @@ def test_the_reader_reads_a_whole_file_without_a_stream(tmp_path):
     spec = config(str(path))
     frame, stream = kinds.Tabular().read(spec)
     assert stream is None
-    pandas.testing.assert_frame_equal(frame, tabular.read_table(str(path)))
+    pandas.testing.assert_frame_equal(frame, tabular.read(str(path)))
 
 
 def test_the_reader_streams_a_file_over_the_memory_budget(tmp_path):
@@ -123,7 +123,7 @@ def test_the_split_constraints_are_the_splitter_of_the_spec():
     spec = config(group_column="g")
     splitter = kinds.Tabular().constrain(spec, tasks.Task.BINARY)
     assert isinstance(splitter, splitters.Splitter)
-    assert splitter.strategy_name == splitters.scheme(spec, tasks.Task.BINARY)
+    assert splitter.strategy == splitters.scheme(spec, tasks.Task.BINARY)
 
 
 def test_the_featuriser_drops_every_column_outside_the_plan():

@@ -101,10 +101,10 @@ def test_segment_skips_empty_pages_and_deep_headings():
 def test_a_sample_derives_identity_and_provenance():
     built = doc("d", "# Title\nbody")
     assert built.content_hash == hashlib.sha256(b"# Title\nbody").hexdigest()
-    assert built.size_bytes == 12
+    assert built.size == 12
     assert built.format is Format.TEXT
     assert [s.kind for s in built.provenance] == ["page", "section"]
-    assert doc("d", "é").size_bytes == 2
+    assert doc("d", "é").size == 2
     assert doc("d", format="markdown").format is Format.MARKDOWN
     given = (Span("page", 0, 1, "p", 1),)
     assert doc("d", provenance=given).provenance == given
@@ -113,19 +113,19 @@ def test_a_sample_derives_identity_and_provenance():
 @pytest.mark.parametrize(
     ("kwargs", "code"),
     [
-        ({"document_id": " "}, "empty_document_id"),
+        ({"identifier": " "}, "empty_document_id"),
         ({"content": " \n"}, "empty_content"),
         ({"encoding": "latin-1"}, "unsupported_encoding"),
-        ({"source_digest": DIGEST.upper()}, "invalid_source_digest"),
+        ({"digest": DIGEST.upper()}, "invalid_source_digest"),
         ({"layout": layout(end=99)}, "layout_out_of_range"),
         (
-            {"layout": layout(digest="b" * 64), "source_digest": DIGEST},
+            {"layout": layout(digest="b" * 64), "digest": DIGEST},
             "layout_source_mismatch",
         ),
     ],
 )
 def test_a_sample_rejects_invalid_parts(kwargs, code):
-    arguments = {"document_id": "d", "content": "hello"} | kwargs
+    arguments = {"identifier": "d", "content": "hello"} | kwargs
     with pytest.raises(DocumentError) as raised:
         sample.Sample(**arguments)
     assert raised.value.details["code"] == code
@@ -135,24 +135,24 @@ def test_a_sample_accepts_utf8_spellings_and_a_matching_layout():
     assert doc("d", encoding="UTF8").encoding == "UTF8"
     built = doc("d", "hello", layout=layout(end=5, digest=DIGEST))
     assert built.layout.elements[0].end == 5
-    assert doc("d", layout=layout(digest="b" * 64)).source_digest is None
+    assert doc("d", layout=layout(digest="b" * 64)).digest is None
 
 
 def test_citations_need_both_a_uri_and_a_digest():
     assert doc("d").citations() == ()
-    assert doc("d", source_uri="file:///x").citations() == ()
-    assert doc("d", source_digest=DIGEST).citations() == ()
-    built = doc("d", "ab", source_uri="file:///x", source_digest=DIGEST)
+    assert doc("d", uri="file:///x").citations() == ()
+    assert doc("d", digest=DIGEST).citations() == ()
+    built = doc("d", "ab", uri="file:///x", digest=DIGEST)
     citations = built.citations()
     assert len(citations) == 1
     assert citations[0].locator == "page 1"
     assert (citations[0].start, citations[0].end) == (0, 2)
-    assert citations[0].page_number == 1
+    assert citations[0].page == 1
     unlabelled = doc(
         "d",
         "ab",
-        source_uri="u",
-        source_digest=DIGEST,
+        uri="u",
+        digest=DIGEST,
         provenance=(Span("section", 0, 2),),
     )
     assert unlabelled.citations()[0].locator == "section:0-2"
@@ -185,7 +185,7 @@ def test_bucketize_names_label_types():
 
 def test_a_split_lists_sorted_document_ids():
     split = sample.Split((doc("b"), doc("a"), doc("a")), (doc("c"),), ())
-    assert split.document_ids() == {
+    assert split.index() == {
         "train": ("a", "b"),
         "validation": ("c",),
         "test": (),
@@ -195,13 +195,13 @@ def test_a_split_lists_sorted_document_ids():
 def test_a_dataset_hash_ignores_order():
     first, second = doc("a", "x"), doc("b", "y")
     forward = dataset.Dataset((first, second))
-    assert dataset.Dataset((second, first)).content_hash == forward.content_hash
+    assert dataset.Dataset((second, first)).digest == forward.digest
     expected = hashlib.sha256(
         "\n".join(
             sorted([f"a\0{first.content_hash}", f"b\0{second.content_hash}"])
         ).encode()
     ).hexdigest()
-    assert forward.content_hash == expected
+    assert forward.digest == expected
 
 
 def test_a_dataset_rejects_empty_and_foreign_samples():
@@ -215,7 +215,7 @@ def test_duplicate_groups_are_sorted_and_need_two_members():
     data = dataset.Dataset(
         (doc("c", "x"), doc("a", "x"), doc("b", "y"), doc("d", "z"))
     )
-    assert data.duplicate_groups() == (("a", "c"),)
+    assert data.group() == (("a", "c"),)
     assert len(data.profile(max_tokens=1)) == 4
 
 
@@ -223,7 +223,7 @@ def test_split_keeps_each_document_in_one_partition():
     samples = tuple(doc(f"d{i % 5}", f"c{i}") for i in range(10))
     data = dataset.Dataset(samples)
     split = data.split(0.2, 0.2, seed=1)
-    ids = split.document_ids()
+    ids = split.index()
     assert (len(ids["train"]), len(ids["validation"]), len(ids["test"])) == (
         3,
         1,
@@ -243,26 +243,26 @@ def test_curate_counts_formats_labels_layouts_and_traceability():
                 "hello there",
                 label="x",
                 layout=layout(0.4, kind="table"),
-                source_uri="u",
-                source_digest=DIGEST,
+                uri="u",
+                digest=DIGEST,
             ),
             doc("b", "bonjour", format="markdown", layout=layout(0.8)),
             doc("c", "plain words"),
         )
     )
     report = data.curate()
-    assert report.sample_count == 3
-    assert report.document_count == 3
+    assert report.samples == 3
+    assert report.documents == 3
     assert report.format_counts == {"markdown": 1, "text": 2}
     assert report.label_counts == {"str:x": 1, "unlabeled": 2}
     assert report.language_counts == {"en": 3}
     assert report.layout_coverage == pytest.approx(2 / 3)
     assert report.layout_element_count == 2
-    assert report.table_element_count == 1
+    assert report.tables == 1
     assert report.ocr_confidence_min == 0.4
     assert report.ocr_confidence_max == 0.8
-    assert report.source_traceability_coverage == pytest.approx(1 / 3)
-    assert report.citation_count == 1
+    assert report.traceability == pytest.approx(1 / 3)
+    assert report.citations == 1
     assert [f.identifier for f in report.risk_findings] == [
         "risk.mixed-label-state"
     ]
@@ -297,7 +297,7 @@ def test_curate_blocks_sensitive_content_and_conflicting_duplicates():
 def test_inspect_lists_quality_findings_in_order():
     data = dataset.Dataset(
         (
-            doc("a", "1234 5678", layout=layout(), source_uri="u"),
+            doc("a", "1234 5678", layout=layout(), uri="u"),
             doc("b", "one two three"),
         )
     )
@@ -333,9 +333,9 @@ def test_review_flaw_builds_an_open_finding():
 def test_legibility_and_traceability_stay_quiet_when_complete():
     assert review.legibility([doc("a")], [layout(0.5)]) == []
     assert review.legibility([doc("a")], []) == []
-    complete = doc("a", source_uri="u", source_digest=DIGEST)
+    complete = doc("a", uri="u", digest=DIGEST)
     assert review.traceability([complete, doc("b")]) == []
-    half = doc("c", source_digest=DIGEST)
+    half = doc("c", digest=DIGEST)
     findings = review.traceability([half])
     assert findings[0].evidence == {"sample_count": 1}
 
@@ -345,7 +345,7 @@ def test_layering_summarises_providers_and_confidence():
     assert summary == {
         "layout_providers": ("a", "z"),
         "layout_element_count": 2,
-        "table_element_count": 0,
+        "tables": 0,
         "ocr_confidence_min": 0.3,
         "ocr_confidence_max": 0.3,
     }
@@ -374,9 +374,9 @@ def test_slurp_enforces_the_size_limit(tmp_path):
 
 
 def test_a_reader_needs_a_positive_limit():
-    with pytest.raises(errors.InputError, match="max_bytes"):
-        reader.Reader(max_bytes=0)
-    assert reader.Reader(max_bytes=1).max_bytes == 1
+    with pytest.raises(errors.InputError, match="limit"):
+        reader.Reader(limit=0)
+    assert reader.Reader(limit=1).limit == 1
 
 
 @pytest.mark.parametrize(
@@ -403,21 +403,21 @@ def test_sniff_prefers_an_explicit_format_and_rejects_unknown_suffixes():
 def test_load_reads_bytes_with_a_fingerprint_identity():
     built = reader.Reader().load(b"hello", label="x")
     digest = hashlib.sha256(b"hello").hexdigest()
-    assert built.document_id == f"document-{digest[:16]}"
-    assert built.source_uri == "memory://"
-    assert built.source_digest == digest
+    assert built.identifier == f"document-{digest[:16]}"
+    assert built.uri == "memory://"
+    assert built.digest == digest
     assert built.format is Format.TEXT
     assert built.label == "x"
-    assert reader.Reader().load(b"hi", document_id="k").document_id == "k"
+    assert reader.Reader().load(b"hi", document_id="k").identifier == "k"
 
 
 def test_load_reads_a_file_and_names_it(tmp_path):
     path = tmp_path / "note.md"
     path.write_text("# Hi\nthere", encoding="utf-8")
     built = reader.Reader().load(path)
-    assert built.document_id == "note.md"
+    assert built.identifier == "note.md"
     assert built.format is Format.MARKDOWN
-    assert built.source_uri == path.resolve().as_uri()
+    assert built.uri == path.resolve().as_uri()
     with pytest.raises(DocumentError, match="not found"):
         reader.Reader().load(tmp_path / "missing.txt")
     with pytest.raises(DocumentError, match="not found"):
@@ -426,13 +426,13 @@ def test_load_reads_a_file_and_names_it(tmp_path):
 
 def test_load_enforces_the_byte_limit():
     with pytest.raises(DocumentError) as raised:
-        reader.Reader(max_bytes=3).load(b"abcd")
+        reader.Reader(limit=3).load(b"abcd")
     assert raised.value.details == {
         "code": "size_limit",
         "actual_bytes": 4,
         "max_bytes": 3,
     }
-    assert reader.Reader(max_bytes=4).load(b"abcd").size_bytes == 4
+    assert reader.Reader(limit=4).load(b"abcd").size == 4
 
 
 def test_unicode_reports_the_malformed_range():
@@ -448,7 +448,7 @@ def test_unicode_reports_the_malformed_range():
 
 
 def test_extract_joins_pdf_pages_with_form_feeds():
-    pdf = reader.Reader(pdf_reader=lambda raw: ["one", "two"])
+    pdf = reader.Reader(pdf=lambda raw: ["one", "two"])
     built = pdf.load(b"%PDF", document_format="pdf")
     assert built.content == "one\ftwo"
     assert [s.page_number for s in built.provenance] == [1, 2]
@@ -464,14 +464,14 @@ def test_extract_maps_parser_failures():
         raise RuntimeError(raw)
 
     with pytest.raises(DependencyError) as raised:
-        reader.Reader(pdf_reader=missing).extract(b"x")
+        reader.Reader(pdf=missing).extract(b"x")
     assert raised.value.details["dependency"] == "pypdf"
     with pytest.raises(DocumentError, match="could not decode"):
-        reader.Reader(pdf_reader=broken).extract(b"x")
+        reader.Reader(pdf=broken).extract(b"x")
     with pytest.raises(DocumentError, match="no valid page text"):
-        reader.Reader(pdf_reader=lambda raw: []).extract(b"x")
+        reader.Reader(pdf=lambda raw: []).extract(b"x")
     with pytest.raises(DocumentError, match="no valid page text"):
-        reader.Reader(pdf_reader=lambda raw: ["a", 1]).extract(b"x")
+        reader.Reader(pdf=lambda raw: ["a", 1]).extract(b"x")
 
 
 def test_overlay_runs_the_layout_callback():
@@ -482,14 +482,14 @@ def test_overlay_runs_the_layout_callback():
         calls.append((raw, identifier, kind))
         return found
 
-    built = reader.Reader(layout_reader=capture).load(b"hi", document_id="d")
+    built = reader.Reader(reader=capture).load(b"hi", document_id="d")
     assert built.layout is found
     assert calls == [(b"hi", "d", Format.TEXT)]
     given = layout(end=1)
-    kept = reader.Reader(layout_reader=capture).load(b"hi", layout=given)
+    kept = reader.Reader(reader=capture).load(b"hi", layout=given)
     assert kept.layout is given
     assert reader.Reader().overlay(b"x", "d", Format.TEXT) is None
-    none = reader.Reader(layout_reader=lambda *a: None)
+    none = reader.Reader(reader=lambda *a: None)
     assert none.overlay(b"x", "d", Format.TEXT) is None
 
 
@@ -501,13 +501,11 @@ def test_overlay_maps_callback_failures():
         raise RuntimeError
 
     with pytest.raises(DependencyError, match="layout extraction"):
-        reader.Reader(layout_reader=missing).overlay(b"x", "d", Format.TEXT)
+        reader.Reader(reader=missing).overlay(b"x", "d", Format.TEXT)
     with pytest.raises(DocumentError, match="could not decode"):
-        reader.Reader(layout_reader=broken).overlay(b"x", "d", Format.TEXT)
+        reader.Reader(reader=broken).overlay(b"x", "d", Format.TEXT)
     with pytest.raises(DocumentError, match="invalid contract"):
-        reader.Reader(layout_reader=lambda *a: "x").overlay(
-            b"x", "d", Format.TEXT
-        )
+        reader.Reader(reader=lambda *a: "x").overlay(b"x", "d", Format.TEXT)
 
 
 def test_fingerprint_uses_the_file_name_or_a_digest(tmp_path):

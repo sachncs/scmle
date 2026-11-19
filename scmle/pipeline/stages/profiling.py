@@ -65,7 +65,7 @@ class Partition(products.Derived):
 
     def close(self) -> None:
         """Closes the locked test set the partition holds."""
-        self.split.locked_test.close()
+        self.split.test.close()
 
 
 class ProfileStage(impounding.Impounding):
@@ -150,7 +150,7 @@ class ProfileStage(impounding.Impounding):
                 board, resolution, screen.frame, split, rows, seasonal
             )
         except BaseException:
-            split.locked_test.close()
+            split.test.close()
             raise
         made.apply(board)
         return made
@@ -246,7 +246,7 @@ class ProfileStage(impounding.Impounding):
             # no locked rows, but the seasonal baseline needs their history.
             seasonal = backtest.seasonal_naive(
                 frame,
-                numpy.asarray(split.manifest.test_ids),
+                numpy.asarray(split.manifest.test),
                 data.value_column or "",
                 data.group_column,
                 len(data.targets),
@@ -262,9 +262,9 @@ class ProfileStage(impounding.Impounding):
         # A charter requests custody regardless of the resource-enforcement
         # mode: sealing the rows must not depend on trial supervision.
         if board.services.governor.hard or chartered:
-            split.locked_test = self.seal(split.locked_test)
-            frame = split.dev_features.assign(
-                **{board.services.spec.data.target: split.dev_target}
+            split.test = self.seal(split.test)
+            frame = split.features.assign(
+                **{board.services.spec.data.target: split.target}
             )
             isolation = "separate vault process"
         board.journal.write_json(
@@ -278,8 +278,8 @@ class ProfileStage(impounding.Impounding):
             {
                 "fingerprint": split.manifest.fingerprint,
                 "strategy": split.manifest.strategy,
-                "development_rows": len(split.manifest.train_ids),
-                "test_rows": len(split.manifest.test_ids),
+                "development_rows": len(split.manifest.training),
+                "test_rows": len(split.manifest.test),
                 "test_set_isolation": isolation,
                 "notes": list(split.manifest.notes),
             },

@@ -283,8 +283,8 @@ def build() -> dict[str, Any]:
     ]
     return {
         "settings": {
-            "skill_ceiling": leakage.CERTIFIED.skill_ceiling,
-            "association_ceiling": leakage.CERTIFIED.association_ceiling,
+            "skill_ceiling": leakage.CERTIFIED.skill,
+            "association_ceiling": leakage.CERTIFIED.ceiling,
             "alpha": leakage.CERTIFIED.alpha,
             "permutations": leakage.CERTIFIED.permutations,
             "run_seed": 0,

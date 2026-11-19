@@ -271,7 +271,7 @@ class Catalog:
     """Versioned, model-agnostic curation evidence for one data snapshot.
 
     The contract accepts arbitrary caller-owned observations, but it never
-    silently invents a content hash for an opaque object.  Use ``from_data``
+    silently invents a content hash for an opaque object.  Use ``observe``
     for supported Python data structures or ``glean`` when a
     caller-owned adapter can provide trustworthy evidence for another format.
     ``digests`` holds ``content``, the SHA-256 digest of the data content.
@@ -369,7 +369,7 @@ class Catalog:
         )
 
     @classmethod
-    def from_data(
+    def observe(
         cls,
         data: Any,
         source: identity.Source | str | pathlib.Path = "memory://",
@@ -412,29 +412,29 @@ class Catalog:
             *limitations,
         ]
         blocker_values = withhold(source_value)
-        blocker_values.extend(observation.release_blockers)
+        blocker_values.extend(observation.blockers)
         blocker_values.extend(release_blockers)
         return cls.glean(
             source=source_value,
-            kind=observation.data_kind,
+            kind=observation.kind,
             shape=observation.shape,
             columns=observation.schema,
-            samples=observation.sample_count,
+            samples=observation.samples,
             missingness=observation.missingness,
             duplicates=observation.duplicates,
             label=observation.label,
-            content=observation.content_identity,
+            content=observation.identity,
             limitations=tuple(dict.fromkeys(limitation_values)),
             blockers=tuple(dict.fromkeys(blocker_values)),
         )
 
     @property
-    def catalog_digest(self) -> str:
+    def digest(self) -> str:
         """The digest of all catalog evidence except this digest.
 
         This is the ``sha256:`` digest of ``contents()``.
         """
-        return canon.digest_value(self.contents())
+        return canon.fingerprint(self.contents())
 
     def contents(self) -> dict[str, Any]:
         """Returns canonical catalog content without the external digest.
@@ -465,7 +465,7 @@ class Catalog:
             The content dictionary plus the catalog digest as ``digest``.
         """
         record = self.contents()
-        record["digest"] = self.catalog_digest
+        record["digest"] = self.digest
         return record
 
     def canonize(self) -> str:
@@ -495,7 +495,7 @@ class Catalog:
         durability.write_atomically(path, encoded)
 
     @classmethod
-    def read_verified(cls, path: str | pathlib.Path) -> Self:
+    def read(cls, path: str | pathlib.Path) -> Self:
         """Reads a catalog and fail closed if its digest or schema is invalid.
 
         The digest is checked on the content as stored, before an older
@@ -518,7 +518,7 @@ class Catalog:
         if not isinstance(payload.get("schema_version"), int):
             raise errors.InputError("catalog evidence schema is invalid")
         if identity.assay(expected_digest, "catalog_digest") != (
-            canon.digest_value(payload)
+            canon.fingerprint(payload)
         ):
             raise errors.InputError(
                 "catalog digest does not match catalog content"

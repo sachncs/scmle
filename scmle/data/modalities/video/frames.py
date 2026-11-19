@@ -34,7 +34,7 @@ def measure(
     """
     where = {"source": sample.source, "frame_index": frame_index}
     try:
-        frame = numpy.asarray(decoder(sample.encoded_bytes, frame_index))
+        frame = numpy.asarray(decoder(sample.encoded, frame_index))
     except Exception as error:
         raise VideoError(
             "video frame decoding failed",
@@ -124,16 +124,16 @@ class Frames:
             metadata = sample.metadata
             rows.append(
                 (
-                    metadata.duration_seconds,
+                    metadata.seconds,
                     float(metadata.width),
                     float(metadata.height),
                     float(metadata.width * metadata.height),
                     metadata.width / metadata.height,
-                    float(metadata.frame_count),
-                    metadata.frames_per_second,
-                    float(metadata.audio_tracks),
-                    float(sample.byte_size),
-                    sample.byte_size / metadata.frame_count,
+                    float(metadata.frames),
+                    metadata.rate,
+                    float(metadata.tracks),
+                    float(sample.size),
+                    sample.size / metadata.frames,
                 )
             )
         values: numpy.ndarray = numpy.asarray(rows, dtype=numpy.float64)
@@ -144,7 +144,7 @@ class Frames:
             )
         return Features(
             sources=tuple(sample.source for sample in self.samples),
-            feature_names=feature_names,
+            names=feature_names,
             values=tuple(
                 tuple(float(value) for value in row) for row in values
             ),
@@ -214,9 +214,9 @@ class Frames:
             sampled_indices.append(indices)
         return Features(
             sources=tuple(sample.source for sample in self.samples),
-            feature_names=feature_names,
+            names=feature_names,
             values=tuple(rows),
-            sampled_frame_indices=tuple(sampled_indices),
+            frames=tuple(sampled_indices),
         )
 
     @staticmethod
@@ -236,12 +236,12 @@ class Frames:
         """
         if max_frames < 1:
             raise errors.InputError("max_frames must be positive")
-        count = min(max_frames, sample.metadata.frame_count)
+        count = min(max_frames, sample.metadata.frames)
         return tuple(
             int(index)
             for index in numpy.linspace(
                 0,
-                sample.metadata.frame_count - 1,
+                sample.metadata.frames - 1,
                 count,
                 dtype=int,
             )

@@ -197,14 +197,14 @@ class Imagery(curators.Preparer):
     def digest(self) -> str:
         """The raster identity and label-sidecar digest."""
         identities = (
-            f"{sample.source}\0{sample.file_hash}\0"
-            f"{sample.nodata_value}\0{sample.nodata_fraction}\0"
+            f"{sample.source}\0{sample.digest}\0"
+            f"{sample.sentinel}\0{sample.nodata}\0"
             f"{self.labels_by_source[sample.source]}\0"
             f"decoder={self.decoder_name or 'metadata-only'}\0"
             f"max_pixels={self.max_pixels}"
             for sample in self.dataset
         )
-        return curation.dataset_hash(identities)
+        return curation.digest(identities)
 
     @property
     def samples(self) -> tuple[geospatial.Tile, ...]:
@@ -225,9 +225,9 @@ class Imagery(curators.Preparer):
         return curation.Curation(
             modality=modalities.serialise(self.modality),
             dataset_hash=self.digest,
-            sample_count=len(self.dataset),
+            samples=len(self.dataset),
             profile=profile,
-            quality_findings=quality_findings,
+            findings=quality_findings,
         )
 
     def split(self, seed: int) -> containers.Partitions:
@@ -504,19 +504,17 @@ def survey(preparer: Imagery) -> Survey:
     crs_values = sorted({sample.crs for sample in preparer.dataset})
     dtypes = sorted({sample.dtype for sample in preparer.dataset})
     fractions = [
-        sample.nodata_fraction
+        sample.nodata
         for sample in preparer.dataset
-        if sample.nodata_fraction is not None
+        if sample.nodata is not None
     ]
     nodata_profile: Nodata = {
-        "statuses": sorted(
-            {sample.nodata_status for sample in preparer.dataset}
-        ),
+        "statuses": sorted({sample.status for sample in preparer.dataset}),
         "declared_values": sorted(
             {
-                sample.nodata_value
+                sample.sentinel
                 for sample in preparer.dataset
-                if sample.nodata_value is not None
+                if sample.sentinel is not None
             }
         ),
         "fraction_min": min(fractions, default=None),
@@ -529,11 +527,9 @@ def survey(preparer: Imagery) -> Survey:
         "transform_lengths": sorted(
             {len(sample.transform) for sample in preparer.dataset}
         ),
-        "total_bytes": sum(sample.byte_size for sample in preparer.dataset),
+        "total_bytes": sum(sample.size for sample in preparer.dataset),
         "nodata": nodata_profile,
-        "label_counts": curation.label_counts(
-            preparer.labels_by_source.values()
-        ),
+        "label_counts": curation.tally(preparer.labels_by_source.values()),
         "pixels": decoding(preparer),
     }
 
@@ -566,10 +562,8 @@ def decoding(preparer: Imagery) -> Pixels:
         shapes.add(tuple(values.shape))
         low = min(low, float(values.min()))
         high = max(high, float(values.max()))
-        if sample.nodata_value is not None:
-            measured.append(
-                float(numpy.equal(values, sample.nodata_value).mean())
-            )
+        if sample.sentinel is not None:
+            measured.append(float(numpy.equal(values, sample.sentinel).mean()))
     return {
         "status": "decoded",
         "decoder": preparer.decoder_name,
@@ -612,7 +606,7 @@ def flaws(preparer: Imagery, profile: Survey) -> tuple[data.Finding, ...]:
                 blocking=False,
             )
         )
-    if any(sample.nodata_status == "unknown" for sample in preparer.dataset):
+    if any(sample.status == "unknown" for sample in preparer.dataset):
         quality_findings.append(
             curation.flaw(
                 "quality.raster-nodata-unknown",
@@ -694,7 +688,7 @@ def metadata(samples: Sequence[geospatial.Tile]) -> containers.Batch:
                 float(sample.width),
                 float(sample.height),
                 float(sample.bands),
-                float(sample.byte_size),
+                float(sample.size),
                 *transform[:6],
             )
         )

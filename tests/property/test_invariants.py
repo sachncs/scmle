@@ -98,7 +98,7 @@ def test_attestation_parser_fails_closed_on_arbitrary_json(payload):
 @given(payload=strategies.binary(max_size=512))
 def test_document_reader_fails_closed_on_arbitrary_bytes(payload):
     """Arbitrary document bytes become structured outcomes or valid samples."""
-    reader = document.Reader(max_bytes=1024)
+    reader = document.Reader(limit=1024)
     rejection = None
     try:
         sample = reader.load(payload, document_id="fuzzed")
@@ -107,7 +107,7 @@ def test_document_reader_fails_closed_on_arbitrary_bytes(payload):
     if rejection is not None:
         assert rejection.category == "document_validation"
         return
-    assert sample.document_id == "fuzzed"
+    assert sample.identifier == "fuzzed"
     assert sample.content
 
 
@@ -117,9 +117,7 @@ def test_profiling_yields_a_consistent_plan_or_a_clear_refusal(frame):
     spec = spec_for()
     manifest = tabular.manifested(frame, "y")
     try:
-        task = scmle.data.validation.target.TaskResolver(spec).resolve(
-            frame["y"]
-        )
+        task = scmle.data.validation.target.Resolver(spec).resolve(frame["y"])
         profile = profiler.Profiler(spec).profile(frame, manifest, task)
     except errors.ScmleError:
         return
@@ -140,9 +138,7 @@ def test_pipelines_fit_and_predict_on_arbitrary_clean_frames(frame, seed):
     spec = spec_for()
     manifest = tabular.manifested(frame, "y")
     try:
-        task = scmle.data.validation.target.TaskResolver(spec).resolve(
-            frame["y"]
-        )
+        task = scmle.data.validation.target.Resolver(spec).resolve(frame["y"])
         plan = (
             profiler.Profiler(spec).profile(frame, manifest, task).feature_plan
         )
@@ -190,7 +186,7 @@ def test_stratified_splits_partition_rows_without_overlap(
     except errors.BlockedError:
         return
     manifest = result.manifest
-    train, test = set(manifest.train_ids), set(manifest.test_ids)
+    train, test = set(manifest.training), set(manifest.test)
     assert not train & test and train | test == set(range(rows))
     covered = set()
     for fit, validate in manifest.folds:
@@ -198,7 +194,7 @@ def test_stratified_splits_partition_rows_without_overlap(
         assert set(fit) | set(validate) <= set(range(len(train)))
         covered |= set(validate)
     assert covered == set(range(len(train)))
-    assert result.locked_test.ids == manifest.test_ids
+    assert result.test.ids == manifest.test
 
 
 @SETTINGS
@@ -222,8 +218,8 @@ def test_group_splits_never_share_a_group(groups, rows, seed):
     except errors.BlockedError:
         return
     manifest = result.manifest
-    train_ids = numpy.asarray(manifest.train_ids, dtype=numpy.int64)
-    test_ids = numpy.asarray(manifest.test_ids, dtype=numpy.int64)
+    train_ids = numpy.asarray(manifest.training, dtype=numpy.int64)
+    test_ids = numpy.asarray(manifest.test, dtype=numpy.int64)
     dev_groups = frame.g.iloc[train_ids].to_numpy()
     assert set(dev_groups).isdisjoint(frame.g.iloc[test_ids])
     for fit, validate in manifest.folds:
@@ -253,8 +249,8 @@ def test_temporal_splits_never_train_on_the_future(rows, seed):
         return
     manifest = result.manifest
     t = frame.t
-    train_ids = numpy.asarray(manifest.train_ids, dtype=numpy.int64)
-    test_ids = numpy.asarray(manifest.test_ids, dtype=numpy.int64)
+    train_ids = numpy.asarray(manifest.training, dtype=numpy.int64)
+    test_ids = numpy.asarray(manifest.test, dtype=numpy.int64)
     assert t.iloc[train_ids].max() <= t.iloc[test_ids].min()
     dev = t.iloc[train_ids].to_numpy()
     for fit, validate in manifest.folds:

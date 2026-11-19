@@ -20,7 +20,7 @@ def spec(**changes):
         "checksum": declared.sha(orders()["order_id"]),
     }
     values.update(changes)
-    return ingest.Expectation((ingest.TableTotals("orders", **values),))
+    return ingest.Expectation((ingest.Totals("orders", **values),))
 
 
 def test_matching_totals_pass_and_are_reported():
@@ -100,7 +100,7 @@ def source_factory(amounts):
 def test_the_source_is_queried_and_a_zero_total_is_compared_not_skipped():
     block = ingest.Expectation(
         (
-            ingest.TableTotals(
+            ingest.Totals(
                 "orders",
                 sums=(ingest.Total("amount", 0.0),),
                 column="order_id",
@@ -109,12 +109,12 @@ def test_the_source_is_queried_and_a_zero_total_is_compared_not_skipped():
         )
     )
     frame = orders().assign(amount=0.0)
-    ok = declared.reconcile_source(
+    ok = declared.survey(
         {"orders": frame}, {"orders": "orders"}, block,
         source_factory([0.0] * 100), 0.0,
     )  # fmt: skip
     assert all(c["passed"] for c in ok) and len(ok) == 3
-    bad = declared.reconcile_source(
+    bad = declared.survey(
         {"orders": frame.assign(amount=1.0)}, {"orders": "orders"}, block,
         source_factory([0.0] * 100), 0.0,
     )  # fmt: skip
@@ -127,11 +127,11 @@ def test_a_non_numeric_source_total_is_reported_not_taken_as_zero(
     # ERR-10 / ERR-14: `except ValueError` swallowed a non-numeric total
     # from the source and compared the extract against zero.
     block = ingest.Expectation(
-        (ingest.TableTotals("orders", sums=(ingest.Total("amount", 0.0),)),)
+        (ingest.Totals("orders", sums=(ingest.Total("amount", 0.0),)),)
     )
     monkeypatch.setattr(declared.profile.Sql, "scalar", lambda self, sql: "n/a")
     with pytest.raises(errors.InputError, match="non-numeric"):
-        declared.reconcile_source(
+        declared.survey(
             {"orders": orders()}, {"orders": "orders"}, block,
             source_factory([50.0] * 100), 0.0,
         )  # fmt: skip

@@ -1,16 +1,16 @@
 """Snapshot identity, schema version, freshness and lineage for every read.
 
-A read through `SnapshotReader` returns the frame and a `SnapshotRecord`:
+A read through `Reader` returns the frame and a `Record`:
 which object was read (URI, content hash, size, modification time, backend
 version), under which declared schema version and whether the data matched
 it, how old the data was against the contract's freshness limit, and which
 earlier snapshots it was derived from. The record's `snapshot_id` is a hash
 of the URI, the content hash and the schema digest, so the same bytes under
 the same contract always give the same id, and a changed object gives a new
-one. Every read is appended to a `ReadLog` (and to a JSON-lines file when one
+one. Every read is appended to a `Log` (and to a JSON-lines file when one
 is given), which is what a later training run is traced back through.
 
-`connector_reader` adapts a store to the `read_bytes` callable of
+`adapt` adapts a store to the `read_bytes` callable of
 `Bucket`, and decoding uses the same `unpack` as the
 source connectors.
 """
@@ -83,7 +83,7 @@ def dtypes(frame: pandas.DataFrame) -> dict[str, str]:
     return {str(name): categorize(frame[name]) for name in frame.columns}
 
 
-def schema_digest(schema: Mapping[str, str]) -> str:
+def fingerprint(schema: Mapping[str, str]) -> str:
     """Hashes a schema, independent of column order.
 
     Args:
@@ -98,7 +98,7 @@ def schema_digest(schema: Mapping[str, str]) -> str:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DataContract:
+class Contract:
     """What a consumer expects of a dataset.
 
     Attributes:
@@ -141,7 +141,7 @@ class DataContract:
     @property
     def digest(self) -> str:
         """Hash of the declared schema."""
-        return schema_digest(self.columns)
+        return fingerprint(self.columns)
 
     def mismatches(self, frame: pandas.DataFrame) -> list[str]:
         """Lists how the frame differs from the declared schema.
@@ -169,11 +169,11 @@ class DataContract:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SnapshotRecord:
+class Record:
     """Everything recorded about one read.
 
     Attributes:
-        snapshot_id: Hash of URI, content hash and schema digest.
+        identifier: Hash of URI, content hash and schema digest.
         uri: Where the object was read.
         sha256: Content hash.
         size: Bytes.
@@ -182,16 +182,16 @@ class SnapshotRecord:
         dataset: Contract name.
         schema_version: Declared schema version.
         schema_digest: Hash of the observed schema.
-        schema_matches: Whether the observed schema equals the declared one.
+        conforms: Whether the observed schema equals the declared one.
         rows: Rows read.
-        read_at: When the read happened (ISO 8601 UTC).
-        age_seconds: `read_at` minus `modified`.
-        max_age_seconds: The contract's limit, if any.
+        read: When the read happened (ISO 8601 UTC).
+        age: `read` minus `modified`.
+        staleness: The contract's limit, if any.
         freshness: `fresh`, `stale` or `unknown` (no limit declared).
         lineage: Snapshot ids this one was derived from.
     """
 
-    snapshot_id: str
+    identifier: str
     uri: str
     sha256: str
     size: int
@@ -200,11 +200,11 @@ class SnapshotRecord:
     dataset: str
     schema_version: str
     schema_digest: str
-    schema_matches: bool
+    conforms: bool
     rows: int
-    read_at: str
-    age_seconds: float
-    max_age_seconds: float | None
+    read: str
+    age: float
+    staleness: float | None
     freshness: str
     lineage: tuple[str, ...]
 
@@ -237,7 +237,7 @@ class SnapshotRecord:
         return self.KEYS.upgrade(record)
 
 
-class ReadLog:
+class Log:
     """Every snapshot read, in order, in memory and optionally on disk.
 
     Attributes:
@@ -252,9 +252,9 @@ class ReadLog:
             path: JSON-lines file appended to on every read.
         """
         self.path = None if path is None else pathlib.Path(path)
-        self.records: list[SnapshotRecord] = []
+        self.records: list[Record] = []
 
-    def append(self, record: SnapshotRecord) -> None:
+    def append(self, record: Record) -> None:
         """Adds a record, and appends it to the file if there is one.
 
         Args:
@@ -265,7 +265,7 @@ class ReadLog:
             line = json.dumps(record.to_dict(), sort_keys=True) + "\n"
             durability.append_text(self.path, line)
 
-    def trace(self, snapshot_id: str) -> list[SnapshotRecord]:
+    def trace(self, snapshot_id: str) -> list[Record]:
         """Follows a snapshot back through the snapshots it derives from.
 
         Args:
@@ -278,12 +278,12 @@ class ReadLog:
         Raises:
             SnapshotError: If the id or one of its ancestors was never read.
         """
-        by_id = {record.snapshot_id: record for record in self.records}
-        order: list[SnapshotRecord] = []
+        by_id = {record.identifier: record for record in self.records}
+        order: list[Record] = []
         pending = [snapshot_id]
         while pending:
             current = pending.pop(0)
-            if current in {record.snapshot_id for record in order}:
+            if current in {record.identifier for record in order}:
                 continue
             found = by_id.get(current)
             if found is None:
@@ -293,7 +293,7 @@ class ReadLog:
         return order
 
 
-def parse_time(text: str) -> datetime.datetime:
+def parse(text: str) -> datetime.datetime:
     """Parses an ISO 8601 time.
 
     Text that is not ISO 8601 raises ValueError, from
@@ -308,7 +308,7 @@ def parse_time(text: str) -> datetime.datetime:
     return datetime.datetime.fromisoformat(text).astimezone(datetime.UTC)
 
 
-class SnapshotReader:
+class Reader:
     """Reads tabular objects from a store and records each read.
 
     Attributes:
@@ -320,7 +320,7 @@ class SnapshotReader:
     def __init__(
         self,
         store: objectstore.Depot,
-        log: ReadLog | None = None,
+        log: Log | None = None,
         clock: Callable[[], datetime.datetime] | None = None,
     ) -> None:
         """Initializes the reader.
@@ -331,15 +331,15 @@ class SnapshotReader:
             clock: Source of the current time (UTC `datetime.now` by default).
         """
         self.store = store
-        self.log = log or ReadLog()
+        self.log = log or Log()
         self.clock = clock or (lambda: datetime.datetime.now(datetime.UTC))
 
     def read(
         self,
         key: str,
-        contract: DataContract,
-        parents: Sequence[SnapshotRecord | str] = (),
-    ) -> tuple[pandas.DataFrame, SnapshotRecord]:
+        contract: Contract,
+        parents: Sequence[Record | str] = (),
+    ) -> tuple[pandas.DataFrame, Record]:
         """Reads one object and records the snapshot.
 
         A schema mismatch or a stale object does not stop the read; it is
@@ -365,9 +365,9 @@ class SnapshotReader:
         except (ValueError, errors.ScmleError) as error:
             raise SnapshotError(f"cannot decode {uri}: {error}") from error
         observed = dtypes(frame)
-        digest = schema_digest(observed)
+        digest = fingerprint(observed)
         now = self.clock().astimezone(datetime.UTC)
-        age = max(0.0, (now - parse_time(meta.modified)).total_seconds())
+        age = max(0.0, (now - parse(meta.modified)).total_seconds())
         limit = contract.max_age_seconds
         if limit is None:
             freshness = UNKNOWN
@@ -376,8 +376,8 @@ class SnapshotReader:
         identity = hashlib.sha256(
             f"{uri}|{meta.sha256}|{digest}".encode()
         ).hexdigest()
-        record = SnapshotRecord(
-            snapshot_id="snap-" + identity[:32],
+        record = Record(
+            identifier="snap-" + identity[:32],
             uri=uri,
             sha256=meta.sha256,
             size=meta.size,
@@ -386,21 +386,21 @@ class SnapshotReader:
             dataset=contract.name,
             schema_version=contract.schema_version,
             schema_digest=digest,
-            schema_matches=not contract.mismatches(frame),
+            conforms=not contract.mismatches(frame),
             rows=len(frame),
-            read_at=objectstore.iso(now),
-            age_seconds=round(age, 3),
-            max_age_seconds=limit,
+            read=objectstore.iso(now),
+            age=round(age, 3),
+            staleness=limit,
             freshness=freshness,
             lineage=tuple(
-                p if isinstance(p, str) else p.snapshot_id for p in parents
+                p if isinstance(p, str) else p.identifier for p in parents
             ),
         )
         self.log.append(record)
         return frame, record
 
 
-def connector_reader(store: objectstore.Depot) -> Callable[[str], bytes]:
+def adapt(store: objectstore.Depot) -> Callable[[str], bytes]:
     """Adapts a store to the `read_bytes` callable of `Bucket`.
 
     The URI's path (after the store's own prefix) is the object key, so a

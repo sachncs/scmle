@@ -104,7 +104,7 @@ class Independence:
             (zero if that is not positive).
         n: Rows used.
         df: Degrees of freedom of the chi-square, 0 for Fisher.
-        skipped_strata: Strata dropped as degenerate (chi-square only).
+        strata: Strata dropped as degenerate (chi-square only).
     """
 
     kind: Procedure
@@ -113,7 +113,7 @@ class Independence:
     effect: float
     n: int
     df: int
-    skipped_strata: int
+    strata: int
 
 
 def residuals(values: numpy.ndarray, given: numpy.ndarray) -> numpy.ndarray:
@@ -246,7 +246,7 @@ def nominal(series: pandas.Series) -> bool:
     return not pandas.api.types.is_numeric_dtype(series)
 
 
-def run_test(
+def test(
     frame: pandas.DataFrame, x: str, y: str, given: Sequence[str]
 ) -> Independence:
     """Runs Fisher's z on numeric data or the chi-square on categories.
@@ -345,18 +345,18 @@ class Falsification:
     survive.
 
     Attributes:
-        dag_hash: Hash of the graph under test.
+        digest: Hash of the graph under test.
         alpha: Family-wise level for falsifying any implication.
         level: Per-test level after Bonferroni correction.
         outcomes: One entry per statement.
-        skipped_nodes: Nodes without statements because a parent is latent.
+        nodes: Nodes without statements because a parent is latent.
     """
 
-    dag_hash: str
+    digest: str
     alpha: float
     level: float
     outcomes: tuple[Outcome, ...]
-    skipped_nodes: tuple[str, ...]
+    nodes: tuple[str, ...]
 
     @property
     def falsified(self) -> tuple[Outcome, ...]:
@@ -411,7 +411,7 @@ def falsify(
     outcomes: list[Outcome] = []
     for index, statement in enumerate(statements):
         try:
-            result = run_test(frame, statement.x, statement.y, statement.given)
+            result = test(frame, statement.x, statement.y, statement.given)
         except ValueError as error:
             # handled: recorded as SKIPPED outcome with error text
             outcomes.append(
@@ -463,7 +463,7 @@ def describe(report: Falsification) -> dict[str, Any]:
         statements, and a note.
     """
     return {
-        "dag_hash": report.dag_hash,
+        "dag_hash": report.digest,
         "status": dag.STATUS,
         "alpha": report.alpha,
         "per_test_level": report.level,

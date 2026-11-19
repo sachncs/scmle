@@ -35,7 +35,7 @@ def test_too_many_levels_is_not_assessable():
 
 
 def descriptive_gate():
-    return coverage_slices.FlagGate(coverage_slices.DESCRIPTIVE, "test")
+    return coverage_slices.Gate(coverage_slices.DESCRIPTIVE, "test")
 
 
 def test_the_summary_gives_coverage_interval_size_and_a_descriptive_flag():
@@ -79,7 +79,7 @@ def test_a_badly_undercovered_slice_is_flagged_and_certified_only_when_gating():
         sizes,
         labels,
         0.9,
-        gate=coverage_slices.FlagGate(coverage_slices.GATING, "test", 200),
+        gate=coverage_slices.Gate(coverage_slices.GATING, "test", 200),
     )
 
     assert loose["flagged"] == ["bad"] == gated["flagged"]
@@ -92,7 +92,7 @@ def test_a_slice_below_the_certified_size_is_not_certified():
     # Enforces website/src/pages/docs/qualification.astro:123.
     labels = numpy.array(["a"] * 60 + ["b"] * 300)
     inside = numpy.ones(360, dtype=bool)
-    gate = coverage_slices.FlagGate(coverage_slices.GATING, "test", 100)
+    gate = coverage_slices.Gate(coverage_slices.GATING, "test", 100)
     found = coverage_slices.summary(
         inside, numpy.ones(360), labels, 0.9, gate=gate
     )
@@ -104,21 +104,21 @@ def test_a_slice_below_the_certified_size_is_not_certified():
 def test_the_flag_gate_follows_the_stored_certificate(tmp_path):
     # Enforces website/src/pages/docs/artifacts.astro:61.
     path = tmp_path / "c.json"
-    assert coverage_slices.flag_gate(path).status == "descriptive"
+    assert coverage_slices.flag(path).status == "descriptive"
     entry = {
         "method_hash": coverage_slices.fingerprint(),
         "passed": True,
         "min_certified_rows": 100,
     }
     path.write_text(json.dumps({"gates": {"G5b": entry}}))
-    gate = coverage_slices.flag_gate(path)
-    assert gate.status == "gating" and gate.min_rows == 100
+    gate = coverage_slices.flag(path)
+    assert gate.status == "gating" and gate.rows == 100
     entry["passed"] = False
     path.write_text(json.dumps({"gates": {"G5b": entry}}))
-    assert coverage_slices.flag_gate(path).status == "descriptive"
+    assert coverage_slices.flag(path).status == "descriptive"
     entry.update(passed=True, method_hash="0" * 64)
     path.write_text(json.dumps({"gates": {"G5b": entry}}))
-    assert "stale" in coverage_slices.flag_gate(path).reason
+    assert "stale" in coverage_slices.flag(path).reason
 
 
 def test_infinite_sizes_give_no_mean():

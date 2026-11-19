@@ -60,16 +60,14 @@ def test_measurements_agree_with_the_certificate():
         f4_certify.MEASUREMENTS_PATH.read_text(encoding="utf-8")
     )
     store = stored()
-    (cert,) = store.current(leakage.DETECTOR_ID, leakage.code_digest())
+    (cert,) = store.current(leakage.DETECTOR_ID, leakage.fingerprint())
     for outcome in cert.outcomes:
         c = outcome.certificate
         assert c.alarms == document["suspect_false_alarms"]
         assert c.detected == document["detected"][c.defect]
         assert c.clean == document["null_replicates"]
         assert c.planted == document["plant_replicates_per_type"]
-    assert (
-        document["settings"]["skill_ceiling"] == leakage.CERTIFIED.skill_ceiling
-    )
+    assert document["settings"]["skill_ceiling"] == leakage.CERTIFIED.skill
     assert document["alpha"] == leakage.CERTIFIED.alpha
 
 
@@ -146,9 +144,9 @@ def test_the_cheap_certificates_reproduce_and_pass():
 def test_detector_code_hashes_cover_the_whole_module():
     assert f4_certify.current_digests()[
         asof.DETECTOR_ID
-    ] == certificates.code_hash(asof)
+    ] == certificates.fingerprint(asof)
     assert f4_certify.current_digests()[reconciliation.DETECTOR_ID] == (
-        certificates.code_hash(reconciliation)
+        certificates.fingerprint(reconciliation)
     )
     assert isinstance(f4_certify.asof_world(0)[0], pandas.DataFrame)
 

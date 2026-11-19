@@ -231,7 +231,7 @@ class Profiler(inspection.Inspection):
                 kind.association(series, target, task), 4
             )
             statistics[name]["missingness_association"] = round(
-                kind.missingness_association(series, target, task), 4
+                kind.discriminate(series, target, task), 4
             )
 
     def profile(

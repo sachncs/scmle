@@ -60,7 +60,7 @@ class TemporalError(GeometryError):
     """Temporal geospatial evidence is incomplete or invalid."""
 
 
-def canonical_source(source: str | pathlib.Path) -> str:
+def identify(source: str | pathlib.Path) -> str:
     """Returns a stable source identifier for a path or URI-like value.
 
     Args:
@@ -79,7 +79,7 @@ def canonical_source(source: str | pathlib.Path) -> str:
     return pathlib.Path(value).expanduser().resolve(strict=False).as_uri()
 
 
-def canonical_observation_time(value: datetime | str) -> datetime:
+def timestamp(value: datetime | str) -> datetime:
     """Parses and normalizes a timezone-aware observation time to UTC.
 
     Args:
@@ -317,50 +317,50 @@ class Placemark:
     """Validated GeoJSON feature with stable serialized identity.
 
     Attributes:
-        feature_id: Non-empty identifier of the feature.
+        identifier: Non-empty identifier of the feature.
         geometry: GeoJSON geometry object.
         properties: JSON-native feature properties, exposed as a read-only
             mapping after validation.
         label: Optional JSON-native label of the feature.
-        observation_time: Optional observation time, normalized to a UTC
+        time: Optional observation time, normalized to a UTC
             datetime when given.
         geometry_hash: SHA-256 hex digest of the canonical geometry JSON.
-        content_hash: SHA-256 hex digest of the canonical feature identity,
+        digest: SHA-256 hex digest of the canonical feature identity,
             covering ID, geometry hash, label, observation time, and
             properties.
     """
 
-    feature_id: str
+    identifier: str
     geometry: Mapping[str, Any]
     properties: Mapping[str, Any] = dataclasses.field(default_factory=dict)
     label: str | int | float | bool | None = None
-    observation_time: datetime | str | None = None
+    time: datetime | str | None = None
     geometry_hash: str = dataclasses.field(init=False)
-    content_hash: str = dataclasses.field(init=False)
+    digest: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
         """Validates feature data and derive canonical content identities.
 
         Raises:
-            ValueError: If ``feature_id`` is empty.
+            ValueError: If ``identifier`` is empty.
             GeometryError: If the geometry is not an object or is
                 invalid, if a property name is not a string, or if the
                 properties and label are not JSON-native. An invalid or
                 timezone-naive observation time raises
                 ``TemporalError``.
         """
-        if not self.feature_id.strip():
+        if not self.identifier.strip():
             raise errors.InputError("feature_id must not be empty")
         if not isinstance(self.geometry, Mapping):
             raise GeometryError(
                 "geometry must be an object", {"code": "invalid_geometry"}
             )
         unpack(self.geometry)
-        if self.observation_time is not None:
+        if self.time is not None:
             object.__setattr__(
                 self,
-                "observation_time",
-                canonical_observation_time(self.observation_time),
+                "time",
+                timestamp(self.time),
             )
         properties = dict(self.properties)
         if any(not isinstance(key, str) for key in properties):
@@ -394,10 +394,10 @@ class Placemark:
         )
         feature_payload = json.dumps(
             {
-                "feature_id": self.feature_id,
+                "feature_id": self.identifier,
                 "geometry_hash": self.geometry_hash,
                 "label": self.label,
-                "observation_time": self.observation_time,
+                "observation_time": self.time,
                 "properties": properties,
             },
             default=lambda value: (
@@ -409,11 +409,11 @@ class Placemark:
             allow_nan=False,
         ).encode("utf-8")
         object.__setattr__(
-            self, "content_hash", hashlib.sha256(feature_payload).hexdigest()
+            self, "digest", hashlib.sha256(feature_payload).hexdigest()
         )
 
     @property
-    def geometry_type(self) -> str:
+    def kind(self) -> str:
         """The validated GeoJSON geometry type name."""
         return str(self.geometry["type"])
 

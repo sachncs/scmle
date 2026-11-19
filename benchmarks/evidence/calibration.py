@@ -233,7 +233,7 @@ NOT_MEASURED: tuple[tuple[str, str], ...] = (
         "the conditional permutation test",
     ),
     (
-        "scmle/assurance/admissibility/screen/fitting.py:skill_bound",
+        "scmle/assurance/admissibility/screen/fitting.py:temper",
         "the screen's skill lower bound",
     ),
     (
@@ -966,9 +966,7 @@ def sample(rng: numpy.random.Generator) -> dict[str, float]:
 
 def settings(rng: numpy.random.Generator) -> leakage.Config:
     """The certified leakage settings with a fresh run seed."""
-    return dataclasses.replace(
-        leakage.CERTIFIED, run_seed=int(rng.integers(2**31))
-    )
+    return dataclasses.replace(leakage.CERTIFIED, seed=int(rng.integers(2**31)))
 
 
 def probe(rng: numpy.random.Generator, grouped: bool) -> dict[str, float]:
@@ -1009,7 +1007,7 @@ def blank(rng: numpy.random.Generator, rows: int) -> numpy.ndarray:
 def gap(rng: numpy.random.Generator) -> dict[str, float]:
     """The missingness test on gaps independent of the outcome."""
     target = (rng.uniform(size=SCREEN_ROWS) < PREVALENCE) * 1
-    found = leakage.missingness_test(
+    found = leakage.test(
         pandas.Series(blank(rng, SCREEN_ROWS), name="f"),
         pandas.Series(target),
         "classification",
@@ -1555,7 +1553,7 @@ def tally(scenario: Scenario, outcomes: list[dict[str, Any]]) -> dict[str, Any]:
 
 def digest() -> str:
     """Hash of this module, the bootstrap trial and the product packages."""
-    own = hashing.code_hash(sys.modules[__name__], coverage.run)
+    own = hashing.fingerprint(sys.modules[__name__], coverage.run)
     product = evidence.source(PRODUCT, PACKAGE)
     return hashlib.sha256(f"{own}{product}".encode()).hexdigest()
 

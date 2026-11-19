@@ -106,7 +106,7 @@ class Sql:
             uri,
             "SELECT 1",
             connection_factory,
-            read_only_statement=read_only_statement,
+            preamble=read_only_statement,
         )
         self.meter = meter
         self.queries = 0
@@ -133,7 +133,7 @@ class Sql:
             The rows as tuples, or None when the budget refused the step
             (the boundary is on the meter).
         """
-        connectors.readonly(sql, self.connector.source_uri)
+        connectors.readonly(sql, self.connector.uri)
         if (
             self.meter is not None
             and stage
@@ -174,7 +174,7 @@ class Sql:
             refused the query.
         """
         sql = statement("SELECT * FROM {t} WHERE 1 = 0", t=quote(table))
-        connectors.readonly(sql, self.connector.source_uri)
+        connectors.readonly(sql, self.connector.uri)
         if (
             self.meter is not None
             and stage
@@ -214,7 +214,7 @@ class Aggregates:
     Attributes:
         name: Column name.
         kind: `number`, `text`, `other` or `empty`.
-        non_null: Count of non-null values.
+        present: Count of non-null values.
         distinct: Count of distinct non-null values.
         minimum: Smallest value, as text, or None.
         maximum: Largest value, as text, or None.
@@ -228,7 +228,7 @@ class Aggregates:
 
     name: str
     kind: str
-    non_null: int
+    present: int
     distinct: int
     minimum: str | None
     maximum: str | None
@@ -487,11 +487,11 @@ def slurp(connector: connectors.Adapter, batch_rows: int) -> pandas.DataFrame:
     checkpoint = None
     names: list[str] = []
     while True:
-        batch = connector.read_rows(checkpoint, batch_rows)
+        batch = connector.read(checkpoint, batch_rows)
         names = [c.name for c in batch.schema.columns]
         rows.extend(batch.rows)
         checkpoint = batch.checkpoint
-        if not batch.has_more:
+        if not batch.more:
             break
     return pandas.DataFrame(rows, columns=names)
 
@@ -531,10 +531,10 @@ def untorn(
         raise connectors.ConnectorError(
             "unordered_query",
             "batched reads need an ORDER BY on a unique key",
-            connector.source_uri,
+            connector.uri,
             {},
         )
-    probe = token or getattr(connector, "snapshot_token", None)
+    probe = token or getattr(connector, "snapshot", None)
     reason = "no attempt"
     for attempt in range(1, max(attempts, 1) + 1):
         before = probe() if probe else None
@@ -550,4 +550,4 @@ def untorn(
             reason = "snapshot token changed"
             continue
         return Reading(frame, before, probe is not None, attempt)
-    raise TornError(connector.source_uri, attempts, reason)
+    raise TornError(connector.uri, attempts, reason)

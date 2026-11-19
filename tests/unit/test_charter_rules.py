@@ -31,7 +31,7 @@ def test_a_charter_without_rules_keeps_its_hash_and_signature():
     # Enforces docs/API_STABILITY.md:102 and docs/API_STABILITY.md:174.
     charter = make_charter()
     assert charter.rules is None
-    assert charter.charter_hash == FROZEN_HASH
+    assert charter.digest == FROZEN_HASH
     assert "rules" not in charter.to_dict()
     wrapper = sealing.envelope(charter, KEY)
     assert wrapper["format"] == 2
@@ -44,12 +44,12 @@ def test_an_old_signed_file_still_loads_and_verifies(tmp_path):
     wrapper = sealing.envelope(make_charter(), KEY)
     wrapper["format"] = 1
     path.write_text(json.dumps(wrapper))
-    loaded = sealing.read_verified(path, signing_key=KEY)
+    loaded = sealing.read(path, signing_key=KEY)
     assert loaded.signed and loaded.charter.rules is None
-    assert loaded.charter_hash == FROZEN_HASH
+    assert loaded.digest == FROZEN_HASH
     del wrapper["format"]
     path.write_text(json.dumps(wrapper))
-    assert sealing.read_verified(path, signing_key=KEY).signed
+    assert sealing.read(path, signing_key=KEY).signed
 
 
 @pytest.mark.parametrize(
@@ -66,15 +66,15 @@ def test_an_old_signed_file_still_loads_and_verifies(tmp_path):
 def test_changing_any_rule_changes_the_charter_hash(changes):
     base = chartered()
     changed = chartered(**changes)
-    assert changed.charter_hash != base.charter_hash
-    assert base.charter_hash != FROZEN_HASH
+    assert changed.digest != base.digest
+    assert base.digest != FROZEN_HASH
 
 
 def test_rules_round_trip_through_a_signed_file(tmp_path):
     charter = chartered(stability=True, agreement=0.9)
     path = sealing.inscribe(tmp_path / "c.json", charter, KEY)
     assert json.loads(path.read_text())["format"] == 3
-    loaded = sealing.read_verified(path, signing_key=KEY)
+    loaded = sealing.read(path, signing_key=KEY)
     assert loaded.signed and loaded.charter == charter
     assert loaded.charter.rules.stability is True
 
@@ -85,7 +85,7 @@ def test_editing_a_rule_in_a_signed_file_is_detected(tmp_path):
     document["charter"]["rules"]["stability"] = True
     path.write_text(json.dumps(document))
     with pytest.raises(errors.ArtifactError):
-        sealing.read_verified(path, signing_key=KEY)
+        sealing.read(path, signing_key=KEY)
 
 
 def test_a_wrapper_from_a_newer_format_is_refused(tmp_path):
@@ -94,7 +94,7 @@ def test_a_wrapper_from_a_newer_format_is_refused(tmp_path):
     document["format"] = contracts.FORMAT_VERSION + 1
     path.write_text(json.dumps(document))
     with pytest.raises(errors.ConfigError, match="format"):
-        sealing.read_verified(path, signing_key=KEY)
+        sealing.read(path, signing_key=KEY)
 
 
 def test_rules_in_an_older_format_are_refused(tmp_path):
@@ -103,7 +103,7 @@ def test_rules_in_an_older_format_are_refused(tmp_path):
     document["format"] = 2
     path.write_text(json.dumps(document))
     with pytest.raises(errors.ConfigError, match="need format 3"):
-        sealing.read_verified(path, signing_key=KEY)
+        sealing.read(path, signing_key=KEY)
 
 
 @pytest.mark.parametrize(
@@ -148,7 +148,7 @@ def test_defaults_match_the_shipped_stability_rule():
 
     defaults = scmle.assurance.charter.rules.Procedure()
     assert dataclasses.asdict(stability.DEFAULT_RULE) == {
-        "s_min": defaults.agreement,
+        "agreement": defaults.agreement,
         "band": defaults.band,
-        "q_min": defaults.exclusion,
+        "exclusion": defaults.exclusion,
     }

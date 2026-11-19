@@ -649,7 +649,7 @@ def trace(uri: str, frame: pandas.DataFrame) -> dict[str, str | None]:
     snapshot_id = tabular.identify(frame, uri)
     source_identity: str | None = None
     if uri not in {"<memory>", "<in-memory>"}:
-        source_identity = connectors.source_identity(uri)
+        source_identity = connectors.identify(uri)
     return {
         "source_uri": uri,
         "source_identity": source_identity,
@@ -694,7 +694,7 @@ def estimate(
         )
     frame = orchestrator.frame
     if frame is None:
-        frame = tabular.read_table(orchestrator.spec.data.uri)
+        frame = tabular.read(orchestrator.spec.data.uri)
     declared, treatment_column, missing_values = screen(
         orchestrator, estimand, policy, frame
     )

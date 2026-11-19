@@ -180,8 +180,8 @@ class SelectStage(interface.Stage):
                 trial.params,
                 featurise=board.get(ingestion.Intake).kind.featurise,
             )
-            candidate.fit(split.dev_features, split.dev_target)
-            usage = resources.measure(candidate, split.dev_features)
+            candidate.fit(split.features, split.target)
+            usage = resources.measure(candidate, split.features)
             rows.append(
                 Candidate(trial, candidate, usage, limits.violations(usage))
             )
@@ -343,8 +343,8 @@ class SelectStage(interface.Stage):
             trial.params,
             featurise=board.get(ingestion.Intake).kind.featurise,
         )
-        candidate.fit(split.dev_features, split.dev_target)
-        usage = resources.measure(candidate, split.dev_features)
+        candidate.fit(split.features, split.target)
+        usage = resources.measure(candidate, split.features)
         broken = limits.violations(usage)
         label = f"{trial.model_name}/{trial.strategy}"
         if broken:
@@ -461,7 +461,7 @@ def codify(
             selected.params,
             featurise=board.get(ingestion.Intake).kind.featurise,
         )
-        pipeline.fit(split.dev_features, split.dev_target)
+        pipeline.fit(split.features, split.target)
         refits[selected.trial_id] = pipeline
     model = products.require(pending.charter.costs, "cost_model")
     classes = sorted(pending.view.target.dropna().unique(), key=str)

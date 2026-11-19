@@ -423,12 +423,12 @@ def test_a_crash_other_than_a_data_error_is_not_a_refusal(
     def crash(path):
         raise ValueError("reader crashed")
 
-    monkeypatch.setattr(tabular, "read_table", crash)
+    monkeypatch.setattr(tabular, "read", crash)
     with pytest.raises(ValueError, match="reader crashed"):
         reading.read(case, tmp_path, 1e-8)
 
     def refuse(path):
         raise errors.DataError("unreadable")
 
-    monkeypatch.setattr(tabular, "read_table", refuse)
+    monkeypatch.setattr(tabular, "read", refuse)
     assert reading.read(case, tmp_path, 1e-8)["outcome"] == "refused"

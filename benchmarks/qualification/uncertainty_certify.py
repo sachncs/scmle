@@ -154,7 +154,7 @@ def wilson_lower(hits: int, rows: int) -> float:
     Returns:
         The lower bound of the 95 percent Wilson interval.
     """
-    return certificates.wilson_interval(hits, rows, 0.95)[0]
+    return certificates.bound(hits, rows, 0.95)[0]
 
 
 def mean_floor(values: numpy.ndarray, nominal: float = LEVEL) -> dict[str, Any]:
@@ -863,7 +863,7 @@ def current_digests() -> dict[str, str]:
     Returns:
         Mapping of gate key to its current code hash.
     """
-    return {k: certificates.code_hash(*v) for k, v in sources().items()}
+    return {k: certificates.fingerprint(*v) for k, v in sources().items()}
 
 
 def certify_all() -> dict[str, Any]:

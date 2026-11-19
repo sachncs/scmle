@@ -44,7 +44,7 @@ def test_single_and_composite_keys_are_found_minimal():
     scan = scan_of(frame)[2]
     assert [k.columns for k in scan.keys] == [("a", "b")]
     assert scan.keys[0].g3 == 0.0
-    assert scan.levels_done == 3
+    assert scan.done == 3
 
 
 def test_three_column_key_needs_level_three():
@@ -83,7 +83,7 @@ def test_ties_are_listed_not_broken():
     )
     scan = scan_of(frame)[2]
     assert scan.ties() == [[("a",), ("b",)]]
-    assert all(k.small_n for k in scan.keys)
+    assert all(k.small for k in scan.keys)
 
 
 def test_hopeless_sets_cost_no_query():
@@ -100,16 +100,16 @@ def test_budget_stops_the_lattice_at_a_level_boundary():
         {c: numpy.tile(numpy.arange(5), 40) for c in "abc"}
         | {"d": numpy.repeat(numpy.arange(40), 5)}
     )
-    meter = budget.Meter(budget.Budget(max_queries=100))
+    meter = budget.Meter(budget.Budget(queries=100))
     db = ingest_worlds.new_database("gb")
     ingest_worlds.load(db, "t", frame)
     source = profile.Sql(db.factory, meter)
     table = profile.survey(source, "t")
-    tight = budget.Meter(budget.Budget(max_queries=0))
+    tight = budget.Meter(budget.Budget(queries=0))
     source.meter = tight
     scan = grain.keysearch(source, table)
     assert scan.partial
-    assert scan.levels_done == 1
+    assert scan.done == 1
     assert tight.stops[0].unit == "level 2"
 
 
@@ -120,7 +120,7 @@ def test_unit_verdict_matches_construction(unit, shape):
     source = db.source()
     profiled = profile.survey(source, table)
     scan = grain.keysearch(source, profiled)
-    verdict = grain.unit_verdict(source, profiled, unit, scan)
+    verdict = grain.judge(source, profiled, unit, scan)
     assert verdict.verdict == ingest_worlds.expected_verdict(unit, shape)
 
 
@@ -129,7 +129,7 @@ def test_unmapped_unit_words_are_unknown_and_asked():
     source = db.source()
     profiled = profile.survey(source, table)
     scan = grain.keysearch(source, profiled)
-    verdict = grain.unit_verdict(source, profiled, "warehouse-shift", scan)
+    verdict = grain.judge(source, profiled, "warehouse-shift", scan)
     assert verdict.verdict == grain.UNKNOWN
     assert verdict.blocks
     assert len(verdict.questions) == 2
@@ -138,7 +138,7 @@ def test_unmapped_unit_words_are_unknown_and_asked():
 def test_no_key_at_tolerance_is_unknown():
     frame = pandas.DataFrame({"customer_id": [1, 1, 2, 2], "x": [0, 0, 1, 1]})
     source, table, scan = scan_of(frame)
-    verdict = grain.unit_verdict(source, table, "customer", scan)
+    verdict = grain.judge(source, table, "customer", scan)
     assert verdict.verdict == grain.UNKNOWN
 
 
@@ -149,9 +149,7 @@ def test_coarser_is_never_match_across_tolerances():
             source = db.source()
             profiled = profile.survey(source, table)
             scan = grain.keysearch(source, profiled, eps_key=eps)
-            verdict = grain.unit_verdict(
-                source, profiled, "customer-month", scan
-            )
+            verdict = grain.judge(source, profiled, "customer-month", scan)
             assert verdict.verdict != grain.MATCH
 
 

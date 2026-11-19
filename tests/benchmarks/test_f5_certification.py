@@ -35,7 +35,7 @@ def test_committed_certificates_are_current_and_consistent(committed):
     assert {c.detector for c in committed.certificates} == set(registry.SPECS)
     for item in committed.certificates:
         types = {o.certificate.defect for o in item.outcomes}
-        assert types == set(registry.SPECS[item.detector].defect_types)
+        assert types == set(registry.SPECS[item.detector].types)
 
 
 def test_committed_certificates_meet_the_planted_count_requirement(committed):
@@ -51,7 +51,7 @@ def test_gating_lists_only_passing_outcomes(committed):
 
 
 def test_a_changed_detector_makes_its_certificate_stale(committed, monkeypatch):
-    monkeypatch.setattr(registry.Identity, "code_hash", lambda self: "f" * 64)
+    monkeypatch.setattr(registry.Identity, "digest", lambda self: "f" * 64)
     assert len(f5.problems(committed)) == len(registry.SPECS)
     assert f5.gating(committed) == []
 

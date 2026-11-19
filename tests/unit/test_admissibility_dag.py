@@ -125,7 +125,7 @@ def test_textbook_confounder_mediator_collider():
         ],
         "expert",
     )
-    assert graph.adjustment_set("T", "Y") == ("C",)
+    assert graph.deconfound("T", "Y") == ("C",)
     assert graph.adjusts("T", "Y", {"C"})
     assert not graph.adjusts("T", "Y", set())  # confounded
     assert not graph.adjusts("T", "Y", {"C", "M"})  # mediator
@@ -139,7 +139,7 @@ def test_m_bias_collider_is_not_adjusted_for_and_empty_set_is_valid():
         "expert",
         latent=["U1", "U2"],
     )
-    assert graph.adjustment_set("T", "Y") == ()
+    assert graph.deconfound("T", "Y") == ()
     assert not graph.adjusts("T", "Y", {"Z"})
     assert graph.adjusts("T", "Y", set())
 
@@ -148,7 +148,7 @@ def test_no_adjustment_set_when_the_confounder_is_latent():
     graph = dag.Dag.build(
         [("U", "T"), ("U", "Y"), ("T", "Y")], "expert", latent=["U"]
     )
-    assert graph.adjustment_set("T", "Y") is None
+    assert graph.deconfound("T", "Y") is None
 
 
 def test_search_is_bounded():
@@ -156,7 +156,7 @@ def test_search_is_bounded():
     edges = [(f"c{i}", "Y") for i in range(count)]
     graph = dag.Dag.build([*edges, ("T", "Y")], "expert")
     with pytest.raises(ValueError, match="candidate"):
-        graph.adjustment_set("T", "Y")
+        graph.deconfound("T", "Y")
 
 
 def test_ancestors_descendants_parents_children():
@@ -219,23 +219,23 @@ def test_artifact_round_trips_and_detects_edits():
     doc = json.loads(json.dumps(graph.artifact()))
     assert doc["status"] == "hypothesis"
     assert doc["hash"] == graph.digest()
-    assert dag.Dag.from_artifact(doc) == graph
+    assert dag.Dag.restore(doc) == graph
     edited = {**doc, "edges": [["a", "b"], ["b", "a"]]}
     with pytest.raises(ValueError):
-        dag.Dag.from_artifact(edited)
+        dag.Dag.restore(edited)
     tampered = {**doc, "source": "someone else"}
     with pytest.raises(ValueError, match="hash"):
-        dag.Dag.from_artifact(tampered)
+        dag.Dag.restore(tampered)
     with pytest.raises(ValueError, match="hypothesis"):
-        dag.Dag.from_artifact({**doc, "status": "confirmed"})
+        dag.Dag.restore({**doc, "status": "confirmed"})
     with pytest.raises(ValueError, match="unexpected or missing"):
-        dag.Dag.from_artifact({k: v for k, v in doc.items() if k != "prompt"})
+        dag.Dag.restore({k: v for k, v in doc.items() if k != "prompt"})
     with pytest.raises(ValueError, match="format_version"):
-        dag.Dag.from_artifact({**doc, "format_version": 2})
+        dag.Dag.restore({**doc, "format_version": 2})
 
 
 def test_a_search_of_exactly_the_maximum_size_is_allowed():
     edges = [(f"c{i}", "Y") for i in range(dag.MAX_SEARCH_CANDIDATES)]
     graph = dag.Dag.build([*edges, ("T", "Y")], "expert")
     assert len(graph.candidates("T", "Y")) == dag.MAX_SEARCH_CANDIDATES
-    assert graph.adjustment_set("T", "Y") == ()
+    assert graph.deconfound("T", "Y") == ()

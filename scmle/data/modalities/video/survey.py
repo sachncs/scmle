@@ -4,10 +4,10 @@ from collections.abc import Sequence
 from typing import Any
 
 from scmle.contracts import data
-from scmle.data.modalities.curation import conflicting_label_groups
+from scmle.data.modalities.curation import conflict
 from scmle.data.modalities.curation import Curation
 from scmle.data.modalities.curation import flaw
-from scmle.data.modalities.curation import label_counts
+from scmle.data.modalities.curation import tally
 from scmle.data.modalities.video.sample import Profile
 from scmle.data.modalities.video.sample import Sample
 
@@ -118,9 +118,7 @@ def timeline(samples: Sequence[Sample]) -> dict[str, str | int]:
         the timed and untimed counts otherwise.
     """
     observation_times = tuple(
-        sample.observation_time
-        for sample in samples
-        if sample.observation_time is not None
+        sample.time for sample in samples if sample.time is not None
     )
     if not observation_times:
         return {"status": "absent"}
@@ -192,7 +190,7 @@ class Survey:
     __slots__ = ()
 
     samples: tuple[Sample, ...]
-    content_hash: str
+    digest: str
 
     def profiles(self) -> tuple[Profile, ...]:
         """Returns profiles in sample order for deterministic curation.
@@ -218,9 +216,9 @@ class Survey:
         dimensions = sorted(
             {(profile.width, profile.height) for profile in profiles}
         )
-        durations = [profile.duration_seconds for profile in profiles]
-        labels = label_counts(sample.label for sample in self.samples)
-        conflicts = conflicting_label_groups(
+        durations = [profile.duration for profile in profiles]
+        labels = tally(sample.label for sample in self.samples)
+        conflicts = conflict(
             (sample.file_hash, sample.source, sample.label)
             for sample in self.samples
         )
@@ -233,7 +231,7 @@ class Survey:
             "duration_min_seconds": min(durations),
             "duration_max_seconds": max(durations),
             "duration_mean_seconds": sum(durations) / len(durations),
-            "total_bytes": sum(profile.byte_size for profile in profiles),
+            "total_bytes": sum(profile.size for profile in profiles),
             "synchronization_statuses": sorted(
                 {sample.metadata.synchrony for sample in self.samples}
             ),
@@ -247,7 +245,7 @@ class Survey:
                 flaw(
                     "quality.video-mixed-temporal-state",
                     data.FindingSeverity.WARNING,
-                    {"dataset": self.content_hash},
+                    {"dataset": self.digest},
                     temporal_evidence,
                     "Supply observation times for every clip before using "
                     "temporal evaluation or declare the untimed subset.",
@@ -256,9 +254,9 @@ class Survey:
             )
         return Curation(
             modality="video",
-            dataset_hash=self.content_hash,
-            sample_count=len(self.samples),
+            dataset_hash=self.digest,
+            samples=len(self.samples),
             profile=profile,
-            quality_findings=tuple(quality_findings),
-            risk_findings=tuple(risks(self.content_hash, labels, conflicts)),
+            findings=tuple(quality_findings),
+            risk_findings=tuple(risks(self.digest, labels, conflicts)),
         )

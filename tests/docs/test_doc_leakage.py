@@ -69,8 +69,8 @@ def test_the_probe_screens_plants_with_the_real_screens_settings(
         return original(*args, **kwargs)
 
     # The digest traces package code, which the recording wrapper is not.
-    digest = screen.code_digest()
-    monkeypatch.setattr(screen, "code_digest", lambda: digest)
+    digest = screen.fingerprint()
+    monkeypatch.setattr(screen, "fingerprint", lambda: digest)
     monkeypatch.setattr(screen, "screen", recording)
     frame = table(rows=200).assign(
         g=numpy.arange(200) % 20, t=numpy.arange(200)[::-1]
@@ -149,8 +149,8 @@ def test_no_null_world_of_the_certification_was_flagged(kind):
     document = json.loads(
         screen_certify.MEASUREMENTS_PATH.read_text(encoding="utf-8")
     )[kind]
-    (cert,) = screen.load_store().current(
-        screen.DETECTORS[kind], screen.code_digest()
+    (cert,) = screen.load().current(
+        screen.DETECTORS[kind], screen.fingerprint()
     )
 
     # The certificate counts false alarms over every world (null, grouped

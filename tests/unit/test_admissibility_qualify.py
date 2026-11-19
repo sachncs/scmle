@@ -29,7 +29,7 @@ def leaky(rows=400, seed=0):
 
 
 def test_a_missing_store_is_descriptive_and_says_so(tmp_path):
-    loaded = qualify.load_store(qualify.F5_STORE, tmp_path)
+    loaded = qualify.load(qualify.F5_STORE, tmp_path)
 
     assert loaded.store is None
     assert "descriptive" in loaded.note
@@ -38,14 +38,14 @@ def test_a_missing_store_is_descriptive_and_says_so(tmp_path):
 def test_an_unreadable_store_is_descriptive_and_says_so(tmp_path):
     (tmp_path / qualify.F5_STORE).write_text("not json")
 
-    loaded = qualify.load_store(qualify.F5_STORE, tmp_path)
+    loaded = qualify.load(qualify.F5_STORE, tmp_path)
 
     assert loaded.store is None
     assert "unreadable" in loaded.note
 
 
 def test_the_shipped_stores_are_found_from_a_checkout():
-    assert qualify.load_store(qualify.F5_STORE).store is not None
+    assert qualify.load(qualify.F5_STORE).store is not None
     assert screen.bundled() is not None
 
 
@@ -66,10 +66,10 @@ def test_without_detector_certificates_only_the_screen_gates(tmp_path):
         directory=tmp_path,
     )
 
-    assert found.leakage_gate is certificates.Authority.GATING
+    assert found.gate is certificates.Authority.GATING
     assert "copy" in found.suspects
     assert "copy" in found.quarantined
-    assert found.f5_store is None
+    assert found.store is None
     assert any("detectors are descriptive" in note for note in found.notes)
     assert all(
         s is certificates.Authority.DESCRIPTIVE
@@ -106,7 +106,7 @@ def test_a_certified_suspect_is_quarantined_and_ledgered():
         features, target, kind="predictive", classification=True, seed=0
     )
 
-    assert found.leakage_gate is certificates.Authority.GATING
+    assert found.gate is certificates.Authority.GATING
     assert set(found.quarantined) == {"copy"}
     assert "leakage suspicion" in found.quarantined["copy"]
     sources = {source for source, check in found.checks}
@@ -143,7 +143,7 @@ def test_a_regression_leak_is_gated_and_quarantined():
         features, target, kind="predictive", classification=False, seed=0
     )
 
-    assert found.leakage_gate is certificates.Authority.GATING
+    assert found.gate is certificates.Authority.GATING
     assert "copy" in found.quarantined
 
 
@@ -297,7 +297,7 @@ def make_ledger(path=None):
     charter = make_charter()
     return scmle.assurance.ledger.ledger.Ledger.create(
         path,
-        charter_hash=charter.charter_hash,
+        charter_hash=charter.digest,
         config=online_fdr.Settings(
             online_fdr.ELOND, charter.budget.exploration.initial
         ),
@@ -327,7 +327,7 @@ def test_a_diagnostic_spends_no_wealth_and_survives_reload(tmp_path):
     ledger = make_ledger(path)
     before = ledger.wealth
 
-    ledger.record_diagnostic(sample_check(), "f4-leakage-skill")
+    ledger.inspect(sample_check(), "f4-leakage-skill")
     ledger.freeze()
 
     assert ledger.wealth == before
@@ -344,7 +344,7 @@ def test_a_diagnostic_cannot_follow_the_freeze():
     with pytest.raises(
         scmle.assurance.ledger.ledger.LedgerError, match="frozen"
     ):
-        ledger.record_diagnostic(sample_check(), "f4-leakage-skill")
+        ledger.inspect(sample_check(), "f4-leakage-skill")
 
 
 def test_a_diagnostic_that_read_c_is_refused():
@@ -354,7 +354,7 @@ def test_a_diagnostic_that_read_c_is_refused():
     with pytest.raises(
         scmle.assurance.ledger.ledger.LedgerError, match="exploration"
     ):
-        ledger.record_diagnostic(check, "f4-leakage-skill")
+        ledger.inspect(check, "f4-leakage-skill")
 
 
 def causal_run():
@@ -376,14 +376,14 @@ def test_an_input_problem_is_a_note_and_a_defect_is_not(monkeypatch):
     def unusable(*args, **kwargs):
         raise errors.InputError("the graph names no treatment")
 
-    monkeypatch.setattr(qualify.rules, "build_table", unusable)
+    monkeypatch.setattr(qualify.rules, "build", unusable)
     found = causal_run()
     assert any("graph rules were not applied" in n for n in found.notes)
 
     def broken(*args, **kwargs):
         raise ValueError("a defect")
 
-    monkeypatch.setattr(qualify.rules, "build_table", broken)
+    monkeypatch.setattr(qualify.rules, "build", broken)
     with pytest.raises(ValueError, match="a defect"):
         causal_run()
 

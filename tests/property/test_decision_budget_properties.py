@@ -28,7 +28,7 @@ horizons = strategies.one_of(
 def test_assigned_levels_never_exceed_the_promotion_level(
     alpha, horizon, count
 ):
-    budget = scmle.assurance.ledger.budget.DecisionBudget(
+    budget = scmle.assurance.ledger.budget.Decision(
         alpha, Fraction(1, 100), horizon
     )
     for index in range(count):
@@ -46,9 +46,7 @@ def test_assigned_levels_never_exceed_the_promotion_level(
 @SETTINGS
 @given(alphas, strategies.integers(min_value=1, max_value=50))
 def test_the_open_ended_discount_sums_to_a_closed_form(alpha, count):
-    budget = scmle.assurance.ledger.budget.DecisionBudget(
-        alpha, Fraction(1, 100)
-    )
+    budget = scmle.assurance.ledger.budget.Decision(alpha, Fraction(1, 100))
     for index in range(count):
         budget, ignored = scmle.assurance.ledger.budget.enroll(
             budget, f"e{index}"
@@ -59,24 +57,22 @@ def test_the_open_ended_discount_sums_to_a_closed_form(alpha, count):
 @SETTINGS
 @given(alphas, strategies.integers(min_value=1, max_value=30))
 def test_a_round_trip_keeps_every_level_bit_for_bit(alpha, count):
-    budget = scmle.assurance.ledger.budget.DecisionBudget(
+    budget = scmle.assurance.ledger.budget.Decision(
         alpha, Fraction(1, 100), horizon=30
     )
     for index in range(count):
         budget, ignored = scmle.assurance.ledger.budget.enroll(
             budget, f"e{index}"
         )
-    budget, ignored = scmle.assurance.ledger.budget.start_rollback_monitor(
-        budget, "champion"
-    )
+    budget, ignored = scmle.assurance.ledger.budget.watch(budget, "champion")
     assert (
-        scmle.assurance.ledger.budget.DecisionBudget.from_dict(budget.to_dict())
+        scmle.assurance.ledger.budget.Decision.from_dict(budget.to_dict())
         == budget
     )
 
 
 def test_a_horizon_budget_is_exhausted_after_horizon_experiments():
-    budget = scmle.assurance.ledger.budget.DecisionBudget(
+    budget = scmle.assurance.ledger.budget.Decision(
         Fraction(1, 50), Fraction(1, 100), horizon=3
     )
     for index in range(3):

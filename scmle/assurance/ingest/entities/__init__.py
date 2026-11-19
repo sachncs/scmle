@@ -50,6 +50,7 @@ from scmle.assurance.ingest.entities.resolution import grade
 from scmle.assurance.ingest.entities.resolution import isolate
 from scmle.assurance.ingest.entities.resolution import Quality
 from scmle.assurance.ingest.entities.resolution import Resolution
+from scmle.assurance.ingest.entities.sampling import appraise
 from scmle.assurance.ingest.entities.sampling import Band
 from scmle.assurance.ingest.entities.sampling import BANDS
 from scmle.assurance.ingest.entities.sampling import calibrate
@@ -58,7 +59,6 @@ from scmle.assurance.ingest.entities.sampling import Estimate
 from scmle.assurance.ingest.entities.sampling import GROUP_PROBABILITY
 from scmle.assurance.ingest.entities.sampling import infer
 from scmle.assurance.ingest.entities.sampling import Labeler
-from scmle.assurance.ingest.entities.sampling import stratified_estimate
 from scmle.assurance.ingest.entities.sampling import stratify
 from scmle.assurance.ingest.entities.sampling import weakest
 from scmle.assurance.ingest.entities.similarity import CLEAN
@@ -90,6 +90,7 @@ __all__ = [
     "Pass",
     "Quality",
     "Resolution",
+    "appraise",
     "calibrate",
     "components",
     "cutoffs",
@@ -102,7 +103,6 @@ __all__ = [
     "normalize",
     "pairing",
     "soundex",
-    "stratified_estimate",
     "stratify",
     "weakest",
 ]

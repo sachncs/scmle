@@ -128,7 +128,7 @@ def pillow(monkeypatch):
 
 
 def make(value, source, **kwargs):
-    return sample.Sample.from_bytes(flat(value), source=source, **kwargs)
+    return sample.Sample.parse(flat(value), source=source, **kwargs)
 
 
 def test_image_errors_carry_their_context():
@@ -145,7 +145,7 @@ def test_image_errors_carry_their_context():
 def test_the_dependency_error_is_raised_without_pillow(monkeypatch):
     monkeypatch.setattr(image, "PILLOW_AVAILABLE", False)
     with pytest.raises(failures.DependencyError):
-        sample.Sample.from_bytes(flat(1))
+        sample.Sample.parse(flat(1))
 
 
 @pytest.mark.parametrize(
@@ -166,7 +166,7 @@ def test_configure_accepts_the_supported_modes():
 def test_bounds_checks_dimensions_and_pixel_limit():
     sample.bounds(2, 3, 6, "s")
     sample.bounds(2, 3, None, "s")
-    with pytest.raises(failures.ImageValidationError) as raised:
+    with pytest.raises(failures.ViolationError) as raised:
         sample.bounds(2, 3, 5, "s")
     assert raised.value.details == {
         "code": "pixel_count_limit",
@@ -174,16 +174,16 @@ def test_bounds_checks_dimensions_and_pixel_limit():
         "pixel_count": 6,
         "max_pixels": 5,
     }
-    with pytest.raises(failures.ImageValidationError, match="positive"):
+    with pytest.raises(failures.ViolationError, match="positive"):
         sample.bounds(0, 3, None, "s")
-    with pytest.raises(failures.ImageValidationError, match="positive"):
+    with pytest.raises(failures.ViolationError, match="positive"):
         sample.bounds(3, 0, None, "s")
 
 
 def test_canonical_source_normalises_paths():
-    assert sample.canonical_source("") == "memory://"
-    assert sample.canonical_source(" mem://a ") == "mem://a"
-    assert sample.canonical_source("x.png") == (
+    assert sample.identify("") == "memory://"
+    assert sample.identify(" mem://a ") == "mem://a"
+    assert sample.identify("x.png") == (
         pathlib.Path("x.png").resolve().as_uri()
     )
 
@@ -198,47 +198,41 @@ def test_from_bytes_reads_metadata_and_identity():
     raw = encode(
         numpy.zeros((3, 2, 3)), exif={271: "cam", 9: "x", 34853: "gps"}
     )
-    built = sample.Sample.from_bytes(raw, source="mem://a", label=1)
+    built = sample.Sample.parse(raw, source="mem://a", label=1)
     assert (built.width, built.height, built.channels) == (2, 3, 3)
     assert built.mode == "RGB"
     assert built.format == "FAKE"
-    assert built.byte_size == len(raw)
+    assert built.size == len(raw)
     assert built.file_hash == hashlib.sha256(raw).hexdigest()
-    assert built.exif_tags == ("271", "34853", "9")
-    assert built.sensitive_metadata == ("camera_make", "gps_info")
-    unknown = sample.Sample.from_bytes(
-        encode(numpy.zeros((1, 1)), "L", kind=None)
-    )
+    assert built.tags == ("271", "34853", "9")
+    assert built.metadata == ("camera_make", "gps_info")
+    unknown = sample.Sample.parse(encode(numpy.zeros((1, 1)), "L", kind=None))
     assert unknown.format == "unknown"
     assert unknown.channels == 1
 
 
 def test_the_content_hash_is_independent_of_the_encoding():
-    rgb = sample.Sample.from_bytes(encode(numpy.full((1, 1, 3), 9)))
-    rgba = sample.Sample.from_bytes(
-        encode(numpy.array([[[9, 9, 9, 255]]]), "RGBA")
-    )
+    rgb = sample.Sample.parse(encode(numpy.full((1, 1, 3), 9)))
+    rgba = sample.Sample.parse(encode(numpy.array([[[9, 9, 9, 255]]]), "RGBA"))
     assert rgb.content_hash == rgba.content_hash
     assert rgb.file_hash != rgba.file_hash
 
 
 def test_from_bytes_enforces_limits():
     raw = flat(1)
-    with pytest.raises(failures.ImageValidationError) as raised:
-        sample.Sample.from_bytes(b"")
+    with pytest.raises(failures.ViolationError) as raised:
+        sample.Sample.parse(b"")
     assert raised.value.code == "empty_payload"
-    with pytest.raises(failures.ImageValidationError) as raised:
-        sample.Sample.from_bytes(raw, max_bytes=len(raw) - 1)
+    with pytest.raises(failures.ViolationError) as raised:
+        sample.Sample.parse(raw, max_bytes=len(raw) - 1)
     assert raised.value.code == "encoded_size_limit"
-    assert sample.Sample.from_bytes(raw, max_bytes=len(raw)).byte_size == len(
-        raw
-    )
-    with pytest.raises(failures.ImageValidationError) as raised:
-        sample.Sample.from_bytes(raw, max_pixels=3)
+    assert sample.Sample.parse(raw, max_bytes=len(raw)).size == len(raw)
+    with pytest.raises(failures.ViolationError) as raised:
+        sample.Sample.parse(raw, max_pixels=3)
     assert raised.value.code == "pixel_count_limit"
-    assert sample.Sample.from_bytes(raw, max_pixels=4).width == 2
-    with pytest.raises(failures.ImageValidationError) as raised:
-        sample.Sample.from_bytes(b"junk")
+    assert sample.Sample.parse(raw, max_pixels=4).width == 2
+    with pytest.raises(failures.ViolationError) as raised:
+        sample.Sample.parse(b"junk")
     assert raised.value.code == "corrupt_payload"
     assert raised.value.details["exception"] == "OSError"
 
@@ -254,17 +248,17 @@ def test_validate_rejects_bad_limits(limit):
 def test_from_path_reads_files_and_checks_them(tmp_path):
     path = tmp_path / "a.fake"
     path.write_bytes(flat(5))
-    built = sample.Sample.from_path(path, label="x", group_id="g")
+    built = sample.Sample.load(path, label="x", group_id="g")
     assert built.source == path.resolve().as_uri()
-    assert (built.label, built.group_id) == ("x", "g")
-    with pytest.raises(failures.ImageValidationError) as raised:
-        sample.Sample.from_path(tmp_path / "missing")
+    assert (built.label, built.group) == ("x", "g")
+    with pytest.raises(failures.ViolationError) as raised:
+        sample.Sample.load(tmp_path / "missing")
     assert raised.value.code == "missing_file"
-    with pytest.raises(failures.ImageValidationError) as raised:
-        sample.Sample.from_path(tmp_path)
+    with pytest.raises(failures.ViolationError) as raised:
+        sample.Sample.load(tmp_path)
     assert raised.value.code == "not_a_file"
-    with pytest.raises(failures.ImageValidationError) as raised:
-        sample.Sample.from_path(path, max_bytes=3)
+    with pytest.raises(failures.ViolationError) as raised:
+        sample.Sample.load(path, max_bytes=3)
     assert raised.value.details["byte_size"] == len(flat(5))
 
 
@@ -272,7 +266,7 @@ def test_a_sample_validates_its_fields():
     built = make(1, "mem://a")
     fields = {
         "source": built.source,
-        "encoded_bytes": built.encoded_bytes,
+        "encoded": built.encoded,
         "file_hash": built.file_hash,
         "content_hash": built.content_hash,
         "width": 2,
@@ -280,13 +274,13 @@ def test_a_sample_validates_its_fields():
         "channels": 3,
         "mode": "RGB",
         "format": "FAKE",
-        "byte_size": built.byte_size,
+        "size": built.size,
     }
     for change, kind, message in (
         ({"source": " "}, errors.InputError, "source"),
-        ({"group_id": ""}, errors.InputError, "group_id"),
+        ({"group": ""}, errors.InputError, "group_id"),
         ({"augmentation": "x"}, errors.KindError, "augmentation"),
-        ({"byte_size": 1}, errors.InputError, "byte_size"),
+        ({"size": 1}, errors.InputError, "byte_size"),
         ({"width": 0}, errors.InputError, "dimensions"),
         ({"height": 0}, errors.InputError, "dimensions"),
         ({"channels": 0}, errors.InputError, "channels"),
@@ -295,7 +289,7 @@ def test_a_sample_validates_its_fields():
     ):
         with pytest.raises(kind, match=message):
             sample.Sample(**(fields | change))
-    assert sample.Sample(**fields).exif_tags == ()
+    assert sample.Sample(**fields).tags == ()
 
 
 def test_to_dict_omits_bytes_and_nests_digests():
@@ -307,7 +301,7 @@ def test_to_dict_omits_bytes_and_nests_digests():
         "content": built.content_hash,
     }
     assert record["group"] == "g"
-    assert record["size"] == built.byte_size
+    assert record["size"] == built.size
     assert record["exif"] == []
     assert record["augmentation"] is None
 
@@ -316,7 +310,7 @@ def test_augmentation_normalises_its_provenance():
     record = sample.Augmentation(
         " mem://p ", " flip ", {"b": 1, "a": [1, 2]}, tool=" t "
     )
-    assert record.parent_source == "mem://p"
+    assert record.source == "mem://p"
     assert record.operation == "flip"
     assert record.tool == "t"
     assert dict(record.parameters) == {"a": [1, 2], "b": 1}
@@ -350,7 +344,7 @@ def test_augmentation_rejects_bad_provenance(operation, parameters, message):
 
 
 def test_decode_converts_and_resizes():
-    built = sample.Sample.from_bytes(encode(numpy.arange(12).reshape(2, 2, 3)))
+    built = sample.Sample.parse(encode(numpy.arange(12).reshape(2, 2, 3)))
     rgb = built.decode()
     assert rgb.shape == (2, 2, 3)
     assert rgb.dtype == numpy.uint8
@@ -382,10 +376,10 @@ def test_decode_wraps_failures():
                     "format",
                 )
             }
-            | {"encoded_bytes": b"junk", "byte_size": 4}
+            | {"encoded": b"junk", "size": 4}
         )
     )
-    with pytest.raises(failures.ImageValidationError) as raised:
+    with pytest.raises(failures.ViolationError) as raised:
         broken.decode()
     assert raised.value.code == "decode_failure"
     assert raised.value.source == "mem://a"
@@ -417,13 +411,13 @@ def test_near_duplicate_groups_need_distinct_content():
             make(250, "mem://d"),
         )
     )
-    assert data.near_duplicate_groups(hash_size=2, max_hamming_distance=0) == (
+    assert data.group(hash_size=2, max_hamming_distance=0) == (
         ("mem://a", "mem://b", "mem://c"),
     )
-    assert data.near_duplicate_groups(max_samples=1) == ()
+    assert data.group(max_samples=1) == ()
     identical = dataset.Dataset((make(1, "mem://a"), make(1, "mem://b")))
-    assert identical.near_duplicate_groups() == ()
-    far = data.near_duplicate_groups(hash_size=2, max_hamming_distance=64)
+    assert identical.group() == ()
+    far = data.group(hash_size=2, max_hamming_distance=64)
     assert far == (("mem://a", "mem://b", "mem://c", "mem://d"),)
 
 
@@ -440,22 +434,20 @@ def test_near_duplicate_groups_need_distinct_content():
 def test_near_duplicate_groups_validate_limits(kwargs, message):
     data = dataset.Dataset((make(1, "mem://a"),))
     with pytest.raises(errors.InputError, match=message):
-        data.near_duplicate_groups(**kwargs)
+        data.group(**kwargs)
 
 
 def test_a_dataset_hash_ignores_order_and_binds_augmentation():
     first, second = make(1, "mem://a"), make(2, "mem://b")
     forward = dataset.Dataset((first, second))
-    assert dataset.Dataset((second, first)).content_hash == forward.content_hash
+    assert dataset.Dataset((second, first)).digest == forward.digest
     augmented = make(
         2, "mem://b", augmentation=sample.Augmentation("mem://a", "flip")
     )
-    assert (
-        dataset.Dataset((first, augmented)).content_hash != forward.content_hash
-    )
+    assert dataset.Dataset((first, augmented)).digest != forward.digest
     with pytest.raises(errors.KindError, match="only Sample"):
         dataset.Dataset(("x",))
-    assert forward.sample_count == 2
+    assert forward.size == 2
 
 
 def test_deduplicate_keeps_the_smallest_source_per_content():
@@ -516,17 +508,17 @@ def test_a_split_lists_its_cohorts():
 def test_profile_measures_pixels_and_shapes():
     data = dataset.Dataset(
         (
-            sample.Sample.from_bytes(flat(100, 2, 2), "mem://a"),
-            sample.Sample.from_bytes(flat(200, 4, 2), "mem://b"),
-            sample.Sample.from_bytes(flat(100, 2, 2, "L"), "mem://c"),
+            sample.Sample.parse(flat(100, 2, 2), "mem://a"),
+            sample.Sample.parse(flat(200, 4, 2), "mem://b"),
+            sample.Sample.parse(flat(100, 2, 2, "L"), "mem://c"),
         )
     )
     profile = data.profile(max_samples=2, profile_size=(2, 2))
-    assert profile.dataset_count == 3
-    assert profile.profiled_count == 2
+    assert profile.samples == 3
+    assert profile.profiled == 2
     assert profile.truncated
-    assert profile.unique_content_count == 2
-    assert profile.duplicate_count == 0
+    assert profile.unique == 2
+    assert profile.duplicates == 0
     assert profile.modes == (("RGB", 2),)
     assert profile.channels == ((3, 2),)
     assert (profile.width_min, profile.width_max, profile.width_mean) == (
@@ -541,7 +533,7 @@ def test_profile_measures_pixels_and_shapes():
     assert not full.truncated
     assert full.modes == (("L", 1), ("RGB", 2))
     assert full.channels == ((1, 1), (3, 2))
-    assert full.duplicate_count == 1
+    assert full.duplicates == 1
     record = full.to_dict()
     assert record["width"] == {"low": 2, "high": 4, "mean": 8 / 3}
     assert record["samples"] == 3
@@ -558,7 +550,7 @@ def test_profile_of_an_empty_dataset_is_all_zero():
 
 
 def test_palette_averages_channel_statistics():
-    split = sample.Sample.from_bytes(
+    split = sample.Sample.parse(
         encode(numpy.array([[[0, 0, 0], [100, 100, 100]]]))
     )
     mean, variance = survey.palette([split], (2, 1))
@@ -619,7 +611,7 @@ def test_hazards_lists_risk_findings_in_order():
 
 
 def test_curate_assembles_profile_and_findings():
-    sensitive = sample.Sample.from_bytes(
+    sensitive = sample.Sample.parse(
         encode(numpy.full((2, 2, 3), 1), exif={315: "me"}),
         source="mem://s",
         label="x",
@@ -627,8 +619,8 @@ def test_curate_assembles_profile_and_findings():
     data = dataset.Dataset((sensitive, make(1, "mem://t", label="y")))
     report = data.curate()
     assert report.modality == "image"
-    assert report.sample_count == 2
-    assert report.dataset_hash == data.content_hash
+    assert report.samples == 2
+    assert report.dataset_hash == data.digest
     assert report.profile["sensitive_metadata"] == ["artist"]
     assert report.profile["label_counts"] == {"str:x": 1, "str:y": 1}
     assert report.profile["near_duplicate_groups"] == []
@@ -637,6 +629,6 @@ def test_curate_assembles_profile_and_findings():
         "risk.image-conflicting-duplicate-labels",
         "risk.image-sensitive-metadata",
     ]
-    assert [f.identifier for f in report.quality_findings] == [
+    assert [f.identifier for f in report.findings] == [
         "quality.image-duplicate-content"
     ]

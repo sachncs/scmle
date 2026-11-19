@@ -93,7 +93,7 @@ def test_a_transient_transform_failure_within_the_budget_is_retried(
             raise retry.TransientError("warehouse busy")
         return failpoints.upper(frame)
 
-    result = processing.IncrementalProcessor(
+    result = processing.Processor(
         store,
         failpoints.CONTRACT,
         flaky,
@@ -151,7 +151,7 @@ def test_a_transform_that_keeps_failing_stops_at_that_object(store, after_two):
             raise retry.TransientError("down")
         return failpoints.upper(frame)
 
-    result = processing.IncrementalProcessor(
+    result = processing.Processor(
         store,
         failpoints.CONTRACT,
         busy_on_third,
@@ -270,7 +270,7 @@ def test_a_lock_release_that_fails_past_budget_leaves_finished_work_intact(
     assert store.exists(failpoints.LOCK_KEY)
     with pytest.raises(processing.LockError):
         failpoints.processor(store).run()
-    failpoints.processor(store).break_lock()
+    failpoints.processor(store).lock()
     again = failpoints.processor(store).run()
     assert again.processed == () and again.skipped == tuple(KEYS)
 
@@ -336,11 +336,11 @@ def test_repeated_uploads_are_skipped_counted_and_never_written(
     store.put("input/o7-again.csv", failpoints.object_bytes(0))
     store.put("input/o8-again.csv", failpoints.object_bytes(2))
     result = failpoints.processor(store).run()
-    assert result.duplicate_objects == (
+    assert result.duplicates == (
         failpoints.copy_key(),
         "input/o7-again.csv",
         "input/o8-again.csv",
-    ) or sorted(result.duplicate_objects) == sorted(
+    ) or sorted(result.duplicates) == sorted(
         [failpoints.copy_key(), "input/o7-again.csv", "input/o8-again.csv"]
     )
     assert result.processed == tuple(REAL)
@@ -351,7 +351,7 @@ def test_repeated_uploads_are_skipped_counted_and_never_written(
     stored = failpoints.checkpoint_of(store)
     assert "input/o7-again.csv" in stored.processed
     again = failpoints.processor(store).run()
-    assert again.duplicate_objects == () and again.processed == ()
+    assert again.duplicates == () and again.processed == ()
     assert len(again.skipped) == len(KEYS) + 2
 
 
@@ -359,7 +359,7 @@ def test_the_later_key_is_the_duplicate_whichever_upload_came_first(store):
     store.put("input/a-first.csv", failpoints.object_bytes(2))
     result = failpoints.processor(store).run()
     assert "input/a-first.csv" in result.processed
-    assert "input/o2.csv" in result.duplicate_objects
+    assert "input/o2.csv" in result.duplicates
     assert "output/a-first.csv" in failpoints.files_of(store)
     assert not store.exists("output/o2.csv")
     ids = failpoints.all_ids(failpoints.files_of(store))

@@ -160,13 +160,13 @@ class Commitment:
     """A claim fixed in the ledger before `C` is opened.
 
     Attributes:
-        claim_id: Unique id (it must not collide with a hypothesis id).
+        identifier: Unique id (it must not collide with a hypothesis id).
         kind: What it is (`baseline`, `causal_primary` or `coverage`).
         statement: The claim in words.
         sha256: Hash of the registration (what was frozen before `C`).
     """
 
-    claim_id: str
+    identifier: str
     kind: str
     statement: str
     sha256: str
@@ -225,7 +225,7 @@ def merge(*runners: Docket | None) -> Docket | None:
     if len(chosen) == 1:
         return chosen[0]
     registered = tuple(item for r in chosen for item in r.registered)
-    names = [item.claim_id for item in registered]
+    names = [item.identifier for item in registered]
     if len(set(names)) != len(names):
         raise errors.InputError("claim ids must be unique across runners")
 
@@ -239,9 +239,11 @@ def merge(*runners: Docket | None) -> Docket | None:
                 # ERR-8: the crash used to leave no type, message or log.
                 LOGGER.exception(
                     "confirmation runner for %s crashed; its claims fail",
-                    [i.claim_id for i in runner.registered],
+                    [i.identifier for i in runner.registered],
                 )
-                statuses.update({i.claim_id: FAILED for i in runner.registered})
+                statuses.update(
+                    {i.identifier: FAILED for i in runner.registered}
+                )
                 continue
             clash = set(documents) & set(found.documents)
             if clash:
@@ -265,12 +267,12 @@ class Confirmation:
         claims: One claim per survivor.
         checks: The checks on `C` (empty when `C` was not tested).
         rule: Multiplicity rule used (or that would have been used).
-        alpha_confirm: The confirmation level.
+        confirm: The confirmation level.
         survivors_sha256: Hash of the frozen survivor set.
         ledger_head: Ledger head hash when the confirmation was written.
-        custody_head: Custody log head hash after the open, or None.
+        head: Custody log head hash after the open, or None.
         control: The negative-control summary, or None.
-        stage_two: Accounting of the withdrawal (family, hash, rule,
+        second: Accounting of the withdrawal (family, hash, rule,
             statement), or None when no withdrawal rule ran.
         registered: Claim id to its registration hash and status, or None
             when no claim was registered.
@@ -296,12 +298,12 @@ class Confirmation:
     claims: tuple[qualification.Claim, ...]
     checks: tuple[qualification.Check, ...]
     rule: str
-    alpha_confirm: Fraction
+    confirm: Fraction
     survivors_sha256: str
     ledger_head: str
-    custody_head: str | None
+    head: str | None
     control: dict[str, Any] | None
-    stage_two: dict[str, Any] | None = None
+    second: dict[str, Any] | None = None
     registered: dict[str, Any] | None = None
     documents: dict[str, Mapping[str, Any]] = dataclasses.field(
         default_factory=dict
@@ -331,9 +333,9 @@ class Confirmation:
             "reason": self.reason,
             "rule": self.rule,
             "guarantee": multiplicity.STATEMENTS[budget.Correction(self.rule)],
-            "alpha": str(self.alpha_confirm),
+            "alpha": str(self.confirm),
             "digests": {"survivors": self.survivors_sha256},
-            "heads": {"ledger": self.ledger_head, "custody": self.custody_head},
+            "heads": {"ledger": self.ledger_head, "custody": self.head},
             "negative_control": self.control,
             "claims": [c.to_dict() for c in self.claims],
             "checks": [c.to_dict() for c in self.checks],
@@ -344,8 +346,8 @@ class Confirmation:
                 "feature admission or preprocessing."
             ),
         }
-        if self.stage_two is not None:
-            record["second"] = self.stage_two
+        if self.second is not None:
+            record["second"] = self.second
         if self.registered is not None:
             record["registered_claims"] = self.registered
         if self.documents:

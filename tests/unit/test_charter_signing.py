@@ -16,7 +16,7 @@ KEY = "unit-test-key"
 def test_signed_charter_verifies(tmp_path):
     path = tmp_path / "analysis_charter.json"
     sealing.inscribe(path, make_charter(), signing_key=KEY)
-    loaded = sealing.read_verified(path, signing_key=KEY)
+    loaded = sealing.read(path, signing_key=KEY)
     assert loaded.charter == make_charter()
     assert loaded.signed is True
 
@@ -24,23 +24,23 @@ def test_signed_charter_verifies(tmp_path):
 def test_unsigned_charter_is_allowed_but_reported_unsigned(tmp_path):
     path = tmp_path / "analysis_charter.json"
     sealing.inscribe(path, make_charter())
-    loaded = sealing.read_verified(path)
+    loaded = sealing.read(path)
     assert loaded.signed is False
-    assert loaded.charter_hash == make_charter().charter_hash
+    assert loaded.digest == make_charter().digest
 
 
 def test_wrong_key_fails_verification(tmp_path):
     path = tmp_path / "analysis_charter.json"
     sealing.inscribe(path, make_charter(), signing_key=KEY)
     with pytest.raises(errors.ArtifactError, match="signature"):
-        sealing.read_verified(path, signing_key="another-key")
+        sealing.read(path, signing_key="another-key")
 
 
 def test_a_signed_charter_needs_a_key_to_be_trusted(tmp_path):
     path = tmp_path / "analysis_charter.json"
     sealing.inscribe(path, make_charter(), signing_key=KEY)
     with pytest.raises(errors.ArtifactError, match="key"):
-        sealing.read_verified(path, require_signature=True)
+        sealing.read(path, require_signature=True)
 
 
 @pytest.mark.parametrize("offset", [0, 40, 120, 300])
@@ -53,7 +53,7 @@ def test_tampering_with_any_byte_fails_verification(tmp_path, offset):
     raw[index] = ord("x") if raw[index] != ord("x") else ord("y")
     path.write_bytes(bytes(raw))
     with pytest.raises((errors.ArtifactError, errors.ConfigError)):
-        sealing.read_verified(path, signing_key=KEY)
+        sealing.read(path, signing_key=KEY)
 
 
 def test_editing_a_field_without_resigning_fails(tmp_path):
@@ -67,7 +67,7 @@ def test_editing_a_field_without_resigning_fails(tmp_path):
     record["charter"]["question"] = "A different question?"
     path.write_text(json.dumps(record))
     with pytest.raises(errors.ArtifactError, match="hash"):
-        sealing.read_verified(path, signing_key=KEY)
+        sealing.read(path, signing_key=KEY)
 
 
 def test_an_amendment_may_only_tighten_the_budget():
@@ -101,7 +101,7 @@ def test_cli_check_and_sign_a_valid_charter(tmp_path, monkeypatch):
         cli.main(["charter", "sign", str(path), "--output", str(signed)])
         == cli.EXIT_OK
     )
-    assert sealing.read_verified(signed, signing_key=KEY).signed is True
+    assert sealing.read(signed, signing_key=KEY).signed is True
     assert (
         cli.main(["charter", "check", str(signed), "--rows", "400"])
         == cli.EXIT_OK
@@ -119,11 +119,9 @@ def test_charter_is_a_plain_dict_when_unsigned(tmp_path):
     path = tmp_path / "analysis_charter.json"
     sealing.inscribe(path, make_charter())
     record = json.loads(path.read_text())
-    assert record["charter_hash"] == make_charter().charter_hash
+    assert record["charter_hash"] == make_charter().digest
     assert "signature" not in record or record["signature"] is None
-    assert (
-        contracts.AnalysisCharter.from_dict(record["charter"]) == make_charter()
-    )
+    assert contracts.Charter.from_dict(record["charter"]) == make_charter()
 
 
 def test_run_and_plan_accept_a_charter_option():

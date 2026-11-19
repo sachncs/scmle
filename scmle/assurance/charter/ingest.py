@@ -263,7 +263,7 @@ class Total:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class TableTotals:
+class Totals:
     """What the source system says one extracted view must contain.
 
     Attributes:
@@ -356,10 +356,10 @@ class Expectation:
     """
 
     migrations: ClassVar[tuple[records.Migration, ...]] = (
-        records.nest(renames={}, parts={"tables": TableTotals.migrations[0]}),
+        records.nest(renames={}, parts={"tables": Totals.migrations[0]}),
     )
 
-    tables: tuple[TableTotals, ...]
+    tables: tuple[Totals, ...]
 
     def __post_init__(self) -> None:
         """Validates the block.
@@ -399,7 +399,7 @@ class Expectation:
             The rebuilt block.
         """
         record = qualification.require(cls, record)
-        return cls(tuple(TableTotals.from_dict(t) for t in record["tables"]))
+        return cls(tuple(Totals.from_dict(t) for t in record["tables"]))
 
 
 def fold(layout: records.Layout) -> records.Layout:

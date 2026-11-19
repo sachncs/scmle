@@ -98,6 +98,7 @@ VERBS = frozenset(
         "disconnect",
         "discriminate",
         "dispatch",
+        "distinguish",
         "download",
         "draft",
         "draw",
@@ -367,11 +368,29 @@ def kind(node: Definition | ast.stmt | None) -> str | None:
     return None
 
 
+def applied(path: str, mapping: dict[str, str]) -> str:
+    """The dotted path of a definition once its lane's map is applied."""
+    parts = path.split(".")
+    for cut in range(1, len(parts) + 1):
+        prefix = ".".join(path.split(".")[:cut])
+        if prefix in mapping:
+            parts[cut - 1] = mapping[prefix]
+    return ".".join(parts)
+
+
 def survey(lane: str, wanted: str) -> dict[str, Site]:
-    """Mapped entries of a lane whose definition is of the wanted kind."""
+    """Mapped entries of a lane whose definition is of the wanted kind.
+
+    A lane already applied names its definitions by their new names, so a
+    definition that is gone under its old path is looked up under the path
+    the map gives it.
+    """
     found = {}
-    for old, new in entries(lane).items():
+    mapping = entries(lane)
+    for old, new in mapping.items():
         node, owner = locate(old)
+        if node is None:
+            node, owner = locate(applied(old, mapping))
         if kind(node) == wanted:
             found[old] = Site(new, node, owner)
     return found

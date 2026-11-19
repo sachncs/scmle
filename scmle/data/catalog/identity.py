@@ -121,7 +121,7 @@ class Source:
             object.__setattr__(self, field_name, field_value.strip())
 
     @property
-    def source_identity(self) -> str:
+    def identity(self) -> str:
         """The deterministic identity of the declared source.
 
         This is the ``sha256:`` digest of the URI, version, owner,
@@ -130,7 +130,7 @@ class Source:
         (``acquisition_method``, ``privacy_classification``): renaming the
         fields never changes the identity of a registered source.
         """
-        return canon.digest_value(
+        return canon.fingerprint(
             {
                 "uri": self.uri,
                 "version": self.version,
@@ -153,7 +153,7 @@ class Source:
             "owner": self.owner,
             "acquisition": self.acquisition,
             "privacy": self.privacy,
-            "identity": self.source_identity,
+            "identity": self.identity,
         }
 
     @classmethod
@@ -181,7 +181,7 @@ class Source:
             privacy=str(record.get("privacy", "")),
         )
         expected = record.get("identity", record.get("source_identity"))
-        if expected != source.source_identity:
+        if expected != source.identity:
             raise errors.InputError(
                 "source_identity does not match source fields"
             )

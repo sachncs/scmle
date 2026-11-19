@@ -64,5 +64,5 @@ class DependencyError(ImageError):
         )
 
 
-class ImageValidationError(ImageError):
+class ViolationError(ImageError):
     """Raised when an image violates a safety or validity constraint."""

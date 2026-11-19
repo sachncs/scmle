@@ -339,7 +339,7 @@ class Folder(Store):
         Raises:
             DataError: If the part files do not share their columns.
         """
-        frames = [tabular.read_table(path) for path in self.parts(name)]
+        frames = [tabular.read(path) for path in self.parts(name)]
         columns = list(frames[0].columns)
         if any(list(frame.columns) != columns for frame in frames):
             raise errors.DataError(

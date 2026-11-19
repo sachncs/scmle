@@ -10,7 +10,7 @@ Three tests, each returning `Check` records:
   no refitting. The AUC carries a DeLong interval (DeLong, DeLong and
   Clarke-Pearson, 1988, Biometrics 44:837-845), which treats the fitted
   classifier as fixed.
-* `mmd_test`: the unbiased squared maximum mean discrepancy with a Gaussian
+* `distinguish`: the unbiased squared maximum mean discrepancy with a Gaussian
   kernel (Gretton et al., 2012, JMLR 13:723-773), the bandwidth fixed by the
   median heuristic on the pooled sample before any permutation (the pooled
   sample does not change when labels are permuted, so the heuristic keeps the
@@ -226,7 +226,7 @@ def shuffle(
                 operator.call,
                 itertools.repeat(
                     lambda: metrics.roc_auc_score(
-                        controls.permute_within(held, labels, rng), scores
+                        controls.permute(held, labels, rng), scores
                     ),
                     permutations,
                 ),
@@ -324,7 +324,7 @@ def align(sample: pandas.DataFrame, reference: pandas.DataFrame) -> None:
         raise errors.InputError(f"each side needs at least {MIN_ROWS} rows")
 
 
-def design_matrix(both: pandas.DataFrame, rows: int) -> numpy.ndarray:
+def embed(both: pandas.DataFrame, rows: int) -> numpy.ndarray:
     """Numeric design for the kernel: standardised, categories one-hot.
 
     Missing numbers are filled with the pooled median. Categorical columns
@@ -446,7 +446,7 @@ def permute(
                 map(
                     operator.call,
                     itertools.repeat(
-                        lambda: controls.permute_within(indicator, labels, rng),
+                        lambda: controls.permute(indicator, labels, rng),
                         stop - start,
                     ),
                 )
@@ -456,7 +456,7 @@ def permute(
     return null
 
 
-def mmd_test(
+def distinguish(
     sample: pandas.DataFrame,
     reference: pandas.DataFrame,
     seed: int,
@@ -501,7 +501,7 @@ def mmd_test(
     both = pandas.concat(
         [sample.iloc[first], reference.iloc[second]], ignore_index=True
     )
-    design = design_matrix(both, len(both))
+    design = embed(both, len(both))
     kernel = gaussian(design, sigma(design))
     labels = (
         None
@@ -543,7 +543,7 @@ class Drift:
         adjusted_p_value: Benjamini-Hochberg adjusted over all columns.
         effect: KS distance or Cramer's V.
         rejected: Whether the adjusted p-value is at most the level.
-        low_counts: True when a chi-square expected count is below 5, which
+        sparse: True when a chi-square expected count is below 5, which
             makes the approximation poor; written as `sparse`.
     """
 
@@ -554,7 +554,7 @@ class Drift:
     adjusted_p_value: float
     effect: float
     rejected: bool
-    low_counts: bool = False
+    sparse: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         """Converts the record to a JSON-ready dictionary.
@@ -562,9 +562,7 @@ class Drift:
         Returns:
             The fields by name; version 1 spelled `sparse` as `low_counts`.
         """
-        record = dataclasses.asdict(self)
-        record["sparse"] = record.pop("low_counts")
-        return record
+        return dataclasses.asdict(self)
 
 
 def contrast(
@@ -656,7 +654,7 @@ def compare(
             adjusted_p_value=float(q),
             effect=effect,
             rejected=bool(q <= alpha),
-            low_counts=low,
+            sparse=low,
         )
         for (name, kind, statistic, p, effect, low), q in zip(
             rows, adjusted, strict=True
@@ -767,7 +765,7 @@ def assess(
         delta=delta,
         gate=c2st_gate,
     )
-    second = mmd_test(
+    second = distinguish(
         left, right, seed, permutations=permutations, alpha=alpha, gate=mmd_gate
     )
     fired = first.decision is not qualification.Decision.PASS
@@ -786,10 +784,10 @@ def assess(
     )
 
 
-def code_digest() -> str:
+def fingerprint() -> str:
     """Hashes this module's source.
 
     Returns:
         The code hash that keys this module's certificates.
     """
-    return certificates.code_hash(sys.modules[__name__])
+    return certificates.fingerprint(sys.modules[__name__])

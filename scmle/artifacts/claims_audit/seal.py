@@ -67,7 +67,7 @@ def authenticate(
             )
         ]
     try:
-        loaded = sealing.read_verified(path, signing_key=signing_key)
+        loaded = sealing.read(path, signing_key=signing_key)
     except errors.InputError:
         # ERR-20: an unusable signing key (empty) is the caller's input
         # error and propagates, as its ValueError did before the error
@@ -76,7 +76,7 @@ def authenticate(
     except errors.ScmleError as error:
         # handled: returned as failed finding/problem/refusal with error text
         return [verdict.Finding(name, verdict.FAIL, str(error))]
-    if loaded.charter_hash != ledger.header.get("charter_hash"):
+    if loaded.digest != ledger.header.get("charter_hash"):
         return [
             verdict.Finding(
                 name, verdict.FAIL, "the ledger names another charter hash"
@@ -84,9 +84,7 @@ def authenticate(
         ]
     how = "signature verified" if loaded.signed else "hash only, not signed"
     return [
-        verdict.Finding(
-            name, verdict.PASS, f"{loaded.charter_hash[:12]} ({how})"
-        ),
+        verdict.Finding(name, verdict.PASS, f"{loaded.digest[:12]} ({how})"),
         ruled(loaded.charter.rules, ledger),
     ]
 
@@ -171,7 +169,7 @@ def crosscheck(
     """
     name = "claims agree with the sealed ledger"
     sealed_row = ledger.confirmation
-    survivors = ledger.survivor_set
+    survivors = ledger.remaining
     if sealed_row is None or survivors is None:
         return verdict.Finding(name, verdict.FAIL, "the ledger is not sealed")
     problems = compare(document, sealed_row, survivors)
@@ -182,7 +180,7 @@ def crosscheck(
     if document.get("outcome") == confirm.NO_SURVIVORS:
         ok_ids = ids == []
     else:
-        ok_ids = ids == list(survivors.hypothesis_ids)
+        ok_ids = ids == list(survivors.hypotheses)
     if not ok_ids:
         problems.append("claim ids differ from the frozen survivors")
     confirmed = [
@@ -302,7 +300,7 @@ def stage_two_record_problems(
         What is inconsistent, in a fixed order; empty if nothing is.
     """
     problems = []
-    if not withdrawn <= set(survivors.hypothesis_ids):
+    if not withdrawn <= set(survivors.hypotheses):
         problems.append("a withdrawn id is not a survivor")
     if record["family"] != family:
         problems.append("family is not survivors minus withdrawn")
@@ -332,13 +330,13 @@ def tally(
     record = document.get("second")
     if record is None:
         return verdict.Finding(name, verdict.SKIPPED, "no withdrawal rule ran")
-    survivors = ledger.survivor_set
+    survivors = ledger.remaining
     if survivors is None:
         return verdict.Finding(
             name, verdict.FAIL, "the ledger has no frozen survivors"
         )
     withdrawn = set(record["withdrawn"])
-    family = [i for i in survivors.hypothesis_ids if i not in withdrawn]
+    family = [i for i in survivors.hypotheses if i not in withdrawn]
     expected = scmle.assurance.ledger.ledger.digest(
         {"survivors_sha256": survivors.sha256, "family": family}
     )

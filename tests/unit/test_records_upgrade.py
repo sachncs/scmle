@@ -74,7 +74,7 @@ def test_an_old_folder_upgrades_and_still_verifies(kind, tmp_path):
     manifest = json.loads((folder / "split_manifest.json").read_text("utf-8"))
     assert manifest[records.KEY] == records.ORIGIN + 1
     assert "digests" in manifest
-    charter = sealing.read_verified(
+    charter = sealing.read(
         folder / "analysis_charter.json",
         key.read_text("utf-8"),
         require_signature=True,

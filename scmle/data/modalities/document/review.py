@@ -64,7 +64,7 @@ def legibility(
     """
     findings: list[data.Finding] = []
     missing_ocr_confidence = sum(
-        layout.ocr_confidence is None for layout in layouts
+        layout.confidence is None for layout in layouts
     )
     if missing_ocr_confidence:
         findings.append(
@@ -73,7 +73,7 @@ def legibility(
                 data.FindingSeverity.WARNING,
                 {
                     "document_ids": [
-                        sample.document_id
+                        sample.identifier
                         for sample in samples
                         if sample.layout is not None
                     ]
@@ -101,7 +101,7 @@ def traceability(samples: Sequence[Sample]) -> list[data.Finding]:
     partially_traceable = tuple(
         sample
         for sample in samples
-        if bool(sample.source_uri.strip()) != (sample.source_digest is not None)
+        if bool(sample.uri.strip()) != (sample.digest is not None)
     )
     if partially_traceable:
         findings.append(
@@ -110,7 +110,7 @@ def traceability(samples: Sequence[Sample]) -> list[data.Finding]:
                 data.FindingSeverity.WARNING,
                 {
                     "document_ids": [
-                        sample.document_id for sample in partially_traceable
+                        sample.identifier for sample in partially_traceable
                     ]
                 },
                 {"sample_count": len(partially_traceable)},
@@ -128,14 +128,14 @@ class Layering(TypedDict):
     Attributes:
         layout_providers: Sorted names of the layout providers.
         layout_element_count: Total number of layout elements.
-        table_element_count: Total number of table elements.
+        tables: Total number of table elements.
         ocr_confidence_min: Smallest OCR confidence, or None.
         ocr_confidence_max: Largest OCR confidence, or None.
     """
 
     layout_providers: tuple[str, ...]
     layout_element_count: int
-    table_element_count: int
+    tables: int
     ocr_confidence_min: float | None
     ocr_confidence_max: float | None
 
@@ -148,20 +148,18 @@ def layering(layouts: Sequence[Layout]) -> Layering:
 
     Returns:
         The `Curation` fields ``layout_providers``,
-        ``layout_element_count``, ``table_element_count``,
+        ``layout_element_count``, ``tables``,
         ``ocr_confidence_min`` and ``ocr_confidence_max``.
     """
     ocr_confidences = [
-        layout.ocr_confidence
-        for layout in layouts
-        if layout.ocr_confidence is not None
+        layout.confidence for layout in layouts if layout.confidence is not None
     ]
     return {
         "layout_providers": tuple(
             sorted({layout.provider for layout in layouts})
         ),
         "layout_element_count": sum(len(layout.elements) for layout in layouts),
-        "table_element_count": sum(layout.table_count for layout in layouts),
+        "tables": sum(layout.tables for layout in layouts),
         "ocr_confidence_min": (
             min(ocr_confidences) if ocr_confidences else None
         ),
@@ -182,7 +180,7 @@ class Review:
     __slots__ = ()
 
     samples: tuple[Sample, ...]
-    content_hash: str
+    digest: str
 
     def sensitivity(self) -> tuple[dict[str, int], list[str]]:
         """Counts sensitive-value matches across the corpus.
@@ -196,7 +194,7 @@ class Review:
         for sample in self.samples:
             matches = pii(sample.content)
             if matches:
-                sensitive_document_ids.append(sample.document_id)
+                sensitive_document_ids.append(sample.identifier)
                 for name, count in matches.items():
                     sensitive_counts[name] += count
         return sensitive_counts, sensitive_document_ids
@@ -319,7 +317,7 @@ class Review:
             )
         conflicts = sorted(
             (
-                tuple(sorted(sample.document_id for sample in members)),
+                tuple(sorted(sample.identifier for sample in members)),
                 {bucketize(sample.label) for sample in members},
             )
             for members in copies.values()
@@ -346,7 +344,7 @@ class Review:
                 flaw(
                     "risk.mixed-label-state",
                     data.FindingSeverity.WARNING,
-                    {"dataset": self.content_hash},
+                    {"dataset": self.digest},
                     {"label_counts": dict(label_counts)},
                     "Declare whether unlabeled samples are valid for the "
                     "intended task.",

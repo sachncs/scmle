@@ -220,7 +220,7 @@ def crossfit(
     )
 
 
-def oof_fit(
+def fit(
     values: numpy.ndarray, phi: numpy.ndarray, splits: leakage.Splits
 ) -> numpy.ndarray:
     """Out-of-fold ridge fits of each row of `values` on the design `phi`.
@@ -327,7 +327,7 @@ class Problem:
         task: `classification` or `regression`.
         classes: Number of classes (0 for regression).
         splits: Cross-fitting folds.
-        total_squares: Total sum of squares of a continuous outcome (0.0 for
+        total: Total sum of squares of a continuous outcome (0.0 for
             a classification).
     """
 
@@ -335,10 +335,10 @@ class Problem:
     task: str
     classes: int
     splits: leakage.Splits
-    total_squares: float
+    total: float
 
 
-def skill_statistic(problem: Problem, phi: numpy.ndarray) -> Statistic:
+def quantify(problem: Problem, phi: numpy.ndarray) -> Statistic:
     """Builds the skill statistic of a column for batches of permuted outcomes.
 
     Args:
@@ -355,9 +355,9 @@ def skill_statistic(problem: Problem, phi: numpy.ndarray) -> Statistic:
 
     def compute(labels: numpy.ndarray) -> numpy.ndarray:
         if problem.task == "regression":
-            pred = oof_fit(labels, phi, problem.splits)
+            pred = fit(labels, phi, problem.splits)
             squares = ((labels - pred) ** 2).sum(axis=1)
-            skill: numpy.ndarray = 1.0 - squares / problem.total_squares
+            skill: numpy.ndarray = 1.0 - squares / problem.total
             return skill
         wanted = (
             [1] if problem.classes == BINARY_CLASSES else range(problem.classes)
@@ -365,7 +365,7 @@ def skill_statistic(problem: Problem, phi: numpy.ndarray) -> Statistic:
         scores = []
         for k in wanted:
             positive = labels == k
-            pred = oof_fit(positive.astype("float64"), phi, problem.splits)
+            pred = fit(positive.astype("float64"), phi, problem.splits)
             scores.append(aucs(pred, positive, tests))
         return numpy.mean(scores, axis=0)  # type: ignore[no-any-return, unused-ignore]  # Any on older NumPy stubs; editing code would stale the shipped certificate
 
@@ -387,12 +387,12 @@ def predict(problem: Problem, phi: numpy.ndarray) -> list[numpy.ndarray]:
     """
     y = problem.y
     if problem.task == "regression":
-        return [oof_fit(y[None, :], phi, problem.splits)[0]]
+        return [fit(y[None, :], phi, problem.splits)[0]]
     wanted = (
         [1] if problem.classes == BINARY_CLASSES else range(problem.classes)
     )
     return [
-        oof_fit((y == k)[None, :].astype("float64"), phi, problem.splits)[0]
+        fit((y == k)[None, :].astype("float64"), phi, problem.splits)[0]
         for k in wanted
     ]
 
@@ -438,7 +438,7 @@ def replicate(
     return float(numpy.mean(scores))
 
 
-def skill_bound(
+def temper(
     problem: Problem,
     phi: numpy.ndarray,
     cfg: leakage.Config,
@@ -624,7 +624,7 @@ def encode(
             than two classes, or an unknown task).
     """
     y = leakage.vectorize(target, task)
-    folds = crossfit(len(y), cfg.folds, groups, block_size, cfg.run_seed)
+    folds = crossfit(len(y), cfg.folds, groups, block_size, cfg.seed)
     total = float(((y - y.mean()) ** 2).sum()) if task == "regression" else 0.0
     if task == "regression" and total == 0.0:
         raise errors.InputError("a constant target has no R^2")

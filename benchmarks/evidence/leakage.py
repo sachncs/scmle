@@ -766,7 +766,7 @@ def digest() -> str:
         makes the stored result stale), the gate, and this module's corpus and
         trial.
     """
-    return certificates.code_hash(
+    return certificates.fingerprint(
         screen,
         scmle.assurance.admissibility.screen.association,
         scmle.assurance.admissibility.screen.fitting,

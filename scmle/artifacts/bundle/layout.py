@@ -6,9 +6,11 @@ import pathlib
 # Format 2 signs and checksums the schema alongside every serialized model
 # component. Format 1 bundles did not authenticate schema.json and are refused
 # by the loader rather than silently weakening the trust boundary. Formats 3
-# and 4 changed the module paths stored in the pickled members: 3 for the
-# class renames, 4 for the package layering (register phase 3, DES-13).
-BUNDLE_FORMAT = 4
+# to 5 changed the module paths or class names stored in the pickled members:
+# 3 for the class renames, 4 for the package layering (register phase 3,
+# DES-13), 5 for the single-word names of lane data_assurance (phase 6:
+# `SkewedLogTransformer` is `Logarithm`, `AsinhTarget` is `Asinh`).
+BUNDLE_FORMAT = 5
 MODEL_FILE = "pipeline.joblib"
 SCHEMA_FILE = "schema.json"
 REFERENCE_FILE = "reference.json"

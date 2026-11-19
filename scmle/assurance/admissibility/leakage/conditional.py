@@ -13,7 +13,7 @@ from scmle.assurance.admissibility.leakage.settings import Config
 from scmle.contracts import qualification
 
 
-def strata_labels(
+def stratify(
     feature: pandas.Series, others: pandas.DataFrame, cfg: Config
 ) -> numpy.ndarray:
     """Strata for the conditional permutation: leaves of a small tree.
@@ -46,14 +46,14 @@ def strata_labels(
             numpy.isnan(values), numpy.nanmedian(values), values
         )
         tree: Any = DecisionTreeRegressor(
-            max_leaf_nodes=cfg.n_strata,
+            max_leaf_nodes=cfg.strata,
             min_samples_leaf=cfg.min_samples_leaf,
             random_state=0,
         ).fit(z, filled)
     else:
         codes = pandas.factorize(feature.astype("object"))[0]
         tree = DecisionTreeClassifier(
-            max_leaf_nodes=cfg.n_strata,
+            max_leaf_nodes=cfg.strata,
             min_samples_leaf=cfg.min_samples_leaf,
             random_state=0,
         ).fit(z, codes)
@@ -87,18 +87,18 @@ class Conditional:
     Attributes:
         feature: Feature name.
         skill: Observed single-feature skill.
-        null_mean: Mean skill over stratum-preserving permutations.
+        null: Mean skill over stratum-preserving permutations.
         p_value: Permutation p-value.
         strata: Number of strata used.
-        keeps_signal: p <= alpha: the feature keeps predictive value given
+        signal: p <= alpha: the feature keeps predictive value given
             the others, to the extent the strata capture them.
         check: Ledger record.
     """
 
     feature: str
     skill: float
-    null_mean: float
+    null: float
     p_value: float
     strata: int
-    keeps_signal: bool
+    signal: bool
     check: qualification.Check

@@ -93,7 +93,7 @@ def test_both_shift_tests_are_decided_on_the_stated_null_count():
 
 def test_a_certificate_under_another_policy_is_reported():
     store = stored()
-    (cert,) = store.current(shift.MMD_ID, shift.code_digest())
+    (cert,) = store.current(shift.MMD_ID, shift.fingerprint())
     old = certificates.Standard(0.80, 0.075, 0.95)
     store.add(
         certificates.certify(
@@ -125,14 +125,14 @@ def test_development_and_certification_seeds_do_not_overlap():
 def test_measurements_agree_with_the_certificates():
     document = measurements()
     store = stored()
-    (cert,) = store.current(shift.C2ST_ID, shift.code_digest())
+    (cert,) = store.current(shift.C2ST_ID, shift.fingerprint())
     (outcome,) = cert.outcomes
     row = document[shift.C2ST_ID]
     assert outcome.certificate.alarms == row["decision_false_alarms"]
     assert outcome.certificate.detected == round(
         row["power"] * row["planted_replicates"]
     )
-    (cert,) = store.current(stability.DETECTOR_ID, stability.code_digest())
+    (cert,) = store.current(stability.DETECTOR_ID, stability.fingerprint())
     by_type = {o.certificate.defect: o.certificate for o in cert.outcomes}
     for kind, counts in document[stability.DETECTOR_ID]["by_defect"].items():
         assert by_type[kind].detected == counts["detected"]

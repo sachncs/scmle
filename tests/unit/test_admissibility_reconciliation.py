@@ -63,7 +63,7 @@ def test_an_explained_gap_passes_with_the_explanation_recorded():
         item(900.0, explanations=(why,)), gate=certificates.Authority.GATING
     )
     assert result.status is reconciliation.Status.EXPLAINED
-    assert result.residual_gap == pytest.approx(0.0)
+    assert result.residual == pytest.approx(0.0)
     assert result.tier is Tier.ATTESTED
     assert result.check.decision is Decision.PASS
     assert result.to_dict()["explanations"][0]["mechanism"] == "filter"
@@ -78,7 +78,7 @@ def test_an_explanation_must_cover_the_gap_within_the_tolerance():
         gate=certificates.Authority.GATING,
     )
     assert result.status is reconciliation.Status.UNEXPLAINED
-    assert result.residual_gap == pytest.approx(0.04)
+    assert result.residual == pytest.approx(0.04)
     lenient = reconciliation.settle(item(900.0, explanations=(partial,)), 0.04)
     assert (
         lenient.status is reconciliation.Status.EXPLAINED

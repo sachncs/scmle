@@ -123,7 +123,7 @@ def test_many_to_many_is_reported_and_never_accepted():
         db, "b", pandas.DataFrame({"id": range(30), "tag": [0, 1, 2] * 10})
     )
     source, catalog, scans, graph = graph_of(db, ["a", "b"])
-    found = joins.many_to_many(source, catalog, scans)
+    found = joins.overlap(source, catalog, scans)
     assert [link.cardinality for link in found] == [joins.MANY_TO_MANY]
     assert not found[0].joinable
     assert all(link.child_columns != ("tag",) for link in graph.accepted())
@@ -145,13 +145,13 @@ def test_many_to_many_charges_the_budget_per_pair_and_stops_at_a_boundary():
     plain = db.source()
     catalog = profile.inventory(plain, ["a", "b", "c"])
     scans = {t.name: grain.keysearch(plain, t) for t in catalog.tables}
-    free = joins.many_to_many(plain, catalog, scans)
+    free = joins.overlap(plain, catalog, scans)
     assert len(free) == 3
 
     # room for exactly one pair (60 rows scanned, two queries)
-    meter = budget.Meter(budget.Budget(max_rows_scanned=60))
+    meter = budget.Meter(budget.Budget(scanned=60))
     limited = profile.Sql(db.factory, meter)
-    found = joins.many_to_many(limited, catalog, scans)
+    found = joins.overlap(limited, catalog, scans)
     assert len(found) == 1
     assert meter.rows == 60
     assert [stop.stage for stop in meter.stops] == ["many_to_many"]
@@ -166,7 +166,7 @@ def test_many_to_many_without_a_meter_or_with_room_is_unchanged():
     scans = {t.name: grain.keysearch(plain, t) for t in catalog.tables}
     meter = budget.Meter(budget.Budget())
     roomy = profile.Sql(db.factory, meter)
-    assert len(joins.many_to_many(roomy, catalog, scans)) == 3
+    assert len(joins.overlap(roomy, catalog, scans)) == 3
     assert not meter.partial
 
 

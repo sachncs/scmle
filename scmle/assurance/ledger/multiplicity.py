@@ -127,7 +127,7 @@ def adjust(
         count = 0
         while count < m and exact[count] <= alpha / (m - count):
             count += 1
-        adjusted_sorted = step_down(
+        adjusted_sorted = ratchet(
             [min(1.0, values[order[k]] * (m - k)) for k in range(m)]
         )
     else:
@@ -157,7 +157,7 @@ def monotone(scaled: list[float]) -> list[float]:
     return out
 
 
-def step_down(scaled: list[float]) -> list[float]:
+def ratchet(scaled: list[float]) -> list[float]:
     """Takes the running maximum from the smallest rank up (Holm).
 
     Args:

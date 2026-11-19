@@ -6,8 +6,8 @@ const backends = [
   ["Directory", "<code>LocalObjectStore(root)</code>", "none"],
 ];
 const policies = [
-  ["<code>fail</code>", "<code>QualityGateError</code> with the report; nothing continues."],
-  ["<code>quarantine</code>", "Row-level rules remove the rows and write them with the report under <code>quarantine/&lt;snapshot id&gt;/</code>. Dataset-level rules (<code>SchemaCheck</code>, <code>Freshness</code>, <code>MinRowsCheck</code>, <code>NullFractionCheck</code>) hold the whole snapshot: a marker is written, the run stops, and the same snapshot is refused until a person calls <code>release</code>."],
+  ["<code>fail</code>", "<code>GateError</code> with the report; nothing continues."],
+  ["<code>quarantine</code>", "Row-level rules remove the rows and write them with the report under <code>quarantine/&lt;snapshot id&gt;/</code>. Dataset-level rules (<code>Schema</code>, <code>Freshness</code>, <code>Rows</code>, <code>Nulls</code>) hold the whole snapshot: a marker is written, the run stops, and the same snapshot is refused until a person calls <code>release</code>."],
   ["<code>warn</code>", "Recorded in the report, data unchanged."],
 ];
 ---
@@ -24,18 +24,18 @@ const policies = [
   <p>One conformance suite is provided for any backend you write: round trip, binary, empty and large objects, overwrite, missing keys, <code>head</code> against <code>get</code>, conditional create, a race of eight conditional creates (exactly one wins), sorted prefix listing, pagination, idempotent delete, key rules and prefix isolation. The tests run it on the directory backend.</p>
 
   <h2>Snapshots</h2>
-  <p><code>SnapshotReader.read(key, contract, parents)</code> returns the frame and a <code>SnapshotRecord</code>, and appends the record to a <code>ReadLog</code> (optionally a JSON-lines file). The record holds the URI, content hash, size, modification time, backend version, declared schema version, observed schema digest and whether it matches, row count, age against the contract's <code>max_age_seconds</code> (<code>fresh</code>, <code>stale</code> or <code>unknown</code>) and the ids of the snapshots it derives from.</p>
-  <p>The <code>snapshot_id</code> hashes URI, content and schema, so the same bytes give the same id. <code>ReadLog.trace(id)</code> walks the lineage, and <code>connector_reader(store)</code> plugs a store into the object-store connector described on the <a href={`${base}/docs/data/`}>data</a> page.</p>
+  <p><code>snapshot.Reader.read(key, contract, parents)</code> returns the frame and a <code>snapshot.Record</code>, and appends the record to a <code>snapshot.Log</code> (optionally a JSON-lines file). The record holds the URI, content hash, size, modification time, backend version, declared schema version, observed schema digest and whether it matches, row count, age against the contract's <code>max_age_seconds</code> (<code>fresh</code>, <code>stale</code> or <code>unknown</code>) and the ids of the snapshots it derives from.</p>
+  <p>The <code>identifier</code> hashes URI, content and schema, so the same bytes give the same id. <code>Log.trace(id)</code> walks the lineage, and <code>adapt(store)</code> plugs a store into the object-store connector described on the <a href={`${base}/docs/data/`}>data</a> page.</p>
 
   <h2>Quality gates</h2>
-  <p><code>QualityGate(rules, store).run(frame, record, contract, stage)</code> runs for stage <code>train</code> or <code>inference</code>. Each rule declares its policy in advance:</p>
+  <p><code>quality.Gate(rules, store).run(frame, record, contract, stage)</code> runs for stage <code>train</code> or <code>inference</code>. Each rule declares its policy in advance:</p>
   <DocTable label="Quality gate policies" head={["Policy", "Effect"]} rows={policies} />
-  <p>Rules: <code>SchemaCheck</code>, <code>Freshness</code>, <code>MinRowsCheck</code>, <code>NullFractionCheck</code>, <code>Complete</code>, <code>UniqueKeyCheck</code>, <code>RangeCheck</code> and <code>Membership</code>, each limited to the stages it names. Every rule is evaluated before any action, and the report is written to <code>quality/</code> whatever the outcome.</p>
+  <p>Rules: <code>Schema</code>, <code>Freshness</code>, <code>Rows</code>, <code>Nulls</code>, <code>Complete</code>, <code>Keys</code>, <code>Range</code> and <code>Membership</code>, each limited to the stages it names. Every rule is evaluated before any action, and the report is written to <code>quality/</code> whatever the outcome.</p>
 
   <h2>Incremental processing</h2>
-  <p><code>IncrementalProcessor</code> processes new objects under an input prefix in sorted key order, once each. It deduplicates repeated row keys and repeated uploads, writes a checkpoint with its own digest after each object, retries transient errors under a <code>Retries</code> (reproducible backoff, no jitter), writes the output before the checkpoint, and takes a lock object so two runs cannot share a checkpoint.</p>
+  <p><code>processing.Processor</code> processes new objects under an input prefix in sorted key order, once each. It deduplicates repeated row keys and repeated uploads, writes a checkpoint with its own digest after each object, retries transient errors under a <code>Retries</code> (reproducible backoff, no jitter), writes the output before the checkpoint, and takes a lock object so two runs cannot share a checkpoint.</p>
   <div class="callout"><p><strong>Delivery semantics: at-least-once for the work, idempotent for the output.</strong> A crash between writing an output and committing the checkpoint makes the next run process that object again and rewrite the same bytes under the same key. The final outputs and checkpoint equal those of an uninterrupted run (tested). Exactly-once is not claimed: a transform with side effects beyond its output must be idempotent.</p></div>
-  <p>A crashed run leaves its lock; <code>break_lock</code> is a person's decision. The set of seen row keys lives in one JSON object, which is fine for millions of keys and not beyond.</p>
+  <p>A crashed run leaves its lock; <code>lock</code> (breaking it) is a person's decision. The set of seen row keys lives in one JSON object, which is fine for millions of keys and not beyond.</p>
 
   <h2>What was not done</h2>
   <p>Only the directory backend is tested. A backend you supply is yours to qualify with the conformance suite; differences in a remote service (consistency, error codes, conditional-write support) are not covered here.</p>

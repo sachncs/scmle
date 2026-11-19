@@ -112,7 +112,7 @@ def stratify(order: numpy.ndarray, bands: int) -> list[numpy.ndarray]:
     return [order[a:b] for a, b in itertools.pairwise(edges) if b > a]
 
 
-def stratified_estimate(
+def appraise(
     weights: numpy.ndarray,
     pairs: Sequence[Pair],
     threshold: float,
@@ -263,11 +263,11 @@ def calibrate(
     estimate = None
     tier = qualification.Tier.UNVERIFIED
     if labeler is not None:
-        estimate_at = stratified_estimate(
+        estimate_at = appraise(
             weights, pairs, -math.inf, labeler, reviewer, per_band, seed
         )
         t_match, t_group = cutoffs(estimate_at.bands, min_precision)
-        estimate = stratified_estimate(
+        estimate = appraise(
             weights, pairs, t_match, labeler, reviewer, per_band, seed
         )
         tier = qualification.Tier.ATTESTED

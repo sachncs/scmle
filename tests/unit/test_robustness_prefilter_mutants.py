@@ -63,7 +63,7 @@ def test_feature_checks_are_capped():
 def test_the_applied_stage_records_every_field_and_the_fragile_reason():
     result, stage = run(True)
 
-    record = result.confirmation.stage_two["rule"]
+    record = result.confirmation.second["rule"]
     found = stage.found
     assert record["name"] == prefilter.FILTER_ID
     assert record["requested"] is True
@@ -83,7 +83,7 @@ def test_the_applied_stage_records_every_field_and_the_fragile_reason():
         "fragile",
         "note",
     }
-    reasons = result.confirmation.stage_two["withdrawn"]
+    reasons = result.confirmation.second["withdrawn"]
     assert len(reasons) == 1
     (reason,) = reasons.values()
     by_name = {f.name: f for f in found.findings}
@@ -92,11 +92,9 @@ def test_the_applied_stage_records_every_field_and_the_fragile_reason():
 
 
 def test_a_not_applied_note_appends_the_rule_note_in_parentheses():
-    loose = stability.Thresholds(s_min=0.5, band=0.9, q_min=0.5)
+    loose = stability.Thresholds(agreement=0.5, band=0.9, exclusion=0.5)
     stage = run(True, rule=loose)[1]
 
     found = stage.found
-    assert found.rule_note and not found.store_note
-    assert stage.note.endswith(
-        f"fragile verdicts are warnings ({found.rule_note})"
-    )
+    assert found.note and not found.store_note
+    assert stage.note.endswith(f"fragile verdicts are warnings ({found.note})")

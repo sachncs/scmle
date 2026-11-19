@@ -8,7 +8,7 @@ from scmle.data.modalities.graph.elements import Issue
 from scmle.data.modalities.graph.elements import Node
 from scmle.data.modalities.graph.elements import Validation
 from scmle.data.modalities.graph.elements import ValidationError
-from scmle.data.modalities.graph.identity import graph_identity
+from scmle.data.modalities.graph.identity import identify
 
 
 class Structure:
@@ -26,21 +26,21 @@ class Structure:
     nodes: tuple[Node, ...]
     edges: tuple[Edge, ...]
     directed: bool
-    feature_names: tuple[str, ...]
+    features: tuple[str, ...]
 
     @property
-    def node_ids(self) -> tuple[str, ...]:
+    def identifiers(self) -> tuple[str, ...]:
         """The node identifiers, in canonical (sorted) order."""
-        return tuple(node.node_id for node in self.nodes)
+        return tuple(node.identifier for node in self.nodes)
 
     @property
     def identity(self) -> str:
         """The full SHA-256 hex identity of the graph content."""
-        return graph_identity(
+        return identify(
             self.nodes,
             self.edges,
             directed=self.directed,
-            feature_names=self.feature_names,
+            feature_names=self.features,
         )
 
     def validate(self) -> Validation:
@@ -51,7 +51,7 @@ class Structure:
             duplicates. Codes are `missing_endpoint`, `self_loop`,
             `invalid_weight` and `duplicate_edge`.
         """
-        node_ids = set(self.node_ids)
+        node_ids = set(self.identifiers)
         issues: list[Issue] = []
         duplicate_counts: defaultdict[tuple[str, str, str, str], int] = (
             defaultdict(int)
@@ -111,7 +111,7 @@ class Structure:
             ValidationError: If `validate` finds any issue.
         """
         report = self.validate()
-        if not report.is_valid:
+        if not report.valid:
             raise ValidationError(report)
 
     def canonicalize(self, edge: Edge) -> tuple[str, str, str, str]:
@@ -128,7 +128,7 @@ class Structure:
         endpoints = (edge.source, edge.target)
         if not self.directed:
             endpoints = tuple(sorted(endpoints))  # type: ignore[assignment]
-        event_time = edge.event_time.isoformat() if edge.event_time else ""
+        event_time = edge.time.isoformat() if edge.time else ""
         return (endpoints[0], endpoints[1], edge.relation, event_time)
 
     def components(self) -> tuple[frozenset[str], ...]:
@@ -142,7 +142,7 @@ class Structure:
             their smallest identifier.
         """
         adjacency: dict[str, set[str]] = {
-            node_id: set() for node_id in self.node_ids
+            node_id: set() for node_id in self.identifiers
         }
         for edge in self.edges:
             if edge.source in adjacency and edge.target in adjacency:

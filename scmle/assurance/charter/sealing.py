@@ -6,7 +6,7 @@ proves possession of the key, not the signer's identity. An unsigned charter
 is allowed: it is hash-only and reported as unsigned.
 
 The hash and the signature cover the charter's schema version 1 layout
-(`AnalysisCharter.anchor`), so a charter signed before its keys were renamed
+(`Charter.anchor`), so a charter signed before its keys were renamed
 still verifies, and a charter written now verifies under its old identity.
 """
 
@@ -45,17 +45,17 @@ class Verified:
 
     Attributes:
         charter: The charter.
-        charter_hash: Its recomputed SHA-256.
+        digest: Its recomputed SHA-256.
         signed: Whether a signature was present and verified.
     """
 
-    charter: contracts.AnalysisCharter
-    charter_hash: str
+    charter: contracts.Charter
+    digest: str
     signed: bool
 
 
 def envelope(
-    charter: contracts.AnalysisCharter, signing_key: str | bytes | None
+    charter: contracts.Charter, signing_key: str | bytes | None
 ) -> dict[str, Any]:
     """Builds the JSON wrapper that is stored on disk.
 
@@ -73,7 +73,7 @@ def envelope(
     return {
         "format": charter.format_version,
         "charter": charter.to_dict(),
-        "charter_hash": charter.charter_hash,
+        "charter_hash": charter.digest,
         "algorithm": signing.SIGNATURE_ALGORITHM,
         SIGNATURE_FIELD: (
             None if key is None else signing.mac(charter.anchor(), key)
@@ -83,7 +83,7 @@ def envelope(
 
 def inscribe(
     path: str | Path,
-    charter: contracts.AnalysisCharter,
+    charter: contracts.Charter,
     signing_key: str | bytes | None = None,
 ) -> Path:
     """Writes the charter with its hash and an optional signature.
@@ -123,15 +123,15 @@ def lift(path: str | Path, record: Any) -> records.Layout:
     """
     try:
         return records.load(
-            contracts.AnalysisCharter.__name__,
-            contracts.AnalysisCharter.migrations,
+            contracts.Charter.__name__,
+            contracts.Charter.migrations,
             record,
         )
     except errors.InputError as error:
         raise errors.ConfigError(f"charter {path}: {error}") from error
 
 
-def check_format(path: str | Path, record: dict[str, Any]) -> None:
+def check(path: str | Path, record: dict[str, Any]) -> None:
     """Refuses a wrapper from a newer format, or a field its format lacks.
 
     A wrapper without a `format` is read as format 1. Format 3 added `rules`,
@@ -209,7 +209,7 @@ def check_format(path: str | Path, record: dict[str, Any]) -> None:
             )
 
 
-def read_verified(
+def read(
     path: str | Path,
     signing_key: str | bytes | None = None,
     require_signature: bool = False,
@@ -222,9 +222,9 @@ def read_verified(
         require_signature: Fail unless a verified signature is present.
 
     A file that cannot be read, is not a JSON object, is not a valid
-    charter, or fails `check_format` raises `ConfigError` (from
+    charter, or fails `check` raises `ConfigError` (from
     `contracts.deserialize`, `contracts.parse` and
-    `check_format`). A bare charter has no wrapper and so no hash or
+    `check`). A bare charter has no wrapper and so no hash or
     signature to check.
 
     Returns:
@@ -244,12 +244,12 @@ def read_verified(
         charter = contracts.parse(record)
         if require_signature:
             raise errors.ArtifactError(f"charter {path} is unsigned")
-        return Verified(charter, charter.charter_hash, signed=False)
+        return Verified(charter, charter.digest, signed=False)
     if record.get("algorithm") != signing.SIGNATURE_ALGORITHM:
         raise errors.ArtifactError(f"charter {path}: unknown algorithm")
-    check_format(path, record)
+    check(path, record)
     charter = contracts.parse(record["charter"])
-    if record.get("charter_hash") != charter.charter_hash:
+    if record.get("charter_hash") != charter.digest:
         raise errors.ArtifactError(
             f"charter hash mismatch in {path}: the file was edited"
         )
@@ -258,19 +258,19 @@ def read_verified(
     if signature is None:
         if require_signature:
             raise errors.ArtifactError(f"charter {path} is unsigned")
-        return Verified(charter, charter.charter_hash, signed=False)
+        return Verified(charter, charter.digest, signed=False)
     if key is None:
         if require_signature:
             raise errors.ArtifactError(
                 f"charter {path} is signed but no signing key is configured"
             )
-        return Verified(charter, charter.charter_hash, signed=False)
+        return Verified(charter, charter.digest, signed=False)
     expected = signing.mac(charter.anchor(), key)
     if not hmac.compare_digest(str(signature), expected):
         raise errors.ArtifactError(
             f"charter signature does not verify for {path}"
         )
-    return Verified(charter, charter.charter_hash, signed=True)
+    return Verified(charter, charter.digest, signed=True)
 
 
 def tighter(old: Any, new: Any) -> bool:
@@ -286,9 +286,7 @@ def tighter(old: Any, new: Any) -> bool:
     return bool(new <= old)
 
 
-def permit(
-    old: contracts.AnalysisCharter, new: contracts.AnalysisCharter
-) -> None:
+def permit(old: contracts.Charter, new: contracts.Charter) -> None:
     """Allows an amendment only if it tightens the budget.
 
     Only a smaller or equal `alpha_confirm`, `quota` (`K_max`) or initial

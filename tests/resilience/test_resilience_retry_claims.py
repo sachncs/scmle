@@ -61,7 +61,7 @@ def test_a_transient_failure_recording_a_repeated_upload_is_retried(tmp_path):
     result = failpoints.processor(faulty, policy=POLICY).run()
     assert result.failed is None, result.error
     assert faulty.matching > 5
-    assert result.duplicate_objects == (failpoints.copy_key(),)
+    assert result.duplicates == (failpoints.copy_key(),)
 
 
 def test_a_transient_failure_reading_the_checkpoint_is_retried(tmp_path):

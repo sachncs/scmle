@@ -20,8 +20,8 @@ import scmle.assurance.ledger.budget
 
 CLS = "classification"
 FAST = leakage.Config(
-    skill_ceiling=0.95,
-    association_ceiling=0.9,
+    skill=0.95,
+    ceiling=0.9,
     permutations=199,
     bootstrap=100,
 )
@@ -93,7 +93,7 @@ def test_the_ridge_fit_matches_numpy_least_squares_on_a_fold():
         (numpy.arange(40), numpy.arange(40, 80)),
         (numpy.arange(40, 80), numpy.arange(40)),
     ]
-    pred = screen.oof_fit(y[None, :], phi, splits)[0]
+    pred = screen.fit(y[None, :], phi, splits)[0]
     train, test = splits[0]
     centred = y[train] - y[train].mean()
     gram = phi[train].T @ phi[train] + screen.RIDGE * numpy.eye(phi.shape[1])
@@ -209,7 +209,7 @@ def test_a_clean_table_has_no_suspect_and_a_planted_copy_has_one():
     assert suspects(report) == {("leak", "skill")}
     (found,) = report.suspects
     assert found.statistic == pytest.approx(1.0)
-    assert found.lower_bound > FAST.skill_ceiling
+    assert found.lower > FAST.skill
     assert found.adjusted_p <= 0.05 and found.significant
 
 
@@ -224,7 +224,7 @@ def test_a_strong_legitimate_predictor_below_the_ceiling_is_not_a_suspect():
         for f in report.findings
         if f.feature == "strong" and f.mechanism == screen.SKILL
     ]
-    assert 0.6 < finding.statistic < FAST.skill_ceiling
+    assert 0.6 < finding.statistic < FAST.skill
     # It cannot be a suspect, so it draws no permutations (`sift`).
     assert finding.p_value == 1.0 and not finding.complete
     assert not finding.significant and not finding.suspect
@@ -270,7 +270,7 @@ def test_a_strong_column_the_other_columns_match_is_not_a_suspect():
         if f.mechanism == screen.SKILL and f.significant
     ]
     assert {f.feature for f in above} == {"first", "second"}
-    assert all(f.lower_bound > ceilings[screen.SKILL] for f in above)
+    assert all(f.lower > ceilings[screen.SKILL] for f in above)
     assert report.suspects == ()
 
 
@@ -334,7 +334,7 @@ def test_early_stopping_leaves_the_decisions_unchanged(monkeypatch):
     frame = world(4).assign(leak=lambda f: f.y + 0.0)
     frame["weak"] = frame.y * 0.3 + numpy.random.default_rng(4).normal(size=300)
     early = run(frame)
-    original = screen.draw_permutations
+    original = screen.draw
 
     def never_stop(pending, labels, binned, strata, total, alpha, seed):
         # A huge level puts the stopping ceiling out of reach.
@@ -342,7 +342,7 @@ def test_early_stopping_leaves_the_decisions_unchanged(monkeypatch):
             pending, labels, binned, strata, total, Fraction(10**9), seed
         )
 
-    monkeypatch.setattr(screen, "draw_permutations", never_stop)
+    monkeypatch.setattr(screen, "draw", never_stop)
     full = run(frame)
     assert any(not f.complete for f in early.findings)
     ceilings = screen.caps(FAST)
@@ -359,9 +359,7 @@ def test_the_screen_is_deterministic_in_the_seed():
     frame = world(5).assign(leak=lambda f: f.y * 1.0)
     one, two = run(frame), run(frame)
     assert one == two
-    other = screen.screen(
-        frame, "y", CLS, dataclasses.replace(FAST, run_seed=9)
-    )
+    other = screen.screen(frame, "y", CLS, dataclasses.replace(FAST, seed=9))
     assert suspects(other) == suspects(one)
 
 
@@ -395,7 +393,7 @@ def test_a_value_recorded_only_for_one_class_is_a_suspect():
     assert found.statistic == 1.0
     low = 0.05 ** (1 / int(frame.body.notna().sum()))
     base = float((frame.y == 0).mean())
-    assert found.lower_bound == pytest.approx(1 - (1 - low) * 0.5 / (1 - base))
+    assert found.lower == pytest.approx(1 - (1 - low) * 0.5 / (1 - base))
 
 
 def test_missing_only_for_one_class_is_a_missingness_suspect():
@@ -432,7 +430,7 @@ def test_regression_copy_and_a_strong_but_noisy_predictor():
     report = screen.screen(frame, "y", "regression", FAST)
     assert suspects(report) == {("leak", screen.SKILL)}
     strong = next(f for f in report.findings if f.feature == "x1")
-    assert strong.statistic < FAST.skill_ceiling and not strong.suspect
+    assert strong.statistic < FAST.skill and not strong.suspect
 
 
 def test_groups_keep_entities_whole_and_still_find_a_leak():
@@ -532,7 +530,7 @@ def test_the_global_null_is_flagged_no_more_often_than_alpha():
             frame,
             "y",
             CLS,
-            dataclasses.replace(FAST, bootstrap=20, run_seed=seed),
+            dataclasses.replace(FAST, bootstrap=20, seed=seed),
         )
         assert report.suspects == ()
         significant += any(f.significant for f in report.findings)
@@ -550,9 +548,9 @@ def probed(frame, seed=0):
 
 
 def test_the_shipped_certificates_are_current_for_every_kind():
-    store = screen.load_store()
+    store = screen.load()
     for detector in screen.DETECTORS.values():
-        state = store.state(detector, screen.code_digest())
+        state = store.state(detector, screen.fingerprint())
         assert state is certificates.Freshness.CURRENT, detector
 
 
@@ -586,7 +584,7 @@ def test_a_missed_plant_is_reported_and_a_suspect_still_blocks(monkeypatch):
 def test_a_stale_certificate_is_reported_and_does_not_decide(monkeypatch):
     # Enforces docs/LEAKAGE.md:236.
     # Enforces website/src/learn/leakage.html:69-70.
-    monkeypatch.setattr(screen, "code_digest", lambda: "0" * 64)
+    monkeypatch.setattr(screen, "fingerprint", lambda: "0" * 64)
     report = probed(world(20))
     assert "published certificate for binary targets: stale" in report.notes
     assert set(report.gates.values()) == {certificates.Authority.GATING}
@@ -665,8 +663,8 @@ def test_r2_matches_sklearn_for_the_observed_regression_fit():
         y, "regression", 0, folds, float(((y - y.mean()) ** 2).sum())
     )
     phi = screen.basis(pandas.Series(x))
-    got = screen.skill_statistic(problem, phi)(y[None, :])[0]
-    pred = screen.oof_fit(y[None, :], phi, folds)[0]
+    got = screen.quantify(problem, phi)(y[None, :])[0]
+    pred = screen.fit(y[None, :], phi, folds)[0]
     assert got == pytest.approx(r2_score(y, pred), abs=1e-12)
 
 

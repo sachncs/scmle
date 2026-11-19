@@ -62,7 +62,7 @@ class Metadata:
             )
 
     @property
-    def duration_seconds(self) -> float:
+    def seconds(self) -> float:
         """The decoded duration in seconds, never rounded to whole seconds."""
         return self.frame_count / self.sample_rate
 
@@ -118,7 +118,7 @@ class Transcript:
         text: Non-blank full transcript text.
         source: Non-blank identifier of the transcribed audio.
         provider: Non-blank name of the transcription provider.
-        provider_version: Non-blank version of the provider.
+        version: Non-blank version of the provider.
         language: Non-blank language of the transcript.
         segments: Time-local segments, ordered by start time.
         confidence: Optional overall confidence in [0, 1].
@@ -127,7 +127,7 @@ class Transcript:
     text: str
     source: str
     provider: str
-    provider_version: str
+    version: str
     language: str
     segments: tuple[Segment, ...] = ()
     confidence: float | None = None
@@ -151,7 +151,7 @@ class Transcript:
             ("text", self.text),
             ("source", self.source),
             ("provider", self.provider),
-            ("provider_version", self.provider_version),
+            ("provider_version", self.version),
             ("language", self.language),
         ):
             if not value.strip():

@@ -331,8 +331,8 @@ def test_the_label_certificate_hashes_the_world_description(monkeypatch):
         },
         sort_keys=True,
     )
-    assert cert.digests["corpus"] == certificates.corpus_hash(
-        [certificates.hash_source(description)]
+    assert cert.digests["corpus"] == certificates.checksum(
+        [certificates.digest(description)]
     )
     assert description.startswith('{"alpha": ')
 
@@ -559,13 +559,13 @@ def expected_base(number):
 
 def test_the_fuzz_tries_the_count_of_records_and_accepts_none(monkeypatch):
     tried = []
-    real = contracts.AnalysisCharter.from_dict
+    real = contracts.Charter.from_dict
 
     def spy(record):
         tried.append(json.loads(json.dumps(record)))
         return real(record)
 
-    monkeypatch.setattr(contracts.AnalysisCharter, "from_dict", spy)
+    monkeypatch.setattr(contracts.Charter, "from_dict", spy)
     assert framing_certify.fuzz_rows(1000) == {
         "malformed": 1000,
         "accepted": 0,
@@ -647,9 +647,7 @@ def test_the_fuzz_counts_what_it_is_asked_for():
 
 
 def test_a_charter_that_is_accepted_is_counted(monkeypatch):
-    monkeypatch.setattr(
-        contracts.AnalysisCharter, "from_dict", lambda record: record
-    )
+    monkeypatch.setattr(contracts.Charter, "from_dict", lambda record: record)
     assert framing_certify.fuzz_rows(25) == {"malformed": 25, "accepted": 25}
 
 
@@ -990,13 +988,13 @@ def test_the_fuzz_default_is_a_thousand_records_with_known_extra_fields(
     monkeypatch,
 ):
     names = []
-    real = contracts.AnalysisCharter.from_dict
+    real = contracts.Charter.from_dict
 
     def spy(record):
         names.extend(k for k in record if k.startswith("extra"))
         return real(record)
 
-    monkeypatch.setattr(contracts.AnalysisCharter, "from_dict", spy)
+    monkeypatch.setattr(contracts.Charter, "from_dict", spy)
     assert framing_certify.fuzz_rows() == {"malformed": 1000, "accepted": 0}
     assert names[:6] == [
         "extra440",

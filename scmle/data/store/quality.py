@@ -1,17 +1,17 @@
 """Quality gates before training and before inference, with a declared policy.
 
-A `QualityGate` holds rules. Each rule has a `policy` that says, in advance,
+A `Gate` holds rules. Each rule has a `policy` that says, in advance,
 what a violation means:
 
 ``fail``
-    The run stops: `QualityGateError`, carrying the report.
+    The run stops: `GateError`, carrying the report.
 ``quarantine``
     The offending rows are removed from the data that continues, and written
     with the report under ``quarantine/<snapshot id>/`` in the store. A
     rule that is about the whole dataset (schema, freshness, row count,
     null fraction) has no rows to remove, so its quarantine holds the whole
     snapshot: a marker is written, the run stops with
-    `QualityGateError(quarantined=True)` and a later run of the same
+    `GateError(quarantined=True)` and a later run of the same
     snapshot is refused without evaluation until the marker is removed.
 ``warn``
     The finding is recorded in the report and the data continues unchanged.
@@ -58,7 +58,7 @@ class Stage(enum.StrEnum):
 BOTH = frozenset(Stage)
 
 
-class QualityGateError(errors.DataError):
+class GateError(errors.DataError):
     """The data failed a rule whose policy stops the run.
 
     Attributes:
@@ -92,7 +92,7 @@ class Finding:
         policy: The rule's declared policy.
         passed: Whether the data satisfied it.
         violations: Violating rows, or 1 for a dataset-level violation.
-        row_level: Whether `rows` identify the violations.
+        granular: Whether `rows` identify the violations.
         rows: Positions of violating rows (empty for dataset-level rules).
         detail: Human-readable explanation.
     """
@@ -101,7 +101,7 @@ class Finding:
     policy: Severity
     passed: bool
     violations: int
-    row_level: bool
+    granular: bool
     rows: tuple[int, ...]
     detail: str
 
@@ -110,12 +110,11 @@ class Finding:
 
         Returns:
             A dict of the fields, with the policy as its string value, at
-            most 20 row positions as a list, and `row_level` as `granular`.
+            most 20 row positions as a list.
         """
         record = dataclasses.asdict(self)
         record["policy"] = self.policy.value
         record["rows"] = list(self.rows[:20])
-        record["granular"] = record.pop("row_level")
         return record
 
 
@@ -125,7 +124,7 @@ class Assessment:
 
     Attributes:
         stage: `train` or `inference`.
-        snapshot_id: The snapshot checked.
+        snapshot: The snapshot checked.
         dataset: The dataset's contract name.
         findings: One per rule that applies to the stage.
         decision: `passed`, `passed_with_warnings`, `rows_quarantined`,
@@ -135,7 +134,7 @@ class Assessment:
     """
 
     stage: str
-    snapshot_id: str
+    snapshot: str
     dataset: str
     findings: tuple[Finding, ...]
     decision: str
@@ -151,7 +150,7 @@ class Assessment:
         """
         return {
             "stage": self.stage,
-            "snapshot": self.snapshot_id,
+            "snapshot": self.snapshot,
             "dataset": self.dataset,
             "decision": self.decision,
             "rows": {"received": self.rows_in, "used": self.rows_out},
@@ -205,8 +204,8 @@ class Check(abc.ABC):
     def evaluate(
         self,
         frame: pandas.DataFrame,
-        record: snapshot.SnapshotRecord,
-        contract: snapshot.DataContract,
+        record: snapshot.Record,
+        contract: snapshot.Contract,
     ) -> Finding:
         """Checks the data.
 
@@ -234,7 +233,7 @@ class Check(abc.ABC):
             policy=self.policy,
             passed=ok,
             violations=0 if ok else 1,
-            row_level=False,
+            granular=False,
             rows=(),
             detail=detail,
         )
@@ -257,13 +256,13 @@ class Check(abc.ABC):
             policy=self.policy,
             passed=not rows,
             violations=len(rows),
-            row_level=True,
+            granular=True,
             rows=rows,
             detail=detail,
         )
 
 
-class SchemaCheck(Check):
+class Schema(Check):
     """The observed schema equals the contract's."""
 
     name = "schema"
@@ -271,8 +270,8 @@ class SchemaCheck(Check):
     def evaluate(
         self,
         frame: pandas.DataFrame,
-        record: snapshot.SnapshotRecord,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
-        contract: snapshot.DataContract,
+        record: snapshot.Record,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
+        contract: snapshot.Contract,
     ) -> Finding:
         """Compares the frame's schema with the contract's.
 
@@ -297,8 +296,8 @@ class Freshness(Check):
     def evaluate(
         self,
         frame: pandas.DataFrame,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
-        record: snapshot.SnapshotRecord,
-        contract: snapshot.DataContract,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
+        record: snapshot.Record,
+        contract: snapshot.Contract,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
     ) -> Finding:
         """Checks the snapshot's age against the contract's limit.
 
@@ -314,11 +313,11 @@ class Freshness(Check):
         stale = record.freshness == snapshot.STALE
         return self.judge(
             not stale,
-            f"{record.age_seconds:.0f}s old, limit {record.max_age_seconds}s",
+            f"{record.age:.0f}s old, limit {record.staleness}s",
         )
 
 
-class MinRowsCheck(Check):
+class Rows(Check):
     """The dataset has at least `minimum` rows."""
 
     name = "min_rows"
@@ -336,8 +335,8 @@ class MinRowsCheck(Check):
     def evaluate(
         self,
         frame: pandas.DataFrame,
-        record: snapshot.SnapshotRecord,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
-        contract: snapshot.DataContract,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
+        record: snapshot.Record,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
+        contract: snapshot.Contract,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
     ) -> Finding:
         """Checks the number of rows.
 
@@ -356,7 +355,7 @@ class MinRowsCheck(Check):
         )
 
 
-class NullFractionCheck(Check):
+class Nulls(Check):
     """At most `maximum` of a column is null."""
 
     name = "null_fraction"
@@ -376,8 +375,8 @@ class NullFractionCheck(Check):
     def evaluate(
         self,
         frame: pandas.DataFrame,
-        record: snapshot.SnapshotRecord,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
-        contract: snapshot.DataContract,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
+        record: snapshot.Record,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
+        contract: snapshot.Contract,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
     ) -> Finding:
         """Checks the fraction of nulls in the column.
 
@@ -420,8 +419,8 @@ class Complete(Check):
     def evaluate(
         self,
         frame: pandas.DataFrame,
-        record: snapshot.SnapshotRecord,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
-        contract: snapshot.DataContract,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
+        record: snapshot.Record,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
+        contract: snapshot.Contract,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
     ) -> Finding:
         """Checks that the column has no nulls.
 
@@ -442,7 +441,7 @@ class Complete(Check):
         )
 
 
-class UniqueKeyCheck(Check):
+class Keys(Check):
     """The contract's key columns identify rows (repeats are violations)."""
 
     name = "unique_key"
@@ -450,8 +449,8 @@ class UniqueKeyCheck(Check):
     def evaluate(
         self,
         frame: pandas.DataFrame,
-        record: snapshot.SnapshotRecord,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
-        contract: snapshot.DataContract,
+        record: snapshot.Record,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
+        contract: snapshot.Contract,
     ) -> Finding:
         """Checks that no key repeats.
 
@@ -475,7 +474,7 @@ class UniqueKeyCheck(Check):
         )
 
 
-class RangeCheck(Check):
+class Range(Check):
     """Values of a numeric column lie in `[minimum, maximum]`."""
 
     name = "range"
@@ -503,8 +502,8 @@ class RangeCheck(Check):
     def evaluate(
         self,
         frame: pandas.DataFrame,
-        record: snapshot.SnapshotRecord,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
-        contract: snapshot.DataContract,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
+        record: snapshot.Record,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
+        contract: snapshot.Contract,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
     ) -> Finding:
         """Checks that values lie within the bounds, which are inclusive.
 
@@ -557,8 +556,8 @@ class Membership(Check):
     def evaluate(
         self,
         frame: pandas.DataFrame,
-        record: snapshot.SnapshotRecord,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
-        contract: snapshot.DataContract,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
+        record: snapshot.Record,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
+        contract: snapshot.Contract,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
     ) -> Finding:
         """Checks that values belong to the declared set.
 
@@ -584,7 +583,7 @@ class Membership(Check):
         )
 
 
-class QualityGate:
+class Gate:
     """Applies rules to a snapshot and acts on each rule's policy.
 
     Attributes:
@@ -639,8 +638,8 @@ class QualityGate:
     def run(
         self,
         frame: pandas.DataFrame,
-        record: snapshot.SnapshotRecord,
-        contract: snapshot.DataContract,
+        record: snapshot.Record,
+        contract: snapshot.Contract,
         stage: Stage,
     ) -> Screening:
         """Checks the data for a stage.
@@ -657,26 +656,26 @@ class QualityGate:
             The report is also written to the store, if there is one.
 
         Raises:
-            QualityGateError: If a `fail` rule is violated, or a dataset
+            GateError: If a `fail` rule is violated, or a dataset
                 level `quarantine` rule is (or the snapshot was quarantined
                 before).
         """
         stage = Stage(stage)
         applicable = [rule for rule in self.rules if stage in rule.stages]
         if self.store is not None and self.store.exists(
-            self.locate(record.snapshot_id)
+            self.locate(record.identifier)
         ):
             report = Assessment(
                 stage.value,
-                record.snapshot_id,
+                record.identifier,
                 record.dataset,
                 (),
                 "quarantined",
                 len(frame),
                 0,
             )
-            raise QualityGateError(
-                f"snapshot {record.snapshot_id} is quarantined",
+            raise GateError(
+                f"snapshot {record.identifier} is quarantined",
                 report,
                 quarantined=True,
             )
@@ -689,7 +688,7 @@ class QualityGate:
         held = frame.reset_index(drop=True).iloc[removed]
         report = Assessment(
             stage.value,
-            record.snapshot_id,
+            record.identifier,
             record.dataset,
             findings,
             decision,
@@ -698,11 +697,11 @@ class QualityGate:
         )
         self.persist(report, held, record, bool(holds))
         if stops:
-            raise QualityGateError(
+            raise GateError(
                 "; ".join(f"{f.rule}: {f.detail}" for f in stops), report
             )
         if holds:
-            raise QualityGateError(
+            raise GateError(
                 "snapshot quarantined: "
                 + "; ".join(f"{f.rule}: {f.detail}" for f in holds),
                 report,
@@ -732,13 +731,13 @@ class QualityGate:
         holds = [
             f
             for f in failed
-            if f.policy is Severity.QUARANTINE and not f.row_level
+            if f.policy is Severity.QUARANTINE and not f.granular
         ]
         removed = sorted(
             {
                 row
                 for f in failed
-                if f.policy is Severity.QUARANTINE and f.row_level
+                if f.policy is Severity.QUARANTINE and f.granular
                 for row in f.rows
             }
         )
@@ -756,7 +755,7 @@ class QualityGate:
         self,
         report: Assessment,
         held: pandas.DataFrame,
-        record: snapshot.SnapshotRecord,
+        record: snapshot.Record,
         whole_snapshot: bool,
     ) -> None:
         """Writes the report, quarantined rows and the snapshot marker.
@@ -776,16 +775,16 @@ class QualityGate:
             return
         body = json.dumps(report.to_dict(), indent=2, sort_keys=True).encode()
         self.store.put(
-            f"{QUALITY_PREFIX}/{record.snapshot_id}-{report.stage}.json", body
+            f"{QUALITY_PREFIX}/{record.identifier}-{report.stage}.json", body
         )
         if len(held):
             self.store.put(
-                f"{QUARANTINE_PREFIX}/{record.snapshot_id}/rows-{report.stage}.csv",
+                f"{QUARANTINE_PREFIX}/{record.identifier}/rows-{report.stage}.csv",
                 held.to_csv(index=False).encode(),
             )
         if whole_snapshot:
-            marker = {"snapshot_id": record.snapshot_id, "stage": report.stage}
+            marker = {"snapshot_id": record.identifier, "stage": report.stage}
             self.store.put(
-                self.locate(record.snapshot_id),
+                self.locate(record.identifier),
                 json.dumps(marker, sort_keys=True).encode(),
             )

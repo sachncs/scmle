@@ -78,7 +78,7 @@ def test_the_cost_of_a_scan_grows_with_its_rows():
 
 
 def demands(frame):
-    cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=7)
+    cfg = dataclasses.replace(leakage.CERTIFIED, seed=7)
     features = [c for c in frame.columns if c != "y"]
     real = screen.measure(
         frame, "y", "classification", cfg, features, None, None
@@ -168,9 +168,7 @@ def profile_of(frame, budget):
         data=tasks.Dataset(uri="m", target="y"),
         resources=tasks.Resources(time_budget_seconds=budget),
     )
-    resolved = scmle.data.validation.target.TaskResolver(spec).resolve(
-        frame["y"]
-    )
+    resolved = scmle.data.validation.target.Resolver(spec).resolve(frame["y"])
     manifest = tabular.manifested(frame, "y")
     return profiler.Profiler(spec).profile(frame, manifest, resolved)
 

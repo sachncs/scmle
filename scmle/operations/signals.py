@@ -254,12 +254,12 @@ def measure(
     unseen: dict[str, float] = {}
     for name, reference in profile.features.items():
         if name not in rows.columns:
-            missing[name] = 1.0 - reference.missing_rate
+            missing[name] = 1.0 - reference.missing
             continue
         column = rows[name]
-        missing[name] = float(column.isna().mean()) - reference.missing_rate
+        missing[name] = float(column.isna().mean()) - reference.missing
         drift[name] = reference.adjust(column)
-        unseen[name] = reference.unseen_rate(column)
+        unseen[name] = reference.rate(column)
     return missing, drift, unseen
 
 

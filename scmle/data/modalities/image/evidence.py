@@ -13,12 +13,12 @@ class Profile:
     """Bounded, deterministic summary of an image dataset.
 
     Attributes:
-        dataset_count: Number of samples in the dataset.
-        profiled_count: Number of samples profiled.
+        samples: Number of samples in the dataset.
+        profiled: Number of samples profiled.
         truncated: Whether samples were left out of the profile.
-        profiled_bytes: Total encoded size of the profiled samples.
-        unique_content_count: Distinct content hashes among them.
-        duplicate_count: Profiled samples minus unique content.
+        size: Total encoded size of the profiled samples.
+        unique: Distinct content hashes among them.
+        duplicates: Profiled samples minus unique content.
         modes: Sorted ``(mode, count)`` pairs.
         channels: Sorted ``(channel count, count)`` pairs.
         width_min: Smallest width in pixels.
@@ -33,12 +33,12 @@ class Profile:
             copies.
     """
 
-    dataset_count: int
-    profiled_count: int
+    samples: int
+    profiled: int
     truncated: bool
-    profiled_bytes: int
-    unique_content_count: int
-    duplicate_count: int
+    size: int
+    unique: int
+    duplicates: int
     modes: tuple[tuple[str, int], ...]
     channels: tuple[tuple[int, int], ...]
     width_min: int
@@ -108,7 +108,7 @@ class Split:
         """
         return {
             name: tuple(
-                sorted({sample.group_id or sample.source for sample in samples})
+                sorted({sample.group or sample.source for sample in samples})
             )
             for name, samples in (
                 ("train", self.train),

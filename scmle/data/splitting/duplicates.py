@@ -13,9 +13,7 @@ DECIMALS = 6
 NOT_DUPLICATED = -1
 
 
-def duplicate_groups(
-    frame: pandas.DataFrame, columns: list[str]
-) -> numpy.ndarray:
+def group(frame: pandas.DataFrame, columns: list[str]) -> numpy.ndarray:
     """Labels each row with the id of its duplicate group.
 
     Args:

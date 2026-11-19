@@ -1771,7 +1771,7 @@ def fingerprint() -> str:
     Returns:
         The combined source hash.
     """
-    return certificates.code_hash(
+    return certificates.fingerprint(
         Task,
         simulate,
         worlds,

@@ -81,7 +81,7 @@ def test_the_permutation_p_value_is_the_add_one_formula():
 def test_the_mmd_statistic_matches_the_definition_from_pairwise_distances():
     left, right = frames(rows=40, shift_by=0.5, columns=3)
     both = pandas.concat([left, right], ignore_index=True)
-    design = shift.design_matrix(both, len(both))
+    design = shift.embed(both, len(both))
     bandwidth = shift.sigma(design)
     kernel = shift.gaussian(design, bandwidth)
     expected = numpy.exp(
@@ -113,9 +113,9 @@ def test_the_median_heuristic_is_the_median_pairwise_distance():
 
 def test_the_mmd_permutation_p_value_agrees_with_scipy_permutation_test():
     left, right = frames(rows=60, shift_by=0.9, columns=2, seed=5)
-    mine = shift.mmd_test(left, right, 0, permutations=499)
+    mine = shift.distinguish(left, right, 0, permutations=499)
     both = pandas.concat([left, right], ignore_index=True)
-    design = shift.design_matrix(both, len(both))
+    design = shift.embed(both, len(both))
     kernel = shift.gaussian(design, shift.sigma(design))
     index = numpy.arange(len(both), dtype=float)
 
@@ -137,12 +137,12 @@ def test_the_mmd_permutation_p_value_agrees_with_scipy_permutation_test():
 
 def test_a_clear_shift_is_found_by_both_tests_and_no_shift_is_not():
     left, right = frames(rows=300, shift_by=1.0, seed=7)
-    for test in (shift.c2st, shift.mmd_test):
+    for test in (shift.c2st, shift.distinguish):
         found = test(left, right, 0, permutations=99)
         assert found.p_value <= 0.05
         assert found.decision is qualification.Decision.WARN
     same_left, same_right = frames(rows=300, seed=8)
-    for test in (shift.c2st, shift.mmd_test):
+    for test in (shift.c2st, shift.distinguish):
         found = test(same_left, same_right, 0, permutations=99)
         assert found.p_value > 0.05
         assert found.decision is qualification.Decision.PASS
@@ -199,7 +199,7 @@ def test_strata_permute_labels_within_blocks_only():
     left, right = frames(rows=100, seed=2)
     strata = numpy.r_[numpy.arange(100) % 10, numpy.arange(100) % 10]
     check = shift.c2st(left, right, 0, permutations=49, strata=strata)
-    other = shift.mmd_test(left, right, 0, permutations=49, strata=strata)
+    other = shift.distinguish(left, right, 0, permutations=49, strata=strata)
     assert 0 < check.p_value <= 1 and 0 < other.p_value <= 1
 
 
@@ -208,7 +208,7 @@ def test_mismatched_columns_and_small_samples_are_refused():
     with pytest.raises(ValueError, match="same columns"):
         shift.c2st(left, right.drop(columns="f0"), 0)
     with pytest.raises(ValueError, match="at least"):
-        shift.mmd_test(left.head(10), right, 0)
+        shift.distinguish(left.head(10), right, 0)
 
 
 def test_categorical_and_missing_values_are_handled():
@@ -227,7 +227,7 @@ def test_categorical_and_missing_values_are_handled():
 
     left, right = table([0.8, 0.1, 0.1]), table([0.1, 0.1, 0.8])
     assert shift.c2st(left, right, 0, permutations=49).p_value <= 0.05
-    assert shift.mmd_test(left, right, 0, permutations=49).p_value <= 0.05
+    assert shift.distinguish(left, right, 0, permutations=49).p_value <= 0.05
 
 
 def test_feature_tests_match_scipy_and_adjust_with_bh():
@@ -299,4 +299,4 @@ def test_assess_reports_fail_pass_and_whether_the_tests_agree():
 
 
 def test_the_digest_is_a_sha256_of_the_module():
-    assert len(shift.code_digest()) == 64
+    assert len(shift.fingerprint()) == 64

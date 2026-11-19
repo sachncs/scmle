@@ -238,7 +238,7 @@ def registered_claim_run(folder, baseline_report=True, causal_report=True):
         ),
         produce,
     )
-    result = governed.run_governed(
+    result = governed.govern(
         charter=charter,
         features=features,
         target=target,
@@ -332,7 +332,7 @@ def test_ledger_head_findings_are_exact(run):
 
 def charter_namespace(rules, signed=True):
     return types.SimpleNamespace(
-        charter_hash="h" * 40,
+        digest="h" * 40,
         signed=signed,
         charter=types.SimpleNamespace(rules=rules),
     )
@@ -356,9 +356,7 @@ def test_charter_findings_describe_the_signature_state(run):
     assert failed[0].status == "fail"
     assert failed[0].detail != "None"
     with pytest.raises(errors.ScmleError) as caught:
-        sealing.read_verified(
-            run / claims_audit.CHARTER_FILE, signing_key="another-key"
-        )
+        sealing.read(run / claims_audit.CHARTER_FILE, signing_key="another-key")
     assert failed[0].detail == str(caught.value)
 
 
@@ -369,7 +367,7 @@ def test_chartered_rules_compare_both_ledger_and_confirmation_rules(
     rules = types.SimpleNamespace(ledger="lord++", confirmation="bh")
     monkeypatch.setattr(
         sealing,
-        "read_verified",
+        "read",
         lambda path, signing_key=None: charter_namespace(rules),
     )
 
@@ -416,7 +414,7 @@ def test_chartered_rules_compare_both_ledger_and_confirmation_rules(
 
 
 def test_header_mismatches_are_named_in_a_fixed_order():
-    survivors = types.SimpleNamespace(sha256="s", hypothesis_ids=("h1",))
+    survivors = types.SimpleNamespace(sha256="s", hypotheses=("h1",))
     row = {"outcome": "o", "rule": "r", "alpha_confirm": "a"}
     document = {
         "digests": {"survivors": "s"},
@@ -444,8 +442,8 @@ def make_sealed_ledger(confirmed=None, outcome="confirmed", stage_two=None):
     }
     if confirmed is not None:
         row["confirmed"] = confirmed
-    survivors = types.SimpleNamespace(sha256="s", hypothesis_ids=("h1", "h2"))
-    return types.SimpleNamespace(confirmation=row, survivor_set=survivors)
+    survivors = types.SimpleNamespace(sha256="s", hypotheses=("h1", "h2"))
+    return types.SimpleNamespace(confirmation=row, remaining=survivors)
 
 
 def make_claims_document(**changes):
@@ -470,11 +468,11 @@ def test_claims_against_ledger_findings_are_exact():
     assert claims_audit.crosscheck(make_claims_document(), ledger) == finding(
         name, "pass", "1 confirmed of 2 claims"
     )
-    unsealed = types.SimpleNamespace(confirmation=None, survivor_set=None)
+    unsealed = types.SimpleNamespace(confirmation=None, remaining=None)
     assert claims_audit.crosscheck(make_claims_document(), unsealed) == finding(
         name, "fail", "the ledger is not sealed"
     )
-    half = types.SimpleNamespace(confirmation={}, survivor_set=None)
+    half = types.SimpleNamespace(confirmation={}, remaining=None)
     assert (
         claims_audit.crosscheck(make_claims_document(), half).status == "fail"
     )
@@ -552,7 +550,7 @@ def test_replay_tolerates_tiny_absolute_differences_only():
 
 
 def test_stage_two_record_problems_are_named_in_order():
-    survivors = types.SimpleNamespace(sha256="s", hypothesis_ids=("h1", "h2"))
+    survivors = types.SimpleNamespace(sha256="s", hypotheses=("h1", "h2"))
     good = {"family": [], "family_sha256": "d", "survivors_sha256": "s"}
     assert (
         claims_audit.stage_two_record_problems(
@@ -572,10 +570,8 @@ def test_stage_two_record_problems_are_named_in_order():
 
 
 def stage_two_ledger():
-    survivors = types.SimpleNamespace(
-        sha256="s", hypothesis_ids=("h1", "h2", "h3")
-    )
-    return types.SimpleNamespace(survivor_set=survivors)
+    survivors = types.SimpleNamespace(sha256="s", hypotheses=("h1", "h2", "h3"))
+    return types.SimpleNamespace(remaining=survivors)
 
 
 def stage_two_document(**changes):
@@ -609,7 +605,7 @@ def test_stage_two_findings_are_exact():
     assert claims_audit.tally({}, ledger) == finding(
         name, "skipped", "no withdrawal rule ran"
     )
-    unfrozen = types.SimpleNamespace(survivor_set=None)
+    unfrozen = types.SimpleNamespace(remaining=None)
     assert claims_audit.tally(stage_two_document(), unfrozen) == (
         finding(name, "fail", "the ledger has no frozen survivors")
     )

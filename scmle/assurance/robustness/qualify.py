@@ -4,7 +4,7 @@ This is the wiring between the robustness package and a charter run. It reads
 the exploration view and, when the data spec names one, a deployment sample;
 it never touches `C`, and it does not open `F` (the final-test set is opened
 by the final evaluation only, so the forward check is reported as not run
-here; `forward.forward_check` is the function that opens `F`, once).
+here; `forward.check` is the function that opens `F`, once).
 
 Certificates are shipped with the package
 (`scmle/certificates/f6_certificates.json`). When the file is missing,
@@ -62,12 +62,12 @@ class Robustness:
         shift: The comparison with the deployment sample.
         coverage: Subgroup coverage rows.
         forward: The forward check (skipped in a run).
-        stability_gate: Whether a current certificate lets stability act.
-        c2st_gate: Gate status of the classifier test.
-        mmd_gate: Gate status of the kernel test.
+        gate: Whether a current certificate lets stability act.
+        classifier: Gate status of the classifier test.
+        kernel: Gate status of the kernel test.
         store_note: Why no certificate store was used, or an empty string.
         rule: The survival rule the verdicts used.
-        rule_note: Why the rule is descriptive, or an empty string.
+        note: Why the rule is descriptive, or an empty string.
         drift: Each time period of `X` against the first.
     """
 
@@ -79,12 +79,12 @@ class Robustness:
     shift: shift.Shift
     coverage: tuple[coverage.Cell, ...]
     forward: forward.Forward
-    stability_gate: certificates.Authority
-    c2st_gate: certificates.Authority
-    mmd_gate: certificates.Authority
+    gate: certificates.Authority
+    classifier: certificates.Authority
+    kernel: certificates.Authority
     store_note: str
     rule: stability.Thresholds = stability.DEFAULT_RULE
-    rule_note: str = ""
+    note: str = ""
     drift: periods.Periods = periods.UNTIMED
 
     @property
@@ -199,7 +199,7 @@ def examine(
     share = budget_seconds / max(len(chosen), 1)
     curve = min(permutations, MAX_CURVE_PERMUTATIONS)
     return tuple(
-        stability.assess_finding(
+        stability.assess(
             name,
             features[name].to_numpy(dtype=float),
             codes.to_numpy(dtype=float),
@@ -243,7 +243,7 @@ def compare(
     c2st_gate, mmd_gate = (
         certificates.Authority.DESCRIPTIVE
         if store is None
-        else store.status(detector, shift.code_digest(), shift.DEFECT_TYPE)
+        else store.status(detector, shift.fingerprint(), shift.DEFECT_TYPE)
         for detector in (shift.C2ST_ID, shift.MMD_ID)
     )
     sample = features[[c for c in candidates if c in features.columns]]
@@ -332,7 +332,7 @@ def run(
         `stability_note` says why, when it chooses none), the shift test,
         the subgroup coverage, a skipped forward check and the gates.
     """
-    loaded = qualify.load_store(F6_STORE, directory)
+    loaded = qualify.load(F6_STORE, directory)
     gate, rule_note = authorize(loaded.store, rule)
     applicable, notes = stability.actionable(choices)
     grid = multiverse.universe(applicable, seed)
@@ -361,10 +361,10 @@ def run(
         shift=result,
         coverage=represent(features, reference, sensitive),
         forward=forward.skipped(TEMPORAL_SKIP if temporal else STATIC_SKIP),
-        stability_gate=gate,
-        c2st_gate=c2st_gate,
-        mmd_gate=mmd_gate,
+        gate=gate,
+        classifier=c2st_gate,
+        kernel=mmd_gate,
         store_note=loaded.note,
         rule=rule,
-        rule_note=rule_note,
+        note=rule_note,
     )

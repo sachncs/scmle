@@ -37,7 +37,7 @@ def test_no_rows_have_a_lower_limit_of_zero() -> None:
 
 
 def test_the_not_evaluated_document_word_for_word() -> None:
-    assert coverage_confirm.not_evaluated("no rows") == {
+    assert coverage_confirm.abstain("no rows") == {
         "schema_version": 1,
         "claim_id": "coverage_nominal",
         "status": confirm.NOT_EVALUATED,

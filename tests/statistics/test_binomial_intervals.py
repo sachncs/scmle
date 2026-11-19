@@ -36,7 +36,7 @@ def test_wilson_endpoints_match_scipy(successes, trials):
     expected = reference(successes, trials, "wilson")
     z = float(stats.norm.ppf(0.975))
     found = {
-        "certificates": certificates.wilson_interval(successes, trials),
+        "certificates": certificates.bound(successes, trials),
         "constraints": constraints.wilson(successes, trials, z),
     }
     for name, (low, high) in found.items():
@@ -103,7 +103,7 @@ def test_wilson_exact_coverage_stays_near_nominal(trials):
     # oscillates around nominal. The stated tolerance is 0.03 for n >= 100
     # and p in [0.1, 0.9].
     def interval(count, size):
-        return certificates.wilson_interval(count, size)
+        return certificates.bound(count, size)
 
     for proportion in numpy.linspace(0.1, 0.9, 33):
         found = exact_coverage(interval, trials, float(proportion))
@@ -126,7 +126,7 @@ def simulated_coverage(interval, trials, proportion, seed):
 @pytest.mark.parametrize(("trials", "proportion"), [(200, 0.5), (1000, 0.3)])
 def test_wilson_coverage_is_near_nominal_in_simulation(trials, proportion):
     for name, interval in {
-        "certificates": certificates.wilson_interval,
+        "certificates": certificates.bound,
         "constraints": lambda k, n: constraints.wilson(
             k, n, float(stats.norm.ppf(0.975))
         ),

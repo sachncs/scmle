@@ -23,27 +23,27 @@ class Identity:
     """A detector's identity for certification and gating.
 
     Attributes:
-        detector_id: Key in the certificate store.
+        key: Key in the certificate store.
         modules: Modules whose source defines the detector.
-        defect_types: Defect types it is certified on; it may gate on a
+        types: Defect types it is certified on; it may gate on a
             type only when that type's outcome passed.
     """
 
-    detector_id: str
+    key: str
     modules: tuple[ModuleType, ...]
-    defect_types: tuple[str, ...]
+    types: tuple[str, ...]
 
-    def code_hash(self) -> str:
+    def digest(self) -> str:
         """Hashes the source of the detector's modules.
 
         Returns:
             The code hash that a certificate for this detector must match.
         """
-        return certificates.code_hash(*self.modules)
+        return certificates.fingerprint(*self.modules)
 
 
 SPECS: dict[str, Identity] = {
-    spec.detector_id: spec
+    spec.key: spec
     for spec in (
         Identity("f5-sentinel", (sentinels,), ("sentinel",)),
         Identity(

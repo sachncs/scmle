@@ -152,7 +152,7 @@ def test_modality_dataset_card_keeps_curation_and_governance_gaps_explicit():
         "risk_findings": [],
     }
 
-    card = curation.Datasheet.from_report(
+    card = curation.Datasheet.draft(
         "image", report, ("bounded representation",)
     )
 
@@ -167,9 +167,9 @@ def test_modality_dataset_card_keeps_curation_and_governance_gaps_explicit():
         curation.Datasheet(
             modality="image",
             dataset_hash="different",
-            sample_count=3,
+            samples=3,
             curation=report,
-            intended_use="test",
+            use="test",
             limitations=("bounded",),
             provenance={"status": "declared"},
             privacy={"status": "assessed"},
@@ -186,11 +186,11 @@ def test_modality_curation_card_can_describe_an_empty_snapshot():
         "risk_findings": [],
     }
 
-    card = curation.Datasheet.from_report(
+    card = curation.Datasheet.draft(
         "extension:acme/empty-source", report, ("empty snapshot",)
     )
 
-    assert card.sample_count == 0
+    assert card.samples == 0
     assert card.manifest is not None
     assert card.manifest.samples == 0
 

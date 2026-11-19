@@ -17,7 +17,7 @@ from tests import support
 
 
 def config(**changes):
-    values = {"skill_ceiling": 0.9, "association_ceiling": 0.5}
+    values = {"skill": 0.9, "ceiling": 0.5}
     values.update(changes)
     return leakage.Config(**values)
 
@@ -68,7 +68,7 @@ def test_a_column_declared_known_after_the_outcome_is_declared():
     assert [f.feature for f in found] == ["duration"]
     (late,) = found
     assert late.mechanism == settings.DECLARED
-    assert late.statistic == 1.0 and late.lower_bound == 1.0
+    assert late.statistic == 1.0 and late.lower == 1.0
     assert late.suspect and late.blocking and late.significant
     assert records.declared(["age"], {"duration": "outcome"}) == []
     assert records.declared(["age"], None) == []

@@ -289,7 +289,7 @@ def decide_graph_rule(
             admission=Admission.QUARANTINE,
             reasons=(*timing.reasons, "descendant of the treatment"),
         )
-    base = graph.adjustment_set(treatment, outcome)
+    base = graph.deconfound(treatment, outcome)
     if base is None:
         return dataclasses.replace(
             timing,
@@ -352,7 +352,7 @@ def adjudicate(
         non-finite lag is rejected with a `ValueError`, as is, when the graph
         rule is reached, a treatment or outcome that is not a node of
         `graph`, the same node given as both, or a search for the adjustment
-        set that `Dag.adjustment_set` refuses as too large.
+        set that `Dag.deconfound` refuses as too large.
     """
     timing = forecastable(
         record, mode, declared_lag_seconds, today, suspect, leakage_gate
@@ -377,11 +377,11 @@ class Admissibility:
         decisions: One per field, in the order of the provenance table.
         dag_hash: Hash of the graph used, or None; written as
             `digests.dag`.
-        adjustment_set: The back-door set found, for a causal estimand;
+        adjustment: The back-door set found, for a causal estimand;
             written as `adjustment`.
         migrations: The written layout's version steps, oldest first, one
             per format version: version 2 changed the decisions, version 3
-            moved `dag_hash` to `digests.dag` and `adjustment_set` to
+            moved `dag_hash` to `digests.dag` and `adjustment` to
             `adjustment`.
     """
 
@@ -397,7 +397,7 @@ class Admissibility:
     mode: Mode
     decisions: tuple[Decision, ...]
     dag_hash: str | None
-    adjustment_set: tuple[str, ...] | None
+    adjustment: tuple[str, ...] | None
 
     def __post_init__(self) -> None:
         """Validates the table.
@@ -435,8 +435,8 @@ class Admissibility:
             "kind": self.kind,
             "mode": self.mode.value,
             "adjustment": None
-            if self.adjustment_set is None
-            else list(self.adjustment_set),
+            if self.adjustment is None
+            else list(self.adjustment),
             "decisions": [d.to_dict() for d in self.decisions],
             "digests": {"dag": self.dag_hash},
         }
@@ -460,7 +460,7 @@ def authority(
     return gate
 
 
-def build_table(
+def build(
     table: provenance.Dictionary,
     kind: str,
     mode: Mode = Mode.STRICT,
@@ -536,5 +536,5 @@ def build_table(
         mode,
         decisions,
         graph.digest(),
-        graph.adjustment_set(treatment, outcome),
+        graph.deconfound(treatment, outcome),
     )

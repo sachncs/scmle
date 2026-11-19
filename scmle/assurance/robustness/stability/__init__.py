@@ -40,8 +40,8 @@ certificate passes, a `fragile` verdict is a warning, not a quarantine.
 """
 
 from scmle.assurance.robustness.stability.assessment import adjudication
-from scmle.assurance.robustness.stability.assessment import assess_finding
-from scmle.assurance.robustness.stability.assessment import code_digest
+from scmle.assurance.robustness.stability.assessment import assess
+from scmle.assurance.robustness.stability.assessment import fingerprint
 from scmle.assurance.robustness.stability.assessment import Stability
 from scmle.assurance.robustness.stability.estimation import actionable
 from scmle.assurance.robustness.stability.estimation import attribution
@@ -105,10 +105,10 @@ __all__ = [
     "Variant",
     "actionable",
     "adjudication",
-    "assess_finding",
+    "assess",
     "attribution",
-    "code_digest",
     "estimate",
+    "fingerprint",
     "prepare",
     "rankcorr",
     "resample",

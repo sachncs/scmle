@@ -43,8 +43,8 @@ from scmle.data.readers.connectors.layout import Row
 from scmle.data.readers.connectors.locator import Bookmark
 from scmle.data.readers.connectors.locator import bookmark
 from scmle.data.readers.connectors.locator import canonicalize
+from scmle.data.readers.connectors.locator import identify
 from scmle.data.readers.connectors.locator import SHA256_HEX_LENGTH
-from scmle.data.readers.connectors.locator import source_identity
 from scmle.data.readers.connectors.locator import unwrap
 from scmle.data.readers.connectors.stream import JSON_TYPE_NAMES
 from scmle.data.readers.connectors.stream import RangeReader
@@ -84,9 +84,9 @@ __all__ = [
     "canonicalize",
     "checksum",
     "feed",
+    "identify",
     "persevere",
     "readonly",
-    "source_identity",
     "unpack",
     "unwrap",
 ]

@@ -88,7 +88,7 @@ class Splitter:
     Attributes:
         spec: Project specification.
         task: Resolved task type.
-        strategy_name: Name of the strategy chosen for the project.
+        strategy: Name of the strategy chosen for the project.
     """
 
     def __init__(self, spec: tasks.Config, task: tasks.Task) -> None:
@@ -100,9 +100,9 @@ class Splitter:
         """
         self.spec = spec
         self.task = task
-        self.strategy_name = scheme(spec, task)
+        self.strategy = scheme(spec, task)
 
-    def feature_columns(self, frame: pandas.DataFrame) -> list[str]:
+    def select(self, frame: pandas.DataFrame) -> list[str]:
         """Finds the columns that describe a record.
 
         Args:
@@ -156,21 +156,23 @@ class Splitter:
             `part` itself when no test row repeats a development record;
             otherwise `part` with a note counting those rows.
         """
-        groups = duplicates.duplicate_groups(frame, self.feature_columns(frame))
-        seen = set(groups[part.dev_ids].tolist()) - {duplicates.NOT_DUPLICATED}
-        repeated = int(numpy.isin(groups[part.test_ids], list(seen)).sum())
+        groups = duplicates.group(frame, self.select(frame))
+        seen = set(groups[part.development].tolist()) - {
+            duplicates.NOT_DUPLICATED
+        }
+        repeated = int(numpy.isin(groups[part.test], list(seen)).sum())
         if not repeated:
             return part
         notes = [
             *part.notes,
             (
-                f"{repeated} of {len(part.test_ids)} test rows repeat a "
+                f"{repeated} of {len(part.test)} test rows repeat a "
                 "development record; rows are treated as exchangeable "
                 "draws (set data.group_column if copies belong to one "
                 "entity)"
             ),
         ]
-        return Partition(part.dev_ids, part.test_ids, part.folds, notes)
+        return Partition(part.development, part.test, part.folds, notes)
 
     def reserve(
         self,
@@ -199,7 +201,7 @@ class Splitter:
         """
         labels = frame[self.spec.data.target].to_numpy()
         rng = numpy.random.default_rng(self.spec.validation.seed)
-        dev, test = part.dev_ids, part.test_ids
+        dev, test = part.development, part.test
         moved = []
         for label in sorted(set(labels[dev].tolist()), key=str):
             pool = dev[labels[dev] == label]
@@ -214,7 +216,7 @@ class Splitter:
         taken = numpy.concatenate(moved)
         dev, test = numpy.setdiff1d(dev, taken), numpy.union1d(test, taken)
         notes: list[str] = []
-        folds = strategy.cross_validation_folds(frame, dev, notes)
+        folds = strategy.fold(frame, dev, notes)
         return Partition(dev, test, folds, notes)
 
     def support(self, frame: pandas.DataFrame, part: Partition) -> None:
@@ -238,7 +240,7 @@ class Splitter:
         if self.task not in (tasks.Task.BINARY, tasks.Task.MULTICLASS):
             return
         labels = frame[self.spec.data.target].dropna()
-        held = frame[self.spec.data.target].iloc[part.test_ids].value_counts()
+        held = frame[self.spec.data.target].iloc[part.test].value_counts()
         short = {
             str(label): int(held.get(label, 0))
             for label in sorted(labels.unique(), key=str)
@@ -271,7 +273,7 @@ class Splitter:
         name = (
             splits.Preset.name
             if streaming.SPLIT_COLUMN in frame.columns
-            else self.strategy_name
+            else self.strategy
         )
         strategy = STRATEGIES[name](self.spec, self.task)
         part = strategy.partition(frame)
@@ -283,8 +285,8 @@ class Splitter:
         manifest = Manifest(
             strategy=name,
             seed=self.spec.validation.seed,
-            train_ids=tuplify(part.dev_ids),
-            test_ids=tuplify(part.test_ids),
+            training=tuplify(part.development),
+            test=tuplify(part.test),
             folds=tuple((tuplify(a), tuplify(b)) for a, b in part.folds),
             notes=tuple(part.notes),
             entities=(
@@ -295,13 +297,13 @@ class Splitter:
         features = frame.drop(columns=[target_name])
         target = frame[target_name]
         locked = lockbox.Resident(
-            features.iloc[part.test_ids].reset_index(drop=True),
-            target.iloc[part.test_ids].reset_index(drop=True),
-            manifest.test_ids,
+            features.iloc[part.test].reset_index(drop=True),
+            target.iloc[part.test].reset_index(drop=True),
+            manifest.test,
         )
         return Split(
             manifest,
-            features.iloc[part.dev_ids].reset_index(drop=True),
-            target.iloc[part.dev_ids].reset_index(drop=True),
+            features.iloc[part.development].reset_index(drop=True),
+            target.iloc[part.development].reset_index(drop=True),
             locked,
         )

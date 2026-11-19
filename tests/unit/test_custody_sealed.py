@@ -127,7 +127,7 @@ def test_exploration_view_holds_no_reference_to_a_sealed_set():
         target=pandas.Series([0]),
         ids=(0,),
         folds=(),
-        manifest_sha256="f" * 64,
+        digest="f" * 64,
     )
     assert not hasattr(view, "__dict__")
     assert set(view.__slots__) == {
@@ -135,7 +135,7 @@ def test_exploration_view_holds_no_reference_to_a_sealed_set():
         "target",
         "ids",
         "folds",
-        "manifest_sha256",
+        "digest",
     }
 
 
@@ -172,7 +172,7 @@ def test_the_binding_and_both_hashes_are_logged():
         "ledger_hash": "ledger-1",
     }
     assert held.committed is True
-    assert held.binding == sealed.binding_digest("claims-1", "ledger-1")
+    assert held.binding == sealed.digest("claims-1", "ledger-1")
 
 
 def test_a_set_commits_once_and_not_after_it_opened():
@@ -187,10 +187,10 @@ def test_a_set_commits_once_and_not_after_it_opened():
 
 
 def test_the_binding_digest_depends_on_both_hashes():
-    base = sealed.binding_digest("a", "b")
-    assert base != sealed.binding_digest("a", "c")
-    assert base != sealed.binding_digest("c", "b")
-    assert base != sealed.binding_digest("b", "a")
+    base = sealed.digest("a", "b")
+    assert base != sealed.digest("a", "c")
+    assert base != sealed.digest("c", "b")
+    assert base != sealed.digest("b", "a")
     assert len(base) == 64
 
 

@@ -22,16 +22,16 @@ MATRIX_DIMENSIONS = 2
 class Observation:
     """Intermediate evidence produced by the supported data observers."""
 
-    data_kind: str
+    kind: str
     shape: tuple[int, ...]
     schema: tuple[evidence.Field, ...]
-    sample_count: int
+    samples: int
     missingness: evidence.Missingness
     duplicates: evidence.Duplication
     label: evidence.Labeling
-    content_identity: str
+    identity: str
     limitations: tuple[str, ...]
-    release_blockers: tuple[str, ...]
+    blockers: tuple[str, ...]
 
 
 def sequential(value: Any) -> bool:
@@ -326,7 +326,7 @@ def summarize(
     )
 
 
-def frame_content(
+def extract(
     frame: pandas.DataFrame, data_kind: str, shape: tuple[int, ...]
 ) -> dict[str, Any]:
     """Returns canonical content for a frame-backed observation.
@@ -389,23 +389,21 @@ def scrutinize(
         limitations.append("duplicate_rows_are_reported_not_removed")
         blockers.append("duplicate_policy_not_declared")
     if supplied_identity is None:
-        content_identity = canon.digest_value(
-            frame_content(frame, data_kind, shape)
-        )
+        content_identity = canon.fingerprint(extract(frame, data_kind, shape))
     else:
         content_identity = identity.assay(supplied_identity, "content_identity")
         limitations.append("content_identity_was_supplied_by_caller")
     return Observation(
-        data_kind=data_kind,
+        kind=data_kind,
         shape=shape,
         schema=schema,
-        sample_count=sample_count,
+        samples=sample_count,
         missingness=missingness,
         duplicates=duplicates,
         label=label,
-        content_identity=content_identity,
+        identity=content_identity,
         limitations=tuple(dict.fromkeys(limitations)),
-        release_blockers=tuple(dict.fromkeys(blockers)),
+        blockers=tuple(dict.fromkeys(blockers)),
     )
 
 
@@ -446,18 +444,18 @@ def weigh(
     blockers.extend(label_blockers)
     blockers.append("modality_specific_decoder_not_declared")
     return Observation(
-        data_kind=data_kind,
+        kind=data_kind,
         shape=shape,
         schema=schema,
-        sample_count=1,
+        samples=1,
         missingness=evidence.Missingness("not_observed", 0, 0, 0, {}),
         duplicates=evidence.Duplication(
             "not_observed", 0, 0.0, "raw bytes have no row identity"
         ),
         label=label,
-        content_identity=content_identity,
+        identity=content_identity,
         limitations=tuple(limitations),
-        release_blockers=tuple(blockers),
+        blockers=tuple(blockers),
     )
 
 
@@ -508,16 +506,16 @@ def examine(
     )
     blockers.extend(("schema_adapter_not_declared", *label_blockers))
     return Observation(
-        data_kind=data_kind,
+        kind=data_kind,
         shape=shape,
         schema=(evidence.Field("value", type(data).__name__),),
-        sample_count=1,
+        samples=1,
         missingness=evidence.Missingness("not_observed", 0, 0, 0, {}),
         duplicates=evidence.Duplication(
             "not_observed", 0, 0.0, "opaque object has no row identity"
         ),
         label=label,
-        content_identity=content_identity,
+        identity=content_identity,
         limitations=tuple(limitations),
-        release_blockers=tuple(blockers),
+        blockers=tuple(blockers),
     )

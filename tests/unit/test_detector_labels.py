@@ -178,16 +178,14 @@ def test_margin_flags_mark_rows_the_small_model_cannot_fit():
 def test_detect_requires_agreement_and_reports_overlap():
     x, y, wrong = separable()
     report = labels.detect(x, y, seed=0)
-    both = set(report.confident_learning) & set(report.margin)
+    both = set(report.candidates) & set(report.margin)
     assert set(report.suspects) == both
     assert 0.0 <= report.agreement <= 1.0
     found = set(report.suspects) & set(numpy.flatnonzero(wrong))
     assert len(found) / wrong.sum() > 0.7
     assert len(set(report.suspects) - set(numpy.flatnonzero(wrong))) < 10
-    assert (
-        report.rate.method == "detector_only" and report.sampling_bound == 0.0
-    )
-    assert report.rows_checked == report.input_rows == len(x)
+    assert report.rate.method == "detector_only" and report.bound == 0.0
+    assert report.checked == report.received == len(x)
     assert report.to_dict()["checked"] == len(x)
     assert labels.detect(x, y, seed=0) == report
 
@@ -212,9 +210,9 @@ def test_detect_records_the_sampling_cap_and_keeps_audited_rows(monkeypatch):
     monkeypatch.setattr(labels, "MAX_ROWS", 120)
     audit = pandas.Series(wrong[:30], index=numpy.arange(30))
     report = labels.detect(x, y, seed=0, audit=audit)
-    assert report.rows_checked == 120 and report.input_rows == 200
-    assert report.sampling_bound == pytest.approx(labels.hoeffding(120))
+    assert report.checked == 120 and report.received == 200
+    assert report.bound == pytest.approx(labels.hoeffding(120))
     assert report.rate.method == "prediction_powered"
     assert report.rate.audited == 30
     capped = labels.detect(x, y, seed=0)
-    assert capped.rows_checked == 120 and capped.rate.audited == 0
+    assert capped.checked == 120 and capped.rate.audited == 0

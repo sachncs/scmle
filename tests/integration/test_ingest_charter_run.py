@@ -278,7 +278,7 @@ def declared_totals(path, rows_off=0):
         )
     return ingest.Expectation(
         (
-            ingest.TableTotals(
+            ingest.Totals(
                 "orders",
                 rows=len(keys) + rows_off,
                 sums=(ingest.Total("amount", float(keys.amount.sum())),),

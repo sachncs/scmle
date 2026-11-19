@@ -133,7 +133,7 @@ override = "none"
 variables = ["data.target", "data.monotonic"]
 
 [split.event.folds]
-site = "scmle.data.splitting.splitters.splits:Events.cross_validation_folds"
+site = "scmle.data.splitting.splitters.splits:Events.fold"
 error = "BlockedError"
 claim = "C5"
 passes = "Events and censored rows each number at least MIN_STRATUM_ROWS among the development rows; folds are reduced to the rarest count if needed."
@@ -151,7 +151,7 @@ override = "none"
 variables = ["MIN_STRATUM_ROWS", "data.event"]
 
 [split.group.class_complete_folds]
-site = "scmle.data.splitting.splitters.splits:Group.class_complete_folds"
+site = "scmle.data.splitting.splitters.splits:Group.fold"
 error = "BlockedError"
 claim = "C5"
 passes = "Some fold count from validation.folds down to 2 gives group-disjoint folds whose training and validation parts each contain every class."
@@ -169,7 +169,7 @@ override = "none"
 variables = ["data.group", "data.query", "validation.folds", "validation.test"]
 
 [split.task_supported]
-site = "scmle.data.splitting.splitters.partitions:Partitioner.check_task"
+site = "scmle.data.splitting.splitters.partitions:Partitioner.check"
 error = "BlockedError"
 claim = "C5"
 passes = "The resolved task is in the strategy's supported_tasks."
@@ -241,7 +241,7 @@ override = "Shorten validation.rolling.horizon, validation.rolling.window or val
 variables = ["MIN_ROLLING_FOLDS", "MIN_ROLLING_TRAIN", "validation.folds", "validation.rolling.horizon", "validation.rolling.window", "validation.embargo", "validation.test", "data.time", "data.horizon"]
 
 [split.stratified.folds]
-site = "scmle.data.splitting.splitters.splits:Stratified.cross_validation_folds"
+site = "scmle.data.splitting.splitters.splits:Stratified.fold"
 error = "BlockedError"
 claim = "C5"
 passes = "Every class has at least MIN_STRATUM_ROWS development rows; folds are reduced to the minority class size if needed."
@@ -259,7 +259,7 @@ override = "none"
 variables = ["MIN_STRATUM_ROWS", "data.target"]
 
 [split.temporal.holdout]
-site = "scmle.data.splitting.splitters.temporal:Chronology.chronological_holdout"
+site = "scmle.data.splitting.splitters.temporal:Chronology.withhold"
 error = "BlockedError"
 claim = "C5"
 passes = "Some row has a timestamp earlier than the test window's first timestamp (the window starts at a timestamp, so no timestamp is on both sides) and, with validation.entities unseen, the held-out entities have rows in the test window and the others rows before it."
@@ -295,7 +295,7 @@ override = "none"
 variables = ["validation.folds", "validation.embargo", "data.horizon", "data.group", "data.time"]
 
 [split.treatment.folds]
-site = "scmle.data.splitting.splitters.splits:Treatment.cross_validation_folds"
+site = "scmle.data.splitting.splitters.splits:Treatment.fold"
 error = "BlockedError"
 claim = "C5"
 passes = "The rarest treatment / outcome cell in the development rows allows at least MIN_FOLDS folds."
@@ -313,7 +313,7 @@ override = "none"
 variables = ["MIN_STRATUM_ROWS", "data.treatment"]
 
 [task.resolve]
-site = "scmle.data.validation.target:TaskResolver.resolve"
+site = "scmle.data.validation.target:Resolver.resolve"
 error = "BlockedError"
 claim = "C1, C5"
 passes = "The target has a non-missing value and the handler for the requested task accepts it."
@@ -322,7 +322,7 @@ override = "none"
 variables = ["task"]
 
 [task.auto]
-site = "scmle.data.validation.target:TaskResolver.resolve_auto"
+site = "scmle.data.validation.target:Resolver.infer"
 error = "BlockedError"
 claim = "C1"
 passes = "The target has at least MIN_CLASSES values and is neither an identifier-like text column nor an ambiguous small-cardinality integer."
@@ -331,7 +331,7 @@ override = "Set task explicitly instead of 'auto', as the error message says."
 variables = ["task", "MIN_CLASSES", "BINARY_CLASSES", "TEXT_TARGET_MIN_CLASSES", "TEXT_TARGET_MAX_RATIO", "AMBIGUOUS_MAX_VALUES", "AMBIGUOUS_MAX_RATIO"]
 
 [task.classification]
-site = "scmle.data.validation.target:TaskResolver.resolve_classification"
+site = "scmle.data.validation.target:Resolver.resolve_classification"
 error = "BlockedError"
 claim = "C1"
 passes = "The target has at least two classes and the class count matches a binary or multiclass request."
@@ -340,7 +340,7 @@ override = "none"
 variables = ["task", "MIN_CLASSES", "BINARY_CLASSES"]
 
 [task.ordinal]
-site = "scmle.data.validation.target:TaskResolver.resolve_ordinal"
+site = "scmle.data.validation.target:Resolver.resolve_ordinal"
 error = "BlockedError"
 claim = "C5"
 passes = "The labels in the data are exactly those listed in data.ordinal_order."
@@ -349,7 +349,7 @@ override = "none"
 variables = ["data.order"]
 
 [task.ranking]
-site = "scmle.data.validation.target:TaskResolver.resolve_ranking"
+site = "scmle.data.validation.target:Resolver.resolve_ranking"
 error = "BlockedError"
 claim = "C5"
 passes = "Every relevance grade parses as a non-negative whole number."
@@ -358,7 +358,7 @@ override = "none"
 variables = []
 
 [task.regression]
-site = "scmle.data.validation.target:TaskResolver.resolve_regression"
+site = "scmle.data.validation.target:Resolver.resolve_regression"
 error = "BlockedError"
 claim = "C1"
 passes = "The target is numeric."
@@ -367,7 +367,7 @@ override = "none"
 variables = ["task"]
 
 [task.survival]
-site = "scmle.data.validation.target:TaskResolver.resolve_survival"
+site = "scmle.data.validation.target:Resolver.resolve_survival"
 error = "BlockedError"
 claim = "C5"
 passes = "The duration target is numeric and every value is greater than zero."
@@ -376,7 +376,7 @@ override = "none"
 variables = []
 
 [task.uplift]
-site = "scmle.data.validation.target:TaskResolver.resolve_uplift"
+site = "scmle.data.validation.target:Resolver.resolve_uplift"
 error = "BlockedError"
 claim = "C5"
 passes = "The outcome is numeric."
@@ -385,7 +385,7 @@ override = "none"
 variables = []
 
 [target.events]
-site = "scmle.data.validation.target:check_events"
+site = "scmle.data.validation.target:check"
 error = "BlockedError"
 claim = "C5"
 passes = "The event column exists, holds 0 or 1 in every row and records at least MIN_EVENTS events."

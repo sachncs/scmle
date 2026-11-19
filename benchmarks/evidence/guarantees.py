@@ -393,7 +393,7 @@ def fingerprint(
     """
     digest = hashlib.sha256()
     digest.update(
-        certificates.code_hash(
+        certificates.fingerprint(
             slugify,
             hide,
             chunk,

@@ -18,9 +18,7 @@ def make_spec(task="auto", **data_overrides):
 
 def profile(frame, task="auto", **data_overrides):
     spec = make_spec(task, **data_overrides)
-    resolved = scmle.data.validation.target.TaskResolver(spec).resolve(
-        frame["y"]
-    )
+    resolved = scmle.data.validation.target.Resolver(spec).resolve(frame["y"])
     manifest = tabular.manifested(frame, "y")
     result = profiler.Profiler(spec).profile(frame, manifest, resolved)
     return resolved, result
@@ -42,7 +40,7 @@ def classification_frame():
 
 
 def resolve(frame, task="auto"):
-    return scmle.data.validation.target.TaskResolver(make_spec(task)).resolve(
+    return scmle.data.validation.target.Resolver(make_spec(task)).resolve(
         frame["y"]
     )
 

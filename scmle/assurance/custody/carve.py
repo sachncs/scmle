@@ -37,16 +37,16 @@ class Carve:
     """The three-way division of the development rows.
 
     Attributes:
-        exploration_ids: Row ids of `X`, in development order.
-        confirmation_ids: Row ids of `C`, in development order.
-        embargo_ids: Row ids dropped from both sets.
-        folds: Cross-validation folds as positions within `exploration_ids`.
+        exploration: Row ids of `X`, in development order.
+        confirmation: Row ids of `C`, in development order.
+        embargo: Row ids dropped from both sets.
+        folds: Cross-validation folds as positions within `exploration`.
         notes: What was done and why.
     """
 
-    exploration_ids: numpy.ndarray
-    confirmation_ids: numpy.ndarray
-    embargo_ids: numpy.ndarray
+    exploration: numpy.ndarray
+    confirmation: numpy.ndarray
+    embargo: numpy.ndarray
     folds: list[tuple[numpy.ndarray, numpy.ndarray]]
     notes: tuple[str, ...]
 
@@ -491,9 +491,9 @@ def divide(
     exploration = ~in_c & ~embargo
     explored = dev_ids[exploration]
     return Carve(
-        exploration_ids=explored,
-        confirmation_ids=dev_ids[in_c],
-        embargo_ids=dev_ids[embargo],
+        exploration=explored,
+        confirmation=dev_ids[in_c],
+        embargo=dev_ids[embargo],
         folds=restrict(folds, dev_ids, explored),
         notes=tuple(notes),
     )

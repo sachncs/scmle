@@ -65,12 +65,12 @@ class Relabelling(remedy.Remedy):
         )
         outcome = pseudo_labeling.judge(
             template,
-            split.dev_features,
-            split.dev_target,
+            split.features,
+            split.target,
             split.manifest.folds,
             unlabeled,
             metric.scorer(
-                scmle.evaluation.metrics.positive_label(split.dev_target, task)
+                scmle.evaluation.metrics.positive_label(split.target, task)
             ),
             data.pseudo_label_confidence,
             lambda: bool(
@@ -90,8 +90,8 @@ class Relabelling(remedy.Remedy):
             return pipeline, examination.Pseudolabels(record)
         augmented, count = pseudo_labeling.selftrain(
             pipeline,
-            split.dev_features,
-            split.dev_target,
+            split.features,
+            split.target,
             unlabeled,
             data.pseudo_label_confidence,
         )

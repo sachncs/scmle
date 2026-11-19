@@ -66,7 +66,7 @@ def scarce(labels: numpy.ndarray | None, fraction: float) -> int | None:
 
 
 def assess(
-    charter: contracts.AnalysisCharter,
+    charter: contracts.Charter,
     n_rows: int,
     minority: int | None,
 ) -> feasibility.Feasibility:
@@ -109,8 +109,8 @@ def complete(
     if labels is None:
         return True
     position = {int(row): index for index, row in enumerate(dev_ids)}
-    in_c = {labels[position[int(r)]] for r in carved.confirmation_ids}
-    in_x = {labels[position[int(r)]] for r in carved.exploration_ids}
+    in_c = {labels[position[int(r)]] for r in carved.confirmation}
+    in_x = {labels[position[int(r)]] for r in carved.exploration}
     return in_x <= in_c
 
 
@@ -130,9 +130,9 @@ def forgo(
         A carve with empty `C` and embargo and `note` as its only note.
     """
     return carve.Carve(
-        exploration_ids=dev_ids,
-        confirmation_ids=dev_ids[:0],
-        embargo_ids=dev_ids[:0],
+        exploration=dev_ids,
+        confirmation=dev_ids[:0],
+        embargo=dev_ids[:0],
         folds=folds,
         notes=(note,),
     )
@@ -197,7 +197,7 @@ class Development:
     @classmethod
     def gather(
         cls,
-        charter: contracts.AnalysisCharter,
+        charter: contracts.Charter,
         split: splitters.Split,
         frame: pandas.DataFrame,
         spec: tasks.Config,
@@ -218,7 +218,7 @@ class Development:
             and the data names a time column.
         """
         data, old = spec.data, split.manifest
-        ids = numpy.asarray(old.train_ids, dtype=int)
+        ids = numpy.asarray(old.training, dtype=int)
         folds = [
             (numpy.asarray(a, int), numpy.asarray(b, int)) for a, b in old.folds
         ]
@@ -240,13 +240,13 @@ class Development:
             if old.strategy in TEMPORAL and data.time_column
             else None
         )
-        columns = splitters.Splitter(spec, task).feature_columns(frame)
-        copies = duplicates.duplicate_groups(frame, columns)[ids]
+        columns = splitters.Splitter(spec, task).select(frame)
+        copies = duplicates.group(frame, columns)[ids]
         return cls(ids, folds, labels, groups, times, copies)
 
 
 def embargo(
-    charter: contracts.AnalysisCharter,
+    charter: contracts.Charter,
     frame: pandas.DataFrame,
     rows: Development,
     data: tasks.Dataset,
@@ -277,7 +277,7 @@ def embargo(
 
 
 def attempt(
-    charter: contracts.AnalysisCharter,
+    charter: contracts.Charter,
     rows: Development,
     data_hash: str,
     embargo_rows: int,
@@ -309,7 +309,7 @@ def attempt(
             rows.folds,
             fraction=fraction,
             seed=charter.seed,
-            charter_hash=charter.charter_hash,
+            charter_hash=charter.digest,
             data_hash=data_hash,
             labels=rows.labels,
             groups=rows.groups,
@@ -326,9 +326,7 @@ def attempt(
         return forgo(
             rows.ids, rows.folds, f"confirmation set not carved: {refusal}"
         )
-    if len(carved.confirmation_ids) and not complete(
-        rows.labels, carved, rows.ids
-    ):
+    if len(carved.confirmation) and not complete(rows.labels, carved, rows.ids):
         return forgo(
             rows.ids, rows.folds, "confirmation set misses a class: not carved"
         )
@@ -337,7 +335,7 @@ def attempt(
 
 def sequester(
     *,
-    charter: contracts.AnalysisCharter,
+    charter: contracts.Charter,
     split: splitters.Split,
     frame: pandas.DataFrame,
     spec: tasks.Config,
@@ -369,15 +367,15 @@ def sequester(
     fraction = charter.sets.confirmation
     actual = assess(
         charter,
-        len(carved.confirmation_ids),
-        scarce(rows.labels, fraction) if len(carved.confirmation_ids) else None,
+        len(carved.confirmation),
+        scarce(rows.labels, fraction) if len(carved.confirmation) else None,
     )
     if actual.verdict is feasibility.Verdict.INFEASIBLE and len(
-        carved.confirmation_ids
+        carved.confirmation
     ):
         carved = forgo(rows.ids, rows.folds, actual.reason)
         actual = assess(charter, 0, None)
-    if not len(carved.confirmation_ids):
+    if not len(carved.confirmation):
         # ERR-11: the run continues unconfirmed, so it says so loudly.
         LOGGER.warning(
             "WARNING no confirmation set was carved; the run's scope is "
@@ -456,21 +454,21 @@ def restrict(
     restricted = splitters.Manifest(
         strategy=old.strategy,
         seed=old.seed,
-        train_ids=exploration,
-        test_ids=old.test_ids,
+        training=exploration,
+        test=old.test,
         folds=folds,
         notes=notes,
     )
     return splitters.Split(
         restricted,
-        split.dev_features.iloc[keep].reset_index(drop=True),
-        split.dev_target.iloc[keep].reset_index(drop=True),
-        split.locked_test,
+        split.features.iloc[keep].reset_index(drop=True),
+        split.target.iloc[keep].reset_index(drop=True),
+        split.test,
     )
 
 
 def finish(
-    charter: contracts.AnalysisCharter,
+    charter: contracts.Charter,
     split: splitters.Split,
     frame: pandas.DataFrame,
     spec: tasks.Config,
@@ -505,8 +503,8 @@ def finish(
         (tuple(int(i) for i in fit), tuple(int(i) for i in held))
         for fit, held in carved.folds
     )
-    exploration = tuple(int(i) for i in carved.exploration_ids)
-    confirmation = tuple(int(i) for i in carved.confirmation_ids)
+    exploration = tuple(int(i) for i in carved.exploration)
+    confirmation = tuple(int(i) for i in carved.confirmation)
     isolation = seal(vault, frame, spec.data.target, confirmation)
     notes = (*old.notes, *carved.notes)
     manifest = scmle.assurance.custody.manifest.Manifest(
@@ -514,13 +512,13 @@ def finish(
         seed=charter.seed,
         embargo=embargo_rows,
         digests=scmle.assurance.custody.manifest.Digests(
-            charter=charter.charter_hash, data=data_hash
+            charter=charter.digest, data=data_hash
         ),
         sets=scmle.assurance.custody.manifest.Sets(
             exploration=exploration,
             confirmation=confirmation,
-            embargo=tuple(int(i) for i in carved.embargo_ids),
-            final=tuple(old.test_ids),
+            embargo=tuple(int(i) for i in carved.embargo),
+            final=tuple(old.test),
         ),
         folds=folds,
         isolation=isolation,
@@ -531,16 +529,16 @@ def finish(
             for name, members in (
                 ("exploration", exploration),
                 ("confirmation", confirmation),
-                ("final_test", tuple(old.test_ids)),
+                ("final_test", tuple(old.test)),
             )
         ),
     )
     result = restrict(split, dev_ids, exploration, folds, notes)
     view = sealed.View(
-        features=result.dev_features,
-        target=result.dev_target,
+        features=result.features,
+        target=result.target,
         ids=exploration,
         folds=folds,
-        manifest_sha256=manifest.sha256,
+        digest=manifest.sha256,
     )
     return Outcome(result, view, manifest, report)

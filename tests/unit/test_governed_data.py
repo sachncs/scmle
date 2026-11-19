@@ -13,7 +13,7 @@ from scmle.data.store import snapshot
 from scmle.runtime import retry
 from scmle.storage import objectstore
 
-CONTRACT = snapshot.DataContract(
+CONTRACT = snapshot.Contract(
     "orders",
     "2",
     {"id": "int", "amount": "float", "region": "string"},
@@ -30,9 +30,9 @@ def store(tmp_path):
 
 def pick(store, key="o.csv", hours=0.0):
     """A reader whose clock is `hours` after the object was modified."""
-    modified = snapshot.parse_time(store.head(key).modified)
+    modified = snapshot.parse(store.head(key).modified)
     now = modified + datetime.timedelta(hours=hours)
-    return snapshot.SnapshotReader(store, clock=lambda: now)
+    return snapshot.Reader(store, clock=lambda: now)
 
 
 def test_every_read_records_identity_schema_freshness_and_lineage(store):
@@ -42,14 +42,14 @@ def test_every_read_records_identity_schema_freshness_and_lineage(store):
     assert record.uri == store.uri("in/orders.csv")
     assert record.sha256 == objectstore.checksum(CSV.encode())
     assert record.size == len(CSV) and record.rows == 3
-    assert record.schema_version == "2" and record.schema_matches
+    assert record.schema_version == "2" and record.conforms
     assert record.schema_digest == CONTRACT.digest
     assert record.freshness == snapshot.FRESH
-    assert record.snapshot_id.startswith("snap-")
+    assert record.identifier.startswith("snap-")
     ignored, child = pick(store, "in/orders.csv").read(
         "in/orders.csv", CONTRACT, parents=[record]
     )
-    assert child.lineage == (record.snapshot_id,)
+    assert child.lineage == (record.identifier,)
 
 
 def test_snapshot_ids_follow_the_content(store):
@@ -59,40 +59,40 @@ def test_snapshot_ids_follow_the_content(store):
     ignored, again = reader.read("o.csv", CONTRACT)
     store.put("o.csv", (CSV + "4,1.0,south\n").encode())
     ignored, changed = reader.read("o.csv", CONTRACT)
-    assert first.snapshot_id == again.snapshot_id
-    assert changed.snapshot_id != first.snapshot_id
+    assert first.identifier == again.identifier
+    assert changed.identifier != first.identifier
     assert len(reader.log.records) == 3
 
 
 def test_staleness_and_schema_drift_are_recorded_not_hidden(store):
     store.put("o.csv", CSV.encode())
     ignored, stale = pick(store, hours=5).read("o.csv", CONTRACT)
-    assert stale.freshness == snapshot.STALE and stale.age_seconds > 7200
+    assert stale.freshness == snapshot.STALE and stale.age > 7200
     store.put("d.csv", b"id,amount\n1,2.0\n")
     ignored, drifted = pick(store, "d.csv").read("d.csv", CONTRACT)
-    assert not drifted.schema_matches
+    assert not drifted.conforms
     assert drifted.schema_digest != CONTRACT.digest
-    open_ended = snapshot.DataContract("x", "1", {"id": "int"})
+    open_ended = snapshot.Contract("x", "1", {"id": "int"})
     ignored, free = pick(store, "d.csv").read("d.csv", open_ended)
     assert free.freshness == snapshot.UNKNOWN
 
 
 def test_the_read_log_persists_and_traces_lineage(store, tmp_path):
-    log = snapshot.ReadLog(tmp_path / "reads.jsonl")
+    log = snapshot.Log(tmp_path / "reads.jsonl")
     store.put("raw.csv", CSV.encode())
     store.put("clean.csv", CSV.encode() + b"9,1.0,south\n")
-    reader = snapshot.SnapshotReader(store, log)
+    reader = snapshot.Reader(store, log)
     ignored, raw = reader.read("raw.csv", CONTRACT)
     ignored, clean = reader.read("clean.csv", CONTRACT, parents=[raw])
     lines = (tmp_path / "reads.jsonl").read_text().splitlines()
     assert [json.loads(line)["identifier"] for line in lines] == [
-        raw.snapshot_id,
-        clean.snapshot_id,
+        raw.identifier,
+        clean.identifier,
     ]
-    trace = log.trace(clean.snapshot_id)
-    assert [r.snapshot_id for r in trace] == [
-        clean.snapshot_id,
-        raw.snapshot_id,
+    trace = log.trace(clean.identifier)
+    assert [r.identifier for r in trace] == [
+        clean.identifier,
+        raw.identifier,
     ]
     with pytest.raises(snapshot.SnapshotError):
         log.trace("snap-unknown")
@@ -103,7 +103,7 @@ def test_unreadable_objects_fail_clearly(store):
     with pytest.raises(snapshot.SnapshotError):
         pick(store, "x.bin").read("x.bin", CONTRACT)
     with pytest.raises(objectstore.AbsentError):
-        snapshot.SnapshotReader(store).read("missing.csv", CONTRACT)
+        snapshot.Reader(store).read("missing.csv", CONTRACT)
 
 
 def test_a_contract_is_validated():
@@ -124,7 +124,7 @@ def test_a_contract_is_validated():
         },
     ):
         with pytest.raises(errors.ConfigError):
-            snapshot.DataContract(**bad)
+            snapshot.Contract(**bad)
 
 
 # ---- quality gates -------------------------------------------------------
@@ -136,28 +136,28 @@ def prepared(store, text=CSV, hours=0.0):
 
 
 def gate_for(store, *rules):
-    return quality.QualityGate(rules, store)
+    return quality.Gate(rules, store)
 
 
 def test_a_clean_dataset_passes_both_stages(store):
     frame, record = prepared(store)
     gate = gate_for(
         store,
-        quality.SchemaCheck(),
+        quality.Schema(),
         quality.Freshness(),
-        quality.MinRowsCheck(3),
-        quality.UniqueKeyCheck(),
+        quality.Rows(3),
+        quality.Keys(),
     )
     for stage in quality.Stage:
         result = gate.run(frame, record, CONTRACT, stage)
         assert result.report.decision == "passed" and len(result.frame) == 3
-    assert store.exists(f"quality/{record.snapshot_id}-train.json")
+    assert store.exists(f"quality/{record.identifier}-train.json")
 
 
 def test_fail_policy_stops_the_run_with_the_report(store):
     frame, record = prepared(store, hours=9)
     gate = gate_for(store, quality.Freshness(policy=quality.Severity.FAIL))
-    with pytest.raises(quality.QualityGateError) as raised:
+    with pytest.raises(quality.GateError) as raised:
         gate.run(frame, record, CONTRACT, quality.Stage.TRAIN)
     assert not raised.value.quarantined
     assert raised.value.report.decision == "failed"
@@ -170,32 +170,28 @@ def test_row_level_quarantine_removes_and_keeps_the_rows(store):
     )
     gate = gate_for(
         store,
-        quality.UniqueKeyCheck(policy=quality.Severity.QUARANTINE),
-        quality.RangeCheck(
-            "amount", 0, 1000, policy=quality.Severity.QUARANTINE
-        ),
+        quality.Keys(policy=quality.Severity.QUARANTINE),
+        quality.Range("amount", 0, 1000, policy=quality.Severity.QUARANTINE),
     )
     result = gate.run(frame, record, CONTRACT, quality.Stage.INFERENCE)
     assert list(result.frame["id"]) == [1, 2, 3]
     assert list(result.quarantined["id"]) == [2, 4, 5]
     assert result.report.decision == "rows_quarantined"
     assert result.report.rows_in == 6 and result.report.rows_out == 3
-    held = store.get(f"quarantine/{record.snapshot_id}/rows-inference.csv")[0]
+    held = store.get(f"quarantine/{record.identifier}/rows-inference.csv")[0]
     assert held.decode().count("\n") == 4
 
 
 def test_dataset_level_quarantine_holds_the_snapshot_until_released(store):
     frame, record = prepared(store, "id,amount,region\n1,1.0,north\n")
-    gate = gate_for(
-        store, quality.MinRowsCheck(5, policy=quality.Severity.QUARANTINE)
-    )
-    with pytest.raises(quality.QualityGateError) as raised:
+    gate = gate_for(store, quality.Rows(5, policy=quality.Severity.QUARANTINE))
+    with pytest.raises(quality.GateError) as raised:
         gate.run(frame, record, CONTRACT, quality.Stage.TRAIN)
     assert raised.value.quarantined
-    permissive = gate_for(store, quality.MinRowsCheck(1))
-    with pytest.raises(quality.QualityGateError, match="is quarantined"):
+    permissive = gate_for(store, quality.Rows(1))
+    with pytest.raises(quality.GateError, match="is quarantined"):
         permissive.run(frame, record, CONTRACT, quality.Stage.TRAIN)
-    permissive.release(record.snapshot_id)
+    permissive.release(record.identifier)
     assert permissive.run(frame, record, CONTRACT, quality.Stage.TRAIN)
 
 
@@ -203,7 +199,7 @@ def test_warn_policy_records_and_continues(store):
     frame, record = prepared(store, "id,amount,region\n1,,north\n2,2.0,south\n")
     gate = gate_for(
         store,
-        quality.NullFractionCheck("amount", 0.1, policy=quality.Severity.WARN),
+        quality.Nulls("amount", 0.1, policy=quality.Severity.WARN),
         quality.Complete("amount", policy=quality.Severity.WARN),
     )
     result = gate.run(frame, record, CONTRACT, quality.Stage.TRAIN)
@@ -215,9 +211,9 @@ def test_warn_policy_records_and_continues(store):
 
 def test_rules_apply_only_to_their_stages(store):
     frame, record = prepared(store, "id,amount,region\n1,1.0,north\n")
-    only_train = quality.MinRowsCheck(10, stages=[quality.Stage.TRAIN])
+    only_train = quality.Rows(10, stages=[quality.Stage.TRAIN])
     gate = gate_for(store, only_train)
-    with pytest.raises(quality.QualityGateError):
+    with pytest.raises(quality.GateError):
         gate.run(frame, record, CONTRACT, quality.Stage.TRAIN)
     result = gate.run(frame, record, CONTRACT, quality.Stage.INFERENCE)
     assert result.report.findings == ()
@@ -226,8 +222,8 @@ def test_rules_apply_only_to_their_stages(store):
 def test_schema_drift_and_allowed_values_are_caught(store):
     store.put("d.csv", b"id,amount\n1,2.0\n")
     frame, record = pick(store, "d.csv").read("d.csv", CONTRACT)
-    with pytest.raises(quality.QualityGateError, match="missing column region"):
-        gate_for(store, quality.SchemaCheck()).run(
+    with pytest.raises(quality.GateError, match="missing column region"):
+        gate_for(store, quality.Schema()).run(
             frame, record, CONTRACT, quality.Stage.INFERENCE
         )
     frame, record = prepared(store, CSV + "6,1.0,mars\n")
@@ -243,9 +239,9 @@ def test_schema_drift_and_allowed_values_are_caught(store):
 
 def test_a_gate_needs_rules_and_valid_policies():
     with pytest.raises(errors.ConfigError):
-        quality.QualityGate([])
+        quality.Gate([])
     with pytest.raises(ValueError):
-        quality.MinRowsCheck(1, policy="explode")
+        quality.Rows(1, policy="explode")
 
 
 # ---- incremental processing ------------------------------------------------
@@ -257,7 +253,7 @@ def upper(frame):
 
 def processor(store, **options):
     options.setdefault("sleep", lambda seconds: None)
-    return processing.IncrementalProcessor(store, CONTRACT, upper, **options)
+    return processing.Processor(store, CONTRACT, upper, **options)
 
 
 def seed(store):
@@ -296,7 +292,7 @@ def test_a_repeated_upload_is_skipped_and_a_changed_input_is_refused(store):
     processor(store).run()
     store.put("input/a-copy.csv", CSV.encode())
     result = processor(store).run()
-    assert result.duplicate_objects == ("input/a-copy.csv",)
+    assert result.duplicates == ("input/a-copy.csv",)
     assert result.processed == ()
     store.put("input/a.csv", (CSV + "7,1.0,south\n").encode())
     with pytest.raises(processing.ChangedError):
@@ -333,18 +329,14 @@ def test_a_crash_between_output_and_checkpoint_recovers_without_duplicates(
     # A killed process cannot release its lock.
     store.put("state/lock", b"locked")
     assert "output/b.csv" in outputs(store)
-    state = processing.Checkpoint.from_bytes(
-        store.get("state/checkpoint.json")[0]
-    )
+    state = processing.Checkpoint.decode(store.get("state/checkpoint.json")[0])
     assert list(state.processed) == ["input/a.csv"]
     with pytest.raises(processing.LockError):
         processor(store).run()
-    processor(store).break_lock()
+    processor(store).lock()
     resumed = processor(store).run()
     assert resumed.processed == ("input/b.csv",)
-    final = processing.Checkpoint.from_bytes(
-        store.get("state/checkpoint.json")[0]
-    )
+    final = processing.Checkpoint.decode(store.get("state/checkpoint.json")[0])
     assert set(final.processed) == {"input/a.csv", "input/b.csv"}
     reference = objectstore.LocalObjectStore(tmp_path / "reference")
     seed(reference)
@@ -365,7 +357,7 @@ def test_transient_failures_are_retried_with_backoff(store):
         return upper(frame)
 
     waits = []
-    run = processing.IncrementalProcessor(
+    run = processing.Processor(
         store,
         CONTRACT,
         flaky,
@@ -390,7 +382,7 @@ def test_exhausted_or_permanent_failures_stop_at_the_object_and_keep_progress(
             raise errors.DataError("bad batch")
         return upper(frame)
 
-    run = processing.IncrementalProcessor(
+    run = processing.Processor(
         store, CONTRACT, broken_on_b, sleep=lambda s: None
     ).run()
     assert run.processed == ("input/a.csv",)
@@ -405,7 +397,7 @@ def test_exhausted_or_permanent_failures_stop_at_the_object_and_keep_progress(
 
     other = objectstore.LocalObjectStore(tmp_path / "reference")
     seed(other)
-    run = processing.IncrementalProcessor(
+    run = processing.Processor(
         other,
         CONTRACT,
         always_busy,
@@ -425,7 +417,7 @@ def test_an_input_error_propagates_as_the_value_error_it_was(store):
         return upper(frame)
 
     with pytest.raises(ValueError, match="bad value"):
-        processing.IncrementalProcessor(
+        processing.Processor(
             store, CONTRACT, rejects_b, sleep=lambda s: None
         ).run()
     assert not store.exists("state/lock")
@@ -436,27 +428,23 @@ def test_the_gate_runs_before_processing_and_quarantine_is_respected(
     store, tmp_path
 ):
     store.put("input/a.csv", (CSV + "9,-1.0,north\n").encode())
-    gate = quality.QualityGate(
-        [
-            quality.RangeCheck(
-                "amount", 0, 100, policy=quality.Severity.QUARANTINE
-            )
-        ],
+    gate = quality.Gate(
+        [quality.Range("amount", 0, 100, policy=quality.Severity.QUARANTINE)],
         store,
     )
     run = processor(store, gate=gate).run()
     assert run.rows_out == 3
-    strict = quality.QualityGate([quality.RangeCheck("amount", 0, 1)], store)
+    strict = quality.Gate([quality.Range("amount", 0, 1)], store)
     other = objectstore.LocalObjectStore(tmp_path / "reference")
     other.put("input/a.csv", CSV.encode())
-    failed = processing.IncrementalProcessor(
+    failed = processing.Processor(
         other,
         CONTRACT,
         upper,
-        gate=quality.QualityGate([quality.RangeCheck("amount", 0, 1)], other),
+        gate=quality.Gate([quality.Range("amount", 0, 1)], other),
         sleep=lambda s: None,
     ).run()
-    assert failed.failed == "input/a.csv" and "QualityGateError" in failed.error
+    assert failed.failed == "input/a.csv" and "GateError" in failed.error
     assert strict
 
 
@@ -479,7 +467,7 @@ def test_a_damaged_checkpoint_is_never_silently_reset(store):
 @pytest.mark.parametrize("stored", [b"1", b"[]", b'"text"', b"null"])
 def test_a_checkpoint_that_is_not_an_object_is_reported_as_corrupt(stored):
     with pytest.raises(processing.CorruptError):
-        processing.Checkpoint.from_bytes(stored)
+        processing.Checkpoint.decode(stored)
 
 
 def test_a_second_run_cannot_share_the_checkpoint(store):
@@ -503,9 +491,9 @@ def test_max_objects_bounds_a_run_and_the_next_continues(store):
 
 
 def test_processing_needs_key_columns():
-    contract = snapshot.DataContract("x", "1", {"id": "int"})
+    contract = snapshot.Contract("x", "1", {"id": "int"})
     with pytest.raises(errors.ConfigError):
-        processing.IncrementalProcessor(
+        processing.Processor(
             objectstore.LocalObjectStore("/tmp/unused"), contract, upper
         )
 
@@ -522,7 +510,7 @@ def test_the_frame_dtype_kinds_are_reader_independent():
 
 def test_a_connector_reader_reads_the_object_a_store_uri_names(store):
     store.put("data/a.csv", b"x,y\n1,2\n")
-    read = snapshot.connector_reader(store)
+    read = snapshot.adapt(store)
 
     assert read(store.uri("data/a.csv")) == b"x,y\n1,2\n"
     with pytest.raises(objectstore.AbsentError):

@@ -55,7 +55,7 @@ def run(requested, tmp_path=None, reference=None, rule=None):
     features, target = world(SEED)
     cfeatures, ctarget = world(100 + SEED)
     stage = stage_for(features, target, requested, reference, rule)
-    result = governed.run_governed(
+    result = governed.govern(
         charter=make_charter(),
         features=features,
         target=target,
@@ -77,7 +77,7 @@ def tiers(result):
 def test_a_fragile_planted_effect_is_not_tested_on_c(tmp_path):
     result, stage = run(True, tmp_path)
 
-    assert stage.found.stability_gate is certificates.Authority.GATING
+    assert stage.found.gate is certificates.Authority.GATING
     assert {f.name: f.status for f in stage.found.findings} == {
         "s": stability.STABLE,
         "o": stability.FRAGILE,
@@ -90,7 +90,7 @@ def test_a_fragile_planted_effect_is_not_tested_on_c(tmp_path):
         if h.spec.column == "o"
     )
     assert fragile_id not in tested
-    stage_two = result.confirmation.stage_two
+    stage_two = result.confirmation.second
     assert set(stage_two["withdrawn"]) == {fragile_id}
     assert stage_two["rule"]["applied"] is True
     assert stage_two["rule"]["thresholds"] == stability.DEFAULT_RULE.to_dict()
@@ -102,7 +102,7 @@ def test_a_fragile_planted_effect_is_not_tested_on_c(tmp_path):
 def test_without_the_charter_request_the_fragile_effect_is_still_tested():
     result, stage = run(False)
 
-    assert result.confirmation.stage_two is None
+    assert result.confirmation.second is None
     assert not stage.applied
     assert stage.note.startswith("not applied: the charter does not ask")
     tested = {c.identifier.split(":")[0] for c in result.confirmation.checks}
@@ -131,7 +131,7 @@ def test_shift_results_are_diagnostics_when_a_reference_exists(tmp_path):
     reference["s"] = reference["s"] + 1.5
     cfeatures, ctarget = world(100 + SEED)
     stage = stage_for(features, target, False, reference=reference)
-    result = governed.run_governed(
+    result = governed.govern(
         charter=make_charter(),
         features=features,
         target=target,
@@ -160,7 +160,7 @@ def test_shift_results_are_diagnostics_when_a_reference_exists(tmp_path):
 
 
 def test_diagnostics_spend_no_wealth():
-    plain = governed.run_governed(
+    plain = governed.govern(
         charter=make_charter(),
         features=world(SEED)[0],
         target=world(SEED)[1],
@@ -174,27 +174,25 @@ def test_diagnostics_spend_no_wealth():
 
 
 def test_thresholds_other_than_the_certified_rule_never_withdraw():
-    loose = stability.Thresholds(s_min=0.5, band=0.9, q_min=0.5)
+    loose = stability.Thresholds(agreement=0.5, band=0.9, exclusion=0.5)
     result, stage = run(True, rule=loose)
 
-    assert stage.found.stability_gate is certificates.Authority.DESCRIPTIVE
-    assert "differ from the certified" in stage.found.rule_note
+    assert stage.found.gate is certificates.Authority.DESCRIPTIVE
+    assert "differ from the certified" in stage.found.note
     assert not stage.applied
     assert stage.note.startswith("requested but not applied")
-    assert result.confirmation.stage_two["withdrawn"] == {}
-    assert (
-        result.confirmation.stage_two["rule"]["thresholds"] == loose.to_dict()
-    )
+    assert result.confirmation.second["withdrawn"] == {}
+    assert result.confirmation.second["rule"]["thresholds"] == loose.to_dict()
     document = report.stability_report(stage.found, stage.note)
     assert document["rule"] == loose.to_dict()
-    assert document["certificate"]["note"] == stage.found.rule_note
+    assert document["certificate"]["note"] == stage.found.note
 
 
 def test_a_missing_certificate_means_a_warning_not_a_withdrawal(tmp_path):
     features, target = world(SEED)
     cfeatures, ctarget = world(100 + SEED)
     stage = stage_for(features, target, True, directory=tmp_path)
-    result = governed.run_governed(
+    result = governed.govern(
         charter=make_charter(),
         features=features,
         target=target,
@@ -203,6 +201,6 @@ def test_a_missing_certificate_means_a_warning_not_a_withdrawal(tmp_path):
         run_dir=None,
         second_stage=stage,
     )
-    assert stage.found.stability_gate is certificates.Authority.DESCRIPTIVE
+    assert stage.found.gate is certificates.Authority.DESCRIPTIVE
     assert not stage.applied and "no current passing certificate" in stage.note
-    assert result.confirmation.stage_two["withdrawn"] == {}
+    assert result.confirmation.second["withdrawn"] == {}

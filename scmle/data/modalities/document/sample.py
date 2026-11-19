@@ -21,12 +21,12 @@ class Sample:
     """Immutable decoded document content and its identity.
 
     Attributes:
-        document_id: Non-blank document identity.
+        identifier: Non-blank document identity.
         content: Non-blank decoded text; pages are separated by form feeds.
         format: Document format; a string is converted to the enum.
-        source_uri: URI of the raw source; may be empty.
+        uri: URI of the raw source; may be empty.
         encoding: Source encoding; only UTF-8 is accepted.
-        source_digest: Optional lowercase SHA-256 hex digest of the raw
+        digest: Optional lowercase SHA-256 hex digest of the raw
             source bytes.
         label: Optional task label.
         provenance: Page and section spans; derived from the content when
@@ -35,21 +35,21 @@ class Sample:
             content.
         content_hash: SHA-256 hex digest of the UTF-8 content; set on
             construction.
-        size_bytes: Length of the UTF-8 content in bytes; set on
+        size: Length of the UTF-8 content in bytes; set on
             construction.
     """
 
-    document_id: str
+    identifier: str
     content: str
     format: Format = Format.TEXT
-    source_uri: str = ""
+    uri: str = ""
     encoding: str = "utf-8"
-    source_digest: str | None = None
+    digest: str | None = None
     label: str | int | float | bool | None = None
     provenance: tuple[Span, ...] = ()
     layout: Layout | None = None
     content_hash: str = dataclasses.field(init=False)
-    size_bytes: int = dataclasses.field(init=False)
+    size: int = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
         """Validates content and derives immutable identity fields.
@@ -61,7 +61,7 @@ class Sample:
                 content, or the layout's source digest differs from the
                 sample's.
         """
-        if not self.document_id.strip():
+        if not self.identifier.strip():
             raise DocumentError(
                 "document_id must not be empty",
                 "empty_document_id",
@@ -70,7 +70,7 @@ class Sample:
             raise DocumentError(
                 "document content must not be empty",
                 "empty_content",
-                {"document_id": self.document_id},
+                {"document_id": self.identifier},
             )
         if self.encoding.lower().replace("-", "") != "utf8":
             raise DocumentError(
@@ -78,13 +78,13 @@ class Sample:
                 "unsupported_encoding",
                 {"encoding": self.encoding},
             )
-        if self.source_digest is not None and not re.fullmatch(
-            r"[0-9a-f]{64}", self.source_digest
+        if self.digest is not None and not re.fullmatch(
+            r"[0-9a-f]{64}", self.digest
         ):
             raise DocumentError(
                 "source_digest must be a lowercase SHA-256 digest",
                 "invalid_source_digest",
-                {"document_id": self.document_id},
+                {"document_id": self.identifier},
             )
         declared_format: Any = self.format  # a plain string is accepted
         if not isinstance(declared_format, Format):
@@ -99,18 +99,18 @@ class Sample:
             raise DocumentError(
                 "document layout element exceeds decoded content",
                 "layout_out_of_range",
-                {"document_id": self.document_id},
+                {"document_id": self.identifier},
             )
         if (
             self.layout is not None
             and self.layout.source_digest is not None
-            and self.source_digest is not None
-            and self.layout.source_digest != self.source_digest
+            and self.digest is not None
+            and self.layout.source_digest != self.digest
         ):
             raise DocumentError(
                 "document layout source digest does not match the document",
                 "layout_source_mismatch",
-                {"document_id": self.document_id},
+                {"document_id": self.identifier},
             )
         content_bytes = self.content.encode("utf-8")
         object.__setattr__(
@@ -118,7 +118,7 @@ class Sample:
             "content_hash",
             hashlib.sha256(content_bytes).hexdigest(),
         )
-        object.__setattr__(self, "size_bytes", len(content_bytes))
+        object.__setattr__(self, "size", len(content_bytes))
 
     def citations(self) -> tuple[Citation, ...]:
         """Returns source-backed citations for the document provenance spans.
@@ -133,17 +133,17 @@ class Sample:
             sample has no source URI or no source digest. The locator is the
             span label, or ``<kind>:<start>-<end>`` when the label is empty.
         """
-        if not self.source_uri.strip() or self.source_digest is None:
+        if not self.uri.strip() or self.digest is None:
             return ()
         return tuple(
             Citation(
-                document_id=self.document_id,
-                source_uri=self.source_uri,
-                source_digest=self.source_digest,
+                document=self.identifier,
+                uri=self.uri,
+                source_digest=self.digest,
                 start=span.start,
                 end=span.end,
                 locator=span.label or f"{span.kind}:{span.start}-{span.end}",
-                page_number=span.page_number,
+                page=span.page_number,
             )
             for span in self.provenance
         )
@@ -175,7 +175,7 @@ class Sample:
             len(self.content) > max_characters or len(tokens) > max_tokens
         )
         return Profile(
-            document_id=self.document_id,
+            document_id=self.identifier,
             character_count=len(sample),
             token_count=min(len(tokens), max_tokens),
             language=detect(sample),
@@ -197,7 +197,7 @@ class Split:
     validation: tuple[Sample, ...]
     test: tuple[Sample, ...]
 
-    def document_ids(self) -> dict[str, tuple[str, ...]]:
+    def index(self) -> dict[str, tuple[str, ...]]:
         """Returns sorted document IDs assigned to each split.
 
         Returns:
@@ -206,12 +206,12 @@ class Split:
         """
         return {
             "train": tuple(
-                sorted({sample.document_id for sample in self.train})
+                sorted({sample.identifier for sample in self.train})
             ),
             "validation": tuple(
-                sorted({sample.document_id for sample in self.validation})
+                sorted({sample.identifier for sample in self.validation})
             ),
-            "test": tuple(sorted({sample.document_id for sample in self.test})),
+            "test": tuple(sorted({sample.identifier for sample in self.test})),
         }
 
 

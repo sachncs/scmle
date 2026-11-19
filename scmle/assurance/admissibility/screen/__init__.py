@@ -121,10 +121,10 @@ import pandas
 
 from scmle.assurance.admissibility import leakage
 from scmle.assurance.admissibility import plants
+from scmle.assurance.admissibility.screen.association import assay
 from scmle.assurance.admissibility.screen.association import chisquare
 from scmle.assurance.admissibility.screen.association import cramer
 from scmle.assurance.admissibility.screen.association import dominance
-from scmle.assurance.admissibility.screen.association import purity_statistic
 from scmle.assurance.admissibility.screen.association import resample
 from scmle.assurance.admissibility.screen.fitting import aucs
 from scmle.assurance.admissibility.screen.fitting import basis
@@ -132,17 +132,17 @@ from scmle.assurance.admissibility.screen.fitting import concordance
 from scmle.assurance.admissibility.screen.fitting import crossfit
 from scmle.assurance.admissibility.screen.fitting import encode
 from scmle.assurance.admissibility.screen.fitting import enough
+from scmle.assurance.admissibility.screen.fitting import fit
 from scmle.assurance.admissibility.screen.fitting import margin
-from scmle.assurance.admissibility.screen.fitting import oof_fit
 from scmle.assurance.admissibility.screen.fitting import pair
 from scmle.assurance.admissibility.screen.fitting import pairs
 from scmle.assurance.admissibility.screen.fitting import permute
 from scmle.assurance.admissibility.screen.fitting import predict
 from scmle.assurance.admissibility.screen.fitting import Problem
+from scmle.assurance.admissibility.screen.fitting import quantify
 from scmle.assurance.admissibility.screen.fitting import replicate
-from scmle.assurance.admissibility.screen.fitting import skill_bound
-from scmle.assurance.admissibility.screen.fitting import skill_statistic
 from scmle.assurance.admissibility.screen.fitting import stratify
+from scmle.assurance.admissibility.screen.fitting import temper
 from scmle.assurance.admissibility.screen.fitting import words
 from scmle.assurance.admissibility.screen.hypotheses import caps
 from scmle.assurance.admissibility.screen.hypotheses import floor
@@ -156,7 +156,7 @@ from scmle.assurance.admissibility.screen.hypotheses import reflect
 from scmle.assurance.admissibility.screen.hypotheses import sift
 from scmle.assurance.admissibility.screen.hypotheses import spell
 from scmle.assurance.admissibility.screen.hypotheses import tested
-from scmle.assurance.admissibility.screen.permutation import draw_permutations
+from scmle.assurance.admissibility.screen.permutation import draw
 from scmle.assurance.admissibility.screen.permutation import resamples
 from scmle.assurance.admissibility.screen.planning import admit
 from scmle.assurance.admissibility.screen.planning import arrange
@@ -168,7 +168,7 @@ from scmle.assurance.admissibility.screen.planning import Demand
 from scmle.assurance.admissibility.screen.planning import disclose
 from scmle.assurance.admissibility.screen.planning import foresee
 from scmle.assurance.admissibility.screen.planning import forgo
-from scmle.assurance.admissibility.screen.planning import load_store
+from scmle.assurance.admissibility.screen.planning import load
 from scmle.assurance.admissibility.screen.planning import measure
 from scmle.assurance.admissibility.screen.planning import ready
 from scmle.assurance.admissibility.screen.planning import reckon
@@ -292,6 +292,7 @@ __all__ = [
     "admit",
     "allowance",
     "arrange",
+    "assay",
     "aucs",
     "basis",
     "bound",
@@ -309,7 +310,7 @@ __all__ = [
     "decline",
     "disclose",
     "dominance",
-    "draw_permutations",
+    "draw",
     "duplication",
     "encode",
     "encodings",
@@ -317,6 +318,7 @@ __all__ = [
     "exceed",
     "faint",
     "family",
+    "fit",
     "floor",
     "forecast",
     "foresee",
@@ -325,17 +327,16 @@ __all__ = [
     "halt",
     "hedge",
     "hypothesize",
-    "load_store",
+    "load",
     "margin",
     "measure",
-    "oof_fit",
     "pair",
     "pairs",
     "permute",
     "predict",
     "prepare",
     "propose",
-    "purity_statistic",
+    "quantify",
     "ready",
     "reckon",
     "reflect",
@@ -344,12 +345,11 @@ __all__ = [
     "resamples",
     "share",
     "sift",
-    "skill_bound",
-    "skill_statistic",
     "spell",
     "stratify",
     "subsample",
     "tally",
+    "temper",
     "tested",
     "throttle",
     "words",
@@ -403,7 +403,7 @@ def screen_table(
         that is not a candidate column, or a missing `target`, raises as in
         `screen`.
     """
-    cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=seed)
+    cfg = dataclasses.replace(leakage.CERTIFIED, seed=seed)
     present = [c for c in features if c in frame.columns]
     late = (dated(frame, present, cutoff), declared(present, known))
     rows, grouping, block_size = arrange(frame, group_column, time_column)
@@ -537,7 +537,7 @@ def probe(
         return {}
     source = rows[[*features, target]]
     labels = plants.names(source.columns)
-    planted = plants.table(source, target, cfg.run_seed, task == "regression")
+    planted = plants.table(source, target, cfg.seed, task == "regression")
     names = [*features, *labels.values()]
     if limit is not None:
         before = foresee(planted, target, task, cfg, names, groups, block_size)
@@ -553,7 +553,7 @@ def probe(
         block_size,
         None,
         apart=tuple(labels.values()),
-        counted=plants.copy(planted, cfg.run_seed),
+        counted=plants.copy(planted, cfg.seed),
         limit=limit,
     )
     if report.unchecked:
@@ -589,12 +589,12 @@ def evidence(task: str, n_classes: int) -> str:
     state = (
         "missing"
         if store is None
-        else store.state(DETECTORS[kind], code_digest()).value
+        else store.state(DETECTORS[kind], fingerprint()).value
     )
     return f"published certificate for {kind} targets: {state}"
 
 
-def code_digest() -> str:
+def fingerprint() -> str:
     """Hash of the code the screen's decisions depend on.
 
     The key of its certificate: `screen` and every function, class and
@@ -677,9 +677,7 @@ def scan(
     if overrun is not None:
         return overrun
     strata = stratify(n, groups, block_size)
-    draw_permutations(
-        pending, problem.y, labels[0], strata, total, alpha, cfg.run_seed
-    )
+    draw(pending, problem.y, labels[0], strata, total, alpha, cfg.seed)
     plan = (total, alpha)
     findings = conclude(
         pending, plan, problem, frame, labels, cfg, groups, gates, apart
@@ -751,7 +749,7 @@ def screen(
     )
     chosen_gates.update(gates or {})
     group_values = None if groups is None else groups.to_numpy()
-    rows, blocks = subsample(len(frame), group_values, block_size, cfg.run_seed)
+    rows, blocks = subsample(len(frame), group_values, block_size, cfg.seed)
     sample = frame.iloc[rows].reset_index(drop=True)
     sample_groups = None if group_values is None else group_values[rows]
     copied = duplication(

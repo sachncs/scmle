@@ -25,7 +25,7 @@ def frame():
 
 
 class Recorder:
-    model_id = "m"
+    model = "m"
 
     def __init__(self):
         self.calls = []
@@ -68,7 +68,7 @@ def test_the_replay_sampler_copies_and_serves_by_index():
     sampler = refusal.Replayer("model", original)
     original[0]["target"] = "changed"
     original.append({"target": "z"})
-    assert sampler.model_id == "model"
+    assert sampler.model == "model"
     assert sampler.recorded == [{"target": "x"}, {"target": "y"}]
     assert sampler.sample("p", 0) == {"target": "x"}
     assert sampler.sample("p", 1) == {"target": "y"}
@@ -90,10 +90,10 @@ def test_the_samples_hash_covers_model_prompt_and_samples():
     expected = hashlib.sha256(
         json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
-    assert refusal.samples_hash("m", "p", [{"a": 1}]) == expected
-    assert refusal.samples_hash("m2", "p", [{"a": 1}]) != expected
-    assert refusal.samples_hash("m", "p2", [{"a": 1}]) != expected
-    assert refusal.samples_hash("m", "p", [{"a": 2}]) != expected
+    assert refusal.digest("m", "p", [{"a": 1}]) == expected
+    assert refusal.digest("m2", "p", [{"a": 1}]) != expected
+    assert refusal.digest("m", "p2", [{"a": 1}]) != expected
+    assert refusal.digest("m", "p", [{"a": 2}]) != expected
 
 
 def test_population_predicates_select_row_positions_for_each_operator():

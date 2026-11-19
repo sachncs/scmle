@@ -46,13 +46,13 @@ class Node:
     """Immutable node with an optional numeric feature vector and label.
 
     Attributes:
-        node_id: Non-empty node identifier.
+        identifier: Non-empty node identifier.
         features: Finite numeric feature vector, stored as floats; may be
             empty.
         label: Optional node label.
     """
 
-    node_id: str
+    identifier: str
     features: tuple[float, ...] = ()
     label: str | int | float | bool | None = None
 
@@ -64,7 +64,7 @@ class Node:
                 not finite.
             TypeError: If a feature is not an int or float.
         """
-        node_id: object = self.node_id
+        node_id: object = self.identifier
         if not isinstance(node_id, str) or not node_id.strip():
             raise errors.InputError("node_id must be a non-empty string")
         if any(not isinstance(value, (int, float)) for value in self.features):
@@ -87,14 +87,14 @@ class Edge:
         target: Non-empty identifier of the target node.
         weight: Finite edge weight, stored as a float.
         relation: Non-empty relation name.
-        event_time: Optional timezone-aware time, stored in UTC.
+        time: Optional timezone-aware time, stored in UTC.
     """
 
     source: str
     target: str
     weight: float = 1.0
     relation: str = "default"
-    event_time: datetime | None = None
+    time: datetime | None = None
 
     def __post_init__(self) -> None:
         """Validates endpoint, relation, and weight values.
@@ -119,18 +119,15 @@ class Edge:
         relation: object = self.relation
         if not isinstance(relation, str) or not relation.strip():
             raise errors.InputError("edge relation must be a non-empty string")
-        if self.event_time is not None:
-            if not isinstance(self.event_time, datetime):
+        if self.time is not None:
+            if not isinstance(self.time, datetime):
                 raise errors.KindError("event_time must be a datetime")
-            if (
-                self.event_time.tzinfo is None
-                or self.event_time.utcoffset() is None
-            ):
+            if self.time.tzinfo is None or self.time.utcoffset() is None:
                 raise errors.InputError("event_time must be timezone-aware")
             object.__setattr__(
                 self,
-                "event_time",
-                self.event_time.astimezone(UTC),
+                "time",
+                self.time.astimezone(UTC),
             )
         object.__setattr__(self, "weight", float(self.weight))
 
@@ -141,13 +138,13 @@ class Chronology:
 
     Attributes:
         cutoff: Timezone-aware cutoff, converted to UTC.
-        train_edges: Edges with event time at or before the cutoff.
-        future_edges: Edges with event time after the cutoff.
+        past: Edges with event time at or before the cutoff.
+        edges: Edges with event time after the cutoff.
     """
 
     cutoff: datetime
-    train_edges: tuple[Edge, ...]
-    future_edges: tuple[Edge, ...]
+    past: tuple[Edge, ...]
+    edges: tuple[Edge, ...]
 
     def __post_init__(self) -> None:
         """Validates the cutoff and timestamp completeness of both partitions.
@@ -163,9 +160,9 @@ class Chronology:
             "cutoff",
             self.cutoff.astimezone(UTC),
         )
-        if any(edge.event_time is None for edge in self.train_edges):
+        if any(edge.time is None for edge in self.past):
             raise errors.InputError("train_edges must contain event times")
-        if any(edge.event_time is None for edge in self.future_edges):
+        if any(edge.time is None for edge in self.edges):
             raise errors.InputError("future_edges must contain event times")
 
     @property
@@ -173,8 +170,7 @@ class Chronology:
         """Whether a training edge occurs after the cutoff."""
         cutoff = self.cutoff.astimezone(UTC)
         return any(
-            edge.event_time is not None and edge.event_time > cutoff
-            for edge in self.train_edges
+            edge.time is not None and edge.time > cutoff for edge in self.past
         )
 
 
@@ -253,12 +249,12 @@ class Validation:
     """Version-1 keys to the written ones; `downgrade` restores version 1."""
 
     @property
-    def is_valid(self) -> bool:
+    def valid(self) -> bool:
         """Whether no validation issues were found."""
         return not self.issues
 
     @property
-    def error_codes(self) -> tuple[str, ...]:
+    def codes(self) -> tuple[str, ...]:
         """The unique issue codes, sorted."""
         return tuple(sorted({issue.code for issue in self.issues}))
 
@@ -271,8 +267,8 @@ class Validation:
         """
         return self.KEYS.upgrade(
             {
-                "is_valid": self.is_valid,
-                "error_codes": list(self.error_codes),
+                "is_valid": self.valid,
+                "error_codes": list(self.codes),
                 "issues": [issue.to_dict() for issue in self.issues],
             }
         )

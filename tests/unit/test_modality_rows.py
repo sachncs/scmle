@@ -57,8 +57,7 @@ def test_mm7_csv_edge_ids_keep_their_text(tmp_path):
     ]
     assert from_csv == graph.edgelist(jsonl)
     assert (
-        graph.Dataset.from_edge_file(csv).identity
-        == graph.Dataset.from_edge_file(jsonl).identity
+        graph.Dataset.load(csv).identity == graph.Dataset.load(jsonl).identity
     )
 
 
@@ -144,14 +143,14 @@ def test_mm10_near_duplicate_documents_share_a_side_of_the_split():
     resemblance = likeness.Resemblance()
     keys = resemblance.cluster([sample.content for sample in dataset.samples])
     by_id = {
-        sample.document_id: key
+        sample.identifier: key
         for sample, key in zip(dataset.samples, keys, strict=True)
     }
     assert by_id["copy-7"] == by_id["doc-7"]
     assert by_id["copy-3"] == by_id["doc-3"]
     for seed in range(20):
         split = dataset.split(0.2, 0.2, seed, resemblance)
-        ids = split.document_ids()
+        ids = split.index()
         for twin, original in (("copy-7", "doc-7"), ("copy-3", "doc-3")):
             side = [name for name, part in ids.items() if original in part]
             assert twin in ids[side[0]]
@@ -184,7 +183,7 @@ def stamp(hours):
 
 def test_mm11_a_timed_graph_holds_out_the_latest_nodes():
     edges = [
-        graph.Edge(f"n{index}", f"n{index + 1}", event_time=stamp(index))
+        graph.Edge(f"n{index}", f"n{index + 1}", time=stamp(index))
         for index in range(20)
     ]
     timed = graph.Dataset.connect(edges)
@@ -198,9 +197,9 @@ def test_mm11_a_timed_graph_holds_out_the_latest_nodes():
 
 def test_mm11_a_partly_timed_graph_is_refused_for_the_node_split():
     edges = [
-        graph.Edge("a", "b", event_time=stamp(1)),
+        graph.Edge("a", "b", time=stamp(1)),
         graph.Edge("b", "c"),
-        graph.Edge("c", "d", event_time=stamp(2)),
+        graph.Edge("c", "d", time=stamp(2)),
     ]
     with pytest.raises(graph.TemporalError, match="partly timed"):
         graph.induct(graph.Dataset.connect(edges), 0.5, 0.25, 0.25)

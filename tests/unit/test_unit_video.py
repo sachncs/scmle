@@ -22,15 +22,15 @@ def meta(**kwargs):
         "format": "mp4",
         "width": 4,
         "height": 2,
-        "frame_count": 10,
-        "frames_per_second": 5.0,
+        "frames": 10,
+        "rate": 5.0,
         "codec": "h264",
     } | kwargs
     return sample.Metadata(**arguments)
 
 
 def clip(source, payload=None, metadata=None, **kwargs):
-    return sample.Sample.from_bytes(
+    return sample.Sample.decode(
         payload or source.encode(),
         metadata or meta(),
         source=source,
@@ -43,26 +43,24 @@ def at(day):
 
 
 def test_metadata_reports_duration_and_synchrony():
-    assert meta().duration_seconds == 2.0
+    assert meta().seconds == 2.0
     assert meta().synchrony == "not_applicable"
-    assert meta(audio_tracks=1).synchrony == "unknown"
+    assert meta(tracks=1).synchrony == "unknown"
     synced = meta(
-        audio_tracks=1,
+        tracks=1,
         audio_duration_seconds=2.0,
-        sync_offset_seconds=-0.1,
-        sync_tolerance_seconds=0.1,
+        offset=-0.1,
+        tolerance=0.1,
     )
     assert synced.synchrony == "within_tolerance"
     drifted = meta(
-        audio_tracks=1,
+        tracks=1,
         audio_duration_seconds=2.0,
-        sync_offset_seconds=0.2,
-        sync_tolerance_seconds=0.1,
+        offset=0.2,
+        tolerance=0.1,
     )
     assert drifted.synchrony == "out_of_tolerance"
-    partial = meta(
-        audio_tracks=1, audio_duration_seconds=2.0, sync_offset_seconds=0.0
-    )
+    partial = meta(tracks=1, audio_duration_seconds=2.0, offset=0.0)
     assert partial.synchrony == "unknown"
 
 
@@ -73,24 +71,24 @@ def test_metadata_reports_duration_and_synchrony():
         ({"codec": ""}, "format and codec"),
         ({"width": 0}, "dimensions"),
         ({"height": 0}, "dimensions"),
-        ({"frame_count": 0}, "frame timing"),
-        ({"frames_per_second": 0.0}, "frame timing"),
-        ({"audio_tracks": -1}, "audio_tracks"),
-        ({"sync_offset_seconds": 0.0}, "requires at least one audio track"),
+        ({"frames": 0}, "frame timing"),
+        ({"rate": 0.0}, "frame timing"),
+        ({"tracks": -1}, "audio_tracks"),
+        ({"offset": 0.0}, "requires at least one audio track"),
         (
-            {"audio_tracks": 1, "audio_duration_seconds": 0.0},
+            {"tracks": 1, "audio_duration_seconds": 0.0},
             "audio_duration_seconds",
         ),
         (
-            {"audio_tracks": 1, "audio_duration_seconds": float("inf")},
+            {"tracks": 1, "audio_duration_seconds": float("inf")},
             "audio_duration_seconds",
         ),
         (
-            {"audio_tracks": 1, "sync_offset_seconds": float("nan")},
+            {"tracks": 1, "offset": float("nan")},
             "sync_offset_seconds",
         ),
         (
-            {"audio_tracks": 1, "sync_tolerance_seconds": -0.1},
+            {"tracks": 1, "tolerance": -0.1},
             "sync_tolerance_seconds",
         ),
     ],
@@ -102,43 +100,43 @@ def test_metadata_rejects_invalid_values(kwargs, message):
 
 def test_a_zero_tolerance_is_allowed():
     exact = meta(
-        audio_tracks=1,
+        tracks=1,
         audio_duration_seconds=1.0,
-        sync_offset_seconds=0.0,
-        sync_tolerance_seconds=0.0,
+        offset=0.0,
+        tolerance=0.0,
     )
     assert exact.synchrony == "within_tolerance"
 
 
 def test_canonical_source_and_time():
-    assert sample.canonical_source(" ") == "memory://"
-    assert sample.canonical_source("s3://v") == "s3://v"
-    assert sample.canonical_source("v.mp4") == (
+    assert sample.identify(" ") == "memory://"
+    assert sample.identify("s3://v") == "s3://v"
+    assert sample.identify("v.mp4") == (
         pathlib.Path("v.mp4").resolve().as_uri()
     )
-    assert sample.canonical_observation_time("2020-01-01T00:00:00Z") == at(1)
-    with pytest.raises(sample.VideoTemporalError) as raised:
-        sample.canonical_observation_time("2020-01-01T00:00:00")
+    assert sample.timestamp("2020-01-01T00:00:00Z") == at(1)
+    with pytest.raises(sample.TemporalError) as raised:
+        sample.timestamp("2020-01-01T00:00:00")
     assert raised.value.details["code"] == "timezone_required"
-    with pytest.raises(sample.VideoTemporalError) as raised:
-        sample.canonical_observation_time("x")
+    with pytest.raises(sample.TemporalError) as raised:
+        sample.timestamp("x")
     assert raised.value.details["code"] == "invalid_observation_time"
-    with pytest.raises(sample.VideoTemporalError, match="datetime or text"):
-        sample.canonical_observation_time(1)
+    with pytest.raises(sample.TemporalError, match="datetime or text"):
+        sample.timestamp(1)
 
 
 def test_from_bytes_builds_a_sample_and_enforces_limits():
     built = clip("mem://a", b"abc", observation_time="2020-01-01T00:00:00Z")
-    assert built.byte_size == 3
+    assert built.size == 3
     assert built.file_hash == hashlib.sha256(b"abc").hexdigest()
-    assert built.observation_time == at(1)
-    assert clip("mem://a", b"abc", max_bytes=3).byte_size == 3
+    assert built.time == at(1)
+    assert clip("mem://a", b"abc", max_bytes=3).size == 3
     with pytest.raises(sample.VideoError, match="byte limit"):
         clip("mem://a", b"abc", max_bytes=2)
     with pytest.raises(sample.VideoError, match="byte limit"):
         clip("mem://a", b"abc", max_bytes=0)
     with pytest.raises(sample.VideoError, match="empty"):
-        sample.Sample.from_bytes(b"", meta())
+        sample.Sample.decode(b"", meta())
 
 
 def test_a_sample_validates_identity():
@@ -146,22 +144,22 @@ def test_a_sample_validates_identity():
     with pytest.raises(errors.InputError, match="source"):
         sample.Sample(" ", b"x", digest, meta())
     with pytest.raises(errors.InputError, match="group_id"):
-        sample.Sample("s", b"x", digest, meta(), group_id=" ")
+        sample.Sample("s", b"x", digest, meta(), group=" ")
     with pytest.raises(errors.InputError, match="SHA-256 hex"):
         sample.Sample("s", b"x", digest.upper(), meta())
     with pytest.raises(errors.InputError, match="does not match"):
         sample.Sample("s", b"x", "0" * 64, meta())
     with pytest.raises(sample.VideoError, match="empty"):
         sample.Sample("s", b"", digest, meta())
-    timed = sample.Sample("s", b"x", digest, meta(), observation_time=at(1))
-    assert timed.observation_time == at(1)
+    timed = sample.Sample("s", b"x", digest, meta(), time=at(1))
+    assert timed.time == at(1)
 
 
 def test_profile_copies_metadata():
     built = clip("mem://a", b"abcd", label=1)
     profile = built.profile()
-    assert (profile.width, profile.height, profile.byte_size) == (4, 2, 4)
-    assert profile.duration_seconds == 2.0
+    assert (profile.width, profile.height, profile.size) == (4, 2, 4)
+    assert profile.duration == 2.0
     assert profile.synchrony == "not_applicable"
     assert profile.codec == "h264"
 
@@ -184,8 +182,8 @@ def test_a_dataset_hash_binds_time_and_order():
             f"mem://b\0{second.file_hash}"
         ).encode()
     ).hexdigest()
-    assert data.content_hash == expected
-    assert dataset.Dataset((second, first)).content_hash != expected
+    assert data.digest == expected
+    assert dataset.Dataset((second, first)).digest != expected
 
 
 def test_numerize_lists_metadata_features():
@@ -195,10 +193,10 @@ def test_numerize_lists_metadata_features():
     assert features.values == (
         (2.0, 4.0, 2.0, 8.0, 2.0, 10.0, 5.0, 0.0, 20.0, 2.0),
     )
-    assert features.feature_names[-1] == "bytes_per_frame"
+    assert features.names[-1] == "bytes_per_frame"
     assert features.shape == (1, 10)
     infinite = dataset.Dataset(
-        (clip("mem://b", metadata=meta(frames_per_second=float("inf"))),)
+        (clip("mem://b", metadata=meta(rate=float("inf"))),)
     )
     with pytest.raises(sample.VideoError, match="finite"):
         infinite.numerize()
@@ -210,7 +208,7 @@ def test_numerize_lists_metadata_features():
 )
 def test_stride_spaces_frame_indices_evenly(count, limit, expected):
     # Enforces website/src/pages/docs/api.astro:354.
-    built = clip("mem://a", metadata=meta(frame_count=count))
+    built = clip("mem://a", metadata=meta(frames=count))
     assert frames.Frames.stride(built, limit) == expected
 
 
@@ -221,7 +219,7 @@ def test_stride_needs_a_positive_limit():
 
 def test_summarize_records_frame_statistics_and_indices():
     # Enforces website/src/pages/docs/api.astro:354.
-    data = dataset.Dataset((clip("mem://a", metadata=meta(frame_count=3)),))
+    data = dataset.Dataset((clip("mem://a", metadata=meta(frames=3)),))
     calls = []
 
     def decoder(raw, index):
@@ -230,15 +228,15 @@ def test_summarize_records_frame_statistics_and_indices():
 
     features = data.summarize(decoder, max_frames=4)
     assert calls == [0, 1, 2]
-    assert features.sampled_frame_indices == ((0, 1, 2),)
-    assert features.feature_names[:5] == (
+    assert features.frames == ((0, 1, 2),)
+    assert features.names[:5] == (
         "frame[0].mean",
         "frame[0].std",
         "frame[0].min",
         "frame[0].max",
         "frame[0].observed",
     )
-    assert len(features.feature_names) == 20
+    assert len(features.names) == 20
     row = features.values[0]
     assert row[:5] == (1.0, 1.0, 0.0, 2.0, 1.0)
     assert row[5:10] == (2.0, 1.0, 1.0, 3.0, 1.0)
@@ -305,9 +303,9 @@ def test_features_validate_their_shape():
         evidence.Features(("a",), ("x",), ((1.0,),), ((-1,),))
     built = evidence.Features(["a"], ["x"], [[1]], [[2.0]])
     assert built.values == ((1.0,),)
-    assert built.sampled_frame_indices == ((2,),)
+    assert built.frames == ((2,),)
     assert built.sources == ("a",)
-    matrix = built.to_numpy()
+    matrix = built.materialize()
     matrix[0, 0] = 5.0
     assert built.values == ((1.0,),)
 
@@ -354,7 +352,7 @@ def test_cutover_puts_the_cutoff_in_training():
     mixed = dataset.Dataset(
         (clip("mem://a", observation_time=at(1)), clip("mem://c"))
     )
-    with pytest.raises(sample.VideoTemporalError, match="every video"):
+    with pytest.raises(sample.TemporalError, match="every video"):
         mixed.cutover(at(1))
 
 
@@ -362,13 +360,13 @@ def test_synchronization_findings_are_ordered():
     drifted = clip(
         "mem://a",
         metadata=meta(
-            audio_tracks=1,
+            tracks=1,
             audio_duration_seconds=1.0,
-            sync_offset_seconds=1.0,
-            sync_tolerance_seconds=0.0,
+            offset=1.0,
+            tolerance=0.0,
         ),
     )
-    unknown = clip("mem://b", metadata=meta(audio_tracks=1))
+    unknown = clip("mem://b", metadata=meta(tracks=1))
     findings = survey.synchronization([drifted, unknown, clip("mem://c")])
     assert [f.identifier for f in findings] == [
         "quality.video-audio-sync-out-of-tolerance",
@@ -428,20 +426,20 @@ def test_curate_summarises_the_collection():
                 "mem://b",
                 b"same",
                 label="y",
-                metadata=meta(frame_count=20, width=8),
+                metadata=meta(frames=20, width=8),
             ),
         )
     )
     report = data.curate()
     assert report.modality == "video"
-    assert report.sample_count == 2
+    assert report.samples == 2
     assert report.profile["dimensions"] == [[4, 2], [8, 2]]
     assert report.profile["duration_min_seconds"] == 2.0
     assert report.profile["duration_max_seconds"] == 4.0
     assert report.profile["duration_mean_seconds"] == 3.0
     assert report.profile["total_bytes"] == 8
     assert report.profile["synchronization_statuses"] == ["not_applicable"]
-    assert [f.identifier for f in report.quality_findings] == [
+    assert [f.identifier for f in report.findings] == [
         "quality.video-dimension-drift",
         "quality.video-mixed-temporal-state",
     ]

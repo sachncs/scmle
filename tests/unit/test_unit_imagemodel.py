@@ -21,11 +21,11 @@ class Report:
     """A stand-in curation report."""
 
     def __init__(self, means, duplicates=0, count=4, blocking=()):
-        self.unresolved_blocking_findings = tuple(
+        self.blockers = tuple(
             type("Finding", (), {"identifier": name})() for name in blocking
         )
         self.profile = {"duplicates": duplicates, "pixel": {"mean": means}}
-        self.sample_count = count
+        self.samples = count
         self.dataset_hash = f"hash-{means}-{duplicates}"
 
 

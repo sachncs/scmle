@@ -1023,7 +1023,7 @@ def confirm_world(kind: str, runs: int, base: int) -> dict[str, Any]:
         sensitivity=causal.Confounding("strongest_observed", 0.2),
     )
     named = dict.fromkeys(spec.assumptions, "certificate harness, 2026-11-04")
-    error_budget = budget.ErrorBudget.create(0.05, 0.1)
+    error_budget = budget.Alpha.create(0.05, 0.1)
     confirmed = tiers_attested = 0
     for i in range(runs):
         x = f10_generators.backdoor(stream(base, i, 0), 1200, **knobs)
@@ -1229,7 +1229,7 @@ def current_digests() -> dict[str, dict[str, str]]:
     return {
         name: {
             "method_hash": methods[name],
-            "code_hash": certificates.code_hash(
+            "code_hash": certificates.fingerprint(
                 *certified.METHOD_SOURCES[name], *harness[name]
             ),
         }

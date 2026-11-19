@@ -486,9 +486,7 @@ def band_rows(estimate):
 
 def test_the_clerical_sample_and_intervals_are_pinned():
     weights, pairs, labeler = stratified_inputs()
-    estimate = entities.stratified_estimate(
-        weights, pairs, 0.5, labeler, "rev", 6, 3
-    )
+    estimate = entities.appraise(weights, pairs, 0.5, labeler, "rev", 6, 3)
     assert estimate.reviewer == "rev"
     assert estimate.precision == pytest.approx(
         (0.5585714285714285, 0.43954091782346444, 0.7421331044644154)
@@ -511,9 +509,7 @@ def test_the_clerical_sample_and_intervals_are_pinned():
 
 def test_a_smaller_sample_per_band_changes_the_labels_drawn():
     weights, pairs, labeler = stratified_inputs()
-    estimate = entities.stratified_estimate(
-        weights, pairs, 0.5, labeler, "rev", 4, 3
-    )
+    estimate = entities.appraise(weights, pairs, 0.5, labeler, "rev", 4, 3)
     assert estimate.precision == pytest.approx(
         (0.6915555555555556, 0.4954203340508876, 0.8965612056857264)
     )
@@ -522,7 +518,7 @@ def test_a_smaller_sample_per_band_changes_the_labels_drawn():
 
 def test_fewer_bands_and_draws_are_honoured():
     weights, pairs, labeler = stratified_inputs()
-    estimate = entities.stratified_estimate(
+    estimate = entities.appraise(
         weights, pairs, 0.5, labeler, "rev", 6, 4, bands=5, draws=50
     )
     assert len(estimate.bands) == 5
@@ -536,14 +532,12 @@ def test_fewer_bands_and_draws_are_honoured():
 
 def test_a_threshold_equal_to_a_band_edge_counts_that_band_as_linked():
     weights, pairs, labeler = stratified_inputs()
-    everything = entities.stratified_estimate(
+    everything = entities.appraise(
         weights, pairs, -math.inf, labeler, "rev", 6, 3
     )
     edge = everything.bands[3].low
-    at = entities.stratified_estimate(
-        weights, pairs, edge, labeler, "rev", 6, 3
-    )
-    above = entities.stratified_estimate(
+    at = entities.appraise(weights, pairs, edge, labeler, "rev", 6, 3)
+    above = entities.appraise(
         weights, pairs, math.nextafter(edge, math.inf), labeler, "rev", 6, 3
     )
     assert at.precision[0] != above.precision[0]
@@ -552,15 +546,13 @@ def test_a_threshold_equal_to_a_band_edge_counts_that_band_as_linked():
 
 def test_nothing_linked_gives_zero_precision_and_recall():
     weights, pairs, labeler = stratified_inputs()
-    estimate = entities.stratified_estimate(
-        weights, pairs, math.inf, labeler, "r", 6, 1
-    )
+    estimate = entities.appraise(weights, pairs, math.inf, labeler, "r", 6, 1)
     assert estimate.precision == (0.0, 0.0, 0.0)
     assert estimate.recall == (0.0, 0.0, 0.0)
 
 
 def test_a_single_pair_is_fully_linked():
-    estimate = entities.stratified_estimate(
+    estimate = entities.appraise(
         numpy.array([1.0]),
         [(0, 1)],
         -math.inf,
@@ -579,7 +571,7 @@ def test_a_single_pair_is_fully_linked():
 def test_tied_weights_are_banded_in_input_order():
     weights = numpy.zeros(200)
     pairs = [(i, i + 1) for i in range(200)]
-    estimate = entities.stratified_estimate(
+    estimate = entities.appraise(
         weights, pairs, 0.0, lambda i, j: i % 3 == 0, "r", 5, 2
     )
     assert [(b.pairs, b.sampled, int(b.matches)) for b in estimate.bands] == [
@@ -599,15 +591,9 @@ def test_tied_weights_are_banded_in_input_order():
 
 def test_the_clerical_sample_depends_on_the_seed():
     weights, pairs, labeler = stratified_inputs()
-    first = entities.stratified_estimate(
-        weights, pairs, 0.5, labeler, "r", 6, 3
-    )
-    again = entities.stratified_estimate(
-        weights, pairs, 0.5, labeler, "r", 6, 3
-    )
-    other = entities.stratified_estimate(
-        weights, pairs, 0.5, labeler, "r", 6, 4
-    )
+    first = entities.appraise(weights, pairs, 0.5, labeler, "r", 6, 3)
+    again = entities.appraise(weights, pairs, 0.5, labeler, "r", 6, 3)
+    other = entities.appraise(weights, pairs, 0.5, labeler, "r", 6, 4)
     assert first == again
     assert first.precision != other.precision
 
@@ -668,11 +654,11 @@ def test_resolution_without_labels_on_a_tiny_table_is_pinned():
     result = entities.resolve(SMALL, SMALL_FIELDS, SMALL_PASSES)
     assert result.groups == [0, 0, 2, 2, 4, 5, 4, 7]
     assert result.links == ((0, 1), (2, 3), (4, 6))
-    assert result.t_group == pytest.approx(19.346605467484476)
+    assert result.group == pytest.approx(19.346605467484476)
     assert result.t_match == pytest.approx(19.346605467484476)
     assert result.compared == 5
-    assert result.reduction_ratio == pytest.approx(1 - 5 / 28)
-    assert result.skipped_blocks == 0
+    assert result.reduction == pytest.approx(1 - 5 / 28)
+    assert result.blocks == 0
     assert result.estimate is None
     assert result.tier is qualification.Tier.UNVERIFIED
     assert result.model.iterations == 23
@@ -691,7 +677,7 @@ def test_resolution_with_labels_on_a_tiny_table_is_pinned():
     )
     assert result.groups == [0, 0, 2, 2, 4, 4, 4, 7]
     assert result.links == ((0, 1), (2, 3), (4, 5), (4, 6), (5, 6))
-    assert result.t_group == pytest.approx(-21.516529867789284)
+    assert result.group == pytest.approx(-21.516529867789284)
     assert result.t_match == pytest.approx(-21.516529867789284)
     assert result.tier is qualification.Tier.ATTESTED
     assert result.estimate.reviewer == "x"
@@ -730,10 +716,10 @@ def test_to_dict_of_a_labelled_resolution_has_every_field():
         "estimate",
     }
     assert document["tier"] == "attested"
-    assert document["thresholds"]["group"] == result.t_group
+    assert document["thresholds"]["group"] == result.group
     assert document["thresholds"]["linkage"] == result.t_match
     assert document["compared_pairs"] == 5
-    assert document["reduction"] == result.reduction_ratio
+    assert document["reduction"] == result.reduction
     assert document["skipped"] == 0
     assert document["links"] == 5
     assert document["groups"] == 4
@@ -777,11 +763,11 @@ def test_without_blocked_pairs_every_record_is_alone_with_an_empty_model():
     result = entities.resolve(frame, SMALL_FIELDS, [entities.Pass("uid")])
     assert result.groups == list(range(8))
     assert result.links == ()
-    assert result.t_group == math.inf
+    assert result.group == math.inf
     assert result.t_match == math.inf
     assert result.compared == 0
-    assert result.reduction_ratio == 1.0
-    assert result.skipped_blocks == 0
+    assert result.reduction == 1.0
+    assert result.blocks == 0
     assert result.estimate is None
     assert result.tier is qualification.Tier.UNVERIFIED
     assert result.model.prior == 0.0
@@ -797,7 +783,7 @@ def test_one_block_compares_every_pair_inside_it():
         frame, [entities.Field("v")], [entities.Pass("k")]
     )
     assert result.compared == 10
-    assert result.reduction_ratio == 0.0
+    assert result.reduction == 0.0
 
 
 def test_an_empty_record_set_resolves_to_nothing():
@@ -806,12 +792,12 @@ def test_an_empty_record_set_resolves_to_nothing():
         frame, [entities.Field("v")], [entities.Pass("k")]
     )
     assert result.groups == []
-    assert result.reduction_ratio == 1.0
+    assert result.reduction == 1.0
     assert result.compared == 0
     one = pandas.DataFrame({"k": ["a"], "v": ["x"]})
     single = entities.resolve(one, [entities.Field("v")], [entities.Pass("k")])
     assert single.groups == [0]
-    assert single.reduction_ratio == 1.0
+    assert single.reduction == 1.0
 
 
 def test_oversized_blocks_are_reported_by_the_resolution():
@@ -819,9 +805,9 @@ def test_oversized_blocks_are_reported_by_the_resolution():
     result = entities.resolve(
         frame, [entities.Field("v")], [entities.Pass("k")]
     )
-    assert result.skipped_blocks == 1
+    assert result.blocks == 1
     assert result.compared == 1
-    assert result.reduction_ratio == pytest.approx(1 - 1 / (203 * 202 / 2))
+    assert result.reduction == pytest.approx(1 - 1 / (203 * 202 / 2))
 
 
 def test_the_reduction_ratio_counts_all_unordered_pairs():
@@ -830,7 +816,7 @@ def test_the_reduction_ratio_counts_all_unordered_pairs():
         frame, [entities.Field("v")], [entities.Pass("k")]
     )
     assert result.compared == 1
-    assert result.reduction_ratio == pytest.approx(1 - 1 / 6)
+    assert result.reduction == pytest.approx(1 - 1 / 6)
 
 
 @pytest.fixture(scope="module")
@@ -842,7 +828,7 @@ def test_unlabelled_thresholds_come_from_the_posterior(world):
     result = entities.resolve(world, FIELDS, PASSES)
     document = result.to_dict()
     assert document["tier"] == "unverified"
-    assert result.t_group == pytest.approx(8.609669212785187)
+    assert result.group == pytest.approx(8.609669212785187)
     assert result.t_match == pytest.approx(9.651041949752166)
     assert document["compared_pairs"] == 2241
     assert document["reduction"] == pytest.approx(0.9483223797993774)
@@ -856,17 +842,17 @@ def test_unlabelled_thresholds_come_from_the_posterior(world):
 def test_a_lower_precision_target_lowers_the_match_threshold(world):
     result = entities.resolve(world, FIELDS, PASSES, min_precision=0.6)
     assert result.t_match == pytest.approx(8.609669212785187)
-    assert result.t_group == pytest.approx(8.609669212785187)
+    assert result.group == pytest.approx(8.609669212785187)
     assert len(result.links) == 95
     strict = entities.resolve(world, FIELDS, PASSES, min_precision=0.999)
     assert strict.t_match >= result.t_match
-    assert strict.t_group == result.t_group
+    assert strict.group == result.group
 
 
 def test_the_group_threshold_never_exceeds_the_match_threshold(world):
     for target in (0.1, 0.5, 0.9, 0.99):
         result = entities.resolve(world, FIELDS, PASSES, min_precision=target)
-        assert result.t_group <= result.t_match
+        assert result.group <= result.t_match
 
 
 def test_labelled_resolution_of_a_world_is_pinned(world):
@@ -882,7 +868,7 @@ def test_labelled_resolution_of_a_world_is_pinned(world):
     )
     document = result.to_dict()
     assert document["tier"] == "attested"
-    assert result.t_group == pytest.approx(28.54123776491317)
+    assert result.group == pytest.approx(28.54123776491317)
     assert result.t_match == pytest.approx(28.54123776491317)
     assert document["links"] == 75
     assert document["groups"] == 220
@@ -932,12 +918,12 @@ def test_measure_quality_counts_pairs_inside_entities_and_groups():
     resolution = entities.Resolution(
         groups=[0, 0, 0, 3, 3, 5],
         links=(),
-        t_group=0.0,
+        group=0.0,
         t_match=0.0,
         model=entities.Model(0.0, numpy.ones((1, 3)), numpy.ones((1, 3)), 0),
         compared=0,
-        reduction_ratio=1.0,
-        skipped_blocks=0,
+        reduction=1.0,
+        blocks=0,
         estimate=None,
         tier=qualification.Tier.UNVERIFIED,
     )
@@ -945,12 +931,12 @@ def test_measure_quality_counts_pairs_inside_entities_and_groups():
     pairs = [(0, 1), (2, 3), (3, 4), (0, 5)]
     quality = entities.grade(entity, resolution, pairs)
     truth = {(0, 1), (2, 3), (2, 4), (3, 4)}
-    assert quality.true_pairs == len(truth) == 4
-    assert quality.grouped_pairs == 2
-    assert quality.pair_completeness == pytest.approx(3 / 4)
-    assert quality.link_recall == pytest.approx(2 / 4)
-    assert quality.false_group_pairs == 2
-    low, high = quality.link_recall_interval
+    assert quality.matches == len(truth) == 4
+    assert quality.pairs == 2
+    assert quality.completeness == pytest.approx(3 / 4)
+    assert quality.recall == pytest.approx(2 / 4)
+    assert quality.spurious == 2
+    low, high = quality.interval
     assert 0.0 < low < 0.5 < high < 1.0
 
 
@@ -968,13 +954,13 @@ def test_measure_quality_of_three_member_groups_counts_every_pair():
         qualification.Tier.UNVERIFIED,
     )
     quality = entities.grade(["a", "b", "c", "d"], resolution, [])
-    assert quality.true_pairs == 0
-    assert quality.false_group_pairs == 6
+    assert quality.matches == 0
+    assert quality.spurious == 6
     triple = entities.grade(["a", "a", "a", "d"], resolution, [(0, 1)])
-    assert triple.true_pairs == 3
-    assert triple.grouped_pairs == 3
-    assert triple.false_group_pairs == 3
-    assert triple.pair_completeness == pytest.approx(1 / 3)
+    assert triple.matches == 3
+    assert triple.pairs == 3
+    assert triple.spurious == 3
+    assert triple.completeness == pytest.approx(1 / 3)
 
 
 def test_measure_quality_without_true_matches_is_perfect_by_convention():
@@ -1006,14 +992,12 @@ def test_measure_quality_matches_the_resolution_of_a_labelled_run():
     )
     pairs = entities.pairing(SMALL, SMALL_PASSES)[0]
     quality = entities.grade(SMALL_ENTITY, result, pairs)
-    assert quality.pair_completeness == 1.0
-    assert quality.link_recall == 1.0
-    assert quality.true_pairs == 5
-    assert quality.grouped_pairs == 5
-    assert quality.false_group_pairs == 0
-    assert quality.link_recall_interval == pytest.approx(
-        (0.5655175352168251, 1.0)
-    )
+    assert quality.completeness == 1.0
+    assert quality.recall == 1.0
+    assert quality.matches == 5
+    assert quality.pairs == 5
+    assert quality.spurious == 0
+    assert quality.interval == pytest.approx((0.5655175352168251, 1.0))
 
 
 def test_the_prior_is_held_inside_the_floor_at_both_ends():

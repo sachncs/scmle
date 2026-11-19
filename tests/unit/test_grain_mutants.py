@@ -37,10 +37,10 @@ def empty_scan(**changes):
         "rows": 10,
         "keys": [],
         "measured": {},
-        "levels_done": 1,
+        "done": 1,
         "partial": False,
         "eps_key": 0.0,
-        "eps_null": 0.0,
+        "null": 0.0,
     }
     fields.update(changes)
     return grain.Scan(**fields)
@@ -158,11 +158,11 @@ def test_single_column_keys_carry_every_measure():
 
 def test_single_column_with_too_many_nulls_cannot_join_a_key():
     table = table_of(10, column("n", 5, 6), column("m", 5, 10))
-    scan = empty_scan(rows=10, eps_null=0.3)
+    scan = empty_scan(rows=10, null=0.3)
     nonkey = grain.sweep(table, ["n", "m"], scan)
     assert scan.measured[("n",)] == (pytest.approx(0.5), pytest.approx(0.4))
     assert nonkey == {("m",)}
-    looser = empty_scan(rows=10, eps_null=0.4)
+    looser = empty_scan(rows=10, null=0.4)
     assert grain.sweep(table, ["n", "m"], looser) == {
         ("n",),
         ("m",),
@@ -206,7 +206,7 @@ def test_a_non_key_pair_that_was_queried_still_reaches_level_three():
     assert grain.feasible(table, ("a", "b"), 0.0)
     assert [k.columns for k in scan.keys] == [("a", "b", "c")]
     assert scan.measured[("a", "b")] == (pytest.approx(0.5), 0.0)
-    assert scan.levels_done == 3
+    assert scan.done == 3
 
 
 def test_composite_key_candidates_record_distinct_rows_and_smallness():
@@ -220,9 +220,9 @@ def test_composite_key_candidates_record_distinct_rows_and_smallness():
     key = scan.keys[0]
     assert key.distinct == 19
     assert key.rows == n
-    assert key.small_n is True
+    assert key.small is True
     assert key.g3 == pytest.approx(0.05)
-    assert key.null_rate == 0.0
+    assert key.nulls == 0.0
 
 
 def test_a_composite_key_of_exactly_the_small_table_limit_is_not_small():
@@ -232,10 +232,10 @@ def test_a_composite_key_of_exactly_the_small_table_limit_is_not_small():
     )
     scan = scan_of(frame, size=2)[2]
     assert [k.columns for k in scan.keys] == [("a", "b")]
-    assert scan.keys[0].small_n is False
+    assert scan.keys[0].small is False
     assert scan.keys[0].distinct == 1000
     below = scan_of(frame.iloc[:999], size=2)[2]
-    assert below.keys[0].small_n is True
+    assert below.keys[0].small is True
 
 
 def test_infer_keys_records_the_table_and_the_search_state():
@@ -245,8 +245,8 @@ def test_infer_keys_records_the_table_and_the_search_state():
     assert scan.rows == 5
     assert scan.partial is False
     assert scan.eps_key == 0.0
-    assert scan.eps_null == 0.0
-    assert scan.levels_done == 2
+    assert scan.null == 0.0
+    assert scan.done == 2
     assert list(scan.measured) == [("k",)]
 
 
@@ -277,15 +277,15 @@ def test_the_default_null_tolerance_is_zero():
     source, table = scan_of(frame)[:2]
     scan = grain.keysearch(source, table, eps_key=0.5)
     assert scan.keys == []
-    assert scan.eps_null == 0.0
+    assert scan.null == 0.0
 
 
 def test_tolerances_may_be_exactly_one_and_the_size_exactly_one():
     source, table = scan_of(pandas.DataFrame({"a": [1, 2, 3]}))[:2]
     scan = grain.keysearch(source, table, 1.0, 1.0, 1)
-    assert scan.levels_done == 1
+    assert scan.done == 1
     assert [k.columns for k in scan.keys] == [("a",)]
-    assert grain.keysearch(source, table, 0.0, 1.0).eps_null == 1.0
+    assert grain.keysearch(source, table, 0.0, 1.0).null == 1.0
 
 
 def test_invalid_tolerance_messages_name_the_argument():
@@ -299,7 +299,7 @@ def test_invalid_tolerance_messages_name_the_argument():
 
 
 def build_budgeted(frame):
-    meter = budget.Meter(budget.Budget(max_queries=1000))
+    meter = budget.Meter(budget.Budget(queries=1000))
     db = ingest_worlds.new_database("gm")
     ingest_worlds.load(db, "t", frame)
     source = profile.Sql(db.factory, meter)
@@ -329,7 +329,7 @@ def test_a_stopped_level_names_the_stage_and_the_level():
         | {"d": numpy.repeat(numpy.arange(40), 5)}
     )
     source, table = build_budgeted(frame)[:2]
-    source.meter = budget.Meter(budget.Budget(max_queries=0))
+    source.meter = budget.Meter(budget.Budget(queries=0))
     scan = grain.keysearch(source, table)
     stop = source.meter.stops[0]
     assert (stop.stage, stop.unit, stop.reason) == (
@@ -339,7 +339,7 @@ def test_a_stopped_level_names_the_stage_and_the_level():
     )
     assert scan.partial is True
     other = build_budgeted(frame)
-    other[0].meter = budget.Meter(budget.Budget(max_queries=0))
+    other[0].meter = budget.Meter(budget.Budget(queries=0))
     grain.keysearch(other[0], other[1], stage="custom")
     assert other[0].meter.stops[0].stage == "custom"
 
@@ -350,7 +350,7 @@ def test_the_level_charge_is_two_queries_for_each_runnable_set():
         | {"d": numpy.repeat(numpy.arange(40), 5)}
     )
     source, table = build_budgeted(frame)[:2]
-    spend = budget.Meter(budget.Budget(max_queries=1000))
+    spend = budget.Meter(budget.Budget(queries=1000))
     source.meter = spend
     scan = grain.keysearch(source, table, max_size=2)
     runnable = [
@@ -413,10 +413,10 @@ def test_match_columns_without_grain_words_say_so():
 
 def test_unmapped_words_give_a_complete_unknown_verdict():
     source, table, scan = customers_table()
-    verdict = grain.unit_verdict(source, table, "warehouse", scan)
+    verdict = grain.judge(source, table, "warehouse", scan)
     assert verdict.verdict == grain.UNKNOWN
     assert verdict.unit == "warehouse"
-    assert verdict.unit_columns == ()
+    assert verdict.columns == ()
     assert verdict.reason == "unit words do not map to columns"
     assert verdict.questions == (
         "which column is 'warehouse'? found no column",
@@ -426,10 +426,10 @@ def test_unmapped_words_give_a_complete_unknown_verdict():
 
 def test_a_matching_unit_reports_its_columns_and_reason():
     source, table, scan = customers_table()
-    verdict = grain.unit_verdict(source, table, "customer month", scan)
+    verdict = grain.judge(source, table, "customer month", scan)
     assert verdict.verdict == grain.MATCH
     assert verdict.unit == "customer month"
-    assert verdict.unit_columns == ("customer_id", "month")
+    assert verdict.columns == ("customer_id", "month")
     assert verdict.reason == "unit columns are a key"
     assert verdict.questions == ()
     assert not verdict.blocks
@@ -437,10 +437,10 @@ def test_a_matching_unit_reports_its_columns_and_reason():
 
 def test_a_finer_table_names_the_first_key_it_found():
     source, table, scan = customers_table()
-    verdict = grain.unit_verdict(source, table, "customer", scan)
+    verdict = grain.judge(source, table, "customer", scan)
     assert verdict.verdict == grain.FINER
     assert verdict.unit == "customer"
-    assert verdict.unit_columns == ("customer_id",)
+    assert verdict.columns == ("customer_id",)
     assert verdict.reason == (
         "unit columns repeat; the table is keyed by "
         f"{list(scan.keys[0].columns)}, so aggregation is needed"
@@ -452,10 +452,10 @@ def test_a_finer_table_names_the_first_key_it_found():
 def test_a_table_without_any_key_gives_the_full_unknown_verdict():
     frame = pandas.DataFrame({"customer_id": [1, 1, 2, 2], "x": [0, 0, 1, 1]})
     source, table, scan = scan_of(frame)
-    verdict = grain.unit_verdict(source, table, "customer", scan)
+    verdict = grain.judge(source, table, "customer", scan)
     assert verdict.verdict == grain.UNKNOWN
     assert verdict.unit == "customer"
-    assert verdict.unit_columns == ("customer_id",)
+    assert verdict.columns == ("customer_id",)
     assert verdict.reason == "no key found at the declared tolerance"
     assert verdict.questions == ("which columns identify a row?",)
     assert verdict.blocks
@@ -466,10 +466,10 @@ def test_a_coarser_table_names_the_subset_that_is_a_key():
         {"customer_id": [1, 2, 3, 4], "month": [1, 1, 2, 2]}
     )
     source, table, scan = scan_of(frame)
-    verdict = grain.unit_verdict(source, table, "customer month", scan)
+    verdict = grain.judge(source, table, "customer month", scan)
     assert verdict.verdict == grain.COARSER
     assert verdict.unit == "customer month"
-    assert verdict.unit_columns == ("customer_id", "month")
+    assert verdict.columns == ("customer_id", "month")
     assert verdict.reason == (
         "['customer_id'] is already a key, so rows are coarser than the unit"
     )
@@ -479,7 +479,7 @@ def test_a_coarser_table_names_the_subset_that_is_a_key():
 
 def test_subset_verdict_stops_with_a_question_when_the_budget_does():
     verdict = grain.shrink("u", ("a", "b"), lambda cols: None)
-    assert verdict == grain.UnitVerdict(
+    assert verdict == grain.Verdict(
         grain.UNKNOWN,
         "u",
         ("a", "b"),
@@ -500,7 +500,7 @@ def test_subset_verdict_reports_the_first_subset_in_size_order():
     verdict = grain.shrink("u", ("a", "b", "c"), identifies)
     assert verdict.verdict == grain.COARSER
     assert verdict.unit == "u"
-    assert verdict.unit_columns == ("a", "b", "c")
+    assert verdict.columns == ("a", "b", "c")
     assert verdict.reason == (
         "['c'] is already a key, so rows are coarser than the unit"
     )
@@ -520,13 +520,13 @@ def test_the_unit_check_charges_the_unit_stage_and_stops_on_budget():
     source = profile.Sql(db.factory)
     table = profile.survey(source, "t")
     scan = grain.keysearch(source, table, max_size=1)
-    source.meter = budget.Meter(budget.Budget(max_queries=0))
-    verdict = grain.unit_verdict(source, table, "customer month", scan)
+    source.meter = budget.Meter(budget.Budget(queries=0))
+    verdict = grain.judge(source, table, "customer month", scan)
     assert verdict.verdict == grain.UNKNOWN
     assert verdict.reason == "budget stopped the unit check"
     assert verdict.questions == ("raise the ingest budget",)
     assert verdict.unit == "customer month"
-    assert verdict.unit_columns == ("customer_id", "month")
+    assert verdict.columns == ("customer_id", "month")
     stop = source.meter.stops[0]
     assert (stop.stage, stop.unit) == ("unit", "customer_id,month")
 
@@ -544,10 +544,10 @@ def test_the_unit_check_measures_unseen_sets_once_and_charges_for_them():
     source = profile.Sql(db.factory)
     table = profile.survey(source, "t")
     scan = grain.keysearch(source, table, max_size=1)
-    spend = budget.Meter(budget.Budget(max_queries=100))
+    spend = budget.Meter(budget.Budget(queries=100))
     source.meter = spend
     before = source.queries
-    verdict = grain.unit_verdict(source, table, "customer month", scan)
+    verdict = grain.judge(source, table, "customer month", scan)
     assert verdict.verdict == grain.MATCH
     assert ("customer_id", "month") in scan.measured
     assert source.queries - before == 2
@@ -565,7 +565,7 @@ def test_a_set_that_cannot_be_a_key_is_never_queried_by_the_unit_check():
     table = profile.survey(source, "t")
     scan = grain.keysearch(source, table, max_size=1)
     before = source.queries
-    verdict = grain.unit_verdict(source, table, "customer", scan)
+    verdict = grain.judge(source, table, "customer", scan)
     assert source.queries == before
     assert verdict.verdict == grain.UNKNOWN
 
@@ -578,9 +578,7 @@ def test_match_columns_follow_the_table_order_not_the_alphabet():
 
 
 def test_a_verdict_serializes_every_field_and_whether_it_blocks():
-    verdict = grain.UnitVerdict(
-        grain.UNKNOWN, "u", ("a", "b"), "why", ("q1", "q2")
-    )
+    verdict = grain.Verdict(grain.UNKNOWN, "u", ("a", "b"), "why", ("q1", "q2"))
     assert verdict.to_dict() == {
         "verdict": "unknown",
         "unit": "u",
@@ -589,17 +587,15 @@ def test_a_verdict_serializes_every_field_and_whether_it_blocks():
         "questions": ["q1", "q2"],
         "blocks": True,
     }
-    match = grain.UnitVerdict(grain.MATCH, "u", ("a",), "ok")
+    match = grain.Verdict(grain.MATCH, "u", ("a",), "ok")
     assert match.to_dict()["questions"] == []
     assert match.to_dict()["blocks"] is False
-    assert grain.UnitVerdict(grain.FINER, "u", (), "r").blocks is False
-    assert grain.UnitVerdict(grain.COARSER, "u", (), "r").blocks is True
+    assert grain.Verdict(grain.FINER, "u", (), "r").blocks is False
+    assert grain.Verdict(grain.COARSER, "u", (), "r").blocks is True
 
 
 def test_a_scan_serializes_keys_ties_and_state():
-    scan = empty_scan(
-        keys=[candidate(("a",)), candidate(("b",))], levels_done=2
-    )
+    scan = empty_scan(keys=[candidate(("a",)), candidate(("b",))], done=2)
     document = scan.to_dict()
     assert document["table"] == "t"
     assert document["rows"] == 10

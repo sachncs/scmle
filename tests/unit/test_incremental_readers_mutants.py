@@ -17,7 +17,7 @@ def make_event(
 
 
 def make_source(events=(), policy=incremental.Lateness.REJECT):
-    return incremental.SequenceEventSource(URI, events, policy)
+    return incremental.Replay(URI, events, policy)
 
 
 def test_incremental_error_keeps_code_uri_and_ordered_details():
@@ -26,7 +26,7 @@ def test_incremental_error_keeps_code_uri_and_ordered_details():
     )
 
     assert error.code == "bad_code"
-    assert error.source_uri == "kafka://x/y"
+    assert error.uri == "kafka://x/y"
     assert str(error) == "the message"
     assert error.details == {
         "code": "over",
@@ -40,18 +40,18 @@ def test_incremental_error_keeps_code_uri_and_ordered_details():
 
 
 def test_parse_timestamp_converts_to_utc_and_names_the_field():
-    parsed = incremental.parse_timestamp("2026-01-01T05:30:00+05:30", "when")
+    parsed = incremental.parse("2026-01-01T05:30:00+05:30", "when")
 
     assert parsed == datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC)
     assert parsed.utcoffset() == datetime.timedelta(0)
     with pytest.raises(ValueError, match=r"^when must not be empty$"):
-        incremental.parse_timestamp("  ", "when")
+        incremental.parse("  ", "when")
     with pytest.raises(ValueError, match=r"^when must not be empty$"):
-        incremental.parse_timestamp(5, "when")
+        incremental.parse(5, "when")
     with pytest.raises(ValueError, match=r"^when must be ISO-8601$"):
-        incremental.parse_timestamp("yesterday", "when")
+        incremental.parse("yesterday", "when")
     with pytest.raises(ValueError, match=r"^when must include a timezone$"):
-        incremental.parse_timestamp("2026-01-01T00:00:00", "when")
+        incremental.parse("2026-01-01T00:00:00", "when")
 
 
 def test_event_validation_messages_and_types():
@@ -148,7 +148,7 @@ def test_batch_validation_messages():
     with pytest.raises(ValueError, match=r"^late_event_ids must be sorted"):
         incremental.Batch("s", (), point, (), ("a", "a"))
     batch = incremental.Batch("s", (make_event("z"),), point)
-    assert batch.event_ids == ("z",)
+    assert batch.identities == ("z",)
 
 
 def test_receipt_to_dict_and_validation():
@@ -181,7 +181,7 @@ def test_receipt_to_dict_and_validation():
 
 def test_acknowledgement_validation_and_round_trip():
     point = incremental.Checkpoint("s", 1)
-    ack = incremental.EventAcknowledgement("s", "g", ("a", "b"), point)
+    ack = incremental.Acknowledgement("s", "g", ("a", "b"), point)
     assert ack.to_dict() == {
         "schema_version": 2,
         "source": "s",
@@ -189,26 +189,22 @@ def test_acknowledgement_validation_and_round_trip():
         "events": ["a", "b"],
         "checkpoint": point.to_dict(),
     }
-    assert incremental.EventAcknowledgement.from_dict(ack.to_dict()) == ack
+    assert incremental.Acknowledgement.from_dict(ack.to_dict()) == ack
     for version in (3, None):
         record = ack.to_dict()
         record["schema_version"] = version
         with pytest.raises(
             ValueError, match=r"^(unsupported ack|Event.*newer)"
         ):
-            incremental.EventAcknowledgement.from_dict(record)
+            incremental.Acknowledgement.from_dict(record)
     with pytest.raises(ValueError, match=r"^source must not be empty$"):
-        incremental.EventAcknowledgement(
-            " ", "g", (), incremental.Checkpoint("x")
-        )
+        incremental.Acknowledgement(" ", "g", (), incremental.Checkpoint("x"))
     with pytest.raises(ValueError, match=r"^consumer must not be empty$"):
-        incremental.EventAcknowledgement("s", " ", (), point)
+        incremental.Acknowledgement("s", " ", (), point)
     with pytest.raises(ValueError, match=r"^events must be sorted and unique$"):
-        incremental.EventAcknowledgement("s", "g", ("b", "a"), point)
+        incremental.Acknowledgement("s", "g", ("b", "a"), point)
     with pytest.raises(ValueError, match=r"^acknowledgement and checkpoint"):
-        incremental.EventAcknowledgement(
-            "s", "g", (), incremental.Checkpoint("t")
-        )
+        incremental.Acknowledgement("s", "g", (), incremental.Checkpoint("t"))
 
 
 def test_consumption_validation_and_dict():
@@ -233,15 +229,15 @@ def test_consumption_validation_and_dict():
 
 
 def test_event_source_accepts_a_policy_string_and_rejects_unknown():
-    source = incremental.SequenceEventSource(URI, (), "drop")
-    assert source.late_data_policy is incremental.Lateness.DROP
+    source = incremental.Replay(URI, (), "drop")
+    assert source.lateness is incremental.Lateness.DROP
     explicit = make_source(policy=incremental.Lateness.ACCEPT)
-    assert explicit.late_data_policy is incremental.Lateness.ACCEPT
+    assert explicit.lateness is incremental.Lateness.ACCEPT
     with pytest.raises(ValueError, match=r"not a valid Lateness"):
-        incremental.SequenceEventSource(URI, (), "ignore")
-    default = incremental.SequenceEventSource(URI, ())
-    assert default.late_data_policy is incremental.Lateness.REJECT
-    assert default.source_uri == "kafka://broker/topic"
+        incremental.Replay(URI, (), "ignore")
+    default = incremental.Replay(URI, ())
+    assert default.lateness is incremental.Lateness.REJECT
+    assert default.uri == "kafka://broker/topic"
 
 
 def test_checkpoint_mismatch_reports_the_checkpoint():
@@ -251,10 +247,10 @@ def test_checkpoint_mismatch_reports_the_checkpoint():
         source.rebind(foreign)
     assert caught.value.code == "checkpoint_mismatch"
     assert caught.value.details["checkpoint"] == foreign.to_dict()
-    assert caught.value.source_uri == source.source_uri
+    assert caught.value.uri == source.uri
     assert str(caught.value) == "checkpoint belongs to a different source"
     fresh = source.rebind(None)
-    assert fresh == incremental.Checkpoint(source.source_identity)
+    assert fresh == incremental.Checkpoint(source.identity)
 
 
 def test_select_events_orders_deduplicates_and_limits():
@@ -265,75 +261,75 @@ def test_select_events_orders_deduplicates_and_limits():
         make_event("a", 1, "2026-01-01T00:00:00Z"),
     ]
     source = make_source()
-    batch = source.select_events(events, limit=2, seen_event_ids=["c"])
+    batch = source.select(events, limit=2, seen_event_ids=["c"])
 
-    assert batch.event_ids == ("a", "b")
-    assert batch.duplicate_event_ids == ("a", "c")
-    assert batch.has_more is False
-    assert batch.next_checkpoint.sequence == 2
-    assert batch.next_checkpoint.watermark == "2026-01-02T00:00:00+00:00"
-    more = source.select_events(events, limit=1)
-    assert more.has_more is True
-    assert more.event_ids == ("a",)
+    assert batch.identities == ("a", "b")
+    assert batch.duplicates == ("a", "c")
+    assert batch.more is False
+    assert batch.checkpoint.sequence == 2
+    assert batch.checkpoint.watermark == "2026-01-02T00:00:00+00:00"
+    more = source.select(events, limit=1)
+    assert more.more is True
+    assert more.identities == ("a",)
     with pytest.raises(ValueError, match=r"^limit must be positive$"):
-        source.select_events(events, limit=0)
+        source.select(events, limit=0)
     with pytest.raises(TypeError, match=r"^transport records must yield Event"):
-        source.select_events(["x"])
+        source.select(["x"])
 
 
 def test_select_events_late_policies():
     point = incremental.Checkpoint(
-        make_source().source_identity, 5, "2026-02-01T00:00:00+00:00"
+        make_source().identity, 5, "2026-02-01T00:00:00+00:00"
     )
     old = make_event("old", 3, "2026-01-01T00:00:00Z")
     new = make_event("new", 6, "2026-03-01T00:00:00Z")
 
     with pytest.raises(incremental.IncrementalError) as caught:
-        make_source().select_events([old, new], point)
+        make_source().select([old, new], point)
     assert caught.value.code == "late_event"
     assert str(caught.value) == "event 'old' is older than checkpoint"
     assert caught.value.details["event_id"] == "old"
     assert caught.value.details["event_sequence"] == 3
     assert caught.value.details["checkpoint_sequence"] == 5
 
-    dropped = make_source(policy=incremental.Lateness.DROP).select_events(
+    dropped = make_source(policy=incremental.Lateness.DROP).select(
         [old, new], point
     )
-    assert dropped.event_ids == ("new",)
-    assert dropped.late_event_ids == ("old",)
+    assert dropped.identities == ("new",)
+    assert dropped.late == ("old",)
 
-    kept = make_source(policy=incremental.Lateness.ACCEPT).select_events(
+    kept = make_source(policy=incremental.Lateness.ACCEPT).select(
         [old, new], point
     )
-    assert kept.event_ids == ("old", "new")
-    assert kept.late_event_ids == ("old",)
-    assert kept.next_checkpoint.sequence == 6
+    assert kept.identities == ("old", "new")
+    assert kept.late == ("old",)
+    assert kept.checkpoint.sequence == 6
 
 
 def test_select_events_keeps_the_checkpoint_when_nothing_is_selected():
     point = incremental.Checkpoint(
-        make_source().source_identity, 5, "2026-02-01T00:00:00Z"
+        make_source().identity, 5, "2026-02-01T00:00:00Z"
     )
-    batch = make_source().select_events([], point)
+    batch = make_source().select([], point)
     assert batch.events == ()
-    assert batch.next_checkpoint.sequence == 5
-    assert batch.next_checkpoint.watermark == "2026-02-01T00:00:00+00:00"
-    empty = make_source().select_events([])
-    assert empty.next_checkpoint.sequence == 0
-    assert empty.next_checkpoint.watermark == ""
-    earlier = make_source(policy=incremental.Lateness.ACCEPT).select_events(
+    assert batch.checkpoint.sequence == 5
+    assert batch.checkpoint.watermark == "2026-02-01T00:00:00+00:00"
+    empty = make_source().select([])
+    assert empty.checkpoint.sequence == 0
+    assert empty.checkpoint.watermark == ""
+    earlier = make_source(policy=incremental.Lateness.ACCEPT).select(
         [make_event("e", 2, "2026-01-01T00:00:00Z")], point
     )
-    assert earlier.next_checkpoint.sequence == 5
-    assert earlier.next_checkpoint.watermark == "2026-02-01T00:00:00+00:00"
+    assert earlier.checkpoint.sequence == 5
+    assert earlier.checkpoint.watermark == "2026-02-01T00:00:00+00:00"
 
 
 def test_read_events_uses_the_available_events():
     source = make_source([make_event("a", 1)])
-    batch = source.read_events()
-    assert batch.event_ids == ("a",)
+    batch = source.read()
+    assert batch.identities == ("a",)
     calls = make_source(lambda: [make_event("b", 2)])
-    assert calls.read_events().event_ids == ("b",)
+    assert calls.read().identities == ("b",)
 
 
 def test_stream_source_validation_and_polling():
@@ -348,32 +344,29 @@ def test_stream_source_validation_and_polling():
     with pytest.raises(TypeError, match=r"^event_reader must be callable$"):
         incremental.Stream(URI, "nope")
     stream = incremental.Stream("  KAFKA://broker/topic ", reader)
-    assert stream.source_uri == "kafka://broker/topic"
-    assert isinstance(stream.retry_budget, incremental.connectors.Retries)
+    assert stream.uri == "kafka://broker/topic"
+    assert isinstance(stream.budget, incremental.connectors.Retries)
     budget = incremental.connectors.Retries()
-    assert (
-        incremental.Stream(URI, reader, retry_budget=budget).retry_budget
-        is budget
-    )
+    assert incremental.Stream(URI, reader, budget=budget).budget is budget
 
     with pytest.raises(incremental.IncrementalError) as caught:
         stream.unconsumed()
     assert caught.value.code == "bounded_poll_required"
-    assert caught.value.source_uri == stream.source_uri
+    assert caught.value.uri == stream.uri
 
     with pytest.raises(ValueError, match=r"^limit must be positive$"):
-        stream.poll_events(incremental.Checkpoint("s"), 0)
+        stream.poll(incremental.Checkpoint("s"), 0)
     with pytest.raises(incremental.IncrementalError) as exceeded:
-        stream.poll_events(incremental.Checkpoint("s"), 1)
+        stream.poll(incremental.Checkpoint("s"), 1)
     assert exceeded.value.code == "batch_limit_exceeded"
     assert exceeded.value.details["limit"] == 1
     assert exceeded.value.details["received"] == 2
 
-    batch = stream.read_events(limit=5)
-    assert batch.event_ids == ("a", "b")
+    batch = stream.read(limit=5)
+    assert batch.identities == ("a", "b")
     assert seen[-1][0] == "kafka://broker/topic"
     assert seen[-1][2] == 5
-    assert seen[-1][1] == incremental.Checkpoint(stream.source_identity)
+    assert seen[-1][1] == incremental.Checkpoint(stream.identity)
 
 
 def test_committed_state_round_trip_and_validation():
@@ -398,16 +391,16 @@ def test_committed_state_round_trip_and_validation():
 
 def make_ledger(tmp_path, source=None):
     source = source or make_source()
-    ledger = incremental.Ledger(tmp_path / "state.json", source.source_identity)
+    ledger = incremental.Ledger(tmp_path / "state.json", source.identity)
     return source, ledger
 
 
 def test_ledger_paths_and_load_defaults(tmp_path):
     source, ledger = make_ledger(tmp_path)
     assert ledger.lockfile.name == "state.json.lock"
-    assert ledger.pending_acknowledgement_path.name == "state.json.ack"
+    assert ledger.pending.name == "state.json.ack"
     assert ledger.load() == incremental.Settlement(
-        incremental.Checkpoint(source.source_identity)
+        incremental.Checkpoint(source.identity)
     )
     ledger.path.write_text(
         json.dumps(
@@ -418,29 +411,27 @@ def test_ledger_paths_and_load_defaults(tmp_path):
     with pytest.raises(incremental.IncrementalError) as caught:
         ledger.load()
     assert caught.value.code == "state_source_mismatch"
-    assert caught.value.source_uri == source.source_identity
+    assert caught.value.uri == source.identity
     assert caught.value.details["state_source_identity"] == "other"
 
 
 def test_ledger_source_and_batch_mismatches(tmp_path):
     ledger = make_ledger(tmp_path)[1]
-    other = incremental.SequenceEventSource("kafka://elsewhere/t", ())
+    other = incremental.Replay("kafka://elsewhere/t", ())
     with pytest.raises(incremental.IncrementalError) as caught:
-        ledger.read_batch(other)
+        ledger.read(other)
     assert caught.value.code == "source_mismatch"
-    assert caught.value.details["source_identity"] == other.source_identity
+    assert caught.value.details["source_identity"] == other.identity
     foreign = incremental.Batch("other", (), incremental.Checkpoint("other"))
     with pytest.raises(incremental.IncrementalError) as batch_error:
         ledger.commit(foreign)
     assert batch_error.value.code == "batch_source_mismatch"
     assert batch_error.value.details["batch_source_identity"] == "other"
     with pytest.raises(incremental.IncrementalError) as state_error:
-        ledger.write_atomically(
-            incremental.Settlement(incremental.Checkpoint("other"))
-        )
+        ledger.write(incremental.Settlement(incremental.Checkpoint("other")))
     assert state_error.value.code == "state_source_mismatch"
     assert not ledger.path.exists()
-    ack = incremental.EventAcknowledgement(
+    ack = incremental.Acknowledgement(
         "other", "g", (), incremental.Checkpoint("other")
     )
     with pytest.raises(incremental.IncrementalError) as ack_error:
@@ -455,9 +446,9 @@ def test_ledger_source_and_batch_mismatches(tmp_path):
 def test_write_atomically_persists_sorted_json_and_cleans_up(tmp_path):
     source, ledger = make_ledger(tmp_path / "nested")
     state = incremental.Settlement(
-        incremental.Checkpoint(source.source_identity, 1), ("a",)
+        incremental.Checkpoint(source.identity, 1), ("a",)
     )
-    ledger.write_atomically(state)
+    ledger.write(state)
     text = ledger.path.read_text(encoding="utf-8")
     assert text == json.dumps(state.to_dict(), sort_keys=True) + "\n"
     assert [p.name for p in ledger.path.parent.iterdir()] == ["state.json"]
@@ -465,7 +456,7 @@ def test_write_atomically_persists_sorted_json_and_cleans_up(tmp_path):
 
 def test_commit_is_idempotent_and_rejects_regression(tmp_path):
     source, ledger = make_ledger(tmp_path)
-    ident = source.source_identity
+    ident = source.identity
     first = incremental.Batch(
         ident,
         (make_event("a", 4),),
@@ -509,8 +500,8 @@ def test_commit_with_writer_receipt_and_checkpoint(tmp_path):
     assert [tuple(e.identifier for e in call) for call in written] == [
         ("a", "b")
     ]
-    assert receipt.accepted_event_ids == ("a", "b")
-    assert receipt.duplicate_event_ids == ()
+    assert receipt.accepted == ("a", "b")
+    assert receipt.duplicates == ()
     assert receipt.checkpoint.sequence == 2
     assert receipt.checkpoint.watermark == "2026-01-05T00:00:00+00:00"
     assert ledger.load().seen == ("a", "b")
@@ -519,13 +510,13 @@ def test_commit_with_writer_receipt_and_checkpoint(tmp_path):
         [make_event("a", 1), make_event("c", 9, "2026-01-03T00:00:00Z")],
         written.append,
     )
-    assert again.accepted_event_ids == ("c",)
-    assert again.duplicate_event_ids == ("a",)
+    assert again.accepted == ("c",)
+    assert again.duplicates == ("a",)
     assert again.checkpoint.sequence == 9
     assert again.checkpoint.watermark == "2026-01-05T00:00:00+00:00"
 
     noop = ledger.finalize([make_event("a", 1)], written.append)
-    assert noop.accepted_event_ids == ()
+    assert noop.accepted == ()
     assert noop.checkpoint == again.checkpoint
     assert len(written) == 2
 
@@ -549,42 +540,38 @@ def test_commit_with_writer_stages_the_acknowledgement_at_the_checkpoint(
     tmp_path,
 ):
     source, ledger = make_ledger(tmp_path)
-    ident = source.source_identity
+    ident = source.identity
     stale = incremental.Checkpoint(ident, 0)
-    ack = incremental.EventAcknowledgement(ident, "g", ("a",), stale)
+    ack = incremental.Acknowledgement(ident, "g", ("a",), stale)
     ledger.finalize([make_event("a", 3)], lambda events: None, ack)
 
     staged = ledger.reclaim()
     assert staged.checkpoint.sequence == 3
     assert staged.consumer == "g"
-    text = ledger.pending_acknowledgement_path.read_text(encoding="utf-8")
+    text = ledger.pending.read_text(encoding="utf-8")
     assert text == json.dumps(staged.to_dict(), sort_keys=True) + "\n"
     ledger.retract()
     assert ledger.reclaim() is None
     ledger.retract()
 
-    empty = incremental.EventAcknowledgement(ident, "g", (), stale)
+    empty = incremental.Acknowledgement(ident, "g", (), stale)
     ledger.finalize([make_event("b", 4)], lambda events: None, empty)
     assert ledger.reclaim() is None
 
 
 def test_pending_acknowledgement_loading_errors(tmp_path):
     source, ledger = make_ledger(tmp_path)
-    ledger.pending_acknowledgement_path.write_text(
-        "{not json", encoding="utf-8"
-    )
+    ledger.pending.write_text("{not json", encoding="utf-8")
     with pytest.raises(incremental.IncrementalError) as bad:
         ledger.reclaim()
     assert bad.value.code == "invalid_pending_acknowledgement"
-    assert bad.value.details["path"] == str(ledger.pending_acknowledgement_path)
-    assert bad.value.source_uri == source.source_identity
+    assert bad.value.details["path"] == str(ledger.pending)
+    assert bad.value.uri == source.identity
 
-    foreign = incremental.EventAcknowledgement(
+    foreign = incremental.Acknowledgement(
         "other", "g", (), incremental.Checkpoint("other")
     )
-    ledger.pending_acknowledgement_path.write_text(
-        json.dumps(foreign.to_dict()), encoding="utf-8"
-    )
+    ledger.pending.write_text(json.dumps(foreign.to_dict()), encoding="utf-8")
     with pytest.raises(incremental.IncrementalError) as mismatch:
         ledger.reclaim()
     assert mismatch.value.code == "acknowledgement_source_mismatch"
@@ -615,8 +602,8 @@ def test_consumer_validation(tmp_path):
     with pytest.raises(incremental.IncrementalError) as caught:
         incremental.Ingestor(source, other, "g", print, print)
     assert caught.value.code == "source_mismatch"
-    assert caught.value.source_uri == "other"
-    assert caught.value.details["source_identity"] == source.source_identity
+    assert caught.value.uri == "other"
+    assert caught.value.details["source_identity"] == source.identity
     with pytest.raises(TypeError, match=r"^writer must be callable$"):
         incremental.Ingestor(source, ledger, "g", None, print)
     with pytest.raises(TypeError, match=r"^acknowledge must be callable$"):
@@ -626,20 +613,20 @@ def test_consumer_validation(tmp_path):
 def test_consume_commits_and_acknowledges_everything_seen(tmp_path):
     events = [make_event("a", 1), make_event("b", 2)]
     consumer, ledger, sink, delivered = make_consumer(tmp_path, events)
-    assert consumer.consumer_group == "g"
+    assert consumer.group == "g"
 
     done = consumer.consume()
-    assert done.consumer_group == "g"
-    assert done.receipt.accepted_event_ids == ("a", "b")
-    assert done.acknowledged_event_ids == ("a", "b")
+    assert done.group == "g"
+    assert done.receipt.accepted == ("a", "b")
+    assert done.acknowledged == ("a", "b")
     assert len(sink) == 1
     assert delivered[0].events == ("a", "b")
     assert delivered[0].checkpoint.sequence == 2
     assert ledger.reclaim() is None
 
     replay = consumer.consume()
-    assert replay.receipt.accepted_event_ids == ()
-    assert replay.acknowledged_event_ids == ("a", "b")
+    assert replay.receipt.accepted == ()
+    assert replay.acknowledged == ("a", "b")
     assert len(sink) == 1
 
 
@@ -658,7 +645,7 @@ def test_a_failed_acknowledgement_is_kept_and_retried(tmp_path):
         consumer.consume()
     error = caught.value
     assert error.code == "acknowledgement_failed"
-    assert error.source_uri == consumer.source.source_uri
+    assert error.uri == consumer.source.uri
     assert error.details["consumer_group"] == "g"
     assert error.details["event_ids"] == ["a"]
     assert isinstance(error.__cause__, RuntimeError)
@@ -671,15 +658,15 @@ def test_a_failed_acknowledgement_is_kept_and_retried(tmp_path):
 
 def test_a_pending_acknowledgement_of_another_group_is_refused(tmp_path):
     consumer, ledger = make_consumer(tmp_path, [make_event("a", 1)])[:2]
-    ack = incremental.EventAcknowledgement(
-        consumer.source.source_identity,
+    ack = incremental.Acknowledgement(
+        consumer.source.identity,
         "elsewhere",
         ("a",),
-        incremental.Checkpoint(consumer.source.source_identity, 1),
+        incremental.Checkpoint(consumer.source.identity, 1),
     )
     ledger.earmark(ack)
     with pytest.raises(incremental.IncrementalError) as caught:
         consumer.handoff()
     assert caught.value.code == "consumer_group_mismatch"
-    assert caught.value.source_uri == consumer.source.source_uri
+    assert caught.value.uri == consumer.source.uri
     assert caught.value.details["pending_group"] == "elsewhere"

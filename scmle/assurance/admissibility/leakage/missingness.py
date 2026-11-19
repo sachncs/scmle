@@ -1,5 +1,7 @@
 """The test of whether being recorded is associated with the target."""
 
+# ruff: noqa: PT028 - `test` is a statistical test, not a pytest function.
+
 import dataclasses
 import math
 
@@ -19,7 +21,7 @@ from scmle.contracts import qualification
 from scmle.runtime import randomness
 
 
-def cramers_v(table: numpy.ndarray) -> float:
+def associate(table: numpy.ndarray) -> float:
     """Computes Cramer's V of a contingency table (no bias correction).
 
     Args:
@@ -61,8 +63,8 @@ class Missingness:
         feature: Feature name.
         method: `fisher` or `chi2`.
         p_value: Test p-value.
-        cramers_v: Strength of association.
-        n_missing: Rows with the feature missing.
+        association: Strength of association.
+        missing: Rows with the feature missing.
         n: Rows.
         suspect: There are at least `min_rows` rows, p <= alpha and V is at
             least the association ceiling.
@@ -72,14 +74,14 @@ class Missingness:
     feature: str
     method: str
     p_value: float
-    cramers_v: float
-    n_missing: int
+    association: float
+    missing: int
     n: int
     suspect: bool
     check: qualification.Check
 
 
-def missingness_test(
+def test(
     feature: pandas.Series,
     target: pandas.Series,
     task: str,
@@ -124,9 +126,9 @@ def missingness_test(
     else:
         method = "chi2"
         p_value = float(stats.chi2_contingency(table, correction=False)[1])  # pyright: ignore[reportArgumentType]  # scipy.stats result types are untyped tuples
-    v = cramers_v(table)
-    powered = len(feature) >= cfg.min_rows
-    suspect = powered and p_value <= cfg.alpha and v >= cfg.association_ceiling
+    v = associate(table)
+    powered = len(feature) >= cfg.minimum
+    suspect = powered and p_value <= cfg.alpha and v >= cfg.ceiling
     path = f"{MISSING}.{feature.name}"
     check = qualification.Check(
         identifier=path,
@@ -138,7 +140,7 @@ def missingness_test(
         n=len(feature),
         decision=decide(suspect, not powered, gate),
         subset=set_id,
-        seeds=randomness.seed_path(cfg.run_seed, path, 0),
+        seeds=randomness.seed_path(cfg.seed, path, 0),
         tier=qualification.Tier.UNVERIFIED,
     )
     return Missingness(

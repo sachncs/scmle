@@ -488,7 +488,7 @@ def test_register_writes_only_what_the_qualification_holds():
     )
     table = types.SimpleNamespace(to_dict=lambda: {"t": 1})
     store = types.SimpleNamespace(to_dict=lambda: {"s": 1})
-    found = types.SimpleNamespace(table=table, f5_store=store)
+    found = types.SimpleNamespace(table=table, store=store)
     assert admission.register(board, found) == [
         "admissibility_table.json",
         "detector_certificates.json",
@@ -497,7 +497,7 @@ def test_register_writes_only_what_the_qualification_holds():
         "admissibility_table.json": {"t": 1},
         "detector_certificates.json": {"s": 1},
     }
-    empty = types.SimpleNamespace(table=None, f5_store=None)
+    empty = types.SimpleNamespace(table=None, store=None)
     assert admission.register(board, empty) == []
 
 
@@ -505,7 +505,7 @@ def test_select_adds_the_rows_set_aside_as_unseen(monkeypatch):
     seen_calls = []
     monkeypatch.setattr(
         admission.scmle.assurance.framing.baseline,
-        "selective_labels",
+        "screen",
         lambda seen, decisions: seen_calls.append(
             (seen.tolist(), decisions.tolist())
         ),

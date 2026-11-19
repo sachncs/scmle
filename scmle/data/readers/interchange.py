@@ -2,7 +2,7 @@
 
 Internally the framework computes on pandas frames, but the public surface is
 Arrow-compatible: any object implementing the Arrow PyCapsule stream protocol
-(`pyarrow.Table`, `polars.DataFrame`, ...) or exposing `to_pandas()` is
+(`pyarrow.Table`, `polars.DataFrame`, ...) or exposing `frame()` is
 accepted wherever data is, and results can be exported as Arrow tables.
 """
 
@@ -25,7 +25,7 @@ def tablelike(data: Any) -> bool:
 
     Returns:
         True if `data` is a pandas DataFrame or exposes the Arrow stream
-        protocol, `to_pandas()` or `collect()`; False otherwise.
+        protocol, `frame()` or `collect()`; False otherwise.
     """
     return (
         isinstance(data, pandas.DataFrame)
@@ -35,7 +35,7 @@ def tablelike(data: Any) -> bool:
     )
 
 
-def to_pandas(data: Any) -> pandas.DataFrame:
+def frame(data: Any) -> pandas.DataFrame:
     """Converts any supported in-memory table to a pandas DataFrame.
 
     Args:

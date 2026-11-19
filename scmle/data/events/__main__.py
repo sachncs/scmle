@@ -244,7 +244,7 @@ def features(options: argparse.Namespace, columns: event.Columns) -> int:
     ]
     backlog = [item for source in files for item in source.events()]
     found = bounded(options, backlog)
-    queries = tabular.read_table(options.queries)
+    queries = tabular.read(options.queries)
     write(found.frame(queries, options.entity, options.cutoff), options.output)
     report(found, sum(len(source.skipped) for source in files))
     return EXIT_OK
@@ -287,7 +287,7 @@ def follow(options: argparse.Namespace, columns: event.Columns) -> int:
         options.events[0], columns, strict=not options.lenient
     )
     found = bounded(options, list(source.events()))
-    queries = tabular.read_table(options.queries)
+    queries = tabular.read(options.queries)
     for column in (options.entity, options.cutoff):
         if column not in queries.columns:
             raise event.EventError(f"the queries need a {column!r} column")

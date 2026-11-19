@@ -135,11 +135,11 @@ def digest(*objects: Any, root: Path = ROOT) -> str:
         module = module or inspect.getmodule(item)
         if module is not None:
             names.add(name(module))
-    parts = [hashing.code_hash(*objects)]
+    parts = [hashing.fingerprint(*objects)]
     for found in closure(names, root):
         path = locate(found, root)
         if path is None:
             continue
         parts.append(found)
-        parts.append(hashing.hash_source(path.read_text(encoding="utf-8")))
+        parts.append(hashing.digest(path.read_text(encoding="utf-8")))
     return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()

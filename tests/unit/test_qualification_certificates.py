@@ -44,7 +44,7 @@ def certified(code_hash=HASH_A, results=None):
     [(0, 10), (1, 10), (5, 10), (9, 10), (10, 10), (37, 120), (1, 1), (0, 1)],
 )
 def test_wilson_interval_matches_scipy(successes, n, confidence):
-    low, high = certificates.wilson_interval(successes, n, confidence)
+    low, high = certificates.bound(successes, n, confidence)
     reference = stats.binomtest(successes, n).proportion_ci(
         confidence_level=confidence, method="wilson"
     )
@@ -55,7 +55,7 @@ def test_wilson_interval_matches_scipy(successes, n, confidence):
 
 def test_wilson_interval_agrees_with_the_certificate_lower_bound():
     cert = measured(planted=57, detected=49)
-    low = certificates.wilson_interval(49, 57, 0.95)[0]
+    low = certificates.bound(49, 57, 0.95)[0]
     assert low == pytest.approx(cert.recall_lower_bound(0.95), abs=1e-12)
 
 
@@ -65,7 +65,7 @@ def test_wilson_interval_agrees_with_the_certificate_lower_bound():
 )
 def test_wilson_interval_rejects_invalid_input(successes, n, confidence):
     with pytest.raises(ValueError):
-        certificates.wilson_interval(successes, n, confidence)
+        certificates.bound(successes, n, confidence)
 
 
 def test_code_hash_ignores_comments_docstrings_and_blank_lines():
@@ -79,9 +79,7 @@ def test_code_hash_ignores_comments_docstrings_and_blank_lines():
             return x + 1  # trailing comment
         '''
     )
-    assert certificates.hash_source(plain) == certificates.hash_source(
-        decorated
-    )
+    assert certificates.digest(plain) == certificates.digest(decorated)
 
 
 @pytest.mark.parametrize(
@@ -95,15 +93,13 @@ def test_code_hash_ignores_comments_docstrings_and_blank_lines():
 )
 def test_code_hash_changes_with_the_logic(changed):
     original = "def f(x):\n    return x + 1\n"
-    assert certificates.hash_source(original) != certificates.hash_source(
-        changed
-    )
+    assert certificates.digest(original) != certificates.digest(changed)
 
 
 def test_code_hash_keeps_a_docstring_that_shares_a_line_with_code():
     one = 'def f():\n    "doc"; return 1\n'
     two = 'def f():\n    "doc"; return 2\n'
-    assert certificates.hash_source(one) != certificates.hash_source(two)
+    assert certificates.digest(one) != certificates.digest(two)
 
 
 def test_code_hash_of_objects_depends_on_order_and_content():
@@ -113,27 +109,27 @@ def test_code_hash_of_objects_depends_on_order_and_content():
     def second() -> int:
         return 2
 
-    forward = certificates.code_hash(first, second)
-    assert forward == certificates.code_hash(first, second)
-    assert forward != certificates.code_hash(second, first)
-    assert forward != certificates.code_hash(first)
+    forward = certificates.fingerprint(first, second)
+    assert forward == certificates.fingerprint(first, second)
+    assert forward != certificates.fingerprint(second, first)
+    assert forward != certificates.fingerprint(first)
     assert len(forward) == 64
 
 
 def test_corpus_hash_is_order_independent_and_needs_parts():
-    assert certificates.corpus_hash([HASH_A, HASH_B]) == (
-        certificates.corpus_hash([HASH_B, HASH_A])
+    assert certificates.checksum([HASH_A, HASH_B]) == (
+        certificates.checksum([HASH_B, HASH_A])
     )
-    assert certificates.corpus_hash([HASH_A]) != certificates.corpus_hash(
+    assert certificates.checksum([HASH_A]) != certificates.checksum(
         [HASH_A, HASH_B]
     )
     with pytest.raises(ValueError):
-        certificates.corpus_hash([])
+        certificates.checksum([])
 
 
 def test_certify_passes_only_when_both_bounds_hold():
     good = certified()
-    assert good.certified_defect_types == ("label_flip",)
+    assert good.certified == ("label_flip",)
     outcome = good.outcomes[0]
     assert outcome.recall[0] >= POLICY.recall
     assert outcome.alarms[1] <= POLICY.alarms
@@ -142,13 +138,13 @@ def test_certify_passes_only_when_both_bounds_hold():
 def test_low_recall_lower_bound_fails_even_when_the_point_estimate_passes():
     # 8/10 = 0.8 meets the floor as a point estimate; the interval does not.
     weak = certified(results=[measured(planted=10, detected=8, fa=0)])
-    assert weak.certified_defect_types == ()
+    assert weak.certified == ()
     assert weak.outcomes[0].passed is False
 
 
 def test_high_false_alarm_upper_bound_fails():
     noisy = certified(results=[measured(fa=60)])
-    assert noisy.certified_defect_types == ()
+    assert noisy.certified == ()
 
 
 def test_certify_rejects_empty_duplicate_and_bad_inputs():

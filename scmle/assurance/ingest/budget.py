@@ -23,10 +23,10 @@ class Budget:
     """Limits for one ingestion run; `None` means unlimited.
 
     Attributes:
-        max_queries: Source queries allowed.
-        max_rows_scanned: Rows the source is estimated to scan. Bytes are not
+        queries: Source queries allowed.
+        scanned: Rows the source is estimated to scan. Bytes are not
             observable through DB-API, so the unit is rows.
-        max_seconds: Wall time allowed (see `Meter` for repeatability).
+        seconds: Wall time allowed (see `Meter` for repeatability).
         max_features: Cap on synthesized features.
         migrations: The written layout's version steps, oldest first;
             version 2 writes `queries`, `scanned`, `seconds` and
@@ -44,9 +44,9 @@ class Budget:
         ),
     )
 
-    max_queries: int | None = None
-    max_rows_scanned: int | None = None
-    max_seconds: float | None = None
+    queries: int | None = None
+    scanned: int | None = None
+    seconds: float | None = None
     max_features: int = 200
 
     def __post_init__(self) -> None:
@@ -55,11 +55,13 @@ class Budget:
         Raises:
             ValueError: If any limit is negative.
         """
-        for name in ("max_queries", "max_rows_scanned"):
-            value = getattr(self, name)
+        for name, value in (
+            ("max_queries", self.queries),
+            ("max_rows_scanned", self.scanned),
+        ):
             if value is not None and value < 0:
                 raise errors.InputError(f"{name} must be non-negative")
-        if self.max_seconds is not None and self.max_seconds < 0:
+        if self.seconds is not None and self.seconds < 0:
             raise errors.InputError("max_seconds must be non-negative")
         if self.max_features < 0:
             raise errors.InputError("max_features must be non-negative")
@@ -149,17 +151,11 @@ class Meter:
             limit, checked in that order; None when the step fits.
         """
         limit = self.budget
-        if (
-            limit.max_queries is not None
-            and self.queries + queries > limit.max_queries
-        ):
+        if limit.queries is not None and self.queries + queries > limit.queries:
             return "queries"
-        if (
-            limit.max_rows_scanned is not None
-            and self.rows + rows > limit.max_rows_scanned
-        ):
+        if limit.scanned is not None and self.rows + rows > limit.scanned:
             return "rows"
-        if limit.max_seconds is not None and self.seconds >= limit.max_seconds:
+        if limit.seconds is not None and self.seconds >= limit.seconds:
             return "seconds"
         return None
 

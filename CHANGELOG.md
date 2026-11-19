@@ -179,6 +179,30 @@ marked `Breaking:` and listed first in their group.
   runs `python -m scmle.serving.runtime`; folders generated earlier pin the
   scmle version that built them. Logger names follow the module path, so a log
   filter on an old path must change.
+* **Single-word names in `scmle.data` and `scmle.assurance` (phase 6).**
+  Classes, functions, methods and attributes of the data and assurance
+  packages take single-word names; the full old-to-new list is in
+  [`docs/RENAMES.md`](docs/RENAMES.md) under "Name renames". Stored record
+  keys do not change (they were renamed in phase 5), so files written
+  earlier still read. The pinned governed-data surface changes:
+  `scmle.data.store.snapshot.DataContract`, `ReadLog`, `SnapshotReader` and
+  `SnapshotRecord` are `Contract`, `Log`, `Reader` and `Record`;
+  `scmle.data.store.quality.QualityGate` and `QualityGateError` are `Gate`
+  and `GateError`; `scmle.data.store.processing.IncrementalProcessor` is
+  `Processor`, and the fields and keywords of `Processing`, `Assessment` and
+  the processor follow the list. The constructor keywords of
+  `DbApiConnector`, `Bucket`, `StreamingObjectStoreConnector`,
+  `incremental.Stream` and the document `Reader` take the attribute names
+  (`factory`, `guarded`, `preamble`, `probe`, `limit`, `codec`, `chunk`,
+  `budget`, `pdf`, `reader`). Replace the old name with the new one to
+  migrate; no alias is kept.
+* **Bundle format 5.** The single-word names of phase 6 (lane
+  `data_assurance`) rename two classes pickled inside a bundle:
+  `scmle.data.transformers.SkewedLogTransformer` is now `Logarithm` and
+  `scmle.data.transformers.AsinhTarget` is now `Asinh`. `BUNDLE_FORMAT` goes
+  from 4 to 5 and `Bundle.load` refuses a format 4 bundle with the existing
+  message: retrain and save it again. The renamed names are listed in
+  `docs/RENAMES.md`.
 * **Bundle format 4.** The package layering (register phase 3) moves
   modules whose classes are pickled inside a bundle, so `BUNDLE_FORMAT` goes
   from 3 to 4 and `Bundle.load` refuses a format 3 bundle with the existing

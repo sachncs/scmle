@@ -103,7 +103,7 @@ class Footage(curators.Preparer):
         self.max_frames = max_frames
         self.max_frame_pixels = max_frame_pixels
         self.temporal_cutoff = (
-            video.canonical_observation_time(temporal_cutoff)
+            video.timestamp(temporal_cutoff)
             if temporal_cutoff is not None
             else None
         )
@@ -111,7 +111,7 @@ class Footage(curators.Preparer):
     @property
     def digest(self) -> str:
         """The video corpus identity."""
-        return self.dataset.content_hash
+        return self.dataset.digest
 
     @property
     def samples(self) -> tuple[video.Sample, ...]:
@@ -177,7 +177,7 @@ class Footage(curators.Preparer):
             else dataset.numerize()
         )
         return containers.Batch(
-            tuple(prepared.sources), prepared.feature_names, prepared.to_numpy()
+            tuple(prepared.sources), prepared.names, prepared.materialize()
         )
 
     def sample_id(self, sample: video.Sample) -> str:
@@ -334,9 +334,7 @@ def groups(samples: Sequence[video.Sample]) -> tuple[str, ...]:
     Returns:
         The sorted group IDs, a video without one counting by its source.
     """
-    return tuple(
-        sorted({sample.group_id or sample.source for sample in samples})
-    )
+    return tuple(sorted({sample.group or sample.source for sample in samples}))
 
 
 def occlusion(
@@ -375,7 +373,7 @@ def occlusion(
         terms.append(
             {
                 "frame_index": frame_index,
-                "time_seconds": frame_index / sample.metadata.frames_per_second,
+                "time_seconds": frame_index / sample.metadata.rate,
                 "score_delta": score - full_score,
             }
         )
@@ -432,14 +430,14 @@ def frames(
             max_frames=preparer.max_frames,
             max_frame_pixels=preparer.max_frame_pixels,
         )
-        values = prepared.to_numpy()[0]
+        values = prepared.materialize()[0]
         score = float(
             numpy.asarray(model.decision_function(values[None])).reshape(-1)[0]
         )
         windows.append(
             {
                 "frame_index": outcomes,
-                "time_seconds": outcomes / sample.metadata.frames_per_second,
+                "time_seconds": outcomes / sample.metadata.rate,
                 "score_delta_from_full": score - original_score,
             }
         )

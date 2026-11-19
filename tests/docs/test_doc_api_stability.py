@@ -55,7 +55,7 @@ def surfaces():
 
 
 def test_the_deployment_contract_is_pinned_and_every_change_is_reported():
-    """Enforces docs/API_STABILITY.md:201.
+    """Enforces docs/API_STABILITY.md:202.
 
     Also enforces website/src/pages/docs/api-stability.astro:34.
     """
@@ -76,7 +76,7 @@ def test_the_deployment_contract_is_pinned_and_every_change_is_reported():
 
 @pytest.mark.parametrize("module", sorted(SECURITY))
 def test_the_security_names_are_pinned_in_the_snapshot(module):
-    """Enforces docs/API_STABILITY.md:208."""
+    """Enforces docs/API_STABILITY.md:209."""
     pinned = surfaces()[module]
     for name in SECURITY[module]:
         assert pinned[name]["signature_sha256"], name
@@ -84,7 +84,7 @@ def test_the_security_names_are_pinned_in_the_snapshot(module):
 
 @pytest.mark.parametrize("module", GOVERNED)
 def test_the_governed_data_modules_are_pinned_in_the_snapshot(module):
-    """Enforces docs/API_STABILITY.md:220."""
+    """Enforces docs/API_STABILITY.md:221."""
     pinned = surfaces()[module]
     assert pinned
     assert all(entry["signature_sha256"] for entry in pinned.values())

@@ -175,7 +175,7 @@ def test_little_rejects_when_missingness_depends_on_observed_value():
 
 def test_normal_scores_are_monotone_symmetric_and_keep_gaps():
     column = numpy.array([5.0, 1.0, numpy.nan, 3.0, 9.0])
-    out = missingness.normal_scores(column[:, None])[:, 0]
+    out = missingness.normalize(column[:, None])[:, 0]
     assert numpy.isnan(out[2])
     seen = out[~numpy.isnan(out)]
     assert list(numpy.argsort(seen)) == list(
@@ -207,13 +207,11 @@ def indicator_frame(dependent, n=200, seed=0):
 
 
 def test_indicator_model_detects_dependence_and_respects_null():
-    hit = missingness.indicator_model_test(indicator_frame(True), "t", 0, 99)
+    hit = missingness.predict(indicator_frame(True), "t", 0, 99)
     assert hit.p_value <= 0.02 and hit.auc > 0.7
     assert hit.column == "t" and hit.missing > 0
     nulls = [
-        missingness.indicator_model_test(
-            indicator_frame(False, seed=s), "t", s, 99
-        ).p_value
+        missingness.predict(indicator_frame(False, seed=s), "t", s, 99).p_value
         for s in range(40)
     ]
     assert numpy.mean(numpy.array(nulls) <= 0.05) <= 0.2
@@ -222,9 +220,9 @@ def test_indicator_model_detects_dependence_and_respects_null():
 
 def test_indicator_model_is_deterministic():
     frame = indicator_frame(True)
-    assert missingness.indicator_model_test(
+    assert missingness.predict(frame, "t", 3, 19) == missingness.predict(
         frame, "t", 3, 19
-    ) == missingness.indicator_model_test(frame, "t", 3, 19)
+    )
 
 
 def test_indicator_model_boundaries():
@@ -233,27 +231,27 @@ def test_indicator_model_boundaries():
     )
     few = base.copy()
     few.loc[: missingness.MIN_MISSING - 2, "t"] = numpy.nan
-    assert missingness.indicator_model_test(few, "t", 0, 9) is None
+    assert missingness.predict(few, "t", 0, 9) is None
     enough = base.copy()
     enough.loc[: missingness.MIN_MISSING - 1, "t"] = numpy.nan
     assert (
-        missingness.indicator_model_test(enough, "t", 0, 9).missing
+        missingness.predict(enough, "t", 0, 9).missing
         == missingness.MIN_MISSING
     )
     crowded = base.iloc[
         : missingness.MIN_MISSING + missingness.MIN_ROWS - 1
     ].copy()
     crowded.loc[: missingness.MIN_MISSING - 1, "t"] = numpy.nan
-    assert missingness.indicator_model_test(crowded, "t", 0, 9) is None
+    assert missingness.predict(crowded, "t", 0, 9) is None
     ok = base.iloc[: missingness.MIN_MISSING + missingness.MIN_ROWS].copy()
     ok.loc[: missingness.MIN_MISSING - 1, "t"] = numpy.nan
-    assert missingness.indicator_model_test(ok, "t", 0, 9) is not None
+    assert missingness.predict(ok, "t", 0, 9) is not None
     alone = enough[["t"]]
-    assert missingness.indicator_model_test(alone, "t", 0, 9) is None
+    assert missingness.predict(alone, "t", 0, 9) is None
     with pytest.raises(ValueError, match="permutations"):
-        missingness.indicator_model_test(enough, "t", 0, 0)
+        missingness.predict(enough, "t", 0, 0)
     with pytest.raises(ValueError, match="folds"):
-        missingness.indicator_model_test(enough, "t", 0, 9, folds=1)
+        missingness.predict(enough, "t", 0, 9, folds=1)
 
 
 def test_numeric_columns_skip_constants_text_and_booleans():
@@ -265,12 +263,12 @@ def test_numeric_columns_skip_constants_text_and_booleans():
 
 def test_assess_mechanism_reports_and_rejects():
     report = missingness.investigate(indicator_frame(True, n=300), seed=1)
-    assert report.mcar_rejected and report.tier == "unverified"
-    assert report.rows_checked == report.input_rows == 300
+    assert report.rejected and report.tier == "unverified"
+    assert report.checked == report.received == 300
     assert report.to_dict()["alpha"] == missingness.ALPHA
     clean = pandas.DataFrame(numpy.random.default_rng(0).normal(size=(60, 3)))
     quiet = missingness.investigate(clean)
-    assert not quiet.mcar_rejected and quiet.little is None
+    assert not quiet.rejected and quiet.little is None
     with pytest.raises(ValueError, match="alpha"):
         missingness.investigate(clean, alpha=1.0)
     with pytest.raises(ValueError, match="alpha"):
@@ -281,7 +279,7 @@ def test_assess_mechanism_records_caps_instead_of_failing(monkeypatch):
     frame = indicator_frame(False, n=300)
     monkeypatch.setattr(missingness, "MAX_ROWS", 100)
     report = missingness.investigate(frame, permutations=9)
-    assert report.rows_checked == 100 and report.input_rows == 300
+    assert report.checked == 100 and report.received == 300
     assert any("sampled" in s for s in report.skipped)
     monkeypatch.setattr(missingness, "MAX_COLUMNS", 2)
     report = missingness.investigate(frame, permutations=9)
@@ -339,7 +337,7 @@ def test_fold_imputer_state_ignores_held_out_rows(strategy):
         assert not set(train) & set(held)
         changed = values.copy()
         changed[held] = 1e6
-        again = missingness.fit_one(changed, strategy, train)
+        again = missingness.fit(changed, strategy, train)
         probe = values[train][:5]
         numpy.testing.assert_array_equal(
             fitted.transform(probe), again.transform(probe)
@@ -359,4 +357,4 @@ def test_imputation_errors_are_measured_per_strategy():
     with pytest.raises(ValueError, match="share"):
         missingness.benchmark(values, share=1.0)
     with pytest.raises(ValueError, match="strategy"):
-        missingness.make_imputer("magic")
+        missingness.provision("magic")

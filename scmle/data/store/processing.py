@@ -1,6 +1,6 @@
 """Deterministic incremental processing with retries, dedup and recovery.
 
-`IncrementalProcessor` turns the objects under an input prefix into output
+`Processor` turns the objects under an input prefix into output
 objects, once each, in sorted key order:
 
 * **Deterministic.** Objects are taken in key order, rows keep their order,
@@ -103,7 +103,7 @@ class Checkpoint:
     processed: dict[str, str] = dataclasses.field(default_factory=dict)
     seen: set[str] = dataclasses.field(default_factory=set)
 
-    def to_bytes(self) -> bytes:
+    def encode(self) -> bytes:
         """Serializes the checkpoint with a digest of its own content.
 
         Returns:
@@ -122,11 +122,11 @@ class Checkpoint:
         return json.dumps({**body, "digest": digest}, sort_keys=True).encode()
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> "Checkpoint":
+    def decode(cls, data: bytes) -> "Checkpoint":
         """Parses and verifies a stored checkpoint.
 
         Args:
-            data: Bytes produced by `to_bytes`.
+            data: Bytes produced by `encode`.
 
         Returns:
             The checkpoint they describe.
@@ -156,7 +156,7 @@ class Processing:
     Attributes:
         processed: Input keys processed in this run.
         skipped: Input keys already done before this run.
-        duplicate_objects: Input keys skipped as repeated uploads.
+        duplicates: Input keys skipped as repeated uploads.
         duplicate_rows: Rows dropped as repeated keys.
         rows_out: Rows written.
         outputs: Output keys written in this run.
@@ -167,7 +167,7 @@ class Processing:
 
     processed: tuple[str, ...]
     skipped: tuple[str, ...]
-    duplicate_objects: tuple[str, ...]
+    duplicates: tuple[str, ...]
     duplicate_rows: int
     rows_out: int
     outputs: tuple[str, ...]
@@ -192,23 +192,23 @@ class Processing:
         return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
-class IncrementalProcessor:
+class Processor:
     """Processes new input objects once each, resuming after a crash.
 
     Attributes:
         store: Holds inputs, outputs, the checkpoint and the lock.
         contract: Declares the schema and the row key columns.
         transform: Maps a clean input frame to an output frame.
-        input_prefix: Where inputs are listed.
-        output_prefix: Where outputs are written.
-        state_key: The checkpoint object.
-        lock_key: The lock object.
+        prefix: Where inputs are listed.
+        destination: Where outputs are written.
+        state: The checkpoint object.
+        guard: The lock object.
         gate: Quality gate applied to each input, if any.
         stage: The gate stage.
         policy: Retry policy for transient errors.
         sleep: Waits between retries.
         reader: Snapshot reader that records each read.
-        before_commit: Hook called between writing an output and writing the
+        hook: Hook called between writing an output and writing the
             checkpoint, if any.
         waits: The retry waits taken in the current or latest run, in
             seconds.
@@ -217,18 +217,18 @@ class IncrementalProcessor:
     def __init__(
         self,
         store: objectstore.Depot,
-        contract: snapshot.DataContract,
+        contract: snapshot.Contract,
         transform: Callable[[pandas.DataFrame], pandas.DataFrame],
         *,
         input_prefix: str = "input/",
         output_prefix: str = "output/",
         state_key: str = "state/checkpoint.json",
         lock_key: str = "state/lock",
-        gate: quality.QualityGate | None = None,
+        gate: quality.Gate | None = None,
         stage: quality.Stage = quality.Stage.TRAIN,
         policy: retry.Retries | None = None,
         sleep: Callable[[float], None] = time.sleep,
-        reader: snapshot.SnapshotReader | None = None,
+        reader: snapshot.Reader | None = None,
         before_commit: Callable[[str], None] | None = None,
     ) -> None:
         """Initializes the processor.
@@ -257,46 +257,46 @@ class IncrementalProcessor:
         self.store = store
         self.contract = contract
         self.transform = transform
-        self.input_prefix = input_prefix
-        self.output_prefix = output_prefix
-        self.state_key = state_key
-        self.lock_key = lock_key
+        self.prefix = input_prefix
+        self.destination = output_prefix
+        self.state = state_key
+        self.guard = lock_key
         self.gate = gate
         self.stage = stage
         self.policy = policy or retry.Retries()
         self.sleep = sleep
-        self.reader = reader or snapshot.SnapshotReader(store)
-        self.before_commit = before_commit
+        self.reader = reader or snapshot.Reader(store)
+        self.hook = before_commit
         self.waits: list[float] = []
 
     def restore(self) -> Checkpoint:
         """Loads the stored checkpoint.
 
         A damaged checkpoint is not replaced: `CorruptError`
-        from `Checkpoint.from_bytes` propagates, as do errors from the
+        from `Checkpoint.decode` propagates, as do errors from the
         store.
 
         Returns:
             The stored checkpoint, or an empty one if none exists yet.
         """
         try:
-            data = self.retrying(lambda: self.store.get(self.state_key))[0]
+            data = self.retrying(lambda: self.store.get(self.state))[0]
         except objectstore.AbsentError:
             # handled: absent checkpoint returns documented empty checkpoint
             return Checkpoint()
-        return Checkpoint.from_bytes(data)
+        return Checkpoint.decode(data)
 
     def stash(self, checkpoint: Checkpoint) -> None:
         """Writes the checkpoint atomically.
 
         Args:
-            checkpoint: The state to store under `state_key`.
+            checkpoint: The state to store under `state`.
         """
-        self.store.put(self.state_key, checkpoint.to_bytes())
+        self.store.put(self.state, checkpoint.encode())
 
-    def break_lock(self) -> None:
+    def lock(self) -> None:
         """Removes a lock left by a crashed run (a human decision)."""
-        self.store.delete(self.lock_key)
+        self.store.delete(self.guard)
 
     def retrying(self, operation: Callable[[], Any]) -> Any:
         """Runs an operation, retrying transient errors and noting waits.
@@ -347,13 +347,13 @@ class IncrementalProcessor:
         as the `ValueError` it was before ERR-20 did.
         """
         try:
-            self.store.put(self.lock_key, b"locked", if_absent=True)
+            self.store.put(self.guard, b"locked", if_absent=True)
         except objectstore.ExistsError as error:
             raise LockError("another run holds the lock") from error
         try:
             return self.sweep(max_objects)
         finally:
-            self.retrying(lambda: self.store.delete(self.lock_key))
+            self.retrying(lambda: self.store.delete(self.guard))
 
     def sweep(self, max_objects: int | None) -> Processing:
         """Runs with the lock held.
@@ -385,9 +385,7 @@ class IncrementalProcessor:
         rows_out = 0
         failed: str | None = None
         problem: str | None = None
-        listing = self.retrying(
-            lambda: self.store.list_objects(self.input_prefix)
-        )
+        listing = self.retrying(lambda: self.store.list_objects(self.prefix))
         for meta in listing:
             known = checkpoint.processed.get(meta.key)
             if known is not None:
@@ -470,12 +468,12 @@ class IncrementalProcessor:
         fresh = ~keys.isin(checkpoint.seen) & ~keys.duplicated(keep="first")
         dropped = int((~fresh).sum())
         result = self.retrying(lambda: self.transform(frame[fresh.to_numpy()]))
-        name = meta.key.removeprefix(self.input_prefix).rsplit(".", 1)[0]
-        output_key = f"{self.output_prefix}{name}.csv"
+        name = meta.key.removeprefix(self.prefix).rsplit(".", 1)[0]
+        output_key = f"{self.destination}{name}.csv"
         payload = result.to_csv(index=False, lineterminator="\n").encode()
         self.retrying(lambda: self.store.put(output_key, payload))
-        if self.before_commit is not None:
-            self.before_commit(meta.key)
+        if self.hook is not None:
+            self.hook(meta.key)
         checkpoint.processed[meta.key] = meta.sha256
         checkpoint.seen.update(keys[fresh].tolist())
         self.retrying(lambda: self.stash(checkpoint))

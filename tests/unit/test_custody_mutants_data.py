@@ -106,7 +106,7 @@ def test_scope_error_lists_the_allowed_scopes():
 
 def test_verify_rows_messages_are_exact():
     frame = pandas.DataFrame({"a": [float(i) for i in range(8)]})
-    assert message(lambda: make().verify_rows(frame)) == (
+    assert message(lambda: make().verify(frame)) == (
         "manifest holds no row content roots"
     )
 
@@ -252,7 +252,7 @@ def test_carve_defaults_and_input_messages():
         data_hash="d",
         times=numpy.arange(40),
     )
-    assert len(result.embargo_ids) == 0
+    assert len(result.embargo) == 0
     for name in ("labels", "groups", "times", "duplicates"):
         with pytest.raises(ValueError) as caught:
             carve.divide(
@@ -282,7 +282,7 @@ def test_string_labels_stratify_and_two_units_can_still_be_split():
         data_hash="d",
         labels=labels,
     )
-    assert len(result.confirmation_ids) > 0
+    assert len(result.confirmation) > 0
     groups = numpy.repeat([0, 1], 20)
     two = carve.divide(
         ids,
@@ -293,7 +293,7 @@ def test_string_labels_stratify_and_two_units_can_still_be_split():
         data_hash="d",
         groups=groups,
     )
-    assert len(two.confirmation_ids) == 20 and len(two.exploration_ids) == 20
+    assert len(two.confirmation) == 20 and len(two.exploration) == 20
 
 
 def test_an_empty_draw_is_reported_with_its_exact_note():
@@ -307,7 +307,7 @@ def test_an_empty_draw_is_reported_with_its_exact_note():
         charter_hash="c",
         data_hash="d",
     )
-    assert len(result.confirmation_ids) == 0
+    assert len(result.confirmation) == 0
     assert result.notes == (
         "no confirmation set carved: too few units to separate",
     )
@@ -352,16 +352,16 @@ def test_the_view_and_split_carry_what_the_manifest_says():
     manifest, view, split = outcome.manifest, outcome.view, outcome.split
     assert split.manifest.strategy == original.manifest.strategy
     assert split.manifest.seed == original.manifest.seed
-    assert split.manifest.test_ids == original.manifest.test_ids
+    assert split.manifest.test == original.manifest.test
     assert split.manifest.notes == manifest.notes
-    assert split.locked_test is original.locked_test
-    assert isinstance(split.dev_features.index, pandas.RangeIndex)
-    assert isinstance(split.dev_target.index, pandas.RangeIndex)
-    assert list(split.dev_features.columns) == ["x", "z"]
-    assert isinstance(split.dev_target, pandas.Series)
-    assert view.target.equals(split.dev_target)
+    assert split.test is original.test
+    assert isinstance(split.features.index, pandas.RangeIndex)
+    assert isinstance(split.target.index, pandas.RangeIndex)
+    assert list(split.features.columns) == ["x", "z"]
+    assert isinstance(split.target, pandas.Series)
+    assert view.target.equals(split.target)
     assert view.folds == manifest.folds
-    assert view.manifest_sha256 == manifest.sha256
+    assert view.digest == manifest.sha256
     ran.vault.close()
 
 

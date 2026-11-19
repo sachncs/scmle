@@ -16,29 +16,29 @@ def message(call):
 
 
 def test_open_unit_bounds_and_types():
-    assert feasibility.open_unit(0.5, "x") == 0.5
-    assert message(lambda: feasibility.open_unit(0.0, "x")) == (
+    assert feasibility.confine(0.5, "x") == 0.5
+    assert message(lambda: feasibility.confine(0.0, "x")) == (
         "x must be strictly between 0.0 and 1"
     )
-    assert message(lambda: feasibility.open_unit(1.0, "x")) == (
+    assert message(lambda: feasibility.confine(1.0, "x")) == (
         "x must be strictly between 0.0 and 1"
     )
-    assert feasibility.open_unit(0.0, "x", low=-1.0) == 0.0
-    assert message(lambda: feasibility.open_unit(-1.0, "x", low=-1.0)) == (
+    assert feasibility.confine(0.0, "x", low=-1.0) == 0.0
+    assert message(lambda: feasibility.confine(-1.0, "x", low=-1.0)) == (
         "x must be strictly between -1.0 and 1"
     )
     for bad in (True, "0.5", None, float("nan")):
-        assert message(lambda bad=bad: feasibility.open_unit(bad, "x")) == (
+        assert message(lambda bad=bad: feasibility.confine(bad, "x")) == (
             "x must be strictly between 0.0 and 1"
         )
 
 
 def test_positive_delta_bounds_and_types():
-    assert feasibility.positive_delta(2, "d") == 2.0
+    assert feasibility.require(2, "d") == 2.0
     for bad in (0, -1, True, "1", float("inf"), float("nan")):
-        assert message(
-            lambda bad=bad: feasibility.positive_delta(bad, "d")
-        ) == ("d must be a finite number greater than 0")
+        assert message(lambda bad=bad: feasibility.require(bad, "d")) == (
+            "d must be a finite number greater than 0"
+        )
 
 
 def test_k_must_be_an_integer_of_at_least_one():
@@ -51,27 +51,29 @@ def test_k_must_be_an_integer_of_at_least_one():
 
 def test_z_sum_is_the_sum_of_two_normal_quantiles():
     expected = stats.norm.ppf(1 - 0.05 / 6) + stats.norm.ppf(0.8)
-    assert feasibility.z_sum(0.05, 3, 0.8) == pytest.approx(expected, rel=1e-12)
-    assert message(lambda: feasibility.z_sum(1.0, 3, 0.8)) == (
+    assert feasibility.combine(0.05, 3, 0.8) == pytest.approx(
+        expected, rel=1e-12
+    )
+    assert message(lambda: feasibility.combine(1.0, 3, 0.8)) == (
         "alpha must be strictly between 0.0 and 1"
     )
-    assert message(lambda: feasibility.z_sum(0.05, 3, 1.0)) == (
+    assert message(lambda: feasibility.combine(0.05, 3, 1.0)) == (
         "power must be strictly between 0.0 and 1"
     )
 
 
 def test_mean_formulas_agree_with_each_other_and_their_boundaries():
-    z = feasibility.z_sum(0.05, 2, 0.8)
+    z = feasibility.combine(0.05, 2, 0.8)
     assert feasibility.n_required_mean(
         0.3, alpha=0.05, k_max=2, power=0.8
     ) == math.ceil((z / 0.3) ** 2)
-    assert feasibility.mde_mean(
+    assert feasibility.detect(
         100, alpha=0.05, k_max=2, power=0.8
     ) == pytest.approx(z / 10)
-    assert feasibility.mde_mean(
+    assert feasibility.detect(
         1, alpha=0.05, k_max=2, power=0.8
     ) == pytest.approx(z)
-    assert math.isnan(feasibility.mde_mean(0, alpha=0.05, k_max=2, power=0.8))
+    assert math.isnan(feasibility.detect(0, alpha=0.05, k_max=2, power=0.8))
     assert message(
         lambda: feasibility.n_required_mean(0, alpha=0.05, k_max=2, power=0.8)
     ) == ("delta must be a finite number greater than 0")
@@ -91,7 +93,7 @@ def test_mean_formulas_agree_with_each_other_and_their_boundaries():
 
 
 def test_correlation_formulas_follow_fisher_z():
-    z = feasibility.z_sum(0.05, 1, 0.8)
+    z = feasibility.combine(0.05, 1, 0.8)
     assert feasibility.n_required_correlation(
         0.3, alpha=0.05, k_max=1, power=0.8
     ) == math.ceil((z / math.atanh(0.3)) ** 2 + 3)
@@ -153,7 +155,7 @@ def test_two_proportions_matches_the_pooled_variance_formula():
 @pytest.mark.parametrize("n", [2, 10, 250])
 @pytest.mark.parametrize("confidence", [0.9, 0.95, 0.99])
 def test_wilson_half_width_equals_half_the_wilson_interval(n, confidence):
-    low, high = certificates.wilson_interval(n // 2, n, confidence)
+    low, high = certificates.bound(n // 2, n, confidence)
     assert feasibility.halfwidth(0.5, n, confidence) == pytest.approx(
         (high - low) / 2, rel=1e-12
     )
@@ -161,7 +163,7 @@ def test_wilson_half_width_equals_half_the_wilson_interval(n, confidence):
 
 def test_wilson_half_width_at_the_edges():
     assert math.isinf(feasibility.halfwidth(0.5, 0))
-    low, high = certificates.wilson_interval(0, 1, 0.95)
+    low, high = certificates.bound(0, 1, 0.95)
     assert feasibility.halfwidth(0.0, 1) == pytest.approx((high - low) / 2)
     z = stats.norm.ppf(0.975)
     expected = z * math.sqrt(0.25 / 4 + z * z / 64) / (1 + z * z / 4)

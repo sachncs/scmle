@@ -36,7 +36,7 @@ def adapter() -> modality_lifecycle.Plaintext:
     """The labelled text data the fixture checkpoints were made from."""
     samples = tuple(
         document.Sample(
-            document_id=f"text-{index}",
+            identifier=f"text-{index}",
             content=("alpha signal " if index % 2 else "beta signal ")
             * (index + 2),
             label="alpha" if index % 2 else "beta",

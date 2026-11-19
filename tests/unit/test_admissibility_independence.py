@@ -118,7 +118,7 @@ def test_stratified_chi_square_equals_the_sum_of_scipy_per_stratum_statistics():
     assert result.statistic == pytest.approx(total, rel=1e-10)
     assert result.df == df
     assert result.p_value == pytest.approx(stats.chi2.sf(total, df), rel=1e-9)
-    assert result.skipped_strata == 0
+    assert result.strata == 0
     # x and y are related only through s, so conditioning removes it
     assert result.p_value > 0.001
     marginal = independence.stratified_chi2(frame, "x", "y", [])
@@ -134,7 +134,7 @@ def test_degenerate_strata_are_skipped_and_counted():
         }
     )
     result = independence.stratified_chi2(frame, "x", "y", ["s"])
-    assert result.skipped_strata == 1
+    assert result.strata == 1
     assert result.df == 1
     nothing = independence.stratified_chi2(frame.iloc[4:], "x", "y", ["s"])
     assert nothing.df == 0 and nothing.p_value == 1.0
@@ -143,19 +143,19 @@ def test_degenerate_strata_are_skipped_and_counted():
 def test_dispatch_and_refusals():
     num = sem_frame(100, 0)
     assert (
-        independence.run_test(num, "a", "b", []).kind
+        independence.test(num, "a", "b", []).kind
         is independence.Procedure.FISHER_Z
     )
     disc = discrete_frame().astype("category")
     assert (
-        independence.run_test(disc, "x", "y", ["s"]).kind
+        independence.test(disc, "x", "y", ["s"]).kind
         is independence.Procedure.STRATIFIED_CHI2
     )
     mixed = disc.assign(w=numpy.arange(len(disc), dtype=float))
     with pytest.raises(ValueError, match="mixed"):
-        independence.run_test(mixed, "x", "w", [])
+        independence.test(mixed, "x", "w", [])
     with pytest.raises(ValueError, match="complete"):
-        independence.run_test(
+        independence.test(
             num.assign(a=numpy.where(num.index == 0, numpy.nan, num["a"])),
             "a",
             "b",
@@ -165,7 +165,7 @@ def test_dispatch_and_refusals():
         {"x": numpy.arange(30).astype(str), "y": numpy.arange(30).astype(str)}
     )
     with pytest.raises(ValueError, match="too many levels"):
-        independence.run_test(wide, "x", "y", [])
+        independence.test(wide, "x", "y", [])
 
 
 def test_implied_statements_of_the_chain():
@@ -212,7 +212,7 @@ def test_a_wrong_graph_is_falsified_when_data_contradict_it():
 
 def test_report_never_confirms_and_records_every_test():
     report = independence.falsify(CHAIN, sem_frame(300, 3), run_seed=7)
-    assert report.dag_hash == CHAIN.digest()
+    assert report.digest == CHAIN.digest()
     assert report.level == pytest.approx(0.05 / len(report.outcomes))
     assert len(report.checks) == len(report.outcomes)
     assert all(o.verdict.value != "confirmed" for o in report.outcomes)
@@ -241,7 +241,7 @@ def test_falsification_threshold_is_inclusive(monkeypatch):
 
     statements = independence.entail(CHAIN)[0]
     level = 0.05 / len(statements)
-    monkeypatch.setattr(independence, "run_test", fake)
+    monkeypatch.setattr(independence, "test", fake)
     report = independence.falsify(CHAIN, sem_frame(50, 0))
     assert len(report.falsified) == len(statements)
     level = level * 1.0001

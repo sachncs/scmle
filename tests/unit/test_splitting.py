@@ -45,16 +45,13 @@ def test_stratified_preserves_ratio_and_is_disjoint(frame):
     result = split(frame)
     manifest = result.manifest
     assert manifest.strategy == "stratified"
-    assert set(manifest.train_ids).isdisjoint(manifest.test_ids)
-    assert len(manifest.train_ids) + len(manifest.test_ids) == len(frame)
-    assert abs(result.dev_target.mean() - frame.y.mean()) < 0.03
+    assert set(manifest.training).isdisjoint(manifest.test)
+    assert len(manifest.training) + len(manifest.test) == len(frame)
+    assert abs(result.target.mean() - frame.y.mean()) < 0.03
     for train, val in manifest.folds:
         assert set(train).isdisjoint(val)
-        assert (
-            abs(result.dev_target.iloc[list(val)].mean() - frame.y.mean())
-            < 0.08
-        )
-    assert "y" not in result.dev_features.columns
+        assert abs(result.target.iloc[list(val)].mean() - frame.y.mean()) < 0.08
+    assert "y" not in result.features.columns
 
 
 def test_group_split_has_no_group_overlap(frame):
@@ -63,10 +60,10 @@ def test_group_split_has_no_group_overlap(frame):
     result = split(frame, make_spec(group_column="g"))
     manifest = result.manifest
     assert manifest.strategy == "group"
-    train_groups = set(frame.g.iloc[list(manifest.train_ids)])
-    test_groups = set(frame.g.iloc[list(manifest.test_ids)])
+    train_groups = set(frame.g.iloc[list(manifest.training)])
+    test_groups = set(frame.g.iloc[list(manifest.test)])
     assert train_groups.isdisjoint(test_groups)
-    dev_groups = frame.g.iloc[list(manifest.train_ids)].to_numpy()
+    dev_groups = frame.g.iloc[list(manifest.training)].to_numpy()
     for train, val in manifest.folds:
         assert set(dev_groups[list(train)]).isdisjoint(dev_groups[list(val)])
 
@@ -79,10 +76,10 @@ def test_temporal_split_respects_order(frame):
     times = shuffled.t
     assert manifest.strategy == "temporal"
     assert (
-        times.iloc[list(manifest.train_ids)].max()
-        <= times.iloc[list(manifest.test_ids)].min()
+        times.iloc[list(manifest.training)].max()
+        <= times.iloc[list(manifest.test)].min()
     )
-    dev_times = times.iloc[list(manifest.train_ids)].to_numpy()
+    dev_times = times.iloc[list(manifest.training)].to_numpy()
     for train, val in manifest.folds:
         assert dev_times[list(train)].max() <= dev_times[list(val)].min()
 
@@ -108,7 +105,7 @@ def test_manifest_is_deterministic(frame):
     first = split(frame).manifest
     second = split(frame.copy()).manifest
     assert first.fingerprint == second.fingerprint
-    assert first.to_dict()["n_test"] == len(first.test_ids)
+    assert first.to_dict()["n_test"] == len(first.test)
 
 
 def test_tiny_minority_class_blocks(frame):
@@ -150,11 +147,11 @@ def test_a_class_with_enough_rows_reaches_the_test_minimum(frame):
     least = partitions.MIN_TEST_CLASS_ROWS
     rare.loc[: least + partitions.MIN_STRATUM_ROWS - 1, "y"] = 1
     result = split(rare)
-    held = rare["y"].iloc[list(result.manifest.test_ids)]
-    kept = rare["y"].iloc[list(result.manifest.train_ids)]
+    held = rare["y"].iloc[list(result.manifest.test)]
+    kept = rare["y"].iloc[list(result.manifest.training)]
     assert (held == 1).sum() == least
     assert (kept == 1).sum() == partitions.MIN_STRATUM_ROWS
-    assert not set(result.manifest.test_ids) & set(result.manifest.train_ids)
+    assert not set(result.manifest.test) & set(result.manifest.training)
     assert result.manifest == split(rare).manifest
 
 
@@ -163,8 +160,8 @@ def test_a_common_class_keeps_its_proportional_test_rows(frame):
     plain = splits.Random(make_spec(), tasks.Task.BINARY)
     labels = frame["y"]
     reference = plain.partition(frame)
-    assert len(result.manifest.test_ids) == len(reference.test_ids)
-    assert (labels.iloc[list(result.manifest.test_ids)] == 1).sum() >= (
+    assert len(result.manifest.test) == len(reference.test)
+    assert (labels.iloc[list(result.manifest.test)] == 1).sum() >= (
         partitions.MIN_TEST_CLASS_ROWS
     )
 
@@ -180,7 +177,7 @@ def test_a_regression_split_is_not_held_to_class_counts(frame):
     result = split(
         frame.assign(y=frame["x"]), make_spec("random"), tasks.Task.REGRESSION
     )
-    assert len(result.manifest.test_ids) == 80
+    assert len(result.manifest.test) == 80
 
 
 def test_regression_defaults_to_random_and_rejects_stratified(frame):
@@ -240,7 +237,7 @@ def test_lockbox_module_holds_the_sealed_test_set_family():
 
 
 def test_locked_test_set_opens_once(frame):
-    locked = split(frame).locked_test
+    locked = split(frame).test
     assert locked.opened is False and "features" not in repr(locked)
     with pytest.raises(errors.LeakageError, match="invalid token"):
         locked.open("guess")
@@ -268,7 +265,7 @@ def test_embargo_keeps_a_gap_between_training_and_validation_windows(frame):
         .split(frame)
         .manifest
     )
-    dev_times = frame.t.iloc[list(manifest.train_ids)].to_numpy()
+    dev_times = frame.t.iloc[list(manifest.training)].to_numpy()
     for fit, validate in manifest.folds:
         assert min(validate) - max(fit) > 10  # at least `embargo` rows apart
         assert dev_times[list(fit)].max() < dev_times[list(validate)].min()
@@ -286,20 +283,18 @@ def test_embargo_rows_before_the_test_set_belong_to_neither_partition(frame):
         .split(frame)
         .manifest
     )
-    assert embargoed.test_ids == plain.test_ids
-    assert len(embargoed.train_ids) == len(plain.train_ids) - 10
+    assert embargoed.test == plain.test
+    assert len(embargoed.training) == len(plain.training) - 10
     unused = (
-        set(range(len(frame)))
-        - set(embargoed.train_ids)
-        - set(embargoed.test_ids)
+        set(range(len(frame))) - set(embargoed.training) - set(embargoed.test)
     )
     assert len(unused) == 10
     ordered = frame.t.sort_values().index.to_list()
     assert (
         set(
             ordered[
-                len(ordered) - len(embargoed.test_ids) - 10 : len(ordered)
-                - len(embargoed.test_ids)
+                len(ordered) - len(embargoed.test) - 10 : len(ordered)
+                - len(embargoed.test)
             ]
         )
         == unused
@@ -334,8 +329,8 @@ def test_group_folds_keep_groups_apart_and_every_class_in_every_fold():
         validation=tasks.Validation(strategy="group"),
     )
     part = splitters.Splitter(spec, tasks.Task.BINARY).split(frame)
-    dev_groups = frame.unit.to_numpy()[list(part.manifest.train_ids)]
-    labels = frame.y.to_numpy()[list(part.manifest.train_ids)]
+    dev_groups = frame.unit.to_numpy()[list(part.manifest.training)]
+    labels = frame.y.to_numpy()[list(part.manifest.training)]
     for fit, held in part.manifest.folds:
         assert not set(dev_groups[list(fit)]) & set(dev_groups[list(held)])
         assert set(labels[list(fit)]) == {0, 1}
@@ -386,7 +381,7 @@ def test_rolling_windows_slide_forward_and_always_validate_on_the_future(frame):
     )
     manifest = result.manifest
     times = (
-        pandas.to_datetime(frame["t"]).iloc[list(manifest.train_ids)].to_numpy()
+        pandas.to_datetime(frame["t"]).iloc[list(manifest.training)].to_numpy()
     )
     order = numpy.argsort(times, kind="stable")
 
@@ -404,9 +399,9 @@ def test_rolling_embargo_leaves_a_gap_before_each_validation_window(frame):
     )
 
     positions = {
-        row: rank for rank, row in enumerate(sorted(result.manifest.train_ids))
+        row: rank for rank, row in enumerate(sorted(result.manifest.training))
     }
-    ordered = frame["t"].iloc[sorted(result.manifest.train_ids)]
+    ordered = frame["t"].iloc[sorted(result.manifest.training)]
     assert ordered.is_monotonic_increasing
     for train, held in result.manifest.folds:
         ranks_train = sorted(positions[i] for i in train)
@@ -477,8 +472,8 @@ def test_a_table_just_large_enough_still_splits():
     rng = numpy.random.default_rng(1)
     enough = pandas.DataFrame({"x": rng.normal(size=60), "y": [0, 1] * 30})
     result = split(enough)
-    assert len(result.dev_features) < 60
-    assert result.dev_target.nunique() == 2
+    assert len(result.features) < 60
+    assert result.target.nunique() == 2
 
 
 def tied_frame(rows=400, tie=7):
@@ -514,15 +509,15 @@ def test_no_tied_timestamp_sits_on_both_sides_of_a_time_split(
     )
     manifest = split(frame, spec).manifest
     times = frame["t"].to_numpy()
-    assert not straddles(times, manifest.train_ids, manifest.test_ids)
-    dev = numpy.asarray(manifest.train_ids)
+    assert not straddles(times, manifest.training, manifest.test)
+    dev = numpy.asarray(manifest.training)
     assert len(manifest.folds) >= 2
     for fit, held in manifest.folds:
         assert len(fit) and len(held)
         assert not straddles(times, dev[list(fit)], dev[list(held)])
         assert times[dev[list(fit)]].max() < times[dev[list(held)]].min()
     # every tie block is whole: the test set starts at a new timestamp
-    assert times[list(manifest.test_ids)].min() > times[dev].max()
+    assert times[list(manifest.test)].min() > times[dev].max()
 
 
 def test_a_time_split_moves_a_tie_at_the_cut_wholly_into_the_test_set():
@@ -533,12 +528,12 @@ def test_a_time_split_moves_a_tie_at_the_cut_wholly_into_the_test_set():
     )
     manifest = split(frame, spec).manifest
     # 20 percent of 100 rows is 20, a whole number of ties of 10.
-    assert len(manifest.test_ids) == 20
+    assert len(manifest.test) == 20
     tilted = tied_frame(rows=95, tie=10)
     manifest = split(tilted, spec).manifest
     # 19 rows would cut a tie of 10; the tie goes to the test set whole.
     counts = tilted["t"].value_counts()
-    held = tilted["t"].iloc[list(manifest.test_ids)]
+    held = tilted["t"].iloc[list(manifest.test)]
     assert all(counts[t] == n for t, n in held.value_counts().items())
 
 
@@ -585,8 +580,8 @@ def entity_spec(strategy, entities=None, **validation):
 
 def sides(manifest):
     """Every pair of sides of a split: the holdout, then each fold."""
-    dev = numpy.asarray(manifest.train_ids)
-    pairs = [(dev, numpy.asarray(manifest.test_ids))]
+    dev = numpy.asarray(manifest.training)
+    pairs = [(dev, numpy.asarray(manifest.test))]
     pairs += [(dev[list(fit)], dev[list(held)]) for fit, held in manifest.folds]
     return pairs
 

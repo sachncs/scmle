@@ -139,8 +139,8 @@ def test_a_row_without_a_declared_group_is_tied_by_nothing_else():
     )
     split = image.IMAGE.constrain(spec, tasks.Task.REGRESSION).split(frame)
     groups = frame["g"].to_numpy()
-    train = list(split.manifest.train_ids)
-    test = list(split.manifest.test_ids)
+    train = list(split.manifest.training)
+    test = list(split.manifest.test)
     assert not ({*groups[train]} & {*groups[test]}) - {None}
 
 
@@ -342,7 +342,7 @@ def clip(
 def test_a_video_is_probed_and_described_from_sampled_frames(tmp_path):
     path = clip(tmp_path / "a.mp4", "testsrc", 2.0)
     metadata = stream.probe(path)
-    assert (metadata.width, metadata.height, metadata.frame_count) == (
+    assert (metadata.width, metadata.height, metadata.frames) == (
         64,
         48,
         20,

@@ -15,7 +15,7 @@ from typing import Self
 from scmle.contracts import errors
 from scmle.contracts import records
 from scmle.data.modalities import image
-from scmle.data.modalities.image.failures import ImageValidationError
+from scmle.data.modalities.image.failures import ViolationError
 from scmle.data.modalities.image.pixels import Pixels
 
 SHA256_HEX_LENGTH = 64
@@ -47,18 +47,18 @@ def bounds(
         source: Stable source label, recorded in the error.
 
     Raises:
-        ImageValidationError: If a dimension is not positive or the pixel
+        ViolationError: If a dimension is not positive or the pixel
             count exceeds ``max_pixels``.
     """
     if width <= 0 or height <= 0:
-        raise ImageValidationError(
+        raise ViolationError(
             "image dimensions must be positive",
             code="empty_dimensions",
             source=source,
         )
     pixel_count = width * height
     if max_pixels is not None and pixel_count > max_pixels:
-        raise ImageValidationError(
+        raise ViolationError(
             f"image has {pixel_count} pixels; limit is {max_pixels}",
             code="pixel_count_limit",
             source=source,
@@ -66,7 +66,7 @@ def bounds(
         )
 
 
-def canonical_source(source: str | pathlib.Path) -> str:
+def identify(source: str | pathlib.Path) -> str:
     """Returns a stable source identifier for a path or URI-like value.
 
     Args:
@@ -123,7 +123,7 @@ def examine(
         text and sorted names of the sensitive EXIF fields present.
 
     Raises:
-        ImageValidationError: If the payload is corrupt, cannot be decoded,
+        ViolationError: If the payload is corrupt, cannot be decoded,
             or exceeds ``max_pixels``.
     """
     try:
@@ -145,10 +145,10 @@ def examine(
                     if tag in SENSITIVE_METADATA_TAGS
                 )
             )
-    except ImageValidationError:
+    except ViolationError:
         raise
     except Exception as error:
-        raise ImageValidationError(
+        raise ViolationError(
             f"could not decode image: {error}",
             code="corrupt_payload",
             source=source,
@@ -171,15 +171,15 @@ class Augmentation:
     """Caller-declared provenance for a transformed image sample.
 
     Attributes:
-        parent_source: Source of the image the sample was derived from,
-            normalised with `canonical_source`.
+        source: Source of the image the sample was derived from,
+            normalised with `identify`.
         operation: Non-empty name of the transformation.
         parameters: JSON-native transformation parameters, read-only.
         tool: Name of the tool that applied the transformation; may be
             empty.
     """
 
-    parent_source: str
+    source: str
     operation: str
     parameters: Mapping[str, Any] = dataclasses.field(default_factory=dict)
     tool: str = ""
@@ -196,7 +196,7 @@ class Augmentation:
             ValueError: If the operation is blank, a parameter key is not a
                 non-empty string, or the parameters are not JSON-native.
         """
-        parent = canonical_source(self.parent_source)
+        parent = identify(self.source)
         operation = self.operation.strip()
         tool = self.tool.strip()
         if not operation:
@@ -216,7 +216,7 @@ class Augmentation:
             raise errors.InputError(
                 "augmentation parameters must be JSON-native"
             ) from error
-        object.__setattr__(self, "parent_source", parent)
+        object.__setattr__(self, "source", parent)
         object.__setattr__(self, "operation", operation)
         object.__setattr__(self, "parameters", MappingProxyType(normalized))
         object.__setattr__(self, "tool", tool)
@@ -243,7 +243,7 @@ class Augmentation:
         """
         return self.KEYS.upgrade(
             {
-                "parent_source": self.parent_source,
+                "parent_source": self.source,
                 "operation": self.operation,
                 "parameters": dict(self.parameters),
                 "tool": self.tool,
@@ -270,17 +270,17 @@ class Sample(Pixels):
         channels: Number of colour bands; positive.
         mode: Pillow mode of the stored image.
         format: Encoded format name, or ``unknown``.
-        byte_size: Length of ``encoded_bytes``.
+        size: Length of ``encoded``.
         label: Optional task label.
-        group_id: Optional identity used to keep related samples in one
+        group: Optional identity used to keep related samples in one
             split.
-        exif_tags: Sorted EXIF tag numbers present, as text.
-        sensitive_metadata: Sorted names of sensitive EXIF fields present.
+        tags: Sorted EXIF tag numbers present, as text.
+        metadata: Sorted names of sensitive EXIF fields present.
         augmentation: Provenance if the sample is a transformed image.
     """
 
     source: str
-    encoded_bytes: bytes = dataclasses.field(repr=False)
+    encoded: bytes = dataclasses.field(repr=False)
     file_hash: str
     content_hash: str
     width: int
@@ -288,11 +288,11 @@ class Sample(Pixels):
     channels: int
     mode: str
     format: str
-    byte_size: int
+    size: int
     label: str | int | float | bool | None = None
-    group_id: str | None = None
-    exif_tags: tuple[str, ...] = ()
-    sensitive_metadata: tuple[str, ...] = ()
+    group: str | None = None
+    tags: tuple[str, ...] = ()
+    metadata: tuple[str, ...] = ()
     augmentation: Augmentation | None = None
 
     KEYS: ClassVar[records.Migration] = records.nest(
@@ -316,20 +316,18 @@ class Sample(Pixels):
             TypeError: If augmentation is neither None nor an
                 Augmentation.
         """
-        object.__setattr__(self, "encoded_bytes", bytes(self.encoded_bytes))
+        object.__setattr__(self, "encoded", bytes(self.encoded))
         if not self.source.strip():
             raise errors.InputError("source must not be empty")
-        if self.group_id is not None and not self.group_id.strip():
+        if self.group is not None and not self.group.strip():
             raise errors.InputError("group_id must not be empty when provided")
-        object.__setattr__(self, "exif_tags", tuple(self.exif_tags))
-        object.__setattr__(
-            self, "sensitive_metadata", tuple(self.sensitive_metadata)
-        )
+        object.__setattr__(self, "tags", tuple(self.tags))
+        object.__setattr__(self, "metadata", tuple(self.metadata))
         if self.augmentation is not None and not isinstance(
             self.augmentation, Augmentation
         ):
             raise errors.KindError("augmentation must be Augmentation or None")
-        if len(self.encoded_bytes) != self.byte_size:
+        if len(self.encoded) != self.size:
             raise errors.InputError("byte_size does not match encoded_bytes")
         if self.width <= 0 or self.height <= 0:
             raise errors.InputError("image dimensions must be positive")
@@ -342,7 +340,7 @@ class Sample(Pixels):
             raise errors.InputError("image hashes must be SHA-256 hex digests")
 
     @classmethod
-    def from_bytes(
+    def parse(
         cls,
         encoded_bytes: bytes,
         source: str = "memory://",
@@ -367,23 +365,23 @@ class Sample(Pixels):
             A validated immutable image snapshot.
 
         Raises:
-            ImageValidationError: If the payload is empty, corrupt, or too
+            ViolationError: If the payload is empty, corrupt, or too
                 large. An DependencyError (Pillow missing) or a
                 ValueError (invalid limit) from the helpers it calls
                 propagates unchanged.
         """
         image.pillow("image ingestion")
         raw = bytes(encoded_bytes)
-        stable_source = canonical_source(source)
+        stable_source = identify(source)
         cls.validate(max_bytes, max_pixels)
         if not raw:
-            raise ImageValidationError(
+            raise ViolationError(
                 "image payload is empty",
                 code="empty_payload",
                 source=stable_source,
             )
         if max_bytes is not None and len(raw) > max_bytes:
-            raise ImageValidationError(
+            raise ViolationError(
                 f"image payload is {len(raw)} bytes; limit is {max_bytes}",
                 code="encoded_size_limit",
                 source=stable_source,
@@ -401,7 +399,7 @@ class Sample(Pixels):
         ) = examine(raw, max_pixels, stable_source)
         return cls(
             source=stable_source,
-            encoded_bytes=raw,
+            encoded=raw,
             file_hash=hashlib.sha256(raw).hexdigest(),
             content_hash=content_hash,
             width=width,
@@ -409,16 +407,16 @@ class Sample(Pixels):
             channels=channels,
             mode=mode,
             format=format_name,
-            byte_size=len(raw),
+            size=len(raw),
             label=label,
-            group_id=group_id,
-            exif_tags=exif_tags,
-            sensitive_metadata=sensitive_metadata,
+            group=group_id,
+            tags=exif_tags,
+            metadata=sensitive_metadata,
             augmentation=augmentation,
         )
 
     @classmethod
-    def from_path(
+    def load(
         cls,
         path: str | pathlib.Path,
         max_bytes: int | None = DEFAULT_MAX_BYTES,
@@ -442,20 +440,20 @@ class Sample(Pixels):
             A validated immutable image snapshot.
 
         Raises:
-            ImageValidationError: If the file is missing, not a regular
+            ViolationError: If the file is missing, not a regular
                 file, larger than ``max_bytes``, or unreadable. Failures of
-                `from_bytes`, including DependencyError, propagate.
+                `parse`, including DependencyError, propagate.
         """
         file_path = pathlib.Path(path).expanduser()
-        source = canonical_source(file_path)
+        source = identify(file_path)
         if not file_path.exists():
-            raise ImageValidationError(
+            raise ViolationError(
                 "image file was not found",
                 code="missing_file",
                 source=source,
             )
         if not file_path.is_file():
-            raise ImageValidationError(
+            raise ViolationError(
                 "image source is not a regular file",
                 code="not_a_file",
                 source=source,
@@ -463,7 +461,7 @@ class Sample(Pixels):
         cls.validate(max_bytes, max_pixels)
         file_size = file_path.stat().st_size
         if max_bytes is not None and file_size > max_bytes:
-            raise ImageValidationError(
+            raise ViolationError(
                 f"image file is {file_size} bytes; limit is {max_bytes}",
                 code="encoded_size_limit",
                 source=source,
@@ -472,12 +470,12 @@ class Sample(Pixels):
         try:
             payload = file_path.read_bytes()
         except OSError as error:
-            raise ImageValidationError(
+            raise ViolationError(
                 f"could not read image file: {error}",
                 code="read_failure",
                 source=source,
             ) from error
-        return cls.from_bytes(
+        return cls.parse(
             payload,
             source,
             max_bytes,
@@ -519,7 +517,7 @@ class Sample(Pixels):
         """Returns JSON-compatible metadata without embedding image bytes.
 
         Returns:
-            A dict of every field except ``encoded_bytes`` in single-word
+            A dict of every field except ``encoded`` in single-word
             keys, the hashes under `digests.{file, content}`; the tag tuples
             become lists and the augmentation becomes its own dict or None.
         """
@@ -533,11 +531,11 @@ class Sample(Pixels):
                 "channels": self.channels,
                 "mode": self.mode,
                 "format": self.format,
-                "byte_size": self.byte_size,
+                "byte_size": self.size,
                 "label": self.label,
-                "group_id": self.group_id,
-                "exif_tags": list(self.exif_tags),
-                "sensitive_metadata": list(self.sensitive_metadata),
+                "group_id": self.group,
+                "exif_tags": list(self.tags),
+                "sensitive_metadata": list(self.metadata),
                 "augmentation": (
                     self.augmentation.to_dict()
                     if self.augmentation is not None

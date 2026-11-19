@@ -308,7 +308,7 @@ def test_the_runners_pair_each_gate_with_its_replicates():
 
 
 def test_wilson_lower_is_the_lower_end_of_the_95_percent_interval():
-    expected = certificates.wilson_interval(30, 40, 0.95)[0]
+    expected = certificates.bound(30, 40, 0.95)[0]
     assert uncertainty_certify.wilson_lower(30, 40) == expected
     assert 0.59 < expected < 0.62
 

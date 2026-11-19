@@ -76,11 +76,11 @@ def test_frame_writes_artifacts_and_an_unsigned_charter(tmp_path):
         "decision_cost_model.json",
         "charter.json",
     }
-    loaded = sealing.read_verified(out / "charter.json")
+    loaded = sealing.read(out / "charter.json")
     assert not loaded.signed
     assert loaded.charter.costs is not None
     stored = json.loads((out / "framing_draft.json").read_text())
-    assert stored["charter_hash"] == loaded.charter_hash
+    assert stored["charter_hash"] == loaded.digest
     assert stored["status"] == "issued_with_questions"
 
 

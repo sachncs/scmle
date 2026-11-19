@@ -853,7 +853,7 @@ def digest() -> str:
     Returns:
         The `code_hash` of this module's measuring functions.
     """
-    return certificates.code_hash(
+    return certificates.fingerprint(
         population,
         mutants,
         reason,

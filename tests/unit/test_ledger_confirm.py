@@ -51,7 +51,7 @@ def explored(tmp_path=None, effect=0.6, control=True, rule=online_fdr.ELOND):
         seed=3,
     )
     plan = explore.hypothesize(x, explore.NUMERIC)
-    explore.run_exploration(ledger, x, y, plan)
+    explore.explore(ledger, x, y, plan)
     if control:
         ledger.negatives(passing_control().to_dict())
     return ledger
@@ -106,9 +106,7 @@ def test_by_is_the_default_and_the_statistics_are_those_on_c():
             features[column].to_numpy(), target.to_numpy()
         ).p
         assert check.p_value == expected[hid]
-    survivors = [
-        ledger.hypotheses[i] for i in ledger.survivor_set.hypothesis_ids
-    ]
+    survivors = [ledger.hypotheses[i] for i in ledger.remaining.hypotheses]
     assert len(survivors) == len(result.claims)
 
 
@@ -127,12 +125,12 @@ def test_selection_is_frozen_and_logged_before_c_opens():
     ]
     frozen = source.log.entries[1]["detail"]
     bound = source.log.entries[2]["detail"]
-    assert bound["claims_hash"] == ledger.survivor_set.sha256
+    assert bound["claims_hash"] == ledger.remaining.sha256
     assert bound["ledger_hash"] == frozen["ledger_head"]
-    assert frozen["survivors_sha256"] == ledger.survivor_set.sha256
+    assert frozen["survivors_sha256"] == ledger.remaining.sha256
     survivors_row = next(r for r in ledger.rows if r["kind"] == "survivors")
     assert frozen["ledger_head"] == survivors_row["hash"]
-    assert result.custody_head == source.log.entries[-1]["hash"]
+    assert result.head == source.log.entries[-1]["hash"]
     assert result.ledger_head == ledger.head
     source.log.verify()
     ledger.verify()
@@ -192,9 +190,7 @@ def test_no_survivors_means_c_is_never_opened():
         alpha_confirm=ALPHA,
         seed=0,
     )
-    explore.run_exploration(
-        ledger, x, y, explore.hypothesize(x, explore.NUMERIC)
-    )
+    explore.explore(ledger, x, y, explore.hypothesize(x, explore.NUMERIC))
     source = source_with(*c_rows())
     result = confirm.confirm(
         ledger, source, alpha_confirm=ALPHA, require_control=False
@@ -320,7 +316,7 @@ def test_claims_file_round_trips_and_carries_the_hashes(tmp_path):
     record = json.loads(path.read_text(encoding="utf-8"))
     assert record["outcome"] == confirm.CONFIRMED
     assert record["alpha"] == "1/20"
-    assert record["digests"] == {"survivors": ledger.survivor_set.sha256}
+    assert record["digests"] == {"survivors": ledger.remaining.sha256}
     assert record["heads"]["ledger"] == ledger.head
     assert record["negative_control"]["exceeds"] is True
     assert record["guarantee"].startswith("FDR <=")
@@ -356,4 +352,4 @@ def test_confirmation_with_class_labels_uses_the_exploration_coding():
     assert float(flipped[labels == "yes"].iloc[0]) == 0.0
     with pytest.raises(ValueError, match="numeric"):
         explore.vectorize(pandas.Series(["a", "b"]), False)
-    assert confirm.default_encoding(labels).tolist() == codes.tolist()
+    assert confirm.encode(labels).tolist() == codes.tolist()

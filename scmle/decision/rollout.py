@@ -19,7 +19,7 @@ that component's null is true, and by Ville's inequality its e-process
 reaches `1 / level` with probability at most `level`, for every stopping rule
 including a look after every unit. No correction across components is
 needed. Across experiments the levels follow the discount-only rule of
-`DecisionBudget`, so the family-wise probability of a false promotion is at
+`budget.Decision`, so the family-wise probability of a false promotion is at
 most `alpha_promote` by the union bound.
 
 After a promotion the `Watchdog` tests `H0_rb: Delta_new_vs_old >=
@@ -184,7 +184,7 @@ def metric_values(
 class Rollout:
     """One experiment: a challenger against the champion.
 
-    The level is supplied by the caller, assigned from the `DecisionBudget`
+    The level is supplied by the caller, assigned from the `budget.Decision`
     before any traffic; nothing in this class draws on the budget.
 
     Attributes:

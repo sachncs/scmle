@@ -216,7 +216,7 @@ def fairness(
 
 
 def rollout_design(
-    charter: contracts.AnalysisCharter, base_rate: float
+    charter: contracts.Charter, base_rate: float
 ) -> tuple[dict[str, Any], rollout.Journal] | None:
     """The rollout plan's design record and its one-row decision log.
 
@@ -267,13 +267,13 @@ def rollout_design(
     log = rollout.Journal()
     log.append(
         "registered",
-        {"plan_hash": plan_hash, "charter_hash": charter.charter_hash},
+        {"plan_hash": plan_hash, "charter_hash": charter.digest},
     )
     return record, log
 
 
 def decision_report(
-    charter: contracts.AnalysisCharter,
+    charter: contracts.Charter,
     decision: Mapping[str, Any] | None,
     net_benefit: Mapping[str, Any] | None,
     value: Mapping[str, Any],
@@ -299,7 +299,7 @@ def decision_report(
     model = charter.costs
     return {
         "schema_version": REPORT_VERSION,
-        "cost_model_hash": None if model is None else model.model_hash,
+        "cost_model_hash": None if model is None else model.digest,
         "unit": None
         if charter.decision is None
         else charter.decision.model.unit,

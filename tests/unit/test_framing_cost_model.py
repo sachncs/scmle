@@ -43,10 +43,10 @@ def test_identity_over_random_cost_matrices():
         )
         y = (rng.random(40) < rng.uniform(0.05, 0.95)).astype(float)
         a = (rng.random(40) < 0.5).astype(float)
-        direct = costs.expected_cost(y, a, m)
+        direct = costs.price(y, a, m)
         prevalence = float(numpy.mean(y))
         never_acts = m.c_00 * (1.0 - prevalence) + m.c_01 * prevalence
-        via = never_acts - m.c_fn * costs.net_benefit(y, a, m.threshold)
+        via = never_acts - m.miss * costs.net_benefit(y, a, m.threshold)
         worst = max(worst, abs(direct - via))
     assert worst <= 1e-9
 
@@ -70,7 +70,7 @@ def test_decision_curve_rethresholds_and_matches_reference():
     y = (rng.random(200) < 0.3).astype(int)
     scores = rng.random(200)
     grid = [0.1, 0.2, 0.4]
-    curve = costs.decision_curve(y, scores, grid)
+    curve = costs.trace(y, scores, grid)
     for t, got in zip(grid, curve["model"], strict=True):
         rule = [int(s >= t) for s in scores]
         assert got == pytest.approx(reference_nb(list(y), rule, t), abs=1e-9)
@@ -107,7 +107,7 @@ def test_round_trip_and_unverified_entries():
         costs.Basis.TEMPLATE,
     )
     assert data.unreviewed == ("c_00",)
-    assert data.model_hash != m.model_hash
+    assert data.digest != m.digest
     with pytest.raises(ValueError):
         costs.Tariff.from_dict({**m.to_dict(), "extra": 1})
 
@@ -135,15 +135,13 @@ def test_charter_cost_model_round_trip_and_old_charters_keep_their_hash():
     )
     record["unit"] = "u"
     record["population"] = "d"
-    old = contracts.AnalysisCharter.from_dict(record)
+    old = contracts.Charter.from_dict(record)
     assert "costs" not in old.to_dict()
     assert old.costs is None
-    new = contracts.AnalysisCharter.from_dict(
-        {**record, "costs": model().to_dict()}
-    )
+    new = contracts.Charter.from_dict({**record, "costs": model().to_dict()})
     assert new.costs == model()
-    assert new.charter_hash != old.charter_hash
-    again = contracts.AnalysisCharter.from_dict(new.to_dict())
-    assert again.charter_hash == new.charter_hash
+    assert new.digest != old.digest
+    again = contracts.Charter.from_dict(new.to_dict())
+    assert again.digest == new.digest
     with pytest.raises(ValueError):
-        contracts.AnalysisCharter.from_dict({**record, "bogus": 1})
+        contracts.Charter.from_dict({**record, "bogus": 1})

@@ -51,7 +51,7 @@ BACKUP = ".bak"
 KINDS: Mapping[str, Any] = {
     "dataset_manifest.json": provenance.DatasetManifest,
     "decision_cost_model.json": costs.Tariff,
-    "error_budget.json": budget.ErrorBudget,
+    "error_budget.json": budget.Alpha,
     "feasibility.json": feasibility.Feasibility,
     "split_manifest.json": manifest.Manifest,
 }
@@ -86,8 +86,8 @@ def rewrite(name: str, stored: Any) -> Any:
     """
     if name == CHARTER:
         if "charter" not in stored:
-            return contracts.AnalysisCharter.from_dict(stored).to_dict()
-        inner = contracts.AnalysisCharter.from_dict(stored["charter"])
+            return contracts.Charter.from_dict(stored).to_dict()
+        inner = contracts.Charter.from_dict(stored["charter"])
         return {**stored, "charter": inner.to_dict()}
     if name == CLAIMS:
         header = records.load(
@@ -139,7 +139,7 @@ def verify(folder: pathlib.Path, key: str | None) -> list[str]:
         try:
             stored = read(path)
             if path.name == CHARTER:
-                sealing.read_verified(path, key)
+                sealing.read(path, key)
             if rewrite(path.name, rewrite(path.name, stored)) != rewrite(
                 path.name, stored
             ):

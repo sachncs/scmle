@@ -359,15 +359,11 @@ def label_certificate(
         The certificate and the measurements.
     """
     detected = sum(
-        baseline.selective_labels(
-            *label_world(planted=True, seed=offset + s)
-        ).flagged
+        baseline.screen(*label_world(planted=True, seed=offset + s)).flagged
         for s in range(LABEL_RUNS)
     )
     alarms = sum(
-        baseline.selective_labels(
-            *label_world(planted=False, seed=offset + s)
-        ).flagged
+        baseline.screen(*label_world(planted=False, seed=offset + s)).flagged
         for s in range(LABEL_RUNS)
     )
     result = qualification.Certificate(
@@ -382,9 +378,9 @@ def label_certificate(
     cert = certificates.certify(
         baseline.DETECTOR_ID,
         code_digest(),
-        certificates.corpus_hash(
+        certificates.checksum(
             [
-                certificates.hash_source(
+                certificates.digest(
                     json.dumps(
                         {
                             "rows": LABEL_ROWS,
@@ -418,9 +414,9 @@ def code_digest() -> str:
     """Hash of the selective-label detector, the certificate key.
 
     Returns:
-        The code hash of `baseline.selective_labels`.
+        The code hash of `baseline.screen`.
     """
-    return certificates.code_hash(baseline.selective_labels)
+    return certificates.fingerprint(baseline.screen)
 
 
 def feasibility_run(seed: int, ratio: float) -> tuple[str, str]:
@@ -648,7 +644,7 @@ def fuzz_rows(count: int = 1000) -> dict[str, Any]:
             case _:
                 record["quota"] = float(rng.choice([0, -3]))
         try:
-            contracts.AnalysisCharter.from_dict(record)
+            contracts.Charter.from_dict(record)
             accepted += 1
         except (ValueError, KeyError, TypeError):
             pass

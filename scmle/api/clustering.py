@@ -161,8 +161,8 @@ def read(data: str | pathlib.Path | Any) -> pandas.DataFrame:
         The table as a pandas frame.
     """
     if isinstance(data, (str, pathlib.Path)):
-        return tabular.read_table(data)
-    return interchange.to_pandas(data)
+        return tabular.read(data)
+    return interchange.frame(data)
 
 
 def check(frame: pandas.DataFrame, names: list[str]) -> None:

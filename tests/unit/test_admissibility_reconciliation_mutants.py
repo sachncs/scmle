@@ -125,7 +125,7 @@ def test_the_check_records_the_statistic_interval_and_seed():
     assert check.interval == (pytest.approx(0.06), pytest.approx(0.1))
     assert check.seeds == (3, "x", 4)
     assert check.decision is qualification.Decision.BLOCK
-    assert verdict.residual_gap == pytest.approx(0.06)
+    assert verdict.residual == pytest.approx(0.06)
 
 
 def test_the_interval_is_ordered_when_the_residual_exceeds_the_gap():
@@ -164,7 +164,7 @@ def test_amounts_are_summed_and_every_attester_is_required():
     two = make_item(explanations=(explanation(-60.0), explanation(-40.0, None)))
     verdict = reconciliation.settle(two)
     assert verdict.status is reconciliation.Status.EXPLAINED
-    assert verdict.residual_gap == 0.0
+    assert verdict.residual == 0.0
     assert verdict.tier is qualification.Tier.UNVERIFIED
     attested = make_item(
         explanations=(explanation(-60.0), explanation(-40.0, "a"))

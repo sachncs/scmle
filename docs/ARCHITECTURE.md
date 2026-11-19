@@ -185,7 +185,7 @@ decision boundary, not merely rename a function call.
 
 | To add | Subclass | Register |
 | --- | --- | --- |
-| a file format | `TableReader` | `Loader(readers=...)` |
+| a file format | `tabular.Reader` | `Loader(readers=...)` |
 | a column family | `Family` | `columns.KINDS` |
 | a feature operation | `Operation` | `feature_graph.OPS` |
 | a synthetic-data generator | `Synthesizer` | `GeneratorOverSampler.generator_class` |

@@ -31,7 +31,7 @@ def document_adapter() -> modality_lifecycle.DocumentPreparer:
     """Build a labelled document fixture with independent document IDs."""
     samples = tuple(
         document.Sample(
-            document_id=f"document-{index}",
+            identifier=f"document-{index}",
             content=("alpha signal " if index % 2 else "beta signal ")
             * (index + 2),
             label="alpha" if index % 2 else "beta",
@@ -45,7 +45,7 @@ def text_adapter() -> modality_lifecycle.Plaintext:
     """Build a labelled text fixture with an explicit text modality."""
     samples = tuple(
         document.Sample(
-            document_id=f"text-{index}",
+            identifier=f"text-{index}",
             content=("alpha signal " if index % 2 else "beta signal ")
             * (index + 2),
             label="alpha" if index % 2 else "beta",
@@ -93,7 +93,7 @@ def image_bytes(value: int) -> bytes:
 def image_adapter() -> modality_lifecycle.ImagePreparer:
     """Build a labelled image fixture with distinct pixel values."""
     samples = tuple(
-        image.Sample.from_bytes(
+        image.Sample.parse(
             image_bytes(20 + index * 15),
             source=f"image-{index}.png",
             label="alpha" if index % 2 else "beta",
@@ -119,7 +119,7 @@ def wav_bytes(amplitude: int) -> bytes:
 def audio_adapter() -> modality_lifecycle.AudioPreparer:
     """Build a labelled WAV fixture with varying signal statistics."""
     samples = tuple(
-        audio.Sample.from_bytes(
+        audio.Sample.decode(
             wav_bytes(500 + index * 300),
             source=f"audio-{index}.wav",
             label="alpha" if index % 2 else "beta",
@@ -133,7 +133,7 @@ def audio_adapter() -> modality_lifecycle.AudioPreparer:
 def video_adapter() -> modality_lifecycle.Footage:
     """Build a labelled probed-video fixture."""
     samples = tuple(
-        video.Sample.from_bytes(
+        video.Sample.decode(
             bytes([index + 1]) * 16,
             video.Metadata(
                 "fixture",
@@ -155,7 +155,7 @@ def video_adapter() -> modality_lifecycle.Footage:
 def decoded_video_adapter() -> modality_lifecycle.Footage:
     """Build a video baseline with an explicit bounded frame decoder."""
     samples = tuple(
-        video.Sample.from_bytes(
+        video.Sample.decode(
             bytes([index + 1]) * 16,
             video.Metadata(
                 "fixture",
@@ -186,7 +186,7 @@ def graph_adapter() -> modality_lifecycle.GraphPreparer:
     """Build an inductive labelled graph fixture."""
     nodes = tuple(
         graph.Node(
-            node_id=f"node-{index}",
+            identifier=f"node-{index}",
             features=(float(index), float(index % 3)),
             label="alpha" if index % 2 else "beta",
         )
@@ -198,7 +198,7 @@ def graph_adapter() -> modality_lifecycle.GraphPreparer:
     dataset = graph.Dataset(
         nodes=nodes,
         edges=edges,
-        feature_names=("position", "remainder"),
+        features=("position", "remainder"),
     )
     return modality_lifecycle.GraphPreparer(dataset)
 
@@ -207,7 +207,7 @@ def geospatial_adapter() -> modality_lifecycle.GeospatialPreparer:
     """Build spatially separated labelled point features."""
     features = tuple(
         geospatial.Placemark(
-            feature_id=f"feature-{index}",
+            identifier=f"feature-{index}",
             geometry={"type": "Point", "coordinates": [float(index), 0.0]},
             label="alpha" if index % 2 else "beta",
         )
@@ -231,8 +231,8 @@ def raster_adapter() -> modality_lifecycle.Imagery:
         samples.append(
             geospatial.Tile(
                 source=source,
-                encoded_bytes=payload,
-                file_hash=hashlib.sha256(payload).hexdigest(),
+                encoded=payload,
+                digest=hashlib.sha256(payload).hexdigest(),
                 width=32,
                 height=32,
                 bands=3,
@@ -250,7 +250,7 @@ def test_raster_curation_records_declared_and_unknown_nodata_state():
     baseline = raster_adapter()
     unknown_report = baseline.curate()
     measured_sample = dataclasses.replace(
-        baseline.samples[0], nodata_value=-9999, nodata_fraction=0.25
+        baseline.samples[0], sentinel=-9999, nodata=0.25
     )
     measured_adapter = modality_lifecycle.Imagery(
         (measured_sample,),
@@ -259,9 +259,7 @@ def test_raster_curation_records_declared_and_unknown_nodata_state():
     measured_report = measured_adapter.curate()
 
     assert unknown_report.profile["nodata"]["statuses"] == ["unknown"]
-    assert [
-        finding.identifier for finding in unknown_report.quality_findings
-    ] == [
+    assert [finding.identifier for finding in unknown_report.findings] == [
         "quality.raster-nodata-unknown",
     ]
     assert measured_report.profile["nodata"] == {
@@ -270,7 +268,7 @@ def test_raster_curation_records_declared_and_unknown_nodata_state():
         "fraction_min": 0.25,
         "fraction_max": 0.25,
     }
-    assert measured_report.quality_findings == ()
+    assert measured_report.findings == ()
 
 
 def test_raster_adapter_has_a_distinct_capability_identity():
@@ -1032,7 +1030,7 @@ def test_graph_lifecycle_emits_one_hop_context_evidence(tmp_path: Path):
     """The graph adapter exposes bounded topology context explicitly."""
     nodes = tuple(
         graph.Node(
-            node_id=f"node-{index}",
+            identifier=f"node-{index}",
             features=(float(index), float(index + 1)),
             label="alpha" if index % 2 else "beta",
         )
@@ -1050,7 +1048,7 @@ def test_graph_lifecycle_emits_one_hop_context_evidence(tmp_path: Path):
         graph.Dataset(
             nodes=nodes,
             edges=edges,
-            feature_names=("first", "second"),
+            features=("first", "second"),
         )
     )
     report = modality_lifecycle.Lifecycle().run(
@@ -1109,7 +1107,7 @@ def test_geospatial_lifecycle_emits_crs_bound_explanation(tmp_path: Path):
     """The geospatial adapter preserves CRS and geometry evidence."""
     features = tuple(
         geospatial.Placemark(
-            feature_id=f"feature-{index}",
+            identifier=f"feature-{index}",
             geometry={
                 "type": "Point",
                 "coordinates": [float(index), float(index % 3)],
@@ -1179,7 +1177,7 @@ def test_geospatial_curation_records_boundary_leakage_warning():
         "potential_leakage"
     )
     assert "quality.geospatial-boundary-leakage" in {
-        finding.identifier for finding in report.quality_findings
+        finding.identifier for finding in report.findings
     }
 
 
@@ -1308,7 +1306,7 @@ def test_video_adapter_uses_explicit_temporal_cutoff_for_lifecycle_split():
     """The lifecycle uses future clips only when a cutoff is declared."""
     metadata = video.Metadata("fixture", 2, 2, 1, 1.0, "codec")
     samples = tuple(
-        video.Sample.from_bytes(
+        video.Sample.decode(
             f"temporal-{index}".encode(),
             metadata,
             source=f"temporal-{index}.fixture",
@@ -1452,7 +1450,7 @@ def test_blocking_geospatial_curation_stops_before_packaging(tmp_path: Path):
     """
     features = tuple(
         geospatial.Placemark(
-            feature_id=f"feature-{index}",
+            identifier=f"feature-{index}",
             geometry={"type": "Point", "coordinates": [float(index), 0.0]},
             label="alpha" if index % 2 else "beta",
         )
@@ -1476,7 +1474,7 @@ def test_graph_without_declared_features_stops_before_modelling(tmp_path: Path):
     """A topology-only graph cannot silently inherit a feature policy."""
     nodes = tuple(
         graph.Node(
-            node_id=f"node-{index}",
+            identifier=f"node-{index}",
             label="alpha" if index % 2 else "beta",
         )
         for index in range(8)

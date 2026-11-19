@@ -141,7 +141,7 @@ class Cataloging(command.Command):
             source = args.source_uri or tabular_input
 
         try:
-            result = Catalog.from_data(
+            result = Catalog.observe(
                 catalog_input,
                 source=source,
                 label_column=args.label_column,
@@ -219,11 +219,11 @@ class IngestCommand(command.Command):
         settings = scmle.assurance.ingest.plan.Config(
             tables=tuple(t for t in args.tables.split(",") if t),
             unit=args.unit,
-            target_table=args.target_table,
-            eps_key=args.eps_key,
-            eps_null=args.eps_null,
-            eps_fk=args.eps_fk,
-            max_key_size=args.max_key_size,
+            target=args.target_table,
+            violation=args.eps_key,
+            null=args.eps_null,
+            orphans=args.eps_fk,
+            width=args.max_key_size,
             declared=declared,
         )
         plan = scmle.assurance.ingest.plan.Plan(
@@ -234,7 +234,7 @@ class IngestCommand(command.Command):
                 args.max_queries, args.max_rows_scanned, args.max_seconds
             ),
         )
-        summary = plan.run_all()
+        summary = plan.execute()
         print(json.dumps(summary, indent=2))
         if plan.verdict is not None and plan.verdict.blocks:
             raise errors.BlockedError(
@@ -321,11 +321,11 @@ class Charter(command.Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        loaded = sealing.read_verified(args.path)
+        loaded = sealing.read(args.path)
         charter = loaded.charter
         LOGGER.info(
             "charter %s %s",
-            loaded.charter_hash,
+            loaded.digest,
             "signature verified" if loaded.signed else "unsigned or unchecked",
         )
         if args.rows is not None:

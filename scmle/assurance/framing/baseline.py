@@ -20,7 +20,7 @@ smallest count at which the measured size met its bound
 issued.
 
 The comparison is valid only if outcomes are observed independently of the
-baseline's decision. `selective_labels` tests that. The hypothesis ledger is not
+baseline's decision. `screen` tests that. The hypothesis ledger is not
 used here: its hypotheses are single-feature bivariate statistics. Instead a
 `Evaluator` registers the cost model and the frozen rule by hash before
 `C` is read and refuses a second evaluation.
@@ -242,7 +242,7 @@ class Selectivity:
         )
 
 
-def selective_labels(observed: ArrayLike, b: ArrayLike) -> Selectivity:
+def screen(observed: ArrayLike, b: ArrayLike) -> Selectivity:
     """Flags an outcome that is observed depending on the baseline action.
 
     Args:
@@ -315,7 +315,7 @@ def gauge(
     mask = (
         ~numpy.isnan(outcomes) if observed is None else numpy.asarray(observed)
     )
-    selectivity = selective_labels(mask, b)
+    selectivity = screen(mask, b)
     grid = numpy.linspace(model.low, model.high, 5)
     profile: dict[str, Any] = {
         "selective_labels": selectivity.to_dict(),
@@ -362,7 +362,7 @@ class Registration:
     t_hi: float
 
     @property
-    def registration_hash(self) -> str:
+    def digest(self) -> str:
         """The SHA-256 hex digest of the registration."""
         return hashlib.sha256(
             signing.canonicalise(dataclasses.asdict(self))
@@ -392,7 +392,7 @@ def register(
     if not 0.0 < level < 1.0:
         raise errors.InputError("alpha must be strictly between 0 and 1")
     return Registration(
-        model.model_hash, fingerprint(rule), level, model.low, model.high
+        model.digest, fingerprint(rule), level, model.low, model.high
     )
 
 
@@ -538,7 +538,7 @@ class Evaluator:
             )
         if (
             fingerprint(rule) != self.registration.rule_hash
-            or model.model_hash != self.registration.cost_model_hash
+            or model.digest != self.registration.cost_model_hash
         ):
             raise BaselineError(
                 "the rule or the cost model differs from what was registered "
@@ -581,7 +581,7 @@ class Evaluator:
             if observed is None
             else numpy.asarray(observed).astype(bool)
         )
-        selectivity = selective_labels(mask, b)
+        selectivity = screen(mask, b)
         labels = numpy.asarray(clusters)
         reasons: list[str] = []
         if selectivity.flagged:
@@ -713,7 +713,7 @@ class Evaluator:
                 "outcomes observed independently of the baseline decision",
                 "the action rule was frozen on X before C was opened",
                 "cluster-robust standard error, asymptotic in the clusters",
-                f"cost model {model.model_hash[:12]} fixed before C",
+                f"cost model {model.digest[:12]} fixed before C",
             ),
         )
         return Outcome(
@@ -723,7 +723,7 @@ class Evaluator:
             endpoints=endpoints,
             p_value=p_value,
             selectivity=selectivity,
-            registration_hash=self.registration.registration_hash,
+            registration_hash=self.registration.digest,
             checks=checks,
             claim=claim,
         )

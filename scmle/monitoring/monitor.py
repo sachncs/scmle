@@ -453,8 +453,8 @@ class Watcher:
                     psi,
                     self.thresholds.status(psi),
                     float(values.isna().mean()),
-                    ref.missing_rate,
-                    ref.unseen_rate(values),
+                    ref.missing,
+                    ref.rate(values),
                     ref.psi(values),
                 )
             )

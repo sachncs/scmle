@@ -135,7 +135,7 @@ class Splitter(model_selection.BaseCrossValidator):  # type: ignore[misc]  # sci
             ).split(features)
 
 
-def for_plan(
+def tailor(
     plan: data.Blueprint,
     classification: bool,
     folds: int,

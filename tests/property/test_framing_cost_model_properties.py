@@ -30,10 +30,10 @@ def test_cost_is_constant_minus_scaled_net_benefit(seed, fp, fn, c00, c11):
     rng = numpy.random.default_rng(seed)
     y = (rng.random(30) < 0.4).astype(float)
     a = (rng.random(30) < 0.5).astype(float)
-    direct = costs.expected_cost(y, a, model)
+    direct = costs.price(y, a, model)
     prevalence = float(numpy.mean(y))
     never_acts = model.c_00 * (1.0 - prevalence) + model.c_01 * prevalence
-    via = never_acts - model.c_fn * costs.net_benefit(y, a, model.threshold)
+    via = never_acts - model.miss * costs.net_benefit(y, a, model.threshold)
     assert abs(direct - via) <= 1e-9
 
 

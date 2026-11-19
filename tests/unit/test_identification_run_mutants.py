@@ -25,7 +25,7 @@ from scmle.contracts import qualification
 from tests.unit.test_identification_run import did_frame
 from tests.unit.test_identification_run import observational
 
-BUDGET = budget.ErrorBudget.create(0.05, 0.1)
+BUDGET = budget.Alpha.create(0.05, 0.1)
 COVARIATES = "unconfoundedness_given:a,b"
 ASSUMPTIONS = (COVARIATES, "positivity", "no_interference")
 UNCHECKED = (
@@ -241,7 +241,7 @@ def test_the_confirmation_level_is_split_four_to_one_exactly():
     assert isinstance(falsify, float)
     assert primary == pytest.approx(0.04, abs=1e-12)
     assert falsify == pytest.approx(0.01, abs=1e-12)
-    wide = budget.ErrorBudget.create(0.1, 0.1)
+    wide = budget.Alpha.create(0.1, 0.1)
     assert run.alphas(wide) == pytest.approx((0.08, 0.02), abs=1e-12)
 
 

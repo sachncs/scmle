@@ -485,7 +485,7 @@ class ExtensionCurator(Curator):
             raise errors.InputError(
                 "curation report hash does not match extension"
             )
-        if report.sample_count != len(self.sample_values):
+        if report.samples != len(self.sample_values):
             raise errors.InputError(
                 "curation report count does not match extension"
             )
@@ -656,7 +656,7 @@ def drift(
     return {
         "reference_hash": reference.dataset_hash,
         "observed_hash": current.dataset_hash,
-        "sample_count_delta": current.sample_count - reference.sample_count,
+        "sample_count_delta": current.samples - reference.samples,
         "profile_delta": {
             key: current.profile.get(key) != reference.profile.get(key)
             for key in sorted(set(current.profile) | set(reference.profile))

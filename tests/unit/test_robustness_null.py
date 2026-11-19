@@ -88,17 +88,17 @@ def ks_uniform_p(pvalues):
 
 
 def test_mmd_p_values_are_uniform_on_exchangeable_splits():
-    pvalues = uniform_p(iid_split, shift.mmd_test)
+    pvalues = uniform_p(iid_split, shift.distinguish)
     assert ks_uniform_p(pvalues) > LEVEL
 
 
 def test_mmd_p_values_are_uniform_on_grouped_data_with_group_strata():
-    pvalues = uniform_p(grouped_split, shift.mmd_test)
+    pvalues = uniform_p(grouped_split, shift.distinguish)
     assert ks_uniform_p(pvalues) > LEVEL
 
 
 def test_mmd_p_values_are_uniform_on_temporal_data_with_block_strata():
-    pvalues = uniform_p(temporal_split, shift.mmd_test)
+    pvalues = uniform_p(temporal_split, shift.distinguish)
     assert ks_uniform_p(pvalues) > LEVEL
 
 
@@ -109,7 +109,7 @@ def test_ignoring_the_blocks_makes_grouped_p_values_wrong():
         # Sides are balanced within groups, so a global permutation breaks
         # that balance and the test is too conservative.
         pvalues.append(
-            shift.mmd_test(left, right, seed, permutations=99).p_value
+            shift.distinguish(left, right, seed, permutations=99).p_value
         )
     assert ks_uniform_p(pvalues) < LEVEL
 

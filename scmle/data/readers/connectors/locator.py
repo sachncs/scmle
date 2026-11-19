@@ -46,7 +46,7 @@ def canonicalize(source_uri: str | pathlib.Path) -> str:
     return pathlib.Path(value).expanduser().resolve(strict=False).as_uri()
 
 
-def source_identity(source_uri: str | pathlib.Path) -> str:
+def identify(source_uri: str | pathlib.Path) -> str:
     """Returns a stable identity for a logical source URI.
 
     Args:
@@ -128,37 +128,36 @@ class Bookmark:
             treated as unset when a cursor is also given.
         cursor: Opaque cursor encoding the source identity and offset, or
             None if not yet bound.
-        source_identity: Identity of the source the checkpoint belongs to,
+        identity: Identity of the source the checkpoint belongs to,
             or an empty string if not yet bound.
-        content_sha256: SHA-256 hex digest of the source content (or of the
+        digest: SHA-256 hex digest of the source content (or of the
             rows before the offset) the checkpoint was taken against, or
             None if unknown.
     """
 
     offset: int = 0
     cursor: str | None = None
-    source_identity: str = ""
-    content_sha256: str | None = None
+    identity: str = ""
+    digest: str | None = None
 
     def __post_init__(self) -> None:
         """Validates and normalizes cursor-derived checkpoint fields.
 
-        An empty `source_identity` or a zero `offset` is filled in from the
+        An empty `identity` or a zero `offset` is filled in from the
         cursor when one is given.
 
         Raises:
-            ValueError: If `offset` is negative, `content_sha256` is not a
+            ValueError: If `offset` is negative, `digest` is not a
                 64-character lower-case hex digest, the cursor is invalid,
                 or the cursor's identity or (non-zero) offset disagrees
                 with the checkpoint.
         """
         if self.offset < 0:
             raise errors.InputError("offset must be non-negative")
-        if self.content_sha256 is not None and (
-            len(self.content_sha256) != SHA256_HEX_LENGTH
+        if self.digest is not None and (
+            len(self.digest) != SHA256_HEX_LENGTH
             or any(
-                character not in "0123456789abcdef"
-                for character in self.content_sha256
+                character not in "0123456789abcdef" for character in self.digest
             )
         ):
             raise errors.InputError(
@@ -167,7 +166,7 @@ class Bookmark:
         if self.cursor is None:
             return
         cursor_identity, cursor_offset = unwrap(self.cursor)
-        if self.source_identity and self.source_identity != cursor_identity:
+        if self.identity and self.identity != cursor_identity:
             raise errors.InputError(
                 "cursor source identity does not match checkpoint"
             )
@@ -175,8 +174,8 @@ class Bookmark:
             raise errors.InputError(
                 "cursor offset does not match checkpoint offset"
             )
-        if not self.source_identity:
-            object.__setattr__(self, "source_identity", cursor_identity)
+        if not self.identity:
+            object.__setattr__(self, "identity", cursor_identity)
         if not self.offset:
             object.__setattr__(self, "offset", cursor_offset)
 
@@ -194,13 +193,13 @@ class Bookmark:
             ValueError: If the checkpoint is already bound to a different
                 source.
         """
-        if self.source_identity and self.source_identity != identity:
+        if self.identity and self.identity != identity:
             raise errors.InputError("checkpoint belongs to a different source")
         return Bookmark(
             offset=self.offset,
             cursor=self.cursor or bookmark(identity, self.offset),
-            source_identity=identity,
-            content_sha256=self.content_sha256,
+            identity=identity,
+            digest=self.digest,
         )
 
     def seal(self, content_sha256: str) -> "Bookmark":
@@ -210,21 +209,21 @@ class Bookmark:
             content_sha256: SHA-256 hex digest of the observed content.
 
         Returns:
-            A copy of the checkpoint carrying `content_sha256`.
+            A copy of the checkpoint carrying `digest`.
 
         Raises:
             ValueError: If the checkpoint already carries a different
                 digest.
         """
-        if self.content_sha256 and self.content_sha256 != content_sha256:
+        if self.digest and self.digest != content_sha256:
             raise errors.InputError(
                 "checkpoint content digest does not match source"
             )
         return Bookmark(
             offset=self.offset,
             cursor=self.cursor,
-            source_identity=self.source_identity,
-            content_sha256=content_sha256,
+            identity=self.identity,
+            digest=content_sha256,
         )
 
     def advance(self, rows: int) -> "Bookmark":
@@ -243,13 +242,13 @@ class Bookmark:
         """
         if rows < 0:
             raise errors.InputError("rows must be non-negative")
-        identity = self.source_identity
+        identity = self.identity
         if not identity:
             raise errors.InputError("checkpoint must be bound before advancing")
         next_offset = self.offset + rows
         return Bookmark(
             offset=next_offset,
             cursor=bookmark(identity, next_offset),
-            source_identity=identity,
-            content_sha256=self.content_sha256,
+            identity=identity,
+            digest=self.digest,
         )

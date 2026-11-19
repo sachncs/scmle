@@ -135,26 +135,26 @@ class Item:
         name: What is counted (for example "orders.row_count").
         extract: Value in the extract.
         source: Value in the independent record; must be non-zero.
-        source_name: The independent record (system, report, ticket).
+        origin: The independent record (system, report, ticket).
         explanations: Mechanisms offered for a gap.
     """
 
     name: str
     extract: float
     source: float
-    source_name: str
+    origin: str
     explanations: tuple[Explanation, ...] = ()
 
     def __post_init__(self) -> None:
         """Validates the record.
 
         Raises:
-            ValueError: If `name` or `source_name` is empty, `extract` or
+            ValueError: If `name` or `origin` is empty, `extract` or
                 `source` is not finite, `source` is zero, or
                 `explanations` is not a tuple.
         """
         evidence.require_text(self.name, "name")
-        evidence.require_text(self.source_name, "source_name")
+        evidence.require_text(self.origin, "source_name")
         qualification.finite(self.extract, "extract")
         if qualification.finite(self.source, "source") == 0.0:
             raise errors.InputError(
@@ -175,7 +175,7 @@ class Verdict:
     Attributes:
         item: The quantity.
         gap: Relative gap before explanations.
-        residual_gap: Relative gap left after the explanations, written as
+        residual: Relative gap left after the explanations, written as
             `residual`.
         status: `matched`, `explained` or `unexplained`.
         tier: `attested` when the source is named and, for an explained gap,
@@ -193,7 +193,7 @@ class Verdict:
 
     item: Item
     gap: float
-    residual_gap: float
+    residual: float
     status: Status
     tier: qualification.Tier
     check: qualification.Check
@@ -209,9 +209,9 @@ class Verdict:
             "name": self.item.name,
             "extract": self.item.extract,
             "source": self.item.source,
-            "source_name": self.item.source_name,
+            "source_name": self.item.origin,
             "gap": self.gap,
-            "residual": self.residual_gap,
+            "residual": self.residual,
             "status": self.status.value,
             "tier": self.tier.value,
             "explanations": [e.to_dict() for e in self.item.explanations],
@@ -268,7 +268,7 @@ def settle(
     check = qualification.Check(
         identifier=f"reconciliation.{item.name}",
         null=(
-            f"the extract equals {item.source_name} within {level:g}, or a "
+            f"the extract equals {item.origin} within {level:g}, or a "
             "named mechanism explains the gap"
         ),
         statistic=gap,

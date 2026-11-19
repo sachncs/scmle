@@ -41,19 +41,19 @@ def test_mde_inverts_the_mean_sample_size_to_1e_9(k_max, delta):
         delta, alpha=0.05, k_max=k_max, power=0.8
     )
     zsum = two_sided_z(0.05, k_max) + stats.norm.ppf(0.8)
-    assert scmle.assurance.charter.feasibility.mde_mean(
+    assert scmle.assurance.charter.feasibility.detect(
         n, alpha=0.05, k_max=k_max, power=0.8
     ) == pytest.approx(zsum / math.sqrt(n), abs=1e-12)
     # One more row never raises the MDE; the required n is the smallest n
     # whose MDE is at most delta.
     assert (
-        scmle.assurance.charter.feasibility.mde_mean(
+        scmle.assurance.charter.feasibility.detect(
             n, alpha=0.05, k_max=k_max, power=0.8
         )
         <= delta + 1e-12
     )
     assert (
-        scmle.assurance.charter.feasibility.mde_mean(
+        scmle.assurance.charter.feasibility.detect(
             n - 1, alpha=0.05, k_max=k_max, power=0.8
         )
         > delta

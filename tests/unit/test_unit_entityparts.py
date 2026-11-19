@@ -251,9 +251,7 @@ def test_stratified_estimate_labels_each_band():
         calls.append((a, b))
         return a >= 12
 
-    out = sampling.stratified_estimate(
-        weights, pairs, 12.0, labeler, "ann", 2, 0, bands=4
-    )
+    out = sampling.appraise(weights, pairs, 12.0, labeler, "ann", 2, 0, bands=4)
     assert [b.pairs for b in out.bands] == [8, 4, 2, 2]
     assert [b.sampled for b in out.bands] == [2, 2, 2, 2]
     assert [b.matches for b in out.bands] == [0, 0, 2, 2]

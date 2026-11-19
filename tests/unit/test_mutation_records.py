@@ -13,7 +13,7 @@ from scmle.assurance.admissibility.screen import records
 
 
 def config():
-    return leakage.Config(skill_ceiling=0.9, association_ceiling=0.5)
+    return leakage.Config(skill=0.9, ceiling=0.5)
 
 
 def test_keys_sort_numbers_by_value_not_by_text():

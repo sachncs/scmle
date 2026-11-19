@@ -18,7 +18,7 @@ def clip(source, rate=8, label=None, transcript=None):
         writer.setsampwidth(2)
         writer.setframerate(rate)
         writer.writeframes(numpy.zeros(4, dtype="<i2").tobytes())
-    return sample.Sample.from_bytes(
+    return sample.Sample.decode(
         payload.getvalue(), source=source, label=label, transcript=transcript
     )
 
@@ -28,7 +28,7 @@ def text():
         text="hi",
         source="s",
         provider="p",
-        provider_version="1",
+        version="1",
         language="en",
         segments=(),
         confidence=None,
@@ -76,7 +76,7 @@ def test_curate_reports_confidence_and_shape_drift_with_sources():
 
     report = data.curate()
 
-    confidence, shape = report.quality_findings
+    confidence, shape = report.findings
     assert (
         confidence.identifier == "quality.audio-transcript-confidence-missing"
     )

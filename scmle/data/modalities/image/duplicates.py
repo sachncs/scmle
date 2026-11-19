@@ -45,7 +45,7 @@ class Duplicates:
 
     samples: tuple[Sample, ...]
 
-    def near_duplicate_groups(
+    def group(
         self,
         max_samples: int = 1024,
         hash_size: int = 8,

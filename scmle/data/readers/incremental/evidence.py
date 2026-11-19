@@ -63,10 +63,10 @@ class Ack:
     """Result of an idempotent sink commit attempt.
 
     Attributes:
-        source_identity: Identity of the source.
-        accepted_event_ids: Sorted, unique identities of events written by
+        identity: Identity of the source.
+        accepted: Sorted, unique identities of events written by
             this attempt.
-        duplicate_event_ids: Sorted, unique identities of events skipped
+        duplicates: Sorted, unique identities of events skipped
             because they were already committed.
         checkpoint: The checkpoint after the attempt.
         migrations: The receipt's version steps, oldest first: version 2
@@ -85,9 +85,9 @@ class Ack:
         ),
     )
 
-    source_identity: str
-    accepted_event_ids: tuple[str, ...]
-    duplicate_event_ids: tuple[str, ...]
+    identity: str
+    accepted: tuple[str, ...]
+    duplicates: tuple[str, ...]
     checkpoint: timeline.Checkpoint
 
     def __post_init__(self) -> None:
@@ -98,17 +98,19 @@ class Ack:
                 belongs to another source, either identity collection is not
                 sorted and unique, or the two collections overlap.
         """
-        if not self.source_identity.strip():
+        if not self.identity.strip():
             raise errors.InputError("source_identity must not be empty")
-        if self.checkpoint.source != self.source_identity:
+        if self.checkpoint.source != self.identity:
             raise errors.InputError(
                 "receipt and checkpoint source identities differ"
             )
-        for name in ("accepted_event_ids", "duplicate_event_ids"):
-            values = getattr(self, name)
+        for name, values in (
+            ("accepted_event_ids", self.accepted),
+            ("duplicate_event_ids", self.duplicates),
+        ):
             if tuple(sorted(set(values))) != values:
                 raise errors.InputError(f"{name} must be sorted and unique")
-        if set(self.accepted_event_ids) & set(self.duplicate_event_ids):
+        if set(self.accepted) & set(self.duplicates):
             raise errors.InputError(
                 "accepted and duplicate event IDs must be disjoint"
             )
@@ -124,9 +126,9 @@ class Ack:
             records.KEY: records.ORIGIN + len(self.migrations),
             **self.migrations[-1].upgrade(
                 {
-                    "source_identity": self.source_identity,
-                    "accepted_event_ids": list(self.accepted_event_ids),
-                    "duplicate_event_ids": list(self.duplicate_event_ids),
+                    "source_identity": self.identity,
+                    "accepted_event_ids": list(self.accepted),
+                    "duplicate_event_ids": list(self.duplicates),
                     "checkpoint": self.checkpoint.to_dict(),
                 }
             ),
@@ -134,7 +136,7 @@ class Ack:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class EventAcknowledgement:
+class Acknowledgement:
     """Broker acknowledgement prepared after a durable sink commit.
 
     The transport adapter owns the actual acknowledgement call. This record
@@ -235,10 +237,10 @@ class Consumption:
     """Evidence from one durable consume-and-acknowledge cycle.
 
     Attributes:
-        source_identity: Identity of the source.
-        consumer_group: Consumer group that ran the cycle.
+        identity: Identity of the source.
+        group: Consumer group that ran the cycle.
         receipt: Receipt of the sink commit.
-        acknowledged_event_ids: Sorted, unique identities of the events
+        acknowledged: Sorted, unique identities of the events
             whose acknowledgement was delivered in this cycle.
         migrations: The evidence's version steps, oldest first: version 2
             changed only the nested receipt (versioned on its own), version
@@ -256,10 +258,10 @@ class Consumption:
         ),
     )
 
-    source_identity: str
-    consumer_group: str
+    identity: str
+    group: str
     receipt: Ack
-    acknowledged_event_ids: tuple[str, ...]
+    acknowledged: tuple[str, ...]
 
     def __post_init__(self) -> None:
         """Validates the result's source, group, and acknowledgement IDs.
@@ -269,15 +271,13 @@ class Consumption:
                 group is blank, or the acknowledged identities are not sorted
                 and unique.
         """
-        if self.receipt.source_identity != self.source_identity:
+        if self.receipt.identity != self.identity:
             raise errors.InputError(
                 "result and receipt source identities differ"
             )
-        if not self.consumer_group.strip():
+        if not self.group.strip():
             raise errors.InputError("consumer_group must not be empty")
-        if tuple(sorted(set(self.acknowledged_event_ids))) != (
-            self.acknowledged_event_ids
-        ):
+        if tuple(sorted(set(self.acknowledged))) != (self.acknowledged):
             raise errors.InputError(
                 "acknowledged_event_ids must be sorted and unique"
             )
@@ -293,10 +293,10 @@ class Consumption:
             records.KEY: records.ORIGIN + len(self.migrations),
             **self.migrations[-1].upgrade(
                 {
-                    "source_identity": self.source_identity,
-                    "consumer_group": self.consumer_group,
+                    "source_identity": self.identity,
+                    "consumer_group": self.group,
                     "receipt": self.receipt.to_dict(),
-                    "acknowledged_event_ids": list(self.acknowledged_event_ids),
+                    "acknowledged_event_ids": list(self.acknowledged),
                 }
             ),
         }

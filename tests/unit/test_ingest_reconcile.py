@@ -54,7 +54,7 @@ def test_zero_source_total_is_listed_not_passed():
     report = reconcile.crosscheck(
         extract.db.source(), extract.assembled, "orders", ["amount"]
     )
-    assert report.not_reconciled == ("orders.sum.amount",)
+    assert report.unreconciled == ("orders.sum.amount",)
     assert not report.passed
     assert report.to_dict()["unreconciled"] == ["orders.sum.amount"]
 

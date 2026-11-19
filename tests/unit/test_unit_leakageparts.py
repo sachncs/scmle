@@ -18,7 +18,7 @@ from scmle.contracts import qualification
 
 
 def config(**changes):
-    values = {"skill_ceiling": 0.9, "association_ceiling": 0.5}
+    values = {"skill": 0.9, "ceiling": 0.5}
     values.update(changes)
     return settings.Config(**values)
 
@@ -44,25 +44,28 @@ def test_the_constants_hold_their_registered_values():
 def test_a_default_config_has_the_documented_defaults():
     cfg = config()
     assert (cfg.alpha, cfg.permutations, cfg.folds) == (0.05, 199, 5)
-    assert (cfg.confidence, cfg.bootstrap, cfg.min_rows) == (0.95, 200, 100)
+    assert (cfg.confidence, cfg.bootstrap, cfg.minimum) == (0.95, 200, 100)
     assert (cfg.max_leaf_nodes, cfg.min_samples_leaf) == (8, 5)
-    assert (cfg.n_strata, cfg.run_seed) == (8, 0)
+    assert (cfg.strata, cfg.seed) == (8, 0)
 
 
 def test_the_certified_config_uses_the_certified_ceilings():
-    assert settings.CERTIFIED.skill_ceiling == 0.95
-    assert settings.CERTIFIED.association_ceiling == 0.9
+    assert settings.CERTIFIED.skill == 0.95
+    assert settings.CERTIFIED.ceiling == 0.9
 
 
 def test_a_ceiling_of_exactly_one_is_accepted():
-    assert config(skill_ceiling=1.0, association_ceiling=1.0).skill_ceiling == 1
+    assert config(skill=1.0, ceiling=1.0).skill == 1
 
 
-@pytest.mark.parametrize("name", ["skill_ceiling", "association_ceiling"])
+@pytest.mark.parametrize(
+    ("field", "name"),
+    [("skill", "skill_ceiling"), ("ceiling", "association_ceiling")],
+)
 @pytest.mark.parametrize("value", [0.0, 1.0000001, -0.1])
-def test_a_ceiling_outside_the_unit_interval_is_refused(name, value):
+def test_a_ceiling_outside_the_unit_interval_is_refused(field, name, value):
     with pytest.raises(errors.InputError, match=f"{name} must be within"):
-        config(**{name: value})
+        config(**{field: value})
 
 
 @pytest.mark.parametrize("name", ["alpha", "confidence"])
@@ -76,7 +79,7 @@ def test_a_level_at_either_end_is_refused(name, value):
 
 def test_a_boolean_ceiling_is_refused():
     with pytest.raises(errors.InputError, match="finite number"):
-        config(skill_ceiling=True)
+        config(skill=True)
 
 
 def test_permutations_below_the_budget_minimum_are_refused():
@@ -93,21 +96,21 @@ def test_permutations_that_cannot_reach_alpha_are_refused():
 
 
 @pytest.mark.parametrize(
-    ("name", "low"),
+    ("field", "name", "low"),
     [
-        ("folds", 1),
-        ("bootstrap", 1),
-        ("min_rows", 0),
-        ("max_leaf_nodes", 1),
-        ("min_samples_leaf", 0),
-        ("n_strata", 1),
-        ("run_seed", -1),
+        ("folds", "folds", 1),
+        ("bootstrap", "bootstrap", 1),
+        ("minimum", "min_rows", 0),
+        ("max_leaf_nodes", "max_leaf_nodes", 1),
+        ("min_samples_leaf", "min_samples_leaf", 0),
+        ("strata", "n_strata", 1),
+        ("seed", "run_seed", -1),
     ],
 )
-def test_a_count_below_its_minimum_is_refused(name, low):
+def test_a_count_below_its_minimum_is_refused(field, name, low):
     with pytest.raises(errors.InputError, match=name):
-        config(**{name: low})
-    assert getattr(config(**{name: low + 1}), name) == low + 1
+        config(**{field: low})
+    assert getattr(config(**{field: low + 1}), field) == low + 1
 
 
 # ---- fitting ----------------------------------------------------------------
@@ -161,21 +164,21 @@ def test_vectorize_refuses_an_unknown_task_missing_values_and_one_class():
 def test_permute_within_groups_moves_rows_only_inside_their_group():
     groups = numpy.array([0, 0, 0, 1, 1, 1, 2, 2])
     rng = numpy.random.default_rng(0)
-    order = fitting.permute_within(numpy.zeros(8), rng, groups, block_size=3)
+    order = fitting.permute(numpy.zeros(8), rng, groups, block_size=3)
     assert sorted(order.tolist()) == list(range(8))
     assert (groups[order] == groups).all()
 
 
 def test_permute_within_blocks_keeps_the_ragged_last_block():
     rng = numpy.random.default_rng(1)
-    order = fitting.permute_within(numpy.zeros(7), rng, None, block_size=3)
+    order = fitting.permute(numpy.zeros(7), rng, None, block_size=3)
     assert sorted(order[:3].tolist()) == [0, 1, 2]
     assert sorted(order[3:6].tolist()) == [3, 4, 5]
     assert order[6] == 6
 
 
 def test_permute_without_structure_is_a_global_permutation():
-    order = fitting.permute_within(
+    order = fitting.permute(
         numpy.zeros(50), numpy.random.default_rng(2), None, None
     )
     assert sorted(order.tolist()) == list(range(50))
@@ -263,7 +266,7 @@ def test_out_of_fold_fills_absent_classes_with_zero():
     x = numpy.arange(6.0).reshape(-1, 1)
     y = numpy.array([0, 0, 0, 1, 1, 2])
     splits = [(numpy.arange(3), numpy.arange(3, 6))]
-    out = fitting.out_of_fold(x, y, "classification", splits, config(), 0)
+    out = fitting.predict(x, y, "classification", splits, config(), 0)
     assert out.shape == (6, 3)
     assert out[3:].tolist() == [[1.0, 0.0, 0.0]] * 3
     assert out[:3].tolist() == [[0.0, 0.0, 0.0]] * 3
@@ -274,7 +277,7 @@ def test_out_of_fold_regression_predicts_from_other_folds():
     y = numpy.arange(20.0)
     splits = [(numpy.arange(10), numpy.arange(10, 20))]
     cfg = config(min_samples_leaf=10)
-    out = fitting.out_of_fold(x, y, "regression", splits, cfg, 0)
+    out = fitting.predict(x, y, "regression", splits, cfg, 0)
     assert out[10:].tolist() == [4.5] * 10
     assert out[:10].tolist() == [0.0] * 10
 
@@ -319,7 +322,7 @@ def test_rescore_resamples_whole_groups():
 
 def test_lower_bound_is_minus_infinity_when_no_draw_is_computable():
     y = numpy.ones(10)
-    bound = fitting.lower_bound(
+    bound = fitting.hedge(
         y,
         y,
         "regression",
@@ -333,7 +336,7 @@ def test_lower_bound_is_minus_infinity_when_no_draw_is_computable():
 def test_lower_bound_of_perfect_predictions_is_one():
     y = numpy.arange(30.0)
     groups = numpy.repeat(numpy.arange(10), 3)
-    bound = fitting.lower_bound(
+    bound = fitting.hedge(
         y,
         y,
         "regression",
@@ -403,7 +406,7 @@ def test_significance_counts_ties_as_exceeding():
 
 
 def test_sufficient_needs_rows_and_enough_of_each_class():
-    cfg = config(min_rows=10, folds=3)
+    cfg = config(minimum=10, folds=3)
     assert not fitting.sufficient(numpy.zeros(9), "regression", cfg)
     assert fitting.sufficient(numpy.zeros(10), "regression", cfg)
     assert fitting.sufficient(
@@ -418,7 +421,7 @@ def test_sufficient_needs_rows_and_enough_of_each_class():
 
 
 def test_strata_are_one_when_there_are_no_other_features():
-    labels = conditional.strata_labels(
+    labels = conditional.stratify(
         pandas.Series([1.0, 2.0, 3.0]),
         pandas.DataFrame(index=range(3)),
         config(),
@@ -430,7 +433,7 @@ def test_strata_are_one_when_there_are_no_other_features():
 def test_strata_follow_the_other_features_for_a_numeric_feature():
     others = pandas.DataFrame({"z": [0.0] * 10 + [1.0] * 10})
     feature = pandas.Series([0.0] * 10 + [5.0] * 9 + [numpy.nan])
-    labels = conditional.strata_labels(feature, others, config(n_strata=2))
+    labels = conditional.stratify(feature, others, config(strata=2))
     assert len(set(labels[:10])) == 1 and len(set(labels[10:])) == 1
     assert labels[0] != labels[10]
 
@@ -438,7 +441,7 @@ def test_strata_follow_the_other_features_for_a_numeric_feature():
 def test_strata_of_a_categorical_feature_come_from_a_classifier():
     others = pandas.DataFrame({"z": [0.0] * 10 + [1.0] * 10})
     feature = pandas.Series(["a"] * 10 + ["b"] * 10)
-    labels = conditional.strata_labels(feature, others, config(n_strata=4))
+    labels = conditional.stratify(feature, others, config(strata=4))
     assert len(set(labels.tolist())) == 2
 
 
@@ -499,7 +502,7 @@ def test_decide_picks_and_demotes_the_decision(suspect, low, gate, expected):
 
 
 def test_summarize_writes_the_skill_check():
-    cfg = config(run_seed=3)
+    cfg = config(seed=3)
     check = skill.summarize(
         "leakage.skill.f",
         cfg,
@@ -550,18 +553,18 @@ def test_summarize_caps_the_interval_below_at_the_bound():
 
 
 def test_cramers_v_is_zero_for_empty_or_single_line_tables():
-    assert missingness.cramers_v(numpy.zeros((2, 2))) == 0.0
-    assert missingness.cramers_v(numpy.array([[3, 4]])) == 0.0
-    assert missingness.cramers_v(numpy.array([[3], [4]])) == 0.0
+    assert missingness.associate(numpy.zeros((2, 2))) == 0.0
+    assert missingness.associate(numpy.array([[3, 4]])) == 0.0
+    assert missingness.associate(numpy.array([[3], [4]])) == 0.0
 
 
 def test_cramers_v_of_a_perfect_and_a_null_association():
-    assert missingness.cramers_v(
+    assert missingness.associate(
         numpy.array([[5, 0], [0, 5]])
     ) == pytest.approx(1.0)
-    assert missingness.cramers_v(numpy.array([[5, 5], [5, 5]])) == 0.0
+    assert missingness.associate(numpy.array([[5, 5], [5, 5]])) == 0.0
     # chi2 = 400/21 on 40 rows of a 2x2 table
-    v = missingness.cramers_v(numpy.array([[10, 10], [5, 15]]))
+    v = missingness.associate(numpy.array([[10, 10], [5, 15]]))
     assert v == pytest.approx(
         math.sqrt((40 * (150 - 50) ** 2 / (20 * 20 * 15 * 25)) / 40)
     )
@@ -580,7 +583,7 @@ def test_bucket_keeps_classes_and_bins_a_continuous_target():
 
 def test_missingness_refuses_mismatched_lengths():
     with pytest.raises(errors.InputError, match="same length"):
-        missingness.missingness_test(
+        missingness.test(
             pandas.Series([1.0]),
             pandas.Series([1, 2]),
             "classification",
@@ -593,16 +596,10 @@ def test_missingness_is_none_for_never_or_always_missing_or_one_class():
     full = pandas.Series([1.0, 2.0, 3.0, 4.0])
     empty = pandas.Series([numpy.nan] * 4)
     some = pandas.Series([numpy.nan, 1.0, 2.0, 3.0])
+    assert missingness.test(full, target, "classification", config()) is None
+    assert missingness.test(empty, target, "classification", config()) is None
     assert (
-        missingness.missingness_test(full, target, "classification", config())
-        is None
-    )
-    assert (
-        missingness.missingness_test(empty, target, "classification", config())
-        is None
-    )
-    assert (
-        missingness.missingness_test(
+        missingness.test(
             some, pandas.Series([1] * 4), "classification", config()
         )
         is None
@@ -612,42 +609,38 @@ def test_missingness_is_none_for_never_or_always_missing_or_one_class():
 def test_a_small_table_uses_fisher_and_reports_the_counts():
     feature = pandas.Series([numpy.nan, numpy.nan, 1.0, 2.0], name="f")
     target = pandas.Series([1, 1, 0, 0])
-    out = missingness.missingness_test(
-        feature, target, "classification", config()
-    )
+    out = missingness.test(feature, target, "classification", config())
     assert out.method == "fisher"
     assert out.p_value == pytest.approx(1 / 3)
-    assert out.n_missing == 2 and out.n == 4
+    assert out.missing == 2 and out.n == 4
     assert out.feature == "f"
     assert not out.suspect
     assert out.check.identifier == "leakage.missingness.f"
     assert out.check.decision is qualification.Decision.WARN
     assert out.check.seeds[2] == 0
     assert out.check.interval is None
-    assert out.check.statistic == out.cramers_v == out.check.effect
+    assert out.check.statistic == out.association == out.check.effect
 
 
 def test_a_large_association_is_a_gated_suspect_by_chi_square():
     n = 200
     target = pandas.Series([0, 1] * (n // 2))
     feature = pandas.Series(numpy.where(target == 1, numpy.nan, 1.0), name="g")
-    cfg = config(min_rows=n)
-    out = missingness.missingness_test(
+    cfg = config(minimum=n)
+    out = missingness.test(
         feature, target, "classification", cfg, certificates.Authority.GATING
     )
     assert out.method == "chi2"
-    assert out.cramers_v == pytest.approx(1.0)
+    assert out.association == pytest.approx(1.0)
     assert out.suspect
     assert out.check.decision is qualification.Decision.QUARANTINE
-    demoted = missingness.missingness_test(
-        feature, target, "classification", cfg
-    )
+    demoted = missingness.test(feature, target, "classification", cfg)
     assert demoted.check.decision is qualification.Decision.WARN
-    weak = missingness.missingness_test(
+    weak = missingness.test(
         feature,
         target,
         "classification",
-        config(min_rows=n + 1),
+        config(minimum=n + 1),
         certificates.Authority.GATING,
     )
     assert not weak.suspect
@@ -658,7 +651,7 @@ def test_an_association_below_the_ceiling_is_not_a_suspect():
     target = pandas.Series(rng.integers(0, 2, 400))
     feature = pandas.Series(rng.normal(size=400))
     feature[rng.random(400) < 0.3] = numpy.nan
-    out = missingness.missingness_test(
+    out = missingness.test(
         feature,
         target,
         "classification",

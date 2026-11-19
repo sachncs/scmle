@@ -197,18 +197,16 @@ def test_hash_source_ignores_comments_docstrings_and_blank_lines():
         "    # another\n"
         "    return x + 1   \n"
     )
-    assert hashing.hash_source(bare) == hashing.hash_source(noisy)
+    assert hashing.digest(bare) == hashing.digest(noisy)
     expected = hashlib.sha256(b"def f(x):\n    return x + 1").hexdigest()
-    assert hashing.hash_source(bare) == expected
-    assert hashing.hash_source(bare) != hashing.hash_source(
-        bare.replace("1", "2")
-    )
+    assert hashing.digest(bare) == expected
+    assert hashing.digest(bare) != hashing.digest(bare.replace("1", "2"))
 
 
 def test_hash_source_dedents_and_refuses_invalid_python():
-    assert hashing.hash_source("    x = 1\n") == hashing.hash_source("x = 1\n")
+    assert hashing.digest("    x = 1\n") == hashing.digest("x = 1\n")
     with pytest.raises(SyntaxError):
-        hashing.hash_source("def (:\n")
+        hashing.digest("def (:\n")
 
 
 def sample_one():
@@ -220,33 +218,33 @@ def sample_two():
 
 
 def test_code_hash_combines_sources_in_order():
-    first = hashing.code_hash(sample_one, sample_two)
-    second = hashing.code_hash(sample_two, sample_one)
+    first = hashing.fingerprint(sample_one, sample_two)
+    second = hashing.fingerprint(sample_two, sample_one)
     assert first != second
     parts = [
-        hashing.hash_source("def sample_one():\n    return 1\n"),
-        hashing.hash_source("def sample_two():\n    return 2\n"),
+        hashing.digest("def sample_one():\n    return 1\n"),
+        hashing.digest("def sample_two():\n    return 2\n"),
     ]
     assert first == hashlib.sha256("\n".join(parts).encode("ascii")).hexdigest()
     with pytest.raises(
         errors.InputError, match="code_hash needs at least one object"
     ):
-        hashing.code_hash()
+        hashing.fingerprint()
 
 
 def test_corpus_hash_ignores_order_and_checks_each_part():
     a, b = "a" * 64, "b" * 64
-    assert hashing.corpus_hash([a, b]) == hashing.corpus_hash([b, a])
+    assert hashing.checksum([a, b]) == hashing.checksum([b, a])
     expected = hashlib.sha256(f"{a}\n{b}".encode("ascii")).hexdigest()
-    assert hashing.corpus_hash([b, a]) == expected
+    assert hashing.checksum([b, a]) == expected
     with pytest.raises(
         errors.InputError, match="corpus_hash needs at least one part"
     ):
-        hashing.corpus_hash([])
+        hashing.checksum([])
     with pytest.raises(
         errors.InputError, match="corpus part must be a 64-character"
     ):
-        hashing.corpus_hash([a, "A" * 64])
+        hashing.checksum([a, "A" * 64])
 
 
 @pytest.mark.parametrize(
@@ -254,9 +252,9 @@ def test_corpus_hash_ignores_order_and_checks_each_part():
 )
 def test_require_digest_refuses_anything_but_a_lowercase_sha256(value):
     with pytest.raises(errors.InputError, match="name must be a 64-character"):
-        hashing.require_digest(value, "name")
+        hashing.require(value, "name")
 
 
 def test_require_digest_returns_a_valid_digest_unchanged():
     value = "0123456789abcdef" * 4
-    assert hashing.require_digest(value, "name") is value
+    assert hashing.require(value, "name") is value

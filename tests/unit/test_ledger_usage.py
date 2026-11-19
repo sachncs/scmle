@@ -62,7 +62,7 @@ def test_the_use_is_recorded_durably_with_its_run(tmp_path):
     assert len(records) == 1
     body = json.loads(records[0].read_text(encoding="utf-8"))
     assert body["run"] == "one"
-    assert body["charter_hash"] == make_charter().charter_hash
+    assert body["charter_hash"] == make_charter().digest
 
 
 def test_the_same_run_may_record_its_own_use_again(tmp_path):
@@ -98,7 +98,7 @@ def test_an_in_memory_run_records_nothing():
 def test_without_a_registry_nothing_is_recorded(tmp_path):
     features, target = build()
     cfeatures, ctarget = build(rows=400, seed=9)
-    governed.run_governed(
+    governed.govern(
         charter=make_charter(),
         features=features,
         target=target,

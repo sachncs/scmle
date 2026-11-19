@@ -52,10 +52,10 @@ def test_deterministic_draft_assembles_an_unsigned_charter():
     assert result.charter.estimand.moment == "as_of"
     assert result.charter.unit == "customer_id"
     assert result.charter.costs == MODEL
-    assert "deployment_population" in result.open_items
+    assert "deployment_population" in result.pending
     assert provenance.Filling.LLM not in result.fields.values()
     again = draft.frame(request(frame), frame, cost_model=MODEL)
-    assert again.charter.charter_hash == result.charter.charter_hash
+    assert again.charter.digest == result.charter.digest
 
 
 def test_missing_named_column_refuses_and_lists_it():
@@ -139,7 +139,7 @@ def test_artifacts_are_written(tmp_path):
         "framing_questions.json",
     } <= set(names)
     stored = json.loads((tmp_path / "framing_draft.json").read_text())
-    assert stored["charter_hash"] == result.charter.charter_hash
+    assert stored["charter_hash"] == result.charter.digest
     refused = draft.frame(request(frame, "Predict `nope`."), frame)
     assert "framing_refusal.json" in draft.emit(refused, tmp_path / "r")
 
@@ -193,7 +193,7 @@ def test_llm_path_fills_slots_as_llm_and_replay_is_hash_identical(monkeypatch):
     )
     assert first.status != draft.REFUSED
     assert first.fields["target"] is provenance.Filling.LLM
-    assert first.charter.charter_hash == second.charter.charter_hash
+    assert first.charter.digest == second.charter.digest
     assert first.sha == second.sha
     assert first.llm["samples_hash"] == second.llm["samples_hash"]
 

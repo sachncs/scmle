@@ -292,7 +292,7 @@ def assess(
     }
 
 
-def not_evaluated(reason: str) -> dict[str, Any]:
+def abstain(reason: str) -> dict[str, Any]:
     """The document of a claim that `C` could not test.
 
     Args:

@@ -82,7 +82,7 @@ def method_hashes() -> dict[str, str]:
         Gate name to the code hash of the functions listed for it in
         `METHOD_SOURCES`.
     """
-    return {k: certificates.code_hash(*v) for k, v in METHOD_SOURCES.items()}
+    return {k: certificates.fingerprint(*v) for k, v in METHOD_SOURCES.items()}
 
 
 def certificated(path: Path | None = None) -> set[str]:
@@ -157,7 +157,7 @@ def fingerprint(report: Any) -> str:
         The code hash of the report function, the Wald test and the
         multiplicity adjustment.
     """
-    return certificates.code_hash(report, battery.wald, multiplicity.adjust)
+    return certificates.fingerprint(report, battery.wald, multiplicity.adjust)
 
 
 def subgroup_gate(report: Any, path: Path | None = None) -> SubgroupGate:

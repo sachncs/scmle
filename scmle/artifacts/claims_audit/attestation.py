@@ -41,7 +41,7 @@ def assess(
     problems = []
     if given.assumption not in allowed.get(given.attestor, set()):
         problems.append(f"{given.assumption}: {given.attestor} not permitted")
-    if given.scope != charter.charter_hash:
+    if given.scope != charter.digest:
         problems.append(f"{given.assumption}: scope is not this charter")
     day = str(attest.Applied.KEYS.upgrade(report).get("evaluated", ""))
     try:

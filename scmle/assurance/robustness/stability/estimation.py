@@ -49,11 +49,11 @@ class Thresholds:
     """The survival rule, fixed before any result exists.
 
     Attributes:
-        s_min: Smallest share of specifications whose effect has the sign of
+        agreement: Smallest share of specifications whose effect has the sign of
             the median.
         band: Largest relative distance of the median effect from the
             headline effect.
-        q_min: Smallest share of specifications whose perturbation interval
+        exclusion: Smallest share of specifications whose perturbation interval
             excludes zero.
         migrations: The written layout's version steps, oldest first;
             version 2 writes `agreement` and `exclusion`, the
@@ -64,19 +64,22 @@ class Thresholds:
         records.Migration(renames={"s_min": "agreement", "q_min": "exclusion"}),
     )
 
-    s_min: float = 0.8
+    agreement: float = 0.8
     band: float = 0.5
-    q_min: float = 0.8
+    exclusion: float = 0.8
 
     def __post_init__(self) -> None:
         """Validates the thresholds.
 
         Raises:
-            ValueError: If `s_min` or `q_min` is outside (0, 1], or `band` is
-                not positive.
+            ValueError: If `agreement` or `exclusion` is outside (0, 1], or
+                `band` is not positive.
         """
-        for name in ("s_min", "q_min"):
-            share = qualification.finite(getattr(self, name), name)
+        for name, value in (
+            ("s_min", self.agreement),
+            ("q_min", self.exclusion),
+        ):
+            share = qualification.finite(value, name)
             if not 0.0 < share <= 1.0:
                 raise errors.InputError(f"{name} must be within (0, 1]")
         if qualification.finite(self.band, "band") <= 0.0:
@@ -391,20 +394,20 @@ def verdict(
         "interval_share": interval_share,
     }
     failures = []
-    if sign_share < rule.s_min:
+    if sign_share < rule.agreement:
         failures.append(
             f"the sign agrees in {sign_share:.0%} of "
-            f"specifications (need {rule.s_min:.0%})"
+            f"specifications (need {rule.agreement:.0%})"
         )
     if size_ratio > rule.band:
         failures.append(
             f"the median effect is {size_ratio:.0%} away from "
             f"the headline (limit {rule.band:.0%})"
         )
-    if interval_share < rule.q_min:
+    if interval_share < rule.exclusion:
         failures.append(
             f"the interval excludes zero in {interval_share:.0%} "
-            f"of specifications (need {rule.q_min:.0%})"
+            f"of specifications (need {rule.exclusion:.0%})"
         )
     if failures:
         return FRAGILE, "; ".join(failures), numbers

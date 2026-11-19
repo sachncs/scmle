@@ -52,9 +52,9 @@ class Duplicates:
         exact_extra: Rows that repeat an earlier row exactly.
         exact_rate: `exact_extra / rows`.
         exact_interval: Clopper-Pearson interval for the rate.
-        near_extra: Rows within the cut of an earlier, non-identical row.
+        near: Rows within the cut of an earlier, non-identical row.
         cut: Distance cut used (column standard deviations, RMS).
-        label_conflicts: Exact groups whose rows disagree on the target
+        conflicts: Exact groups whose rows disagree on the target
             (0 when no target was given).
         groups: Number of exact duplicate groups.
         similar: Rows whose text nearly copies an earlier row's (MinHash),
@@ -86,9 +86,9 @@ class Duplicates:
     exact_extra: int
     exact_rate: float
     exact_interval: tuple[float, float]
-    near_extra: int
+    near: int
     cut: float
-    label_conflicts: int
+    conflicts: int
     groups: int
     similar: int = 0
     similarity: float = DEFAULT_SIMILARITY
@@ -114,7 +114,7 @@ def verbatim(frame: pandas.DataFrame, columns: Sequence[str]) -> numpy.ndarray:
     Returns:
         A boolean per row, True for a row that repeats an earlier row.
     """
-    ids = scmle.data.splitting.duplicates.duplicate_groups(frame, list(columns))
+    ids = scmle.data.splitting.duplicates.group(frame, list(columns))
     flags = numpy.zeros(len(frame), dtype=bool)
     seen: set[int] = set()
     for position, group in enumerate(ids):
@@ -126,7 +126,7 @@ def verbatim(frame: pandas.DataFrame, columns: Sequence[str]) -> numpy.ndarray:
     return flags
 
 
-def near_flags(
+def approximate(
     frame: pandas.DataFrame, columns: Sequence[str], cut: float = DEFAULT_CUT
 ) -> numpy.ndarray:
     """True for rows within `cut` of an earlier row in the same block.
@@ -186,7 +186,7 @@ def resemble(
 
     The non-numeric columns of a row, joined, are its text; texts at or
     above `similarity` (exact Jaccard, after MinHash proposes the pair) are
-    compared on the numeric columns as in `near_flags`.
+    compared on the numeric columns as in `approximate`.
 
     Args:
         frame: Table.
@@ -196,7 +196,7 @@ def resemble(
 
     Returns:
         A boolean per row; rows whose texts are identical are left to
-        `near_flags` and `verbatim`.
+        `approximate` and `verbatim`.
 
     Raises:
         InputError: If `cut` is not positive and finite, or `similarity`
@@ -260,7 +260,7 @@ def standardize(
     return numpy.asarray(block / spread.to_numpy(dtype=float))
 
 
-def duplicate_flags(
+def flag(
     frame: pandas.DataFrame,
     cut: float = DEFAULT_CUT,
     similarity: float = DEFAULT_SIMILARITY,
@@ -283,7 +283,7 @@ def duplicate_flags(
     columns = list(frame.columns)
     flags = (
         verbatim(frame, columns)
-        | near_flags(frame, columns, cut)
+        | approximate(frame, columns, cut)
         | resemble(frame, columns, cut, similarity)
     )
     return pandas.Series(flags, index=frame.index)
@@ -328,9 +328,9 @@ def assess(
     """
     names = list(frame.columns) if columns is None else list(columns)
     exact = verbatim(frame, names)
-    near = near_flags(frame, names, cut) & ~exact
+    near = approximate(frame, names, cut) & ~exact
     similar = resemble(frame, names, cut, similarity) & ~exact & ~near
-    ids = scmle.data.splitting.duplicates.duplicate_groups(frame, names)
+    ids = scmle.data.splitting.duplicates.group(frame, names)
     members = ids[ids != scmle.data.splitting.duplicates.NOT_DUPLICATED]
     conflicts = 0
     if target is not None:
@@ -344,9 +344,9 @@ def assess(
         exact_extra=extra,
         exact_rate=extra / len(frame),
         exact_interval=clopper_pearson(extra, len(frame)),
-        near_extra=int(near.sum()),
+        near=int(near.sum()),
         cut=cut,
-        label_conflicts=conflicts,
+        conflicts=conflicts,
         groups=len(numpy.unique(members)),
         similar=int(similar.sum()),
         similarity=similarity,

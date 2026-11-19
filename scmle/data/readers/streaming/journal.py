@@ -27,13 +27,13 @@ def adjoin(
         StreamingError: With code "checkpoint_mismatch" if the batch starts
             elsewhere.
     """
-    if batch.start_offset != current.checkpoint.offset:
+    if batch.offset != current.checkpoint.offset:
         raise failure.StreamingError(
             "checkpoint_mismatch",
             "batch does not start at the durable checkpoint",
-            source.source_identity(),
+            source.identify(),
             {
-                "batch_start_offset": batch.start_offset,
+                "batch_start_offset": batch.offset,
                 "checkpoint_offset": current.checkpoint.offset,
             },
         )
@@ -63,7 +63,7 @@ def replay(
             it is recorded as committed without transaction evidence.
     """
     evidence = next(
-        (item for item in current.commitments if item.batch == batch.batch_id),
+        (item for item in current.commitments if item.batch == batch.key),
         None,
     )
     if evidence is not None:
@@ -71,23 +71,23 @@ def replay(
             raise failure.StreamingError(
                 "acknowledgement_mismatch",
                 "batch is already bound to another acknowledgement",
-                source.source_identity(),
+                source.identify(),
                 {},
             )
         return transaction.Receipt(
-            batch.source_identity,
-            batch.batch_id,
+            batch.identity,
+            batch.key,
             accepted=False,
             duplicate=True,
             checkpoint=evidence.acknowledgement.checkpoint,
-            sink_receipt=evidence.receipt,
+            receipt=evidence.receipt,
             acknowledgement=evidence.acknowledgement,
         )
-    if batch.batch_id in current.committed:
+    if batch.key in current.committed:
         raise failure.StreamingError(
             "transaction_evidence_missing",
             "batch was committed without transactional evidence",
-            source.source_identity(),
+            source.identify(),
             {},
         )
     return None
@@ -116,8 +116,8 @@ def settle(
             sorted((*recorded, evidence), key=lambda item: item.batch)
         )
     return transaction.Settlement(
-        batch.next_checkpoint,
-        tuple(sorted((*current.committed, batch.batch_id))),
+        batch.checkpoint,
+        tuple(sorted((*current.committed, batch.key))),
         recorded,
     )
 
@@ -137,7 +137,7 @@ class Journal(archive.Archive):
         source: The chunked source being consumed.
     """
 
-    def commit_transaction(
+    def commit(
         self,
         batch: progress.Batch,
         sink: transaction.Sink,
@@ -145,7 +145,7 @@ class Journal(archive.Archive):
     ) -> transaction.Receipt:
         """Commits a batch and atomically persists its receipt evidence.
 
-        The sink is caller-owned and must deduplicate ``batch.batch_id`` when
+        The sink is caller-owned and must deduplicate ``batch.key`` when
         a process fails after the sink commit but before this local JSON state
         is replaced. A matching retry is handled without calling the sink a
         second time. This local transaction binds evidence atomically within
@@ -221,24 +221,24 @@ class Journal(archive.Archive):
             raise failure.StreamingError(
                 "invalid_sink_receipt",
                 "transactional sink returned an invalid receipt",
-                self.source.source_identity(),
+                self.source.identify(),
                 {"type": type(sink_receipt).__name__},
             )
         self.attest(batch, sink_receipt)
         evidence = transaction.Commitment(
-            batch.source_identity,
-            batch.batch_id,
+            batch.identity,
+            batch.key,
             sink_receipt,
             acknowledgement,
         )
-        self.write_atomically(settle(current, batch, evidence))
+        self.write(settle(current, batch, evidence))
         return transaction.Receipt(
-            batch.source_identity,
-            batch.batch_id,
+            batch.identity,
+            batch.key,
             accepted=True,
             duplicate=False,
-            checkpoint=batch.next_checkpoint,
-            sink_receipt=sink_receipt,
+            checkpoint=batch.checkpoint,
+            receipt=sink_receipt,
             acknowledgement=acknowledgement,
         )
 
@@ -281,40 +281,40 @@ class Journal(archive.Archive):
             raise errors.KindError("writer must be callable")
         self.validate(batch)
         if acknowledgement is not None and (
-            acknowledgement.source != batch.source_identity
-            or acknowledgement.batch != batch.batch_id
+            acknowledgement.source != batch.identity
+            or acknowledgement.batch != batch.key
         ):
             raise failure.StreamingError(
                 "acknowledgement_batch_mismatch",
                 "acknowledgement does not match the batch",
-                self.source.source_identity(),
+                self.source.identify(),
                 {},
             )
         with self.lock():
             current = self.load()
-            if batch.batch_id in current.committed:
+            if batch.key in current.committed:
                 if acknowledgement is not None:
                     self.earmark(acknowledgement)
                 return transaction.Receipt(
-                    batch.source_identity,
-                    batch.batch_id,
+                    batch.identity,
+                    batch.key,
                     accepted=False,
                     duplicate=True,
                     checkpoint=current.checkpoint,
                 )
             adjoin(current, batch, self.source)
-            writer(batch.frame, batch.batch_id)
-            self.write_atomically(settle(current, batch))
+            writer(batch.frame, batch.key)
+            self.write(settle(current, batch))
             if acknowledgement is not None:
                 self.earmark(
                     dataclasses.replace(
-                        acknowledgement, checkpoint=batch.next_checkpoint
+                        acknowledgement, checkpoint=batch.checkpoint
                     )
                 )
             return transaction.Receipt(
-                batch.source_identity,
-                batch.batch_id,
+                batch.identity,
+                batch.key,
                 accepted=True,
                 duplicate=False,
-                checkpoint=batch.next_checkpoint,
+                checkpoint=batch.checkpoint,
             )

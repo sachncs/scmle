@@ -359,7 +359,7 @@ class Dag:
         banned = {treatment, outcome} | self.descendants(treatment)
         return [n for n in self.observed if n not in banned]
 
-    def adjustment_set(
+    def deconfound(
         self, treatment: str, outcome: str
     ) -> tuple[str, ...] | None:
         """Finds the smallest valid back-door set of observed nodes, if any.
@@ -428,7 +428,7 @@ class Dag:
         return {**self.to_dict(), "hash": self.digest()}
 
     @classmethod
-    def from_artifact(cls, document: Mapping[str, Any]) -> Self:
+    def restore(cls, document: Mapping[str, Any]) -> Self:
         """Rebuilds a graph and verifies its stored hash and status.
 
         Args:

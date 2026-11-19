@@ -16,7 +16,7 @@ from scmle.causal.identification.run import exogeneity
 from scmle.causal.identification.run import panel
 from tests.unit.test_identification_run import observational
 
-BUDGET = budget.ErrorBudget.create(0.05, 0.1)
+BUDGET = budget.Alpha.create(0.05, 0.1)
 ASSUMPTIONS = ("unconfoundedness_given:a,b", "positivity", "no_interference")
 
 
@@ -109,9 +109,9 @@ def test_the_alphas_split_four_to_one():
     primary, falsify = analysis.alphas(BUDGET)
     assert primary == pytest.approx(0.04, abs=1e-12)
     assert falsify == pytest.approx(0.01, abs=1e-12)
-    assert analysis.alphas(
-        budget.ErrorBudget.create(0.1, 0.1)
-    ) == pytest.approx((0.08, 0.02), abs=1e-12)
+    assert analysis.alphas(budget.Alpha.create(0.1, 0.1)) == pytest.approx(
+        (0.08, 0.02), abs=1e-12
+    )
 
 
 def test_a_single_unit_fragility_is_the_placebo_note():

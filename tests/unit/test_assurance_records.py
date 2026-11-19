@@ -68,11 +68,11 @@ def bare(layout):
 
 
 def test_a_flag_gate_writes_rows():
-    gate = coverage_slices.FlagGate("gating", "certified", 100)
+    gate = coverage_slices.Gate("gating", "certified", 100)
     new = {"status": "gating", "reason": "certified", "rows": 100}
     assert gate.to_dict() == new
     moves(
-        coverage_slices.FlagGate,
+        coverage_slices.Gate,
         {"status": "gating", "reason": "certified", "min_rows": 100},
         new,
     )
@@ -142,14 +142,14 @@ def test_reconciliation_results_write_residual_at_format_three():
     item = reconciliation.Item("rows", 900.0, 1000.0, "ledger")
     verdict = reconciliation.settle(item, 0.2)
     written = verdict.to_dict()
-    assert written["residual"] == verdict.residual_gap
+    assert written["residual"] == verdict.residual
     assert "residual_gap" not in written
     assert (
         1 + len(reconciliation.Verdict.migrations)
         == reconciliation.FORMAT_VERSION
     )
     old = records.downgrade(reconciliation.Verdict.migrations, written, 2)
-    assert old["residual_gap"] == verdict.residual_gap
+    assert old["residual_gap"] == verdict.residual
     report = reconcile.Report(reconciliation.reconcile([item], 0.2), ("x",))
     document = report.to_dict()
     assert document["unreconciled"] == ["x"]
@@ -202,7 +202,7 @@ def test_the_baseline_report_nests_its_registration_digest():
     outcome = run(evaluator, y, a, b, cluster)
     document = outcome.to_dict()
     assert document[records.KEY] == 1 + len(baseline.Outcome.migrations) == 2
-    digest = evaluator.registration.registration_hash
+    digest = evaluator.registration.digest
     assert document["digests"] == {"registration": digest}
     assert set(document["selective_labels"]["missing"]) == {
         "control",
@@ -218,13 +218,11 @@ def test_the_baseline_report_nests_its_registration_digest():
 
 
 def test_a_refused_baseline_report_is_written_at_version_two():
-    found = baseline.selective_labels([True] * 20 + [False] * 20, [0, 1] * 20)
+    found = baseline.screen([True] * 20 + [False] * 20, [0, 1] * 20)
     registration = guard().registration
     document = claim.refused(registration, found.to_dict())
     assert document[records.KEY] == 2
-    assert document["digests"] == {
-        "registration": registration.registration_hash
-    }
+    assert document["digests"] == {"registration": registration.digest}
     assert "registration_hash" not in document
 
 
@@ -233,11 +231,11 @@ def test_the_framing_draft_hash_is_anchored_at_version_one():
     result = draft.frame(request(frame), frame, cost_model=MODEL)
     document = result.to_dict()
     assert document[records.KEY] == 2
-    assert document["pending"] == list(result.open_items)
+    assert document["pending"] == list(result.pending)
     assert "open_items" not in document
     anchor = result.anchor()
     assert anchor[records.KEY] == 1
-    assert anchor["open_items"] == list(result.open_items)
+    assert anchor["open_items"] == list(result.pending)
     assert "pending" not in anchor
     # The hash a version-1 writer produced: its own document, with the
     # charter in the charter's version-1 layout.
@@ -315,12 +313,12 @@ def test_entity_resolution_nests_its_thresholds():
     result = resolution.isolate(3, 2, 1.0, 4)
     written = result.to_dict()
     assert written["thresholds"] == {
-        "group": result.t_group,
+        "group": result.group,
         "linkage": result.t_match,
     }
     assert (written["reduction"], written["skipped"]) == (1.0, 4)
     old = records.downgrade(resolution.Resolution.migrations, written)
-    assert (old["t_group"], old["t_match"]) == (result.t_group, result.t_match)
+    assert (old["t_group"], old["t_match"]) == (result.group, result.t_match)
     assert (old["reduction_ratio"], old["skipped_blocks"]) == (1.0, 4)
     assert records.upgrade(resolution.Resolution.migrations, old, 1) == written
 
@@ -349,7 +347,7 @@ def test_a_grain_scan_writes_tolerances_and_its_keys_at_version_two():
         0.05,
     )
     assert records.upgrade(grain.Scan.migrations, old, 1) == written
-    unit = grain.UnitVerdict("unknown", "u", ("a",), "why")
+    unit = grain.Verdict("unknown", "u", ("a",), "why")
     assert unit.to_dict()["columns"] == ["a"]
     assert "unit_columns" not in unit.to_dict()
 
@@ -439,12 +437,12 @@ def confirmation(**changes):
         "claims": (),
         "checks": (),
         "rule": "bh",
-        "alpha_confirm": Fraction(1, 20),
+        "confirm": Fraction(1, 20),
         "survivors_sha256": "s",
         "ledger_head": "l",
-        "custody_head": "c",
+        "head": "c",
         "control": None,
-        "stage_two": {"family": []},
+        "second": {"family": []},
     }
     return confirm.Confirmation(**{**fields, **changes})
 
@@ -465,7 +463,7 @@ def test_the_claims_file_groups_digests_and_heads_at_version_two():
     assert records.load(
         "Confirmation", confirm.Confirmation.migrations, old
     ) == (written)
-    plain = confirmation(stage_two=None, custody_head=None).to_dict()
+    plain = confirmation(second=None, head=None).to_dict()
     assert "second" not in plain and plain["heads"]["custody"] is None
 
 

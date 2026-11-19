@@ -3,7 +3,7 @@
 `scmle.decision.rollout` decides from an e-process; it knows nothing of
 registries. This hook is the one place that joins the two:
 
-* an experiment is started with the level the `DecisionBudget` assigns, spent
+* an experiment is started with the level the `budget.Decision` assigns, spent
   whether or not the experiment promotes (the budget after the assignment is
   written to the deployment ledger);
 * units are assigned by the salted hash of the rollout plan and every
@@ -56,7 +56,7 @@ class Sentinel:
     manager: lifecycle.Maintainer
     plan: scmle.assurance.charter.decision.Experiment
     ledger: deployment_ledger.DeploymentLedger
-    budget: scmle.assurance.ledger.budget.DecisionBudget
+    budget: scmle.assurance.ledger.budget.Decision
     log: rollout.Journal
     experiment_id: str | None
     decision: rollout.Decision | None
@@ -92,7 +92,7 @@ class Sentinel:
             )
         record = self.manager.elevate(approval, signing_key)
         self.champion_id = f"{self.manager.model}:v{record.version}"
-        budget, level = scmle.assurance.ledger.budget.start_rollback_monitor(
+        budget, level = scmle.assurance.ledger.budget.watch(
             self.budget, self.champion_id
         )
         self.budget = budget
@@ -193,7 +193,7 @@ class Hook(Sentinel):
         plan: scmle.assurance.charter.decision.Experiment,
         ledger: deployment_ledger.DeploymentLedger,
         *,
-        budget: scmle.assurance.ledger.budget.DecisionBudget | None = None,
+        budget: scmle.assurance.ledger.budget.Decision | None = None,
         log: rollout.Journal | None = None,
     ) -> None:
         """Binds the hook to a manager, a plan and a deployment ledger.

@@ -111,7 +111,7 @@ def provenance_for(
     for name in OUTLIER_COLUMNS:
         low, high = float(frame[name].min()), float(frame[name].max())
         pad = OUTLIER_PAD * (high - low)
-        out[name] = outliers.Pedigree(instrument_range=(low - pad, high + pad))
+        out[name] = outliers.Pedigree(instrument=(low - pad, high + pad))
     return out
 
 
@@ -223,7 +223,7 @@ def row_detectors(
     provenance = provenance_for(frame)
     return {
         "f5-sentinel": sentinels.placeholders,
-        "f5-duplicates": duplicates.duplicate_flags,
+        "f5-duplicates": duplicates.flag,
         "f5-label-noise": label_detector,
         "f5-outlier-triage": lambda f: outliers.misrecorded(f, provenance),
     }
@@ -263,9 +263,7 @@ def certify_missingness(
                 mechanism=mechanism,
                 driver=driver if mechanism == "mar" else None,
             )
-            count += int(
-                missingness.investigate(planted.frame, seed).mcar_rejected
-            )
+            count += int(missingness.investigate(planted.frame, seed).rejected)
         rejected[mechanism] = count
     results = [
         qualification.Certificate(
@@ -281,8 +279,8 @@ def certify_missingness(
     ]
     return certificates.certify(
         "f5-missingness",
-        registry.SPECS["f5-missingness"].code_hash(),
-        certificates.corpus_hash([certify.frame_digest(base)]),
+        registry.SPECS["f5-missingness"].digest(),
+        certificates.checksum([certify.frame_digest(base)]),
         seeds,
         results,
         policy,
@@ -311,7 +309,7 @@ def select_cut(
     best = CUT_GRID[0]
     columns = list(frame.columns)
     for cut in CUT_GRID:
-        flagged = int(duplicates.near_flags(frame, columns, cut).sum())
+        flagged = int(duplicates.approximate(frame, columns, cut).sum())
         upper = certificates.interval(
             flagged, len(frame), policy.confidence, policy.method
         )[1]
@@ -349,7 +347,7 @@ def certify_all(
             certify.certify_detector(
                 detector_id,
                 detector,
-                spec.code_hash(),
+                spec.digest(),
                 data,
                 plans[detector_id],
                 seeds,
@@ -373,7 +371,7 @@ def problems(store: certificates.Store) -> list[str]:
     """
     found = []
     for detector_id, spec in registry.SPECS.items():
-        state = store.state(detector_id, spec.code_hash())
+        state = store.state(detector_id, spec.digest())
         if state is not certificates.Freshness.CURRENT:
             found.append(f"{detector_id}: certificate is {state.value}")
     return found
@@ -392,11 +390,11 @@ def gating(
     """
     registered: list[tuple[str, str, str]] = []
     for detector_id, spec in registry.SPECS.items():
-        digest = spec.code_hash()
+        digest = spec.digest()
         registered.extend(
             (detector_id, digest, defect)
             for item in store.current(detector_id, digest)
-            for defect in item.certified_defect_types
+            for defect in item.certified
         )
     return registered
 

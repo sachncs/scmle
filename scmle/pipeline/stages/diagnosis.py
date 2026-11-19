@@ -139,13 +139,13 @@ class Diagnosis(calibration.Calibration):
         fit_positions, evaluate_positions = split.manifest.folds[0]
         curve = learning_curve.compute(
             template,
-            split.dev_features,
-            split.dev_target,
+            split.features,
+            split.target,
             fit_positions,
             evaluate_positions,
             metric.scorer(
                 scmle.evaluation.metrics.positive_label(
-                    split.dev_target,
+                    split.target,
                     partition.task,
                 )
             ),
@@ -185,8 +185,8 @@ class Diagnosis(calibration.Calibration):
         build = recipe(board, selected)
         found = bias_variance.decompose(
             lambda: build(selected.params),
-            split.dev_features,
-            split.dev_target,
+            split.features,
+            split.target,
             task.is_classification,
             replicates,
             board.services.spec.validation.seed,
@@ -230,17 +230,17 @@ class Diagnosis(calibration.Calibration):
         if cost.halt(board, selected, "sensitivity analysis"):
             return {"skipped": "time budget spent"}
         split = partition.split
-        if len(split.dev_target) < sensitivity.MIN_ROWS:
+        if len(split.target) < sensitivity.MIN_ROWS:
             return {"skipped": "too few rows"}
         build = recipe(board, selected)
         metric = partition.metric
         scorer = metric.scorer(
-            scmle.evaluation.metrics.positive_label(split.dev_target, task)
+            scmle.evaluation.metrics.positive_label(split.target, task)
         )
         report = sensitivity.analyze(
             lambda: build(selected.params),
-            split.dev_features,
-            split.dev_target,
+            split.features,
+            split.target,
             scorer,
             repeats,
             board.services.spec.validation.seed,
@@ -280,14 +280,12 @@ class Diagnosis(calibration.Calibration):
         adapter = board.services.registry.get(selected.model_name)
         build = recipe(board, selected)
         metric = partition.metric
-        positive = scmle.evaluation.metrics.positive_label(
-            split.dev_target, task
-        )
+        positive = scmle.evaluation.metrics.positive_label(split.target, task)
         result = nested.nest(
             build,
             adapter.search_space,
-            split.dev_features,
-            split.dev_target,
+            split.features,
+            split.target,
             [(f[0], f[1]) for f in split.manifest.folds],
             metric.scorer(positive),
             task.is_classification,
@@ -338,12 +336,12 @@ class Diagnosis(calibration.Calibration):
             held = numpy.asarray(evaluate_positions)
             model = cast(
                 "scmle.contracts.models.Estimator", base.clone(template)
-            ).fit(split.dev_features.iloc[fit], split.dev_target.iloc[fit])
+            ).fit(split.features.iloc[fit], split.target.iloc[fit])
             fitted.append(
                 (
                     model,
-                    split.dev_features.iloc[held],
-                    split.dev_target.iloc[held],
+                    split.features.iloc[held],
+                    split.target.iloc[held],
                 )
             )
         headline = None

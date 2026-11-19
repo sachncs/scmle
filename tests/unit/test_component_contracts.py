@@ -53,7 +53,7 @@ def concrete_subclasses(base, *modules):
 @pytest.mark.parametrize(
     ("base", "modules"),
     [
-        (tabular.TableReader, [tabular]),
+        (tabular.Reader, [tabular]),
         (columns.Family, [columns]),
         (splitters.Partitioner, [splitters]),
         (strategies.Strategy, [strategies]),
@@ -119,7 +119,7 @@ def test_the_stages_cover_the_lifecycle_states_in_order():
 
 def test_abstract_bases_cannot_be_instantiated():
     for base in (
-        tabular.TableReader,
+        tabular.Reader,
         columns.Family,
         splitters.Partitioner,
         strategies.Strategy,

@@ -45,20 +45,20 @@ def make_found(
 ):
     return types.SimpleNamespace(
         findings=tuple(findings),
-        stability_gate=gate,
+        gate=gate,
         fragile=tuple(
             f.name for f in findings if f.status == stability.FRAGILE
         ),
         shift=types.SimpleNamespace(c2st=c2st, mmd=mmd, features=features),
         rule=stability.DEFAULT_RULE,
-        rule_note=rule_note,
+        note=rule_note,
         store_note=store_note,
     )
 
 
 def make_hypothesis(column, identifier):
     return types.SimpleNamespace(
-        spec=types.SimpleNamespace(column=column), hypothesis_id=identifier
+        spec=types.SimpleNamespace(column=column), identifier=identifier
     )
 
 

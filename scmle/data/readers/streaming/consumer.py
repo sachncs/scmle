@@ -16,7 +16,7 @@ class Consumer:
 
     Attributes:
         ledger: The ledger holding the durable state.
-        consumer_group: Non-empty name of the consumer group.
+        group: Non-empty name of the consumer group.
         writer: Callable receiving a batch's frame and batch identity.
         acknowledge: Callable that delivers an acknowledgement to the
             transport.
@@ -39,7 +39,7 @@ class Consumer:
                 transport.
 
         Raises:
-            ValueError: If `consumer_group` is blank.
+            ValueError: If `group` is blank.
             TypeError: If `writer` or `acknowledge` is not callable.
         """
         if not consumer_group.strip():
@@ -51,7 +51,7 @@ class Consumer:
         ):
             raise errors.KindError("writer and acknowledge must be callable")
         self.ledger = ledger
-        self.consumer_group = consumer_group
+        self.group = consumer_group
         self.writer = writer
         self.acknowledge = acknowledge
 
@@ -70,11 +70,11 @@ class Consumer:
         pending = self.ledger.reclaim()
         if pending is None:
             return None
-        if pending.consumer != self.consumer_group:
+        if pending.consumer != self.group:
             raise failure.StreamingError(
                 "consumer_group_mismatch",
                 "pending acknowledgement belongs to another consumer group",
-                self.ledger.source.source_identity(),
+                self.ledger.source.identify(),
                 {"pending_consumer_group": pending.consumer},
             )
         try:
@@ -83,7 +83,7 @@ class Consumer:
             raise failure.StreamingError(
                 "acknowledgement_failed",
                 "external acknowledgement failed; retry is required",
-                self.ledger.source.source_identity(),
+                self.ledger.source.identify(),
                 {"batch_id": pending.batch},
             ) from error
         self.ledger.retract()
@@ -108,12 +108,12 @@ class Consumer:
             The receipt of the ledger commit.
         """
         self.handoff()
-        batch = self.ledger.read_batch(rows, watermark_column)
+        batch = self.ledger.read(rows, watermark_column)
         acknowledgement = transaction.Acknowledgement(
-            batch.source_identity,
-            self.consumer_group,
-            batch.batch_id,
-            batch.next_checkpoint,
+            batch.identity,
+            self.group,
+            batch.key,
+            batch.checkpoint,
         )
         receipt = self.ledger.finalize(batch, self.writer, acknowledgement)
         self.handoff()

@@ -108,7 +108,7 @@ class GeospatialPreparer(curators.Preparer):
     @property
     def digest(self) -> str:
         """The vector dataset identity."""
-        return self.dataset.content_hash
+        return self.dataset.digest
 
     @property
     def samples(self) -> tuple[geospatial.Placemark, ...]:
@@ -124,7 +124,7 @@ class GeospatialPreparer(curators.Preparer):
         """
         report = self.dataset.curate()
         profile = dict(report.profile)
-        quality_findings = list(report.quality_findings)
+        quality_findings = list(report.findings)
         if not self.dataset.crs.strip():
             profile["spatial_boundary_leakage"] = {
                 "status": "blocked_missing_crs",
@@ -133,7 +133,7 @@ class GeospatialPreparer(curators.Preparer):
         else:
             leakage = self.dataset.straddle(self.side)
             profile["spatial_boundary_leakage"] = leakage.to_dict()
-            if leakage.crossing_feature_ids:
+            if leakage.crossing:
                 quality_findings.append(
                     curation.flaw(
                         "quality.geospatial-boundary-leakage",
@@ -151,7 +151,7 @@ class GeospatialPreparer(curators.Preparer):
         return dataclasses.replace(
             report,
             profile=profile,
-            quality_findings=tuple(quality_findings),
+            findings=tuple(quality_findings),
         )
 
     def split(self, seed: int) -> containers.Partitions:
@@ -190,11 +190,11 @@ class GeospatialPreparer(curators.Preparer):
         dataset = geospatial.Dataset(
             tuple(samples), crs=self.dataset.crs, source=self.dataset.source
         )
-        prepared = dataset.prepare_features()
+        prepared = dataset.prepare()
         return containers.Batch(
             tuple(prepared.feature_ids),
             prepared.feature_names,
-            prepared.to_numpy(),
+            prepared.materialize(),
         )
 
     def sample_id(self, sample: geospatial.Placemark) -> str:
@@ -206,7 +206,7 @@ class GeospatialPreparer(curators.Preparer):
         Returns:
             The feature ID.
         """
-        return sample.feature_id
+        return sample.identifier
 
     def label(self, sample: geospatial.Placemark) -> object | None:
         """Gives the feature label.
@@ -249,11 +249,11 @@ class GeospatialPreparer(curators.Preparer):
         feature_index = next(
             index
             for index, item in enumerate(self.dataset.features)
-            if item.feature_id == sample.feature_id
+            if item.identifier == sample.identifier
         )
-        prepared = self.dataset.prepare_features()
+        prepared = self.dataset.prepare()
         values = numpy.asarray(
-            prepared.to_numpy()[feature_index], dtype=numpy.float64
+            prepared.materialize()[feature_index], dtype=numpy.float64
         )
         decision = numpy.asarray(model.decision_function(values[None]))
         anchored = scoring.anchor(model, values[None], decision)
@@ -264,9 +264,9 @@ class GeospatialPreparer(curators.Preparer):
         return {
             "status": "available",
             "method": "crs_bound_geometry_and_feature_contribution",
-            "feature_id": sample.feature_id,
+            "feature_id": sample.identifier,
             "crs": self.dataset.crs,
-            "geometry_type": sample.geometry_type,
+            "geometry_type": sample.kind,
             "bounds": list(sample.bounds),
             "feature_terms": [[name, value] for name, value in feature_terms],
             "decision_score": float(decision.reshape(-1)[0]),
@@ -303,8 +303,8 @@ class GeospatialPreparer(curators.Preparer):
         reference = self.dataset.profile().to_dict()
         current = observed.dataset.profile().to_dict()
         return {
-            "reference_hash": self.dataset.content_hash,
-            "observed_hash": observed.dataset.content_hash,
+            "reference_hash": self.dataset.digest,
+            "observed_hash": observed.dataset.digest,
             "crs_changed": current["crs"] != reference["crs"],
             "bounds_changed": current["bounds"] != reference["bounds"],
         }

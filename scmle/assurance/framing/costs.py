@@ -99,10 +99,10 @@ class Tariff:
         """
         for name in ENTRY_NAMES:
             qualification.finite(getattr(self, name), name)
-        if self.c_fp <= 0 or self.c_fn <= 0:
+        if self.alarm <= 0 or self.miss <= 0:
             raise DominatedError(
                 "one action dominates (c_FP and c_FN must both be positive): "
-                f"c_FP={self.c_fp}, c_FN={self.c_fn}"
+                f"c_FP={self.alarm}, c_FN={self.miss}"
             )
         low = qualification.finite(self.low, "low")
         high = qualification.finite(self.high, "high")
@@ -124,19 +124,19 @@ class Tariff:
             raise errors.InputError("basis must be a Basis")
 
     @property
-    def c_fp(self) -> float:
+    def alarm(self) -> float:
         """Extra cost of acting on a row whose outcome is 0."""
         return self.c_10 - self.c_00
 
     @property
-    def c_fn(self) -> float:
+    def miss(self) -> float:
         """Extra cost of not acting on a row whose outcome is 1."""
         return self.c_01 - self.c_11
 
     @property
     def threshold(self) -> float:
         """The implied decision threshold `t = c_FP / (c_FP + c_FN)`."""
-        return self.c_fp / (self.c_fp + self.c_fn)
+        return self.alarm / (self.alarm + self.miss)
 
     @property
     def unreviewed(self) -> tuple[str, ...]:
@@ -151,7 +151,7 @@ class Tariff:
         )
 
     @property
-    def model_hash(self) -> str:
+    def digest(self) -> str:
         """SHA-256 of the canonical JSON of the model's version-1 layout.
 
         The hash is anchored at version 1 (`t_lo`, `t_hi`, `range_source`),
@@ -321,7 +321,7 @@ def net_benefit_none() -> float:
     return 0.0
 
 
-def expected_cost(y: ArrayLike, a: ArrayLike, model: Tariff) -> float:
+def price(y: ArrayLike, a: ArrayLike, model: Tariff) -> float:
     """Returns the mean cost per row, read straight from the four cells.
 
     Input that `pair` rejects raises `ValueError`.
@@ -368,7 +368,7 @@ def benefits(
     }
 
 
-def decision_curve(
+def trace(
     y: ArrayLike, scores: ArrayLike, thresholds: ArrayLike
 ) -> dict[str, list[float]]:
     """Net benefit when the rule is re-thresholded at every `t`.

@@ -100,7 +100,7 @@ class Noise:
             "rate": self.rate,
         }
 
-    def quality_evidence(
+    def attest(
         self,
         input_rows: int,
         rows_checked: int,
@@ -395,5 +395,5 @@ def inspect(
         )
     return data.Observation(
         note=note,
-        evidence=report.quality_evidence(input_rows, rows_checked, seed, limit),
+        evidence=report.attest(input_rows, rows_checked, seed, limit),
     )

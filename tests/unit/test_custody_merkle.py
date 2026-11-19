@@ -87,32 +87,30 @@ def test_the_row_id_is_part_of_the_row():
 
 def test_the_empty_set_has_a_fixed_root():
     assert merkle.merkleize(table(), []) == merkle.EMPTY_ROOT
-    assert merkle.merkle_root([]) == merkle.EMPTY_ROOT
+    assert merkle.fold([]) == merkle.EMPTY_ROOT
 
 
 def test_leaves_and_nodes_are_domain_separated():
-    leaf = merkle.row_hash(0, [("a", 1.0)])
-    other = merkle.row_hash(1, [("a", 1.0)])
-    assert merkle.merkle_root([leaf]) == leaf
-    pair = merkle.merkle_root([leaf, other])
+    leaf = merkle.digest(0, [("a", 1.0)])
+    other = merkle.digest(1, [("a", 1.0)])
+    assert merkle.fold([leaf]) == leaf
+    pair = merkle.fold([leaf, other])
     assert pair == merkle.combine(leaf, other)
     # An inner node cannot be passed off as a leaf of a shorter tree.
-    assert merkle.merkle_root([pair]) == pair
-    assert merkle.merkle_root([leaf, other, leaf]) != pair
+    assert merkle.fold([pair]) == pair
+    assert merkle.fold([leaf, other, leaf]) != pair
 
 
 def test_an_odd_leaf_is_not_duplicated():
-    a, b, c = (merkle.row_hash(i, [("v", i)]) for i in range(3))
-    assert merkle.merkle_root([a, b, c]) != merkle.merkle_root([a, b, c, c])
-    assert merkle.merkle_root([a, b, c]) == merkle.combine(
-        merkle.combine(a, b), c
-    )
+    a, b, c = (merkle.digest(i, [("v", i)]) for i in range(3))
+    assert merkle.fold([a, b, c]) != merkle.fold([a, b, c, c])
+    assert merkle.fold([a, b, c]) == merkle.combine(merkle.combine(a, b), c)
 
 
 def test_the_row_hash_matches_its_stated_encoding():
     text = "id=3\x1fa=f:1.5\x1fb=i:2"
     expected = hashlib.sha256(b"\x00" + text.encode()).hexdigest()
-    assert merkle.row_hash(3, [("a", 1.5), ("b", 2)]) == expected
+    assert merkle.digest(3, [("a", 1.5), ("b", 2)]) == expected
 
 
 def test_a_fixed_table_has_a_pinned_root():

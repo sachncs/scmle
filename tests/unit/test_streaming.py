@@ -77,7 +77,7 @@ def test_locked_rows_never_enter_the_development_sample(tmp_path):
         kept[streaming.SPLIT_COLUMN] == streaming.DEVELOPMENT
     ).sum() == 2_000
     assert (kept[streaming.SPLIT_COLUMN] == streaming.LOCKED).sum() == 500
-    assert len(kept) == totals.development_sample + totals.locked_sample
+    assert len(kept) == totals.sample + totals.locked_sample
 
 
 def test_a_file_far_larger_than_the_budget_is_read_in_bounded_memory(tmp_path):
@@ -178,7 +178,7 @@ class RecordingSink(streaming.Sink):
         self.committed_batch_ids = []
 
     def commit(self, batch):
-        self.committed_batch_ids.append(batch.batch_id)
+        self.committed_batch_ids.append(batch.key)
         return self.receipt
 
 
@@ -187,33 +187,31 @@ def test_stream_checkpoint_binds_snapshot_offset_and_watermark(tmp_path):
     write_stream_csv(path)
     source = streaming.Csv(path)
 
-    first = source.read_batch(rows=2, watermark_column="event_time")
-    second = source.read_batch(
-        first.next_checkpoint, rows=2, watermark_column="event_time"
+    first = source.read(rows=2, watermark_column="event_time")
+    second = source.read(
+        first.checkpoint, rows=2, watermark_column="event_time"
     )
 
-    assert first.start_offset == 0
-    assert first.next_checkpoint.offset == 2
-    assert first.next_checkpoint.column == "event_time"
-    assert first.next_checkpoint.watermark.endswith("10:01:00+00:00")
-    assert first.has_more
-    assert second.start_offset == 2
-    assert second.next_checkpoint.offset == 4
-    assert second.next_checkpoint.watermark.endswith("10:03:00+00:00")
-    assert not second.has_more
+    assert first.offset == 0
+    assert first.checkpoint.offset == 2
+    assert first.checkpoint.column == "event_time"
+    assert first.checkpoint.watermark.endswith("10:01:00+00:00")
+    assert first.more
+    assert second.offset == 2
+    assert second.checkpoint.offset == 4
+    assert second.checkpoint.watermark.endswith("10:03:00+00:00")
+    assert not second.more
 
     changed = dataclasses.replace(
-        first.next_checkpoint, digests={"snapshot": "0" * 64}
+        first.checkpoint, digests={"snapshot": "0" * 64}
     )
     with pytest.raises(
         streaming.StreamingError, match="does not match the checkpoint"
     ):
-        source.read_batch(changed, rows=2, watermark_column="event_time")
+        source.read(changed, rows=2, watermark_column="event_time")
 
     with pytest.raises(streaming.StreamingError, match="watermark column"):
-        source.read_batch(
-            first.next_checkpoint, rows=2, watermark_column="value"
-        )
+        source.read(first.checkpoint, rows=2, watermark_column="value")
 
 
 def test_transactional_sink_binds_receipt_ack_and_checkpoint_durably(
@@ -224,38 +222,38 @@ def test_transactional_sink_binds_receipt_ack_and_checkpoint_durably(
     write_stream_csv(path)
     source = streaming.Csv(path)
     ledger = streaming.Journal(tmp_path / "state.json", source)
-    batch = ledger.read_batch(rows=2, watermark_column="event_time")
+    batch = ledger.read(rows=2, watermark_column="event_time")
     acknowledgement = streaming.Acknowledgement(
-        batch.source_identity,
+        batch.identity,
         "events-consumer",
-        batch.batch_id,
-        batch.next_checkpoint,
+        batch.key,
+        batch.checkpoint,
     )
     sink_receipt = streaming.Voucher(
-        batch.source_identity,
-        batch.batch_id,
-        batch.next_checkpoint,
+        batch.identity,
+        batch.key,
+        batch.checkpoint,
         "sink-receipt-1",
     )
     sink = RecordingSink(sink_receipt)
 
-    first = ledger.commit_transaction(batch, sink, acknowledgement)
+    first = ledger.commit(batch, sink, acknowledgement)
     reopened = streaming.Journal(ledger.path, source)
     retry_sink = RecordingSink(sink_receipt)
-    second = reopened.commit_transaction(batch, retry_sink, acknowledgement)
+    second = reopened.commit(batch, retry_sink, acknowledgement)
     durable = json.loads(ledger.path.read_text(encoding="utf-8"))
     evidence = durable["commitments"][0]
 
     assert first.accepted and not first.duplicate
     assert second.duplicate and not second.accepted
-    assert first.sink_receipt == sink_receipt
-    assert second.sink_receipt == sink_receipt
-    assert sink.committed_batch_ids == [batch.batch_id]
+    assert first.receipt == sink_receipt
+    assert second.receipt == sink_receipt
+    assert sink.committed_batch_ids == [batch.key]
     assert retry_sink.committed_batch_ids == []
-    assert evidence["batch"] == batch.batch_id
+    assert evidence["batch"] == batch.key
     assert evidence["receipt"]["receipt"] == "sink-receipt-1"
     assert evidence["acknowledgement"]["checkpoint"] == (
-        batch.next_checkpoint.to_dict()
+        batch.checkpoint.to_dict()
     )
 
 
@@ -274,47 +272,47 @@ def test_transactional_sink_rejects_receipts_not_bound_to_the_batch(
     write_stream_csv(path)
     source = streaming.Csv(path)
     ledger = streaming.Journal(tmp_path / "state.json", source)
-    batch = ledger.read_batch(rows=2)
+    batch = ledger.read(rows=2)
     acknowledgement = streaming.Acknowledgement(
-        batch.source_identity,
+        batch.identity,
         "events-consumer",
-        batch.batch_id,
-        batch.next_checkpoint,
+        batch.key,
+        batch.checkpoint,
     )
     if receipt_kind == "batch":
         receipt = streaming.Voucher(
-            batch.source_identity,
+            batch.identity,
             "batch_" + "0" * 64,
-            batch.next_checkpoint,
+            batch.checkpoint,
             "bad-batch",
         )
     elif receipt_kind == "source":
         other_checkpoint = dataclasses.replace(
-            batch.next_checkpoint, source="other-events.csv"
+            batch.checkpoint, source="other-events.csv"
         )
         receipt = streaming.Voucher(
             "other-events.csv",
-            batch.batch_id,
+            batch.key,
             other_checkpoint,
             "bad-source",
         )
     else:
         other_checkpoint = dataclasses.replace(
-            batch.next_checkpoint, offset=batch.next_checkpoint.offset + 1
+            batch.checkpoint, offset=batch.checkpoint.offset + 1
         )
         receipt = streaming.Voucher(
-            batch.source_identity,
-            batch.batch_id,
+            batch.identity,
+            batch.key,
             other_checkpoint,
             "bad-checkpoint",
         )
     sink = RecordingSink(receipt)
 
     with pytest.raises(streaming.StreamingError) as raised:
-        ledger.commit_transaction(batch, sink, acknowledgement)
+        ledger.commit(batch, sink, acknowledgement)
 
     assert raised.value.code == expected_code
-    assert sink.committed_batch_ids == [batch.batch_id]
+    assert sink.committed_batch_ids == [batch.key]
     assert not ledger.path.exists()
 
 
@@ -323,31 +321,31 @@ def test_writer_commit_preserves_previous_transaction_evidence(tmp_path):
     write_stream_csv(path)
     source = streaming.Csv(path)
     ledger = streaming.Journal(tmp_path / "state.json", source)
-    first_batch = ledger.read_batch(rows=2)
+    first_batch = ledger.read(rows=2)
     acknowledgement = streaming.Acknowledgement(
-        first_batch.source_identity,
+        first_batch.identity,
         "events-consumer",
-        first_batch.batch_id,
-        first_batch.next_checkpoint,
+        first_batch.key,
+        first_batch.checkpoint,
     )
     sink_receipt = streaming.Voucher(
-        first_batch.source_identity,
-        first_batch.batch_id,
-        first_batch.next_checkpoint,
+        first_batch.identity,
+        first_batch.key,
+        first_batch.checkpoint,
         "sink-receipt-1",
     )
-    ledger.commit_transaction(
+    ledger.commit(
         first_batch,
         RecordingSink(sink_receipt),
         acknowledgement,
     )
 
-    second_batch = ledger.read_batch(rows=2)
+    second_batch = ledger.read(rows=2)
     ledger.finalize(second_batch, lambda frame, batch_id: None)
 
     reopened = streaming.Journal(ledger.path, source)
     retry_sink = RecordingSink(sink_receipt)
-    duplicate = reopened.commit_transaction(
+    duplicate = reopened.commit(
         first_batch,
         retry_sink,
         acknowledgement,
@@ -362,7 +360,7 @@ def test_stream_ledger_commits_idempotently_and_persists_checkpoint(tmp_path):
     write_stream_csv(path)
     source = streaming.Csv(path)
     ledger = streaming.Journal(tmp_path / "state.json", source)
-    batch = ledger.read_batch(rows=2, watermark_column="event_time")
+    batch = ledger.read(rows=2, watermark_column="event_time")
     written = []
 
     first = ledger.finalize(
@@ -376,9 +374,9 @@ def test_stream_ledger_commits_idempotently_and_persists_checkpoint(tmp_path):
     assert first.accepted and not first.duplicate
     assert second.duplicate and not second.accepted
     assert len(written) == 1
-    assert written[0][1] == batch.batch_id
+    assert written[0][1] == batch.key
     assert reopened.load().checkpoint.offset == 2
-    assert batch.batch_id in reopened.load().committed
+    assert batch.key in reopened.load().committed
 
 
 def test_stream_consumer_retries_ack_after_restart_without_replaying_writer(
@@ -411,7 +409,7 @@ def test_stream_consumer_retries_ack_after_restart_without_replaying_writer(
         first_consumer.consume(rows=2, watermark_column="event_time")
 
     assert len(written) == 1
-    assert first_consumer.ledger.pending_acknowledgement_path.exists()
+    assert first_consumer.ledger.pending.exists()
 
     restarted = streaming.Consumer(
         streaming.Journal(ledger_path, source),
@@ -427,7 +425,7 @@ def test_stream_consumer_retries_ack_after_restart_without_replaying_writer(
         written[0][1],
         written[1][1],
     ]
-    assert not restarted.ledger.pending_acknowledgement_path.exists()
+    assert not restarted.ledger.pending.exists()
 
 
 def test_stream_ledger_refuses_a_changed_source_snapshot(tmp_path):
@@ -436,7 +434,7 @@ def test_stream_ledger_refuses_a_changed_source_snapshot(tmp_path):
     write_stream_csv(path)
     source = streaming.Csv(path)
     ledger = streaming.Journal(tmp_path / "state.json", source)
-    batch = ledger.read_batch(rows=2)
+    batch = ledger.read(rows=2)
     ledger.finalize(batch, lambda frame, key: None)
 
     changed = pandas.read_csv(path)

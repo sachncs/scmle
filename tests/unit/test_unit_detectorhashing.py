@@ -50,19 +50,19 @@ def test_hash_source_drops_comments_docstrings_and_blanks():
         "    # whole-line comment\n"
         "    return 1   \n"
     )
-    assert hashing.hash_source(noisy) == sha(plain)
-    assert hashing.hash_source(plain) == sha(plain)
+    assert hashing.digest(noisy) == sha(plain)
+    assert hashing.digest(plain) == sha(plain)
 
 
 def test_hash_source_dedents_and_sees_any_code_change():
-    assert hashing.hash_source("    x = 1\n") == sha("x = 1")
-    assert hashing.hash_source("x = 1\n") != hashing.hash_source("x = 2\n")
-    assert hashing.hash_source("x = 1\n") != hashing.hash_source("x  = 1\n")
+    assert hashing.digest("    x = 1\n") == sha("x = 1")
+    assert hashing.digest("x = 1\n") != hashing.digest("x = 2\n")
+    assert hashing.digest("x = 1\n") != hashing.digest("x  = 1\n")
 
 
 def test_hash_source_refuses_invalid_python():
     with pytest.raises(SyntaxError):
-        hashing.hash_source("def (:\n")
+        hashing.digest("def (:\n")
 
 
 def sample():
@@ -74,29 +74,31 @@ def other():
 
 
 def test_code_hash_combines_the_source_hashes_in_order():
-    first = hashing.hash_source("def sample():\n    return 1\n")
-    second = hashing.hash_source("def other():\n    return 2\n")
-    assert hashing.code_hash(sample) == sha(first)
-    assert hashing.code_hash(sample, other) == sha(f"{first}\n{second}")
-    assert hashing.code_hash(other, sample) != hashing.code_hash(sample, other)
+    first = hashing.digest("def sample():\n    return 1\n")
+    second = hashing.digest("def other():\n    return 2\n")
+    assert hashing.fingerprint(sample) == sha(first)
+    assert hashing.fingerprint(sample, other) == sha(f"{first}\n{second}")
+    assert hashing.fingerprint(other, sample) != hashing.fingerprint(
+        sample, other
+    )
 
 
 def test_code_hash_needs_an_object():
     with pytest.raises(errors.InputError, match="needs at least one object"):
-        hashing.code_hash()
+        hashing.fingerprint()
 
 
 def test_corpus_hash_ignores_order():
     a, b = "a" * 64, "b" * 64
-    assert hashing.corpus_hash([b, a]) == sha(f"{a}\n{b}")
-    assert hashing.corpus_hash([a, b]) == hashing.corpus_hash([b, a])
+    assert hashing.checksum([b, a]) == sha(f"{a}\n{b}")
+    assert hashing.checksum([a, b]) == hashing.checksum([b, a])
 
 
 def test_corpus_hash_needs_digests():
     with pytest.raises(errors.InputError, match="needs at least one part"):
-        hashing.corpus_hash([])
+        hashing.checksum([])
     with pytest.raises(errors.InputError, match="corpus part must be"):
-        hashing.corpus_hash(["A" * 64])
+        hashing.checksum(["A" * 64])
 
 
 @pytest.mark.parametrize("bad", ["a" * 63, "a" * 65, "g" * 64, "A" * 64, 5])
@@ -104,9 +106,9 @@ def test_require_digest_refuses_anything_but_lowercase_sha256(bad):
     with pytest.raises(
         errors.InputError, match="x must be a 64-character lowercase SHA-256"
     ):
-        hashing.require_digest(bad, "x")
+        hashing.require(bad, "x")
 
 
 def test_require_digest_returns_a_valid_digest():
-    assert hashing.require_digest(DIGEST, "x") is DIGEST
+    assert hashing.require(DIGEST, "x") is DIGEST
     assert hashing.DOCSTRING_OWNERS[0] is ast.Module

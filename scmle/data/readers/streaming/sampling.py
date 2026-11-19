@@ -18,7 +18,7 @@ MIX_A = numpy.uint64(0xBF58476D1CE4E5B9)
 MIX_B = numpy.uint64(0x94D049BB133111EB)
 
 
-def row_hash(positions: numpy.ndarray, seed: int) -> numpy.ndarray:
+def scramble(positions: numpy.ndarray, seed: int) -> numpy.ndarray:
     """A deterministic number in [0, 1) for each row position (SplitMix64).
 
     Args:
@@ -55,7 +55,7 @@ def allot(
         An integer array, one entry per position: 1 (locked) where the
         position's hash is below `fraction`, otherwise 0 (development).
     """
-    return (row_hash(positions, seed) < fraction).astype(int)
+    return (scramble(positions, seed) < fraction).astype(int)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -65,13 +65,13 @@ class Totals:
     Attributes:
         rows: All rows in the file.
         locked: Rows assigned to the locked test partition.
-        development_sample: Development rows kept in memory.
+        sample: Development rows kept in memory.
         locked_sample: Locked rows kept in memory.
     """
 
     rows: int
     locked: int
-    development_sample: int
+    sample: int
     locked_sample: int
 
 
@@ -149,7 +149,7 @@ def sweep(
         offset += len(batch)
         side = allot(positions, test_fraction, seed)
         locked_total += int(side.sum())
-        priority = row_hash(positions, seed + 7919)
+        priority = scramble(positions, seed + 7919)
         tagged = batch.assign(**{SPLIT_COLUMN: side, "priority": priority})
         dev = retain(dev, tagged[side == DEVELOPMENT], development_cap)
         locked = retain(locked, tagged[side == LOCKED], locked_cap)

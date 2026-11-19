@@ -156,7 +156,7 @@ def test_forgetting_finds_registry_copies_and_prediction_logs(world):
 def test_forgetting_a_subject_purges_the_rows_and_retrains(world):
     base, project, other = world.base, world.project, world.other
     source = base / "people.csv"
-    original = tabular.read_table(source)
+    original = tabular.read(source)
 
     receipt = erasure.Forgetting(
         [project],
@@ -166,7 +166,7 @@ def test_forgetting_a_subject_purges_the_rows_and_retrains(world):
         retrain=True,
     ).execute(KEY)
 
-    purged = tabular.read_table(source)
+    purged = tabular.read(source)
     assert len(purged) == ROWS - 2
     assert not purged.id.isin(["P-0003", "P-0150"]).any()
     assert purged.equals(

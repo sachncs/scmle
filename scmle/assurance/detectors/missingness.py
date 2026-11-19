@@ -126,11 +126,11 @@ class Missingness:
     """Evidence about the missingness mechanism of a table.
 
     Attributes:
-        rows_checked: Rows used after the cap.
-        input_rows: Rows given.
+        checked: Rows used after the cap.
+        received: Rows given.
         little: Little's test, or None when it was not run.
         indicators: One result per modelled column.
-        mcar_rejected: Whether either test rejects MCAR after a split of
+        rejected: Whether either test rejects MCAR after a split of
             `alpha` (half to Little, half Bonferroni over the indicators).
         alpha: Family level.
         skipped: Reasons something was not run ("skipped, over budget").
@@ -149,11 +149,11 @@ class Missingness:
         ),
     )
 
-    rows_checked: int
-    input_rows: int
+    checked: int
+    received: int
     little: Mcar | None
     indicators: tuple[Predictability, ...]
-    mcar_rejected: bool
+    rejected: bool
     alpha: float
     skipped: tuple[str, ...]
     tier: str = "unverified"
@@ -349,7 +349,7 @@ def measure(values: numpy.ndarray, fit: Moments) -> tuple[float, int]:
     return statistic, observed_total - p
 
 
-def normal_scores(values: numpy.ndarray) -> numpy.ndarray:
+def normalize(values: numpy.ndarray) -> numpy.ndarray:
     """Rank-based inverse-normal scores per column, NaN kept.
 
     A monotone transform of the observed values leaves the missingness
@@ -383,7 +383,7 @@ def little_mcar_test(
         frame: Table.
         columns: Numeric columns to use; defaults to all non-constant,
             non-boolean numeric ones.
-        transform: `normal_scores` or `none`.
+        transform: `normalize` or `none`.
 
     Returns:
         The result, or None when fewer than two columns are used, no value is
@@ -410,7 +410,7 @@ def little_mcar_test(
     if len(names) < MIN_COLUMNS or not numpy.isnan(values).any():
         return None
     if transform == "normal_scores":
-        values = normal_scores(values)
+        values = normalize(values)
     fit = em(values)
     statistic, df = measure(values, fit)
     if df <= 0:
@@ -467,7 +467,7 @@ def crossfit(
     return scores
 
 
-def indicator_model_test(
+def predict(
     frame: pandas.DataFrame,
     column: str,
     seed: int = 0,
@@ -586,7 +586,7 @@ def investigate(
         gaps = gaps[:MAX_INDICATOR_COLUMNS]
     results = []
     for name in gaps:
-        found = indicator_model_test(frame, name, seed, permutations)
+        found = predict(frame, name, seed, permutations)
         if found is not None:
             results.append(found)
     rejected = bool(
@@ -594,11 +594,11 @@ def investigate(
         or any(r.p_value < alpha / 2.0 / len(results) for r in results)
     )
     return Missingness(
-        rows_checked=len(frame),
-        input_rows=input_rows,
+        checked=len(frame),
+        received=input_rows,
         little=little,
         indicators=tuple(results),
-        mcar_rejected=rejected,
+        rejected=rejected,
         alpha=alpha,
         skipped=tuple(skipped),
     )
@@ -677,7 +677,7 @@ def tipover(
     return Sensitivity(low, high, flip, flip is not None, baseline, steps)
 
 
-def make_imputer(strategy: str) -> Any:
+def provision(strategy: str) -> Any:
     """Builds an unfitted imputer for a strategy name.
 
     Args:
@@ -719,12 +719,12 @@ def imputers(
         random_state=randomness.derive_int_seed(seed, "detectors.folds", 0),
     )
     return [
-        (train, held, fit_one(values, strategy, train))
+        (train, held, fit(values, strategy, train))
         for train, held in splitter.split(values)
     ]
 
 
-def fit_one(values: numpy.ndarray, strategy: str, train: numpy.ndarray) -> Any:
+def fit(values: numpy.ndarray, strategy: str, train: numpy.ndarray) -> Any:
     """Fits an imputer on the rows `train` of `values` and nothing else.
 
     Args:
@@ -735,7 +735,7 @@ def fit_one(values: numpy.ndarray, strategy: str, train: numpy.ndarray) -> Any:
     Returns:
         The fitted imputer.
     """
-    imputer = make_imputer(strategy)
+    imputer = provision(strategy)
     imputer.fit(values[train])
     return imputer
 

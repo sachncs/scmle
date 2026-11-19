@@ -110,7 +110,7 @@ def test_only_implemented_choices_and_options_are_run_and_the_rest_noted():
 
 def test_a_strong_and_robust_effect_is_stable():
     x, y = data(rows=400, beta=1.0)
-    result = stability.assess_finding("x", x, y, grid(), 0, bootstrap=60)
+    result = stability.assess("x", x, y, grid(), 0, bootstrap=60)
     assert result.status == stability.STABLE, result.reason
     assert result.check.decision is qualification.Decision.PASS
     assert result.check.subset is qualification.Subset.EXPLORATION
@@ -130,7 +130,7 @@ def test_a_sign_that_flips_with_the_declared_choice_is_fragile():
     x = rng.normal(size=rows)
     half = numpy.arange(rows) < rows / 2
     y = numpy.where(half, 1.0, -1.0) * x + 0.5 * rng.normal(size=rows)
-    result = stability.assess_finding("x", x, y, grid(), 0, bootstrap=40)
+    result = stability.assess("x", x, y, grid(), 0, bootstrap=40)
     assert result.status == stability.FRAGILE
     assert "sign" in result.reason or "interval" in result.reason
     assert result.numbers["sign_share"] < 0.8
@@ -143,9 +143,7 @@ def test_a_fragile_finding_quarantines_only_when_the_detector_is_gating():
     x = rng.normal(size=300)
     y = rng.normal(size=300)
     gate = certificates.Authority.GATING
-    result = stability.assess_finding(
-        "x", x, y, grid(), 0, bootstrap=30, gate=gate
-    )
+    result = stability.assess("x", x, y, grid(), 0, bootstrap=30, gate=gate)
     assert result.status == stability.FRAGILE
     assert result.check.decision is qualification.Decision.QUARANTINE
 
@@ -154,7 +152,7 @@ def test_a_flipped_sign_in_more_than_the_allowed_share_is_fragile_by_rule():
     def row(effect, low, high):
         return stability.Variant("h", {}, effect, low, high)
 
-    rule = stability.Thresholds(s_min=0.8, band=0.5, q_min=0.8)
+    rule = stability.Thresholds(agreement=0.8, band=0.5, exclusion=0.8)
     good = [row(0.5, 0.3, 0.7)] * 10
     verdict = stability.verdict(good, 0.5, rule)
     assert verdict[0] == stability.STABLE
@@ -190,13 +188,13 @@ def test_too_few_specifications_cannot_be_evaluated():
     )
     single = multiverse.universe((), 0)
     x, y = data()
-    result = stability.assess_finding("x", x, y, single, 0, bootstrap=10)
+    result = stability.assess("x", x, y, single, 0, bootstrap=10)
     assert result.status == stability.NOT_EVALUABLE and result.check is None
 
 
 def test_the_rule_validates_its_thresholds():
     with pytest.raises(ValueError, match="s_min"):
-        stability.Thresholds(s_min=0.0)
+        stability.Thresholds(agreement=0.0)
     with pytest.raises(ValueError, match="band"):
         stability.Thresholds(band=0.0)
 
@@ -204,13 +202,9 @@ def test_the_rule_validates_its_thresholds():
 def test_the_same_seed_gives_the_same_verdict_and_a_cache_resumes_it():
     x, y = data(seed=5)
     cache = multiverse.Memo()
-    first = stability.assess_finding(
-        "x", x, y, grid(), 7, bootstrap=20, cache=cache
-    )
-    again = stability.assess_finding(
-        "x", x, y, grid(), 7, bootstrap=20, cache=cache
-    )
-    plain = stability.assess_finding("x", x, y, grid(), 7, bootstrap=20)
+    first = stability.assess("x", x, y, grid(), 7, bootstrap=20, cache=cache)
+    again = stability.assess("x", x, y, grid(), 7, bootstrap=20, cache=cache)
+    plain = stability.assess("x", x, y, grid(), 7, bootstrap=20)
     assert first.to_dict() == again.to_dict() == plain.to_dict()
     assert len(cache.items) == 18
 
@@ -218,7 +212,7 @@ def test_the_same_seed_gives_the_same_verdict_and_a_cache_resumes_it():
 def test_the_time_budget_records_the_specifications_it_skipped():
     x, y = data(seed=6)
     ticks = iter(range(1000))
-    result = stability.assess_finding(
+    result = stability.assess(
         "x",
         x,
         y,
@@ -258,7 +252,7 @@ def test_the_curve_test_separates_a_real_effect_from_noise():
 
 def test_a_finding_with_a_curve_test_reports_its_p_value_on_the_check():
     x, y = data(rows=300, beta=0.8, seed=9)
-    result = stability.assess_finding(
+    result = stability.assess(
         "x", x, y, grid(), 0, bootstrap=20, curve_permutations=19
     )
     assert result.curve is not None
@@ -269,9 +263,7 @@ def test_stable_findings_under_a_permuted_target_stay_under_the_floor():
     stable = 0
     for seed in range(20):
         x, y = data(rows=250, beta=0.0, seed=seed, missing=0.1)
-        result = stability.assess_finding(
-            "x", x, y, grid(seed), seed, bootstrap=30
-        )
+        result = stability.assess("x", x, y, grid(seed), seed, bootstrap=30)
         stable += result.status == stability.STABLE
     assert stable <= 2
 

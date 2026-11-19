@@ -145,7 +145,7 @@ def test_catalog_command_catalogs_tabular_data_and_writes_verified_artifact(
 
     assert code == cli.EXIT_OK
     emitted = json.loads(capsys.readouterr().out)
-    restored = Catalog.read_verified(output)
+    restored = Catalog.read(output)
     assert emitted == restored.to_dict()
     assert restored.shape == (3, 2)
     assert restored.source.uri == "s3://bucket/events.csv?version=7"

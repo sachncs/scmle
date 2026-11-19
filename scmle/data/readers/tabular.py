@@ -1,7 +1,7 @@
 """Dataset ingestion and manifest construction.
 
 Readers are polymorphic: `Loader` dispatches on file suffix to a
-`TableReader` subclass, so supporting a new format means adding one class.
+`Reader` subclass, so supporting a new format means adding one class.
 `Loader.stream` reads a file a chunk at a time: delimited text, JSON lines
 and Parquet are streamed with bounded memory; the other formats are read
 whole and then split.
@@ -25,7 +25,7 @@ from scmle.data.readers import delimited
 from scmle.data.readers import stream
 
 
-class TableReader(abc.ABC):
+class Reader(abc.ABC):
     """Reads one tabular file format into a DataFrame.
 
     Attributes:
@@ -65,7 +65,7 @@ class TableReader(abc.ABC):
             yield frame.iloc[start : start + rows].reset_index(drop=True)
 
 
-class Csv(TableReader):
+class Csv(Reader):
     """Delimited text, including compressed files.
 
     The bytes are decoded by byte-order mark, as UTF-8 or as plausible
@@ -154,7 +154,7 @@ class Tsv(Csv):
         super().__init__("\t", encoding)
 
 
-class Json(TableReader):
+class Json(Reader):
     """JSON records or a JSON array of records."""
 
     suffixes = (".json",)
@@ -171,7 +171,7 @@ class Json(TableReader):
         return pandas.read_json(path)
 
 
-class Jsonl(TableReader):
+class Jsonl(Reader):
     """Newline-delimited JSON records."""
 
     suffixes = (".jsonl", ".ndjson", ".jsonl.gz", ".ndjson.gz")
@@ -204,7 +204,7 @@ class Jsonl(TableReader):
                 yield chunk.reset_index(drop=True)
 
 
-class Excel(TableReader):
+class Excel(Reader):
     """Excel workbooks, using the first sheet by default."""
 
     suffixes = (".xlsx", ".xlsm")
@@ -230,7 +230,7 @@ class Excel(TableReader):
             ) from error
 
 
-class Parquet(TableReader):
+class Parquet(Reader):
     """Apache Parquet."""
 
     suffixes = (".parquet", ".pq")
@@ -266,7 +266,7 @@ class Parquet(TableReader):
             yield batch.to_pandas()
 
 
-class Feather(TableReader):
+class Feather(Reader):
     """Arrow IPC / Feather files."""
 
     suffixes = (".feather", ".arrow")
@@ -284,13 +284,13 @@ class Feather(TableReader):
 
 
 class Loader:
-    """Dispatches file reads to the matching `TableReader`.
+    """Dispatches file reads to the matching `Reader`.
 
     Attributes:
         readers: The readers consulted, in order, when choosing by suffix.
     """
 
-    def __init__(self, readers: tuple[TableReader, ...] | None = None) -> None:
+    def __init__(self, readers: tuple[Reader, ...] | None = None) -> None:
         """Initializes the loader.
 
         Args:
@@ -314,7 +314,7 @@ class Loader:
         """
         return sorted(s for reader in self.readers for s in reader.suffixes)
 
-    def pick(self, path: pathlib.Path) -> TableReader:
+    def pick(self, path: pathlib.Path) -> Reader:
         """Selects the reader for `path`.
 
         Args:
@@ -418,7 +418,7 @@ class Loader:
             raise errors.DataError(f"{path.name} contains no rows")
 
 
-def read_table(uri: str | pathlib.Path) -> pandas.DataFrame:
+def read(uri: str | pathlib.Path) -> pandas.DataFrame:
     """Reads a supported file dataset with the default loader.
 
     Args:

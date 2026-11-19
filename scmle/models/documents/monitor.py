@@ -47,14 +47,14 @@ class Monitor:
             mean character count and the duplicate rate.
         """
         current = observed.curate(
-            self.reference.max_characters,
-            self.reference.max_tokens,
+            self.reference.characters,
+            self.reference.tokens,
         )
         languages = set(self.reference.language_counts) | set(
             current.language_counts
         )
-        reference_total = max(self.reference.sample_count, 1)
-        current_total = max(current.sample_count, 1)
+        reference_total = max(self.reference.samples, 1)
+        current_total = max(current.samples, 1)
         language_distance = (
             sum(
                 abs(
@@ -69,8 +69,7 @@ class Monitor:
         reference_mean = self.measure(self.reference)
         current_mean = self.measure(current)
         duplicate_rate = (
-            sum(len(group) for group in current.duplicate_groups)
-            / current.sample_count
+            sum(len(group) for group in current.duplicates) / current.samples
         )
         return Drift(
             reference_hash=self.reference.dataset_hash,

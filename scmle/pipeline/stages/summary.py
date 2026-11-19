@@ -107,7 +107,7 @@ class Summary(reporting.Reporting):
                     else None
                 ),
                 temporal=split.manifest.strategy == "temporal",
-                reference_features=split.dev_features,
+                reference_features=split.features,
                 sensitive_columns=tuple(data.sensitive_columns),
             ),
             suite.lineup(),
@@ -201,7 +201,7 @@ class Summary(reporting.Reporting):
             ],
             "streamed_locked": self.tally(board, pipeline),
             "uplift": self.uplift_report(board, pipeline, features, target),
-            "n_dev": len(split.dev_features),
+            "n_dev": len(split.features),
             "n_test": len(features),
             "split_fingerprint": split.manifest.fingerprint,
             "split_strategy": split.manifest.strategy,

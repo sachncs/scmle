@@ -7,10 +7,10 @@ import numpy
 
 from scmle.contracts import data
 from scmle.contracts import errors
-from scmle.data.modalities.curation import conflicting_label_groups
+from scmle.data.modalities.curation import conflict
 from scmle.data.modalities.curation import Curation
 from scmle.data.modalities.curation import flaw
-from scmle.data.modalities.curation import label_counts
+from scmle.data.modalities.curation import tally
 from scmle.data.modalities.image.duplicates import Duplicates
 from scmle.data.modalities.image.evidence import Profile
 from scmle.data.modalities.image.pixels import configure
@@ -18,12 +18,12 @@ from scmle.data.modalities.image.sample import DEFAULT_PROFILE_SIZE
 from scmle.data.modalities.image.sample import Sample
 
 EMPTY_PROFILE = Profile(
-    dataset_count=0,
-    profiled_count=0,
+    samples=0,
+    profiled=0,
     truncated=False,
-    profiled_bytes=0,
-    unique_content_count=0,
-    duplicate_count=0,
+    size=0,
+    unique=0,
+    duplicates=0,
     modes=(),
     channels=(),
     width_min=0,
@@ -90,10 +90,10 @@ def augmentation(
         ),
         "external_parent_sources": sorted(
             {
-                sample.augmentation.parent_source
+                sample.augmentation.source
                 for sample in augmented_samples
                 if sample.augmentation is not None
-                and sample.augmentation.parent_source not in source_names
+                and sample.augmentation.source not in source_names
             }
         ),
     }
@@ -129,13 +129,13 @@ def defects(
                 blocking=True,
             )
         )
-    if profile.duplicate_count:
+    if profile.duplicates:
         quality_findings.append(
             flaw(
                 "quality.image-duplicate-content",
                 data.FindingSeverity.WARNING,
                 {"dataset": "profiled_samples"},
-                {"duplicate_count": profile.duplicate_count},
+                {"duplicate_count": profile.duplicates},
                 "Review duplicate content and prevent split contamination.",
                 blocking=False,
             )
@@ -163,7 +163,7 @@ def defects(
                 {"dataset": "profiled_samples"},
                 {
                     "max_samples": max_samples,
-                    "profiled_count": profile.profiled_count,
+                    "profiled_count": profile.profiled,
                 },
                 "Run a full-content audit before release or record the "
                 "sampling policy.",
@@ -238,7 +238,7 @@ class Survey(Duplicates):
 
     __slots__ = ()
 
-    content_hash: str
+    digest: str
 
     def profile(
         self,
@@ -289,12 +289,12 @@ class Survey(Duplicates):
         )
         unique_count = len({sample.content_hash for sample in profiled})
         return Profile(
-            dataset_count=len(self.samples),
-            profiled_count=len(profiled),
+            samples=len(self.samples),
+            profiled=len(profiled),
             truncated=len(profiled) < len(self.samples),
-            profiled_bytes=sum(sample.byte_size for sample in profiled),
-            unique_content_count=unique_count,
-            duplicate_count=len(profiled) - unique_count,
+            size=sum(sample.size for sample in profiled),
+            unique=unique_count,
+            duplicates=len(profiled) - unique_count,
             modes=modes,
             channels=channels,
             width_min=min(sample.width for sample in profiled),
@@ -326,12 +326,12 @@ class Survey(Duplicates):
             label counts, conflicting labels, sensitive metadata,
             near-duplicate groups and augmentation summary, with quality and
             risk findings. Invalid ``max_samples`` or ``profile_size``
-            (ValueError) and an undecodable image (ImageValidationError)
+            (ValueError) and an undecodable image (ViolationError)
             propagate from `profile`.
         """
         profile = self.profile(max_samples, profile_size)
-        labels = label_counts(sample.label for sample in self.samples)
-        conflicts = conflicting_label_groups(
+        labels = tally(sample.label for sample in self.samples)
+        conflicts = conflict(
             (sample.content_hash, sample.source, sample.label)
             for sample in self.samples
         )
@@ -339,24 +339,20 @@ class Survey(Duplicates):
         profile_data["label_counts"] = labels
         profile_data["conflicting_label_groups"] = list(conflicts)
         sensitive_metadata = sorted(
-            {
-                tag
-                for sample in self.samples
-                for tag in sample.sensitive_metadata
-            }
+            {tag for sample in self.samples for tag in sample.metadata}
         )
         profile_data["sensitive_metadata"] = sensitive_metadata
-        near_duplicate_groups = self.near_duplicate_groups(max_samples)
+        near_duplicate_groups = self.group(max_samples)
         profile_data["near_duplicate_groups"] = [
             list(group) for group in near_duplicate_groups
         ]
         profile_data["augmentation"] = augmentation(self.samples)
         return Curation(
             modality="image",
-            dataset_hash=self.content_hash,
-            sample_count=len(self.samples),
+            dataset_hash=self.digest,
+            samples=len(self.samples),
             profile=profile_data,
-            quality_findings=tuple(
+            findings=tuple(
                 defects(
                     len(self.samples),
                     profile,

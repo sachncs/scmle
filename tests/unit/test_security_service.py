@@ -296,7 +296,7 @@ def test_a_failed_activation_is_audited(tmp_path):
 
 def test_no_unauthenticated_server_can_listen_beyond_loopback(reference):
     # Enforces docs/TENANT_ISOLATION.md:118.
-    # Enforces docs/API_STABILITY.md:212.
+    # Enforces docs/API_STABILITY.md:213.
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:184.
     # Enforces README.md:285.
     # Enforces website/src/learn/what-scmle-cannot-do.html:46-47.
@@ -398,7 +398,7 @@ def test_a_tampered_artifact_never_loads_in_production(reference, tmp_path):
 
 
 def test_the_modality_service_is_gated_the_same_way(tmp_path):
-    # Enforces docs/API_STABILITY.md:212.
+    # Enforces docs/API_STABILITY.md:213.
     # Enforces website/src/pages/docs/api-stability.astro:76.
     from scmle.pipeline import modality_lifecycle
     from scmle.serving import modality

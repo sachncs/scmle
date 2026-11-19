@@ -58,7 +58,7 @@ def entropy(series: pandas.Series) -> float:
     return float(-(proportions * numpy.log2(proportions)).sum())
 
 
-def outlier_rate(series: pandas.Series) -> float:
+def rate(series: pandas.Series) -> float:
     """Computes the share of values outside Tukey's 1.5 x IQR fences.
 
     Args:
@@ -298,7 +298,7 @@ class Family(abc.ABC):
         """
         return 0.0
 
-    def missingness_association(
+    def discriminate(
         self, series: pandas.Series, target: pandas.Series, task: tasks.Task
     ) -> float:
         """Measures how strongly *being missing* tells the target apart.
@@ -388,7 +388,7 @@ class Quantitative(Family):
         Returns:
             The base statistics plus, for non-boolean columns, `skew`,
             `mean`, `std`, `min`, `max` (NaN replaced by 0.0) and
-            `outlier_rate`.
+            `rate`.
         """
         stats = super().statistics(series)
         if not pandas.api.types.is_bool_dtype(series):
@@ -398,7 +398,7 @@ class Quantitative(Family):
             stats |= {
                 str(k): float(numpy.nan_to_num(v)) for k, v in moments.items()
             }
-            stats["outlier_rate"] = outlier_rate(finite)
+            stats["outlier_rate"] = rate(finite)
         return stats
 
     @staticmethod
@@ -462,7 +462,7 @@ class Quantitative(Family):
         if options.impute:
             steps.append(("impute", self.imputer(options.missing)))
         if options.log_skewed:
-            steps.append(("log", transformers.SkewedLogTransformer()))
+            steps.append(("log", transformers.Logarithm()))
         if options.scale:
             steps.append(("scale", preprocessing.StandardScaler()))
         if options.interactions:
@@ -507,7 +507,7 @@ class Quantitative(Family):
         return stump(values.astype(float), labels)
 
 
-class DatetimeKind(Family):
+class Datetime(Family):
     """Datetime columns: expanded into calendar and trend features."""
 
     name = "datetime"
@@ -543,7 +543,7 @@ class DatetimeKind(Family):
         return None
 
 
-class TextKind(Family):
+class Text(Family):
     """Free text: sentences or descriptions, encoded as TF-IDF terms."""
 
     name = "text"
@@ -770,8 +770,8 @@ class Categorical(Family):
 
 KINDS: tuple[Family, ...] = (
     Quantitative(),
-    DatetimeKind(),
-    TextKind(),
+    Datetime(),
+    Text(),
     Categorical(),
 )
 

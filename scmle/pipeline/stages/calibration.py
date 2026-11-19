@@ -173,9 +173,9 @@ class Calibration(documentation.Documentation):
             evaluate = numpy.asarray(evaluate_positions)
             candidate = cast(
                 "scmle.contracts.models.Estimator", base.clone(template)
-            ).fit(split.dev_features.iloc[fit], split.dev_target.iloc[fit])
-            rows = split.dev_features.iloc[evaluate]
-            held_labels.extend(split.dev_target.iloc[evaluate])
+            ).fit(split.features.iloc[fit], split.target.iloc[fit])
+            rows = split.features.iloc[evaluate]
+            held_labels.extend(split.target.iloc[evaluate])
             if entity_column is not None:
                 held_entities.extend(rows[entity_column].astype(str))
             if task is tasks.Task.REGRESSION:
@@ -210,7 +210,7 @@ class Calibration(documentation.Documentation):
         path = board.services.spec.charter_path
         if not path:
             return None
-        charter = sealing.read_verified(str(path)).charter
+        charter = sealing.read(str(path)).charter
         if charter.purpose != contracts.NEW_ENTITY:
             return None
         return board.services.spec.data.group_column
@@ -242,7 +242,7 @@ class Calibration(documentation.Documentation):
         held = [fold[1] for fold in split.manifest.folds]
         plan = cv_plus.strategize(
             held,
-            len(split.dev_features),
+            len(split.features),
             len(observed),
             models,
             self.allowance(board),
@@ -275,7 +275,7 @@ class Calibration(documentation.Documentation):
         """
         path = board.services.spec.charter_path
         if path:
-            block = sealing.read_verified(str(path)).charter.uncertainty
+            block = sealing.read(str(path)).charter.uncertainty
             if block is not None and block.limit is not None:
                 return block.limit
         return cv_plus.MAX_BYTES

@@ -57,7 +57,7 @@ PREDICATE = re.compile(
 class Sampler(Protocol):
     """Draws slot proposals for a request (an LLM adapter)."""
 
-    model_id: str
+    model: str
 
     def sample(self, prompt: str, index: int) -> Mapping[str, Any]:
         """Returns one JSON-like proposal for the draw `index`.
@@ -104,7 +104,7 @@ class Replayer:
             model_id: Name of the model the proposals are attributed to.
             recorded: The proposals, one per draw.
         """
-        self.model_id = model_id
+        self.model = model_id
         self.recorded = [dict(r) for r in recorded]
 
     def sample(self, prompt: str, index: int) -> Mapping[str, Any]:  # noqa: ARG002 -- implements the Sampler protocol
@@ -146,7 +146,7 @@ def draw(
     return out
 
 
-def samples_hash(model_id: str, prompt: str, samples: Sequence[Any]) -> str:
+def digest(model_id: str, prompt: str, samples: Sequence[Any]) -> str:
     """Hashes the model id, the prompt and the raw samples together.
 
     Args:
@@ -339,7 +339,7 @@ class Calibration:
     Attributes:
         tau: Largest ambiguity accepted, or None if no value met `epsilon`.
         epsilon: Tolerated error rate among accepted drafts.
-        n_calibration: Problems in the calibration split.
+        calibration: Problems in the calibration split.
         curve: (tau, coverage, error rate, CP upper bound) per candidate.
         migrations: The written layout's version steps, oldest first;
             version 2 spells `n_calibration` as `calibration`.
@@ -351,7 +351,7 @@ class Calibration:
 
     tau: float | None
     epsilon: float
-    n_calibration: int
+    calibration: int
     curve: tuple[tuple[float, float, float, float], ...]
 
     def to_dict(self) -> dict[str, Any]:
@@ -359,12 +359,12 @@ class Calibration:
 
         Returns:
             The risk-coverage certificate: `tau`, `epsilon`,
-            `n_calibration` and the curve as lists.
+            `calibration` and the curve as lists.
         """
         return {
             "tau": self.tau,
             "epsilon": self.epsilon,
-            "calibration": self.n_calibration,
+            "calibration": self.calibration,
             "risk_coverage": [list(c) for c in self.curve],
         }
 

@@ -16,16 +16,16 @@ class Features:
 
     Attributes:
         sources: Source identifier of each row.
-        feature_names: Name of each column.
+        names: Name of each column.
         values: One tuple of finite feature values per source.
-        sampled_frame_indices: Per source, the indices of the frames the
+        frames: Per source, the indices of the frames the
             features came from; empty when not frame-based.
     """
 
     sources: tuple[str, ...]
-    feature_names: tuple[str, ...]
+    names: tuple[str, ...]
     values: tuple[tuple[float, ...], ...]
-    sampled_frame_indices: tuple[tuple[int, ...], ...] = ()
+    frames: tuple[tuple[int, ...], ...] = ()
 
     def __post_init__(self) -> None:
         """Validates feature dimensions and sampled-frame metadata.
@@ -38,15 +38,14 @@ class Features:
         """
         if len(self.values) != len(self.sources):
             raise errors.InputError("feature rows must match video sources")
-        if any(len(row) != len(self.feature_names) for row in self.values):
+        if any(len(row) != len(self.names) for row in self.values):
             raise errors.InputError("feature columns must match feature names")
         if not numpy.isfinite(
             numpy.asarray(self.values, dtype=numpy.float64)
         ).all():
             raise errors.InputError("video features must be finite")
         sampled = tuple(
-            tuple(int(index) for index in indices)
-            for indices in self.sampled_frame_indices
+            tuple(int(index) for index in indices) for indices in self.frames
         )
         if sampled and len(sampled) != len(self.sources):
             raise errors.InputError(
@@ -57,20 +56,20 @@ class Features:
                 "sampled frame indices must not be negative"
             )
         object.__setattr__(self, "sources", tuple(self.sources))
-        object.__setattr__(self, "feature_names", tuple(self.feature_names))
+        object.__setattr__(self, "names", tuple(self.names))
         object.__setattr__(
             self,
             "values",
             tuple(tuple(float(value) for value in row) for row in self.values),
         )
-        object.__setattr__(self, "sampled_frame_indices", sampled)
+        object.__setattr__(self, "frames", sampled)
 
     @property
     def shape(self) -> tuple[int, int]:
         """The number of videos and the number of features, as a pair."""
-        return (len(self.sources), len(self.feature_names))
+        return (len(self.sources), len(self.names))
 
-    def to_numpy(self) -> numpy.ndarray:
+    def materialize(self) -> numpy.ndarray:
         """Returns a writable copy of the feature matrix.
 
         Returns:
@@ -103,7 +102,7 @@ class Split:
         """
         return {
             name: tuple(
-                sorted({sample.group_id or sample.source for sample in samples})
+                sorted({sample.group or sample.source for sample in samples})
             )
             for name, samples in (
                 ("train", self.train),
@@ -137,11 +136,11 @@ class Chronology:
         if self.cutoff.tzinfo is None or self.cutoff.utcoffset() is None:
             raise errors.InputError("cutoff must be timezone-aware")
         object.__setattr__(self, "cutoff", self.cutoff.astimezone(UTC))
-        if any(sample.observation_time is None for sample in self.train):
+        if any(sample.time is None for sample in self.train):
             raise errors.InputError(
                 "train videos must contain observation times"
             )
-        if any(sample.observation_time is None for sample in self.future):
+        if any(sample.time is None for sample in self.future):
             raise errors.InputError(
                 "future videos must contain observation times"
             )
@@ -150,7 +149,6 @@ class Chronology:
     def lookahead(self) -> bool:
         """Whether a training clip was observed after the cutoff."""
         return any(
-            isinstance(sample.observation_time, datetime)
-            and sample.observation_time > self.cutoff
+            isinstance(sample.time, datetime) and sample.time > self.cutoff
             for sample in self.train
         )

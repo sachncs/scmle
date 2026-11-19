@@ -11,7 +11,7 @@ from sklearn.feature_extraction import text
 DEFAULT_SKEW_THRESHOLD = 1.0
 
 
-class SkewedLogTransformer(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base classes are Any
+class Logarithm(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base classes are Any
     """Applies `log1p` to strongly right-skewed, non-negative columns.
 
     Which columns qualify is learned from the training data only (fit), so the
@@ -152,7 +152,7 @@ class Vectorizer(base.TransformerMixin, base.BaseEstimator):  # type: ignore[mis
         return terms
 
 
-class AsinhTarget(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base classes are Any
+class Asinh(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base classes are Any
     """Inverse hyperbolic sine of the target, scaled by its spread.
 
     Behaves like a log for large values and like the identity near zero, is

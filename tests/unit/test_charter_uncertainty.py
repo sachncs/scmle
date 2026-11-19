@@ -28,7 +28,7 @@ def with_cap(size=5_000_000):
 def test_a_charter_without_the_block_keeps_its_hash_and_format():
     # Enforces docs/API_STABILITY.md:102.
     charter = make_charter()
-    assert charter.charter_hash == PINNED_HASH
+    assert charter.digest == PINNED_HASH
     assert "uncertainty" not in charter.to_dict()
     assert charter.format_version == 2
     assert contracts.FORMAT_VERSION == 11
@@ -39,18 +39,18 @@ def test_an_empty_block_is_an_empty_record_and_still_format_ten():
     record = json.loads(json.dumps(charter.to_dict()))
     assert record["uncertainty"] == {}
     assert charter.format_version == 10
-    assert contracts.AnalysisCharter.from_dict(record) == charter
+    assert contracts.Charter.from_dict(record) == charter
 
 
 def test_the_block_changes_the_hash_round_trips_and_needs_format_ten():
     # Enforces docs/API_STABILITY.md:102.
     # Enforces website/src/pages/docs/api-stability.astro:55.
     charter = with_cap()
-    assert charter.charter_hash != PINNED_HASH
+    assert charter.digest != PINNED_HASH
     assert charter.format_version == 10
     record = json.loads(json.dumps(charter.to_dict()))
     assert record["uncertainty"] == {"limit": 5_000_000}
-    assert contracts.AnalysisCharter.from_dict(record) == charter
+    assert contracts.Charter.from_dict(record) == charter
 
 
 def test_a_format_ten_charter_keeps_its_hash_and_signature():
@@ -58,7 +58,7 @@ def test_a_format_ten_charter_keeps_its_hash_and_signature():
     # Enforces website/src/pages/docs/api-stability.astro:51.
     # Enforces website/src/pages/docs/qualification.astro:67.
     charter = with_cap()
-    assert charter.charter_hash == FORMAT_TEN_HASH
+    assert charter.digest == FORMAT_TEN_HASH
     assert sealing.envelope(charter, "k")["signature"] == FORMAT_TEN_SIGNATURE
 
 
@@ -70,7 +70,7 @@ def test_the_block_in_an_older_format_is_refused(tmp_path):
     wrapper["format"] = 9
     path.write_text(json.dumps(wrapper))
     with pytest.raises(errors.ConfigError, match="needs format 10"):
-        sealing.read_verified(path, signing_key="k")
+        sealing.read(path, signing_key="k")
 
 
 @pytest.mark.parametrize("bad", [0, -5, 1.5, True])
@@ -112,10 +112,10 @@ def test_slice_columns_round_trip_and_leave_a_cap_only_charter_alone():
     charter = make_charter(uncertainty=spec)
     record = json.loads(json.dumps(charter.to_dict()))
     assert record["uncertainty"]["slices"] == ["grp", "region"]
-    assert contracts.AnalysisCharter.from_dict(record) == charter
-    assert charter.charter_hash != FORMAT_TEN_HASH
+    assert contracts.Charter.from_dict(record) == charter
+    assert charter.digest != FORMAT_TEN_HASH
     assert "slices" not in with_cap().to_dict()["uncertainty"]
-    assert with_cap().charter_hash == FORMAT_TEN_HASH
+    assert with_cap().digest == FORMAT_TEN_HASH
 
 
 @pytest.mark.parametrize("bad", [("a", "a"), ("",), (" ",), ["a"]])
@@ -132,10 +132,10 @@ def test_the_confirmation_coverage_flag_needs_format_eleven_and_round_trips():
     assert charter.format_version == 11
     record = json.loads(json.dumps(charter.to_dict()))
     assert record["uncertainty"] == {"confirmatory": True}
-    assert contracts.AnalysisCharter.from_dict(record) == charter
+    assert contracts.Charter.from_dict(record) == charter
     assert (
-        charter.charter_hash
-        != make_charter(uncertainty=uncertainty.Uncertainty()).charter_hash
+        charter.digest
+        != make_charter(uncertainty=uncertainty.Uncertainty()).digest
     )
 
 
@@ -145,7 +145,7 @@ def test_without_the_flag_a_format_ten_charter_keeps_its_hash():
     off = uncertainty.Uncertainty(5_000_000, (), False)
     charter = make_charter(uncertainty=off)
     assert charter.format_version == 10
-    assert charter.charter_hash == FORMAT_TEN_HASH
+    assert charter.digest == FORMAT_TEN_HASH
     assert "confirmatory" not in charter.to_dict()["uncertainty"]
 
 
@@ -157,7 +157,7 @@ def test_the_flag_in_an_older_format_is_refused(tmp_path):
     wrapper["format"] = 10
     path.write_text(json.dumps(wrapper))
     with pytest.raises(errors.ConfigError, match="needs format 11"):
-        sealing.read_verified(path, signing_key="k")
+        sealing.read(path, signing_key="k")
 
 
 @pytest.mark.parametrize("bad", [1, "yes", None])

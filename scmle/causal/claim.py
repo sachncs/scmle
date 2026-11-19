@@ -75,7 +75,7 @@ def unseal(path: str | None) -> scmle.assurance.admissibility.dag.Dag | None:
         return None
     try:
         document = json.loads(Path(path).read_text(encoding="utf-8"))
-        return scmle.assurance.admissibility.dag.Dag.from_artifact(document)
+        return scmle.assurance.admissibility.dag.Dag.restore(document)
     except (OSError, ValueError, TypeError) as error:
         raise errors.ConfigError(
             f"cannot load the declared DAG {path}: {error}"
@@ -86,7 +86,7 @@ def registration(
     spec: causal.Question,
     plan: select.Plan,
     dag: scmle.assurance.admissibility.dag.Dag | None,
-    error_budget: budget.ErrorBudget,
+    error_budget: budget.Alpha,
     exploration_rows: int,
 ) -> confirm.Commitment:
     """Returns the claim as it is fixed before `C` is opened.
@@ -185,7 +185,7 @@ def rig(
     spec: causal.Question,
     x: pandas.DataFrame,
     target_name: str,
-    error_budget: budget.ErrorBudget,
+    error_budget: budget.Alpha,
     *,
     dag: scmle.assurance.admissibility.dag.Dag | None = None,
     attestors: Mapping[str, str] | None = None,

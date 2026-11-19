@@ -31,7 +31,7 @@ class Finding:
 
     Attributes:
         column: Column name.
-        missing_rate: Share of development rows with the value missing.
+        missing: Share of development rows with the value missing.
         test: Name of the statistical test used.
         p_value: Probability of an association this strong by chance.
         effect: Effect size in [0, 1] (Cramer's V or rank-biserial).
@@ -40,7 +40,7 @@ class Finding:
     """
 
     column: str
-    missing_rate: float
+    missing: float
     test: str
     p_value: float
     effect: float

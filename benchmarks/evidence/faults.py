@@ -220,7 +220,7 @@ def configured(run: Any) -> dict[str, Any]:
         The parsed `config.json` of its folder.
     """
     loaded: dict[str, Any] = json.loads(
-        (Path(run.run_dir) / "config.json").read_text(encoding="utf-8")
+        (Path(run.directory) / "config.json").read_text(encoding="utf-8")
     )
     return loaded
 
@@ -235,7 +235,7 @@ def text(run: Any, name: str) -> str:
     Returns:
         The file's text, empty when it is absent.
     """
-    path = Path(run.run_dir) / name
+    path = Path(run.directory) / name
     return path.read_text(encoding="utf-8") if path.exists() else ""
 
 
@@ -569,7 +569,7 @@ def totals(path: str, short: int) -> Any:
     keeper.close()
     return ingest.Expectation(
         (
-            ingest.TableTotals(
+            ingest.Totals(
                 "sales",
                 rows=len(sold) + short,
                 sums=(ingest.Total("price", float(sold["price"].sum())),),
@@ -860,7 +860,7 @@ def admissibility(attest: bool) -> str | None:
         charter: Any = types.SimpleNamespace(
             estimand=types.SimpleNamespace(kind="predictive", causal=None),
             seed=0,
-            charter_hash=scope,
+            digest=scope,
         )
         view = types.SimpleNamespace(features=features, target=target)
         found = stages.ProfileStage().qualify_exploration(
@@ -929,7 +929,7 @@ def reconcile(drop: int) -> None:
     )
     expected = ingest.Expectation(
         (
-            ingest.TableTotals(
+            ingest.Totals(
                 "orders",
                 rows=100,
                 sums=(ingest.Total("amount", 5000.0),),
@@ -1162,7 +1162,7 @@ def confirmation(times: int) -> None:
         seed=3,
     )
     features, target = world(600, 1)
-    explore.run_exploration(
+    explore.explore(
         ledger,
         features,
         target,
@@ -1363,7 +1363,7 @@ def folds(kind: str, rare: int) -> Any:
         cells = split.cells(frame)
         keep = cells[cells == cells.value_counts().idxmin()].index[1:]
         frame = frame.drop(index=keep).reset_index(drop=True)
-    return split.cross_validation_folds(frame, numpy.arange(len(frame)), [])
+    return split.fold(frame, numpy.arange(len(frame)), [])
 
 
 def scarce(rare: int | None) -> Any:
@@ -1793,7 +1793,7 @@ def plugin(fault: str) -> type:
             Args:
                 board: The run's board holding the partition and its split.
             """
-            locked = board.get(profiling.Partition).split.locked_test
+            locked = board.get(profiling.Partition).split.test
             if fault == "bind":
                 locked.bind("plugin")
             if fault == "open":
@@ -1846,7 +1846,7 @@ def resolve(
     """
     import scmle.data.validation.target
 
-    resolver = scmle.data.validation.target.TaskResolver(spec(task, **fields))
+    resolver = scmle.data.validation.target.Resolver(spec(task, **fields))
     return resolver.resolve(target)
 
 
@@ -2090,7 +2090,7 @@ def quarantined(attest: bool) -> str | None:
     lab = bypass.Lab(Path(tempfile.mkdtemp(prefix="faults-")))
     path = bypass.charter(lab)
     if attest:
-        scope = sealing.read_verified(path, bypass.KEY).charter_hash
+        scope = sealing.read(path, bypass.KEY).digest
         item = attestations.Affidavit(
             "copy",
             provenance.Attestation(
@@ -2112,7 +2112,7 @@ def quarantined(attest: bool) -> str | None:
         options = {**options, "leakage_attestations": filed}
     with bypass.environ(SCMLE_SIGNING_KEY=bypass.KEY):
         run = launch(copied, target, charter=path, **options)
-    for written in sorted(Path(run.run_dir).rglob("*.json")):
+    for written in sorted(Path(run.directory).rglob("*.json")):
         body = written.read_text(encoding="utf-8")
         if "attest" in body and '"copy"' in body:
             return f"{written.name}: attestation of column copy"
@@ -3305,8 +3305,8 @@ def digest() -> str:
     from scmle.assurance.detectors import certificates
 
     module = sys.modules[__name__]
-    own = certificates.code_hash(module)
-    gates = certificates.code_hash(*sites())
+    own = certificates.fingerprint(module)
+    gates = certificates.fingerprint(*sites())
     table = hashlib.sha256(registry.PATH.read_bytes()).hexdigest()
     return hashlib.sha256(f"{own}{gates}{table}".encode()).hexdigest()
 

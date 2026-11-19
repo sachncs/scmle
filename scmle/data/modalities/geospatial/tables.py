@@ -284,7 +284,7 @@ def measure(item: Placemark) -> tuple[Any, ...]:
         length,
         vertices,
         parts,
-        item.geometry_type,
+        item.kind,
     )
 
 

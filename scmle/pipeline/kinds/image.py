@@ -88,7 +88,7 @@ class Image(media.Media):
             The `descriptor.describe` features of its RGB pixels and the
             file's digest.
         """
-        sample = image.Sample.from_path(path)
+        sample = image.Sample.load(path)
         pixels = sample.decode("RGB", (descriptor.WORK, descriptor.WORK))
         values = descriptor.describe(pixels, sample.width, sample.height)
         return media.Description(
@@ -137,7 +137,7 @@ class Image(media.Media):
             the masked one, largest change first and ties by region.
         """
         pillow = image.pillow("image explanation")
-        sample = image.Sample.from_path(path)
+        sample = image.Sample.load(path)
         source = sample.decode("RGB")
         height, width = source.shape[:2]
         bounds = [

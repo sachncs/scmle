@@ -77,7 +77,7 @@ def test_the_charter_artifacts_are_written_and_verifiable(
         json.loads((folder / "split_manifest.json").read_text())
     )
     assert len(loaded.sha256) == 64
-    assert sealing.read_verified(
+    assert sealing.read(
         folder / "analysis_charter.json", signing_key=KEY
     ).signed
     sealed.Journal(folder / "custody_log.jsonl")
@@ -270,7 +270,7 @@ def test_a_stale_certificate_no_longer_keeps_a_suspect_field(
     # stale certificate is only reported.
     from scmle.assurance.admissibility import screen
 
-    monkeypatch.setattr(screen, "code_digest", lambda: "0" * 64)
+    monkeypatch.setattr(screen, "fingerprint", lambda: "0" * 64)
     result = run(leaky_frame(binary_frame), tmp_path, inscribe(tmp_path))
 
     done = event(result.run_dir, "admissibility.completed")["data"]
@@ -291,7 +291,7 @@ def test_a_valid_attestation_keeps_a_certified_suspect_and_is_ledgered(
         "statement": "echo is the clinic's own earlier reading",
         "evidence": "ticket DATA-7",
         "date": "2020-01-01",
-        "scope": make_charter(effect=0.5, quota=3).charter_hash,
+        "scope": make_charter(effect=0.5, quota=3).digest,
         "expires": "2099-01-01",
     }
     path = tmp_path / "attestations.json"
@@ -380,7 +380,7 @@ def test_a_charter_run_writes_valid_stability_and_shift_reports(
     stability = json.loads((folder / "stability_report.json").read_text())
     shifted = json.loads((folder / "shift_report.json").read_text())
     scmle.assurance.robustness.report.conform(stability)
-    scmle.assurance.robustness.report.validate_shift(shifted)
+    scmle.assurance.robustness.report.validate(shifted)
     # The default charter declares one implemented choice with one usable
     # option, so no finding can be called stable.
     assert stability["status"] == "not_evaluated"

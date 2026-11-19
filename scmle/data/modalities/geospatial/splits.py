@@ -9,10 +9,10 @@ from scmle.data.modalities.curation import proportions
 from scmle.data.modalities.geospatial.evidence import Chronology
 from scmle.data.modalities.geospatial.evidence import Leakage
 from scmle.data.modalities.geospatial.evidence import Partition
-from scmle.data.modalities.geospatial.geometry import canonical_observation_time
 from scmle.data.modalities.geospatial.geometry import GeometryError
 from scmle.data.modalities.geospatial.geometry import Placemark
 from scmle.data.modalities.geospatial.geometry import TemporalError
+from scmle.data.modalities.geospatial.geometry import timestamp
 from scmle.data.modalities.geospatial.survey import Survey
 
 
@@ -56,7 +56,7 @@ class Splits(Survey):
         envelopes: dict[str, tuple[int, int, int, int]] = {}
         for feature in self.features:
             minimum_x, minimum_y, maximum_x, maximum_y = feature.bounds
-            envelopes[feature.feature_id] = (
+            envelopes[feature.identifier] = (
                 math.floor((minimum_x - origin_x) / block_size),
                 math.floor((minimum_y - origin_y) / block_size),
                 math.floor((maximum_x - origin_x) / block_size),
@@ -99,23 +99,23 @@ class Splits(Survey):
         truncated_feature_ids: list[str] = []
         for feature in self.features:
             minimum_x, minimum_y, maximum_x, maximum_y = envelopes[
-                feature.feature_id
+                feature.identifier
             ]
             block_count = (maximum_x - minimum_x + 1) * (
                 maximum_y - minimum_y + 1
             )
-            block_counts.append((feature.feature_id, block_count))
+            block_counts.append((feature.identifier, block_count))
             if block_count > 1:
-                crossing_feature_ids.append(feature.feature_id)
+                crossing_feature_ids.append(feature.identifier)
             if block_count > max_blocks_per_feature:
-                truncated_feature_ids.append(feature.feature_id)
+                truncated_feature_ids.append(feature.identifier)
         return Leakage(
-            block_size=block_size,
-            feature_count=len(self.features),
-            feature_block_counts=tuple(block_counts),
-            crossing_feature_ids=tuple(crossing_feature_ids),
-            truncated_feature_ids=tuple(truncated_feature_ids),
-            max_blocks_per_feature=max_blocks_per_feature,
+            block=block_size,
+            features=len(self.features),
+            blocks=tuple(block_counts),
+            crossing=tuple(crossing_feature_ids),
+            truncated=tuple(truncated_feature_ids),
+            spread=max_blocks_per_feature,
         )
 
     def tile(
@@ -215,8 +215,8 @@ class Splits(Survey):
             TemporalError: If the cutoff is invalid or lacks a
                 timezone, or any feature has no observation time.
         """
-        cutoff_time = canonical_observation_time(cutoff)
-        if any(feature.observation_time is None for feature in self.features):
+        cutoff_time = timestamp(cutoff)
+        if any(feature.time is None for feature in self.features):
             raise TemporalError(
                 "temporal splitting requires an observation time on every "
                 "feature",
@@ -225,14 +225,13 @@ class Splits(Survey):
         train = tuple(
             feature
             for feature in self.features
-            if isinstance(feature.observation_time, datetime)
-            and feature.observation_time <= cutoff_time
+            if isinstance(feature.time, datetime)
+            and feature.time <= cutoff_time
         )
         future = tuple(
             feature
             for feature in self.features
-            if isinstance(feature.observation_time, datetime)
-            and feature.observation_time > cutoff_time
+            if isinstance(feature.time, datetime) and feature.time > cutoff_time
         )
         return Chronology(
             cutoff=cutoff_time,

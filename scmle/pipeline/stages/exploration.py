@@ -24,7 +24,7 @@ from scmle.pipeline.stages import admission
 
 
 def coverage_on_confirmation(
-    charter: contracts.AnalysisCharter, task: tasks.Task
+    charter: contracts.Charter, task: tasks.Task
 ) -> bool:
     """Returns whether the charter asks for the coverage claim on `C`.
 
@@ -68,7 +68,7 @@ class Escrow:
 
     explored: governed.Explored
     task: tasks.Task
-    charter: contracts.AnalysisCharter
+    charter: contracts.Charter
     view: Any
     structure: tuple[str, ...]
     graph: Any
@@ -149,7 +149,7 @@ class Claims(products.Derived):
             return {"pending": False}
         return {
             "pending": True,
-            "charter": self.pending.charter.charter_hash,
+            "charter": self.pending.charter.digest,
             "coverage": self.pending.holds_for_coverage,
         }
 
@@ -192,7 +192,7 @@ class Exploration(admission.Admission):
             )
             return Claims()
         spec = board.services.spec
-        verified = sealing.read_verified(str(spec.charter_path))
+        verified = sealing.read(str(spec.charter_path))
         charter = verified.charter
         data = spec.data
         view = outcome.view
@@ -272,7 +272,7 @@ class Exploration(admission.Admission):
             if board.services.store is not None
             else None,
             exclude=structure + tuple(found.quarantined),
-            strata=governed.strata_labels(
+            strata=governed.stratify(
                 view.features, data.group_column, data.time_column
             ),
             rule=governing(

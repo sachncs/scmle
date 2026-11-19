@@ -120,10 +120,10 @@ def consult(
     samples = refusal.draw(sampler, prompt, k)
     agreed = refusal.consensus(data_sample, samples)
     llm = {
-        "model_id": sampler.model_id,
+        "model_id": sampler.model,
         "prompt": prompt,
         "samples": samples,
-        "samples_hash": refusal.samples_hash(sampler.model_id, prompt, samples),
+        "samples_hash": refusal.digest(sampler.model, prompt, samples),
         "ambiguity": agreed.ambiguity,
         "agreement": agreed.agreement,
         "tau": tau,
@@ -383,7 +383,7 @@ def emit(draft: records.Draft, directory: str | Path) -> list[str]:
     documents["framing_questions.json"] = {
         "questions": [q.to_dict() for q in draft.questions],
         "robust": list(draft.robust),
-        "open_items": list(draft.open_items),
+        "open_items": list(draft.pending),
     }
     if draft.charter is not None and draft.charter.costs is not None:
         documents["decision_cost_model.json"] = draft.charter.costs.to_dict()

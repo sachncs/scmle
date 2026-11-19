@@ -21,7 +21,7 @@ from scmle.contracts import errors
 
 
 def config(**changes):
-    values = {"skill_ceiling": 0.9, "association_ceiling": 0.5}
+    values = {"skill": 0.9, "ceiling": 0.5}
     values.update(changes)
     return leakage.Config(**values)
 
@@ -184,7 +184,7 @@ def test_oof_fit_matches_a_direct_ridge_fit():
     phi = rng.normal(size=(12, 2))
     values = rng.normal(size=(2, 12))
     splits = fitting.crossfit(12, 3, None, None, 0)
-    out = fitting.oof_fit(values, phi, splits)
+    out = fitting.fit(values, phi, splits)
     for train, test in splits:
         for b in range(2):
             mean = values[b, train].mean()
@@ -218,7 +218,7 @@ def test_aucs_are_nan_where_no_fold_has_both_classes():
 
 def test_encode_codes_classes_and_refuses_a_constant_regression():
     problem = binary_problem()
-    assert problem.classes == 2 and problem.total_squares == 0.0
+    assert problem.classes == 2 and problem.total == 0.0
     assert len(problem.splits) == 4
     regression = fitting.encode(
         pandas.Series([1.0, 2.0, 3.0, 4.0]),
@@ -228,7 +228,7 @@ def test_encode_codes_classes_and_refuses_a_constant_regression():
         None,
     )
     assert regression.classes == 0
-    assert regression.total_squares == 5.0
+    assert regression.total == 5.0
     with pytest.raises(errors.InputError, match="constant target"):
         fitting.encode(
             pandas.Series([1.0] * 4), "regression", config(folds=2), None, None
@@ -238,7 +238,7 @@ def test_encode_codes_classes_and_refuses_a_constant_regression():
 def test_a_copy_of_a_binary_target_has_perfect_skill():
     problem = binary_problem()
     phi = fitting.basis(pandas.Series(problem.y))
-    statistic = fitting.skill_statistic(problem, phi)
+    statistic = fitting.quantify(problem, phi)
     assert statistic(problem.y[None, :]).tolist() == [1.0]
     predictions = fitting.predict(problem, phi)
     assert len(predictions) == 1
@@ -250,7 +250,7 @@ def test_a_copy_of_a_binary_target_has_perfect_skill():
         fitting.replicate(problem, predictions, numpy.arange(40), fold_of)
         == 1.0
     )
-    bound = fitting.skill_bound(
+    bound = fitting.temper(
         problem, phi, config(bootstrap=20), None, numpy.random.default_rng(0)
     )
     assert bound == 1.0
@@ -260,7 +260,7 @@ def test_a_multiclass_skill_averages_one_versus_rest():
     y = pandas.Series([0, 1, 2] * 10)
     problem = fitting.encode(y, "classification", config(folds=3), None, None)
     phi = fitting.basis(y)
-    statistic = fitting.skill_statistic(problem, phi)
+    statistic = fitting.quantify(problem, phi)
     assert statistic(problem.y[None, :])[0] == pytest.approx(1.0)
     assert len(fitting.predict(problem, phi)) == 3
 
@@ -269,7 +269,7 @@ def test_a_regression_skill_is_r_squared():
     y = pandas.Series(numpy.arange(30.0))
     problem = fitting.encode(y, "regression", config(folds=3), None, None)
     phi = fitting.basis(y)
-    value = fitting.skill_statistic(problem, phi)(problem.y[None, :])[0]
+    value = fitting.quantify(problem, phi)(problem.y[None, :])[0]
     assert 0.9 < value <= 1.0
     predictions = fitting.predict(problem, phi)
     fold_of = numpy.zeros(30, dtype="int64")
@@ -300,7 +300,7 @@ def test_skill_bound_is_minus_infinity_without_a_computable_draw():
 
     phi = fitting.basis(pandas.Series(problem.y))
     assert (
-        fitting.skill_bound(problem, phi, config(bootstrap=3), None, Fixed())
+        fitting.temper(problem, phi, config(bootstrap=3), None, Fixed())
         == -math.inf
     )
 
@@ -333,7 +333,7 @@ def test_chisquare_matches_the_contingency_formula():
 
 def test_purity_is_the_share_of_the_commonest_recorded_class():
     recorded = numpy.array([True, True, True, False])
-    statistic = association.purity_statistic(recorded)
+    statistic = association.assay(recorded)
     out = statistic(numpy.array([[0, 0, 1, 1], [2, 2, 2, 0]]))
     # Three classes are seen: class 0 is 2/3 of the recorded rows and half
     # of all, standardized to three equal classes; class 2 holds back every
@@ -347,7 +347,7 @@ def test_purity_is_corrected_for_the_base_rate():
     rng = numpy.random.default_rng(0)
     labels = (rng.random(4000) < 0.02).astype("int64")
     recorded = rng.random(4000) < 0.5
-    statistic = association.purity_statistic(recorded)
+    statistic = association.assay(recorded)
     raw = float((labels[recorded] == 0).mean())
     assert raw > 0.95
     assert statistic(labels[None, :])[0] < 0.75
@@ -487,7 +487,7 @@ def test_gauge_skips_a_single_column_design():
         "skill",
         1.0,
     )
-    assert found.uses_binned is False
+    assert found.binned is False
 
 
 def test_caps_share_the_association_ceiling():
@@ -661,7 +661,7 @@ def test_draw_permutations_counts_exceedances_and_stops_hopeless_ones():
     fixed = hypotheses.Pending(
         "m", "missingness", 0.0, None, True, p_value=0.5, active=False
     )
-    permutation.draw_permutations(
+    permutation.draw(
         [strong, weak, fixed],
         labels,
         labels,
@@ -711,10 +711,10 @@ def test_subsample_draws_random_rows_otherwise():
 
 
 def test_load_store_returns_none_for_a_missing_or_broken_file(tmp_path):
-    assert planning.load_store(tmp_path / "absent.json") is None
+    assert planning.load(tmp_path / "absent.json") is None
     broken = tmp_path / "broken.json"
     broken.write_text("{not json", encoding="utf-8")
-    assert planning.load_store(broken) is None
+    assert planning.load(broken) is None
     assert isinstance(planning.bundled(), certificates.Store)
 
 
@@ -927,7 +927,7 @@ def test_a_noisy_class_code_is_read_by_its_line_when_that_scores_higher():
     read = hypotheses.reading(h, h.data, frame, problem)
     straight = fitting.predict(problem, fitting.line(frame["leak"]))
     smooth = fitting.predict(problem, h.data)
-    score = fitting.skill_statistic(problem, fitting.line(frame["leak"]))
+    score = fitting.quantify(problem, fitting.line(frame["leak"]))
     if float(score(problem.y[None, :])[0]) > h.observed:
         assert numpy.allclose(read[0], straight[0])
     else:
@@ -976,7 +976,7 @@ def test_a_date_after_the_cutoff_is_late_and_one_before_it_is_not():
     assert [f.feature for f in found] == ["closed"]
     (late,) = found
     assert late.mechanism == settings.DATED
-    assert late.statistic == 1.0 and late.lower_bound == 1.0
+    assert late.statistic == 1.0 and late.lower == 1.0
     assert late.suspect and late.blocking and late.significant
     half = records.dated(frame, ["closed"], "2020-01-15")
     assert half[0].statistic == pytest.approx(

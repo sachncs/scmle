@@ -37,8 +37,8 @@ class Temporal:
                 fill features of rows whose own batch lacks the past.
         """
         self.nodes = nodes
-        self.group_column = group_column
-        self.time_column = time_column
+        self.group = group_column
+        self.timestamp = time_column
         self.history = history
 
     @property
@@ -50,7 +50,7 @@ class Temporal:
         """
         derived = {node.name for node in self.nodes}
         raw = roots(self.nodes, derived)
-        names = [self.group_column, self.time_column, *raw]
+        names = [self.group, self.timestamp, *raw]
         return list(dict.fromkeys(c for c in names if c))
 
     @property
@@ -83,8 +83,8 @@ class Temporal:
         Returns:
             One key per row, as strings; all zeros without a group column.
         """
-        if self.group_column:
-            return frame[self.group_column].astype(str).to_numpy()
+        if self.group:
+            return frame[self.group].astype(str).to_numpy()
         return numpy.zeros(len(frame), dtype=int)
 
     def retain(self, frame: pandas.DataFrame) -> pandas.DataFrame:
@@ -101,7 +101,7 @@ class Temporal:
         """
         columns = self.historical
         subset = frame[columns].copy()
-        times = pandas.to_datetime(subset[self.time_column], errors="coerce")
+        times = pandas.to_datetime(subset[self.timestamp], errors="coerce")
         subset = subset[times.notna().to_numpy()]
         times = times[times.notna()]
         keys = self.identify(subset)
@@ -156,21 +156,21 @@ class Temporal:
             ConfigError: If the time column has unparseable values, or a node
                 is not an ordered operation.
         """
-        if self.time_column not in frame.columns:
+        if self.timestamp not in frame.columns:
             raise errors.DataError(
-                f"time column '{self.time_column}' is required to compute "
+                f"time column '{self.timestamp}' is required to compute "
                 "series features"
             )
-        times = pandas.to_datetime(frame[self.time_column], errors="coerce")
+        times = pandas.to_datetime(frame[self.timestamp], errors="coerce")
         if times.isna().any():
             raise errors.ConfigError(
-                f"time column '{self.time_column}' has unparseable values"
+                f"time column '{self.timestamp}' has unparseable values"
             )
         earliest = (
             pandas.Series(times.to_numpy()).groupby(self.identify(frame)).min()
         )
         history = self.history if self.history is not None else frame.iloc[:0]
-        past_times = pandas.to_datetime(history[self.time_column])
+        past_times = pandas.to_datetime(history[self.timestamp])
         limits = pandas.Series(self.identify(history)).map(earliest)
         keep = (past_times.to_numpy() < limits.to_numpy()) & limits.notna()
         past = history[numpy.asarray(keep)][
@@ -198,20 +198,20 @@ class Temporal:
             ConfigError: If the time column has unparseable values, or a node
                 is not an ordered operation.
         """
-        if self.time_column not in frame.columns:
+        if self.timestamp not in frame.columns:
             raise errors.DataError(
-                f"time column '{self.time_column}' is required to compute "
+                f"time column '{self.timestamp}' is required to compute "
                 "series features"
             )
         result = frame.copy()
-        times = pandas.to_datetime(result[self.time_column], errors="coerce")
+        times = pandas.to_datetime(result[self.timestamp], errors="coerce")
         if times.isna().any():
             raise errors.ConfigError(
-                f"time column '{self.time_column}' has unparseable values"
+                f"time column '{self.timestamp}' has unparseable values"
             )
         groups = (
-            result[self.group_column].astype(str).to_numpy()
-            if self.group_column
+            result[self.group].astype(str).to_numpy()
+            if self.group
             else numpy.zeros(len(result), dtype=int)
         )
         position = numpy.arange(len(result))

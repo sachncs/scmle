@@ -30,9 +30,9 @@ def run(n=400, fraction=0.25, seed=1, dev_ids=None, **kwargs):
 
 def sets(result):
     return (
-        set(result.exploration_ids.tolist()),
-        set(result.confirmation_ids.tolist()),
-        set(result.embargo_ids.tolist()),
+        set(result.exploration.tolist()),
+        set(result.confirmation.tolist()),
+        set(result.embargo.tolist()),
     )
 
 
@@ -45,15 +45,13 @@ def test_sets_partition_the_development_rows():
 
 def test_confirmation_size_is_close_to_the_fraction():
     result = run(n=1000, fraction=0.2)
-    assert abs(len(result.confirmation_ids) - 200) <= 10
+    assert abs(len(result.confirmation) - 200) <= 10
 
 
 def test_the_carve_is_a_pure_function_of_its_inputs():
     first, second = run(), run()
-    assert numpy.array_equal(first.confirmation_ids, second.confirmation_ids)
-    assert not numpy.array_equal(
-        first.confirmation_ids, run(seed=2).confirmation_ids
-    )
+    assert numpy.array_equal(first.confirmation, second.confirmation)
+    assert not numpy.array_equal(first.confirmation, run(seed=2).confirmation)
     other_charter = carve.divide(
         numpy.arange(400),
         folds_for(400),
@@ -62,19 +60,17 @@ def test_the_carve_is_a_pure_function_of_its_inputs():
         charter_hash="e" * 64,
         data_hash=DH,
     )
-    assert not numpy.array_equal(
-        first.confirmation_ids, other_charter.confirmation_ids
-    )
+    assert not numpy.array_equal(first.confirmation, other_charter.confirmation)
 
 
 def test_groups_never_straddle_exploration_and_confirmation():
     rng = numpy.random.default_rng(3)
     groups = rng.integers(0, 60, 600)
     result = run(n=600, groups=groups)
-    x_groups = set(groups[result.exploration_ids])
-    c_groups = set(groups[result.confirmation_ids])
+    x_groups = set(groups[result.exploration])
+    c_groups = set(groups[result.confirmation])
     assert x_groups.isdisjoint(c_groups)
-    assert len(result.confirmation_ids) > 0
+    assert len(result.confirmation) > 0
 
 
 def test_duplicate_rows_stay_together():
@@ -85,8 +81,8 @@ def test_duplicate_rows_stay_together():
     result = run(n=n, duplicates=duplicates)
     for index in range(0, 200, 2):
         pair = {index, index + 1}
-        assert pair <= set(result.confirmation_ids.tolist()) or pair <= set(
-            result.exploration_ids.tolist()
+        assert pair <= set(result.confirmation.tolist()) or pair <= set(
+            result.exploration.tolist()
         )
 
 
@@ -96,7 +92,7 @@ def test_groups_and_duplicates_merge_into_one_unit():
     duplicates = numpy.full(n, -1)
     duplicates[0] = duplicates[100] = 0  # joins group 0 with group 33
     result = run(n=n, groups=groups, duplicates=duplicates)
-    c = set(result.confirmation_ids.tolist())
+    c = set(result.confirmation.tolist())
     assert (0 in c) == (100 in c)
     assert ({0, 1, 2} <= c) == (0 in c)
 
@@ -105,7 +101,7 @@ def test_classes_are_represented_in_confirmation():
     rng = numpy.random.default_rng(4)
     labels = (rng.random(800) < 0.1).astype(int)
     result = run(n=800, labels=labels)
-    c_labels = labels[result.confirmation_ids]
+    c_labels = labels[result.confirmation]
     assert 0 < c_labels.mean() < 0.2
     assert abs(c_labels.mean() - labels.mean()) < 0.05
 
@@ -114,14 +110,14 @@ def test_temporal_carve_uses_blocks_with_an_embargo():
     n = 600
     times = numpy.arange(n)
     result = run(n=n, times=times, embargo_rows=6)
-    c = numpy.sort(result.confirmation_ids)
-    x = result.exploration_ids
+    c = numpy.sort(result.confirmation)
+    x = result.exploration
     assert len(c) > 0
     # No exploration row lies within 6 positions of a confirmation row.
     nearest = numpy.abs(x[:, None] - c[None, :]).min(axis=1)
     assert nearest.min() > 6
     # Every row near a confirmation block is in the embargo set.
-    assert len(result.embargo_ids) > 0
+    assert len(result.embargo) > 0
     # Confirmation is contiguous blocks, not scattered rows.
     breaks = int((numpy.diff(c) > 1).sum())
     assert breaks < len(c) / 10
@@ -131,14 +127,14 @@ def test_temporal_carve_with_groups_never_shares_a_group():
     n = 600
     groups = numpy.arange(n) // 6
     result = run(n=n, times=numpy.arange(n), embargo_rows=2, groups=groups)
-    assert set(groups[result.exploration_ids]).isdisjoint(
-        groups[result.confirmation_ids]
+    assert set(groups[result.exploration]).isdisjoint(
+        groups[result.confirmation]
     )
 
 
 def test_folds_are_restricted_to_exploration_rows():
     result = run(n=400)
-    size = len(result.exploration_ids)
+    size = len(result.exploration)
     assert len(result.folds) == 4
     val = numpy.sort(numpy.concatenate([pair[1] for pair in result.folds]))
     assert numpy.array_equal(val, numpy.arange(size))
@@ -162,7 +158,7 @@ def test_zero_fraction_is_refused_and_one_row_per_unit_is_not_required():
 
 def test_a_single_unit_cannot_be_carved_out():
     result = run(n=50, groups=numpy.zeros(50, dtype=int))
-    assert len(result.confirmation_ids) == 0
+    assert len(result.confirmation) == 0
     assert any("unit" in note for note in result.notes)
 
 

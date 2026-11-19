@@ -228,7 +228,7 @@ def measure_corpus(name: str) -> dict[str, Any]:
         cert = certify.certify_detector(
             detector_id,
             detector,
-            registry.SPECS[detector_id].code_hash(),
+            registry.SPECS[detector_id].digest(),
             frame,
             table_plans[detector_id],
             f5.ROW_SEEDS,
@@ -280,7 +280,7 @@ def tally(tables: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
             "tables_passing": passed,
             "tables": count,
             "table_level_wilson_lower": round(
-                certificates.wilson_interval(passed, count, 0.95)[0], 4
+                certificates.bound(passed, count, 0.95)[0], 4
             ),
         }
         for (detector, defect), passed in sorted(keys.items())
@@ -303,7 +303,7 @@ def measure_all() -> dict[str, Any]:
         },
         "seeds": list(f5.ROW_SEEDS),
         "code_hashes": {
-            key: spec.code_hash() for key, spec in registry.SPECS.items()
+            key: spec.digest() for key, spec in registry.SPECS.items()
         },
         "tables": tables,
         "tally": tally(tables),
@@ -321,8 +321,7 @@ def stale() -> list[str]:
     return [
         key
         for key, digest in document["code_hashes"].items()
-        if key not in registry.SPECS
-        or registry.SPECS[key].code_hash() != digest
+        if key not in registry.SPECS or registry.SPECS[key].digest() != digest
     ]
 
 

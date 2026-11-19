@@ -51,7 +51,7 @@ class Identification(qualification.Qualification):
     def ground(
         self,
         board: engine.Board,
-        charter: contracts.AnalysisCharter,
+        charter: contracts.Charter,
         view: Any,
     ) -> None:
         """Checks that the charter's words name real columns.
@@ -81,7 +81,7 @@ class Identification(qualification.Qualification):
     def hypothesise(
         self,
         board: engine.Board,
-        charter: contracts.AnalysisCharter,
+        charter: contracts.Charter,
         view: Any,
         graph: Any,
         found: qualify.Qualification,
@@ -119,13 +119,13 @@ class Identification(qualification.Qualification):
             dag=graph,
             seed=charter.seed,
             dag_report=found.dag,
-            charter_hash=charter.charter_hash,
+            charter_hash=charter.digest,
         )
 
     def identify(
         self,
         board: engine.Board,
-        charter: contracts.AnalysisCharter,
+        charter: contracts.Charter,
         view: Any,
         run: governed.Governance,
         graph: Any,

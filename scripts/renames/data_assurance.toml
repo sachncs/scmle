@@ -254,7 +254,7 @@
 "scmle.assurance.robustness.shift.Drift.low_counts" = "sparse"
 "scmle.assurance.robustness.shift.code_digest" = "fingerprint"
 "scmle.assurance.robustness.shift.design_matrix" = "embed"
-"scmle.assurance.robustness.shift.mmd_test" = "test"
+"scmle.assurance.robustness.shift.mmd_test" = "distinguish"
 "scmle.assurance.robustness.stability.assessment.assess_finding" = "assess"
 "scmle.assurance.robustness.stability.assessment.code_digest" = "fingerprint"
 "scmle.assurance.robustness.stability.estimation.Thresholds.q_min" = "exclusion"
@@ -321,6 +321,7 @@
 "scmle.data.modalities.document.report.Curation.source_traceability_coverage" = "traceability"
 "scmle.data.modalities.document.report.Curation.table_element_count" = "tables"
 "scmle.data.modalities.document.report.Curation.unresolved_blocking_findings" = "blockers"
+"scmle.data.modalities.document.review.Layering.table_element_count" = "tables"
 "scmle.data.modalities.document.sample.Sample.document_id" = "identifier"
 "scmle.data.modalities.document.sample.Sample.size_bytes" = "size"
 "scmle.data.modalities.document.sample.Sample.source_digest" = "digest"
@@ -547,7 +548,7 @@
 "scmle.data.splitting.splitters.partitions.Partition.dev_ids" = "development"
 "scmle.data.splitting.splitters.partitions.Partition.test_ids" = "test"
 "scmle.data.splitting.splitters.partitions.Partitioner.check_task" = "check"
-"scmle.data.splitting.splitters.partitions.Partitioner.supported_tasks" = "tasks"
+"scmle.data.splitting.splitters.partitions.Partitioner.supported_tasks" = "scope"
 "scmle.data.splitting.splitters.partitions.Split.dev_features" = "features"
 "scmle.data.splitting.splitters.partitions.Split.dev_target" = "target"
 "scmle.data.splitting.splitters.partitions.Split.locked_test" = "test"
@@ -734,7 +735,6 @@
 "scmle.data.modalities.document.review.Layering.layout_providers" = ["providers", "layout"]  # stored key with no record-key rename yet (docs/RECORD_KEYS.md); renaming the attribute changes the written layout, so it waits for a migration step; the first candidate is the chosen word
 "scmle.data.modalities.document.review.Layering.ocr_confidence_max" = ["highest", "ocr", "confidence"]  # stored key with no record-key rename yet (docs/RECORD_KEYS.md); renaming the attribute changes the written layout, so it waits for a migration step; the first candidate is the chosen word
 "scmle.data.modalities.document.review.Layering.ocr_confidence_min" = ["lowest", "ocr", "confidence"]  # stored key with no record-key rename yet (docs/RECORD_KEYS.md); renaming the attribute changes the written layout, so it waits for a migration step; the first candidate is the chosen word
-"scmle.data.modalities.document.review.Layering.table_element_count" = ["tables", "count", "table"]  # stored key with no record-key rename yet (docs/RECORD_KEYS.md); renaming the attribute changes the written layout, so it waits for a migration step; the first candidate is the chosen word
 "scmle.data.modalities.document.sample.Sample.content_hash" = ["hash", "content"]  # stored as the nested key `digests.content` (docs/RECORD_KEYS.md); one word needs the field moved into a nested part, a structural change
 "scmle.data.modalities.geospatial.evidence.Autocorrelation.p_value" = ["value", "p_value"]  # `p_value` is the statistical symbol, kept like the stored `p_value` key (docs/RECORD_KEYS.md); no one word names it
 "scmle.data.modalities.geospatial.evidence.Features.feature_ids" = ["identifiers", "ids", "feature"]  # stored key with no record-key rename yet (docs/RECORD_KEYS.md); renaming the attribute changes the written layout, so it waits for a migration step; the first candidate is the chosen word

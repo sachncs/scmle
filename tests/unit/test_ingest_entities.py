@@ -58,13 +58,13 @@ def test_resolution_with_labels_reports_pair_completeness_and_recall():
     pairs = entities.pairing(frame, PASSES)[0]
     quality = entities.grade(truth, result, pairs)
     assert result.tier is qualification.Tier.ATTESTED
-    assert quality.pair_completeness >= 0.95
-    assert quality.link_recall >= 0.9
-    assert result.reduction_ratio > 0.8
+    assert quality.completeness >= 0.95
+    assert quality.recall >= 0.9
+    assert result.reduction > 0.8
     assert result.estimate is not None
     low, high = result.estimate.precision[1:]
     assert 0.0 <= low <= high <= 1.0
-    assert result.t_group <= result.t_match
+    assert result.group <= result.t_match
 
 
 def test_unlabelled_resolution_is_unverified_and_groups_more_not_less():
@@ -76,7 +76,7 @@ def test_unlabelled_resolution_is_unverified_and_groups_more_not_less():
     assert result.tier is qualification.Tier.UNVERIFIED
     assert result.estimate is None
     pairs = entities.pairing(frame, PASSES)[0]
-    assert entities.grade(truth, result, pairs).link_recall >= 0.8
+    assert entities.grade(truth, result, pairs).recall >= 0.8
 
 
 def test_resolution_is_deterministic():
@@ -84,7 +84,7 @@ def test_resolution_is_deterministic():
     first = entities.resolve(frame, FIELDS, PASSES)
     second = entities.resolve(frame, FIELDS, PASSES)
     assert first.groups == second.groups
-    assert first.t_group == second.t_group
+    assert first.group == second.group
 
 
 def test_labeler_needs_a_named_reviewer():

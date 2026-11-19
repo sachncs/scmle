@@ -53,8 +53,8 @@ def observed_access(
         (distill(list(fit)), distill(list(validate)))
         for fit, validate in manifest.folds
     ]
-    development = {str(i) for i in manifest.train_ids}
-    test_ids = {str(i) for i in manifest.test_ids}
+    development = {str(i) for i in manifest.training}
+    test_ids = {str(i) for i in manifest.test}
     checked = mismatched = 0
     for trial in trials:
         for index, seen in enumerate(trial.observed_access):
@@ -93,7 +93,7 @@ def itemize(
         Cross validation, final refit, threshold optimization and final
         evaluation, in that order.
     """
-    development = set(manifest.train_ids)
+    development = set(manifest.training)
     fold_sizes = [
         {"fit_rows": len(fit), "validation_rows": len(validate)}
         for fit, validate in manifest.folds
@@ -120,7 +120,7 @@ def itemize(
         },
         {
             "operation": "final_evaluation",
-            "rows": len(set(manifest.test_ids)),
+            "rows": len(set(manifest.test)),
             "partition": "locked test",
             "opened": test_opens,
         },
@@ -149,8 +149,8 @@ def compose(
         `verified` section of booleans.
     """
     manifest = split.manifest
-    development = set(manifest.train_ids)
-    test = set(manifest.test_ids)
+    development = set(manifest.training)
+    test = set(manifest.test)
     positions = set(range(len(development)))
     folds_inside = all(
         set(fit) | set(validate) <= positions

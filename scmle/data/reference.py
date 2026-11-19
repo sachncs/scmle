@@ -80,13 +80,13 @@ class Reference(abc.ABC):
     """Reference distribution of one column or score.
 
     Attributes:
-        missing_rate: Share of missing values in the reference data.
+        missing: Share of missing values in the reference data.
         rows: Number of non-missing reference observations (drives the
             sampling-noise floor of PSI).
         kind: Discriminator used when persisting.
     """
 
-    missing_rate: float
+    missing: float
     rows: int = 0
     kind: ClassVar[str]
 
@@ -129,7 +129,7 @@ class Reference(abc.ABC):
         """
         return divergence(self.expected(), self.proportions(values))
 
-    def noise_floor(self, new_rows: int) -> float:
+    def estimate(self, new_rows: int) -> float:
         """Estimates the PSI level that sampling noise alone produces.
 
         With few observations PSI is positive even without drift: its mean is
@@ -159,10 +159,10 @@ class Reference(abc.ABC):
             The adjusted PSI.
         """
         raw = self.psi(values)
-        floor = self.noise_floor(int(values.notna().sum()))
+        floor = self.estimate(int(values.notna().sum()))
         return max(raw - floor, 0.0)
 
-    def unseen_rate(
+    def rate(
         self,
         values: pandas.Series,  # noqa: ARG002 -- subclasses override with this signature
     ) -> float:
@@ -254,7 +254,7 @@ class Deciles(Reference):
         return REFERENCE.upgrade(
             {
                 "kind": self.kind,
-                "missing_rate": self.missing_rate,
+                "missing_rate": self.missing,
                 "rows": self.rows,
                 "edges": list(self.edges),
                 "fractions": list(self.fractions),
@@ -263,7 +263,7 @@ class Deciles(Reference):
 
 
 @dataclasses.dataclass(frozen=True)
-class CategoricalReference(Reference):
+class Frequencies(Reference):
     """Category frequency distribution.
 
     Attributes:
@@ -328,7 +328,7 @@ class CategoricalReference(Reference):
         """
         return numpy.array([self.frequencies[level] for level in self.levels()])
 
-    def unseen_rate(self, values: pandas.Series) -> float:
+    def rate(self, values: pandas.Series) -> float:
         """Computes the share of new values with a category unseen in training.
 
         Args:
@@ -353,7 +353,7 @@ class CategoricalReference(Reference):
         return REFERENCE.upgrade(
             {
                 "kind": self.kind,
-                "missing_rate": self.missing_rate,
+                "missing_rate": self.missing,
                 "rows": self.rows,
                 "frequencies": self.frequencies,
             }
@@ -361,7 +361,7 @@ class CategoricalReference(Reference):
 
 
 REFERENCE_KINDS: dict[str, type[Reference]] = {
-    cls.kind: cls for cls in (Deciles, CategoricalReference)
+    cls.kind: cls for cls in (Deciles, Frequencies)
 }
 
 
@@ -386,9 +386,7 @@ def rebuild(record: dict[str, Any]) -> Reference:
             tuple(record["edges"]),
             tuple(record["fractions"]),
         )
-    return CategoricalReference(
-        record["missing"], record["rows"], record["frequencies"]
-    )
+    return Frequencies(record["missing"], record["rows"], record["frequencies"])
 
 
 @dataclasses.dataclass(frozen=True)
@@ -446,12 +444,10 @@ class Baseline:
                 references[column] = Deciles.fit(features[column])
         for column in plan.categorical:
             if column in features.columns:
-                references[column] = CategoricalReference.fit(features[column])
+                references[column] = Frequencies.fit(features[column])
         numeric_output = pandas.api.types.is_numeric_dtype(output)
         output_reference = (
-            Deciles.fit(output)
-            if numeric_output
-            else CategoricalReference.fit(output)
+            Deciles.fit(output) if numeric_output else Frequencies.fit(output)
         )
         return cls(references, output_reference, name, metrics)
 

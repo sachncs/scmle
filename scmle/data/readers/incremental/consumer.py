@@ -22,7 +22,7 @@ class Ingestor:
     Attributes:
         source: The event source.
         ledger: The ledger holding the durable state.
-        consumer_group: Name of the consumer group, stripped of
+        group: Name of the consumer group, stripped of
             surrounding whitespace.
         writer: Callable receiving the tuple of unseen events.
         acknowledge: Callable that delivers an acknowledgement to the
@@ -35,7 +35,7 @@ class Ingestor:
         ledger: store.Ledger,
         consumer_group: str,
         writer: Callable[[tuple[timeline.Event, ...]], None],
-        acknowledge: Callable[[evidence.EventAcknowledgement], None],
+        acknowledge: Callable[[evidence.Acknowledgement], None],
     ) -> None:
         """Initializes a consumer around explicit transport and sink seams.
 
@@ -49,7 +49,7 @@ class Ingestor:
                 transport.
 
         Raises:
-            ValueError: If `consumer_group` is blank.
+            ValueError: If `group` is blank.
             IncrementalError: With code "source_mismatch" if the source and
                 ledger identities differ.
             TypeError: If `writer` or `acknowledge` is not callable.
@@ -57,12 +57,12 @@ class Ingestor:
         group = consumer_group.strip()
         if not group:
             raise errors.InputError("consumer_group must not be empty")
-        if source.source_identity != ledger.source_identity:
+        if source.identity != ledger.identity:
             raise timeline.IncrementalError(
                 "source_mismatch",
                 "source does not match consumer ledger",
-                ledger.source_identity,
-                {"source_identity": source.source_identity},
+                ledger.identity,
+                {"source_identity": source.identity},
             )
         if not callable(writer):
             raise errors.KindError("writer must be callable")
@@ -70,7 +70,7 @@ class Ingestor:
             raise errors.KindError("acknowledge must be callable")
         self.source = source
         self.ledger = ledger
-        self.consumer_group = group
+        self.group = group
         self.writer = writer
         self.acknowledge = acknowledge
 
@@ -89,11 +89,11 @@ class Ingestor:
         pending = self.ledger.reclaim()
         if pending is None:
             return ()
-        if pending.consumer != self.consumer_group:
+        if pending.consumer != self.group:
             raise timeline.IncrementalError(
                 "consumer_group_mismatch",
                 "pending acknowledgement belongs to another consumer group",
-                self.source.source_uri,
+                self.source.uri,
                 {"pending_group": pending.consumer},
             )
         try:
@@ -102,9 +102,9 @@ class Ingestor:
             raise timeline.IncrementalError(
                 "acknowledgement_failed",
                 "transport acknowledgement failed; retry is required",
-                self.source.source_uri,
+                self.source.uri,
                 {
-                    "consumer_group": self.consumer_group,
+                    "consumer_group": self.group,
                     "event_ids": list(pending.events),
                 },
             ) from error
@@ -125,27 +125,25 @@ class Ingestor:
             delivered in this cycle.
         """
         self.handoff()
-        batch = self.ledger.read_batch(self.source, limit)
+        batch = self.ledger.read(self.source, limit)
         event_ids = tuple(
             sorted(
-                set(batch.event_ids)
-                | set(batch.duplicate_event_ids)
-                | set(batch.late_event_ids)
+                set(batch.identities) | set(batch.duplicates) | set(batch.late)
             )
         )
-        acknowledgement = evidence.EventAcknowledgement(
-            source=self.source.source_identity,
-            consumer=self.consumer_group,
+        acknowledgement = evidence.Acknowledgement(
+            source=self.source.identity,
+            consumer=self.group,
             events=event_ids,
-            checkpoint=batch.next_checkpoint,
+            checkpoint=batch.checkpoint,
         )
         receipt = self.ledger.finalize(
             batch.events, self.writer, acknowledgement
         )
         acknowledged = self.handoff()
         return evidence.Consumption(
-            source_identity=self.source.source_identity,
-            consumer_group=self.consumer_group,
+            identity=self.source.identity,
+            group=self.group,
             receipt=receipt,
-            acknowledged_event_ids=acknowledged,
+            acknowledged=acknowledged,
         )

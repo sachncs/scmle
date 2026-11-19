@@ -14,10 +14,10 @@ summaries), `inspection` (the data observers) and `manifest` (`Catalog`).
 
 # ruff: noqa: F401 - the names below are re-exported for existing callers.
 
-from scmle.data.catalog.canon import canonical_collection
 from scmle.data.catalog.canon import canonicalize
 from scmle.data.catalog.canon import canonize
-from scmle.data.catalog.canon import digest_value
+from scmle.data.catalog.canon import convert
+from scmle.data.catalog.canon import fingerprint
 from scmle.data.catalog.canon import normalise
 from scmle.data.catalog.evidence import Duplication
 from scmle.data.catalog.evidence import Field
@@ -31,8 +31,8 @@ from scmle.data.catalog.inspection import coerce
 from scmle.data.catalog.inspection import dedupe
 from scmle.data.catalog.inspection import describe
 from scmle.data.catalog.inspection import examine
+from scmle.data.catalog.inspection import extract
 from scmle.data.catalog.inspection import fallback
-from scmle.data.catalog.inspection import frame_content
 from scmle.data.catalog.inspection import frame_for_mapping
 from scmle.data.catalog.inspection import frame_for_pandas
 from scmle.data.catalog.inspection import MATRIX_DIMENSIONS

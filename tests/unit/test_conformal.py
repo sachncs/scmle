@@ -137,7 +137,7 @@ def test_sensitivity_below_the_minimum_rows_is_skipped_not_raised():
 
     partition = SimpleNamespace(
         task=tasks.Task.REGRESSION,
-        split=SimpleNamespace(dev_target=numpy.arange(10.0)),
+        split=SimpleNamespace(target=numpy.arange(10.0)),
     )
     context = SimpleNamespace(
         get={profiling.Partition: partition}.__getitem__,

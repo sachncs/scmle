@@ -53,8 +53,8 @@ def test_near_the_boundary_the_report_says_inconclusive():
         power=0.8,
     )
     assert report.verdict == "feasible"
-    assert report.s_d_interval[0] < report.s_d < report.s_d_interval[1]
-    assert report.to_dict()["interval"][0] == report.s_d_interval[0]
+    assert report.interval[0] < report.deviation < report.interval[1]
+    assert report.to_dict()["interval"][0] == report.interval[0]
 
 
 def test_invalid_inputs_are_rejected():

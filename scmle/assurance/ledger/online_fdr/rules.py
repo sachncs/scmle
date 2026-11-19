@@ -438,10 +438,10 @@ class Settings:
         w0 = record["w0"]
         return cls(
             rule=record["rule"],
-            alpha=budget.parse_fraction(record["alpha"], "alpha"),
+            alpha=budget.parse(record["alpha"], "alpha"),
             horizon=record["horizon"],
-            w0=None if w0 is None else budget.parse_fraction(w0, "w0"),
-            lam=budget.parse_fraction(record["lambda"], "lambda"),
+            w0=None if w0 is None else budget.parse(w0, "w0"),
+            lam=budget.parse(record["lambda"], "lambda"),
             kappa=record["kappa"],
         )
 

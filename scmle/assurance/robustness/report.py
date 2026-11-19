@@ -1,7 +1,7 @@
 """`stability_report.json` and `shift_report.json` for a charter run.
 
 Both documents carry a `schema_version` and are checked by `conform`
-and `validate_shift`, which raise `ValueError` on a missing key or an unknown
+and `validate`, which raise `ValueError` on a missing key or an unknown
 status. Specification-curve data (one effect and interval per specification)
 and the choice-to-result attribution are inside each finding.
 """
@@ -18,7 +18,7 @@ from scmle.contracts import errors
 # Version 2: the nested records spell their keys in single words (the
 # stability rule, the permutation curve, coverage cells, forward findings and
 # drift rows; see each record's `to_dict`). Version 1 documents still pass
-# `conform` and `validate_shift`, whose keys did not change.
+# `conform` and `validate`, whose keys did not change.
 SCHEMA_VERSION = 2
 STABILITY_KEYS = (
     "schema_version",
@@ -90,9 +90,7 @@ def stability_report(
         "or time blocks when the data have them",
         "rule": found.rule.to_dict(),
         "grid": {
-            "declaration_sha256": None
-            if grid is None
-            else grid.declaration_sha256,
+            "declaration_sha256": None if grid is None else grid.digest,
             "total": None if grid is None else grid.total,
             "run": None if grid is None else len(grid.specs),
             "subset": None if grid is None else grid.subset,
@@ -102,13 +100,13 @@ def stability_report(
             "stored row order",
         },
         "certificate": {
-            "gate": found.stability_gate.value,
+            "gate": found.gate.value,
             "note": found.store_note
-            or found.rule_note
+            or found.note
             or (
                 "a current passing certificate lets a fragile verdict "
                 "quarantine"
-                if found.stability_gate.value == "gating"
+                if found.gate.value == "gating"
                 else "no current passing certificate: a fragile verdict is a "
                 "warning"
             ),
@@ -126,7 +124,7 @@ def stability_report(
     }
 
 
-def shift_report(found: qualify.Robustness) -> dict[str, Any]:
+def report(found: qualify.Robustness) -> dict[str, Any]:
     """Builds the `shift_report.json` document.
 
     Args:
@@ -137,8 +135,8 @@ def shift_report(found: qualify.Robustness) -> dict[str, Any]:
     """
     result = found.shift.to_dict()
     gates = {
-        shift.C2ST_ID: found.c2st_gate.value,
-        shift.MMD_ID: found.mmd_gate.value,
+        shift.C2ST_ID: found.classifier.value,
+        shift.MMD_ID: found.kernel.value,
     }
     return {
         "schema_version": SCHEMA_VERSION,
@@ -209,7 +207,7 @@ def conform(document: dict[str, Any]) -> None:
             raise errors.InputError("a finding has an unknown status")
 
 
-def validate_shift(document: dict[str, Any]) -> None:
+def validate(document: dict[str, Any]) -> None:
     """Checks the structure of a shift report.
 
     Args:

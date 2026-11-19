@@ -404,7 +404,7 @@ class RejectionRate:
     @property
     def interval(self) -> tuple[float, float]:
         """Wilson interval for the rejection probability."""
-        return certificates.wilson_interval(self.rejections, self.runs)
+        return certificates.bound(self.rejections, self.runs)
 
     @property
     def within_size_band(self) -> bool:

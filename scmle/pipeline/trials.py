@@ -384,11 +384,9 @@ class Runner:
             task=self.task,
             seed=board.services.spec.validation.seed,
             metric=self.metric,
-            positive_label=metrics.positive_label(
-                self.split.dev_target, self.task
-            ),
-            features=self.split.dev_features,
-            target=self.split.dev_target,
+            positive_label=metrics.positive_label(self.split.target, self.task),
+            features=self.split.features,
+            target=self.split.target,
             folds=self.folds,
             threadcap=governor.threadcap,
             ceiling_seconds=governor.deadline(),

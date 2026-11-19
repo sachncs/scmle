@@ -26,9 +26,9 @@ def found_stability(**overrides):
         "rule": Dumped({"s_min": 0.5}),
         "applicable": (),
         "notes": (),
-        "stability_gate": certificates.Authority.GATING,
+        "gate": certificates.Authority.GATING,
         "store_note": "",
-        "rule_note": "",
+        "note": "",
         "fragile": (),
     }
     values.update(overrides)
@@ -87,7 +87,7 @@ def test_the_estimator_and_guarantee_texts_are_stated():
 
 def test_a_grid_and_findings_are_summarised():
     grid = types.SimpleNamespace(
-        declaration_sha256="abc", total=9, specs=(1, 2, 3), subset=True
+        digest="abc", total=9, specs=(1, 2, 3), subset=True
     )
     findings = (
         make_finding("a", stability.STABLE),
@@ -131,9 +131,9 @@ def test_a_grid_and_findings_are_summarised():
 
 def test_the_certificate_note_prefers_the_store_then_the_rule_note():
     both = report.stability_report(
-        found_stability(store_note="store", rule_note="rule")
+        found_stability(store_note="store", note="rule")
     )
-    rule_only = report.stability_report(found_stability(rule_note="rule"))
+    rule_only = report.stability_report(found_stability(note="rule"))
 
     assert both["certificate"] == {"gate": "gating", "note": "store"}
     assert rule_only["certificate"]["note"] == "rule"
@@ -142,7 +142,7 @@ def test_the_certificate_note_prefers_the_store_then_the_rule_note():
 def test_the_default_certificate_note_depends_on_the_gate():
     gating = report.stability_report(found_stability())
     descriptive = report.stability_report(
-        found_stability(stability_gate=certificates.Authority.DESCRIPTIVE)
+        found_stability(gate=certificates.Authority.DESCRIPTIVE)
     )
 
     assert gating["certificate"]["note"] == (
@@ -178,8 +178,8 @@ def found_shift(**overrides):
                 "features": [{"column": "x"}],
             }
         ),
-        "c2st_gate": certificates.Authority.GATING,
-        "mmd_gate": certificates.Authority.DESCRIPTIVE,
+        "classifier": certificates.Authority.GATING,
+        "kernel": certificates.Authority.DESCRIPTIVE,
         "coverage": (Dumped({"level": "l1"}), Dumped({"level": "l2"})),
         "forward": Dumped({"status": "skipped"}),
         "store_note": "note",
@@ -190,7 +190,7 @@ def found_shift(**overrides):
 
 
 def test_the_shift_report_carries_each_part():
-    document = report.shift_report(found_shift())
+    document = report.report(found_shift())
 
     assert document["schema_version"] == 2
     assert document["status"] == "pass"
@@ -314,24 +314,24 @@ def test_validate_stability_messages_and_findings():
 
 
 def test_validate_shift_messages_and_statuses():
-    document = report.shift_report(found_shift())
+    document = report.report(found_shift())
     document["status"] = "unverifiable"
-    report.validate_shift(document)
-    report.validate_shift({**document, "status": "fail"})
-    report.validate_shift({**document, "status": "pass"})
+    report.validate(document)
+    report.validate({**document, "status": "fail"})
+    report.validate({**document, "status": "pass"})
 
     with pytest.raises(
         ValueError, match=r"^shift report has an unknown status$"
     ):
-        report.validate_shift({**document, "status": "bogus"})
+        report.validate({**document, "status": "bogus"})
     with pytest.raises(
         ValueError,
         match=r"^a pass needs a deployment sample and a test$",
     ):
-        report.validate_shift({**document, "status": "pass", "c2st": None})
-    report.validate_shift({**document, "status": "fail", "c2st": None})
+        report.validate({**document, "status": "pass", "c2st": None})
+    report.validate({**document, "status": "fail", "c2st": None})
     with pytest.raises(ValueError, match=r"^shift report is missing "):
-        report.validate_shift({"schema_version": 1})
+        report.validate({"schema_version": 1})
 
 
 def test_validate_stability_names_the_report_in_its_errors():

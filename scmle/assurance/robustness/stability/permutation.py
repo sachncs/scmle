@@ -23,8 +23,8 @@ class Curve:
 
     Attributes:
         permutations: Number of permuted curves.
-        median_abs_effect: Observed median absolute effect.
-        share_significant: Observed share of specifications with p <= 0.05.
+        median: Observed median absolute effect.
+        significant: Observed share of specifications with p <= 0.05.
         p_median: Permutation p-value of the median absolute effect:
             ``(1 + #{permuted >= observed}) / (permutations + 1)``.
         p_share: The same for the share significant.
@@ -41,8 +41,8 @@ class Curve:
     )
 
     permutations: int
-    median_abs_effect: float
-    share_significant: float
+    median: float
+    significant: float
     p_median: float
     p_share: float
 
@@ -129,9 +129,7 @@ def specify(
         map(
             operator.call,
             itertools.repeat(
-                lambda: summarize(
-                    x, controls.permute_within(y, strata, rng), grid
-                ),
+                lambda: summarize(x, controls.permute(y, strata, rng), grid),
                 permutations,
             ),
         )

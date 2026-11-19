@@ -69,12 +69,12 @@ class Verdict:
     Attributes:
         verdict: `feasible`, `downgrade`, `infeasible` or `inconclusive`.
         scope: `confirmatory` or `exploratory_unconfirmed`.
-        s_d: Standard deviation of the gain on `X`.
-        s_d_interval: Chi-square interval for `s_d`.
+        deviation: Standard deviation of the gain on `X`.
+        interval: Chi-square interval for `deviation`.
         rho: Estimated intraclass correlation.
-        design_effect: `1 + (m - 1) rho`.
-        n_required: Rows needed at the point estimate.
-        n_effective: Confirmation rows divided by the design effect.
+        deff: `1 + (m - 1) rho`.
+        required: Rows needed at the point estimate.
+        effective: Confirmation rows divided by the design effect.
         reason: Why the verdict was reached.
         migrations: The written layout's version steps, oldest first;
             version 2 writes `deviation`, `interval`, `deff`, `required`
@@ -95,23 +95,23 @@ class Verdict:
 
     verdict: str
     scope: str
-    s_d: float
-    s_d_interval: tuple[float, float]
+    deviation: float
+    interval: tuple[float, float]
     rho: float
-    design_effect: float
-    n_required: int
-    n_effective: float
+    deff: float
+    required: int
+    effective: float
     reason: str
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the verdict as a JSON-ready record.
 
         Returns:
-            A mapping of every field to its value, with `s_d_interval` as a
+            A mapping of every field to its value, with `interval` as a
             list.
         """
         record = dataclasses.asdict(self)
-        record["s_d_interval"] = list(self.s_d_interval)
+        record["interval"] = list(self.interval)
         return records.upgrade(self.migrations, record, records.ORIGIN)
 
 

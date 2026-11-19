@@ -262,7 +262,7 @@ class Data(Link):
             problems.append(f"{path} does not hash to the recorded raw source")
         if self.parsable(records, dataset):
             try:
-                parsed = tabular.data_hash(tabular.read_table(path))
+                parsed = tabular.data_hash(tabular.read(path))
             except errors.DataError as error:
                 return [*problems, f"{path} cannot be read: {error}"]
             if parsed != recorded:

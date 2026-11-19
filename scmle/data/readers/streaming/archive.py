@@ -35,10 +35,10 @@ def confine(
             with code "source_snapshot_changed" if `snapshot` is not the
             digest of the file as it is now.
     """
-    expected = source.source_identity()
+    expected = source.identify()
     if identity != expected:
         raise failure.StreamingError(code, messages[0], expected, {})
-    if snapshot != source.snapshot_sha256():
+    if snapshot != source.digest():
         raise failure.StreamingError(
             "source_snapshot_changed", messages[1], expected, {}
         )
@@ -71,8 +71,8 @@ class Archive(sidecar.Sidecar):
                 the state (including its transaction evidence) belongs to
                 another source or another snapshot of the file.
         """
-        snapshot = self.source.snapshot_sha256()
-        identity = self.source.source_identity()
+        snapshot = self.source.digest()
+        identity = self.source.identify()
         if not self.path.exists():
             return transaction.Settlement(
                 progress.Checkpoint(identity, {"snapshot": snapshot})
@@ -121,14 +121,14 @@ class Archive(sidecar.Sidecar):
                 )
         return state
 
-    def read_batch(
+    def read(
         self,
         rows: int = feed.BATCH_ROWS,
         watermark_column: str | None = None,
     ) -> progress.Batch:
         """Reads the next bounded batch from the durable checkpoint.
 
-        Failures from `load` and from the source's `read_batch` propagate
+        Failures from `load` and from the source's `read` propagate
         unchanged.
 
         Args:
@@ -140,11 +140,11 @@ class Archive(sidecar.Sidecar):
             The next batch after the durable checkpoint.
         """
         state = self.load()
-        return self.source.read_batch(
+        return self.source.read(
             state.checkpoint, rows=rows, watermark_column=watermark_column
         )
 
-    def write_atomically(self, state: transaction.Settlement) -> None:
+    def write(self, state: transaction.Settlement) -> None:
         """Publishes state with durable temporary-file replacement.
 
         Args:
@@ -192,7 +192,7 @@ class Archive(sidecar.Sidecar):
             ),
         )
         durability.write_atomically(
-            self.pending_acknowledgement_path,
+            self.pending,
             (
                 json.dumps(acknowledgement.to_dict(), sort_keys=True) + "\n"
             ).encode("utf-8"),
@@ -208,22 +208,18 @@ class Archive(sidecar.Sidecar):
             StreamingError: If the staged file is unreadable or malformed, or
                 belongs to another source or another snapshot of the file.
         """
-        if not self.pending_acknowledgement_path.exists():
+        if not self.pending.exists():
             return None
         try:
             acknowledgement = transaction.Acknowledgement.from_dict(
-                json.loads(
-                    self.pending_acknowledgement_path.read_text(
-                        encoding="utf-8"
-                    )
-                )
+                json.loads(self.pending.read_text(encoding="utf-8"))
             )
         except (OSError, TypeError, ValueError, json.JSONDecodeError) as error:
             raise failure.StreamingError(
                 "invalid_acknowledgement",
                 "pending streaming acknowledgement is unreadable",
-                self.source.source_identity(),
-                {"path": str(self.pending_acknowledgement_path)},
+                self.source.identify(),
+                {"path": str(self.pending)},
             ) from error
         confine(
             self.source,
@@ -243,8 +239,8 @@ class Archive(sidecar.Sidecar):
         Nothing happens if no acknowledgement is staged.
         """
         try:
-            self.pending_acknowledgement_path.unlink()
-            durability.sync_directory(self.pending_acknowledgement_path.parent)
+            self.pending.unlink()
+            durability.sync_directory(self.pending.parent)
         except FileNotFoundError:
             # handled: documented no-op when no acknowledgement staged
             return
@@ -261,8 +257,8 @@ class Archive(sidecar.Sidecar):
         """
         confine(
             self.source,
-            batch.source_identity,
-            batch.snapshot_sha256,
+            batch.identity,
+            batch.snapshot,
             "batch_source_mismatch",
             (
                 "batch belongs to another source",
@@ -285,22 +281,22 @@ class Archive(sidecar.Sidecar):
             StreamingError: If the acknowledgement's source, batch identity or
                 checkpoint differs from the batch's.
         """
-        identity = self.source.source_identity()
-        if acknowledgement.source != batch.source_identity:
+        identity = self.source.identify()
+        if acknowledgement.source != batch.identity:
             raise failure.StreamingError(
                 "acknowledgement_source_mismatch",
                 "acknowledgement does not match the batch source",
                 identity,
                 {},
             )
-        if acknowledgement.batch != batch.batch_id:
+        if acknowledgement.batch != batch.key:
             raise failure.StreamingError(
                 "acknowledgement_batch_mismatch",
                 "acknowledgement does not match the batch",
                 identity,
                 {},
             )
-        if acknowledgement.checkpoint != batch.next_checkpoint:
+        if acknowledgement.checkpoint != batch.checkpoint:
             raise failure.StreamingError(
                 "acknowledgement_checkpoint_mismatch",
                 "acknowledgement does not match the batch checkpoint",
@@ -321,22 +317,22 @@ class Archive(sidecar.Sidecar):
             StreamingError: If the receipt's source, batch identity or
                 checkpoint differs from the batch's.
         """
-        identity = self.source.source_identity()
-        if receipt.source != batch.source_identity:
+        identity = self.source.identify()
+        if receipt.source != batch.identity:
             raise failure.StreamingError(
                 "sink_receipt_source_mismatch",
                 "sink receipt belongs to another source",
                 identity,
                 {"receipt_source_identity": receipt.source},
             )
-        if receipt.batch != batch.batch_id:
+        if receipt.batch != batch.key:
             raise failure.StreamingError(
                 "sink_receipt_batch_mismatch",
                 "sink receipt belongs to another batch",
                 identity,
                 {"receipt_batch_id": receipt.batch},
             )
-        if receipt.checkpoint != batch.next_checkpoint:
+        if receipt.checkpoint != batch.checkpoint:
             raise failure.StreamingError(
                 "sink_receipt_checkpoint_mismatch",
                 "sink receipt belongs to another checkpoint",

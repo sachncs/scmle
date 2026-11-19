@@ -133,9 +133,9 @@ class FinalEvaluationStage(summary.Summary):
         board.services.check()
         partition = board.get(profiling.Partition)
         split = partition.split
-        if not isinstance(split.locked_test, journal.Custodian):
-            split.locked_test = journal.Custodian(
-                split.locked_test,
+        if not isinstance(split.test, journal.Custodian):
+            split.test = journal.Custodian(
+                split.test,
                 journal.Journal.locate(board.services.workspace.directory),
             )
         selected = products.require(
@@ -149,10 +149,10 @@ class FinalEvaluationStage(summary.Summary):
         unmitigated = pipeline
         pipeline, remedy = self.mitigate(board, selected, pipeline, threshold)
         claim = self.pledge(board)
-        locked = split.locked_test
+        locked = split.test
         rows = self.unlock(board, threshold)
         remedy = self.corroborate(remedy, unmitigated, pipeline, *rows)
-        usage = cost.meter(board, pipeline, split.dev_features)
+        usage = cost.meter(board, pipeline, split.features)
         test_metrics = self.measure(board, pipeline, *rows)
         shipped, refit = self.ship(board, pipeline, rows, pseudolabels)
         readings = self.examine(board, pipeline, *rows)
@@ -218,7 +218,7 @@ class FinalEvaluationStage(summary.Summary):
                 selected.params,
                 featurise=board.get(ingestion.Intake).kind.featurise,
             )
-            pipeline.fit(split.dev_features, split.dev_target)
+            pipeline.fit(split.features, split.target)
         return pipeline
 
     def ship(
@@ -263,7 +263,7 @@ class FinalEvaluationStage(summary.Summary):
             board.journal.forgo("refit on every row", reason)
             return evaluated, {
                 "refit": False,
-                "rows": len(split.dev_features),
+                "rows": len(split.features),
                 "reason": reason,
             }
         features, target = pool(split, rows)
@@ -320,7 +320,7 @@ class FinalEvaluationStage(summary.Summary):
         selected = products.require(
             board.get(selecting.Choice).selected, "selected"
         )
-        developed = max(len(split.dev_features), 1)
+        developed = max(len(split.features), 1)
         return board.services.governor.overdue(
             cost.refitcost(board, selected) * (developed + tested) / developed,
             board.services.governor.reserve.parts.get("package", 0.0),
@@ -347,7 +347,7 @@ class FinalEvaluationStage(summary.Summary):
         selected = products.require(
             board.get(selecting.Choice).selected, "selected"
         )
-        locked = split.locked_test
+        locked = split.test
         binding = scoring.pin(selected, decision)
         locked.bind(binding)
         features, target = locked.open(locked.mint(), binding)
@@ -382,10 +382,10 @@ def pool(
         Every row's features and labels, ordered by row id.
     """
     order = numpy.argsort(
-        numpy.concatenate([split.manifest.train_ids, split.manifest.test_ids]),
+        numpy.concatenate([split.manifest.training, split.manifest.test]),
         kind="stable",
     )
-    parts = [split.dev_features, rows[0], split.dev_target, rows[1]]
+    parts = [split.features, rows[0], split.target, rows[1]]
     parts = [part.copy(deep=False) for part in parts]
     for part in parts:
         # `pandas.concat` compares the parts' `attrs`, which fails when a

@@ -37,22 +37,22 @@ def flac_probe(payload: bytes) -> audio.Metadata:
 
 def test_audio_wav_ingestion_preserves_identity_and_profile():
     """WAV metadata and bytes are bound to the same immutable sample."""
-    sample = audio.Sample.from_bytes(wav_bytes(), source="clip.wav")
+    sample = audio.Sample.decode(wav_bytes(), source="clip.wav")
 
     assert sample.source.endswith("/clip.wav")
     assert sample.metadata.sample_rate == 8
     assert sample.metadata.channels == 1
     assert sample.profile().duration_seconds == 1.0
-    assert sample.file_hash == hashlib.sha256(sample.encoded_bytes).hexdigest()
+    assert sample.file_hash == hashlib.sha256(sample.encoded).hexdigest()
 
 
 def test_audio_non_wav_requires_explicit_probe():
     """Unknown containers do not silently acquire a codec dependency."""
     with pytest.raises(audio.DecoderError):
-        audio.Sample.from_bytes(b"opaque-audio", source="clip.flac")
+        audio.Sample.decode(b"opaque-audio", source="clip.flac")
 
     with pytest.raises(audio.DecoderError):
-        audio.Sample.from_bytes(
+        audio.Sample.decode(
             b"opaque-audio",
             source="clip.flac",
             probe=failing_probe,
@@ -61,8 +61,8 @@ def test_audio_non_wav_requires_explicit_probe():
 
 def test_audio_dataset_rejects_duplicate_sources():
     """Duplicate source identities are a curation error, not two samples."""
-    first = audio.Sample.from_bytes(wav_bytes(), source="one.wav")
-    duplicate = audio.Sample.from_bytes(wav_bytes(), source="one.wav")
+    first = audio.Sample.decode(wav_bytes(), source="one.wav")
+    duplicate = audio.Sample.decode(wav_bytes(), source="one.wav")
 
     with pytest.raises(audio.ValidationError, match="duplicate sources"):
         audio.Dataset((first, duplicate))
@@ -70,26 +70,26 @@ def test_audio_dataset_rejects_duplicate_sources():
 
 def test_audio_curation_reports_metadata_and_label_composition():
     """Audio data understanding is explicit before a model is selected."""
-    sample = audio.Sample.from_bytes(wav_bytes(), source="one.wav")
+    sample = audio.Sample.decode(wav_bytes(), source="one.wav")
 
     report = audio.Dataset((sample,)).curate()
 
     assert report.modality == "audio"
-    assert report.sample_count == 1
+    assert report.samples == 1
     assert report.profile["sample_rates"] == [8]
     assert report.profile["label_counts"] == {"unlabeled": 1}
-    assert report.release_ready
+    assert report.release
 
 
 def test_audio_curation_hash_matches_source_order_identity():
     """Audio curation remains attached when source order is non-sorted."""
     samples = (
-        audio.Sample.from_bytes(wav_bytes(), source="z-last.wav"),
-        audio.Sample.from_bytes(wav_bytes(), source="a-first.wav"),
+        audio.Sample.decode(wav_bytes(), source="z-last.wav"),
+        audio.Sample.decode(wav_bytes(), source="a-first.wav"),
     )
     dataset = audio.Dataset(samples)
 
-    assert dataset.curate().dataset_hash == dataset.content_hash
+    assert dataset.curate().dataset_hash == dataset.digest
 
 
 def test_audio_transcript_provenance_is_bounded_and_curated():
@@ -98,7 +98,7 @@ def test_audio_transcript_provenance_is_bounded_and_curated():
         text="hello world",
         source="transcriber://run-7",
         provider="acme-asr",
-        provider_version="2026.10",
+        version="2026.10",
         language="en",
         segments=(
             audio.Segment(0.0, 0.5, "hello", 0.9),
@@ -106,7 +106,7 @@ def test_audio_transcript_provenance_is_bounded_and_curated():
         ),
         confidence=0.85,
     )
-    sample = audio.Sample.from_bytes(
+    sample = audio.Sample.decode(
         wav_bytes(), source="spoken.wav", transcript=transcript
     )
 
@@ -119,7 +119,7 @@ def test_audio_transcript_provenance_is_bounded_and_curated():
     assert report.profile["transcript_sources"] == ["transcriber://run-7"]
     assert report.profile["transcript_segment_count"] == 2
     assert report.profile["transcript_confidence_min"] == 0.8
-    assert report.quality_findings == ()
+    assert report.findings == ()
 
 
 def test_audio_transcript_confidence_and_timing_fail_closed():
@@ -128,31 +128,31 @@ def test_audio_transcript_confidence_and_timing_fail_closed():
         text="hello",
         source="transcriber://run-8",
         provider="acme-asr",
-        provider_version="2026.10",
+        version="2026.10",
         language="en",
         segments=(audio.Segment(0.0, 0.5, "hello"),),
     )
     report = audio.Dataset(
         (
-            audio.Sample.from_bytes(
+            audio.Sample.decode(
                 wav_bytes(), source="uncertain.wav", transcript=uncertain
             ),
         )
     ).curate()
 
-    assert [finding.identifier for finding in report.quality_findings] == [
+    assert [finding.identifier for finding in report.findings] == [
         "quality.audio-transcript-confidence-missing",
     ]
     out_of_range = audio.Transcript(
         text="too long",
         source="transcriber://run-9",
         provider="acme-asr",
-        provider_version="2026.10",
+        version="2026.10",
         language="en",
         segments=(audio.Segment(0.0, 2.0, "too long"),),
     )
     with pytest.raises(audio.ValidationError, match="exceeds audio"):
-        audio.Sample.from_bytes(
+        audio.Sample.decode(
             wav_bytes(), source="bad.wav", transcript=out_of_range
         )
 
@@ -164,10 +164,10 @@ def test_audio_curation_blocks_conflicting_duplicate_labels():
     """
     dataset = audio.Dataset(
         (
-            audio.Sample.from_bytes(
+            audio.Sample.decode(
                 wav_bytes(), source="first.wav", label="speech"
             ),
-            audio.Sample.from_bytes(
+            audio.Sample.decode(
                 wav_bytes(), source="second.wav", label="music"
             ),
         )
@@ -176,7 +176,7 @@ def test_audio_curation_blocks_conflicting_duplicate_labels():
     report = dataset.curate()
 
     assert report.profile["conflicting_label_groups"]
-    assert report.release_ready is False
+    assert report.release is False
     assert [finding.identifier for finding in report.risk_findings] == [
         "risk.audio-conflicting-duplicate-labels",
     ]
@@ -184,42 +184,40 @@ def test_audio_curation_blocks_conflicting_duplicate_labels():
 
 def test_audio_feature_preparation_is_bounded_and_explainable():
     """Signal features expose the observed prefix and deterministic names."""
-    sample = audio.Sample.from_bytes(wav_bytes(frame_count=8), source="one.wav")
+    sample = audio.Sample.decode(wav_bytes(frame_count=8), source="one.wav")
 
-    prepared = audio.Dataset((sample,)).prepare_features(max_frames=3)
+    prepared = audio.Dataset((sample,)).prepare(max_frames=3)
 
     assert prepared.shape == (1, 13)
-    assert prepared.frames_observed == (3,)
-    assert prepared.frames_truncated == (True,)
-    assert prepared.feature_names[:4] == (
+    assert prepared.observed == (3,)
+    assert prepared.truncated == (True,)
+    assert prepared.names[:4] == (
         "mean_amplitude",
         "mean_absolute_amplitude",
         "rms_amplitude",
         "peak_amplitude",
     )
-    assert prepared.to_numpy()[0, 2] == 0.0
+    assert prepared.materialize()[0, 2] == 0.0
 
 
 def test_audio_feature_preparation_supports_a_bounded_window():
     """A decoded WAV window remains tied to its source frame boundary."""
-    sample = audio.Sample.from_bytes(wav_bytes(frame_count=8), source="one.wav")
+    sample = audio.Sample.decode(wav_bytes(frame_count=8), source="one.wav")
 
-    prepared = audio.Dataset((sample,)).prepare_features(
-        max_frames=3, start_frame=4
-    )
+    prepared = audio.Dataset((sample,)).prepare(max_frames=3, start_frame=4)
 
-    assert prepared.frames_observed == (3,)
-    assert prepared.to_numpy()[0, 7] == 3.0
+    assert prepared.observed == (3,)
+    assert prepared.materialize()[0, 7] == 3.0
 
 
 def test_audio_feature_preparation_requires_a_wav_decoder():
     """Explicit probe metadata does not silently imply signal decoding."""
-    sample = audio.Sample.from_bytes(
+    sample = audio.Sample.decode(
         b"opaque-audio", source="clip.flac", probe=flac_probe
     )
 
     with pytest.raises(audio.DecoderError, match="WAV decoder"):
-        audio.Dataset((sample,)).prepare_features()
+        audio.Dataset((sample,)).prepare()
 
 
 def test_audio_split_keeps_explicit_speaker_groups_together():
@@ -228,7 +226,7 @@ def test_audio_split_keeps_explicit_speaker_groups_together():
     Also enforces website/src/pages/docs/modalities.astro:42.
     """
     samples = tuple(
-        audio.Sample.from_bytes(
+        audio.Sample.decode(
             wav_bytes(),
             source=f"clip-{index}.wav",
             label="speech",
@@ -254,17 +252,15 @@ def test_video_metadata_is_explicit_and_profiled():
         format="mp4",
         width=1920,
         height=1080,
-        frame_count=60,
-        frames_per_second=30.0,
+        frames=60,
+        rate=30.0,
         codec="h264",
-        audio_tracks=1,
+        tracks=1,
     )
-    sample = video.Sample.from_bytes(
-        b"video-bytes", metadata, source="sample.mp4"
-    )
+    sample = video.Sample.decode(b"video-bytes", metadata, source="sample.mp4")
 
-    assert sample.profile().duration_seconds == 2.0
-    assert sample.profile().audio_tracks == 1
+    assert sample.profile().duration == 2.0
+    assert sample.profile().tracks == 1
     assert sample.source.endswith("/sample.mp4")
 
 
@@ -279,10 +275,10 @@ def test_video_curation_records_explicit_audio_video_synchronization():
         "h264",
         1,
         audio_duration_seconds=2.02,
-        sync_offset_seconds=0.05,
-        sync_tolerance_seconds=0.1,
+        offset=0.05,
+        tolerance=0.1,
     )
-    sample = video.Sample.from_bytes(
+    sample = video.Sample.decode(
         b"synchronized-video", metadata, source="synced.mp4"
     )
 
@@ -293,7 +289,7 @@ def test_video_curation_records_explicit_audio_video_synchronization():
     assert report.profile["synchronization_statuses"] == [
         "within_tolerance",
     ]
-    assert report.quality_findings == ()
+    assert report.findings == ()
 
 
 def test_video_curation_hash_matches_source_order_identity():
@@ -301,12 +297,12 @@ def test_video_curation_hash_matches_source_order_identity():
     metadata = video.Metadata("mp4", 2, 2, 1, 1.0, "h264")
     dataset = video.Dataset(
         (
-            video.Sample.from_bytes(b"z-video", metadata, "z-last.mp4"),
-            video.Sample.from_bytes(b"a-video", metadata, "a-first.mp4"),
+            video.Sample.decode(b"z-video", metadata, "z-last.mp4"),
+            video.Sample.decode(b"a-video", metadata, "a-first.mp4"),
         )
     )
 
-    assert dataset.curate().dataset_hash == dataset.content_hash
+    assert dataset.curate().dataset_hash == dataset.digest
 
 
 def test_video_temporal_split_normalizes_time_and_records_coverage():
@@ -318,7 +314,7 @@ def test_video_temporal_split_normalizes_time_and_records_coverage():
     """
     metadata = video.Metadata("mp4", 2, 2, 1, 1.0, "h264")
     samples = tuple(
-        video.Sample.from_bytes(
+        video.Sample.decode(
             f"video-{index}".encode(),
             metadata,
             source=f"video-{index}.mp4",
@@ -337,9 +333,7 @@ def test_video_temporal_split_normalizes_time_and_records_coverage():
     split = dataset.cutover("2026-01-02T00:00:00+00:00")
     report = dataset.curate()
 
-    assert dataset.samples[0].observation_time == datetime(
-        2026, 1, 1, tzinfo=UTC
-    )
+    assert dataset.samples[0].time == datetime(2026, 1, 1, tzinfo=UTC)
     assert len(split.train) == 2
     assert len(split.future) == 1
     assert not split.lookahead
@@ -357,13 +351,13 @@ def test_video_temporal_state_fails_closed_when_incomplete():
     metadata = video.Metadata("mp4", 2, 2, 1, 1.0, "h264")
     dataset = video.Dataset(
         (
-            video.Sample.from_bytes(
+            video.Sample.decode(
                 b"timed-video",
                 metadata,
                 source="timed.mp4",
                 observation_time="2026-01-01T00:00:00Z",
             ),
-            video.Sample.from_bytes(
+            video.Sample.decode(
                 b"untimed-video", metadata, source="untimed.mp4"
             ),
         )
@@ -377,12 +371,12 @@ def test_video_temporal_state_fails_closed_when_incomplete():
         "untimed_video_count": 1,
     }
     assert "quality.video-mixed-temporal-state" in {
-        finding.identifier for finding in report.quality_findings
+        finding.identifier for finding in report.findings
     }
-    with pytest.raises(video.VideoTemporalError, match="every video"):
+    with pytest.raises(video.TemporalError, match="every video"):
         dataset.cutover("2026-01-02T00:00:00Z")
-    with pytest.raises(video.VideoTemporalError, match="timezone"):
-        video.canonical_observation_time("2026-01-01T00:00:00")
+    with pytest.raises(video.TemporalError, match="timezone"):
+        video.timestamp("2026-01-01T00:00:00")
 
 
 def test_video_curation_blocks_measured_sync_drift_and_surfaces_unknown_sync():
@@ -396,24 +390,24 @@ def test_video_curation_blocks_measured_sync_drift_and_surfaces_unknown_sync():
         "h264",
         1,
         audio_duration_seconds=2.4,
-        sync_offset_seconds=0.4,
-        sync_tolerance_seconds=0.1,
+        offset=0.4,
+        tolerance=0.1,
     )
     unknown = video.Metadata("mp4", 2, 2, 60, 30.0, "h264", 1)
 
     drift_report = video.Dataset(
-        (video.Sample.from_bytes(b"drift", drifted, "drift.mp4"),)
+        (video.Sample.decode(b"drift", drifted, "drift.mp4"),)
     ).curate()
     unknown_report = video.Dataset(
-        (video.Sample.from_bytes(b"unknown", unknown, "unknown.mp4"),)
+        (video.Sample.decode(b"unknown", unknown, "unknown.mp4"),)
     ).curate()
 
-    assert drift_report.release_ready is False
-    assert drift_report.quality_findings[0].identifier == (
+    assert drift_report.release is False
+    assert drift_report.findings[0].identifier == (
         "quality.video-audio-sync-out-of-tolerance"
     )
-    assert unknown_report.release_ready
-    assert unknown_report.quality_findings[0].identifier == (
+    assert unknown_report.release
+    assert unknown_report.findings[0].identifier == (
         "quality.video-audio-sync-unknown"
     )
 
@@ -425,7 +419,7 @@ def test_video_rejects_hash_mismatch():
     with pytest.raises(ValueError, match="file_hash"):
         video.Sample(
             source="memory://video",
-            encoded_bytes=b"video",
+            encoded=b"video",
             file_hash="0" * 64,
             metadata=metadata,
         )
@@ -437,8 +431,8 @@ def test_video_curation_surfaces_encoding_and_dimension_drift():
     second_metadata = video.Metadata("webm", 4, 4, 2, 1.0, "vp9")
     dataset = video.Dataset(
         (
-            video.Sample.from_bytes(b"one", first_metadata, "one.mp4"),
-            video.Sample.from_bytes(b"two", second_metadata, "two.webm"),
+            video.Sample.decode(b"one", first_metadata, "one.mp4"),
+            video.Sample.decode(b"two", second_metadata, "two.webm"),
         )
     )
 
@@ -446,7 +440,7 @@ def test_video_curation_surfaces_encoding_and_dimension_drift():
 
     assert report.profile["formats"] == ["mp4", "webm"]
     assert report.profile["dimensions"] == [[2, 2], [4, 4]]
-    assert [finding.identifier for finding in report.quality_findings] == [
+    assert [finding.identifier for finding in report.findings] == [
         "quality.video-encoding-drift",
         "quality.video-dimension-drift",
     ]
@@ -460,10 +454,10 @@ def test_video_curation_blocks_conflicting_duplicate_labels():
     metadata = video.Metadata("mp4", 2, 2, 1, 1.0, "h264")
     dataset = video.Dataset(
         (
-            video.Sample.from_bytes(
+            video.Sample.decode(
                 b"same-video", metadata, "first.mp4", label="event"
             ),
-            video.Sample.from_bytes(
+            video.Sample.decode(
                 b"same-video", metadata, "second.mp4", label="background"
             ),
         )
@@ -472,7 +466,7 @@ def test_video_curation_blocks_conflicting_duplicate_labels():
     report = dataset.curate()
 
     assert report.profile["conflicting_label_groups"]
-    assert report.release_ready is False
+    assert report.release is False
     assert [finding.identifier for finding in report.risk_findings] == [
         "risk.video-conflicting-duplicate-labels",
     ]
@@ -485,30 +479,28 @@ def test_video_metadata_features_are_numeric_and_decoder_free():
     Also enforces website/src/pages/docs/data.astro:355.
     """
     metadata = video.Metadata("mp4", 1920, 1080, 60, 30.0, "h264", 1)
-    sample = video.Sample.from_bytes(
-        b"video-bytes", metadata, source="sample.mp4"
-    )
+    sample = video.Sample.decode(b"video-bytes", metadata, source="sample.mp4")
 
     prepared = video.Dataset((sample,)).numerize()
 
     assert prepared.shape == (1, 10)
-    assert prepared.feature_names[:5] == (
+    assert prepared.names[:5] == (
         "duration_seconds",
         "width",
         "height",
         "pixel_count",
         "aspect_ratio",
     )
-    assert prepared.to_numpy()[0, 0] == 2.0
-    assert prepared.to_numpy()[0, 4] == 1920 / 1080
+    assert prepared.materialize()[0, 0] == 2.0
+    assert prepared.materialize()[0, 4] == 1920 / 1080
 
 
 def test_video_metadata_features_preserve_sample_order():
     """Feature rows remain bound to canonical source order."""
-    first = video.Sample.from_bytes(
+    first = video.Sample.decode(
         b"one", video.Metadata("mp4", 2, 2, 2, 2.0, "h264"), "one.mp4"
     )
-    second = video.Sample.from_bytes(
+    second = video.Sample.decode(
         b"two", video.Metadata("mp4", 4, 2, 4, 2.0, "h264"), "two.mp4"
     )
 
@@ -516,19 +508,17 @@ def test_video_metadata_features_preserve_sample_order():
 
     assert prepared.sources[0].endswith("/one.mp4")
     assert prepared.sources[1].endswith("/two.mp4")
-    assert prepared.to_numpy()[:, 1].tolist() == [2.0, 4.0]
+    assert prepared.materialize()[:, 1].tolist() == [2.0, 4.0]
 
 
 def test_video_frame_features_use_a_bounded_explicit_decoder():
     """Temporal features record evenly sampled frame identities."""
     metadata = video.Metadata("mp4", 4, 4, 5, 2.0, "h264")
-    sample = video.Sample.from_bytes(
-        b"video-bytes", metadata, source="sample.mp4"
-    )
+    sample = video.Sample.decode(b"video-bytes", metadata, source="sample.mp4")
     calls: list[int] = []
 
     def decoder(payload: bytes, frame_index: int) -> numpy.ndarray:
-        assert payload == sample.encoded_bytes
+        assert payload == sample.encoded
         calls.append(frame_index)
         return numpy.full((2, 2, 3), frame_index, dtype=numpy.uint8)
 
@@ -537,12 +527,12 @@ def test_video_frame_features_use_a_bounded_explicit_decoder():
     )
 
     assert calls == [0, 2, 4]
-    assert prepared.sampled_frame_indices == ((0, 2, 4),)
+    assert prepared.frames == ((0, 2, 4),)
     assert prepared.shape == (1, 15)
-    assert prepared.feature_names[0] == "frame[0].mean"
-    assert prepared.to_numpy()[0, 0] == 0.0
-    assert prepared.to_numpy()[0, 5] == 2.0
-    assert prepared.to_numpy()[0, 14] == 1.0
+    assert prepared.names[0] == "frame[0].mean"
+    assert prepared.materialize()[0, 0] == 0.0
+    assert prepared.materialize()[0, 5] == 2.0
+    assert prepared.materialize()[0, 14] == 1.0
 
 
 def test_video_frame_features_reject_oversized_decoded_frames():
@@ -551,9 +541,7 @@ def test_video_frame_features_reject_oversized_decoded_frames():
     Also enforces website/src/pages/docs/api.astro:354.
     """
     metadata = video.Metadata("mp4", 4, 4, 1, 1.0, "h264")
-    sample = video.Sample.from_bytes(
-        b"video-bytes", metadata, source="sample.mp4"
-    )
+    sample = video.Sample.decode(b"video-bytes", metadata, source="sample.mp4")
 
     with pytest.raises(video.VideoError, match="pixel limit"):
         video.Dataset((sample,)).summarize(
@@ -565,7 +553,7 @@ def test_video_frame_features_reject_oversized_decoded_frames():
 def test_video_split_keeps_explicit_subject_groups_together():
     """Grouped splitting prevents subject leakage across partitions."""
     samples = tuple(
-        video.Sample.from_bytes(
+        video.Sample.decode(
             f"video-{index}".encode(),
             video.Metadata("mp4", 2, 2, 2, 2.0, "h264"),
             source=f"clip-{index}.mp4",
@@ -592,7 +580,7 @@ def test_video_split_keeps_explicit_subject_groups_together():
 
 def test_geospatial_feature_collection_preserves_bounds_and_crs():
     """GeoJSON validation produces deterministic geometry understanding."""
-    dataset = geospatial.Dataset.from_geojson(
+    dataset = geospatial.Dataset.parse(
         {
             "type": "FeatureCollection",
             "features": [
@@ -618,8 +606,8 @@ def test_geospatial_feature_collection_preserves_bounds_and_crs():
     )
 
     profile = dataset.profile()
-    assert profile.feature_count == 2
-    assert profile.geometry_types == ("LineString", "Point")
+    assert profile.features == 2
+    assert profile.geometries == ("LineString", "Point")
     assert profile.crs == "EPSG:4326"
     assert profile.bounds == (-3.0, -2.0, 5.0, 4.0)
     assert dataset.source.endswith("/features.geojson")
@@ -648,8 +636,8 @@ def test_geospatial_identity_binds_crs_and_ignores_feature_order():
     )
 
     assert first.crs == "EPSG:4326"
-    assert first.content_hash == reordered.content_hash
-    assert first.content_hash != projected.content_hash
+    assert first.digest == reordered.digest
+    assert first.digest != projected.digest
 
 
 def test_geospatial_identity_binds_labels_and_properties():
@@ -679,8 +667,8 @@ def test_geospatial_identity_binds_labels_and_properties():
         crs="EPSG:4326",
     )
 
-    assert baseline.content_hash != changed_label.content_hash
-    assert baseline.content_hash != changed_property.content_hash
+    assert baseline.digest != changed_label.digest
+    assert baseline.digest != changed_property.digest
     with pytest.raises(TypeError):
         baseline.features[0].properties["kind"] = "mutated"
 
@@ -714,20 +702,20 @@ def test_geospatial_spatial_join_records_bounded_same_crs_evidence():
         crs="EPSG:3857",
     )
 
-    report = left.spatial_join(
+    report = left.join(
         right,
         lambda first, second: abs(first.centroid[0] - second.centroid[0]) < 5,
         "centroid_distance_lt_5/v1",
     )
 
     assert report.crs == "EPSG:3857"
-    assert report.comparison_count == 4
-    assert report.match_count == 1
+    assert report.comparisons == 4
+    assert report.matched == 1
     assert report.unmatched_left_count == 1
     assert report.unmatched_right_count == 1
     assert report.matches == (geospatial.Match("left-a", "right-a"),)
-    assert report.left_dataset_hash == left.content_hash
-    assert report.right_dataset_hash == right.content_hash
+    assert report.left_dataset_hash == left.digest
+    assert report.right_dataset_hash == right.digest
     assert report.to_dict()["predicate"] == "centroid_distance_lt_5/v1"
 
 
@@ -744,13 +732,13 @@ def test_geospatial_spatial_join_rejects_crs_mismatch_and_unbounded_work():
     right = geospatial.Dataset((feature,), crs="EPSG:3857")
 
     with pytest.raises(geospatial.GeometryError, match="matching CRS"):
-        left.spatial_join(right, lambda first, second: True, "always/v1")
+        left.join(right, lambda first, second: True, "always/v1")
 
     with pytest.raises(
         geospatial.GeometryError,
         match="comparison limit",
     ):
-        left.spatial_join(
+        left.join(
             geospatial.Dataset(
                 tuple(
                     geospatial.Placemark(
@@ -778,7 +766,7 @@ def test_geospatial_spatial_join_rejects_invalid_predicate_output():
         geospatial.GeometryError,
         match="must return a boolean",
     ):
-        dataset.spatial_join(dataset, lambda first, second: "yes", "bad/v1")
+        dataset.join(dataset, lambda first, second: "yes", "bad/v1")
 
 
 def test_geospatial_reprojection_records_source_and_target_identity():
@@ -796,7 +784,7 @@ def test_geospatial_reprojection_records_source_and_target_identity():
                 {"type": "Point", "coordinates": [1, 2]},
                 {"kind": "park"},
                 label="open",
-                observation_time=observation_time,
+                time=observation_time,
             ),
         ),
         crs="EPSG:4326",
@@ -808,7 +796,7 @@ def test_geospatial_reprojection_records_source_and_target_identity():
         assert source_crs == "EPSG:4326"
         assert target_crs == "EPSG:3857"
         return geospatial.Placemark(
-            feature.feature_id,
+            feature.identifier,
             {
                 "type": "Point",
                 "coordinates": [
@@ -818,16 +806,16 @@ def test_geospatial_reprojection_records_source_and_target_identity():
             },
             dict(feature.properties),
             feature.label,
-            feature.observation_time,
+            feature.time,
         )
 
     result = dataset.reproject("EPSG:3857", transform, "scale/v1")
 
     assert result.dataset.crs == "EPSG:3857"
     assert result.dataset.features[0].geometry["coordinates"] == [2.0, 4.0]
-    assert result.report.source_dataset_hash == dataset.content_hash
-    assert result.report.target_dataset_hash == result.dataset.content_hash
-    assert result.report.transformer_name == "scale/v1"
+    assert result.report.source_dataset_hash == dataset.digest
+    assert result.report.target_dataset_hash == result.dataset.digest
+    assert result.report.transformer == "scale/v1"
     assert result.to_dict()["report"]["features"] == 1
 
 
@@ -848,7 +836,7 @@ def test_geospatial_reprojection_rejects_metadata_changes():
         value: geospatial.Placemark, source_crs: str, target_crs: str
     ) -> geospatial.Placemark:
         return geospatial.Placemark(
-            value.feature_id,
+            value.identifier,
             value.geometry,
             dict(value.properties),
             label="closed",
@@ -875,7 +863,7 @@ def test_geospatial_rejects_invalid_geometry():
 
 def test_geospatial_curation_blocks_missing_crs():
     """Spatial coordinates cannot enter modelling without a reference CRS."""
-    dataset = geospatial.Dataset.from_geojson(
+    dataset = geospatial.Dataset.parse(
         {
             "type": "FeatureCollection",
             "features": [
@@ -890,10 +878,8 @@ def test_geospatial_curation_blocks_missing_crs():
 
     report = dataset.curate()
 
-    assert report.release_ready is False
-    assert report.unresolved_blocking_findings[0].identifier == (
-        "quality.geospatial-missing-crs"
-    )
+    assert report.release is False
+    assert report.blockers[0].identifier == ("quality.geospatial-missing-crs")
 
 
 def test_geospatial_curation_reports_mixed_label_state():
@@ -935,16 +921,12 @@ def test_geospatial_curation_records_deterministic_spatial_autocorrelation():
         crs="EPSG:3857",
     )
 
-    first = dataset.spatial_autocorrelation(
-        neighbor_count=1, permutations=19, seed=11
-    )
-    second = dataset.spatial_autocorrelation(
-        neighbor_count=1, permutations=19, seed=11
-    )
+    first = dataset.autocorrelate(neighbor_count=1, permutations=19, seed=11)
+    second = dataset.autocorrelate(neighbor_count=1, permutations=19, seed=11)
     report = dataset.curate()
 
     assert first == second
-    assert first.edge_count == 4
+    assert first.edges == 4
     assert first.statistic > 0
     assert 0.0 <= first.p_value <= 1.0
     evidence = report.profile["spatial_autocorrelation"]
@@ -967,10 +949,10 @@ def test_spatial_autocorrelation_rejects_non_numeric_and_constant_values():
     dataset = geospatial.Dataset(features, crs="EPSG:3857")
 
     with pytest.raises(geospatial.GeometryError, match="numeric"):
-        dataset.spatial_autocorrelation()
+        dataset.autocorrelate()
 
     with pytest.raises(geospatial.GeometryError, match="more than one unique"):
-        dataset.spatial_autocorrelation(values=[1.0, 1.0, 1.0])
+        dataset.autocorrelate(values=[1.0, 1.0, 1.0])
 
 
 def test_geospatial_spatial_split_keeps_blocks_together():
@@ -1030,9 +1012,9 @@ def test_geospatial_boundary_leakage_reports_conservative_envelope_crossings():
     evidence = dataset.straddle(block_size=1.0, max_blocks_per_feature=2)
 
     assert evidence.status == "potential_leakage"
-    assert evidence.crossing_feature_ids == ("line",)
-    assert evidence.truncated_feature_ids == ("line",)
-    assert evidence.feature_block_counts == (("point", 1), ("line", 3))
+    assert evidence.crossing == ("line",)
+    assert evidence.truncated == ("line",)
+    assert evidence.blocks == (("point", 1), ("line", 3))
     assert evidence.to_dict()["spread"] == 2
 
 
@@ -1042,7 +1024,7 @@ def test_geospatial_temporal_split_normalizes_time_and_curates_coverage():
         geospatial.Placemark(
             f"feature-{index}",
             {"type": "Point", "coordinates": [float(index), 0]},
-            observation_time=timestamp,
+            time=timestamp,
         )
         for index, timestamp in enumerate(
             (
@@ -1057,9 +1039,7 @@ def test_geospatial_temporal_split_normalizes_time_and_curates_coverage():
     split = dataset.cutover("2026-01-02T00:00:00+00:00")
     report = dataset.curate()
 
-    assert dataset.features[0].observation_time == datetime(
-        2026, 1, 1, tzinfo=UTC
-    )
+    assert dataset.features[0].time == datetime(2026, 1, 1, tzinfo=UTC)
     assert len(split.train) == 2
     assert len(split.future) == 1
     assert not split.lookahead
@@ -1074,7 +1054,7 @@ def test_geospatial_temporal_state_fails_closed_when_incomplete():
             geospatial.Placemark(
                 "timed",
                 {"type": "Point", "coordinates": [0, 0]},
-                observation_time=datetime(2026, 1, 1, tzinfo=UTC),
+                time=datetime(2026, 1, 1, tzinfo=UTC),
             ),
             geospatial.Placemark(
                 "untimed", {"type": "Point", "coordinates": [1, 1]}
@@ -1084,7 +1064,7 @@ def test_geospatial_temporal_state_fails_closed_when_incomplete():
     )
 
     report = mixed.curate()
-    quality_ids = {finding.identifier for finding in report.quality_findings}
+    quality_ids = {finding.identifier for finding in report.findings}
 
     assert report.profile["temporal"] == {
         "status": "mixed",
@@ -1095,7 +1075,7 @@ def test_geospatial_temporal_state_fails_closed_when_incomplete():
     with pytest.raises(geospatial.TemporalError, match="every feature"):
         mixed.cutover("2026-01-02T00:00:00Z")
     with pytest.raises(geospatial.TemporalError, match="timezone"):
-        geospatial.canonical_observation_time("2026-01-01T00:00:00")
+        geospatial.timestamp("2026-01-01T00:00:00")
 
 
 def test_geospatial_feature_preparation_preserves_crs_units():
@@ -1116,12 +1096,12 @@ def test_geospatial_feature_preparation_preserves_crs_units():
         crs="EPSG:4326",
     )
 
-    prepared = dataset.prepare_features()
+    prepared = dataset.prepare()
 
     assert prepared.shape == (2, 9)
     assert prepared.crs == "EPSG:4326"
     assert prepared.feature_ids == ("point", "line")
-    assert prepared.to_numpy()[1, 4:6].tolist() == [8.0, 6.0]
+    assert prepared.materialize()[1, 4:6].tolist() == [8.0, 6.0]
 
 
 def test_geospatial_raw_axis_mask_preserves_nested_geometry_structure():
@@ -1174,7 +1154,7 @@ def test_geospatial_feature_preparation_rejects_missing_crs():
     )
 
     with pytest.raises(geospatial.GeometryError, match="CRS"):
-        dataset.prepare_features()
+        dataset.prepare()
 
 
 def test_raster_identity_requires_spatial_metadata():
@@ -1182,8 +1162,8 @@ def test_raster_identity_requires_spatial_metadata():
     payload = b"raster"
     raster = geospatial.Tile(
         source="memory://raster",
-        encoded_bytes=payload,
-        file_hash=hashlib.sha256(payload).hexdigest(),
+        encoded=payload,
+        digest=hashlib.sha256(payload).hexdigest(),
         width=10,
         height=20,
         bands=3,
@@ -1192,7 +1172,7 @@ def test_raster_identity_requires_spatial_metadata():
         transform=(1, 0, 0, 0, -1, 0),
     )
 
-    assert raster.byte_size == len(payload)
+    assert raster.size == len(payload)
     assert raster.crs == "EPSG:3857"
 
 
@@ -1201,15 +1181,15 @@ def test_raster_decoder_is_bounded_and_shape_checked():
     payload = b"raster"
     raster = geospatial.Tile(
         source="memory://raster",
-        encoded_bytes=payload,
-        file_hash=hashlib.sha256(payload).hexdigest(),
+        encoded=payload,
+        digest=hashlib.sha256(payload).hexdigest(),
         width=2,
         height=3,
         bands=2,
         dtype="uint8",
         crs="EPSG:3857",
         transform=(1, 0, 0, 0, -1, 0),
-        nodata_value=0,
+        sentinel=0,
     )
 
     pixels = raster.decode(
@@ -1220,7 +1200,7 @@ def test_raster_decoder_is_bounded_and_shape_checked():
     assert pixels.shape == (3, 2, 2)
     assert not pixels.flags.writeable
     assert (
-        raster.measured_nodata_fraction(
+        raster.measure(
             lambda value: numpy.full((3, 2, 2), value[0], dtype=numpy.uint8)
         )
         == 0.0
@@ -1238,8 +1218,8 @@ def test_raster_decoder_rejects_metadata_mismatch():
     payload = b"raster"
     raster = geospatial.Tile(
         source="memory://raster",
-        encoded_bytes=payload,
-        file_hash=hashlib.sha256(payload).hexdigest(),
+        encoded=payload,
+        digest=hashlib.sha256(payload).hexdigest(),
         width=2,
         height=3,
         bands=1,

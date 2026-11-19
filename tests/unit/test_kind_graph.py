@@ -199,12 +199,12 @@ def test_mm11_the_split_holds_out_the_latest_seen_nodes(tmp_path):
     seen = frame[rows.KEY]
     split = graph.GRAPH.constrain(spec, tasks.Task.BINARY).split(frame)
     assert split.manifest.strategy == "temporal"
-    assert rows.KEY not in split.dev_features.columns
-    assert rows.KEY not in split.locked_test.features.columns
-    train = seen.iloc[list(split.manifest.train_ids)]
-    test = seen.iloc[list(split.manifest.test_ids)]
+    assert rows.KEY not in split.features.columns
+    assert rows.KEY not in split.test.features.columns
+    train = seen.iloc[list(split.manifest.training)]
+    test = seen.iloc[list(split.manifest.test)]
     assert train.max() < test.min()
-    kept = numpy.asarray(split.manifest.train_ids)
+    kept = numpy.asarray(split.manifest.training)
     for fit, check in split.manifest.folds:
         assert (
             seen.iloc[kept[list(fit)]].max()

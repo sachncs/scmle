@@ -100,7 +100,7 @@ class Bracketing(diagnosis.Diagnosis):
         if runner is None:
             board.journal.write_json(
                 coverage_confirm.DOCUMENT,
-                coverage_confirm.not_evaluated(
+                coverage_confirm.abstain(
                     "the bundle holds no conformal calibration, so there is "
                     "no interval or set to test on C"
                 ),
@@ -156,25 +156,21 @@ class Bracketing(diagnosis.Diagnosis):
                 return None
             fit = numpy.asarray(fit_positions)
             evaluate = numpy.asarray(evaluate_positions)
-            train_x = split.dev_features.iloc[fit]
-            train_y = split.dev_target.iloc[fit]
+            train_x = split.features.iloc[fit]
+            train_y = split.target.iloc[fit]
             low, high = quantile.corridor(
                 build(quantile.LOWER_LEVEL).fit(train_x, train_y),
                 build(quantile.UPPER_LEVEL).fit(train_x, train_y),
-                split.dev_features.iloc[evaluate],
+                split.features.iloc[evaluate],
             )
-            observed.extend(split.dev_target.iloc[evaluate])
+            observed.extend(split.target.iloc[evaluate])
             lows.extend(low)
             highs.extend(high)
         if len(observed) < conformal.MIN_CALIBRATION_ROWS:
             return None
         return quantile.QuantileIntervals(
-            build(quantile.LOWER_LEVEL).fit(
-                split.dev_features, split.dev_target
-            ),
-            build(quantile.UPPER_LEVEL).fit(
-                split.dev_features, split.dev_target
-            ),
+            build(quantile.LOWER_LEVEL).fit(split.features, split.target),
+            build(quantile.UPPER_LEVEL).fit(split.features, split.target),
             quantile.Band.calibrate(observed, lows, highs),
         )
 
@@ -214,14 +210,14 @@ class Bracketing(diagnosis.Diagnosis):
         slices = {
             column: (
                 coverage_slices.bucket(
-                    test_features[column], split.dev_features.get(column)
+                    test_features[column], split.features.get(column)
                 )
                 if column in test_features.columns
                 else None
             )
             for column in scoring.slicers(board)
         }
-        measured = coverage_run.run_report(
+        measured = coverage_run.report(
             bundle,
             *rows,
             scoring.COVERAGE_LEVELS,

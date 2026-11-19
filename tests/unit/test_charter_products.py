@@ -88,7 +88,7 @@ def custody(monkeypatch):
     charter = types.SimpleNamespace(purpose="predictive")
     monkeypatch.setattr(
         impounding.sealing,
-        "read_verified",
+        "read",
         lambda path: types.SimpleNamespace(charter=charter, signed=True),
     )
     monkeypatch.setattr(sealed, "Vault", Vault)
@@ -177,7 +177,7 @@ def test_no_vault_is_made_when_the_charter_is_refused(custody, monkeypatch):
     charter = types.SimpleNamespace(purpose=contracts.NEW_ENTITY)
     monkeypatch.setattr(
         impounding.sealing,
-        "read_verified",
+        "read",
         lambda path: types.SimpleNamespace(charter=charter, signed=True),
     )
     with pytest.raises(errors.ConfigError, match="group_column"):
@@ -200,7 +200,7 @@ def test_a_known_entity_charter_names_the_cluster_column(custody, monkeypatch):
     charter = types.SimpleNamespace(purpose=contracts.KNOWN_ENTITY_FUTURE)
     monkeypatch.setattr(
         impounding.sealing,
-        "read_verified",
+        "read",
         lambda path: types.SimpleNamespace(charter=charter, signed=True),
     )
     board = start(group_column="g", time_column="t")
@@ -231,7 +231,7 @@ def escrow(coverage):
     return exploration.Escrow(
         explored="explored",
         task=tasks.Task.BINARY,
-        charter=types.SimpleNamespace(charter_hash="h"),
+        charter=types.SimpleNamespace(digest="h"),
         view="view",
         structure=(),
         graph=None,
@@ -286,7 +286,7 @@ def test_defer_keeps_the_ledger_off_the_context():
 def found():
     return types.SimpleNamespace(
         fragile=["b"],
-        stability_gate=types.SimpleNamespace(value="certified"),
+        gate=types.SimpleNamespace(value="certified"),
         forward=types.SimpleNamespace(status="pass"),
     )
 
@@ -300,11 +300,11 @@ def test_assess_robustness_returns_the_verdicts(monkeypatch):
     )
     monkeypatch.setattr(
         report,
-        "shift_report",
+        "report",
         lambda found: {"status": "unverifiable", "reason": "no reference"},
     )
     monkeypatch.setattr(report, "conform", lambda document: None)
-    monkeypatch.setattr(report, "validate_shift", lambda document: None)
+    monkeypatch.setattr(report, "validate", lambda document: None)
     monkeypatch.setattr(
         qualification.html_report, "render", lambda *given: "<html>"
     )

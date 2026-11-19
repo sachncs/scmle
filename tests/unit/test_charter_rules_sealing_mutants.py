@@ -91,25 +91,25 @@ def test_an_amendment_that_loosens_any_one_of_the_three_is_refused():
 def test_an_amendment_may_tighten_alpha_or_wealth_but_not_loosen_either():
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:409.
     # Enforces website/src/learn/when-things-go-wrong.html:183-184.
-    old = make_charter(budget=budget.ErrorBudget.create(0.05, 0.1))
+    old = make_charter(budget=budget.Alpha.create(0.05, 0.1))
     for tighter in (
-        budget.ErrorBudget.create(0.04, 0.1),
-        budget.ErrorBudget.create(0.05, 0.05),
-        budget.ErrorBudget.create(0.04, 0.05),
+        budget.Alpha.create(0.04, 0.1),
+        budget.Alpha.create(0.05, 0.05),
+        budget.Alpha.create(0.04, 0.05),
     ):
         sealing.permit(old, make_charter(budget=tighter))
     for looser in (
-        budget.ErrorBudget.create(0.06, 0.1),
-        budget.ErrorBudget.create(0.05, 0.2),
+        budget.Alpha.create(0.06, 0.1),
+        budget.Alpha.create(0.05, 0.2),
     ):
         with pytest.raises(Exception, match="may only tighten"):
             sealing.permit(old, make_charter(budget=looser))
 
 
 def test_an_amendment_that_changes_another_budget_field_is_refused():
-    old = make_charter(budget=budget.ErrorBudget.create(0.05, 0.1))
+    old = make_charter(budget=budget.Alpha.create(0.05, 0.1))
     other = make_charter(
-        budget=budget.ErrorBudget.create(
+        budget=budget.Alpha.create(
             0.05, 0.1, permutations=old.budget.permutations + 100
         )
     )
@@ -124,16 +124,16 @@ def test_read_verified_reports_signed_or_not_with_the_recomputed_hash(
     charter = make_charter()
     bare = tmp_path / "bare.json"
     bare.write_text(json.dumps(charter.to_dict()))
-    plain = sealing.read_verified(bare)
+    plain = sealing.read(bare)
     assert plain.charter == charter
-    assert plain.charter_hash == charter.charter_hash
+    assert plain.digest == charter.digest
     assert plain.signed is False
     signed_path = sealing.inscribe(tmp_path / "s.json", charter, "k")
-    signed = sealing.read_verified(signed_path, signing_key="k")
+    signed = sealing.read(signed_path, signing_key="k")
     assert signed.charter == charter and signed.signed is True
-    assert signed.charter_hash == charter.charter_hash
+    assert signed.digest == charter.digest
     with pytest.raises(Exception) as caught:
-        sealing.read_verified(bare, require_signature=True)
+        sealing.read(bare, require_signature=True)
     assert str(caught.value) == f"charter {bare} is unsigned"
 
 
@@ -144,21 +144,21 @@ def test_the_format_errors_name_the_file(tmp_path):
     record["format"] = 99
     path.write_text(json.dumps(record))
     with pytest.raises(Exception) as caught:
-        sealing.read_verified(path, signing_key="k")
+        sealing.read(path, signing_key="k")
     assert str(caught.value).startswith(f"charter {path} has format 99; ")
     record["format"] = 2
     record["charter"]["rules"] = {}
     path.write_text(json.dumps(record))
     with pytest.raises(Exception) as caught:
-        sealing.read_verified(path, signing_key="k")
+        sealing.read(path, signing_key="k")
     assert str(caught.value) == (
         f"charter {path} declares format 2 but carries 'rules', "
         f"which need format {sealing.RULES_FORMAT}"
     )
     record["format"] = 2
     del record["charter"]["rules"]
-    sealing.check_format(path, {"format": 2})
-    sealing.check_format(path, {"format": 2, "charter": {"x": 1}})
+    sealing.check(path, {"format": 2})
+    sealing.check(path, {"format": 2, "charter": {"x": 1}})
 
 
 def test_a_nan_power_is_named():
@@ -173,16 +173,16 @@ def test_a_signed_charter_read_without_a_key_is_unsigned_not_an_error(
     monkeypatch.delenv("SCMLE_SIGNING_KEY", raising=False)
     charter = make_charter()
     path = sealing.inscribe(tmp_path / "s.json", charter, "k")
-    seen = sealing.read_verified(path)
+    seen = sealing.read(path)
     assert seen.charter == charter and seen.signed is False
-    assert seen.charter_hash == charter.charter_hash
+    assert seen.digest == charter.digest
     with pytest.raises(Exception) as caught:
-        sealing.read_verified(path, require_signature=True)
+        sealing.read(path, require_signature=True)
     assert str(caught.value) == (
         f"charter {path} is signed but no signing key is configured"
     )
     with pytest.raises(Exception) as caught:
-        sealing.read_verified(path, signing_key="wrong")
+        sealing.read(path, signing_key="wrong")
     assert str(caught.value) == f"charter signature does not verify for {path}"
 
 
@@ -191,9 +191,9 @@ def test_a_wrapper_without_a_signature_reads_as_unsigned(tmp_path, monkeypatch):
     charter = make_charter()
     path = sealing.inscribe(tmp_path / "u.json", charter)
     assert json.loads(path.read_text())["signature"] is None
-    seen = sealing.read_verified(path)
+    seen = sealing.read(path)
     assert seen.charter == charter and seen.signed is False
-    assert seen.charter_hash == charter.charter_hash
+    assert seen.digest == charter.digest
 
 
 def test_read_charter_unwraps_a_signed_file_and_reads_a_bare_one(tmp_path):

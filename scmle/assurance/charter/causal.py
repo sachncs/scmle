@@ -438,7 +438,7 @@ class Question:
             qualification.tupled(getattr(self, name), name)
         for item in self.assumptions:
             vet(item)
-        self.check_repeats()
+        self.check()
         self.reconcile()
         columns = [g.column for g in self.subgroups]
         if len(set(columns)) != len(columns):
@@ -456,7 +456,7 @@ class Question:
         if not 0.0 < share <= 1.0:
             raise errors.InputError("retained must be within (0, 1]")
 
-    def check_repeats(self) -> None:
+    def check(self) -> None:
         """Checks that no assumption or strategy is repeated.
 
         Raises:

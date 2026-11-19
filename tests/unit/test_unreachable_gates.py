@@ -97,7 +97,7 @@ def test_the_split_keeps_every_column_but_the_target():
         ),
     )
     result = splitter.Splitter(spec, tasks.Task.BINARY).split(frame)
-    assert list(result.dev_features.columns) == [
+    assert list(result.features.columns) == [
         c for c in frame.columns if c != "y"
     ]
 

@@ -67,9 +67,9 @@ def test_a_specification_added_later_changes_both_hashes_and_the_tier():
             ),
         )
     )
-    assert base.charter_hash != amended.charter_hash
-    declared = multiverse.declaration_sha256(base.multiverse)
-    used = multiverse.declaration_sha256(amended.multiverse)
+    assert base.digest != amended.digest
+    declared = multiverse.fingerprint(base.multiverse)
+    used = multiverse.fingerprint(amended.multiverse)
     assert declared != used
     keep = qualification.Tier.ATTESTED
     assert multiverse.downgrade(declared, declared, keep) is keep
@@ -80,9 +80,9 @@ def test_a_specification_added_later_changes_both_hashes_and_the_tier():
 
 
 def test_the_declaration_hash_ignores_the_order_of_choices():
-    assert multiverse.declaration_sha256(
-        choices()
-    ) == multiverse.declaration_sha256(tuple(reversed(choices())))
+    assert multiverse.fingerprint(choices()) == multiverse.fingerprint(
+        tuple(reversed(choices()))
+    )
 
 
 def test_results_are_cached_by_finding_specification_and_seed(tmp_path):
@@ -94,16 +94,12 @@ def test_results_are_cached_by_finding_specification_and_seed(tmp_path):
         calls.append(spec.sha256)
         return {"effect": 0.5}
 
-    first = multiverse.run_grid(
-        grid, evaluate, finding="a", seed=0, cache=cache
-    )
+    first = multiverse.sweep(grid, evaluate, finding="a", seed=0, cache=cache)
     assert len(calls) == 6 and first.cached == 0
-    second = multiverse.run_grid(
-        grid, evaluate, finding="a", seed=0, cache=cache
-    )
+    second = multiverse.sweep(grid, evaluate, finding="a", seed=0, cache=cache)
     assert len(calls) == 6 and second.cached == 6
-    multiverse.run_grid(grid, evaluate, finding="b", seed=0, cache=cache)
-    multiverse.run_grid(grid, evaluate, finding="a", seed=1, cache=cache)
+    multiverse.sweep(grid, evaluate, finding="b", seed=0, cache=cache)
+    multiverse.sweep(grid, evaluate, finding="a", seed=1, cache=cache)
     assert len(calls) == 18
     path = tmp_path / "cache.json"
     cache.save(path)
@@ -116,7 +112,7 @@ def test_results_are_cached_by_finding_specification_and_seed(tmp_path):
 def test_the_time_budget_skips_and_records_the_rest():
     grid = multiverse.universe(choices(), 0)
     ticks = iter(range(100))
-    run = multiverse.run_grid(
+    run = multiverse.sweep(
         grid,
         lambda spec: {"effect": 1.0},
         finding="a",
@@ -131,6 +127,6 @@ def test_the_time_budget_skips_and_records_the_rest():
 
 def test_the_run_is_deterministic_under_a_fixed_seed():
     grid = multiverse.universe(choices(), 3)
-    a = multiverse.run_grid(grid, lambda s: {"v": 1.0}, finding="x", seed=3)
-    b = multiverse.run_grid(grid, lambda s: {"v": 1.0}, finding="x", seed=3)
+    a = multiverse.sweep(grid, lambda s: {"v": 1.0}, finding="x", seed=3)
+    b = multiverse.sweep(grid, lambda s: {"v": 1.0}, finding="x", seed=3)
     assert a.results == b.results and a.skipped == ()

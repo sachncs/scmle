@@ -36,7 +36,7 @@ MIN_EVENTS = 10
 MIN_ARM_ROWS = 20
 
 
-def check_events(frame: pandas.DataFrame, column: str | None) -> None:
+def check(frame: pandas.DataFrame, column: str | None) -> None:
     """Requires a complete 0/1 event column with enough observed events.
 
     Args:
@@ -122,7 +122,7 @@ def check_targets(
             )
 
 
-class TaskResolver:
+class Resolver:
     """Resolves the requested task against the actual target values.
 
     Attributes:
@@ -164,7 +164,7 @@ class TaskResolver:
             "ranking": self.resolve_ranking,
             "uplift": self.resolve_uplift,
             "regression": self.resolve_regression,
-            "auto": self.resolve_auto,
+            "auto": self.infer,
         }
         handler = handlers.get(self.request)
         if handler is not None:
@@ -308,7 +308,7 @@ class TaskResolver:
             )
         return tasks.Task.BINARY if binary else tasks.Task.MULTICLASS
 
-    def resolve_auto(self, target: pandas.Series) -> tasks.Task:
+    def infer(self, target: pandas.Series) -> tasks.Task:
         """Infers the task; blocks when the choice is genuinely ambiguous.
 
         Args:

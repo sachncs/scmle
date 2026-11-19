@@ -81,7 +81,7 @@ def test_scheme_respects_an_explicit_strategy():
     built = splitter.Splitter(
         spec("group", group_column="g"), tasks.Task.BINARY
     )
-    assert built.strategy_name == "group"
+    assert built.strategy == "group"
     assert built.task is tasks.Task.BINARY
 
 
@@ -100,7 +100,7 @@ def test_feature_columns_drop_every_role():
         ),
         tasks.Task.REGRESSION,
     )
-    assert built.feature_columns(data) == ["x", "z"]
+    assert built.select(data) == ["x", "z"]
 
 
 def test_split_is_disjoint_and_records_its_manifest():
@@ -109,16 +109,16 @@ def test_split_is_disjoint_and_records_its_manifest():
     manifest = result.manifest
     assert manifest.strategy == "stratified"
     assert manifest.seed == 3
-    assert not set(manifest.train_ids) & set(manifest.test_ids)
-    assert len(manifest.train_ids) + len(manifest.test_ids) == 200
-    assert len(manifest.test_ids) == 40
-    assert len(result.dev_features) == len(manifest.train_ids)
-    assert "y" not in result.dev_features.columns
+    assert not set(manifest.training) & set(manifest.test)
+    assert len(manifest.training) + len(manifest.test) == 200
+    assert len(manifest.test) == 40
+    assert len(result.features) == len(manifest.training)
+    assert "y" not in result.features.columns
     assert (
-        result.dev_target.tolist()
-        == data["y"].iloc[list(manifest.train_ids)].tolist()
+        result.target.tolist()
+        == data["y"].iloc[list(manifest.training)].tolist()
     )
-    assert list(result.dev_features.index) == list(range(160))
+    assert list(result.features.index) == list(range(160))
     assert len(manifest.folds) == 5
 
 
@@ -127,7 +127,7 @@ def test_split_uses_a_preset_side_column():
     data["split_side"] = [0] * 8 + [1] * 2
     result = splitter.Splitter(spec(), tasks.Task.REGRESSION).split(data)
     assert result.manifest.strategy == "preset"
-    assert result.manifest.test_ids == (8, 9)
+    assert result.manifest.test == (8, 9)
     # two test rows cannot score both classes of a binary task
     with pytest.raises(errors.BlockedError, match="test rows"):
         splitter.Splitter(spec(), tasks.Task.BINARY).split(data)
@@ -142,8 +142,8 @@ def test_disclose_counts_test_rows_that_repeat_development():
         numpy.array([0, 2, 3, 4]), numpy.array([1, 5]), [], ["n"]
     )
     told = built.disclose(data, part)
-    assert told.dev_ids.tolist() == [0, 2, 3, 4]
-    assert told.test_ids.tolist() == [1, 5]
+    assert told.development.tolist() == [0, 2, 3, 4]
+    assert told.test.tolist() == [1, 5]
     assert told.notes[0] == "n"
     assert told.notes[1].startswith(
         "1 of 2 test rows repeat a development record"

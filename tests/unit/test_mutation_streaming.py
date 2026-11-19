@@ -27,31 +27,29 @@ def source(path) -> streaming.Csv:
 def first(tmp_path):
     feed = source(tmp_path / "events.csv")
     ledger = streaming.Journal(tmp_path / "state.json", feed)
-    return feed, ledger, ledger.read_batch(rows=2)
+    return feed, ledger, ledger.read(rows=2)
 
 
 def acknowledge(batch, batch_id=None) -> streaming.Acknowledgement:
     return streaming.Acknowledgement(
-        batch.source_identity,
+        batch.identity,
         "consumer",
-        batch_id or batch.batch_id,
-        batch.next_checkpoint,
+        batch_id or batch.key,
+        batch.checkpoint,
     )
 
 
 def voucher(batch) -> streaming.Voucher:
-    return streaming.Voucher(
-        batch.source_identity, batch.batch_id, batch.next_checkpoint, "r1"
-    )
+    return streaming.Voucher(batch.identity, batch.key, batch.checkpoint, "r1")
 
 
 def test_a_voucher_from_another_source_is_refused(tmp_path) -> None:
     batch = first(tmp_path)[2]
-    other = dataclasses.replace(batch.next_checkpoint, source="x")
+    other = dataclasses.replace(batch.checkpoint, source="x")
     with pytest.raises(
         errors.InputError, match=r"^receipt and checkpoint sources differ$"
     ):
-        streaming.Voucher(batch.source_identity, batch.batch_id, other, "r1")
+        streaming.Voucher(batch.identity, batch.key, other, "r1")
 
 
 def test_a_commitment_for_another_batch_is_refused(tmp_path) -> None:
@@ -61,8 +59,8 @@ def test_a_commitment_for_another_batch_is_refused(tmp_path) -> None:
         match=r"^evidence and acknowledgement batches differ$",
     ):
         streaming.Commitment(
-            batch.source_identity,
-            batch.batch_id,
+            batch.identity,
+            batch.key,
             voucher(batch),
             acknowledge(batch, OTHER_BATCH),
         )
@@ -75,23 +73,23 @@ def test_a_receipt_for_another_batch_is_refused(tmp_path) -> None:
         match=r"^acknowledgement does not match the commit$",
     ):
         streaming.Receipt(
-            batch.source_identity,
-            batch.batch_id,
+            batch.identity,
+            batch.key,
             accepted=True,
             duplicate=False,
-            checkpoint=batch.next_checkpoint,
+            checkpoint=batch.checkpoint,
             acknowledgement=acknowledge(batch, OTHER_BATCH),
         )
 
 
 def test_a_batch_past_the_checkpoint_is_refused(tmp_path) -> None:
     feed, ledger, batch = first(tmp_path)
-    later = feed.read_batch(batch.next_checkpoint, rows=2)
+    later = feed.read(batch.checkpoint, rows=2)
     with pytest.raises(
         streaming.StreamingError,
         match=r"^batch does not start at the durable checkpoint$",
     ) as raised:
-        ledger.commit_transaction(later, Sink(), acknowledge(later))
+        ledger.commit(later, Sink(), acknowledge(later))
     assert raised.value.code == "checkpoint_mismatch"
 
 
@@ -101,9 +99,7 @@ def test_state_of_another_source_names_that_source(tmp_path) -> None:
     other = source(tmp_path / "other.csv")
     with pytest.raises(streaming.StreamingError) as raised:
         streaming.Journal(ledger.path, other).load()
-    assert raised.value.details["state_source_identity"] == (
-        feed.source_identity()
-    )
+    assert raised.value.details["state_source_identity"] == (feed.identify())
 
 
 @pytest.mark.parametrize(
@@ -112,11 +108,11 @@ def test_state_of_another_source_names_that_source(tmp_path) -> None:
 )
 def test_rebind_names_this_source(tmp_path, change) -> None:
     feed, batch = first(tmp_path)[::2]
-    checkpoint = dataclasses.replace(batch.next_checkpoint, **change)
+    checkpoint = dataclasses.replace(batch.checkpoint, **change)
     with pytest.raises(streaming.StreamingError) as raised:
-        feed.rebind(checkpoint, feed.snapshot_sha256())
-    assert raised.value.source_identity == feed.source_identity()
-    assert raised.value.details["source_identity"] == feed.source_identity()
+        feed.rebind(checkpoint, feed.digest())
+    assert raised.value.identity == feed.identify()
+    assert raised.value.details["source_identity"] == feed.identify()
 
 
 def test_json_lines_report_the_columns_of_the_first_record(tmp_path) -> None:

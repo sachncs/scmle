@@ -34,14 +34,14 @@ class Findings:
         results: Detector id -> result object; a detector that did not run is
             absent.
         status: Detector id -> defect type -> gating status.
-        recode_log: Sentinel recodes applied before later detectors.
+        log: Sentinel recodes applied before later detectors.
         skipped: Detector id -> reason it did not run.
     """
 
     order: tuple[str, ...]
     results: Mapping[str, Any]
     status: Mapping[str, Mapping[str, certificates.Authority]]
-    recode_log: tuple[dict[str, Any], ...]
+    log: tuple[dict[str, Any], ...]
     skipped: Mapping[str, str]
 
 
@@ -59,14 +59,14 @@ def adjudication(
         status is descriptive when there is no store.
     """
     spec = registry.SPECS[detector_id]
-    digest = spec.code_hash()
+    digest = spec.digest()
     return {
         defect: (
             certificates.Authority.DESCRIPTIVE
             if store is None
             else store.status(detector_id, digest, defect)
         )
-        for defect in spec.defect_types
+        for defect in spec.types
     }
 
 

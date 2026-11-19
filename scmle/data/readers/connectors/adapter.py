@@ -13,9 +13,9 @@ class Adapter(abc.ABC):
     """Public polymorphic contract for bounded source retrieval.
 
     Attributes:
-        source_uri: Canonical URI of the source.
-        source_identity: Stable identity of the source.
-        retry_budget: Retry policy applied to each operation.
+        uri: Canonical URI of the source.
+        identity: Stable identity of the source.
+        budget: Retry policy applied to each operation.
     """
 
     def __init__(
@@ -29,9 +29,9 @@ class Adapter(abc.ABC):
             source_uri: URI or local path of the source; it is canonicalized.
             retry_budget: Retry policy; defaults to `Retries()`.
         """
-        self.source_uri = locator.canonicalize(source_uri)
-        self.source_identity = locator.source_identity(self.source_uri)
-        self.retry_budget = retry_budget or failure.Retries()
+        self.uri = locator.canonicalize(source_uri)
+        self.identity = locator.identify(self.uri)
+        self.budget = retry_budget or failure.Retries()
 
     @abc.abstractmethod
     def schema(self) -> layout.Columns:
@@ -42,7 +42,7 @@ class Adapter(abc.ABC):
         """
 
     @abc.abstractmethod
-    def read_rows(
+    def read(
         self, checkpoint: locator.Bookmark | None = None, limit: int = 1_000
     ) -> layout.Page:
         """Reads at most ``limit`` rows from a checkpoint.
@@ -67,8 +67,8 @@ class Adapter(abc.ABC):
         """
         return locator.Bookmark(
             offset=offset,
-            cursor=locator.bookmark(self.source_identity, offset),
-            source_identity=self.source_identity,
+            cursor=locator.bookmark(self.identity, offset),
+            identity=self.identity,
         )
 
     def rebind(self, checkpoint: locator.Bookmark | None) -> locator.Bookmark:
@@ -86,20 +86,20 @@ class Adapter(abc.ABC):
         """
         value = checkpoint or locator.Bookmark()
         try:
-            return value.bind(self.source_identity)
+            return value.bind(self.identity)
         except ValueError as error:
             raise failure.CheckpointError(
-                self.source_uri,
+                self.uri,
                 "checkpoint_mismatch",
                 str(error),
                 {
-                    "checkpoint_source_identity": value.source_identity,
-                    "connector_source_identity": self.source_identity,
+                    "checkpoint_source_identity": value.identity,
+                    "connector_source_identity": self.identity,
                     "offset": value.offset,
                 },
             ) from error
 
-    def validate_limit(self, limit: int) -> None:
+    def validate(self, limit: int) -> None:
         """Rejects unbounded or invalid batch requests.
 
         Args:

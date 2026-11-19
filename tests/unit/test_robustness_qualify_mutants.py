@@ -24,13 +24,13 @@ def certified_store(tmp_path, *, stability_too=True, shift_too=True):
         wanted.append(
             (
                 stability.DETECTOR_ID,
-                stability.code_digest(),
+                stability.fingerprint(),
                 stability.DEFECT_TYPES,
             )
         )
     if shift_too:
         wanted += [
-            (detector, shift.code_digest(), (shift.DEFECT_TYPE,))
+            (detector, shift.fingerprint(), (shift.DEFECT_TYPE,))
             for detector in (shift.C2ST_ID, shift.MMD_ID)
         ]
     for detector, digest, defects in wanted:
@@ -66,7 +66,7 @@ def test_a_missing_store_gives_a_note_naming_the_file(tmp_path):
         f"f6_certificates.json not found at {tmp_path / 'f6_certificates.json'}"
         ": detectors are descriptive"
     )
-    assert found.mmd_gate is certificates.Authority.DESCRIPTIVE
+    assert found.kernel is certificates.Authority.DESCRIPTIVE
 
 
 def test_an_unreadable_store_is_descriptive_with_the_reason(tmp_path):
@@ -75,7 +75,7 @@ def test_an_unreadable_store_is_descriptive_with_the_reason(tmp_path):
     found = run(frame, codes, tmp_path)
     assert found.store_note.startswith("f6_certificates.json unreadable (")
     assert found.store_note.endswith("): detectors are descriptive")
-    assert found.stability_gate is certificates.Authority.DESCRIPTIVE
+    assert found.gate is certificates.Authority.DESCRIPTIVE
 
 
 def test_a_current_store_lets_every_check_gate(tmp_path):
@@ -83,24 +83,24 @@ def test_a_current_store_lets_every_check_gate(tmp_path):
     frame, codes = world()
     found = run(frame, codes, tmp_path)
     assert found.store_note == ""
-    assert found.stability_gate is certificates.Authority.GATING
-    assert found.c2st_gate is certificates.Authority.GATING
-    assert found.mmd_gate is certificates.Authority.GATING
-    assert found.rule_note == "" and found.rule == stability.DEFAULT_RULE
+    assert found.gate is certificates.Authority.GATING
+    assert found.classifier is certificates.Authority.GATING
+    assert found.kernel is certificates.Authority.GATING
+    assert found.note == "" and found.rule == stability.DEFAULT_RULE
 
 
 def test_each_gate_follows_its_own_certificate(tmp_path):
     certified_store(tmp_path, stability_too=False)
     frame, codes = world()
     only_shift = run(frame, codes, tmp_path)
-    assert only_shift.stability_gate is certificates.Authority.DESCRIPTIVE
-    assert only_shift.c2st_gate is certificates.Authority.GATING
-    assert only_shift.mmd_gate is certificates.Authority.GATING
+    assert only_shift.gate is certificates.Authority.DESCRIPTIVE
+    assert only_shift.classifier is certificates.Authority.GATING
+    assert only_shift.kernel is certificates.Authority.GATING
     certified_store(tmp_path, shift_too=False)
     only_stability = run(frame, codes, tmp_path)
-    assert only_stability.stability_gate is certificates.Authority.GATING
-    assert only_stability.c2st_gate is certificates.Authority.DESCRIPTIVE
-    assert only_stability.mmd_gate is certificates.Authority.DESCRIPTIVE
+    assert only_stability.gate is certificates.Authority.GATING
+    assert only_stability.classifier is certificates.Authority.DESCRIPTIVE
+    assert only_stability.kernel is certificates.Authority.DESCRIPTIVE
 
 
 def test_another_rule_is_descriptive_and_says_so(tmp_path):
@@ -109,12 +109,12 @@ def test_another_rule_is_descriptive_and_says_so(tmp_path):
     rule = stability.Thresholds(0.7, 0.5, 0.8)
     found = run(frame, codes, tmp_path, rule=rule)
     assert found.rule == rule
-    assert found.stability_gate is certificates.Authority.DESCRIPTIVE
-    assert found.rule_note == (
+    assert found.gate is certificates.Authority.DESCRIPTIVE
+    assert found.note == (
         "the chartered stability thresholds differ from the certified rule: "
         "the verdicts are descriptive"
     )
-    assert found.c2st_gate is certificates.Authority.GATING
+    assert found.classifier is certificates.Authority.GATING
 
 
 def test_the_reasons_stability_was_not_run_are_worded_exactly(tmp_path):
@@ -181,7 +181,7 @@ def test_each_survivor_is_assessed_with_its_own_slice_and_the_shared_budget(
     tmp_path, monkeypatch
 ):
     capture = Capture()
-    monkeypatch.setattr(stability, "assess_finding", capture)
+    monkeypatch.setattr(stability, "assess", capture)
     frame, codes = world()
     strata = numpy.arange(len(frame)) % 5
     found = run(
@@ -224,7 +224,7 @@ def test_the_curve_uses_the_charter_permutations_when_fewer_than_the_cap(
     tmp_path, monkeypatch
 ):
     capture = Capture()
-    monkeypatch.setattr(stability, "assess_finding", capture)
+    monkeypatch.setattr(stability, "assess", capture)
     frame, codes = world()
     run(frame, codes, tmp_path, permutations=150)
     assert capture.calls[0][1]["curve_permutations"] == 150
@@ -238,7 +238,7 @@ def test_the_default_budget_is_shared_equally_and_the_rule_is_passed_on(
     tmp_path, monkeypatch
 ):
     capture = Capture()
-    monkeypatch.setattr(stability, "assess_finding", capture)
+    monkeypatch.setattr(stability, "assess", capture)
     frame, codes = world()
     rule = stability.Thresholds(0.9, 0.4, 0.7)
     qualify.run(
@@ -261,7 +261,7 @@ def test_a_cap_on_the_findings_keeps_the_first_ones_in_order(
     tmp_path, monkeypatch
 ):
     capture = Capture()
-    monkeypatch.setattr(stability, "assess_finding", capture)
+    monkeypatch.setattr(stability, "assess", capture)
     monkeypatch.setattr(qualify, "MAX_FINDINGS", 2)
     frame, codes = world()
     frame["c"] = frame["b"]
@@ -275,7 +275,7 @@ def test_a_cap_on_the_findings_keeps_the_first_ones_in_order(
 
 def test_no_assessment_runs_when_a_reason_stops_it(tmp_path, monkeypatch):
     capture = Capture()
-    monkeypatch.setattr(stability, "assess_finding", capture)
+    monkeypatch.setattr(stability, "assess", capture)
     frame, codes = world()
     run(frame, codes, tmp_path, multiclass=True)
     run(frame, codes, tmp_path, survivors=[])
@@ -452,13 +452,13 @@ def test_the_fragile_names_keep_the_order_of_the_findings():
         shift=None,
         coverage=(),
         forward=None,
-        stability_gate=certificates.Authority.DESCRIPTIVE,
-        c2st_gate=certificates.Authority.DESCRIPTIVE,
-        mmd_gate=certificates.Authority.DESCRIPTIVE,
+        gate=certificates.Authority.DESCRIPTIVE,
+        classifier=certificates.Authority.DESCRIPTIVE,
+        kernel=certificates.Authority.DESCRIPTIVE,
         store_note="",
     )
     assert holder.fragile == ("x", "z")
-    assert holder.rule == stability.DEFAULT_RULE and holder.rule_note == ""
+    assert holder.rule == stability.DEFAULT_RULE and holder.note == ""
 
 
 def test_the_charter_seed_orders_the_specification_subset(tmp_path):
@@ -473,7 +473,7 @@ def test_the_charter_seed_orders_the_specification_subset(tmp_path):
 
 def test_a_single_survivor_gets_the_whole_budget(tmp_path, monkeypatch):
     capture = Capture()
-    monkeypatch.setattr(stability, "assess_finding", capture)
+    monkeypatch.setattr(stability, "assess", capture)
     frame, codes = world()
     run(frame, codes, tmp_path, budget_seconds=8.0)
     assert capture.calls[0][1]["budget_seconds"] == 8.0
@@ -483,7 +483,7 @@ def test_integer_columns_and_codes_are_handed_over_as_floats(
     tmp_path, monkeypatch
 ):
     capture = Capture()
-    monkeypatch.setattr(stability, "assess_finding", capture)
+    monkeypatch.setattr(stability, "assess", capture)
     frame, codes = world()
     frame["n"] = numpy.arange(len(frame))
     run(frame, codes.round().astype(int), tmp_path, survivors=["n"])

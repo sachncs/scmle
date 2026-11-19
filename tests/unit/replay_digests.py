@@ -28,7 +28,7 @@ def digests() -> dict[str, str]:
         cost_model=test_framing_draft.MODEL,
         baseline_column="current_rule",
     )
-    out: dict[str, str] = {"charter_hash": result.charter.charter_hash}
+    out: dict[str, str] = {"charter_hash": result.charter.digest}
     with tempfile.TemporaryDirectory() as folder:
         root = pathlib.Path(folder)
         for name in sorted(draft.emit(result, root)):

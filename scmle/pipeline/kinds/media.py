@@ -254,7 +254,7 @@ class Media(rows.Rows):
             ]
             table = pandas.DataFrame(found, columns=[SOURCE, data.target])
         elif root.is_file():
-            table = tabular.read_table(root)
+            table = tabular.read(root)
             table = table.rename(
                 columns={self.column(table, root.parent): SOURCE}
             )

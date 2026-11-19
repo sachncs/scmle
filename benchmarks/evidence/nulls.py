@@ -629,7 +629,7 @@ def digest() -> str:
         are read and decided) and of every Python file of every product
         subpackage: a null task runs the whole product.
     """
-    own = certificates.code_hash(sys.modules[__name__], quality, acceptance)
+    own = certificates.fingerprint(sys.modules[__name__], quality, acceptance)
     names = tuple(
         sorted(
             p.name

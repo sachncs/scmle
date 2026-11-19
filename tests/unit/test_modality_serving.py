@@ -33,7 +33,7 @@ class DocumentDecoder(modality.ModalitySampleDecoder):
                 raise TypeError("every sample must be an object")
             samples.append(
                 document.Sample(
-                    document_id=str(record["document_id"]),
+                    identifier=str(record["document_id"]),
                     content=str(record["content"]),
                     label=str(record.get("label", "unknown")),
                 )
@@ -61,7 +61,7 @@ def adapter() -> modality_lifecycle.DocumentPreparer:
     """Build a small, labelled document fixture."""
     samples = tuple(
         document.Sample(
-            document_id=f"document-{index}",
+            identifier=f"document-{index}",
             content=("alpha " if index % 2 else "beta ") * (index + 2),
             label="alpha" if index % 2 else "beta",
         )

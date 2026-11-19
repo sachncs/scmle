@@ -38,7 +38,7 @@ Row kinds (``open`` first and only once):
     halt does not have).
 ``rollout_experiment``, ``rollout_assignment``, ``rollout_decision``
     The decision layer's rollout: an experiment is started with the
-    level the `DecisionBudget` assigned and the budget after the assignment;
+    level the `budget.Decision` assigned and the budget after the assignment;
     each batch of units is logged with the arm and the probability that arm
     had (the propensity), and only for a started experiment; the decision
     (`hold`, `promote`, `hold_final`, `hold_invalid`, or a rollback) is

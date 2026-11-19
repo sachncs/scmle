@@ -31,14 +31,14 @@ def test_numeric_reference_tracks_missingness_and_coerces_text():
         [1.0, 2.0, numpy.nan, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
     )
     ref = reference.Deciles.fit(values)
-    assert ref.missing_rate == pytest.approx(0.1)
+    assert ref.missing == pytest.approx(0.1)
     assert ref.proportions(pandas.Series(["x", "y"])).sum() == 0.0
 
 
 def test_categorical_reference_and_unseen_categories():
     rng = numpy.random.default_rng(1)
     base = pandas.Series(rng.choice(["a", "b", "c"], 3000, p=[0.5, 0.3, 0.2]))
-    ref = reference.CategoricalReference.fit(base)
+    ref = reference.Frequencies.fit(base)
     assert (
         ref.psi(
             pandas.Series(rng.choice(["a", "b", "c"], 1000, p=[0.5, 0.3, 0.2]))
@@ -49,13 +49,13 @@ def test_categorical_reference_and_unseen_categories():
         rng.choice(["a", "b", "c", "new"], 1000, p=[0.2, 0.2, 0.2, 0.4])
     )
     assert ref.psi(drifted) > 0.25
-    assert ref.unseen_rate(drifted) == pytest.approx(0.4, abs=0.05)
-    assert ref.unseen_rate(pandas.Series([], dtype=object)) == 0.0
+    assert ref.rate(drifted) == pytest.approx(0.4, abs=0.05)
+    assert ref.rate(pandas.Series([], dtype=object)) == 0.0
 
 
 def test_high_cardinality_collapses_into_other():
     values = pandas.Series([f"c{i % 80}" for i in range(2000)])
-    ref = reference.CategoricalReference.fit(values)
+    ref = reference.Frequencies.fit(values)
     assert len(ref.frequencies) == reference.MAX_CATEGORIES + 1
     assert sum(ref.frequencies.values()) == pytest.approx(1.0)
 
@@ -75,7 +75,7 @@ def test_profile_roundtrips_through_json():
     labels = reference.Baseline.build(
         frame, plan, pandas.Series(rng.choice(["u", "v"], 500)), "class", {}
     )
-    assert isinstance(labels.output, reference.CategoricalReference)
+    assert isinstance(labels.output, reference.Frequencies)
     assert reference.Baseline.from_dict(labels.to_dict()) == labels
 
 
@@ -84,8 +84,8 @@ def test_noise_floor_shrinks_with_sample_size():
     small = reference.Deciles.fit(pandas.Series(rng.normal(size=100)))
     large = reference.Deciles.fit(pandas.Series(rng.normal(size=10000)))
     assert small.rows == 100 and large.rows == 10000
-    assert small.noise_floor(500) > 5 * large.noise_floor(500)
-    assert small.noise_floor(0) == 0.0
+    assert small.estimate(500) > 5 * large.estimate(500)
+    assert small.estimate(0) == 0.0
 
 
 def fresh_reference(rng, rows=120):
@@ -98,7 +98,7 @@ def test_noise_floor_tracks_simulated_psi_without_drift():
         fresh_reference(rng).psi(pandas.Series(rng.normal(size=600)))
         for trial in range(60)
     ]
-    floor = fresh_reference(rng).noise_floor(600)
+    floor = fresh_reference(rng).estimate(600)
     assert numpy.mean(simulated) < floor < 3 * numpy.mean(simulated)
     assert numpy.mean([value > floor for value in simulated]) < 0.15
 

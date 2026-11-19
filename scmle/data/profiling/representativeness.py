@@ -64,7 +64,7 @@ class Representativeness:
         """
         return dataclasses.asdict(self)
 
-    def quality_evidence(
+    def attest(
         self,
         sample_rows: int,
         reference_rows: int,
@@ -265,7 +265,7 @@ def withhold(
     )
 
 
-def assess_representativeness(
+def assess(
     sample: pandas.DataFrame, reference: pandas.DataFrame, seed: int = 0
 ) -> data.Observation:
     """Compares bounded samples and retains the complete quality evidence.
@@ -319,7 +319,7 @@ def assess_representativeness(
         )
     return data.Observation(
         note=note,
-        evidence=report.quality_evidence(
+        evidence=report.attest(
             sample_rows,
             reference_rows,
             len(checked_sample),

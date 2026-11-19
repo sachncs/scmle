@@ -4,7 +4,7 @@ Three robustness checks may gate a run once certified:
 
 * `f6-shift-c2st` (`scmle.assurance.robustness.shift.c2st`): the classifier
   two-sample test.
-* `f6-shift-mmd` (`...shift.mmd_test`): the kernel two-sample test.
+* `f6-shift-mmd` (`...shift.distinguish`): the kernel two-sample test.
 * `f6-stability` (`...stability`, `...multiverse`): the multiverse survival
   rule.
 
@@ -205,7 +205,7 @@ def shift_replicate(test: str, planted: bool, seed: int) -> tuple[bool, float]:
         it reports none).
     """
     first, second = shift_samples(planted, seed)
-    run = shift.c2st if test == shift.C2ST_ID else shift.mmd_test
+    run = shift.c2st if test == shift.C2ST_ID else shift.distinguish
     check = run(first, second, seed, gate=certificates.Authority.GATING)
     return check.decision is not qualification.Decision.PASS, float(
         check.p_value or 1.0
@@ -282,9 +282,7 @@ def stability_replicate(kind: str, seed: int) -> str:
     grid = multiverse.universe(
         GRID_CHOICES, seed, multiverse.DEFAULT_MAX_SPECS * 2
     )
-    result = stability.assess_finding(
-        kind, x, y, grid, seed, bootstrap=BOOTSTRAP
-    )
+    result = stability.assess(kind, x, y, grid, seed, bootstrap=BOOTSTRAP)
     return result.status
 
 
@@ -346,8 +344,8 @@ def shift_certificate(
     )
     cert = certificates.certify(
         test,
-        shift.code_digest(),
-        certificates.corpus_hash(
+        shift.fingerprint(),
+        certificates.checksum(
             [
                 multiverse.digest(
                     {
@@ -432,8 +430,8 @@ def stability_certificate(
     pool = pandas.Series(source_values()).to_frame("value")
     cert = certificates.certify(
         stability.DETECTOR_ID,
-        stability.code_digest(),
-        certificates.corpus_hash(
+        stability.fingerprint(),
+        certificates.checksum(
             [
                 certify.frame_digest(pool),
                 multiverse.digest(
@@ -501,9 +499,9 @@ def current_digests() -> dict[str, str]:
         Mapping of detector id to its current code hash.
     """
     return {
-        shift.C2ST_ID: shift.code_digest(),
-        shift.MMD_ID: shift.code_digest(),
-        stability.DETECTOR_ID: stability.code_digest(),
+        shift.C2ST_ID: shift.fingerprint(),
+        shift.MMD_ID: shift.fingerprint(),
+        stability.DETECTOR_ID: stability.fingerprint(),
     }
 
 

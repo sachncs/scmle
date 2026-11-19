@@ -18,7 +18,7 @@ Two controls:
     lower than it is: the control then passes findings that are artefacts of
     the structure. `benchmarks.qualification.controls_check` measures this.
 
-``resampling_control``
+``control``
     For findings that do not use the target (drift, shape, pairwise feature
     structure). Each feature column is shuffled independently (within
     strata), which breaks association between features, or the order of
@@ -63,7 +63,7 @@ RESAMPLING = "resampling"
 COUNT_FUNCTION = Callable[[pandas.DataFrame, pandas.Series], int]
 
 
-def quantile_index(b: int, q: float = QUANTILE) -> int:
+def rank(b: int, q: float = QUANTILE) -> int:
     """Returns the 0-based index of the ``ceil(q * (B + 1))``-th smallest count.
 
     Using ``B + 1`` (the observed count plus the B re-runs) makes the gate a
@@ -86,7 +86,7 @@ def quantile_index(b: int, q: float = QUANTILE) -> int:
 def percentile(counts: tuple[int, ...], q: float = QUANTILE) -> int:
     """Returns the conservative order-statistic percentile of the counts.
 
-    It is the ``ceil(q * (B + 1))``-th smallest value (see `quantile_index`).
+    It is the ``ceil(q * (B + 1))``-th smallest value (see `rank`).
 
     Args:
         counts: Discovery counts of the re-runs.
@@ -100,7 +100,7 @@ def percentile(counts: tuple[int, ...], q: float = QUANTILE) -> int:
     """
     if not counts:
         raise errors.InputError("counts must not be empty")
-    return sorted(counts)[quantile_index(len(counts), q)]
+    return sorted(counts)[rank(len(counts), q)]
 
 
 def bracket(
@@ -137,7 +137,7 @@ def bracket(
     ]
 
 
-def interval_coverage(
+def cover(
     b: int,
     q: float = QUANTILE,
     confidence: float = INTERVAL_CONFIDENCE,
@@ -175,7 +175,7 @@ def interval_coverage(
     )
 
 
-def permute_within(
+def permute(
     values: numpy.ndarray,
     strata: numpy.ndarray | None,
     rng: numpy.random.Generator,
@@ -210,7 +210,7 @@ def permute_within(
     return out
 
 
-def block_labels(order: numpy.ndarray, block_size: int) -> numpy.ndarray:
+def block(order: numpy.ndarray, block_size: int) -> numpy.ndarray:
     """Builds labels that cut rows, ordered by `order`, into contiguous blocks.
 
     Args:
@@ -297,7 +297,7 @@ class Control:
             "p95": self.p95,
             "interval": list(self.interval),
             "p95_interval_confidence": INTERVAL_CONFIDENCE,
-            "p95_interval_achieved_confidence": interval_coverage(self.b),
+            "p95_interval_achieved_confidence": cover(self.b),
             "exceedance": self.exceedance,
             "exceeds": self.exceeds,
             "message": self.message,
@@ -416,7 +416,7 @@ def placebo(
     counts = []
     for repeat in range(b):
         rng = randomness.component_rng(seed, component, repeat)
-        values = permute_within(target.to_numpy(), strata, rng)
+        values = permute(target.to_numpy(), strata, rng)
         shuffled = pandas.Series(values, index=target.index, name=target.name)
         counts.append(int(discoveries(features, shuffled)))
     return summarize(
@@ -446,7 +446,7 @@ def scramble(
     out = {}
     for name in features.columns:
         column = features[name].to_numpy()
-        out[name] = permute_within(column, strata, rng)
+        out[name] = permute(column, strata, rng)
     return pandas.DataFrame(out, index=features.index)
 
 
@@ -486,7 +486,7 @@ def jumble(
     return pandas.DataFrame(out, index=features.index)
 
 
-def resampling_control(
+def control(
     discoveries: COUNT_FUNCTION,
     features: pandas.DataFrame,
     target: pandas.Series,

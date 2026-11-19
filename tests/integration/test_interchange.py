@@ -44,7 +44,7 @@ def test_polars_frames_and_lazyframes_are_accepted(binary_frame, tmp_path):
 def test_feather_files_are_read_and_scored(binary_frame, tmp_path):
     path = tmp_path / "d.feather"
     binary_frame.to_feather(path)
-    assert tabular.read_table(path).shape == binary_frame.shape
+    assert tabular.read(path).shape == binary_frame.shape
     result = run(binary_frame, tmp_path / "r")
     new = tmp_path / "new.arrow"
     binary_frame.drop(columns="y").to_feather(new)
@@ -53,10 +53,10 @@ def test_feather_files_are_read_and_scored(binary_frame, tmp_path):
 
 def test_to_pandas_copies_and_rejects_non_tables():
     frame = pandas.DataFrame({"a": [1, 2]})
-    copy = interchange.to_pandas(frame)
+    copy = interchange.frame(frame)
     copy.loc[0, "a"] = 99
     assert frame.loc[0, "a"] == 1
     with pytest.raises(errors.DataError):
-        interchange.to_pandas(42)
+        interchange.frame(42)
     assert not interchange.tablelike("some/path.csv")
     assert interchange.tablelike(pyarrow.table({"a": [1]}))

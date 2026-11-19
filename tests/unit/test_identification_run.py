@@ -10,7 +10,7 @@ from scmle.assurance.charter import causal
 from scmle.assurance.ledger import budget
 from scmle.causal.identification import run
 
-BUDGET = budget.ErrorBudget.create(0.05, 0.1)
+BUDGET = budget.Alpha.create(0.05, 0.1)
 COVARIATES = "unconfoundedness_given:a,b"
 ASSUMPTIONS = (COVARIATES, "positivity", "no_interference")
 GATES = (

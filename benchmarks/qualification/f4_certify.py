@@ -122,7 +122,7 @@ def leak_detected(
         Whether the certified skill test calls the feature a suspect, and
         the permutation p-value of its skill.
     """
-    cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=run_seed)
+    cfg = dataclasses.replace(leakage.CERTIFIED, seed=run_seed)
     result = leakage.assess(
         feature,
         pandas.DataFrame(index=feature.index),
@@ -251,8 +251,8 @@ def certify_leakage(workers: int = 1) -> tuple[Any, dict[str, Any]]:
         )
     cert = certificates.certify(
         leakage.DETECTOR_ID,
-        leakage.code_digest(),
-        certificates.corpus_hash([certify.frame_digest(frame)]),
+        leakage.fingerprint(),
+        certificates.checksum([certify.frame_digest(frame)]),
         [0],
         results,
         LEAK_POLICY,
@@ -376,7 +376,7 @@ def certify_asof() -> certificates.Certification:
     return certify.certify_detector(
         asof.DETECTOR_ID,
         asof_detector(log),
-        certificates.code_hash(asof),
+        certificates.fingerprint(asof),
         rows,
         [overwrite_plan()],
         SEEDS,
@@ -490,7 +490,7 @@ def certify_reconciliation() -> certificates.Certification:
     return certify.certify_detector(
         reconciliation.DETECTOR_ID,
         gap_detector,
-        certificates.code_hash(reconciliation),
+        certificates.fingerprint(reconciliation),
         gap_frame(0),
         [gap_plan()],
         SEEDS,
@@ -505,9 +505,9 @@ def current_digests() -> dict[str, str]:
         Mapping of detector id to its current code hash.
     """
     return {
-        leakage.DETECTOR_ID: leakage.code_digest(),
-        asof.DETECTOR_ID: certificates.code_hash(asof),
-        reconciliation.DETECTOR_ID: certificates.code_hash(reconciliation),
+        leakage.DETECTOR_ID: leakage.fingerprint(),
+        asof.DETECTOR_ID: certificates.fingerprint(asof),
+        reconciliation.DETECTOR_ID: certificates.fingerprint(reconciliation),
     }
 
 

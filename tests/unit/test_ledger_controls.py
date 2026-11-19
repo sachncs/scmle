@@ -21,9 +21,9 @@ def test_percentile_is_the_ceil_q_b_plus_1_th_order_statistic():
     assert controls.percentile(tuple(range(100))) == 95  # ceil(95.95) = 96th
     assert controls.percentile(tuple(range(19, -1, -1))) == 19  # unsorted input
     assert controls.percentile((5,) * 20) == 5
-    assert controls.quantile_index(20) == 19
-    assert controls.quantile_index(100) == 95
-    assert controls.quantile_index(19) == 18
+    assert controls.rank(20) == 19
+    assert controls.rank(100) == 95
+    assert controls.rank(19) == 18
     with pytest.raises(ValueError):
         controls.percentile(())
 
@@ -88,7 +88,7 @@ def test_permute_within_never_crosses_strata():
     strata = numpy.array([0, 0, 0, 1, 1, 1, 1, 2])
     values = numpy.arange(8.0)
     for seed in range(20):
-        out = controls.permute_within(values, strata, rng(seed))
+        out = controls.permute(values, strata, rng(seed))
         for label in (0, 1, 2):
             inside = strata == label
             assert sorted(out[inside]) == sorted(values[inside])
@@ -98,30 +98,30 @@ def test_permute_within_never_crosses_strata():
 def test_permute_within_actually_shuffles_and_global_crosses():
     values = numpy.arange(200.0)
     strata = numpy.repeat([0, 1], 100)
-    inside = controls.permute_within(values, strata, rng(1))
+    inside = controls.permute(values, strata, rng(1))
     assert not numpy.array_equal(inside, values)
     assert set(inside[:100]) == set(values[:100])
-    everywhere = controls.permute_within(values, None, rng(1))
+    everywhere = controls.permute(values, None, rng(1))
     assert set(everywhere[:100]) != set(values[:100])
     assert sorted(everywhere) == sorted(values)
     with pytest.raises(ValueError, match="one label"):
-        controls.permute_within(values, strata[:5], rng())
+        controls.permute(values, strata[:5], rng())
 
 
 def test_permute_within_does_not_modify_its_input():
     values = numpy.arange(10.0)
     keep = values.copy()
-    controls.permute_within(values, numpy.repeat([0, 1], 5), rng())
+    controls.permute(values, numpy.repeat([0, 1], 5), rng())
     assert numpy.array_equal(values, keep)
 
 
 def test_block_labels_cut_ordered_rows_into_blocks():
     order = numpy.array([5, 3, 1, 4, 2, 0])
-    labels = controls.block_labels(order, 2)
+    labels = controls.block(order, 2)
     # sorted order 0..5 -> ranks; rows with the 2 smallest keys share block 0
     assert list(labels) == [2, 1, 0, 2, 1, 0]
     with pytest.raises(ValueError):
-        controls.block_labels(order, 1)
+        controls.block(order, 1)
 
 
 def test_target_control_permutes_only_the_target_within_strata():
@@ -233,13 +233,13 @@ def test_resampling_control_modes_and_validation():
         received.append(frame)
         return 0
 
-    result = controls.resampling_control(
+    result = controls.control(
         spy, features, target, observed=2, b=20, seed=1, mode="columns"
     )
     assert result.kind == "resampling" and result.scope == "global"
     assert len(received) == 20
     blocks = numpy.repeat(numpy.arange(5), 10)
-    result = controls.resampling_control(
+    result = controls.control(
         spy,
         features,
         target,
@@ -251,11 +251,11 @@ def test_resampling_control_modes_and_validation():
     )
     assert result.scope == "blocks"
     with pytest.raises(ValueError, match="block labels"):
-        controls.resampling_control(
+        controls.control(
             spy, features, target, observed=0, b=20, seed=1, mode="blocks"
         )
     with pytest.raises(ValueError, match="mode"):
-        controls.resampling_control(
+        controls.control(
             spy, features, target, observed=0, b=20, seed=1, mode="x"
         )
 

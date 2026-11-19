@@ -47,7 +47,7 @@ def test_a_charter_without_the_block_keeps_its_hash():
     # Enforces website/src/pages/docs/api-stability.astro:74.
     # Enforces website/src/pages/docs/qualification.astro:67.
     charter = make_charter()
-    assert charter.charter_hash == FROZEN_HASH
+    assert charter.digest == FROZEN_HASH
     assert "causal" not in charter.estimand.to_dict()
     assert charter.format_version == 2
 
@@ -57,7 +57,7 @@ def test_the_block_round_trips_and_needs_format_four():
     # Enforces website/src/pages/docs/causal-decision.astro:55.
     charter = causal_charter()
     record = json.loads(json.dumps(charter.to_dict()))
-    assert contracts.AnalysisCharter.from_dict(record) == charter
+    assert contracts.Charter.from_dict(record) == charter
     assert charter.format_version == 4
 
 
@@ -76,9 +76,7 @@ def test_the_block_round_trips_and_needs_format_four():
     ],
 )
 def test_the_hash_changes_with_any_causal_field(changes):
-    assert (
-        causal_charter(**changes).charter_hash != causal_charter().charter_hash
-    )
+    assert causal_charter(**changes).digest != causal_charter().digest
 
 
 def test_a_causal_block_needs_a_causal_kind():
@@ -113,7 +111,7 @@ def test_covariates_are_read_from_the_attestation():
 def test_m_max_is_part_of_the_hash_and_must_not_be_negative():
     one = causal_charter(sensitivity=causal.Confounding(multiple=1.0))
     two = causal_charter(sensitivity=causal.Confounding(multiple=2.0))
-    assert one.charter_hash != two.charter_hash
+    assert one.digest != two.digest
     with pytest.raises(ValueError, match="multiple"):
         causal.Confounding(multiple=-1.0)
 
@@ -133,7 +131,7 @@ def test_a_causal_block_in_an_older_format_is_refused(tmp_path):
     wrapper["format"] = 3
     path.write_text(json.dumps(wrapper))
     with pytest.raises(errors.ConfigError, match="causal"):
-        sealing.read_verified(path, signing_key=KEY)
+        sealing.read(path, signing_key=KEY)
 
 
 # Hash and signature (key "k") of a format 4 causal charter written before
@@ -162,7 +160,7 @@ def test_a_format_four_causal_charter_keeps_hash_and_signature():
     # Enforces docs/API_STABILITY.md:92.
     # Enforces website/src/pages/docs/api-stability.astro:74.
     charter = format_four_charter()
-    assert charter.charter_hash == FORMAT_FOUR_HASH
+    assert charter.digest == FORMAT_FOUR_HASH
     assert charter.format_version == 4
     block = charter.estimand.to_dict()["causal"]
     assert "subgroups" not in block and "attestors" not in block
@@ -179,9 +177,9 @@ def test_subgroups_need_format_nine_and_round_trip():
     # Enforces docs/API_STABILITY.md:92.
     charter = causal_charter(subgroups=SUBGROUPS)
     assert charter.format_version == 9
-    assert charter.charter_hash != causal_charter().charter_hash
+    assert charter.digest != causal_charter().digest
     record = json.loads(json.dumps(charter.to_dict()))
-    assert contracts.AnalysisCharter.from_dict(record) == charter
+    assert contracts.Charter.from_dict(record) == charter
 
 
 def test_subgroups_in_an_older_format_are_refused(tmp_path):
@@ -191,7 +189,7 @@ def test_subgroups_in_an_older_format_are_refused(tmp_path):
     wrapper["format"] = 8
     path.write_text(json.dumps(wrapper))
     with pytest.raises(errors.ConfigError, match="subgroups"):
-        sealing.read_verified(path, signing_key=KEY)
+        sealing.read(path, signing_key=KEY)
 
 
 @pytest.mark.parametrize(
@@ -223,9 +221,9 @@ def test_attestors_need_format_nine_and_round_trip():
     # Enforces website/src/pages/docs/qualification.astro:71.
     charter = causal_charter(attestors=ATTESTORS, attestations="signed.json")
     assert charter.format_version == 9
-    assert charter.charter_hash != causal_charter().charter_hash
+    assert charter.digest != causal_charter().digest
     record = json.loads(json.dumps(charter.to_dict()))
-    assert contracts.AnalysisCharter.from_dict(record) == charter
+    assert contracts.Charter.from_dict(record) == charter
     block = charter.estimand.to_dict()["causal"]
     assert block["attestations"] == "signed.json"
 
@@ -242,7 +240,7 @@ def test_attestors_in_an_older_format_are_refused(tmp_path, field):
     wrapper["format"] = 8
     path.write_text(json.dumps(wrapper))
     with pytest.raises(errors.ConfigError, match=field):
-        sealing.read_verified(path, signing_key=KEY)
+        sealing.read(path, signing_key=KEY)
 
 
 @pytest.mark.parametrize(

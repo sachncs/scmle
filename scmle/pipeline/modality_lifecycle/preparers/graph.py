@@ -97,7 +97,7 @@ class GraphPreparer(curators.Preparer):
             each under `groups`.
         """
         result = graph.induct(self.dataset, seed=seed)
-        by_id = {node.node_id: node for node in self.dataset.nodes}
+        by_id = {node.identifier: node for node in self.dataset.nodes}
         return containers.Partitions(
             tuple(by_id[node_id] for node_id in result.train_nodes),
             tuple(by_id[node_id] for node_id in result.validation_nodes),
@@ -122,7 +122,7 @@ class GraphPreparer(curators.Preparer):
         Raises:
             ValueError: If the graph declares no node features.
         """
-        if not self.dataset.feature_names:
+        if not self.dataset.features:
             raise errors.InputError(
                 "graph baseline requires declared node features"
             )
@@ -130,8 +130,8 @@ class GraphPreparer(curators.Preparer):
             [sample.features for sample in samples], dtype=float
         )
         return containers.Batch(
-            tuple(sample.node_id for sample in samples),
-            self.dataset.feature_names,
+            tuple(sample.identifier for sample in samples),
+            self.dataset.features,
             rows,
         )
 
@@ -144,7 +144,7 @@ class GraphPreparer(curators.Preparer):
         Returns:
             The node ID.
         """
-        return sample.node_id
+        return sample.identifier
 
     def label(self, sample: graph.Node) -> object | None:
         """Gives the node label.
@@ -189,7 +189,7 @@ class GraphPreparer(curators.Preparer):
             raise errors.InputError("max_nodes must be positive")
         if max_edges < 1:
             raise errors.InputError("max_edges must be positive")
-        if node_id not in self.dataset.node_ids:
+        if node_id not in self.dataset.identifiers:
             raise errors.InputError(f"unknown graph node: {node_id}")
 
         incident_edges = tuple(
@@ -264,7 +264,7 @@ class GraphPreparer(curators.Preparer):
         """
         if not isinstance(sample, graph.Node):
             raise errors.KindError("sample must be a Node")
-        subgraph = self.neighbourhood(sample.node_id)
+        subgraph = self.neighbourhood(sample.identifier)
         subgraph_node_ids = cast("list[str]", subgraph["node_ids"])
         neighbors = subgraph_node_ids[1:]
         edges = cast("list[dict[str, object]]", subgraph["edges"])
@@ -279,7 +279,7 @@ class GraphPreparer(curators.Preparer):
         return {
             "status": "available",
             "method": "one_hop_graph_context_and_node_feature_contribution",
-            "node_id": sample.node_id,
+            "node_id": sample.identifier,
             "neighbors": neighbors,
             "edges": edges,
             "subgraph": subgraph,
@@ -361,7 +361,7 @@ def knockouts(
         masked_values = list(source_values)
         masked_values[index] = 0.0
         masked_sample = graph.Node(
-            node_id=sample.node_id,
+            identifier=sample.identifier,
             features=tuple(masked_values),
             label=sample.label,
         )

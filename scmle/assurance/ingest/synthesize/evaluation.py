@@ -46,7 +46,7 @@ def outcomes(
         A frame with the view's key column, `TARGET_COLUMN` (the row
         position) and `CUTOFF_COLUMN` (moment minus lag, in days).
     """
-    cutoff = asof_view.to_days(targets[moment]) - lag_days
+    cutoff = asof_view.convert(targets[moment]) - lag_days
     return pandas.DataFrame(
         {
             view.key: targets[key].to_numpy(),
@@ -209,27 +209,27 @@ def evaluate(
     source = sources[spec.source]
     view = source.view
     count = len(targets)
-    asked = outcomes(targets, source.target_key, moment, lag_days, view)
+    asked = outcomes(targets, source.anchor, moment, lag_days, view)
     rows = view.visible(asked)
     if spec.kind in ("aggregate", "lookup"):
-        return fold(rows, spec.primitive, spec.value, spec.window_days, count)
+        return fold(rows, spec.primitive, spec.value, spec.window, count)
     if spec.nest is None or spec.inner is None:
         raise errors.ScmleError("nested feature lacks nest or inner")
     nest = nests[spec.nest]
-    if spec.window_days is not None:
+    if spec.window is not None:
         rows = rows.loc[
             rows[asof_view.EVENT_COLUMN]
-            > rows[asof_view.CUTOFF_COLUMN] - spec.window_days
+            > rows[asof_view.CUTOFF_COLUMN] - spec.window
         ]
     pairs = rows.reset_index(drop=True)
     pair_targets = pandas.DataFrame(
         {
-            nest.leaf.key: pairs[nest.mid_id].to_numpy(),
+            nest.leaf.key: pairs[nest.link].to_numpy(),
             asof_view.TARGET_COLUMN: numpy.arange(len(pairs)),
             asof_view.CUTOFF_COLUMN: pairs[asof_view.CUTOFF_COLUMN].to_numpy(),
         }
     )
     leaves = nest.leaf.visible(pair_targets)
-    inner = fold(leaves, spec.inner, spec.value, spec.window_days, len(pairs))
+    inner = fold(leaves, spec.inner, spec.value, spec.window, len(pairs))
     outer_rows = pairs.assign(inner_value=inner.to_numpy())
     return fold(outer_rows, spec.primitive, "inner_value", None, count)
