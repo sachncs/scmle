@@ -122,7 +122,7 @@ def defects(
         quality_findings.append(
             flaw(
                 "quality.image-empty-dataset",
-                data.FindingSeverity.CRITICAL,
+                data.Severity.CRITICAL,
                 {"dataset": "empty"},
                 {"sample_count": 0},
                 "Provide at least one validated image before training.",
@@ -133,7 +133,7 @@ def defects(
         quality_findings.append(
             flaw(
                 "quality.image-duplicate-content",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"dataset": "profiled_samples"},
                 {"duplicate_count": profile.duplicates},
                 "Review duplicate content and prevent split contamination.",
@@ -144,7 +144,7 @@ def defects(
         quality_findings.append(
             flaw(
                 "quality.image-near-duplicate-content",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"dataset": "profiled_samples"},
                 {
                     "group_count": len(near_duplicate_groups),
@@ -159,7 +159,7 @@ def defects(
         quality_findings.append(
             flaw(
                 "quality.image-profile-truncated",
-                data.FindingSeverity.INFO,
+                data.Severity.INFO,
                 {"dataset": "profiled_samples"},
                 {
                     "max_samples": max_samples,
@@ -194,7 +194,7 @@ def hazards(
         risk_findings.append(
             flaw(
                 "risk.image-conflicting-duplicate-labels",
-                data.FindingSeverity.ERROR,
+                data.Severity.ERROR,
                 {"dataset": "all_samples"},
                 {"groups": list(conflicts)},
                 "Resolve the label conflict or explicitly exclude the "
@@ -206,7 +206,7 @@ def hazards(
         risk_findings.append(
             flaw(
                 "risk.image-sensitive-metadata",
-                data.FindingSeverity.ERROR,
+                data.Severity.ERROR,
                 {"dataset": "all_samples"},
                 {"tags": sensitive_metadata},
                 "Review, redact, or explicitly approve image metadata "
@@ -218,7 +218,7 @@ def hazards(
         risk_findings.append(
             flaw(
                 "risk.image-mixed-label-state",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"dataset": "all_samples"},
                 {"label_counts": labels},
                 "Declare whether unlabeled images are valid for the "

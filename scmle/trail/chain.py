@@ -151,14 +151,14 @@ def seal(
     derived = trace.derive(folder, keys)
     for name, report in derived.reports.items():
         if report is not None:
-            records.write_json(folder / records.REPORTS / name, report)
+            records.write(folder / records.REPORTS / name, report)
     derived = trace.derive(folder, keys)
     steps = link(derived.steps)
     held = inventory(folder)
     head = steps[-1]["hash"]
     inputs = {}
     if (folder / records.INPUTS).is_file():
-        inputs = records.read_json(folder / records.INPUTS)
+        inputs = records.read(folder / records.INPUTS)
     analyst = keys.get("analyst")
     document = {
         "format": records.FORMAT,
@@ -170,7 +170,7 @@ def seal(
         "retained": held,
         "builder_signature": (sign(head, held, analyst) if analyst else None),
     }
-    records.write_json(folder / records.TRAIL_FILE, document)
+    records.write(folder / records.TRAIL_FILE, document)
     return verify(folder, keys)
 
 
@@ -329,7 +329,7 @@ def verify(
         )
         return Verification(str(folder), "", 0, found)
     try:
-        document = records.read_json(path)
+        document = records.read(path)
     except ValueError:
         # handled: returned as failed finding/problem/refusal with error text
         found = (

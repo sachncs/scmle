@@ -31,7 +31,7 @@ def charter_with_costs(tmp_path, c_fp=1.0, c_fn=2.0):
 
 
 def evaluation(result):
-    folder = pathlib.Path(result.run_dir)
+    folder = pathlib.Path(result.directory)
     for name in ("evaluation.json", "diagnostics/evaluation.json"):
         if (folder / name).exists():
             return json.loads((folder / name).read_text())
@@ -53,8 +53,8 @@ def test_the_charter_cost_model_sets_the_threshold(binary_frame, tmp_path):
     result = support.make_project(
         binary_frame,
         "y",
-        time_budget=300,
-        output_dir=tmp_path / "out",
+        budget=300,
+        directory=tmp_path / "out",
         charter=path,
     ).run()
     document = evaluation(result)
@@ -79,6 +79,6 @@ def test_a_run_without_a_decision_layer_has_no_net_benefit(
 ):
     # Enforces docs/API_STABILITY.md:187 and docs/API_STABILITY.md:190.
     result = support.make_project(
-        binary_frame, "y", time_budget=300, output_dir=tmp_path / "out"
+        binary_frame, "y", budget=300, directory=tmp_path / "out"
     ).run()
     assert evaluation(result)["benefit"] is None

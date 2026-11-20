@@ -39,7 +39,7 @@ METHOD_SOURCES: dict[str, list[Any]] = {
         aipw.spawn,
         aipw.Design,
     ],
-    "coverage_randomized": [aipw.difference_in_means],
+    "coverage_randomized": [aipw.contrast],
     "coverage_did": [did.estimate],
     "coverage_iv": [iv.estimate, iv.anderson_rubin, iv.residualise],
     "coverage_rd": [
@@ -48,14 +48,14 @@ METHOD_SOURCES: dict[str, list[Any]] = {
         rd.polyfit,
         rd.crossvalidate,
     ],
-    "size_synth": [synth.estimate, synth.weigh, synth.ratio_for],
+    "size_synth": [synth.estimate, synth.weigh, synth.gauge],
     "overlap": [aipw.propensities],
     "iv_strength": [iv.estimate, iv.anderson_rubin],
     "density_rd": [rd.estimate, rd.crossvalidate, rd.polyfit],
-    "battery_nco": [battery.run_battery, battery.wald, aipw.estimate],
-    "battery_pretrend": [battery.run_battery, did.estimate],
+    "battery_nco": [battery.correct, battery.wald, aipw.estimate],
+    "battery_pretrend": [battery.correct, did.estimate],
     "battery_rd": [
-        battery.run_battery,
+        battery.correct,
         rd.estimate,
         rd.falsify,
         rd.discontinuity,
@@ -70,12 +70,12 @@ METHOD_SOURCES: dict[str, list[Any]] = {
         sensitivity.ceiling,
     ],
     "sensitivity_did": [did.estimate, did.Estimate.sensitivity],
-    "false_confirm": [tier.decide, battery.run_battery],
+    "false_confirm": [tier.decide, battery.correct],
 }
 NOT_MEASURED = ("battery_iv", "battery_synth")
 
 
-def method_hashes() -> dict[str, str]:
+def checksum() -> dict[str, str]:
     """Hashes the package methods behind each gate.
 
     Returns:
@@ -100,7 +100,7 @@ def certificated(path: Path | None = None) -> set[str]:
     if not target.exists():
         return set()
     document = json.loads(target.read_text(encoding="utf-8"))
-    current = method_hashes()
+    current = checksum()
     return {
         name
         for name, entry in document.get("gates", {}).items()
@@ -115,7 +115,7 @@ DESCRIPTIVE = "descriptive"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SubgroupGate:
+class Gate:
     """Whether the Holm family of subgroup estimates is certified.
 
     Attributes:
@@ -128,7 +128,7 @@ class SubgroupGate:
 
     status: str
     reason: str
-    min_rows: int | None = None
+    rows: int | None = None
 
     KEYS: ClassVar[records.Migration] = records.Migration(
         renames={
@@ -160,7 +160,7 @@ def fingerprint(report: Any) -> str:
     return certificates.fingerprint(report, battery.wald, multiplicity.adjust)
 
 
-def subgroup_gate(report: Any, path: Path | None = None) -> SubgroupGate:
+def gate(report: Any, path: Path | None = None) -> Gate:
     """Decides whether subgroup results gate or only describe.
 
     The subgroup family never changes the tier (the tier rule has no
@@ -177,20 +177,20 @@ def subgroup_gate(report: Any, path: Path | None = None) -> SubgroupGate:
     """
     target = SUBGROUP_STORE_PATH if path is None else path
     if not target.exists():
-        return SubgroupGate(DESCRIPTIVE, "no subgroup certificate file")
+        return Gate(DESCRIPTIVE, "no subgroup certificate file")
     document = json.loads(target.read_text(encoding="utf-8"))
     entry = document.get("gates", {}).get(SUBGROUP_GATE)
     if entry is None:
-        return SubgroupGate(DESCRIPTIVE, "no subgroup certificate")
+        return Gate(DESCRIPTIVE, "no subgroup certificate")
     if entry.get("method_hash") != fingerprint(report):
-        return SubgroupGate(
+        return Gate(
             DESCRIPTIVE, "stale: the code changed since it was measured"
         )
     if not entry.get("passed"):
-        return SubgroupGate(
+        return Gate(
             DESCRIPTIVE, "the certificate missed its pre-registered floor"
         )
-    return SubgroupGate(
+    return Gate(
         GATING,
         "family-wise error and power met their pre-registered floors",
         entry.get("min_certified_rows"),

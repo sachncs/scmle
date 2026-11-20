@@ -10,7 +10,7 @@ from scmle.contracts import errors
 
 def test_a_saved_bundle_predicts_without_the_project(binary_frame, tmp_path):
     result = support.make_project(
-        binary_frame, "y", time_budget=300, output_dir=tmp_path
+        binary_frame, "y", budget=300, directory=tmp_path
     ).run()
     result.save(tmp_path / "model")
     rows = binary_frame.drop(columns="y").head(10)
@@ -18,15 +18,15 @@ def test_a_saved_bundle_predicts_without_the_project(binary_frame, tmp_path):
     labels = scmle.api.predict.predict(tmp_path / "model", rows, trusted=True)
 
     numpy.testing.assert_array_equal(labels, result.predict(rows))
-    model = scmle.api.predict.load_model(tmp_path / "model", trusted=True)
-    assert model.info.model_version == result.bundle.info.model_version
+    model = scmle.api.predict.load(tmp_path / "model", trusted=True)
+    assert model.info.version == result.bundle.info.model_version
 
 
 def test_loading_an_unsigned_bundle_needs_trust(binary_frame, tmp_path):
     result = support.make_project(
-        binary_frame, "y", time_budget=300, output_dir=tmp_path
+        binary_frame, "y", budget=300, directory=tmp_path
     ).run()
     result.save(tmp_path / "model")
 
     with pytest.raises(errors.ArtifactError):
-        scmle.api.predict.load_model(tmp_path / "model")
+        scmle.api.predict.load(tmp_path / "model")

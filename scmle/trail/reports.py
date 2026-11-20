@@ -50,14 +50,14 @@ def exploratory(directory: Path) -> dict[str, Any]:
     curation = scmle.contracts.records.load(
         "Curation",
         profiles.Curation.migrations,
-        records.read_json(base / "curation_report.json"),
+        records.read(base / "curation_report.json"),
     )
-    manifest = provenance.DatasetManifest.from_dict(
-        records.read_json(base / "dataset_manifest.json")
+    manifest = provenance.Manifest.from_dict(
+        records.read(base / "dataset_manifest.json")
     )
-    feasibility = records.read_json(base / "feasibility.json")
-    claims = records.read_json(base / "confirmed_claims.json")
-    ledger = records.read_lines(base / "hypothesis_ledger.jsonl")
+    feasibility = records.read(base / "feasibility.json")
+    claims = records.read(base / "confirmed_claims.json")
+    ledger = records.scan(base / "hypothesis_ledger.jsonl")
     kinds = Counter(row["kind"] for row in ledger)
     tiers = Counter(check["tier"] for check in claims["checks"])
     findings = curation["findings"]["quality"] + curation["findings"]["risk"]
@@ -124,7 +124,7 @@ def entry(path: Path) -> scmle.contracts.records.Layout:
     trial = scmle.contracts.records.load(
         "Trial",
         scmle.contracts.experiments.Trial.migrations,
-        records.read_json(path),
+        records.read(path),
     )
     return {
         "trial": trial["identifier"],
@@ -157,7 +157,7 @@ def experiments(directory: Path) -> dict[str, Any]:
         reading.
     """
     base = directory / records.RETAINED / "run"
-    evaluation = results.evaluation(records.read_json(base / "evaluation.json"))
+    evaluation = results.evaluation(records.read(base / "evaluation.json"))
     rows = [entry(p) for p in sorted((base / "trials").glob("trial_*.json"))]
     done = [r for r in rows if r["status"] == "ok" and r["score"] is not None]
     done.sort(key=lambda r: (-r["score"], r["trial"]))

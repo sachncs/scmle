@@ -15,7 +15,7 @@ class Rollout(records.Records):
     """Traffic moves on the platform, each confirmed before it counts."""
 
     def restore(
-        self, plane: control.ControlPlane, previous: dict[str, Any] | None
+        self, plane: control.Platform, previous: dict[str, Any] | None
     ) -> bool | None:
         """Puts the previous revision back and confirms it (best effort).
 
@@ -31,7 +31,7 @@ class Rollout(records.Records):
         if previous is None:
             return None
         try:
-            plane.set_traffic({previous["revision"]: 100})
+            plane.route({previous["revision"]: 100})
             control.confirm(
                 plane,
                 control.expecting(
@@ -40,7 +40,7 @@ class Rollout(records.Records):
                 self.policy,
             )
         except (
-            control.RuntimeUnconfirmed,
+            control.UnconfirmedError,
             control.Unsupported,
             errors.ScmleError,
         ):
@@ -78,7 +78,7 @@ class Rollout(records.Records):
 
     def shift(
         self,
-        plane: control.ControlPlane,
+        plane: control.Platform,
         revision: str,
         image_digest: str,
         steps: tuple[int, ...],
@@ -101,7 +101,7 @@ class Rollout(records.Records):
                 allocation[status.predecessor(previous)["revision"]] = (
                     status.FULL_ROLLOUT - percent
                 )
-            plane.set_traffic(allocation)
+            plane.route(allocation)
             seen = control.confirm(
                 plane,
                 control.expecting(revision, image_digest, percent),

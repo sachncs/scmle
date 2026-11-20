@@ -21,7 +21,7 @@ def test_every_missing_staging_check_is_listed() -> None:
     thin = dataclasses.replace(staged, evidence=staged.evidence[:1]).signed(
         support_release.KEY
     )
-    candidate = support_release.candidate("production", staging_record=thin)
+    candidate = support_release.candidate("production", record=thin)
     missing = ", ".join(livetests.CHECK_NAMES[1:])
     assert gate.audit(candidate, support_release.KEY) == [
         f"staging evidence is missing: {missing}"

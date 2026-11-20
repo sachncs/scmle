@@ -134,9 +134,7 @@ class Booster(models.Model):
                 f"{self.name}: install the 'boosting' extra ({self.library})"
             )
         module = importlib.import_module(self.library)
-        class_name = (
-            self.classifier if task.is_classification else self.regressor
-        )
+        class_name = self.classifier if task.classification else self.regressor
         given = dict(params or {})
         fit_params = {
             name: given.pop(name) for name in self.fitting if name in given
@@ -151,15 +149,13 @@ class Booster(models.Model):
             estimator = early_stopping.wrap(estimator, self.rounds, seed)
         if fit_params:
             wrapper = (
-                wrappers.FitParamsClassifier
-                if task.is_classification
-                else wrappers.Curried
+                wrappers.Forwarder if task.classification else wrappers.Curried
             )
             estimator = wrapper(estimator, fit_params)
-        if task.is_classification and self.relabel:
+        if task.classification and self.relabel:
             return wrappers.Encoded(estimator)
-        if task.is_classification and self.predictions:
-            return wrappers.FlatPredictionClassifier(estimator)
+        if task.classification and self.predictions:
+            return wrappers.Flattener(estimator)
         return cast("models.Estimator", estimator)
 
 
@@ -190,12 +186,12 @@ LIGHTGBM = Lightgbm(
     fitting=("categorical_feature",),
     capabilities=models.Capabilities(
         tasks.STANDARD_TASKS,
-        sparse_input=True,
-        handles_missing=True,
-        native_categorical=True,
+        sparse=True,
+        missing=True,
+        categorical=True,
         early_stopping=True,
         cost=3,
-        memory_factor=2.0,
+        factor=2.0,
     ),
     fixed={"verbose": -1, "subsample_freq": 1, "n_jobs": 1},
     search_space=search.Space(
@@ -222,12 +218,12 @@ XGBOOST = Booster(
     monotonic_param="monotone_constraints",
     capabilities=models.Capabilities(
         tasks.STANDARD_TASKS,
-        sparse_input=True,
-        handles_missing=True,
-        native_categorical=False,
+        sparse=True,
+        missing=True,
+        categorical=False,
         early_stopping=True,
         cost=3,
-        memory_factor=2.5,
+        factor=2.5,
     ),
     fixed={"verbosity": 0, "n_jobs": 1},
     search_space=search.Space(
@@ -253,13 +249,13 @@ CATBOOST = Booster(
     regressor="CatBoostRegressor",
     capabilities=models.Capabilities(
         tasks.STANDARD_TASKS,
-        sparse_input=True,
-        handles_missing=True,
-        native_categorical=False,
+        sparse=True,
+        missing=True,
+        categorical=False,
         early_stopping=True,
         gpu=False,
         cost=4,
-        memory_factor=3.0,
+        factor=3.0,
     ),
     fixed={
         "verbose": 0,

@@ -111,12 +111,12 @@ class Selection(interface.Stage):
         """
         board.journal.emit(
             "selection.frozen",
-            f"{selected.model_name}/{selected.strategy}",
-            (f"trials/{selected.trial_id}.json",),
+            f"{selected.model}/{selected.strategy}",
+            (f"trials/{selected.identifier}.json",),
             {
-                "trial_id": selected.trial_id,
+                "trial_id": selected.identifier,
                 "params": selected.params,
-                "cv_score": selected.score_mean,
+                "cv_score": selected.score,
             },
         )
         return Pick(selected)
@@ -166,16 +166,16 @@ class Selection(interface.Stage):
         partition = board.get(profiling.Partition)
         split = partition.split
         task = partition.task
-        plan = partition.profile.feature_plan
+        plan = partition.profile.plan
         metric = partition.metric
-        sign = 1.0 if metric.greater_is_better else -1.0
+        sign = 1.0 if metric.maximize else -1.0
         rows = []
         for trial in checked:
             if cost.late(board, trial):
                 continue
             candidate = strategies.lookup(trial.strategy).build(
                 plan,
-                board.services.registry.get(trial.model_name),
+                board.services.registry.get(trial.model),
                 task,
                 board.services.spec.validation.seed,
                 trial.params,
@@ -194,11 +194,11 @@ class Selection(interface.Stage):
                 f"none of the top {len(checked)} candidates satisfies the "
                 "serving constraints; relax the limits or allow more candidates"
             )
-        best = max(sign * r.trial.score_mean for r in feasible)
+        best = max(sign * r.trial.score for r in feasible)
         near = [
             r
             for r in feasible
-            if best - sign * r.trial.score_mean
+            if best - sign * r.trial.score
             <= board.services.spec.selection.pareto_tolerance
         ]
         chosen = min(
@@ -207,13 +207,13 @@ class Selection(interface.Stage):
         )
         trial = chosen.trial
         board.journal.enter(
-            f"{trial.model_name}/{trial.strategy}",
+            f"{trial.model}/{trial.strategy}",
             experiments.Edict.INCLUDE,
             "fastest within "
             f"{board.services.spec.selection.pareto_tolerance} of the "
             f"best score ({chosen.usage.latency:.1f} ms p95)",
         )
-        refits[trial.trial_id] = chosen.candidate
+        refits[trial.identifier] = chosen.candidate
         self.announce(board, trial)
         return Pick(trial, frontier(rows, chosen, sign))
 
@@ -304,7 +304,7 @@ class Selection(interface.Stage):
             measured += 1
             candidate = self.measure(board, trial, limits)
             if candidate is not None:
-                refits[trial.trial_id] = candidate
+                refits[trial.identifier] = candidate
                 return self.announce(board, trial)
         if not measured:
             return self.announce(board, cost.affordable(board, checked))
@@ -335,10 +335,10 @@ class Selection(interface.Stage):
         partition = board.get(profiling.Partition)
         split = partition.split
         task = partition.task
-        plan = partition.profile.feature_plan
+        plan = partition.profile.plan
         candidate = strategies.lookup(trial.strategy).build(
             plan,
-            board.services.registry.get(trial.model_name),
+            board.services.registry.get(trial.model),
             task,
             board.services.spec.validation.seed,
             trial.params,
@@ -347,7 +347,7 @@ class Selection(interface.Stage):
         candidate.fit(split.features, split.target)
         usage = resources.measure(candidate, split.features)
         broken = limits.violations(usage)
-        label = f"{trial.model_name}/{trial.strategy}"
+        label = f"{trial.model}/{trial.strategy}"
         if broken:
             board.journal.enter(
                 label, experiments.Edict.REJECT, "; ".join(broken)
@@ -383,17 +383,17 @@ def earn(
         no successful default pipeline or no successful variant.
     """
     metric = board.get(profiling.Partition).metric
-    sign = 1 if metric.greater_is_better else -1
+    sign = 1 if metric.maximize else -1
     ok = [t for t in trials if t.status is experiments.Termination.OK]
-    defaults = {t.model_name: t for t in ok if strategy_search.plain(t)}
+    defaults = {t.model: t for t in ok if strategy_search.plain(t)}
     variants = {id(t) for t in ok if not strategy_search.plain(t)}
     if not defaults or not variants:
         return trials
-    best = max(defaults.values(), key=lambda t: sign * t.score_mean)
+    best = max(defaults.values(), key=lambda t: sign * t.score)
     needed = strategy_search.CONFIDENCE
     kept = []
     for trial in trials:
-        reference = defaults.get(trial.model_name, best)
+        reference = defaults.get(trial.model, best)
         chance = (
             strategy_search.odds(trial, reference, sign)
             if id(trial) in variants
@@ -403,10 +403,10 @@ def earn(
             kept.append(trial)
             continue
         board.journal.enter(
-            f"{trial.model_name}/{trial.strategy}",
+            f"{trial.model}/{trial.strategy}",
             experiments.Edict.REJECT,
-            f"{trial.trial_id}: cv {metric.name} {trial.score_mean:.4f} vs "
-            f"{reference.model_name} default {reference.score_mean:.4f}; "
+            f"{trial.identifier}: cv {metric.name} {trial.score:.4f} vs "
+            f"{reference.model} default {reference.score:.4f}; "
             f"probability better {chance:.3f}, needed {needed:.3f}",
         )
     return kept
@@ -451,19 +451,19 @@ def codify(
         sorted order), the cost model's threshold and a description of how
         it was fitted.
     """
-    pipeline = refits.get(selected.trial_id)
+    pipeline = refits.get(selected.identifier)
     partition = board.get(profiling.Partition)
     if pipeline is None:
         pipeline = strategies.lookup(selected.strategy).build(
-            partition.profile.feature_plan,
-            board.services.registry.get(selected.model_name),
+            partition.profile.plan,
+            board.services.registry.get(selected.model),
             partition.task,
             board.services.spec.validation.seed,
             selected.params,
             featurise=board.get(ingestion.Intake).kind.featurise,
         )
         pipeline.fit(split.features, split.target)
-        refits[selected.trial_id] = pipeline
+        refits[selected.identifier] = pipeline
     model = products.require(pending.charter.costs, "cost_model")
     classes = sorted(pending.view.target.dropna().unique(), key=str)
     return scmle.assurance.framing.claim.Selection(
@@ -471,10 +471,10 @@ def codify(
         classes[-1],
         float(model.threshold),
         {
-            "model": selected.model_name,
+            "model": selected.model,
             "strategy": selected.strategy,
             "params": selected.params,
-            "trial_id": selected.trial_id,
+            "trial_id": selected.identifier,
             "split": split.manifest.fingerprint,
             "seed": board.services.spec.validation.seed,
         },
@@ -501,7 +501,7 @@ def frontier(
     """
     points = [
         (
-            sign * r.trial.score_mean,
+            sign * r.trial.score,
             r.usage.latency,
             r.usage.size,
         )
@@ -521,9 +521,9 @@ def frontier(
 
     return [
         {
-            "model": r.trial.model_name,
+            "model": r.trial.model,
             "strategy": r.trial.strategy,
-            "score": r.trial.score_mean,
+            "score": r.trial.score,
             "p95_latency_ms": r.usage.latency,
             "model_mb": r.usage.size,
             "violations": list(r.broken),

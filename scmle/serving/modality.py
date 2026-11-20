@@ -263,7 +263,7 @@ class ModalityHttpServing:
         """Binds the socket and serves in a daemon thread.
 
         A non-loopback host without a gateway is refused with a
-        `ConfigError` by `access.require_authentication_for`.
+        `ConfigError` by `access.insist`.
 
         Raises:
             ScmleError: If the server is already running.
@@ -271,7 +271,7 @@ class ModalityHttpServing:
         if self.httpd is not None:
             raise errors.ScmleError("server is already running")
         handler = functools.partial(Responder, adapter=self)
-        access.require_authentication_for(self.host, self.gateway)
+        access.insist(self.host, self.gateway)
         self.httpd = server.ThreadingHTTPServer((self.host, self.port), handler)
         self.thread = threading.Thread(
             target=self.httpd.serve_forever,

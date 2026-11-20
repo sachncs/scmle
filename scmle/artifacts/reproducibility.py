@@ -36,10 +36,10 @@ class Comparison:
     Attributes:
         level: `exact`, `comparable` or `different`.
         reasons: Why the level is not `exact` (empty for `exact`).
-        max_abs_difference: Largest absolute fold-score difference over the
+        discrepancy: Largest absolute fold-score difference over the
             compared trials whose status matches; 0.0 for `exact`, and NaN
             when the runs differ before any trial is compared.
-        trials_compared: Number of trials compared (0 when the runs differ
+        compared: Number of trials compared (0 when the runs differ
             before any trial is compared).
         notes: Caveats, such as differing environments (they do not change
             the level).
@@ -47,8 +47,8 @@ class Comparison:
 
     level: str
     reasons: list[str]
-    max_abs_difference: float
-    trials_compared: int
+    discrepancy: float
+    compared: int
     notes: list[str]
 
 
@@ -158,8 +158,8 @@ def compare(
         reasons.append("configurations differ")
     datasets = [
         records.load(
-            provenance.DatasetManifest.__name__,
-            provenance.DatasetManifest.migrations,
+            provenance.Manifest.__name__,
+            provenance.Manifest.migrations,
             record["dataset"],
         )["digests"]["data"]
         for record in (first, second)

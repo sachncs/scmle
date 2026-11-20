@@ -17,7 +17,7 @@ class Provenance(workspace.Workspace):
 
     __slots__ = ()
 
-    def run_invalid_signature(
+    def forge(
         self,
     ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Tampers with an attestation signature and records the failed check.
@@ -42,9 +42,7 @@ class Provenance(workspace.Workspace):
         tampered = dataclasses.replace(record, signature="0" * 64)
         rejected = not tampered.verify(provenance, {}, signing_key="local-key")
         quarantine = self.root / "quarantine-signature.json"
-        self.write_json(
-            quarantine, {"state": "quarantined", "rejected": rejected}
-        )
+        self.write(quarantine, {"state": "quarantined", "rejected": rejected})
         return (
             self.artifact(
                 scenario,
@@ -66,7 +64,7 @@ class Provenance(workspace.Workspace):
             ),
         )
 
-    def run_duplicate_event(
+    def duplicate(
         self,
     ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Commits one event twice to an ingestion ledger and records both.
@@ -119,7 +117,7 @@ class Provenance(workspace.Workspace):
             ),
         )
 
-    def run_incomplete_lineage(
+    def orphan(
         self,
     ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Adds a lineage edge to a missing node and records the rejection.
@@ -164,7 +162,7 @@ class Provenance(workspace.Workspace):
             ),
         )
 
-    def run_rejected_approval(
+    def reject(
         self,
     ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Validates a signed rejected approval and records the refusal.
@@ -181,12 +179,12 @@ class Provenance(workspace.Workspace):
         approval = scmle.governance.registry.Sanction(
             model="local-model",
             version=1,
-            content_id="bundle-digest",
+            content="bundle-digest",
             reviewer="independent-reviewer",
             decision=scmle.governance.registry.Verdict.REJECTED,
             reason="controlled rejection",
             evidence=("artifact://review",),
-            approved_at="2026-10-20T10:00:00+00:00",
+            approved="2026-10-20T10:00:00+00:00",
         ).sign("local-key")
         rejected = False
         try:
@@ -218,7 +216,7 @@ class Provenance(workspace.Workspace):
             ),
         )
 
-    def run_changed_snapshot(
+    def mutate(
         self,
     ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Registers a snapshot, then one with the same id and other data.

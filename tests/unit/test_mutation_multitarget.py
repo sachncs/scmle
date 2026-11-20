@@ -90,9 +90,7 @@ def test_the_label_probabilities_come_from_the_fitted_model() -> None:
     template = pipeline.Pipeline(
         [("keep", keep()), ("model", neighbors.KNeighborsClassifier(3))]
     )
-    fitted = multitarget.MultiLabelEstimator(template, ("a", "b")).fit(
-        labels, primary
-    )
+    fitted = multitarget.Multilabel(template, ("a", "b")).fit(labels, primary)
     found = fitted.predict_proba(frame[FEATURES])
     expected = fitted.model_.predict_proba(
         fitted.preprocessing_.transform(frame[FEATURES])

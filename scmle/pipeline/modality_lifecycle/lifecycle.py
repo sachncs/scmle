@@ -256,9 +256,9 @@ class Lifecycle:
                 if bespoke
                 else modalities.Status.EXPERIMENTAL
             ),
-            stage_evidence=report.evidence,
-            required_extras=("core",),
-            failure_modes=(
+            evidence=report.evidence,
+            extras=("core",),
+            modes=(
                 "malformed or unsupported modality input",
                 "representation or codec dependency unavailable",
                 "resource limits exceeded",

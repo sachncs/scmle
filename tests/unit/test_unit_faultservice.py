@@ -37,14 +37,14 @@ def test_a_client_counts_failures_against_a_dead_instance():
     dead.wait()
     instance = harness.Instance(dead, demo.unused(), pathlib.Path())
     client = service.Client({"current": instance})
-    assert (client.sent, client.failed, client.longest_gap) == (0, 0, 0.0)
+    assert (client.sent, client.failed, client.gap) == (0, 0, 0.0)
     client.start()
     time.sleep(0.3)
-    client.stop_flag.set()
+    client.halt.set()
     client.join(timeout=10)
     assert client.sent >= 1
     assert client.failed == client.sent
-    assert client.longest_gap == 0.0
+    assert client.gap == 0.0
 
 
 def test_drain_gives_up_after_its_deadline(monkeypatch):
@@ -99,7 +99,7 @@ def test_a_rotated_key_serves_and_is_audited():
 
 
 def test_a_corrupted_bundle_is_refused_and_restored():
-    result = service.corrupted_bundle()
+    result = service.bundle()
     passed(result)
     assert result.fault == "corrupted_bundle"
     assert harness.unready(result.detail["tampered_verdict"])

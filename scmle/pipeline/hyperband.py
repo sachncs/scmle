@@ -123,19 +123,19 @@ class Hyperband:
                 for trial_id, params in zip(ids, proposals, strict=True)
             ]
         )
-        sign = 1 if self.metric.greater_is_better else -1
+        sign = 1 if self.metric.maximize else -1
         for rung in rungs[1:]:
             alive = [
                 t for t in current if t.status is experiments.Termination.OK
             ]
             keep = max(1, math.ceil(len(alive) / self.search.eta))
-            winners = sorted(alive, key=lambda t: -sign * t.score_mean)[:keep]
+            winners = sorted(alive, key=lambda t: -sign * t.score)[:keep]
             finished = {
-                t.trial_id: t
+                t.identifier: t
                 for t in self.runner.dispatch(
                     [
                         trials.Job(
-                            t.trial_id, t.model_name, t.params, rung, t.strategy
+                            t.identifier, t.model, t.params, rung, t.strategy
                         )
                         for t in winners
                     ]
@@ -144,13 +144,15 @@ class Hyperband:
             for trial in current:
                 if (
                     trial.status is experiments.Termination.OK
-                    and trial.trial_id not in finished
+                    and trial.identifier not in finished
                 ):
                     trial.status = experiments.Termination.PRUNED
                     trial.error = f"pruned before the {rung or 'full'} rung"
                     self.complete(trial, optimizer)
             current = [
-                finished[t.trial_id] for t in winners if t.trial_id in finished
+                finished[t.identifier]
+                for t in winners
+                if t.identifier in finished
             ]
         for trial in current:
             if trial.status is experiments.Termination.OK:
@@ -173,5 +175,5 @@ class Hyperband:
             experiments.Termination.OK,
             experiments.Termination.PRUNED,
         ):
-            optimizer.tell(trial.params, trial.score_mean)
+            optimizer.tell(trial.params, trial.score)
         self.board.journal.transcribe(trial)

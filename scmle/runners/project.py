@@ -122,7 +122,7 @@ class Mirror:
             The number of files downloaded.
         """
         count = 0
-        for meta in self.store.list_objects(self.prefix):
+        for meta in self.store.catalog(self.prefix):
             relative = meta.key.removeprefix(self.prefix)
             target = self.directory / relative
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -206,7 +206,7 @@ def configure(options: Mapping[str, Any]) -> dict[str, Any]:
     return converted
 
 
-def run_project(
+def project(
     context: local.Context,
     sync_seconds: float = SYNC_SECONDS,
     on_start: Callable[[Any], None] | None = None,
@@ -233,7 +233,7 @@ def run_project(
     spec = context.spec.project
     if "data" not in spec or "target" not in spec:
         raise errors.ConfigError("the project needs 'data' and 'target'")
-    root = pathlib.Path(tempfile.gettempdir()) / f"scmle-job-{context.run_id}"
+    root = pathlib.Path(tempfile.gettempdir()) / f"scmle-job-{context.run}"
     shutil.rmtree(root, ignore_errors=True)
     try:
         data_path = root / "data" / pathlib.Path(str(spec["data"])).name
@@ -242,7 +242,7 @@ def run_project(
         data_path.write_bytes(content)
         workdir = root / "runs"
         workdir.mkdir()
-        sync = Mirror(context.store, f"runs/{context.run_id}/workdir/", workdir)
+        sync = Mirror(context.store, f"runs/{context.run}/workdir/", workdir)
         restored = sync.restore()
         sync.start(sync_seconds)
         try:
@@ -293,7 +293,7 @@ def execute(
     started = scmle.api.project.Project(
         data_path,
         spec["target"],
-        output_dir=workdir,
+        directory=workdir,
         **configure(spec.get("options", {})),
     )
     if on_start is not None:
@@ -318,13 +318,13 @@ def summarize(result: Any, resumed: bool) -> dict[str, Any]:
         "run_id": result.run_id,
         "state": result.state,
         "resumed": resumed,
-        "selected_model": result.selected_model,
+        "selected_model": result.model,
         "metric": evaluation["metric"],
         "selected_cv_score": evaluation["selected"]["score"],
         "test_metrics": evaluation["metrics"],
         "trials": [
             {
-                "model": trial.model_name,
+                "model": trial.model,
                 "status": getattr(trial.status, "value", str(trial.status)),
             }
             for trial in result.trials

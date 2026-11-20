@@ -49,7 +49,7 @@ LEDGER = "hypothesis_ledger.jsonl"
 TRAIL = "trail.json"
 BACKUP = ".bak"
 KINDS: Mapping[str, Any] = {
-    "dataset_manifest.json": provenance.DatasetManifest,
+    "dataset_manifest.json": provenance.Manifest,
     "decision_cost_model.json": costs.Tariff,
     "error_budget.json": budget.Alpha,
     "feasibility.json": feasibility.Feasibility,
@@ -165,7 +165,7 @@ def restore(paths: list[pathlib.Path]) -> None:
     """
     for path in paths:
         backup = path.with_name(path.name + BACKUP)
-        durability.write_atomically(path, backup.read_bytes())
+        durability.write(path, backup.read_bytes())
         backup.unlink()
 
 
@@ -235,9 +235,9 @@ class Records(command.Command):
             return command.EXIT_OK
         for path, current in changes.items():
             backup = path.with_name(path.name + BACKUP)
-            durability.write_atomically(backup, path.read_bytes())
+            durability.write(backup, path.read_bytes())
             text = json.dumps(current, indent=2, sort_keys=True) + "\n"
-            durability.write_atomically(path, text.encode("utf-8"))
+            durability.write(path, text.encode("utf-8"))
         problems = verify(folder, key)
         if problems:
             restore(list(changes))

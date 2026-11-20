@@ -15,25 +15,25 @@ def release_policy(
 ) -> evaluation.Gates:
     """Build a complete release policy for contract tests."""
     return evaluation.Gates(
-        metric_gates=(
+        metrics=(
             evaluation.Hurdle(
                 metric=metric, direction=direction, threshold=0.75
             ),
         ),
-        diagnostic_gates=(
+        diagnostics=(
             evaluation.Requirement(
                 name="metric_uncertainty",
                 action=evaluation.Remedy.BLOCK,
-                required_evidence=("bootstrap-ci.json",),
+                evidence=("bootstrap-ci.json",),
             ),
             evaluation.Requirement(
                 name="robustness",
                 action=evaluation.Remedy.WARN,
-                required_evidence=("robustness.json",),
+                evidence=("robustness.json",),
             ),
         ),
-        required_evidence=("run-manifest.json", "test-metrics.json"),
-        fairness_gates=fairness_gates,
+        evidence=("run-manifest.json", "test-metrics.json"),
+        fairness=fairness_gates,
     )
 
 
@@ -48,7 +48,7 @@ def binary_policy(
     """Build a complete valid binary policy for tests."""
     return evaluation.Criteria(
         task=tasks.Task.BINARY,
-        primary_metric="roc_auc",
+        metric="roc_auc",
         metrics=(
             evaluation.Declaration(
                 name="roc_auc", direction=evaluation.Orientation.MAXIMIZE
@@ -60,19 +60,17 @@ def binary_policy(
             ),
         ),
         uncertainty=uncertainty
-        or evaluation.Uncertainty(method=evaluation.UncertaintyMethod.NONE),
+        or evaluation.Uncertainty(method=evaluation.Method.NONE),
         calibration=calibration
         or evaluation.Calibration(method=evaluation.Procedure.NONE),
         fairness=fairness
         or evaluation.Fairness(method=evaluation.Technique.NONE),
-        small_groups=evaluation.Subgroups(
-            warning_threshold=30, blocking_threshold=10
-        ),
+        small=evaluation.Subgroups(warning=30, blocking=10),
         explanations=explanations
         or evaluation.Explanations(
             availability=evaluation.Explicability.GLOBAL,
-            required_methods=("permutation_importance",),
-            required_evidence=("explanation.json",),
+            methods=("permutation_importance",),
+            evidence=("explanation.json",),
         ),
         release=release or release_policy(),
     )
@@ -81,20 +79,20 @@ def binary_policy(
 def test_valid_policy_contains_task_aware_contracts():
     policy = binary_policy(
         uncertainty=evaluation.Uncertainty(
-            method=evaluation.UncertaintyMethod.CONFORMAL,
+            method=evaluation.Method.CONFORMAL,
             required=True,
-            confidence_level=0.95,
-            coverage_target=0.90,
-            minimum_rows=100,
+            confidence=0.95,
+            coverage=0.90,
+            rows=100,
         ),
         calibration=evaluation.Calibration(
             method=evaluation.Procedure.RELIABILITY_CURVE,
             required=True,
-            maximum_error=0.05,
+            error=0.05,
         ),
         fairness=evaluation.Fairness(
             method=evaluation.Technique.GROUP_REPORT,
-            sensitive_columns=("sex",),
+            sensitive=("sex",),
             metrics=("demographic_parity_difference",),
         ),
         release=release_policy(
@@ -102,7 +100,7 @@ def test_valid_policy_contains_task_aware_contracts():
                 evaluation.Equity(
                     metric="demographic_parity_difference",
                     maximum=0.10,
-                    required_evidence=("fairness.json",),
+                    evidence=("fairness.json",),
                 ),
             )
         ),
@@ -119,8 +117,8 @@ def test_valid_policy_contains_task_aware_contracts():
 def test_explanation_quality_thresholds_are_explicit_and_serialized():
     policy = evaluation.Explanations(
         availability=evaluation.Explicability.GLOBAL,
-        required_methods=("permutation_importance",),
-        required_evidence=("explanation.json",),
+        methods=("permutation_importance",),
+        evidence=("explanation.json",),
         require_stability=True,
         require_fidelity=True,
         stability_threshold=0.8,
@@ -144,8 +142,8 @@ def test_explanation_quality_thresholds_are_explicit_and_serialized():
 def test_required_explanation_quality_needs_a_threshold(field):
     values = {
         "availability": evaluation.Explicability.GLOBAL,
-        "required_methods": ("permutation_importance",),
-        "required_evidence": ("explanation.json",),
+        "methods": ("permutation_importance",),
+        "evidence": ("explanation.json",),
         "require_stability": field == "stability_threshold",
         "require_fidelity": field == "fidelity_threshold",
     }
@@ -166,20 +164,18 @@ def test_unsupported_metric_and_direction_fail_closed():
     with pytest.raises(ValueError, match="direction"):
         evaluation.Criteria(
             task=tasks.Task.BINARY,
-            primary_metric="roc_auc",
+            metric="roc_auc",
             metrics=(
                 evaluation.Declaration(
                     name="roc_auc", direction=evaluation.Orientation.MINIMIZE
                 ),
             ),
-            uncertainty=evaluation.Uncertainty(
-                method=evaluation.UncertaintyMethod.NONE
-            ),
+            uncertainty=evaluation.Uncertainty(method=evaluation.Method.NONE),
             calibration=evaluation.Calibration(
                 method=evaluation.Procedure.NONE
             ),
             fairness=evaluation.Fairness(method=evaluation.Technique.NONE),
-            small_groups=evaluation.Subgroups(warning_threshold=30),
+            small=evaluation.Subgroups(warning=30),
             explanations=evaluation.Explanations(
                 availability=evaluation.Explicability.NONE
             ),
@@ -191,40 +187,40 @@ def test_unsupported_uncertainty_calibration_fairness_and_explanation_fail():
     with pytest.raises(evaluation.UnsupportedError, match="uncertainty"):
         evaluation.Criteria(
             task=tasks.Task.REGRESSION,
-            primary_metric="rmse",
+            metric="rmse",
             metrics=(
                 evaluation.Declaration(
                     name="rmse", direction=evaluation.Orientation.MINIMIZE
                 ),
             ),
             uncertainty=evaluation.Uncertainty(
-                method=evaluation.UncertaintyMethod.CALIBRATED_PROBABILITY
+                method=evaluation.Method.CALIBRATED_PROBABILITY
             ),
             calibration=evaluation.Calibration(
                 method=evaluation.Procedure.NONE
             ),
             fairness=evaluation.Fairness(method=evaluation.Technique.NONE),
-            small_groups=evaluation.Subgroups(warning_threshold=30),
+            small=evaluation.Subgroups(warning=30),
             explanations=evaluation.Explanations(
                 availability=evaluation.Explicability.GLOBAL,
-                required_methods=("permutation_importance",),
+                methods=("permutation_importance",),
             ),
             release=evaluation.Gates(
-                metric_gates=(
+                metrics=(
                     evaluation.Hurdle(
                         metric="rmse",
                         direction=evaluation.Orientation.MINIMIZE,
                         threshold=1.0,
                     ),
                 ),
-                diagnostic_gates=(
+                diagnostics=(
                     evaluation.Requirement(
                         name="residuals",
                         action=evaluation.Remedy.BLOCK,
-                        required_evidence=("residuals.json",),
+                        evidence=("residuals.json",),
                     ),
                 ),
-                required_evidence=("run.json",),
+                evidence=("run.json",),
             ),
         )
 
@@ -239,7 +235,7 @@ def test_unsupported_uncertainty_calibration_fairness_and_explanation_fail():
         binary_policy(
             fairness=evaluation.Fairness(
                 method=evaluation.Technique.INTERSECTIONAL_REPORT,
-                sensitive_columns=("sex", "age_band"),
+                sensitive=("sex", "age_band"),
                 metrics=("demographic_parity_difference",),
             ),
             release=release_policy(
@@ -247,7 +243,7 @@ def test_unsupported_uncertainty_calibration_fairness_and_explanation_fail():
                     evaluation.Equity(
                         metric="demographic_parity_difference",
                         maximum=0.1,
-                        required_evidence=("fairness.json",),
+                        evidence=("fairness.json",),
                     ),
                 )
             ),
@@ -256,40 +252,38 @@ def test_unsupported_uncertainty_calibration_fairness_and_explanation_fail():
     with pytest.raises(evaluation.UnsupportedError, match="explanation"):
         evaluation.Criteria(
             task=tasks.Task.SURVIVAL,
-            primary_metric="c_index",
+            metric="c_index",
             metrics=(
                 evaluation.Declaration(
                     name="c_index", direction=evaluation.Orientation.MAXIMIZE
                 ),
             ),
-            uncertainty=evaluation.Uncertainty(
-                method=evaluation.UncertaintyMethod.NONE
-            ),
+            uncertainty=evaluation.Uncertainty(method=evaluation.Method.NONE),
             calibration=evaluation.Calibration(
                 method=evaluation.Procedure.NONE
             ),
             fairness=evaluation.Fairness(method=evaluation.Technique.NONE),
-            small_groups=evaluation.Subgroups(warning_threshold=30),
+            small=evaluation.Subgroups(warning=30),
             explanations=evaluation.Explanations(
                 availability=evaluation.Explicability.LOCAL,
-                required_methods=("occlusion",),
+                methods=("occlusion",),
             ),
             release=evaluation.Gates(
-                metric_gates=(
+                metrics=(
                     evaluation.Hurdle(
                         metric="c_index",
                         direction=evaluation.Orientation.MAXIMIZE,
                         threshold=0.6,
                     ),
                 ),
-                diagnostic_gates=(
+                diagnostics=(
                     evaluation.Requirement(
                         name="metric_uncertainty",
                         action=evaluation.Remedy.BLOCK,
-                        required_evidence=("ci.json",),
+                        evidence=("ci.json",),
                     ),
                 ),
-                required_evidence=("run.json",),
+                evidence=("run.json",),
             ),
         )
 
@@ -297,51 +291,51 @@ def test_unsupported_uncertainty_calibration_fairness_and_explanation_fail():
 def test_release_policy_requires_explicit_thresholds_evidence_and_blocker():
     with pytest.raises(ValueError, match="metric_gates"):
         evaluation.Gates(
-            metric_gates=(),
-            diagnostic_gates=(
+            metrics=(),
+            diagnostics=(
                 evaluation.Requirement(
                     name="robustness",
                     action=evaluation.Remedy.BLOCK,
-                    required_evidence=("x",),
+                    evidence=("x",),
                 ),
             ),
-            required_evidence=("run.json",),
+            evidence=("run.json",),
         )
     with pytest.raises(ValueError, match="evidence"):
         evaluation.Gates(
-            metric_gates=(
+            metrics=(
                 evaluation.Hurdle(
                     metric="roc_auc",
                     direction=evaluation.Orientation.MAXIMIZE,
                     threshold=0.7,
                 ),
             ),
-            diagnostic_gates=(
+            diagnostics=(
                 evaluation.Requirement(
                     name="robustness",
                     action=evaluation.Remedy.BLOCK,
-                    required_evidence=("x",),
+                    evidence=("x",),
                 ),
             ),
-            required_evidence=(),
+            evidence=(),
         )
     with pytest.raises(ValueError, match="blocking diagnostic"):
         evaluation.Gates(
-            metric_gates=(
+            metrics=(
                 evaluation.Hurdle(
                     metric="roc_auc",
                     direction=evaluation.Orientation.MAXIMIZE,
                     threshold=0.7,
                 ),
             ),
-            diagnostic_gates=(
+            diagnostics=(
                 evaluation.Requirement(
                     name="robustness",
                     action=evaluation.Remedy.WARN,
-                    required_evidence=("x",),
+                    evidence=("x",),
                 ),
             ),
-            required_evidence=("run.json",),
+            evidence=("run.json",),
         )
 
 
@@ -352,21 +346,21 @@ def test_release_gates_must_be_declared_and_task_supported():
     with pytest.raises(evaluation.UnsupportedError, match="diagnostic"):
         binary_policy(
             release=evaluation.Gates(
-                metric_gates=(
+                metrics=(
                     evaluation.Hurdle(
                         metric="roc_auc",
                         direction=evaluation.Orientation.MAXIMIZE,
                         threshold=0.7,
                     ),
                 ),
-                diagnostic_gates=(
+                diagnostics=(
                     evaluation.Requirement(
                         name="survival_curve",
                         action=evaluation.Remedy.BLOCK,
-                        required_evidence=("x",),
+                        evidence=("x",),
                     ),
                 ),
-                required_evidence=("run.json",),
+                evidence=("run.json",),
             )
         )
 
@@ -377,7 +371,7 @@ def test_registry_fails_closed_for_undeclared_tasks_and_sorts_records():
     assert registry.require(tasks.Task.BINARY) is binary
     with pytest.raises(evaluation.UndeclaredError, match="survival"):
         registry.require(tasks.Task.SURVIVAL)
-    assert registry.list_policies() == (binary,)
+    assert registry.tabulate() == (binary,)
     assert json.loads(registry.canonize())["policies"][0]["task"] == (
         "binary_classification"
     )
@@ -395,33 +389,31 @@ def test_custom_metric_requires_evidence_and_json_is_deterministic():
     )
     policy = evaluation.Criteria(
         task=tasks.Task.BINARY,
-        primary_metric="business_cost",
+        metric="business_cost",
         metrics=(custom,),
-        uncertainty=evaluation.Uncertainty(
-            method=evaluation.UncertaintyMethod.NONE
-        ),
+        uncertainty=evaluation.Uncertainty(method=evaluation.Method.NONE),
         calibration=evaluation.Calibration(method=evaluation.Procedure.NONE),
         fairness=evaluation.Fairness(method=evaluation.Technique.NONE),
-        small_groups=evaluation.Subgroups(warning_threshold=30),
+        small=evaluation.Subgroups(warning=30),
         explanations=evaluation.Explanations(
             availability=evaluation.Explicability.NONE
         ),
         release=evaluation.Gates(
-            metric_gates=(
+            metrics=(
                 evaluation.Hurdle(
                     metric="business_cost",
                     direction=evaluation.Orientation.MINIMIZE,
                     threshold=0.2,
                 ),
             ),
-            diagnostic_gates=(
+            diagnostics=(
                 evaluation.Requirement(
                     name="metric_uncertainty",
                     action=evaluation.Remedy.BLOCK,
-                    required_evidence=("ci.json",),
+                    evidence=("ci.json",),
                 ),
             ),
-            required_evidence=("run.json",),
+            evidence=("run.json",),
         ),
     )
     assert policy.canonize() == policy.canonize()
@@ -436,6 +428,6 @@ def test_custom_metric_requires_evidence_and_json_is_deterministic():
 
 def test_small_group_thresholds_are_ordered():
     with pytest.raises(ValueError, match="blocking_threshold"):
-        evaluation.Subgroups(warning_threshold=30, blocking_threshold=31)
+        evaluation.Subgroups(warning=30, blocking=31)
     with pytest.raises(ValueError, match="warning_threshold"):
-        evaluation.Subgroups(warning_threshold=0)
+        evaluation.Subgroups(warning=0)

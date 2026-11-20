@@ -67,9 +67,9 @@ class Copula(Synthesizer):
     Attributes:
         numeric: Numeric column names.
         categorical: Other column names.
-        sorted_values: Sorted non-missing values per numeric column.
+        ordered: Sorted non-missing values per numeric column.
         correlation: Correlation of the numeric columns' normal scores.
-        missing_rates: Missing share per column.
+        rates: Missing share per column.
         frequencies: Category proportions per categorical column.
         dtypes: Original dtypes, restored on sampling.
     """
@@ -96,8 +96,8 @@ class Copula(Synthesizer):
             c for c in features.columns if c not in self.numeric
         ]
         self.dtypes = features.dtypes.to_dict()
-        self.missing_rates = features.isna().mean().to_dict()
-        self.sorted_values = {
+        self.rates = features.isna().mean().to_dict()
+        self.ordered = {
             c: numpy.sort(features[c].dropna().to_numpy(dtype=float))
             for c in self.numeric
         }
@@ -162,7 +162,7 @@ class Copula(Synthesizer):
             )
             uniform = special.ndtr(normal)
             for index, column in enumerate(self.numeric):
-                values = self.sorted_values[column]
+                values = self.ordered[column]
                 if len(values) == 0:
                     output[column] = numpy.full(rows, numpy.nan)
                     continue
@@ -179,7 +179,7 @@ class Copula(Synthesizer):
                     p=(freq / freq.sum()).to_numpy(),
                 )
         frame = pandas.DataFrame(output)[list(self.dtypes)]
-        for key, rate in self.missing_rates.items():
+        for key, rate in self.rates.items():
             if rate > 0:
                 frame.loc[rng.random(rows) < rate, key] = numpy.nan
         for key, dtype in self.dtypes.items():
@@ -188,7 +188,7 @@ class Copula(Synthesizer):
         return frame
 
 
-class GeneratorOverSampler(resampling.Resampler):
+class Generator(resampling.Resampler):
     """Oversamples minority classes with synthetic rows from a generator.
 
     Attributes:
@@ -196,7 +196,7 @@ class GeneratorOverSampler(resampling.Resampler):
     """
 
     name = "generator_oversample"
-    generator_class: type[Synthesizer] = Copula
+    generator: type[Synthesizer] = Copula
 
     def resample(
         self, features: pandas.DataFrame, target: pandas.Series, seed: int
@@ -234,7 +234,7 @@ class GeneratorOverSampler(resampling.Resampler):
                     MIN_FIT_ROWS,
                 )
                 continue
-            synthetic = self.generator_class().fit(members).sample(missing, rng)
+            synthetic = self.generator().fit(members).sample(missing, rng)
             cast = synthetic.astype(features.dtypes.to_dict(), errors="ignore")
             kept = [
                 column
@@ -259,8 +259,8 @@ class GeneratorOverSampler(resampling.Resampler):
         ), combined_target.iloc[order].reset_index(drop=True)
 
 
-class CopulaOverSampler(GeneratorOverSampler):
+class CopulaOverSampler(Generator):
     """Gaussian-copula oversampling of minority classes."""
 
     name = "copula_oversample"
-    generator_class = Copula
+    generator = Copula

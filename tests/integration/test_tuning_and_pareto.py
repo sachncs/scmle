@@ -20,8 +20,8 @@ def test_hyperband_with_a_grid_tunes_and_prunes_cheaply(tmp_path):
     result = support.make_project(
         frame(),
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
         folds=5,
         search=tasks.Search(
             top_models=1,
@@ -42,8 +42,8 @@ def test_the_pareto_front_is_reported_and_the_fast_model_wins_a_tie(tmp_path):
     result = support.make_project(
         frame(),
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
         selection=tasks.Selection(pareto=True, pareto_tolerance=0.05),
     ).run()
 
@@ -62,7 +62,7 @@ def test_the_pareto_front_is_reported_and_the_fast_model_wins_a_tie(tmp_path):
 
 def test_pareto_is_off_by_default(tmp_path):
     result = support.make_project(
-        frame(300), "y", time_budget=300, output_dir=tmp_path
+        frame(300), "y", budget=300, directory=tmp_path
     ).run()
 
     assert result.evaluation["pareto"] is None

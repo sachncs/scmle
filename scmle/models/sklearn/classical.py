@@ -147,7 +147,7 @@ class Learner(models.Model):
             ConfigError: If the adapter declares no class for the task.
         """
         estimator_class = (
-            self.classifier if task.is_classification else self.regressor
+            self.classifier if task.classification else self.regressor
         )
         if estimator_class is None:
             raise errors.ConfigError(
@@ -178,8 +178,8 @@ class Dummy(models.Model):
                 tasks.Task.UPLIFT,
             }
         ),
-        sparse_input=True,
-        handles_missing=True,
+        sparse=True,
+        missing=True,
     )
 
     def build(
@@ -228,7 +228,7 @@ class Dummy(models.Model):
             )
         baseline: models.Estimator = (
             dummy.DummyClassifier(strategy="prior")
-            if task.is_classification
+            if task.classification
             else dummy.DummyRegressor(strategy="mean")
         )
         return baseline
@@ -324,7 +324,7 @@ class Svm(Learner):
         """
         kwargs: dict[str, Any] = dict(params or {})
         support: models.Estimator
-        if not task.is_classification:
+        if not task.classification:
             support = svm.SVR(**kwargs)
         else:
             support = inner_cv.Calibrated(
@@ -349,7 +349,7 @@ LOGISTIC_REGRESSION = Learner(
     name="logistic_regression",
     family="linear",
     capabilities=models.Capabilities(
-        CLASSIFICATION, sparse_input=True, needs_scaling=True, memory_factor=2.0
+        CLASSIFICATION, sparse=True, scaling=True, factor=2.0
     ),
     classifier=linear_model.LogisticRegression,
     fixed={"max_iter": 1000},
@@ -361,9 +361,9 @@ RIDGE = Learner(
     family="linear",
     capabilities=models.Capabilities(
         REGRESSION_ONLY,
-        sparse_input=True,
-        needs_scaling=True,
-        memory_factor=2.0,
+        sparse=True,
+        scaling=True,
+        factor=2.0,
     ),
     regressor=linear_model.Ridge,
     search_space=search.Space((search.Real("alpha", 1e-3, 1e3, log=True),)),
@@ -374,11 +374,11 @@ SGD_LOGISTIC = Learner(
     family="linear",
     capabilities=models.Capabilities(
         CLASSIFICATION,
-        sparse_input=True,
-        needs_scaling=True,
+        sparse=True,
+        scaling=True,
         incremental=True,
-        stream_only=True,
-        memory_factor=1.5,
+        streaming=True,
+        factor=1.5,
     ),
     classifier=linear_model.SGDClassifier,
     fixed={"loss": "log_loss", "max_iter": 50, "tol": 1e-4},
@@ -390,11 +390,11 @@ SGD_REGRESSION = Learner(
     family="linear",
     capabilities=models.Capabilities(
         REGRESSION_ONLY,
-        sparse_input=True,
-        needs_scaling=True,
+        sparse=True,
+        scaling=True,
         incremental=True,
-        stream_only=True,
-        memory_factor=1.5,
+        streaming=True,
+        factor=1.5,
     ),
     regressor=linear_model.SGDRegressor,
     fixed={"max_iter": 50, "tol": 1e-4},
@@ -406,10 +406,10 @@ ELASTIC_NET = Learner(
     family="linear",
     capabilities=models.Capabilities(
         REGRESSION_ONLY,
-        sparse_input=True,
-        needs_scaling=True,
+        sparse=True,
+        scaling=True,
         cost=2,
-        memory_factor=2.0,
+        factor=2.0,
     ),
     regressor=linear_model.ElasticNet,
     fixed={"alpha": 0.1, "max_iter": 5000},
@@ -424,9 +424,7 @@ ELASTIC_NET = Learner(
 DECISION_TREE = Learner(
     name="decision_tree",
     family="tree",
-    capabilities=models.Capabilities(
-        ALL_TASKS, handles_missing=True, memory_factor=2.0
-    ),
+    capabilities=models.Capabilities(ALL_TASKS, missing=True, factor=2.0),
     classifier=trees.Tree,
     regressor=tree.DecisionTreeRegressor,
     search_space=search.Space(
@@ -440,7 +438,7 @@ DECISION_TREE = Learner(
 RANDOM_FOREST = Learner(
     name="random_forest",
     family="tree",
-    capabilities=models.Capabilities(ALL_TASKS, cost=3, memory_factor=6.0),
+    capabilities=models.Capabilities(ALL_TASKS, cost=3, factor=6.0),
     classifier=trees.Forest,
     regressor=ensemble.RandomForestRegressor,
     search_space=TREE_ENSEMBLE_SPACE,
@@ -449,7 +447,7 @@ RANDOM_FOREST = Learner(
 EXTRA_TREES = Learner(
     name="extra_trees",
     family="tree",
-    capabilities=models.Capabilities(ALL_TASKS, cost=3, memory_factor=6.0),
+    capabilities=models.Capabilities(ALL_TASKS, cost=3, factor=6.0),
     classifier=trees.Extra,
     regressor=ensemble.ExtraTreesRegressor,
     search_space=TREE_ENSEMBLE_SPACE,
@@ -460,11 +458,11 @@ HIST_GRADIENT_BOOSTING = Histogram(
     family="boosting",
     capabilities=models.Capabilities(
         ALL_TASKS,
-        handles_missing=True,
-        native_categorical=True,
+        missing=True,
+        categorical=True,
         early_stopping=True,
         cost=3,
-        memory_factor=3.0,
+        factor=3.0,
     ),
     classifier=Boosted,
     regressor=ensemble.HistGradientBoostingRegressor,
@@ -485,11 +483,11 @@ SUPPORT_VECTOR = Svm(
     family="kernel",
     capabilities=models.Capabilities(
         ALL_TASKS,
-        sparse_input=True,
-        needs_scaling=True,
-        max_rows=20_000,
+        sparse=True,
+        scaling=True,
+        scale=20_000,
         cost=4,
-        memory_factor=4.0,
+        factor=4.0,
     ),
     classifier=svm.SVC,
     regressor=svm.SVR,
@@ -506,11 +504,11 @@ KNN = Learner(
     family="neighbors",
     capabilities=models.Capabilities(
         ALL_TASKS,
-        sparse_input=True,
-        needs_scaling=True,
-        max_rows=50_000,
+        sparse=True,
+        scaling=True,
+        scale=50_000,
         cost=2,
-        memory_factor=3.0,
+        factor=3.0,
     ),
     classifier=neighbors.KNeighborsClassifier,
     regressor=neighbors.KNeighborsRegressor,
@@ -531,11 +529,11 @@ NEURAL_NETWORK = Learner(
     family="neural",
     capabilities=models.Capabilities(
         ALL_TASKS,
-        needs_scaling=True,
+        scaling=True,
         early_stopping=True,
-        max_rows=200_000,
+        scale=200_000,
         cost=4,
-        memory_factor=4.0,
+        factor=4.0,
     ),
     classifier=neural_network.MLPClassifier,
     regressor=neural_network.MLPRegressor,

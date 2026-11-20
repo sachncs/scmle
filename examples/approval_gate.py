@@ -37,7 +37,7 @@ def main() -> None:
     project = scmle.api.project.Project(
         make_dataset(),
         "y",
-        time_budget=60,
+        budget=60,
         checkpoints=(policies.Callback(reviewer),),
     )
     try:

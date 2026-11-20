@@ -33,9 +33,7 @@ def test_the_bundle_digest_is_the_digest_of_the_stored_manifest(
     (tmp_path / provenance.MANIFEST_FILE).write_text(
         json.dumps(manifest), encoding="utf-8"
     )
-    assert provenance.bundle_digest(tmp_path) == expected(
-        '{"a":"\\u00e9","z":1}'
-    )
+    assert provenance.digest(tmp_path) == expected('{"a":"\\u00e9","z":1}')
 
 
 def test_a_manifest_that_is_not_an_object_is_refused_word_for_word(
@@ -45,7 +43,7 @@ def test_a_manifest_that_is_not_an_object_is_refused_word_for_word(
     with pytest.raises(
         errors.ArtifactError, match=r"^the bundle manifest is not an object$"
     ):
-        provenance.bundle_digest(tmp_path)
+        provenance.digest(tmp_path)
 
 
 def test_a_file_larger_than_one_chunk_digests_all_its_bytes(tmp_path) -> None:

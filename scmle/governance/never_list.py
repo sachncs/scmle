@@ -2,7 +2,7 @@
 
 Each of the eleven actions has a guard: called without a valid attestation in
 the deployment ledger, `Guard.require` writes an `escalation` row (once per
-pending question) and raises `AttestationRequired`; the action is not
+pending question) and raises `UnattestedError`; the action is not
 performed. A valid attestation is one that
 
 * answers an escalation whose question hash equals the hash of this exact
@@ -27,7 +27,7 @@ Reach. `Loop`'s wrappers, a `ModelRegistryStore` with an attached guard (so
 `Maintainer.elevate`, `revertible` and `enlist(promote=True)` too) and nothing
 else. The custody API (`scmle.assurance.custody`) is not routed through the
 guard: its own one-time open of a sealed set stays the only check there, and
-`Loop.reopen_sealed` is the wrapper for callers who want the attestation in
+`Loop.reopen` is the wrapper for callers who want the attestation in
 front of it.
 
 Limits. The guard is code around the entry points of this package. It cannot
@@ -71,22 +71,22 @@ ALLOWING = (
 )
 
 
-class AttestationRequired(errors.ArtifactError):
+class UnattestedError(errors.ArtifactError):
     """An action on the never list was requested without an attestation."""
 
-    def __init__(self, action: Forbidden, escalation_id: str) -> None:
+    def __init__(self, action: Forbidden, escalation: str) -> None:
         """Records the action and the escalation that now waits.
 
         Args:
             action: The never-list action that was refused.
-            escalation_id: Identifier of the pending escalation.
+            escalation: Identifier of the pending escalation.
         """
         super().__init__(
             f"{action.value} (never-list item {ITEM_NUMBER[action]}) needs a "
-            f"valid human attestation; escalation {escalation_id} is pending"
+            f"valid human attestation; escalation {escalation} is pending"
         )
         self.action = action
-        self.escalation_id = escalation_id
+        self.escalation = escalation
 
 
 def interrogate(
@@ -110,28 +110,28 @@ class Guard:
 
     def __init__(
         self,
-        ledger: deployment_ledger.DeploymentLedger,
+        ledger: deployment_ledger.Ledger,
         today: Callable[[], datetime.date] = datetime.date.today,
-        verification_keys: Mapping[str, str | bytes] | None = None,
-        single_use: bool = False,
+        keys: Mapping[str, str | bytes] | None = None,
+        use: bool = False,
     ) -> None:
         """Creates the guard.
 
         Args:
             ledger: The deployment ledger.
             today: Clock, replaceable in tests.
-            verification_keys: Optional map from key id to the key that
+            keys: Optional map from key id to the key that
                 verifies attestations signed under it. When non-empty, an
                 attestation whose key id is missing from it or whose
                 signature does not verify is not valid.
-            single_use: Whether an attestation is spent by the first action
+            use: Whether an attestation is spent by the first action
                 it allows (`require` then writes an `attestation_used` row).
         """
         self.ledger = ledger
-        self.single_use = single_use
+        self.use = use
         self.today = today
-        self.verification_keys = dict(verification_keys or {})
-        self.on_write: Callable[[], None] | None = None
+        self.keys = dict(keys or {})
+        self.observer: Callable[[], None] | None = None
 
     def vouch(
         self, question: Mapping[str, Any]
@@ -172,14 +172,14 @@ class Guard:
         if reply.decision not in ALLOWING or reply.scope != scope:
             return False
         today = self.today()
-        issued = deployment_ledger.parse_date(reply.date, "date")
-        expires = deployment_ledger.parse_date(reply.expires, "expires")
+        issued = deployment_ledger.parse(reply.date, "date")
+        expires = deployment_ledger.parse(reply.expires, "expires")
         if not issued <= today <= expires:
             return False
-        if reply.key_id in self.ledger.system_keys:
+        if reply.key_id in self.ledger.keys:
             return False
-        if self.verification_keys:
-            key = self.verification_keys.get(reply.key_id)
+        if self.keys:
+            key = self.keys.get(reply.key_id)
             return key is not None and reply.verify(key)
         return True
 
@@ -209,7 +209,7 @@ class Guard:
     ) -> deployment_ledger.Attestation:
         """Returns the valid attestation, or escalates and raises.
 
-        With `single_use`, using an attestation first commits an
+        With `use`, using an attestation first commits an
         `attestation_used` row for it.
 
         Args:
@@ -230,7 +230,7 @@ class Guard:
         question = interrogate(action, detail, scope)
         reply = self.vouch(question)
         if reply is not None:
-            if self.single_use:
+            if self.use:
                 self.ledger.commit(
                     deployment_ledger.ATTESTATION_USED,
                     {
@@ -238,8 +238,8 @@ class Guard:
                         "action": action.value,
                     },
                 )
-                if self.on_write is not None:
-                    self.on_write()
+                if self.observer is not None:
+                    self.observer()
             return reply
         pending = self.outstanding(question)
         if pending is None:
@@ -258,9 +258,9 @@ class Guard:
                     "never_list_item": ITEM_NUMBER[action],
                 },
             )
-            if self.on_write is not None:
-                self.on_write()
-        raise AttestationRequired(action, pending)
+            if self.observer is not None:
+                self.observer()
+        raise UnattestedError(action, pending)
 
     def perform(
         self,
@@ -272,7 +272,7 @@ class Guard:
     ) -> Any:
         """Runs `do()` only with a valid attestation.
 
-        Without one the call is refused with `AttestationRequired` and `do` is
+        Without one the call is refused with `UnattestedError` and `do` is
         not called.
 
         Args:

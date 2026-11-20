@@ -82,7 +82,7 @@ def test_the_sparse_selector_drops_noise_and_keeps_signal():
     matrix = numpy.hstack([signal, noise])
     target = (signal[:, 0] + signal[:, 1] > 0).astype(int)
 
-    chooser = selection.SparseSelector(classification=True).fit(matrix, target)
+    chooser = selection.Selector(classification=True).fit(matrix, target)
 
     assert chooser.support_[:2].all() and chooser.support_[2:].sum() <= 2
     assert chooser.transform(matrix).shape[1] == chooser.support_.sum()
@@ -93,10 +93,10 @@ def test_regression_selection_and_the_never_empty_guarantee():
     matrix = rng.normal(size=(500, 5))
     target = 3 * matrix[:, 1] + rng.normal(0, 0.1, 500)
 
-    kept = selection.SparseSelector(classification=False).fit(matrix, target)
+    kept = selection.Selector(classification=False).fit(matrix, target)
     assert kept.support_[1]
 
-    heavy = selection.SparseSelector(classification=False, alpha=1e6).fit(
+    heavy = selection.Selector(classification=False, alpha=1e6).fit(
         matrix, target
     )
     assert heavy.support_.sum() == 1 and heavy.support_[1]
@@ -108,7 +108,7 @@ def test_the_sparse_selector_handles_more_than_two_classes():
     matrix = rng.normal(size=(300, 6))
     target = numpy.digitize(matrix[:, 0] + 0.1 * matrix[:, 1], [-0.5, 0.5])
 
-    chooser = selection.SparseSelector(classification=True).fit(matrix, target)
+    chooser = selection.Selector(classification=True).fit(matrix, target)
 
     assert set(numpy.unique(target)) == {0, 1, 2}
     assert chooser.support_[0]

@@ -46,7 +46,7 @@ def test_deploy_commands_take_keys_only_as_files():
     """
     deploy = next(
         action.choices["deploy"]
-        for action in vars(cli.build_parser())["_actions"]
+        for action in vars(cli.build())["_actions"]
         if isinstance(getattr(action, "choices", None), dict)
     )
     named = {option for option in options(deploy) if "key" in option}
@@ -268,7 +268,7 @@ def test_retire_refuses_a_bundle_and_retires_a_registered_version(
 
     other = tmp_path / "other"
     model.save(other)
-    store = registry.ModelRegistryStore(tmp_path / "registry")
+    store = registry.Registry(tmp_path / "registry")
     release = store.register("churn", other, trusted=True)
     command = [
         "retire",
@@ -282,9 +282,9 @@ def test_retire_refuses_a_bundle_and_retires_a_registered_version(
         *receipts,
     ]
     assert cli.main(command) == cli.EXIT_OK
-    machine = release_state.ReleaseRegistry(store)
+    machine = release_state.Registry(store)
     state = machine.lookup("churn", release.version)
-    assert state is release_state.ReleaseState.RETIRED
+    assert state is release_state.State.RETIRED
     with pytest.raises(tombstone.RetiredError):
         bundle.Bundle.load(tmp_path / "registry" / release.path, trusted=True)
 

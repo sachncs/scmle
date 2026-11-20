@@ -22,7 +22,7 @@ from scmle import durability
 n = 0
 while True:
     body = json.dumps({"counter": n}).encode()
-    durability.write_atomically(sys.argv[1], body)
+    durability.write(sys.argv[1], body)
     print(n, flush=True)
     n += 1
 """
@@ -81,7 +81,7 @@ def stress(fleet: harness.Fleet, base: pathlib.Path) -> dict[str, Any]:
     }
 
 
-def process_kill() -> recovery.Outcome:
+def process() -> recovery.Outcome:
     """Kills the service process three times, restarting it each time.
 
     After the three kills it also runs `stress` on atomic state
@@ -99,7 +99,7 @@ def process_kill() -> recovery.Outcome:
         base,
         result,
     ):
-        service = harness.export_service(base / "service", harness.specify())
+        service = harness.export(base / "service", harness.specify())
         times = []
         same = []
         remaining = 3
@@ -208,7 +208,7 @@ print(json.dumps({"state": record["state"]}), flush=True)
 """
 
 
-def job_interruption() -> recovery.Outcome:
+def resume() -> recovery.Outcome:
     """A three-step workflow run kills itself in step two; a rerun resumes it.
 
     A second process started after the one-second lease runs the same trigger
@@ -237,8 +237,8 @@ def job_interruption() -> recovery.Outcome:
         elapsed = time.monotonic() - started
         final = marker.read_text(encoding="utf-8").split()
         finished = '"succeeded"' in output
-        persisted = objectstore.LocalObjectStore(state)
-        keys = persisted.list_objects("workflows/recovery-job/")
+        persisted = objectstore.Disk(state)
+        keys = persisted.catalog("workflows/recovery-job/")
         repeated_finished = final.count("ingest") - 1
         result.checks = {
             "the first run was killed during train": killed

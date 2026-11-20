@@ -54,7 +54,7 @@ def test_stress_loses_no_acknowledged_atomic_write(tmp_path):
 
 
 def test_a_killed_job_resumes_without_repeating_finished_steps():
-    result = crashes.job_interruption()
+    result = crashes.resume()
     passed(result)
     assert result.fault == "job_interruption"
     assert result.detail["handler_calls"] == [
@@ -86,7 +86,7 @@ def test_a_killed_audit_writer_reopens_with_a_verified_chain():
 
 
 def test_a_killed_service_restarts_with_the_same_answers():
-    result = crashes.process_kill()
+    result = crashes.process()
     passed(result)
     assert result.fault == "process_kill"
     assert len(result.detail["service_rto_seconds_per_trial"]) == 3

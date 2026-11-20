@@ -155,29 +155,29 @@ class Trial:
     """Outcome of evaluating one complete candidate pipeline.
 
     Attributes:
-        trial_id: Identifier within the run.
-        model_name: Candidate model name.
+        identifier: Identifier within the run.
+        model: Candidate model name.
         status: Terminal status.
         metric: Metric name the scores refer to.
-        score_mean: Mean cross-validation score (natural units).
-        score_std: Standard deviation across folds.
-        fold_scores: Per-fold scores.
-        fit_seconds: Wall-clock cost.
+        score: Mean cross-validation score (natural units).
+        deviation: Standard deviation across folds.
+        folds: Per-fold scores.
+        fit: Wall-clock cost.
         error: Failure or skip reason, empty on success.
         failure: The failure's type, message, traceback and causes
             (`errors.Failure.dump`), empty unless the trial raised.
         params: Hyperparameter overrides (empty for default configuration).
         strategy: Data strategy the candidate was built with.
-        observed_access: What each fold's fit and scoring actually received:
+        access: What each fold's fit and scoring actually received:
             per fold, one record for the fit rows and one for the evaluated
             rows, each holding the row count and a digest of the row ids.
             The ledger checks these observations against the split manifest.
-        evaluation_config: How the candidate was evaluated (metric, number
+        evaluation: How the candidate was evaluated (metric, number
             of folds, seed, whether weights were used), so a trial is
             reproducible from its own record.
         runtime: Runtime requirements of the candidate (Python version and
             the libraries its model needs).
-        train_scores: Per-fold scores on the rows each model was fitted on,
+        training: Per-fold scores on the rows each model was fitted on,
             for the fit-health check (a bounded sample of those rows).
         migrations: Version steps of the stored trial. Version 2 writes
             single-word keys (`identifier`, `model`, `score`, `deviation`,
@@ -202,24 +202,22 @@ class Trial:
         ),
     )
 
-    trial_id: str
-    model_name: str
+    identifier: str
+    model: str
     status: Termination
     metric: str = ""
-    score_mean: float = float("nan")
-    score_std: float = float("nan")
-    fold_scores: list[float] = dataclasses.field(default_factory=list)
-    fit_seconds: float = 0.0
+    score: float = float("nan")
+    deviation: float = float("nan")
+    folds: list[float] = dataclasses.field(default_factory=list)
+    fit: float = 0.0
     error: str = ""
     failure: Mapping[str, object] = dataclasses.field(default_factory=dict)
     params: dict[str, Any] = dataclasses.field(default_factory=dict)
     strategy: str = DEFAULT_STRATEGY
-    observed_access: list[dict[str, Any]] = dataclasses.field(
-        default_factory=list
-    )
-    evaluation_config: dict[str, Any] = dataclasses.field(default_factory=dict)
+    access: list[dict[str, Any]] = dataclasses.field(default_factory=list)
+    evaluation: dict[str, Any] = dataclasses.field(default_factory=dict)
     runtime: dict[str, Any] = dataclasses.field(default_factory=dict)
-    train_scores: list[float] = dataclasses.field(default_factory=list)
+    training: list[float] = dataclasses.field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping.

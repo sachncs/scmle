@@ -33,7 +33,7 @@ def test_compatibility_gate_reports_removed_and_changed_exports():
 
     differences = check_api_compatibility.differences(expected, changed)
 
-    assert "surface removed: scmle.api.predict.load_model" in differences
+    assert "surface removed: scmle.api.predict.load" in differences
     assert "surface contract changed: scmle.api.predict.predict" in differences
 
 

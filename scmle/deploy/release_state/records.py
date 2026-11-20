@@ -18,8 +18,8 @@ class Records:
 
     def __init__(
         self,
-        store: registry.ModelRegistryStore,
-        ledger: deployment_ledger.DeploymentLedger | None = None,
+        store: registry.Registry,
+        ledger: deployment_ledger.Ledger | None = None,
         policy: control.Polling | None = None,
     ) -> None:
         """Binds the release state to a registry.
@@ -59,7 +59,7 @@ class Records:
         Args:
             state: The complete state document.
         """
-        durability.write_atomically(
+        durability.write(
             self.store.root / status.STATE_FILE,
             json.dumps(state, indent=2, sort_keys=True).encode("utf-8"),
         )
@@ -80,7 +80,7 @@ class Records:
         )
         return entry
 
-    def lookup(self, model: str, version: int) -> status.ReleaseState:
+    def lookup(self, model: str, version: int) -> status.State:
         """Returns the release state of a registered version.
 
         The version must be registered; the store refuses an unknown one with
@@ -100,13 +100,9 @@ class Records:
             .get("versions", {})
             .get(str(version))
         )
-        return (
-            status.ReleaseState(found["state"])
-            if found
-            else status.ReleaseState.CANDIDATE
-        )
+        return status.State(found["state"]) if found else status.State.CANDIDATE
 
-    def states(self, model: str) -> dict[int, status.ReleaseState]:
+    def states(self, model: str) -> dict[int, status.State]:
         """Returns the release state of every registered version.
 
         Args:
@@ -146,9 +142,9 @@ class Records:
         self,
         entry: dict[str, Any],
         version: int,
-        target: status.ReleaseState,
+        target: status.State,
         reason: str,
-        current: status.ReleaseState,
+        current: status.State,
     ) -> None:
         """Sets a version's state and appends to its history (in memory).
 
@@ -189,7 +185,7 @@ class Records:
         model: str,
         version: int,
         environment: str,
-        plane: control.ControlPlane,
+        plane: control.Platform,
         event: str,
         revision: str | None,
         image_digest: str,
@@ -231,7 +227,7 @@ class Records:
         model: str,
         version: int,
         environment: str,
-        plane: control.ControlPlane,
+        plane: control.Platform,
         revision: str | None,
         image_digest: str,
         reasons: Sequence[str] = (),

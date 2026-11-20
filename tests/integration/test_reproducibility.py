@@ -10,24 +10,24 @@ from scmle.artifacts import reproducibility
 
 def run(frame, tmp_path, **kwargs):
     return support.make_project(
-        frame, "y", time_budget=300, output_dir=tmp_path, **kwargs
+        frame, "y", budget=300, directory=tmp_path, **kwargs
     ).run()
 
 
 def test_a_deterministic_rerun_is_an_exact_replay(binary_frame, tmp_path):
     original = run(binary_frame, tmp_path)
-    verdict = scmle.api.project.Project.verify_replay(
-        original.run_dir, data=binary_frame
+    verdict = scmle.api.project.Project.verify(
+        original.directory, data=binary_frame
     )
     assert verdict.level == reproducibility.EXACT
-    assert verdict.reasons == [] and verdict.max_abs_difference == 0.0
-    assert verdict.trials_compared == len(original.trials)
+    assert verdict.reasons == [] and verdict.discrepancy == 0.0
+    assert verdict.compared == len(original.trials)
 
 
 def test_a_different_seed_is_a_different_run(binary_frame, tmp_path):
-    first = reproducibility.reread(run(binary_frame, tmp_path / "a").run_dir)
+    first = reproducibility.reread(run(binary_frame, tmp_path / "a").directory)
     second = reproducibility.reread(
-        run(binary_frame, tmp_path / "b", seed=7).run_dir
+        run(binary_frame, tmp_path / "b", seed=7).directory
     )
     verdict = reproducibility.judge(first, second)
     assert verdict.level == reproducibility.DIFFERENT
@@ -38,10 +38,10 @@ def test_a_different_seed_is_a_different_run(binary_frame, tmp_path):
 
 
 def test_changed_data_is_detected(binary_frame, tmp_path):
-    first = reproducibility.reread(run(binary_frame, tmp_path / "a").run_dir)
+    first = reproducibility.reread(run(binary_frame, tmp_path / "a").directory)
     altered = binary_frame.copy()
     altered.loc[1, "a"] += 1.0
-    second = reproducibility.reread(run(altered, tmp_path / "b").run_dir)
+    second = reproducibility.reread(run(altered, tmp_path / "b").directory)
     assert "datasets differ" in reproducibility.judge(first, second).reasons
 
 
@@ -71,7 +71,7 @@ def test_tiny_nondeterminism_is_comparable_not_exact():
     jittered = make_facts([0.8002, 0.8199, 0.8101])
     verdict = reproducibility.judge(base, jittered)
     assert verdict.level == reproducibility.COMPARABLE
-    assert 0 < verdict.max_abs_difference < 0.001
+    assert 0 < verdict.discrepancy < 0.001
     assert (
         reproducibility.judge(base, copy.deepcopy(base)).level
         == reproducibility.EXACT

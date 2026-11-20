@@ -63,7 +63,7 @@ def test_evaluate_reports_nan_for_undefined_metric():
 
 
 def make_trial(name, score, status=experiments.Termination.OK):
-    return experiments.Trial(f"t_{name}", name, status, "m", score_mean=score)
+    return experiments.Trial(f"t_{name}", name, status, "m", score=score)
 
 
 @pytest.fixture(scope="module")
@@ -79,8 +79,8 @@ def test_best_mean_respects_orientation(registry):
     ]
     higher = metrics.CATALOG.metrics["roc_auc"]
     lower = metrics.CATALOG.metrics["rmse"]
-    assert policy.select(trials, higher, registry).model_name == "random_forest"
-    assert policy.select(trials, lower, registry).model_name == "decision_tree"
+    assert policy.select(trials, higher, registry).model == "random_forest"
+    assert policy.select(trials, lower, registry).model == "decision_tree"
 
 
 def test_ties_prefer_cheaper_model_and_baseline_excluded(registry):
@@ -91,7 +91,7 @@ def test_ties_prefer_cheaper_model_and_baseline_excluded(registry):
         make_trial("dummy", 0.99),
     ]
     winner = policy.select(trials, metrics.CATALOG.metrics["roc_auc"], registry)
-    assert winner.model_name == "decision_tree"
+    assert winner.model == "decision_tree"
 
 
 def test_baseline_selected_only_when_alone(registry):
@@ -101,7 +101,7 @@ def test_baseline_selected_only_when_alone(registry):
         make_trial("ridge", 0.0, experiments.Termination.FAILED),
     ]
     winner = policy.select(trials, metrics.CATALOG.metrics["roc_auc"], registry)
-    assert winner.model_name == "dummy"
+    assert winner.model == "dummy"
 
 
 def test_all_failed_raises(registry):
@@ -169,9 +169,9 @@ def scored_trial(name, score, std, folds=5):
         name,
         experiments.Termination.OK,
         "m",
-        score_mean=score,
-        score_std=std,
-        fold_scores=[score] * folds,
+        score=score,
+        deviation=std,
+        folds=[score] * folds,
     )
 
 
@@ -182,11 +182,11 @@ def test_tolerance_turns_small_gaps_into_ties_resolved_by_simplicity(registry):
     ]
     auc = metrics.CATALOG.metrics["roc_auc"]
     strict = selection.Averager().select(trials, auc, registry)
-    assert strict.model_name == "random_forest"
+    assert strict.model == "random_forest"
     loose = selection.Averager(tasks.Selection(tie_tolerance=0.005)).select(
         trials, auc, registry
     )
-    assert loose.model_name == "decision_tree"  # cheaper wins the tie
+    assert loose.model == "decision_tree"  # cheaper wins the tie
 
 
 def test_one_standard_error_rule_treats_noise_as_a_tie(registry):
@@ -197,7 +197,7 @@ def test_one_standard_error_rule_treats_noise_as_a_tie(registry):
     auc = metrics.CATALOG.metrics["roc_auc"]
     rule = tasks.Selection(uncertainty="one_standard_error")
     policy = selection.Averager(rule)
-    assert policy.select(trials, auc, registry).model_name == "decision_tree"
+    assert policy.select(trials, auc, registry).model == "decision_tree"
     assert "one standard error" in policy.description
 
 
@@ -208,9 +208,9 @@ def test_lower_variance_tie_breaker_prefers_the_steadier_model(registry):
     ]
     auc = metrics.CATALOG.metrics["roc_auc"]
     policy = selection.Averager(tasks.Selection(tie_breaker="lower_variance"))
-    assert policy.select(trials, auc, registry).model_name == "random_forest"
+    assert policy.select(trials, auc, registry).model == "random_forest"
     default = selection.Averager().select(trials, auc, registry)
-    assert default.model_name == "decision_tree"
+    assert default.model == "decision_tree"
 
 
 def test_maximize_sets_the_metric_and_conflicts_are_rejected():
@@ -245,9 +245,9 @@ def folds_trial(name, scores):
         name,
         experiments.Termination.OK,
         "m",
-        score_mean=float(numpy.mean(scores)),
-        score_std=float(numpy.std(scores)),
-        fold_scores=scores,
+        score=float(numpy.mean(scores)),
+        deviation=float(numpy.std(scores)),
+        folds=scores,
     )
 
 
@@ -262,8 +262,8 @@ def test_bayesian_selection_prefers_the_simpler_model_when_gain_is_noise(
         [noisy_winner, simpler], metrics.CATALOG.metrics["roc_auc"], registry
     )
 
-    assert noisy_winner.score_mean > simpler.score_mean - 0.01
-    assert winner.model_name == "decision_tree"
+    assert noisy_winner.score > simpler.score - 0.01
+    assert winner.model == "decision_tree"
 
 
 def test_bayesian_selection_keeps_a_credibly_better_model(registry):
@@ -275,7 +275,7 @@ def test_bayesian_selection_keeps_a_credibly_better_model(registry):
         [clear_winner, simpler], metrics.CATALOG.metrics["roc_auc"], registry
     )
 
-    assert winner.model_name == "random_forest"
+    assert winner.model == "random_forest"
     assert "probability" in policy.description
 
 
@@ -292,7 +292,7 @@ def test_a_rope_makes_negligible_gains_ties(registry):
         [slightly_better, simpler], metrics.CATALOG.metrics["roc_auc"], registry
     )
 
-    assert winner.model_name == "decision_tree"
+    assert winner.model == "decision_tree"
 
 
 def test_a_lower_is_better_positive_label_metric_scores_sign_adjusted():

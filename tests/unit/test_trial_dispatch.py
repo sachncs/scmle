@@ -84,7 +84,7 @@ def test_each_job_gets_the_window_left_when_it_is_dispatched(monkeypatch):
     skipped = results[4]
     assert skipped.status is experiments.Termination.SKIPPED
     assert "trial window" in skipped.error
-    assert skipped.strategy == "smote" and skipped.trial_id == "t4"
+    assert skipped.strategy == "smote" and skipped.identifier == "t4"
 
 
 def test_a_strategy_search_the_window_cannot_hold_is_skipped_on_record():
@@ -107,7 +107,7 @@ def test_a_strategy_search_the_window_cannot_hold_is_skipped_on_record():
         ),
     )
     runner = SimpleNamespace(
-        metric=SimpleNamespace(greater_is_better=True),
+        metric=SimpleNamespace(maximize=True),
         task=tasks.Task.BINARY,
         profile=object(),
     )

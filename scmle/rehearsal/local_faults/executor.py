@@ -45,39 +45,21 @@ class Executor(
             reliability.Contingency,
             Callable[[], tuple[scmle.governance.reliability.Emission, ...]],
         ] = {
-            reliability.Contingency.PROCESS_DEATH: self.run_process_death,
-            reliability.Contingency.STALE_CHECKPOINT: (
-                self.run_stale_checkpoint
-            ),
-            reliability.Contingency.DISK_FULL: self.run_disk_full,
-            reliability.Contingency.CORRUPT_ARTIFACT: (
-                self.run_corrupt_artifact
-            ),
-            reliability.Contingency.WORKER_LOSS: self.run_worker_loss,
-            reliability.Contingency.TIMEOUT: self.run_timeout,
-            reliability.Contingency.MEMORY_EXHAUSTION: (
-                self.run_memory_exhaustion
-            ),
-            reliability.Contingency.PARTIAL_WRITE: self.run_partial_write,
-            reliability.Contingency.DEPENDENCY_MISMATCH: (
-                self.run_dependency_mismatch
-            ),
-            reliability.Contingency.INVALID_SIGNATURE: (
-                self.run_invalid_signature
-            ),
-            reliability.Contingency.RETRY_EXHAUSTION: (
-                self.run_retry_exhaustion
-            ),
-            reliability.Contingency.DUPLICATE_EVENT: (self.run_duplicate_event),
-            reliability.Contingency.INCOMPLETE_LINEAGE: (
-                self.run_incomplete_lineage
-            ),
-            reliability.Contingency.REJECTED_APPROVAL: (
-                self.run_rejected_approval
-            ),
-            reliability.Contingency.CHANGED_SNAPSHOT: (
-                self.run_changed_snapshot
-            ),
+            reliability.Contingency.PROCESS_DEATH: self.kill,
+            reliability.Contingency.STALE_CHECKPOINT: (self.rebind),
+            reliability.Contingency.DISK_FULL: self.fill,
+            reliability.Contingency.CORRUPT_ARTIFACT: (self.corrupt),
+            reliability.Contingency.WORKER_LOSS: self.lose,
+            reliability.Contingency.TIMEOUT: self.expire,
+            reliability.Contingency.MEMORY_EXHAUSTION: (self.starve),
+            reliability.Contingency.PARTIAL_WRITE: self.truncate,
+            reliability.Contingency.DEPENDENCY_MISMATCH: (self.mismatch),
+            reliability.Contingency.INVALID_SIGNATURE: (self.forge),
+            reliability.Contingency.RETRY_EXHAUSTION: (self.exhaust),
+            reliability.Contingency.DUPLICATE_EVENT: (self.duplicate),
+            reliability.Contingency.INCOMPLETE_LINEAGE: (self.orphan),
+            reliability.Contingency.REJECTED_APPROVAL: (self.reject),
+            reliability.Contingency.CHANGED_SNAPSHOT: (self.mutate),
         }
         try:
             artifacts = handlers[scenario]()
@@ -90,7 +72,7 @@ class Executor(
             for plan in reliability.drills()
             if plan.scenario is scenario
         )
-        names = tuple(item.evidence_type for item in artifacts)
+        names = tuple(item.kind for item in artifacts)
         if set(names) != set(expected) or len(names) != len(set(names)):
             raise ValueError(
                 f"scenario {scenario.value} returned evidence {names}; "

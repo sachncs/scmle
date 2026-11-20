@@ -146,13 +146,13 @@ class Run:
     """Everything a completed run produced.
 
     Attributes:
-        run_id: Run identifier.
-        run_dir: Directory holding all artifacts.
+        identifier: Run identifier.
+        directory: Directory holding all artifacts.
         state: Terminal state name.
         plan: The executed experiment plan.
         profile: Dataset profile.
         trials: All trials in execution order.
-        selected_model: Winning model name.
+        model: Winning model name.
         evaluation: Final evaluation record (also saved as JSON).
         bundle: The packaged inference pipeline.
         diagnostics: Post-selection diagnostic reports by name.
@@ -160,13 +160,13 @@ class Run:
             declared on the project; never used for model selection.
     """
 
-    run_id: str
-    run_dir: pathlib.Path
+    identifier: str
+    directory: pathlib.Path
     state: str
     plan: experiments.Plan
     profile: scmle.contracts.data.Portrait
     trials: list[experiments.Trial]
-    selected_model: str
+    model: str
     evaluation: dict[str, Any]
     bundle: scmle.artifacts.bundle.Bundle
     diagnostics: dict[str, dict[str, Any]] = dataclasses.field(
@@ -305,7 +305,7 @@ class Run:
             Sorted column names; empty when nothing is outstanding.
         """
         suspects = set(map(str, self.profile.leakage.get("suspects", ())))
-        path = pathlib.Path(self.run_dir) / "admissibility_table.json"
+        path = pathlib.Path(self.directory) / "admissibility_table.json"
         if suspects and path.exists():
             record = json.loads(path.read_text(encoding="utf-8"))
             for decision in record.get("decisions", ()):
@@ -323,7 +323,7 @@ class Run:
             Tier name to count (a claim without a tier counts as
             `unverified`); empty if the run wrote no `confirmed_claims.json`.
         """
-        path = pathlib.Path(self.run_dir) / "confirmed_claims.json"
+        path = pathlib.Path(self.directory) / "confirmed_claims.json"
         if not path.exists():
             return {}
         record = json.loads(path.read_text(encoding="utf-8"))
@@ -359,7 +359,7 @@ class Run:
             reasons.append("leakage screen incomplete")
         label = f" (PROVISIONAL: {'; '.join(reasons)})" if reasons else ""
         text = (
-            f"{self.run_id}: selected {self.selected_model} "
+            f"{self.identifier}: selected {self.model} "
             f"(cv {evaluation['metric']}="
             f"{evaluation['selected']['score']:.4f}); test{label}: {test}"
         )

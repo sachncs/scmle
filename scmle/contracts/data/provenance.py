@@ -272,7 +272,7 @@ VERSION = records.ORIGIN + 1
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DatasetManifest:
+class Manifest:
     """Immutable identity of an ingested dataset.
 
     Attributes:
@@ -448,7 +448,7 @@ class DatasetManifest:
 class Passport:
     """Immutable identity and governance metadata for any modality.
 
-    Unlike ``DatasetManifest``, this contract does not assume rows, columns,
+    Unlike ``Manifest``, this contract does not assume rows, columns,
     or a tabular schema. It binds a modality sample collection to its source,
     transformation, label, privacy, and curation evidence instead.
 

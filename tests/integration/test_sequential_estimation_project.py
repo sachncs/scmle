@@ -15,12 +15,12 @@ def test_project_persists_atomic_report_and_verifies_exact_replay(
 ) -> None:
     """Run, persistence, load, and replay form one durable contract."""
     project = Estimation(
-        make_frame(), make_estimand(), make_policy(), output_dir=tmp_path
+        make_frame(), make_estimand(), make_policy(), directory=tmp_path
     )
 
     result = project.run()
-    envelope = json.loads(project.artifact_path.read_text(encoding="utf-8"))
-    replay = project.verify_replay()
+    envelope = json.loads(project.artifact.read_text(encoding="utf-8"))
+    replay = project.verify()
 
     assert project.result == result
     assert envelope["schema_version"] == 3
@@ -33,13 +33,13 @@ def test_project_replay_rejects_a_different_input_identity(tmp_path) -> None:
     """Changing even one input value invalidates the persisted identity."""
     frame = make_frame()
     project = Estimation(
-        frame, make_estimand(), make_policy(), output_dir=tmp_path
+        frame, make_estimand(), make_policy(), directory=tmp_path
     )
     project.run()
     changed = frame.copy()
     changed.loc[0, "outcome"] += 1.0
 
-    replay = project.verify_replay(changed)
+    replay = project.verify(changed)
 
     assert replay.level == "different"
     assert any("fingerprint" in reason for reason in replay.reasons)
@@ -48,12 +48,12 @@ def test_project_replay_rejects_a_different_input_identity(tmp_path) -> None:
 def test_project_rejects_tampered_report_before_replay(tmp_path) -> None:
     """Digest verification prevents replay from consuming altered evidence."""
     project = Estimation(
-        make_frame(), make_estimand(), make_policy(), output_dir=tmp_path
+        make_frame(), make_estimand(), make_policy(), directory=tmp_path
     )
     project.run()
-    envelope = json.loads(project.artifact_path.read_text(encoding="utf-8"))
+    envelope = json.loads(project.artifact.read_text(encoding="utf-8"))
     envelope["report"]["rows"]["used"] += 1
-    project.artifact_path.write_text(json.dumps(envelope), encoding="utf-8")
+    project.artifact.write_text(json.dumps(envelope), encoding="utf-8")
 
     with pytest.raises(ValueError, match="digest mismatch"):
-        project.verify_replay()
+        project.verify()

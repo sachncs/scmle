@@ -65,11 +65,11 @@ def test_no_artifact_holds_a_canary_of_c_or_the_final_test_set(tmp_path):
     result = support.make_project(
         frame,
         "y",
-        time_budget=300,
-        output_dir=tmp_path / "out",
+        budget=300,
+        directory=tmp_path / "out",
         charter=path,
     ).run()
-    folder = pathlib.Path(result.run_dir)
+    folder = pathlib.Path(result.directory)
     manifest = json.loads((folder / "split_manifest.json").read_text())
     values = frame[CANARY].to_numpy()
     sets = manifest["sets"]

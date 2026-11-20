@@ -158,7 +158,7 @@ class Journal:
             record: Fields of the record.
         """
         line = json.dumps({"type": kind, **record}, default=str)
-        durability.append_text(self.path, line + "\n")
+        durability.append(self.path, line + "\n")
 
     def chronicle(
         self,
@@ -223,7 +223,7 @@ class Journal:
         for row, event_id in enumerate(ids):
             event = Served(
                 event_id=event_id,
-                model_version=bundle.info.model_version,
+                model_version=bundle.info.version,
                 timestamp=events.stamp(),
                 features={
                     str(k): (None if pandas.isna(v) else v)
@@ -259,20 +259,20 @@ class Journal:
         if self.policy is None:
             return
         model_fingerprint = bundle.info.files.get(
-            scmle.artifacts.bundle.MODEL_FILE, bundle.info.model_version
+            scmle.artifacts.bundle.MODEL_FILE, bundle.info.version
         )
         event = observability.Inference(
-            request_id=request_id,
-            run_id=self.run or bundle.info.model_version,
+            request=request_id,
+            run=self.run or bundle.info.version,
             model_fingerprint=model_fingerprint,
             outcome=outcome,
-            latency_ms=(time.perf_counter() - started) * 1000.0,
+            latency=(time.perf_counter() - started) * 1000.0,
             timestamp=events.stamp(),
-            input_fingerprint=input_fingerprint,
-            error_category=error_category,
-            redacted_fields=self.policy.redacted_fields,
+            fingerprint=input_fingerprint,
+            category=error_category,
+            fields=self.policy.fields,
         )
-        durability.append_text(
+        durability.append(
             self.sidecar,
             json.dumps(
                 {"type": "inference", **event.to_dict()},
@@ -326,7 +326,7 @@ class Journal:
             observed_text, "observed_at"
         )
         cutoff = observed_timestamp - datetime.timedelta(
-            days=self.policy.retention_days
+            days=self.policy.retention
         )
         path = self.sidecar
         if not path.exists():
@@ -356,7 +356,7 @@ class Journal:
                 handle.flush()
                 os.fsync(handle.fileno())
             pathlib.Path(temporary_name).replace(path)
-            durability.sync_directory(path.parent)
+            durability.flush(path.parent)
         except BaseException:
             pathlib.Path(temporary_name).unlink(missing_ok=True)
             raise

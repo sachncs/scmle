@@ -735,9 +735,9 @@ def product(
                 target,
                 task="regression" if name == "regression" else "classification",
                 metric=scmle_runner.METRICS[name],
-                time_budget=BUDGET,
+                budget=BUDGET,
                 seed=found["seed"],
-                output_dir=Path(folder) / "run",
+                directory=Path(folder) / "run",
             ).run()
             found["score"] = scmle_runner.score(result, test, target, name)
         except Exception:  # noqa: BLE001 -- a failure scores the worst

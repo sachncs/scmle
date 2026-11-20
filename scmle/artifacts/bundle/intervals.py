@@ -109,7 +109,7 @@ class Intervals(core.Core):
         Raises:
             ArtifactError: If the bundle has no CV+ fold models.
         """
-        if self.cv_plus is None:
+        if self.plus is None:
             raise errors.ArtifactError(
                 "this bundle has no CV+ fold models; the run stores them "
                 "for regression with fewer than "
@@ -117,7 +117,7 @@ class Intervals(core.Core):
                 "held out once each (see the cv_plus.skipped event)"
             )
         frame = self.prepare(data, mapping)
-        lower, upper = self.cv_plus.interval(frame, coverage)
+        lower, upper = self.plus.interval(frame, coverage)
         predictions = numpy.asarray(self.pipeline.predict(frame), dtype=float)
         return pandas.DataFrame(
             {"prediction": predictions, "lower": lower, "upper": upper}
@@ -182,8 +182,8 @@ class Intervals(core.Core):
             target_rows[list(chosen)].to_numpy(float),
             clip,
         )
-        self.shift_weights = shift_weights.Weights(found, chosen)
-        return self.shift_weights
+        self.weights = shift_weights.Weights(found, chosen)
+        return self.weights
 
     def reweight(
         self,
@@ -206,7 +206,7 @@ class Intervals(core.Core):
         Raises:
             ArtifactError: If no shift weights are attached.
         """
-        if self.shift_weights is None:
+        if self.weights is None:
             raise errors.ArtifactError(
                 "this bundle has no shift weights; call tilt"
             )
@@ -214,8 +214,8 @@ class Intervals(core.Core):
         predictions = numpy.asarray(self.pipeline.predict(frame), dtype=float)
         lower, upper = calibrator.reweight(
             predictions,
-            self.shift_weights.weights.calibration,
-            self.shift_weights.test(frame),
+            self.weights.weights.calibration,
+            self.weights.test(frame),
             coverage,
         )
         return pandas.DataFrame(

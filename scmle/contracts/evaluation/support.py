@@ -19,7 +19,7 @@ class Orientation(enum.StrEnum):
     MINIMIZE = "minimize"
 
 
-class UncertaintyMethod(enum.StrEnum):
+class Method(enum.StrEnum):
     """Uncertainty contract promised by an evaluation policy."""
 
     NONE = "none"
@@ -159,35 +159,33 @@ DEFAULT_METRICS: Mapping[tasks.Task, str] = {
 }
 
 
-SUPPORTED_UNCERTAINTY: Mapping[tasks.Task, frozenset[UncertaintyMethod]] = {
-    **{task: frozenset({UncertaintyMethod.NONE}) for task in tasks.Task},
+SUPPORTED_UNCERTAINTY: Mapping[tasks.Task, frozenset[Method]] = {
+    **{task: frozenset({Method.NONE}) for task in tasks.Task},
     tasks.Task.BINARY: frozenset(
         {
-            UncertaintyMethod.NONE,
-            UncertaintyMethod.CALIBRATED_PROBABILITY,
-            UncertaintyMethod.CONFORMAL,
-            UncertaintyMethod.ABSTENTION,
+            Method.NONE,
+            Method.CALIBRATED_PROBABILITY,
+            Method.CONFORMAL,
+            Method.ABSTENTION,
         }
     ),
     tasks.Task.MULTICLASS: frozenset(
         {
-            UncertaintyMethod.NONE,
-            UncertaintyMethod.CALIBRATED_PROBABILITY,
-            UncertaintyMethod.CONFORMAL,
-            UncertaintyMethod.ABSTENTION,
+            Method.NONE,
+            Method.CALIBRATED_PROBABILITY,
+            Method.CONFORMAL,
+            Method.ABSTENTION,
         }
     ),
     tasks.Task.REGRESSION: frozenset(
         {
-            UncertaintyMethod.NONE,
-            UncertaintyMethod.PREDICTION_INTERVAL,
-            UncertaintyMethod.CONFORMAL,
-            UncertaintyMethod.ABSTENTION,
+            Method.NONE,
+            Method.PREDICTION_INTERVAL,
+            Method.CONFORMAL,
+            Method.ABSTENTION,
         }
     ),
-    tasks.Task.SURVIVAL: frozenset(
-        {UncertaintyMethod.NONE, UncertaintyMethod.SURVIVAL_CURVE}
-    ),
+    tasks.Task.SURVIVAL: frozenset({Method.NONE, Method.SURVIVAL_CURVE}),
 }
 
 

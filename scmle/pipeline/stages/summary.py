@@ -60,9 +60,9 @@ class Summary(reporting.Reporting):
         )
         board.journal.track(
             selected_strategy=selected.strategy,
-            selected_model=selected.model_name,
+            selected_model=selected.model,
             metric=metric.name,
-            cv_score=selected.score_mean,
+            cv_score=selected.score,
             test_metrics=test_metrics,
         )
         return test_metrics
@@ -98,7 +98,7 @@ class Summary(reporting.Reporting):
                 target,
                 task,
                 partition.metric,
-                partition.profile.feature_plan,
+                partition.profile.plan,
                 board.services.spec.validation.seed,
                 groups=(
                     features[data.group_column]
@@ -163,17 +163,17 @@ class Summary(reporting.Reporting):
         features, target = rows
         pseudolabels, remedy = judged
         return {
-            "run_id": store.run_id if (store := board.services.store) else "",
+            "run_id": store.run if (store := board.services.store) else "",
             "task": task.value,
             "metric": metric.name,
-            "metric_greater_is_better": metric.greater_is_better,
+            "metric_greater_is_better": metric.maximize,
             "selection_policy": board.services.policy.description,
-            "selected_model": selected.model_name,
-            "selected_trial_id": selected.trial_id,
+            "selected_model": selected.model,
+            "selected_trial_id": selected.identifier,
             "selected_params": selected.params,
             "selected_strategy": selected.strategy,
-            "selected_cv_score": selected.score_mean,
-            "selected_cv_std": selected.score_std,
+            "selected_cv_score": selected.score,
+            "selected_cv_std": selected.deviation,
             "fit_health": self.diagnose(board, selected),
             "cv_confidence": self.assure(board),
             "baseline_cv_score": self.baseline(board),
@@ -222,12 +222,12 @@ class Summary(reporting.Reporting):
             (
                 t
                 for t in board.journal.trials
-                if t.model_name == BASELINE
+                if t.model == BASELINE
                 and t.status is experiments.Termination.OK
             ),
             None,
         )
-        return found.score_mean if found else None
+        return found.score if found else None
 
     def assure(self, board: engine.Board) -> Any:
         """The confidence interval of the selected cross-validation score.
@@ -245,16 +245,16 @@ class Summary(reporting.Reporting):
         )
         metric = partition.metric
         return confidence.bound(
-            selected.fold_scores,
+            selected.folds,
             float(numpy.mean([len(fold[0]) for fold in split.manifest.folds])),
             float(numpy.mean([len(fold[1]) for fold in split.manifest.folds])),
             split.manifest.strategy,
             [
-                trial.fold_scores
+                trial.folds
                 for trial in board.journal.trials
                 if trial.status is experiments.Termination.OK
             ],
-            metric.greater_is_better,
+            metric.maximize,
         )
 
     def weigh(

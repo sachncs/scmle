@@ -41,9 +41,7 @@ def reference(tmp_path_factory):
 @pytest.fixture(scope="module")
 def after_two(tmp_path_factory):
     """The checkpoint a run that committed two objects leaves."""
-    store = objectstore.LocalObjectStore(
-        tmp_path_factory.mktemp("two") / "root"
-    )
+    store = objectstore.Disk(tmp_path_factory.mktemp("two") / "root")
     failpoints.seed(store)
     failpoints.processor(store).run(max_objects=2)
     return store.get(failpoints.STATE_KEY)[0]
@@ -51,7 +49,7 @@ def after_two(tmp_path_factory):
 
 @pytest.fixture
 def store(tmp_path):
-    local = objectstore.LocalObjectStore(tmp_path / "root")
+    local = objectstore.Disk(tmp_path / "root")
     failpoints.seed(local)
     return local
 
@@ -227,7 +225,7 @@ def test_a_retrying_store_absorbs_failures_in_every_call_within_budget(
 ):
     waits = []
     faulty = faulty_store.FaultyStore(store, failures, **GUARDED[target])
-    guarded = objectstore.RetryingStore(faulty, POLICY, sleep=waits.append)
+    guarded = objectstore.Retrier(faulty, POLICY, sleep=waits.append)
     result = failpoints.processor(guarded).run()
     assert result.failed is None
     assert waits == POLICY.delays()[:failures]
@@ -243,7 +241,7 @@ def test_a_lock_that_cannot_be_taken_within_budget_stops_before_any_work(
     faulty = faulty_store.FaultyStore(
         store, POLICY.attempts, **GUARDED["lock_acquire"]
     )
-    guarded = objectstore.RetryingStore(faulty, POLICY, sleep=waits.append)
+    guarded = objectstore.Retrier(faulty, POLICY, sleep=waits.append)
     with pytest.raises(retry.RetryError) as raised:
         failpoints.processor(guarded).run()
     assert raised.value.attempts == POLICY.attempts
@@ -260,9 +258,7 @@ def test_a_lock_release_that_fails_past_budget_leaves_finished_work_intact(
     faulty = faulty_store.FaultyStore(
         store, POLICY.attempts, **GUARDED["lock_release"]
     )
-    guarded = objectstore.RetryingStore(
-        faulty, POLICY, sleep=lambda seconds: None
-    )
+    guarded = objectstore.Retrier(faulty, POLICY, sleep=lambda seconds: None)
     with pytest.raises(retry.RetryError):
         failpoints.processor(guarded).run()
     assert failpoints.files_of(store) == reference.files
@@ -281,7 +277,7 @@ def test_the_retrying_store_makes_exactly_the_budgeted_attempts(
 ):
     waits = []
     faulty = faulty_store.FaultyStore(store, failures, operations=("get",))
-    guarded = objectstore.RetryingStore(faulty, POLICY, sleep=waits.append)
+    guarded = objectstore.Retrier(faulty, POLICY, sleep=waits.append)
     if failures < POLICY.attempts:
         assert guarded.get("input/o0.csv")[0] == failpoints.object_bytes(0)
         assert faulty.matching == failures + 1

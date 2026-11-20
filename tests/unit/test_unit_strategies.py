@@ -35,9 +35,9 @@ def plan(numeric=(), categorical=(), high=(), monotonic=None, informative=None):
 
 def portrait(target=None, stats=None, **kwargs):
     return types.SimpleNamespace(
-        target_summary=target or {},
-        column_statistics=stats or {},
-        feature_plan=plan(**kwargs),
+        summary=target or {},
+        statistics=stats or {},
+        plan=plan(**kwargs),
     )
 
 
@@ -140,9 +140,9 @@ def test_smote_needs_the_extra_and_numeric_features(monkeypatch):
         "needs at least two numeric features"
     )
     assert why(smote, portrait(skewed, numeric=["a", "b"]), "knn") is None
-    assert rebalancing.Borderline.sampler_name == "BorderlineSMOTE"
-    assert rebalancing.Adasyn.sampler_name == "ADASYN"
-    assert rebalancing.Smote.min_features == 2
+    assert rebalancing.Borderline.sampler == "BorderlineSMOTE"
+    assert rebalancing.Adasyn.sampler == "ADASYN"
+    assert rebalancing.Smote.minimum == 2
 
 
 def test_recalibration_needs_an_uncalibrated_classifier():
@@ -301,7 +301,7 @@ def test_indicators_need_informative_gaps():
 
 
 def test_feature_strategy_flags():
-    assert features.Logarithm.log_skewed
+    assert features.Logarithm.skewed
     assert features.Interactions.interactions
     assert features.Construction.construct
     assert features.Selection.select
@@ -320,9 +320,7 @@ def real_plan():
     spec = tasks.Config(data=tasks.Dataset(uri="m", target="y"))
     manifest = tabular.manifested(frame, "y")
     return (
-        profiler.Profiler(spec)
-        .profile(frame, manifest, tasks.Task.BINARY)
-        .feature_plan
+        profiler.Profiler(spec).profile(frame, manifest, tasks.Task.BINARY).plan
     )
 
 
@@ -336,15 +334,15 @@ def test_builds_wrap_the_pipeline_as_each_strategy_requires(real_plan):
     assert weighted.get_params()["model__class_weight"] == "balanced"
     oversampled = build("random_oversample")
     assert isinstance(oversampled, resampling.ResamplingClassifier)
-    assert isinstance(oversampled.resampler, resampling.RandomOverSampler)
+    assert isinstance(oversampled.resampler, resampling.Oversampler)
     undersampled = build("random_undersample")
-    assert isinstance(undersampled.resampler, resampling.RandomUnderSampler)
+    assert isinstance(undersampled.resampler, resampling.Undersampler)
     assert isinstance(build("calibrated"), inner_cv.Calibrated)
     transformed = build("target_transform", "ridge", tasks.Task.REGRESSION)
     assert isinstance(transformed, compose.TransformedTargetRegressor)
     weighted_rows = build(
         "rare_target_weighting", "ridge", tasks.Task.REGRESSION
     )
-    assert isinstance(weighted_rows, resampling.DensityWeightedRegressor)
+    assert isinstance(weighted_rows, resampling.Density)
     for name in ("default", "log_skewed", "select_features", "target_encoding"):
         assert build(name).get_params()

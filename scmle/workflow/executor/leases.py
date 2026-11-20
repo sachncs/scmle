@@ -154,7 +154,7 @@ class Leases(records.Records):
 
     def hold(
         self, run_id: str
-    ) -> tuple[Mapping[str, Any], objectstore.ObjectMeta]:
+    ) -> tuple[Mapping[str, Any], objectstore.Metadata]:
         """Checks that this executor still holds the run's lease.
 
         Args:
@@ -274,7 +274,7 @@ class Leases(records.Records):
         """
         prefix = f"workflows/{self.workflow.name}/runs/"
         active = []
-        for meta in self.store.list_objects(prefix):
+        for meta in self.store.catalog(prefix):
             if not meta.key.endswith("/lock"):
                 continue
             held = self.read(meta.key)

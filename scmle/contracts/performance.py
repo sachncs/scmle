@@ -26,7 +26,7 @@ class Operation(enum.StrEnum):
     INFERENCE = "inference"
 
 
-def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
+def parse(value: str, field_name: str) -> datetime.datetime:
     """Parses an offset-aware ISO-8601 timestamp.
 
     Args:
@@ -112,7 +112,7 @@ class Observation:
         software: object = self.software  # may be a non-string at runtime
         if not isinstance(software, str) or not software.strip():
             raise errors.InputError("software must not be empty")
-        parse_timestamp(self.observed, "observed")
+        parse(self.observed, "observed")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-native performance evidence."""
@@ -273,18 +273,18 @@ class Comparison:
     )
 
     passed: bool
-    baseline_run_count: int
-    current_run_id: str
-    relative_regressions: dict[str, dict[str, float | None]]
+    baselines: int
+    run: str
+    regressions: dict[str, dict[str, float | None]]
     violations: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-native comparison evidence."""
         return {
             "passed": self.passed,
-            "baselines": self.baseline_run_count,
-            "run": self.current_run_id,
-            "regressions": self.relative_regressions,
+            "baselines": self.baselines,
+            "run": self.run,
+            "regressions": self.regressions,
             "violations": list(self.violations),
         }
 
@@ -310,8 +310,8 @@ class Baseline:
         ),
     )
 
-    reference_runs: tuple[Run, ...]
-    max_relative_regression: float = 0.10
+    runs: tuple[Run, ...]
+    regression: float = 0.10
 
     def __post_init__(self) -> None:
         """Validates repeated, schema-consistent reference measurements.
@@ -322,15 +322,12 @@ class Baseline:
                 operations, differ in operations or sample counts, or come from
                 more than one environment.
         """
-        runs = tuple(self.reference_runs)
+        runs = tuple(self.runs)
         if len(runs) < MIN_REFERENCE_RUNS:
             raise errors.InputError(
                 "performance baseline requires at least two reference runs"
             )
-        if (
-            not math.isfinite(self.max_relative_regression)
-            or self.max_relative_regression < 0
-        ):
+        if not math.isfinite(self.regression) or self.regression < 0:
             raise errors.InputError(
                 "max_relative_regression must be finite and non-negative"
             )
@@ -374,7 +371,7 @@ class Baseline:
             raise errors.InputError(
                 "performance baseline runs must share one environment"
             )
-        object.__setattr__(self, "reference_runs", runs)
+        object.__setattr__(self, "runs", runs)
 
     def evaluate(self, current: Run) -> Comparison:
         """Compares one run with the median of the repeated baseline.
@@ -401,8 +398,8 @@ class Baseline:
         """
         expected = self.match(current)
         reference_environment = (
-            self.reference_runs[0].observations[0].machine,
-            self.reference_runs[0].observations[0].software,
+            self.runs[0].observations[0].machine,
+            self.runs[0].observations[0].software,
         )
         current_environment = (
             current.observations[0].machine,
@@ -411,9 +408,9 @@ class Baseline:
         if current_environment != reference_environment:
             return Comparison(
                 passed=False,
-                baseline_run_count=len(self.reference_runs),
-                current_run_id=current.identifier,
-                relative_regressions={},
+                baselines=len(self.runs),
+                run=current.identifier,
+                regressions={},
                 violations=(
                     "performance comparison environment differs from baseline",
                 ),
@@ -423,9 +420,9 @@ class Baseline:
         if tally:
             return Comparison(
                 passed=False,
-                baseline_run_count=len(self.reference_runs),
-                current_run_id=current.identifier,
-                relative_regressions={},
+                baselines=len(self.runs),
+                run=current.identifier,
+                regressions={},
                 violations=tally,
             )
 
@@ -438,9 +435,9 @@ class Baseline:
             violations.extend(found)
         return Comparison(
             passed=not violations,
-            baseline_run_count=len(self.reference_runs),
-            current_run_id=current.identifier,
-            relative_regressions=regressions,
+            baselines=len(self.runs),
+            run=current.identifier,
+            regressions=regressions,
             violations=tuple(violations),
         )
 
@@ -461,8 +458,7 @@ class Baseline:
             observation.operation for observation in current.observations
         }
         expected = {
-            observation.operation
-            for observation in self.reference_runs[0].observations
+            observation.operation for observation in self.runs[0].observations
         }
         if operations != expected:
             missing = sorted(
@@ -499,7 +495,7 @@ class Baseline:
         """
         violations: list[str] = []
         for operation in sorted(expected, key=lambda item: item.value):
-            baseline_observation = self.reference_runs[0].observation(operation)
+            baseline_observation = self.runs[0].observation(operation)
             current_observation = current.observation(operation)
             if baseline_observation is None or current_observation is None:
                 raise RuntimeError(
@@ -538,7 +534,7 @@ class Baseline:
                 f"{operation.value}"
             )
         reference_observations = [
-            run.observation(operation) for run in self.reference_runs
+            run.observation(operation) for run in self.runs
         ]
         if any(observation is None for observation in reference_observations):
             raise RuntimeError(
@@ -565,28 +561,28 @@ class Baseline:
             "elapsed_seconds": time_regression,
             "peak_memory_gb": memory_regression,
         }
-        if time_regression > self.max_relative_regression:
+        if time_regression > self.regression:
             violations.append(
                 f"{operation.value} time regression "
                 f"{time_regression:.2%} exceeds "
-                f"{self.max_relative_regression:.2%}"
+                f"{self.regression:.2%}"
             )
         if (
             memory_regression is not None
-            and memory_regression > self.max_relative_regression
+            and memory_regression > self.regression
         ):
             violations.append(
                 f"{operation.value} memory regression "
                 f"{memory_regression:.2%} exceeds "
-                f"{self.max_relative_regression:.2%}"
+                f"{self.regression:.2%}"
             )
         return regression, violations
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-native baseline policy and reference evidence."""
         return {
-            "regression": self.max_relative_regression,
-            "runs": [run.to_dict() for run in self.reference_runs],
+            "regression": self.regression,
+            "runs": [run.to_dict() for run in self.runs],
         }
 
 
@@ -654,8 +650,8 @@ class Budget:
         ),
     )
 
-    max_seconds: Mapping[Operation, float]
-    max_peak_memory_gb: float | None = None
+    seconds: Mapping[Operation, float]
+    memory: float | None = None
 
     def __post_init__(self) -> None:
         """Validates positive ceilings and normalizes operation names.
@@ -666,7 +662,7 @@ class Budget:
                 limits.
         """
         normalized: dict[Operation, float] = {}
-        for operation, limit in self.max_seconds.items():
+        for operation, limit in self.seconds.items():
             named: Any = operation  # keys may be raw values at runtime
             resolved = (
                 named if isinstance(named, Operation) else Operation(named)
@@ -678,14 +674,13 @@ class Budget:
             normalized[resolved] = float(limit)
         if not normalized:
             raise errors.InputError("max_seconds must not be empty")
-        if self.max_peak_memory_gb is not None and (
-            not math.isfinite(self.max_peak_memory_gb)
-            or self.max_peak_memory_gb <= 0
+        if self.memory is not None and (
+            not math.isfinite(self.memory) or self.memory <= 0
         ):
             raise errors.InputError(
                 "max_peak_memory_gb must be positive when present"
             )
-        object.__setattr__(self, "max_seconds", normalized)
+        object.__setattr__(self, "seconds", normalized)
 
     def evaluate(self, observations: tuple[Observation, ...]) -> "Verdict":
         """Evaluates observations without treating missing data as pass.
@@ -698,7 +693,7 @@ class Budget:
             given, and the violations. Only operations with a time limit are
             checked (extra observations are ignored). Each is checked for a
             missing observation, an exceeded time limit and, when
-            `max_peak_memory_gb` is set, an exceeded or missing peak memory.
+            `memory` is set, an exceeded or missing peak memory.
 
         Raises:
             ValueError: If an operation is observed more than once.
@@ -712,7 +707,7 @@ class Budget:
                 )
             by_operation[observation.operation] = observation
         for operation, limit in sorted(
-            self.max_seconds.items(), key=lambda item: item[0].value
+            self.seconds.items(), key=lambda item: item[0].value
         ):
             measurement = by_operation.get(operation)
             if measurement is None:
@@ -727,19 +722,19 @@ class Budget:
                     f"> {limit:.6g}s budget"
                 )
             memory = measurement.memory
-            if self.max_peak_memory_gb is not None and memory is None:
+            if self.memory is not None and memory is None:
                 violations.append(
                     f"missing peak memory observation: {operation.value}"
                 )
             elif (
-                self.max_peak_memory_gb is not None
+                self.memory is not None
                 and memory is not None
-                and memory > self.max_peak_memory_gb
+                and memory > self.memory
             ):
                 violations.append(
                     f"{operation.value} used "
                     f"{memory:.6g} GB "
-                    f"> {self.max_peak_memory_gb:.6g} GB budget"
+                    f"> {self.memory:.6g} GB budget"
                 )
         return Verdict(
             passed=not violations,
@@ -753,10 +748,10 @@ class Budget:
             "seconds": {
                 operation.value: limit
                 for operation, limit in sorted(
-                    self.max_seconds.items(), key=lambda item: item[0].value
+                    self.seconds.items(), key=lambda item: item[0].value
                 )
             },
-            "memory": self.max_peak_memory_gb,
+            "memory": self.memory,
         }
 
 
@@ -787,6 +782,6 @@ __all__ = [
     "Operation",
     "Run",
     "Verdict",
-    "parse_timestamp",
+    "parse",
     "rise",
 ]

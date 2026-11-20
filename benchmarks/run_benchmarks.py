@@ -122,15 +122,15 @@ def run_one(
                 dataset.target,
                 task=dataset.task,
                 metric=dataset.metric,
-                time_budget=budget,
+                budget=budget,
                 workers=workers,
-                time_column=dataset.time_column,
+                timestamp=dataset.time_column,
                 # The benchmark measures model quality on public tables whose
                 # strong legitimate predictors the leakage screen flags.
-                leakage_policy="warn",
+                leakage="warn",
                 time_as_feature=dataset.time_as_feature,
                 seed=seed,
-                output_dir=root / f"{dataset.name}-{seed}",
+                directory=root / f"{dataset.name}-{seed}",
             )
             result = project.run()
             evaluation = result.evaluation
@@ -139,11 +139,10 @@ def run_one(
                 record.task = evaluation["task"]
                 record.metric = evaluation["metric"]
                 strategy = evaluation["selected"]["strategy"]
-                record.selected = f"{result.selected_model}/{strategy}"
+                record.selected = f"{result.model}/{strategy}"
                 record.baseline_cv = evaluation["baseline"]
                 record.findings = list(
-                    result.profile.quality_findings
-                    + result.profile.risk_findings
+                    result.profile.quality + result.profile.risk_findings
                 )
             record.trials += len(result.trials)
             cv_scores.append(evaluation["selected"]["score"])
@@ -152,7 +151,7 @@ def run_one(
                 reference.reference_score(
                     frame,
                     dataset.target,
-                    result.run_dir,
+                    result.directory,
                     record.task,
                     record.metric,
                     record.task != "regression",

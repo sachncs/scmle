@@ -51,7 +51,7 @@ def test_roundtrip_prediction_equivalence(trained, tmp_path):
         bundle.predict_proba(features), loaded.predict_proba(features)
     )
     assert loaded.classes == (0, 1)
-    assert loaded.info.model_name == "rf"
+    assert loaded.info.model == "rf"
 
 
 def test_predict_from_file_with_extra_columns(trained, tmp_path):
@@ -239,8 +239,8 @@ def test_regression_bundle_has_no_probabilities(tmp_path):
 def test_run_store_allocates_unique_directories(tmp_path):
     first = scmle.artifacts.store.Workspace.create(tmp_path / "runs")
     second = scmle.artifacts.store.Workspace.create(tmp_path / "runs")
-    assert first.run_id != second.run_id and first.directory.is_dir()
-    first.write_json("a.json", {"x": 1})
+    assert first.run != second.run and first.directory.is_dir()
+    first.write("a.json", {"x": 1})
     first.write_text("b.txt", "hi")
     sub = first.path("trials")
     sub.mkdir()
@@ -412,9 +412,7 @@ def test_signing_key_rotation_preserves_bundle_and_rejects_old_key(
 ):
     bundle, features = trained
     directory = bundle.save(tmp_path / "m", signing_key="old-key")
-    scmle.artifacts.bundle.Bundle.rotate_signing_key(
-        directory, "old-key", "new-key"
-    )
+    scmle.artifacts.bundle.Bundle.rotate(directory, "old-key", "new-key")
     with pytest.raises(errors.ArtifactError, match="signature is invalid"):
         scmle.artifacts.bundle.Bundle.load(directory, signing_key="old-key")
     loaded = scmle.artifacts.bundle.Bundle.load(
@@ -585,7 +583,7 @@ def test_the_environment_lock_pins_the_build_environment(trained, tmp_path):
     bundle = trained[0]
     path = tmp_path / "lock.txt"
 
-    text = bundle.environment_lock(path)
+    text = bundle.pin(path)
 
     assert path.read_text() == text
     assert text.startswith("# scmle environment lock")
@@ -642,7 +640,7 @@ def test_the_lock_survives_saving_and_loading(trained, tmp_path):
 
     loaded = scmle.artifacts.bundle.Bundle.load(tmp_path / "m", trusted=True)
 
-    assert loaded.environment_lock() == bundle.environment_lock()
+    assert loaded.pin() == bundle.pin()
 
 
 def test_a_version_mismatch_arrives_with_the_lock_attached(trained, tmp_path):
@@ -657,7 +655,7 @@ def test_a_version_mismatch_arrives_with_the_lock_attached(trained, tmp_path):
         scmle.artifacts.bundle.Bundle.load(tmp_path / "m", trusted=True)
 
     lock = caught.value.details["environment_lock"]
-    assert lock == bundle.environment_lock()
+    assert lock == bundle.pin()
     assert f"numpy=={numpy.__version__}" in lock
 
 

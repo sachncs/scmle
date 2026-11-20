@@ -34,9 +34,9 @@ def test_embedded_text_trains_packages_and_predicts(tmp_path):
     result = support.make_project(
         frame,
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
-        text_encoding="embedding",
+        budget=300,
+        directory=tmp_path,
+        encoding="embedding",
     ).run()
 
     assert result.evaluation["metrics"]["roc_auc"] > 0.9

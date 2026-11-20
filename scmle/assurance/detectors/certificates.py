@@ -400,7 +400,7 @@ class Certification:
                 defect types repeat, or an outcome belongs to a different
                 detector.
         """
-        evidence.require_text(self.detector, "detector")
+        evidence.require(self.detector, "detector")
         if set(self.digests) != {"code", "corpus"}:
             raise errors.InputError("digests must hold code and corpus")
         require(self.digests["code"], "code digest")

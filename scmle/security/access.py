@@ -71,7 +71,7 @@ def is_loopback(host: str) -> bool:
         return False
 
 
-def require_authentication_for(host: str, gateway: "Gateway | None") -> None:
+def insist(host: str, gateway: "Gateway | None") -> None:
     """Refuses to expose a backend without authentication.
 
     A server may run without a gateway only on a loopback address.
@@ -99,7 +99,7 @@ class DeniedError(errors.ScmleError):
     Attributes:
         status: HTTP status (401, 403 or 429).
         reason: Precise cause for the audit log; never sent to the caller.
-        retry_after: Seconds to wait, for 429.
+        backoff: Seconds to wait, for 429.
         principal: The verified caller, if authentication had succeeded.
     """
 
@@ -109,7 +109,7 @@ class DeniedError(errors.ScmleError):
         self,
         status: int,
         reason: str,
-        retry_after: float | None = None,
+        backoff: float | None = None,
         principal: tokens.Principal | None = None,
     ) -> None:
         """Initializes the refusal.
@@ -117,7 +117,7 @@ class DeniedError(errors.ScmleError):
         Args:
             status: HTTP status.
             reason: Cause for the audit log.
-            retry_after: Seconds until the caller may retry.
+            backoff: Seconds until the caller may retry.
             principal: The verified caller, when the refusal came after
                 authentication (for the audit row).
 
@@ -128,7 +128,7 @@ class DeniedError(errors.ScmleError):
         self.principal = principal
         self.status = status
         self.reason = reason
-        self.retry_after = retry_after
+        self.backoff = backoff
 
     @property
     def body(self) -> dict[str, Any]:
@@ -143,18 +143,18 @@ class DeniedError(errors.ScmleError):
         """The response headers for the refusal.
 
         A 401 carries the bearer challenge, a 429 a ``Retry-After`` of
-        ``retry_after`` rounded up to whole seconds (at least 1), and a 403
+        ``backoff`` rounded up to whole seconds (at least 1), and a 403
         none.
         """
         if self.status == http.HTTPStatus.UNAUTHORIZED:
             return {"WWW-Authenticate": 'Bearer realm="scmle"'}
         if self.status == http.HTTPStatus.TOO_MANY_REQUESTS:
-            wait = max(1, int(-(-(self.retry_after or 1.0) // 1)))
+            wait = max(1, int(-(-(self.backoff or 1.0) // 1)))
             return {"Retry-After": str(wait)}
         return {}
 
 
-class RateLimiter:
+class Limiter:
     """A token bucket per key, with an injectable clock.
 
     Each key may make `rate` requests per second on average and bursts of up to
@@ -237,7 +237,7 @@ class Gateway:
         tenant: The one tenant this deployment serves, or None.
         routes: Scope needed per `(method, path)`.
         limiter: Per-subject request limit.
-        failure_limiter: Per-client limit on failed authentication attempts.
+        throttle: Per-client limit on failed authentication attempts.
         audit: Where decisions are recorded, or None.
     """
 
@@ -247,8 +247,8 @@ class Gateway:
         *,
         tenant: str | None = None,
         routes: Mapping[tuple[str, str], str] = DEFAULT_ROUTES,
-        limiter: RateLimiter | None = None,
-        failure_limiter: RateLimiter | None = None,
+        limiter: Limiter | None = None,
+        throttle: Limiter | None = None,
         audit: scmle.security.audit.Log | None = None,
     ) -> None:
         """Initializes the gateway.
@@ -259,7 +259,7 @@ class Gateway:
                 whose tenant claim differs, or is absent, is refused (403).
             routes: Scope needed per `(method, path)`.
             limiter: Per-subject request limit (default 20/s, burst 40).
-            failure_limiter: Per-client limit on failed authentication
+            throttle: Per-client limit on failed authentication
                 attempts (missing or invalid credentials), so that guessing
                 credentials is slowed (default 2/s, burst 10).
             audit: Where decisions are recorded.
@@ -267,8 +267,8 @@ class Gateway:
         self.verifier = verifier
         self.tenant = tenant
         self.routes = dict(routes)
-        self.limiter = limiter or RateLimiter(20.0, 40)
-        self.failure_limiter = failure_limiter or RateLimiter(2.0, 10)
+        self.limiter = limiter or Limiter(20.0, 40)
+        self.throttle = throttle or Limiter(2.0, 10)
         self.audit = audit
 
     def check(
@@ -389,7 +389,7 @@ class Gateway:
         """
         # A fixed-size key, so the limiter never stores the raw address.
         client = hashlib.sha256(remote.encode()).hexdigest()[:16]
-        wait = self.failure_limiter.take(client)
+        wait = self.throttle.take(client)
         if wait is not None:
             raise DeniedError(429, "too_many_failures", wait)
         raise DeniedError(status, reason)
@@ -453,22 +453,22 @@ class Config:
     """Authentication settings read from the environment.
 
     Attributes:
-        keys_file: JWKS file path, or empty.
-        hs256_secret: Inline HS256 secret (local or small deployments).
+        jwks: JWKS file path, or empty.
+        secret: Inline HS256 secret (local or small deployments).
         issuer: Required issuer.
         audience: Required audience.
         tenant: The tenant this deployment serves, or empty.
-        revoked_file: Revocation file path, or empty.
-        audit_file: Audit ledger path, or empty for memory only.
+        revocations: Revocation file path, or empty.
+        audit: Audit ledger path, or empty for memory only.
     """
 
-    keys_file: str
-    hs256_secret: str
+    jwks: str
+    secret: str
     issuer: str
     audience: str
     tenant: str
-    revoked_file: str
-    audit_file: str
+    revocations: str
+    audit: str
 
     @classmethod
     def load(cls, environ: Mapping[str, str]) -> "Config":
@@ -485,23 +485,23 @@ class Config:
             The settings.
         """
         names = {
-            "keys_file": "SCMLE_AUTH_KEYS_FILE",
-            "hs256_secret": "SCMLE_AUTH_HS256_SECRET",  # nosec B105 - a name
+            "jwks": "SCMLE_AUTH_KEYS_FILE",
+            "secret": "SCMLE_AUTH_HS256_SECRET",  # nosec B105 - a name
             "issuer": "SCMLE_AUTH_ISSUER",
             "audience": "SCMLE_AUTH_AUDIENCE",
             "tenant": "SCMLE_TENANT",
-            "revoked_file": "SCMLE_AUTH_REVOKED_FILE",
-            "audit_file": "SCMLE_AUDIT_FILE",
+            "revocations": "SCMLE_AUTH_REVOKED_FILE",
+            "audit": "SCMLE_AUDIT_FILE",
         }
         return cls(**{k: environ.get(v, "") for k, v in names.items()})
 
     @property
     def configured(self) -> bool:
         """Whether any key source is configured."""
-        return bool(self.keys_file or self.hs256_secret)
+        return bool(self.jwks or self.secret)
 
 
-def gateway_from_environment(environ: Mapping[str, str]) -> Gateway | None:
+def assemble(environ: Mapping[str, str]) -> Gateway | None:
     """Builds the gateway the environment asks for.
 
     A keys file takes precedence over an inline HS256 secret. The revocation
@@ -529,15 +529,11 @@ def gateway_from_environment(environ: Mapping[str, str]) -> Gateway | None:
             "SCMLE_AUTH_ISSUER and SCMLE_AUTH_AUDIENCE are required with "
             "authentication keys"
         )
-    if settings.keys_file:
-        keys = tokens.Keystore.from_file(settings.keys_file)
+    if settings.jwks:
+        keys = tokens.Keystore.read(settings.jwks)
     else:
         keys = tokens.Keystore(
-            [
-                tokens.Key(
-                    "env", tokens.HS256, secret=settings.hs256_secret.encode()
-                )
-            ]
+            [tokens.Key("env", tokens.HS256, secret=settings.secret.encode())]
         )
     if settings.tenant:
         try:
@@ -554,22 +550,22 @@ def gateway_from_environment(environ: Mapping[str, str]) -> Gateway | None:
                 f"keys {foreign} are bound to another tenant than "
                 f"{settings.tenant!r}"
             )
-    revocation_source: Callable[[], tokens.RevocationList] | None = None
-    if settings.revoked_file:
-        path = settings.revoked_file
+    revocation_source: Callable[[], tokens.Revocations] | None = None
+    if settings.revocations:
+        path = settings.revocations
 
-        def revocations() -> tokens.RevocationList:
+        def revocations() -> tokens.Revocations:
             """Reads the revocation list from its file.
 
             Returns:
                 The revocations currently in the file.
             """
-            return tokens.RevocationList.from_file(path)
+            return tokens.Revocations.read(path)
 
         revocation_source = revocations
 
     verifier = tokens.Verifier(
         keys, settings.issuer, settings.audience, revocations=revocation_source
     )
-    log = scmle.security.audit.Log.open(settings.audit_file or None)
+    log = scmle.security.audit.Log.open(settings.audit or None)
     return Gateway(verifier, tenant=settings.tenant or None, audit=log)

@@ -67,7 +67,7 @@ from scmle.api import project
 
 def main():
     data = datasets.load_breast_cancer(as_frame=True).frame
-    result = project.Project(data, "target", time_budget=60).run()
+    result = project.Project(data, "target", budget=60).run()
     print(result.summary())
 
 
@@ -546,7 +546,7 @@ refusals of the same family (From the code): `promotion approval does not match
 bundle identity`, `promotion was rejected by the reviewer`, `champion promotion
 requires independent review`, `champion promotion requires a valid signature`.
 
-### `AttestationRequired`: `move_champion_or_roll_back (never-list item 1) needs a valid human attestation; escalation esc-N is pending` (From the code)
+### `UnattestedError`: `move_champion_or_roll_back (never-list item 1) needs a valid human attestation; escalation esc-N is pending` (From the code)
 
 **What it means.** The registry was given a guard that insists a named person
 decide before the live model moves.

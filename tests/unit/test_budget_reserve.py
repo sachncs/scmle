@@ -27,7 +27,7 @@ def test_a_skip_is_recorded_in_the_events_and_the_report_list():
 def test_a_budget_too_small_for_the_minimum_run_is_refused(tmp_path):
     with pytest.raises(errors.BlockedError, match="smallest budget") as caught:
         scmle.api.project.Project(
-            frame(), "y", time_budget=1, output_dir=tmp_path
+            frame(), "y", budget=1, directory=tmp_path
         ).run()
     assert caught.value.details["smallest_budget_seconds"] > 1
 

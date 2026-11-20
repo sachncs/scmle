@@ -16,19 +16,19 @@ def facts(**changes) -> tier.Inputs:
         "identified": True,
         "needed": NEEDED,
         "attestors": dict.fromkeys(NEEDED, "A. Analyst, 2026-11-04"),
-        "estimated_on_c": True,
-        "design_passed": True,
-        "design_gates": ("overlap",),
-        "interval_gate": "coverage_aipw",
-        "battery_ran": True,
-        "battery_passed": True,
-        "negative_control_declared": True,
-        "battery_gate": "battery_nco",
-        "replication_passed": True,
-        "sensitivity_holds": True,
-        "sensitivity_gate": "sensitivity_bound",
-        "single_unit": False,
-        "weak_instrument": False,
+        "confirmatory": True,
+        "sound": True,
+        "gates": ("overlap",),
+        "interval": "coverage_aipw",
+        "ran": True,
+        "passed": True,
+        "negative": True,
+        "gate": "battery_nco",
+        "replicated": True,
+        "holds": True,
+        "sensitivity": "sensitivity_bound",
+        "unit": False,
+        "instrument": False,
         "certified": GATES,
     }
     values.update(changes)
@@ -93,7 +93,7 @@ def test_missing_attestation_failed_design_or_rejection_is_unverified(changes):
 
 
 def test_a_sensitivity_gate_is_not_needed_when_the_strategy_has_none():
-    out = tier.decide(facts(sensitivity_gate=None, sensitivity_holds=True))
+    out = tier.decide(facts(sensitivity=None, holds=True))
     assert out.tier == Tier.CONFIRMED
 
 
@@ -107,10 +107,10 @@ def test_the_held_out_estimate_alone_never_confirms():
     # Enforces website/src/pages/docs/causal-decision.astro:64.
     out = tier.decide(
         facts(
-            battery_ran=False,
-            negative_control_declared=False,
-            replication_passed=None,
-            sensitivity_holds=None,
+            ran=False,
+            negative=False,
+            replicated=None,
+            holds=None,
         )
     )
     assert out.tier != Tier.CONFIRMED

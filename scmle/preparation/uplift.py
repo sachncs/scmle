@@ -10,7 +10,7 @@ from sklearn import base
 from sklearn import pipeline
 
 
-class TreatmentAwareEstimator(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Estimator(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Fits an uplift pipeline using the treatment column of the frame.
 
     The preprocessing never sees the treatment (it selects columns by name),

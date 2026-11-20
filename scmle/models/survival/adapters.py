@@ -16,10 +16,8 @@ class Cox(models.Model):
 
     name = "cox_ph"
     family = "linear"
-    capabilities = models.Capabilities(SURVIVAL, needs_scaling=True, cost=2)
-    search_space = search.Space(
-        (search.Real("penalty", 1e-3, 100.0, log=True),)
-    )
+    capabilities = models.Capabilities(SURVIVAL, scaling=True, cost=2)
+    space = search.Space((search.Real("penalty", 1e-3, 100.0, log=True),))
 
     def build(
         self,
@@ -46,9 +44,9 @@ class Hazard(models.Model):
     name = "discrete_time_boosting"
     family = "boosting"
     capabilities = models.Capabilities(
-        SURVIVAL, handles_missing=False, cost=4, memory_factor=4.0
+        SURVIVAL, missing=False, cost=4, factor=4.0
     )
-    search_space = search.Space(
+    space = search.Space(
         (
             search.Real("learning_rate", 0.02, 0.3, log=True),
             search.Integer("max_leaf_nodes", 4, 32),

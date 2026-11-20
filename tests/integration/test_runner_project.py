@@ -33,7 +33,7 @@ def make_frame():
 
 
 def test_workdir_sync_pushes_changes_and_restores(tmp_path):
-    store = objectstore.LocalObjectStore(tmp_path / "store")
+    store = objectstore.Disk(tmp_path / "store")
     source = tmp_path / "work"
     (source / "sub").mkdir(parents=True)
     (source / "a.txt").write_text("one")
@@ -53,7 +53,7 @@ def test_workdir_sync_pushes_changes_and_restores(tmp_path):
 
 def spec_of(run_id="churn-1"):
     return base.Job(
-        run_id=run_id,
+        identifier=run_id,
         name="churn",
         project={"data": "data/train.csv", "target": "y", "options": OPTIONS},
         identity="arn:train",
@@ -63,26 +63,25 @@ def spec_of(run_id="churn-1"):
 
 def runner_for(store, workload):
     return local.Runner(
-        store, workload, serving_identity="arn:serve", poll_seconds=0
+        store, workload, identity="arn:serve", interval=0
     )
 
 
 def test_a_project_runs_as_a_job(tmp_path):
-    store = objectstore.LocalObjectStore(tmp_path / "store")
+    store = objectstore.Disk(tmp_path / "store")
     store.put("data/train.csv", make_frame().to_csv(index=False).encode())
-    manifest = runner_for(store, project.run_project).run(spec_of())
+    manifest = runner_for(store, project.project).run(spec_of())
     assert manifest.state == "succeeded", manifest.attempts[-1].reason
     result = json.loads(store.get("runs/churn-1/result.json")[0])
     assert result["resumed"] is False and result["selected_model"]
     assert any(
-        m.key.endswith(".json")
-        for m in store.list_objects("runs/churn-1/workdir/")
+        m.key.endswith(".json") for m in store.catalog("runs/churn-1/workdir/")
     )
     assert not pathlib.Path(tempfile.gettempdir(), "scmle-job-churn-1").exists()
 
 
 def test_a_cancelled_project_is_interrupted_and_the_retry_resumes_it(tmp_path):
-    store = objectstore.LocalObjectStore(tmp_path / "store")
+    store = objectstore.Disk(tmp_path / "store")
     store.put("data/train.csv", make_frame().to_csv(index=False).encode())
     attempts = []
 
@@ -92,7 +91,7 @@ def test_a_cancelled_project_is_interrupted_and_the_retry_resumes_it(tmp_path):
             threading.Timer(3.0, started.cancel).start()
 
     workload = functools.partial(
-        project.run_project, sync_seconds=1.0, on_start=cancel_first_attempt
+        project.project, sync_seconds=1.0, on_start=cancel_first_attempt
     )
     manifest = runner_for(store, workload).run(spec_of())
     assert manifest.state == "succeeded", manifest.attempts

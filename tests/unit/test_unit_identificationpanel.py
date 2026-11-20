@@ -40,7 +40,7 @@ def did_block(**changes):
 
 @pytest.mark.parametrize("missing", ["unit", "time", "adoption"])
 def test_a_did_without_panel_columns_raises(missing):
-    adapter = panel.DiD(
+    adapter = panel.Differences(
         did_block(**{missing: None}), did_frame(1, 20), 0, "linear", 0.01
     )
     with pytest.raises(
@@ -50,28 +50,30 @@ def test_a_did_without_panel_columns_raises(missing):
 
 
 def test_a_did_reads_its_columns():
-    adapter = panel.DiD(did_block(), did_frame(1, 20), 0, "linear", 0.01)
-    assert panel.DiD.name == "did"
+    adapter = panel.Differences(
+        did_block(), did_frame(1, 20), 0, "linear", 0.01
+    )
+    assert panel.Differences.name == "did"
     assert adapter.columns() == ("id", "t", "g")
 
 
 def test_a_did_prepare_records_the_panel_from_x():
     x = did_frame(1, 200)
-    adapter = panel.DiD(did_block(), x, 0, "linear", 0.01)
+    adapter = panel.Differences(did_block(), x, 0, "linear", 0.01)
     adapter.prepare()
     fit = did.estimate(x, "id", "t", "g", "y")
     assert adapter.design == {
         "groups": fit.groups,
-        "n_never_treated": fit.n_never,
+        "n_never_treated": fit.untreated,
         "events": list(fit.events),
-        "pretrend_p_on_x": fit.pretrend_p,
+        "pretrend_p_on_x": fit.pretrend,
         "pre_periods_support_sensitivity": True,
     }
 
 
 def test_a_did_estimate_equals_the_engine():
     x, c = did_frame(1, 200), did_frame(2, 200)
-    adapter = panel.DiD(did_block(), x, 0, "linear", 0.01)
+    adapter = panel.Differences(did_block(), x, 0, "linear", 0.01)
     est = adapter.estimate(c, 0.9)
     fit = did.estimate(c, "id", "t", "g", "y", 0.9)
     assert (est.estimate, est.se, est.low, est.high, est.n) == (
@@ -82,7 +84,7 @@ def test_a_did_estimate_equals_the_engine():
         len(c),
     )
     assert est.detail == {
-        "pretrend_p": fit.pretrend_p,
+        "pretrend_p": fit.pretrend,
         "event_study": dict(zip(fit.events, fit.coefficients, strict=True)),
     }
     other = adapter.reckon(c, 0.9, "nco")
@@ -94,19 +96,19 @@ def test_a_did_estimate_equals_the_engine():
 
 def test_did_controls_are_the_pretrend_then_negative_outcomes():
     c = did_frame(3, 200)
-    adapter = panel.DiD(did_block(), c, 0, "linear", 0.01)
+    adapter = panel.Differences(did_block(), c, 0, "linear", 0.01)
     tests = adapter.controls(c, 0.9)
     fit = did.estimate(c, "id", "t", "g", "y", 0.9)
     assert [(t.name, t.kind) for t in tests] == [
         ("pretrend_wald", "placebo"),
         ("negative_outcome:nco", "negative_outcome"),
     ]
-    assert tests[0].p_value == fit.pretrend_p
+    assert tests[0].p_value == fit.pretrend
 
 
 def test_did_sensitivity_widens_by_the_relative_magnitude():
     c = did_frame(4, 300)
-    adapter = panel.DiD(did_block(), c, 0, "linear", 0.01)
+    adapter = panel.Differences(did_block(), c, 0, "linear", 0.01)
     out = adapter.sensitivity(c, 0.9)
     fit = did.estimate(c, "id", "t", "g", "y", 0.9)
     low, high = fit.sensitivity(1.0)
@@ -116,14 +118,16 @@ def test_did_sensitivity_widens_by_the_relative_magnitude():
         "low": low,
         "high": high,
         "breakdown_m": fit.breakdown(),
-        "max_pre_change": fit.max_pre_change,
+        "max_pre_change": fit.drift,
         "note": "simplified relative-magnitudes bound, not HonestDiD",
     }
 
 
 def test_did_sensitivity_notes_a_missing_block():
     c = did_frame(4, 50)
-    adapter = panel.DiD(did_block(sensitivity=None), c, 0, "linear", 0.01)
+    adapter = panel.Differences(
+        did_block(sensitivity=None), c, 0, "linear", 0.01
+    )
     assert adapter.sensitivity(c, 0.9) == {
         "holds": None,
         "note": "no sensitivity block in the charter",
@@ -133,7 +137,7 @@ def test_did_sensitivity_notes_a_missing_block():
 def test_did_sensitivity_needs_two_pre_periods():
     c = did_frame(5, 100)
     c["g"] = c["g"].where(c["g"].isna(), 1.0)
-    adapter = panel.DiD(did_block(), c, 0, "linear", 0.01)
+    adapter = panel.Differences(did_block(), c, 0, "linear", 0.01)
     assert adapter.sensitivity(c, 0.9) == {
         "holds": None,
         "note": "fewer than two pre-periods",
@@ -171,7 +175,7 @@ def test_a_synthetic_control_is_a_single_unit_design_on_x():
     x = synth_panel()
     adapter = panel.Synth(synth_block(), x, 0, "linear", 0.01)
     assert panel.Synth.name == "synth"
-    assert adapter.single_unit is True
+    assert adapter.unit is True
     est = adapter.estimate(x.iloc[:0], 0.9)
     result = synth.estimate(x, "u", "t", "y", 0, 12, 1 - 0.9)
     assert est.estimate == result.effect
@@ -180,7 +184,7 @@ def test_a_synthetic_control_is_a_single_unit_design_on_x():
     assert est.detail == {"p_value": result.p_value, "ratio": result.ratio}
     assert adapter.design == {
         "donors": result.donors,
-        "min_attainable_p": result.min_p,
+        "min_attainable_p": result.floor,
         "pre_rmspe": result.pre_rmspe,
         "weights": result.weights,
     }

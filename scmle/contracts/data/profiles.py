@@ -33,13 +33,13 @@ class Blueprint:
         numeric: Numeric feature columns.
         categorical: Categorical feature columns.
         text: Free-text columns (encoded as TF-IDF terms; also listed in
-            `extra_inputs` so inference requires them).
+            `extras` so inference requires them).
         dropped: Mapping of dropped column to the reason.
         derived: Row-wise feature-graph nodes computed inside the pipeline.
         series: Ordered (time-series) feature-graph nodes.
-        extra_inputs: Raw columns only the feature graph reads.
+        extras: Raw columns only the feature graph reads.
         monotonic: Numeric feature to +1 / -1 monotonic constraint.
-        high_cardinality: Categorical features with many distinct levels
+        cardinal: Categorical features with many distinct levels
             (`HIGH_CARDINALITY_LEVELS` or more), which one-hot encoding
             handles poorly.
         group_column: Entity column, so inner cross-validation keeps entities
@@ -72,8 +72,8 @@ class Blueprint:
     monotonic: Mapping[str, int] = dataclasses.field(default_factory=dict)
     derived: tuple[Any, ...] = ()
     series: tuple[Any, ...] = ()
-    extra_inputs: tuple[str, ...] = ()
-    high_cardinality: tuple[str, ...] = ()
+    extras: tuple[str, ...] = ()
+    cardinal: tuple[str, ...] = ()
     group_column: str | None = None
     time_column: str | None = None
     weight_column: str | None = None
@@ -108,7 +108,7 @@ class Blueprint:
         """
         rowwise = frozenset(n.name for n in self.derived)
         columns = [c for c in self.features if c not in rowwise]
-        return tuple(dict.fromkeys([*columns, *self.extra_inputs]))
+        return tuple(dict.fromkeys([*columns, *self.extras]))
 
     def pick(self, kind_name: str) -> tuple[str, ...]:
         """Returns the feature columns of one kind.
@@ -135,8 +135,8 @@ class Blueprint:
             "dropped": dict(self.dropped),
             "derived": [n.model_dump(mode="json") for n in self.derived],
             "series": [n.model_dump(mode="json") for n in self.series],
-            "extras": list(self.extra_inputs),
-            "cardinal": list(self.high_cardinality),
+            "extras": list(self.extras),
+            "cardinal": list(self.cardinal),
         }
 
 
@@ -146,16 +146,16 @@ class Portrait:
 
     Attributes:
         manifest: Identity of the profiled dataset.
-        column_statistics: Per-column statistics.
-        quality_findings: Data-quality observations.
+        statistics: Per-column statistics.
+        quality: Data-quality observations.
         risk_findings: Leakage / imbalance / shift hypotheses (not verdicts).
-        target_summary: Target distribution summary.
-        feature_plan: Resulting feature selection.
-        dataset_statistics: Dataset-level fingerprint grouped by dimension
+        summary: Target distribution summary.
+        plan: Resulting feature selection.
+        overview: Dataset-level fingerprint grouped by dimension
             (shape, types, missingness, target, features, relationships,
             structure, quality, operational, risk).
         missingness: Per-column tests of whether gaps relate to the target.
-        quality_evidence: JSON-native records for reproducible quality checks.
+        evidence: JSON-native records for reproducible quality checks.
         leakage: The leakage screen (`screen.Screen.to_dict`): its level,
             family size, suspects and the suspects that may block a run. Empty
             when the screen did not apply.
@@ -177,17 +177,15 @@ class Portrait:
         ),
     )
 
-    manifest: provenance.DatasetManifest
-    column_statistics: Mapping[str, Any]
-    quality_findings: tuple[str, ...]
+    manifest: provenance.Manifest
+    statistics: Mapping[str, Any]
+    quality: tuple[str, ...]
     risk_findings: tuple[str, ...]
-    target_summary: Mapping[str, Any]
-    feature_plan: Blueprint
-    dataset_statistics: Mapping[str, Any] = dataclasses.field(
-        default_factory=dict
-    )
+    summary: Mapping[str, Any]
+    plan: Blueprint
+    overview: Mapping[str, Any] = dataclasses.field(default_factory=dict)
     missingness: tuple[Mapping[str, Any], ...] = ()
-    quality_evidence: tuple[dict[str, object], ...] = ()
+    evidence: tuple[dict[str, object], ...] = ()
     leakage: Mapping[str, Any] = dataclasses.field(default_factory=dict)
 
     @property
@@ -209,24 +207,24 @@ class Portrait:
         """Validates and detaches structured quality evidence."""
         normalized = tuple(
             findings.normalise(item, f"quality_evidence[{index}]")
-            for index, item in enumerate(self.quality_evidence)
+            for index, item in enumerate(self.evidence)
         )
-        object.__setattr__(self, "quality_evidence", normalized)
+        object.__setattr__(self, "evidence", normalized)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping."""
         return {
             "manifest": self.manifest.to_dict(),
-            "columns": dict(self.column_statistics),
+            "columns": dict(self.statistics),
             "findings": {
-                "quality": list(self.quality_findings),
+                "quality": list(self.quality),
                 "risk": list(self.risk_findings),
             },
-            "target": dict(self.target_summary),
-            "plan": self.feature_plan.to_dict(),
-            "statistics": dict(self.dataset_statistics),
+            "target": dict(self.summary),
+            "plan": self.plan.to_dict(),
+            "statistics": dict(self.overview),
             "missingness": [dict(item) for item in self.missingness],
-            "evidence": [dict(item) for item in self.quality_evidence],
+            "evidence": [dict(item) for item in self.evidence],
             "leakage": dict(self.leakage),
         }
 
@@ -263,20 +261,20 @@ class Curation:
         ),
     )
 
-    manifest: provenance.DatasetManifest
+    manifest: provenance.Manifest
     source_rows: int
-    profiled_rows: int
-    read_seconds: float
+    rows: int
+    read: float
     streamed: bool
-    cleaning_notes: tuple[str, ...]
-    quality_findings: tuple[findings.Finding, ...]
+    notes: tuple[str, ...]
+    quality: tuple[findings.Finding, ...]
     risk_findings: tuple[findings.Finding, ...]
-    feature_columns: Mapping[str, tuple[str, ...]]
-    dropped_columns: Mapping[str, str]
+    features: Mapping[str, tuple[str, ...]]
+    dropped: Mapping[str, str]
     schema_version: int = records.ORIGIN + len(migrations)
 
     @property
-    def unresolved_blocking_findings(self) -> tuple[findings.Finding, ...]:
+    def blockers(self) -> tuple[findings.Finding, ...]:
         """The blocking findings without an explicit safe disposition."""
         safe_dispositions = {
             findings.Disposition.RESOLVED,
@@ -285,41 +283,35 @@ class Curation:
         }
         return tuple(
             finding
-            for finding in (*self.quality_findings, *self.risk_findings)
+            for finding in (*self.quality, *self.risk_findings)
             if finding.blocking and finding.disposition not in safe_dispositions
         )
 
     @property
-    def release_ready(self) -> bool:
+    def release(self) -> bool:
         """Whether curation has no unresolved blocking findings."""
-        return not self.unresolved_blocking_findings
+        return not self.blockers
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable curation record."""
         return {
             "schema_version": self.schema_version,
             "manifest": self.manifest.to_dict(),
-            "read": self.read_seconds,
+            "read": self.read,
             "streamed": self.streamed,
-            "notes": list(self.cleaning_notes),
+            "notes": list(self.notes),
             "features": {
-                name: list(columns)
-                for name, columns in self.feature_columns.items()
+                name: list(columns) for name, columns in self.features.items()
             },
-            "dropped": dict(self.dropped_columns),
-            "ready": self.release_ready,
-            "blockers": [
-                finding.identifier
-                for finding in self.unresolved_blocking_findings
-            ],
+            "dropped": dict(self.dropped),
+            "ready": self.release,
+            "blockers": [finding.identifier for finding in self.blockers],
             "rows": {
                 "source": self.source_rows,
-                "profiled": self.profiled_rows,
+                "profiled": self.rows,
             },
             "findings": {
-                "quality": [
-                    finding.to_dict() for finding in self.quality_findings
-                ],
+                "quality": [finding.to_dict() for finding in self.quality],
                 "risk": [finding.to_dict() for finding in self.risk_findings],
             },
         }
@@ -355,25 +347,25 @@ class Datasheet:
         ),
     )
 
-    dataset_id: str
-    snapshot_id: str
+    dataset: str
+    snapshot: str
     modality: str
     task: str
     target: str
-    intended_use: str
-    out_of_scope: tuple[str, ...]
+    use: str
+    excluded: tuple[str, ...]
     composition: Mapping[str, int]
-    feature_summary: Mapping[str, tuple[str, ...]]
+    summary: Mapping[str, tuple[str, ...]]
     limitations: tuple[str, ...]
-    quality_findings: tuple[findings.Finding, ...]
+    quality: tuple[findings.Finding, ...]
     risk_findings: tuple[findings.Finding, ...]
     source: provenance.Origin
     lineage: provenance.Ancestry
     privacy: provenance.Confidentiality
     owner: str
-    review_status: str = "machine_generated_unreviewed"
+    status: str = "machine_generated_unreviewed"
     schema_version: int = records.ORIGIN + len(migrations)
-    generated_at: str = dataclasses.field(default_factory=events.stamp)
+    generated: str = dataclasses.field(default_factory=events.stamp)
 
     def __post_init__(self) -> None:
         """Validates the fields that make the card useful to reviewers.
@@ -386,12 +378,12 @@ class Datasheet:
                 empty.
         """
         for name, value in (
-            ("dataset_id", self.dataset_id),
+            ("dataset_id", self.dataset),
             ("modality", self.modality),
-            ("intended_use", self.intended_use),
+            ("intended_use", self.use),
             ("owner", self.owner),
-            ("review_status", self.review_status),
-            ("generated_at", self.generated_at),
+            ("review_status", self.status),
+            ("generated_at", self.generated),
         ):
             if not value.strip():
                 raise errors.InputError(f"{name} must not be empty")
@@ -399,7 +391,7 @@ class Datasheet:
             raise errors.InputError("schema_version must be positive")
         if any(value < 0 for value in self.composition.values()):
             raise errors.InputError("composition counts must not be negative")
-        if not self.out_of_scope:
+        if not self.excluded:
             raise errors.InputError("out_of_scope must not be empty")
         if not self.limitations:
             raise errors.InputError("limitations must not be empty")
@@ -420,20 +412,20 @@ class Datasheet:
             "This machine-generated card requires human review before release.",
             "Curation findings are observations, not proof of data quality.",
         ]
-        limitations.extend(report.cleaning_notes)
+        limitations.extend(report.notes)
         if not report.risk_findings:
             limitations.append("No risk finding was emitted by the profiler.")
         return cls(
-            dataset_id=manifest.identifier,
-            snapshot_id=manifest.snapshot,
+            dataset=manifest.identifier,
+            snapshot=manifest.snapshot,
             modality=manifest.modality,
             task=manifest.task,
             target=manifest.target,
-            intended_use=(
+            use=(
                 f"Training and evaluation for {task} using the declared "
                 "target and feature decisions."
             ),
-            out_of_scope=(
+            excluded=(
                 "It is not evidence of production-population coverage.",
                 "It is not a release approval or a causal claim.",
                 (
@@ -443,15 +435,15 @@ class Datasheet:
             ),
             composition={
                 "source_rows": report.source_rows,
-                "profiled_rows": report.profiled_rows,
+                "profiled_rows": report.rows,
                 "feature_columns": sum(
-                    len(columns) for columns in report.feature_columns.values()
+                    len(columns) for columns in report.features.values()
                 ),
-                "dropped_columns": len(report.dropped_columns),
+                "dropped_columns": len(report.dropped),
             },
-            feature_summary=report.feature_columns,
+            summary=report.features,
             limitations=tuple(limitations),
-            quality_findings=report.quality_findings,
+            quality=report.quality,
             risk_findings=report.risk_findings,
             source=manifest.source,
             lineage=manifest.lineage,
@@ -463,29 +455,26 @@ class Datasheet:
         """Returns a JSON-serializable dataset card."""
         return {
             "schema_version": self.schema_version,
-            "dataset": self.dataset_id,
-            "snapshot": self.snapshot_id,
+            "dataset": self.dataset,
+            "snapshot": self.snapshot,
             "modality": self.modality,
             "task": self.task,
             "target": self.target,
-            "use": self.intended_use,
-            "excluded": list(self.out_of_scope),
+            "use": self.use,
+            "excluded": list(self.excluded),
             "composition": dict(self.composition),
             "features": {
-                name: list(columns)
-                for name, columns in self.feature_summary.items()
+                name: list(columns) for name, columns in self.summary.items()
             },
             "limitations": list(self.limitations),
             "source": self.source.to_dict(),
             "lineage": self.lineage.to_dict(),
             "privacy": self.privacy.to_dict(),
             "owner": self.owner,
-            "review": self.review_status,
-            "generated": self.generated_at,
+            "review": self.status,
+            "generated": self.generated,
             "findings": {
-                "quality": [
-                    finding.to_dict() for finding in self.quality_findings
-                ],
+                "quality": [finding.to_dict() for finding in self.quality],
                 "risk": [finding.to_dict() for finding in self.risk_findings],
             },
         }
@@ -497,11 +486,11 @@ class Preprocessing:
 
     Attributes:
         scale: Standardize numeric features.
-        log_skewed: Log-transform strongly right-skewed numeric features.
+        skewed: Log-transform strongly right-skewed numeric features.
         interactions: Add pairwise numeric interaction features.
         impute: Impute missing numeric values (off for models that handle
             missing values natively).
-        high_cardinality: How high-cardinality categorical features are
+        cardinality: How high-cardinality categorical features are
             encoded: `onehot`, `target` (regularized, cross-fitted target
             encoding) or `ordinal` (integer codes for native categorical
             handling).
@@ -513,18 +502,18 @@ class Preprocessing:
             `indicator` (median plus a flag column per feature that has
             missing values) or `iterative` (each feature predicted from the
             others).
-        text_encoding: `tfidf` or `embedding` for free-text columns.
-        embedding_model: Sentence-embedding model for `embedding`.
+        encoding: `tfidf` or `embedding` for free-text columns.
+        model: Sentence-embedding model for `embedding`.
     """
 
     scale: bool = False
-    log_skewed: bool = False
+    skewed: bool = False
     interactions: bool = False
     impute: bool = True
-    high_cardinality: str = "onehot"
+    cardinality: str = "onehot"
     sparse: bool = False
     construct: bool = False
     select: bool = False
     missing: str = "median"
-    text_encoding: str = "tfidf"
-    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    encoding: str = "tfidf"
+    model: str = "sentence-transformers/all-MiniLM-L6-v2"

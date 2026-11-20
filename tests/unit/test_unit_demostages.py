@@ -43,7 +43,7 @@ def test_prepare_trains_registers_and_packages(prepared):
     packaged = log.steps[1].detail
     assert packaged["versions"] == [1, 2]
     assert packaged["champion"] == 1
-    assert packaged["bundle_digest"] == provenance.bundle_digest(
+    assert packaged["bundle_digest"] == provenance.digest(
         workdir / "service" / "model"
     )
     assert "provenance.json" in packaged["files"]
@@ -82,5 +82,5 @@ def test_the_rollback_drill_restores_the_good_version(prepared):
     assert drill["champion_after_rollback"] == 1
     assert drill["serves_restored_model"] is True
     assert drill["audit_has_rollback_check"] is True
-    store = registry.ModelRegistryStore(workdir / "registry")
+    store = registry.Registry(workdir / "registry")
     assert store.resolve(fixture.MODEL).version == 1

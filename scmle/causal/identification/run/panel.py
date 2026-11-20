@@ -13,7 +13,7 @@ from scmle.causal.identification.run.estimator import waldify
 from scmle.contracts import errors
 
 
-class DiD(Estimator):
+class Differences(Estimator):
     """Group-time difference in differences."""
 
     name = "did"
@@ -41,10 +41,10 @@ class DiD(Estimator):
         fit = did.estimate(self.x, unit, time, adoption, self.spec.outcome)
         self.design = {
             "groups": fit.groups,
-            "n_never_treated": fit.n_never,
+            "n_never_treated": fit.untreated,
             "events": list(fit.events),
-            "pretrend_p_on_x": fit.pretrend_p,
-            "pre_periods_support_sensitivity": fit.max_pre_change is not None,
+            "pretrend_p_on_x": fit.pretrend,
+            "pre_periods_support_sensitivity": fit.drift is not None,
         }
 
     def fit(
@@ -84,7 +84,7 @@ class DiD(Estimator):
             fit.high,
             len(c),
             {
-                "pretrend_p": fit.pretrend_p,
+                "pretrend_p": fit.pretrend,
                 "event_study": dict(
                     zip(fit.events, fit.coefficients, strict=True)
                 ),
@@ -121,10 +121,8 @@ class DiD(Estimator):
         """
         tests = []
         fit = self.fit(c, level)
-        if fit.pretrend_p is not None:
-            tests.append(
-                battery.Test("pretrend_wald", "placebo", fit.pretrend_p)
-            )
+        if fit.pretrend is not None:
+            tests.append(battery.Test("pretrend_wald", "placebo", fit.pretrend))
         for control in self.spec.controls:
             if control.kind == "outcome":
                 est = self.reckon(c, level, control.variable)
@@ -157,7 +155,7 @@ class DiD(Estimator):
                 "note": "no sensitivity block in the charter",
             }
         fit = self.fit(c, level)
-        if fit.max_pre_change is None:
+        if fit.drift is None:
             return {"holds": None, "note": "fewer than two pre-periods"}
         m = spec.sensitivity.multiple
         low, high = fit.sensitivity(m)
@@ -167,7 +165,7 @@ class DiD(Estimator):
             "low": low,
             "high": high,
             "breakdown_m": fit.breakdown(),
-            "max_pre_change": fit.max_pre_change,
+            "max_pre_change": fit.drift,
             "note": "simplified relative-magnitudes bound, not HonestDiD",
         }
 
@@ -184,7 +182,7 @@ class Synth(Estimator):
             *args: The `Adapter` constructor arguments.
         """
         super().__init__(*args)
-        self.single_unit = True
+        self.unit = True
 
     def estimate(self, c: pandas.DataFrame, level: float) -> Est:  # noqa: ARG002 -- overrides Estimator.estimate, which fixes this signature
         """Computes the synthetic control effect on `X`.
@@ -228,7 +226,7 @@ class Synth(Estimator):
         )
         self.design = {
             "donors": result.donors,
-            "min_attainable_p": result.min_p,
+            "min_attainable_p": result.floor,
             "pre_rmspe": result.pre_rmspe,
             "weights": result.weights,
         }

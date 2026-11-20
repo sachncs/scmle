@@ -117,7 +117,7 @@ class Risk(desk.Desk):
         result = escalation.select(
             score, loss, self.policy.target, self.policy.delta, weights
         )
-        curve = escalation.risk_coverage(score, loss, weights)
+        curve = escalation.sweep(score, loss, weights)
         (self.directory / terms.RISK_COVERAGE_FILE).write_text(
             json.dumps(
                 terms.jsonify(
@@ -137,7 +137,7 @@ class Risk(desk.Desk):
                     "batch": self.batch,
                 },
             )
-            self.halt_reason = None
+            self.reason = None
             released = True
         elif result.tau < self.tau and self.calibrated:
             self.guard.require(
@@ -156,10 +156,8 @@ class Risk(desk.Desk):
         if not self.ledger.halted or released:
             self.tau = result.tau
         self.calibrated = True
-        self.halted_by_state = (
-            self.halted_by_state and released is False and False
-        )
-        self.save_state()
+        self.frozen = self.frozen and released is False and False
+        self.save()
         return result
 
     def performativity(
@@ -213,11 +211,11 @@ class Risk(desk.Desk):
                 {"p_value": check.p_value, "batch": self.batch},
                 proposed_default=self.policy.fallback,
             )
-        self.write_label_mechanism()
-        self.save_state()
+        self.declare()
+        self.save()
         return check
 
-    def write_label_mechanism(self) -> None:
+    def declare(self) -> None:
         """Writes `label_mechanism.json`."""
         record = {
             "mechanism": self.mechanism.value,

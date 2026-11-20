@@ -33,14 +33,14 @@ def citations(
     Returns:
         The unique references, sorted.
     """
-    references = set(policy.release.required_evidence)
+    references = set(policy.release.evidence)
     for metric in policy.metrics:
         references.update(metric.evidence)
-    for diagnostic_gate in policy.release.diagnostic_gates:
-        references.update(diagnostic_gate.required_evidence)
-    for fairness_gate in policy.release.fairness_gates:
-        references.update(fairness_gate.required_evidence)
-    references.update(policy.explanations.required_evidence)
+    for diagnostic_gate in policy.release.diagnostics:
+        references.update(diagnostic_gate.evidence)
+    for fairness_gate in policy.release.fairness:
+        references.update(fairness_gate.evidence)
+    references.update(policy.explanations.evidence)
     return tuple(sorted(references))
 
 
@@ -272,7 +272,7 @@ def adjudge(
             blocking=blocking,
             reason=f"diagnostic '{name}' is missing",
             expected="report without error",
-            evidence=diagnostic_gate.required_evidence,
+            evidence=diagnostic_gate.evidence,
         )
     if not isinstance(report, Mapping) or not report:
         return Finding(
@@ -282,7 +282,7 @@ def adjudge(
             blocking=True,
             reason=f"diagnostic '{name}' has an unsupported report",
             expected="non-empty mapping",
-            evidence=diagnostic_gate.required_evidence,
+            evidence=diagnostic_gate.evidence,
         )
     failed = False
     reason = f"diagnostic '{name}' is present"
@@ -302,7 +302,7 @@ def adjudge(
                 blocking=True,
                 reason=f"diagnostic '{name}' has an unsupported verdict",
                 expected="boolean pass verdict",
-                evidence=diagnostic_gate.required_evidence,
+                evidence=diagnostic_gate.evidence,
             )
         if verdict is False:
             failed = True
@@ -318,7 +318,7 @@ def adjudge(
         blocking,
         reason,
         expected="report without error",
-        evidence=diagnostic_gate.required_evidence,
+        evidence=diagnostic_gate.evidence,
     )
 
 
@@ -352,7 +352,7 @@ def explain(
         ),
     )
     findings: list[Finding] = []
-    for method in policy.explanations.required_methods:
+    for method in policy.explanations.methods:
         report = diagnostic_reports.get(method)
         for field_name, required, threshold, label in quality_requirements:
             if not required:
@@ -429,7 +429,7 @@ def audit(
             expected=fairness_gate.maximum
             if fairness_gate.maximum is not None
             else fairness_gate.minimum,
-            evidence=fairness_gate.required_evidence,
+            evidence=fairness_gate.evidence,
         )
     expected: float | None
     if fairness_gate.maximum is not None:
@@ -449,7 +449,7 @@ def audit(
             passed=False,
             blocking=True,
             reason=f"fairness metric '{metric}' has no bound",
-            evidence=fairness_gate.required_evidence,
+            evidence=fairness_gate.evidence,
         )
     result = "passed" if passed else "failed"
     return Finding(
@@ -463,7 +463,7 @@ def audit(
         ),
         observed=observed,
         expected=expected,
-        evidence=fairness_gate.required_evidence,
+        evidence=fairness_gate.evidence,
     )
 
 
@@ -578,16 +578,16 @@ def screen(
     )
     findings.extend(
         judge(metric_gate, declared_metrics, metric_values)
-        for metric_gate in policy.release.metric_gates
+        for metric_gate in policy.release.metrics
     )
     findings.extend(
         adjudge(diagnostic_gate, diagnostic_reports)
-        for diagnostic_gate in policy.release.diagnostic_gates
+        for diagnostic_gate in policy.release.diagnostics
     )
     findings.extend(explain(policy, diagnostic_reports))
     findings.extend(
         audit(fairness_gate, fairness_reports)
-        for fairness_gate in policy.release.fairness_gates
+        for fairness_gate in policy.release.fairness
     )
     return findings
 

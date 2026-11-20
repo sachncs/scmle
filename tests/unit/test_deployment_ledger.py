@@ -10,7 +10,7 @@ SYSTEM_KEY = "system-key"
 
 
 def make(path=None):
-    return deployment_ledger.DeploymentLedger.create(
+    return deployment_ledger.Ledger.create(
         path,
         charter_hash="c" * 64,
         policy={"r_star": 0.05},
@@ -65,7 +65,7 @@ def filled(tmp_path):
 def test_a_valid_ledger_loads_and_has_the_open_row_first(tmp_path):
     # Enforces docs/ARTIFACTS.md:90.
     ledger = filled(tmp_path)
-    again = deployment_ledger.DeploymentLedger.load(
+    again = deployment_ledger.Ledger.load(
         tmp_path / deployment_ledger.FILE_NAME
     )
     assert again.head == ledger.head
@@ -84,9 +84,7 @@ def test_deleting_a_middle_row_fails_verification(tmp_path):
     filled(tmp_path)
     rewrite(tmp_path, lambda lines: lines[:2] + lines[3:])
     with pytest.raises(deployment_ledger.MisuseError, match="chain broken"):
-        deployment_ledger.DeploymentLedger.load(
-            tmp_path / deployment_ledger.FILE_NAME
-        )
+        deployment_ledger.Ledger.load(tmp_path / deployment_ledger.FILE_NAME)
 
 
 def test_reordering_rows_fails_verification(tmp_path):
@@ -94,9 +92,7 @@ def test_reordering_rows_fails_verification(tmp_path):
     filled(tmp_path)
     rewrite(tmp_path, lambda lines: [lines[0], lines[2], lines[1], *lines[3:]])
     with pytest.raises(deployment_ledger.MisuseError, match="chain broken"):
-        deployment_ledger.DeploymentLedger.load(
-            tmp_path / deployment_ledger.FILE_NAME
-        )
+        deployment_ledger.Ledger.load(tmp_path / deployment_ledger.FILE_NAME)
 
 
 def test_editing_a_row_fails_verification(tmp_path):
@@ -110,9 +106,7 @@ def test_editing_a_row_fails_verification(tmp_path):
 
     rewrite(tmp_path, edit)
     with pytest.raises(deployment_ledger.MisuseError, match="chain broken"):
-        deployment_ledger.DeploymentLedger.load(
-            tmp_path / deployment_ledger.FILE_NAME
-        )
+        deployment_ledger.Ledger.load(tmp_path / deployment_ledger.FILE_NAME)
 
 
 def test_tail_truncation_is_caught_with_the_recorded_head(tmp_path):
@@ -120,11 +114,9 @@ def test_tail_truncation_is_caught_with_the_recorded_head(tmp_path):
     ledger = filled(tmp_path)
     head = ledger.head
     rewrite(tmp_path, lambda lines: lines[:-1])
-    assert deployment_ledger.DeploymentLedger.load(
-        tmp_path / deployment_ledger.FILE_NAME
-    )
+    assert deployment_ledger.Ledger.load(tmp_path / deployment_ledger.FILE_NAME)
     with pytest.raises(deployment_ledger.MisuseError, match="recorded head"):
-        deployment_ledger.DeploymentLedger.load(
+        deployment_ledger.Ledger.load(
             tmp_path / deployment_ledger.FILE_NAME, head
         )
 
@@ -317,10 +309,10 @@ def test_in_memory_verify_replays_the_rows():
 
 def test_replay_is_deterministic_across_loads(tmp_path):
     ledger = filled(tmp_path)
-    first = deployment_ledger.DeploymentLedger.load(
+    first = deployment_ledger.Ledger.load(
         tmp_path / deployment_ledger.FILE_NAME
     )
-    second = deployment_ledger.DeploymentLedger.load(
+    second = deployment_ledger.Ledger.load(
         tmp_path / deployment_ledger.FILE_NAME
     )
     assert first.head == second.head == ledger.head

@@ -8,7 +8,7 @@ for any other place is written by the user against the same interface.
 
 `Job` names a durable `run_id` (the idempotency key), the project
 specification (opaque JSON), the training identity, resources, a timeout, a
-`Retries`, an optional `CostBudget` and a non-secret environment. A GPU
+`Retries`, an optional `Budget` and a non-secret environment. A GPU
 needs a stated `gpu_reason`: specialised compute only behind a declared need.
 `Runner.run(spec)` is the same on every runner:
 
@@ -39,9 +39,9 @@ Training and serving are different identities and different permissions
 (`scmle.runners.roles`). Training reads `data/`, `runs/`, `artifacts/` and
 writes `runs/`, `artifacts/`, `evidence/`; serving reads `bundles/`,
 `artifacts/` and writes `audit/`.
-`check_separation` refuses overlapping write prefixes, a training role that
+`separate` refuses overlapping write prefixes, a training role that
 can write `bundles/` and a serving role that can write `runs/`.
-Workloads receive a `RoleStore` that enforces the training role.
+Workloads receive a `Store` that enforces the training role.
 `Runner.run` refuses a job spec naming the serving identity before any
 attempt starts. Releasing a bundle is a third act, with an approval, outside
 both.
@@ -50,7 +50,7 @@ both.
 
 | Runner | Runs the attempt as | Identity | Interruption |
 | --- | --- | --- | --- |
-| `Runner` | the workload, in this process | the training role of `RoleStore` | injected, or `PreemptedError` |
+| `Runner` | the workload, in this process | the training role of `Store` | injected, or `PreemptedError` |
 | `Process` | `python -m scmle.runners.entrypoint`, a child process | the training role, in the child | SIGTERM, then SIGKILL after `grace` |
 | `Container` | the same entrypoint in an image, through the Docker CLI | the training role, as uid 10001 on a read-only root | `docker stop`: SIGTERM, then SIGKILL |
 
@@ -66,7 +66,7 @@ in the image, which opens the `file://` store named by `SCMLE_STORE_URI`
 (confined to `tenants/<tenant>/` when `SCMLE_TENANT` is set), loads
 the stored spec, refuses it if its digest is not the one the runner started,
 and runs the workload (`SCMLE_WORKLOAD`, default
-`scmle.runners.project:run_project`). `run_project` runs an unchanged
+`scmle.runners.project:project`). `project` runs an unchanged
 `Project`: it copies the data from the store, mirrors the run directory to
 `runs/<id>/workdir/` every 30 seconds and at the end, and after a restart on an
 empty disk restores it and calls `Project.resume`. A hard kill loses at most

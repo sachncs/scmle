@@ -308,8 +308,8 @@ def test_a_classification_run_takes_the_shared_stages(registered, tmp_path):
         target="label",
         modality="raster",
         models=support.optin(tasks.Task.BINARY),
-        time_budget=60,
-        output_dir=str(tmp_path / "out"),
+        budget=60,
+        directory=str(tmp_path / "out"),
     ).run()
 
     found = test_kind_audio.outcome(run)
@@ -344,8 +344,8 @@ def test_a_regression_run_takes_the_shared_stages(registered, tmp_path):
         target="level",
         modality="raster",
         models=support.optin(tasks.Task.REGRESSION),
-        time_budget=60,
-        output_dir=str(tmp_path / "out"),
+        budget=60,
+        directory=str(tmp_path / "out"),
     ).run()
 
     assert run.evaluation["task"] == tasks.Task.REGRESSION.value

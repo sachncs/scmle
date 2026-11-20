@@ -58,7 +58,7 @@ def test_a_malformed_file_is_rejected_once_and_escalated(world):
     assert result.observed == 1
     assert not controller.loop.halted
     questions = [
-        e.question["action"] for e in controller.loop.pending_escalations()
+        e.question["action"] for e in controller.loop.survey()
     ]
     assert questions.count("controller_input_rejected") == 1
     again = world.controller().tick(world.inbox)
@@ -79,11 +79,11 @@ def test_no_new_data_opens_one_escalation(world):
     policy = scmle.operations.controller.Limits(idle=2)
     controller = world.controller(policy=policy)
     controller.tick(world.inbox)
-    assert not controller.loop.pending_escalations()
+    assert not controller.loop.survey()
     controller.tick(world.inbox)
     controller.tick(world.inbox)
     actions = [
-        e.question["action"] for e in controller.loop.pending_escalations()
+        e.question["action"] for e in controller.loop.survey()
     ]
     assert actions == ["controller_no_new_data"]
 
@@ -95,7 +95,7 @@ def test_labels_that_never_arrive_open_one_escalation(world):
         world.deliver(index, labels=False)
         controller.tick(world.inbox)
     actions = [
-        e.question["action"] for e in controller.loop.pending_escalations()
+        e.question["action"] for e in controller.loop.survey()
     ]
     assert actions == ["controller_labels_not_arriving"]
 
@@ -104,7 +104,7 @@ def test_a_halted_loop_is_left_alone(world):
     world.deliver(0)
     controller = world.controller()
     controller.loop.suspend("operator_halt", {"reason": "test"})
-    controller.loop.save_state()
+    controller.loop.save()
     result = world.controller().tick(world.inbox)
     assert result.status == scmle.operations.controller.HALTED
     assert result.observed == 0

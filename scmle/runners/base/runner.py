@@ -19,10 +19,10 @@ class Runner(abc.ABC):
     Attributes:
         kind: Name of the kind of runner, recorded in the manifest.
         store: Durable storage.
-        serving_identity: The identity a job may not run as.
+        identity: The identity a job may not run as.
         clock: Time source.
-        poll_seconds: Seconds between status polls.
-        stop_reason: Why the supervisor stopped the current attempt, if it did.
+        interval: Seconds between status polls.
+        reason: Why the supervisor stopped the current attempt, if it did.
         watcher: Returns the stop reason of the current attempt, or None.
     """
 
@@ -32,25 +32,25 @@ class Runner(abc.ABC):
         self,
         store: objectstore.Depot,
         *,
-        serving_identity: str,
+        identity: str,
         clock: job.Clock | None = None,
-        poll_seconds: float = 5.0,
+        interval: float = 5.0,
     ) -> None:
         """Initializes the runner.
 
         Args:
             store: Durable storage for the spec, manifest, checkpoints and
                 result. It must outlive the job.
-            serving_identity: The identity the serving side uses; a job may
+            identity: The identity the serving side uses; a job may
                 not run as it.
             clock: Time source (tests inject one).
-            poll_seconds: Seconds between status polls.
+            interval: Seconds between status polls.
         """
         self.store = store
-        self.serving_identity = serving_identity
+        self.identity = identity
         self.clock = clock or job.Clock()
-        self.poll_seconds = poll_seconds
-        self.stop_reason: job.Progress | None = None
+        self.interval = interval
+        self.reason: job.Progress | None = None
         self.watcher: Callable[[], job.Progress | None] = lambda: None
 
     @abc.abstractmethod
@@ -118,7 +118,7 @@ class Runner(abc.ABC):
         """
         return f"runs/{run_id}/result.json"
 
-    def save(self, manifest: ledger.RunManifest) -> None:
+    def save(self, manifest: ledger.Manifest) -> None:
         """Writes the manifest atomically.
 
         Args:
@@ -127,7 +127,7 @@ class Runner(abc.ABC):
         body = json.dumps(manifest.to_dict(), indent=2, sort_keys=True)
         self.store.put(self.locate(manifest.identifier), body.encode())
 
-    def load(self, run_id: str) -> ledger.RunManifest | None:
+    def load(self, run_id: str) -> ledger.Manifest | None:
         """Reads a run's manifest.
 
         Args:
@@ -141,9 +141,9 @@ class Runner(abc.ABC):
         except objectstore.AbsentError:
             # handled: documented None when run has no manifest
             return None
-        return ledger.RunManifest.from_dict(json.loads(data))
+        return ledger.Manifest.from_dict(json.loads(data))
 
-    def register(self, spec: job.Job) -> ledger.RunManifest:
+    def register(self, spec: job.Job) -> ledger.Manifest:
         """Stores the spec, or recognises the same run, or refuses a clash.
 
         The job's identity is first checked against the serving identity, which
@@ -158,24 +158,24 @@ class Runner(abc.ABC):
         Raises:
             ConflictError: If the id exists with a different spec.
         """
-        roles.check_distinct(spec.identity, self.serving_identity)
+        roles.check(spec.identity, self.identity)
         body = json.dumps(spec.to_dict(), indent=2, sort_keys=True).encode()
         try:
-            self.store.put(self.spec_key(spec.run_id), body, if_absent=True)
+            self.store.put(self.spec_key(spec.identifier), body, if_absent=True)
         except objectstore.ExistsError:
-            stored = self.store.get(self.spec_key(spec.run_id))[0]
+            stored = self.store.get(self.spec_key(spec.identifier))[0]
             if stored != body:
                 raise job.ConflictError(
-                    f"run {spec.run_id} exists with a different spec"
+                    f"run {spec.identifier} exists with a different spec"
                 ) from None
-        existing = self.load(spec.run_id)
+        existing = self.load(spec.identifier)
         if existing is not None:
             return existing
-        manifest = ledger.RunManifest.begin(spec, self.kind)
+        manifest = ledger.Manifest.begin(spec, self.kind)
         self.save(manifest)
         return manifest
 
-    def run(self, spec: job.Job) -> ledger.RunManifest:
+    def run(self, spec: job.Job) -> ledger.Manifest:
         """Runs the spec to a final state, resuming and retrying as declared.
 
         Calling it again with the same spec after the run finished returns the
@@ -208,7 +208,7 @@ class Runner(abc.ABC):
     def attempt(
         self,
         spec: job.Job,
-        manifest: ledger.RunManifest,
+        manifest: ledger.Manifest,
         meter: job.Meter,
         number: int,
     ) -> job.Progress | None:
@@ -226,7 +226,7 @@ class Runner(abc.ABC):
             interrupted or failed retryably and another attempt may follow.
         """
         started = self.clock.now()
-        self.stop_reason = None
+        self.reason = None
 
         def watch() -> job.Progress | None:
             """Checks the budget and the timeout of the running attempt.
@@ -234,11 +234,11 @@ class Runner(abc.ABC):
             Returns:
                 The reason the attempt must stop (`BUDGET_STOPPED` or
                 `TIMED_OUT`), or None if it may continue; the reason is also
-                kept as `stop_reason`.
+                kept as `reason`.
             """
             elapsed = self.clock.now() - started
-            self.stop_reason = meter.verdict(elapsed) or self.stop_reason
-            return self.stop_reason
+            self.reason = meter.verdict(elapsed) or self.reason
+            return self.reason
 
         self.watcher = watch
         handle = self.submit(spec, number)
@@ -251,14 +251,14 @@ class Runner(abc.ABC):
         while True:
             status = self.poll(handle)
             if status.state in job.TERMINAL:
-                stopped = self.stop_reason
+                stopped = self.reason
                 break
             stopped = watch()
             if stopped is not None:
                 self.cancel(handle, stopped.value)
                 status = self.confirm(handle)
                 break
-            self.clock.sleep(self.poll_seconds)
+            self.clock.sleep(self.interval)
         elapsed = self.clock.now() - started
         record.seconds = round(elapsed, 3)
         record.ended_at = job.stamp()
@@ -286,13 +286,13 @@ class Runner(abc.ABC):
             remaining -= 1
             if status.state in job.TERMINAL:
                 return status
-            self.clock.sleep(self.poll_seconds)
+            self.clock.sleep(self.interval)
             status = self.poll(handle)
         return job.Status(job.State.CANCELLED, "cancel requested")
 
     def finish(
-        self, spec: job.Job, manifest: ledger.RunManifest, state: job.Progress
-    ) -> ledger.RunManifest:
+        self, spec: job.Job, manifest: ledger.Manifest, state: job.Progress
+    ) -> ledger.Manifest:
         """Seals the manifest with checkpoints, the result and the state.
 
         A run that succeeded but left no result is recorded as failed.
@@ -308,8 +308,8 @@ class Runner(abc.ABC):
         manifest.seal(
             self.store,
             state,
-            result=self.result_key(spec.run_id),
-            own=self.locate(spec.run_id),
+            result=self.result_key(spec.identifier),
+            own=self.locate(spec.identifier),
         )
         self.save(manifest)
         return manifest

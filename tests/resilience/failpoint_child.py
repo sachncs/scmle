@@ -22,14 +22,14 @@ HOLD_SECONDS = 120
 
 
 def kill_run(root, label, phase, index, gated):
-    inner = objectstore.LocalObjectStore(root)
+    inner = objectstore.Disk(root)
     trigger = failpoints.Trigger(label, phase, index, failpoints.kill_process)
     store = failpoints.FailpointStore(inner, trigger)
     failpoints.processor(store, gated).run()
 
 
 def hold_run(root, marker, release):
-    store = objectstore.LocalObjectStore(root)
+    store = objectstore.Disk(root)
 
     def waiting(frame):
         pathlib.Path(marker).write_text("held", encoding="utf-8")

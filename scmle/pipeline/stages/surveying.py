@@ -96,7 +96,7 @@ class Surveying(labelling.Labelling):
         if notes:
             profile = dataclasses.replace(
                 profile,
-                quality_findings=profile.quality_findings + tuple(notes),
+                quality=profile.quality + tuple(notes),
             )
         profile = self.annotate(spec, task, development, profile)
         if task is not tasks.Task.UPLIFT:
@@ -111,7 +111,7 @@ class Surveying(labelling.Labelling):
         finding = f"treatment assignment: {propensity.note}"
         profile = dataclasses.replace(
             profile,
-            quality_findings=(*profile.quality_findings, finding),
+            quality=(*profile.quality, finding),
         )
         return profile, development, propensity.to_dict()
 
@@ -146,24 +146,24 @@ class Surveying(labelling.Labelling):
         curation = scmle.contracts.data.Curation(
             manifest=intake.manifest,
             source_rows=source_rows,
-            profiled_rows=len(development),
-            read_seconds=intake.read,
+            rows=len(development),
+            read=intake.read,
             streamed=intake.stream is not None,
-            cleaning_notes=tuple(board.get(labelling.Resolution).notes),
-            quality_findings=tuple(
+            notes=tuple(board.get(labelling.Resolution).notes),
+            quality=tuple(
                 scmle.contracts.data.Finding.glean(finding, "quality")
-                for finding in profile.quality_findings
+                for finding in profile.quality
             ),
             risk_findings=tuple(
                 scmle.contracts.data.Finding.glean(finding, "risk")
                 for finding in profile.risk_findings
             ),
-            feature_columns={
-                "numeric": profile.feature_plan.numeric,
-                "categorical": profile.feature_plan.categorical,
-                "text": profile.feature_plan.text,
+            features={
+                "numeric": profile.plan.numeric,
+                "categorical": profile.plan.categorical,
+                "text": profile.plan.text,
             },
-            dropped_columns=profile.feature_plan.dropped,
+            dropped=profile.plan.dropped,
         )
         card = scmle.contracts.data.Datasheet.distill(curation)
         board.journal.write("dataset_profile.json", profile.to_dict())
@@ -180,7 +180,7 @@ class Surveying(labelling.Labelling):
             {
                 "source_rows": source_rows,
                 "profiled_rows": len(development),
-                "quality_findings": len(profile.quality_findings),
+                "quality_findings": len(profile.quality),
                 "risk_findings": len(profile.risk_findings),
             },
         )
@@ -210,10 +210,8 @@ class Surveying(labelling.Labelling):
             `profile` itself if there are none.
         """
         present = set(development.columns)
-        columns = [c for c in profile.feature_plan.numeric if c in present]
-        categorical = [
-            c for c in profile.feature_plan.categorical if c in present
-        ]
+        columns = [c for c in profile.plan.numeric if c in present]
+        categorical = [c for c in profile.plan.categorical if c in present]
         notes: list[str] = []
         evidence: list[dict[str, object]] = []
         if columns and task in (
@@ -245,8 +243,8 @@ class Surveying(labelling.Labelling):
             return profile
         return dataclasses.replace(
             profile,
-            quality_findings=(*profile.quality_findings, *notes),
-            quality_evidence=(*profile.quality_evidence, *evidence),
+            quality=(*profile.quality, *notes),
+            evidence=(*profile.evidence, *evidence),
         )
 
 
@@ -272,7 +270,7 @@ def graft(
     if not graph.nodes:
         return profile
     ordered, rowwise = feature_graph.segregate(graph)
-    plan = profile.feature_plan
+    plan = profile.plan
     computed = {n.name for n in graph.nodes} | plan.engineered
     needed = feature_graph.roots(graph.nodes, computed)
     if ordered:
@@ -283,15 +281,13 @@ def graft(
         ]
     used = set(plan.features) | {n.name for n in rowwise}
     extra = tuple(
-        dict.fromkeys(
-            [*plan.extra_inputs, *(c for c in needed if c not in used)]
-        )
+        dict.fromkeys([*plan.extras, *(c for c in needed if c not in used)])
     )
     new_plan = dataclasses.replace(
         plan,
         numeric=plan.numeric + tuple(n.name for n in rowwise),
         derived=plan.derived + tuple(rowwise),
         series=tuple(ordered),
-        extra_inputs=extra,
+        extras=extra,
     )
-    return dataclasses.replace(profile, feature_plan=new_plan)
+    return dataclasses.replace(profile, plan=new_plan)

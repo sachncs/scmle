@@ -158,8 +158,8 @@ class Calibration(documentation.Documentation):
         task = partition.task
         split = partition.split
         template = strategies.lookup(selected.strategy).build(
-            partition.profile.feature_plan,
-            board.services.registry.get(selected.model_name),
+            partition.profile.plan,
+            board.services.registry.get(selected.model),
             task,
             board.services.spec.validation.seed,
             selected.params,
@@ -259,7 +259,7 @@ class Calibration(documentation.Documentation):
                 data={"reason": plan.reason},
             )
             return
-        bundle.cv_plus = cv_plus.Ensemble(
+        bundle.plus = cv_plus.Ensemble(
             tuple(models), plan.folds, numpy.abs(observed - predicted)
         )
 

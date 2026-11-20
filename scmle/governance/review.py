@@ -42,7 +42,7 @@ class Kind(enum.StrEnum):
     SECURITY = "security"
 
 
-def require_text(value: object, field_name: str) -> str:
+def require(value: object, field_name: str) -> str:
     """Returns a non-empty release-review string.
 
     Args:
@@ -99,7 +99,7 @@ class Recomputation:
             "uri",
             "notes",
         ):
-            require_text(getattr(self, field_name), field_name)
+            require(getattr(self, field_name), field_name)
         kind: Any = self.kind  # may be text from a persisted record
         if not isinstance(kind, Kind):
             object.__setattr__(self, "kind", Kind(kind))
@@ -184,7 +184,7 @@ def vet(claims: tuple[Recomputation, ...]) -> None:
         raise errors.InputError("claims must not contain duplicate criteria")
 
 
-def require_artifact_digests(artifact_digests: Mapping[Any, Any]) -> None:
+def enforce(artifact_digests: Mapping[Any, Any]) -> None:
     """Checks the artifact digests are present and named.
 
     Args:
@@ -277,21 +277,21 @@ class Signoff:
                 time or has no timezone.
         """
         for field_name in ("release", "commit", "reviewer", "observed"):
-            require_text(getattr(self, field_name), field_name)
+            require(getattr(self, field_name), field_name)
         for name in ("clone", "environment"):
-            require_text(self.digests.get(name), f"digests.{name}")
+            require(self.digests.get(name), f"digests.{name}")
         separation(self.reviewer, self.implementers)
         if not self.commands or any(not item.strip() for item in self.commands):
             raise errors.InputError(
                 "commands must contain reproducible commands"
             )
         vet(self.claims)
-        require_artifact_digests(self.digests.get("artifacts") or {})
+        enforce(self.digests.get("artifacts") or {})
         decision: Any = self.decision  # may be text from a persisted record
         if not isinstance(decision, Verdict):
             object.__setattr__(self, "decision", Verdict(decision))
         if self.signature is not None:
-            require_text(self.signature, "signature")
+            require(self.signature, "signature")
         timestamp = datetime.datetime.fromisoformat(
             self.observed.replace("Z", "+00:00")  # noqa: FURB162 -- keeps the exact set of accepted inputs
         )
@@ -400,7 +400,7 @@ class Signoff:
             signature=signing.mac(self.preimage(), signing_key),
         )
 
-    def verify_signature(self, signing_key: str | bytes) -> bool:
+    def verify(self, signing_key: str | bytes) -> bool:
         """Checks the review signature without trusting its decision.
 
         An empty key is refused by the signing helper with a `ValueError`
@@ -441,7 +441,7 @@ class Signoff:
                 stream.flush()
                 os.fsync(stream.fileno())
             temporary.replace(target)
-            durability.sync_directory(target.parent)
+            durability.flush(target.parent)
         except Exception:
             if temporary.exists():
                 temporary.unlink()
@@ -489,11 +489,11 @@ class Signoff:
             True if the review is of that commit, approved, correctly signed,
             every claim passed and every required kind is covered.
         """
-        if self.commit != require_text(source_commit, "source_commit"):
+        if self.commit != require(source_commit, "source_commit"):
             return False
         if self.decision is not Verdict.APPROVED:
             return False
-        if not self.verify_signature(signing_key):
+        if not self.verify(signing_key):
             return False
         if not all(claim.passed for claim in self.claims):
             return False
@@ -510,5 +510,5 @@ __all__ = [
     "Recomputation",
     "Signoff",
     "Verdict",
-    "require_text",
+    "require",
 ]

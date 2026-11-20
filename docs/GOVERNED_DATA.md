@@ -20,10 +20,10 @@ The package ships the interface and one backend:
 Any other backend is written by the user against the same `Depot`
 interface; no object-store SDK is a dependency. Keys are validated before
 they reach a backend (no `..`, empty segment or leading slash).
-`RetryingStore` retries `TransientStoreError` (throttling, timeouts, 5xx)
+`Retrier` retries `TransientError` (throttling, timeouts, 5xx)
 under a `Retries`.
 
-`scmle.storage.conformance.run_conformance(store)` is the one conformance
+`scmle.storage.conformance.certify(store)` is the one conformance
 suite, to be run against any backend you write: round trip, binary and empty and large objects, overwrite, missing
 keys, `head` against `get`, conditional create, a race of eight conditional
 creates (exactly one wins), sorted prefix listing, pagination, idempotent

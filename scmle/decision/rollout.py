@@ -79,11 +79,11 @@ class Decision:
         status: One of `hold`, `promote`, `hold_final`, `hold_invalid`.
         units: Units observed (at the decision, when one was taken).
         level: The experiment's level from the decision budget.
-        log_e: Log e-value of the primary and of each guardrail at the end
+        evalues: Log e-value of the primary and of each guardrail at the end
             of the last batch.
-        lower_bound: Time-uniform lower confidence bound on the primary
+        lower: Time-uniform lower confidence bound on the primary
             advantage at level `level`, in metric units.
-        challenger_units: Units assigned to the challenger.
+        challenger: Units assigned to the challenger.
         tier: `confirmed` once the rule promoted with the sample-ratio check
             passing, otherwise `unverified`.
         assumptions: The conditions the guarantee needs.
@@ -92,9 +92,9 @@ class Decision:
     status: str
     units: int
     level: float
-    log_e: dict[str, float]
-    lower_bound: float
-    challenger_units: int
+    evalues: dict[str, float]
+    lower: float
+    challenger: int
     tier: str
     assumptions: tuple[str, ...] = ASSUMPTIONS
 
@@ -116,7 +116,7 @@ class Decision:
         return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
-def metric_stream(
+def feed(
     plan: scmle.assurance.charter.decision.Experiment,
     guard: scmle.assurance.charter.decision.Guardrail | None,
 ) -> anytime.Stream:
@@ -141,7 +141,7 @@ def metric_stream(
     return anytime.deviations(q, margin, "less")
 
 
-def metric_values(
+def centre(
     plan: scmle.assurance.charter.decision.Experiment,
     guard: scmle.assurance.charter.decision.Guardrail | None,
     arm: NDArray[numpy.float64],
@@ -170,7 +170,7 @@ def metric_values(
         (plan.low, plan.high) if guard is None else (guard.low, guard.high)
     )
     y = (numpy.asarray(outcome, dtype=float) - low) / (high - low)
-    z = anytime.pseudo_outcomes(
+    z = anytime.transform(
         arm, y, plan.assignment, anytime.centers(y, carry=carry)
     )
     if (
@@ -189,26 +189,26 @@ class Rollout:
 
     Attributes:
         plan: The rollout plan.
-        experiment_id: Identity of the experiment.
+        experiment: Identity of the experiment.
         level: The level assigned to this experiment.
         status: One of `hold`, `promote`, `hold_final`, `hold_invalid`.
         units: Units observed so far.
-        challenger_units: Units assigned to the challenger so far.
-        done_at: The unit at which the status stopped being `hold`, or 0
+        assigned: Units assigned to the challenger so far.
+        stopped: The unit at which the status stopped being `hold`, or 0
             while the experiment is still running.
     """
 
     def __init__(
         self,
         plan: scmle.assurance.charter.decision.Experiment,
-        experiment_id: str,
+        experiment: str,
         level: float,
     ) -> None:
         """Starts an experiment at the level the budget assigned.
 
         Args:
             plan: The rollout plan.
-            experiment_id: Identity of the experiment.
+            experiment: Identity of the experiment.
             level: The level the decision budget assigned, strictly between
                 0 and 1.
 
@@ -218,7 +218,7 @@ class Rollout:
         if not 0.0 < level < 1.0:
             raise errors.InputError("level must be strictly between 0 and 1")
         self.plan = plan
-        self.experiment_id = experiment_id
+        self.experiment = experiment
         self.level = level
         self.target = -math.log(level)
         names = [plan.primary, *(g.name for g in plan.guardrails)]
@@ -228,7 +228,7 @@ class Rollout:
             *plan.guardrails,
         ]
         self.processes = {
-            name: anytime.Martingale(metric_stream(plan, guard))
+            name: anytime.Martingale(feed(plan, guard))
             for name, guard in zip(names, self.guards, strict=True)
         }
         self.carry: dict[str, tuple[float, int]] = dict.fromkeys(
@@ -236,9 +236,9 @@ class Rollout:
         )
         self.primary_z: list[NDArray[numpy.float64]] = []
         self.units = 0
-        self.challenger_units = 0
+        self.assigned = 0
         self.status = HOLD
-        self.done_at = 0
+        self.stopped = 0
 
     def observe(
         self,
@@ -265,7 +265,7 @@ class Rollout:
         Raises:
             ValueError: If a guardrail of the rollout plan has no values in
                 `guardrails`. Invalid arms or outcomes are rejected with a
-                `ValueError` by `anytime.pseudo_outcomes`.
+                `ValueError` by `anytime.transform`.
         """
         if self.status != HOLD:
             return self.decision()
@@ -281,7 +281,7 @@ class Rollout:
         paths = []
         for name, guard in zip(self.names, self.guards, strict=True):
             raw = primary if guard is None else supplied[name]
-            values, self.carry[name] = metric_values(
+            values, self.carry[name] = centre(
                 self.plan,
                 guard,
                 a,
@@ -292,7 +292,7 @@ class Rollout:
             paths.append(self.processes[name].path)
             if guard is None:
                 self.primary_z.append(values)
-        counts = self.challenger_units + numpy.cumsum(a)
+        counts = self.assigned + numpy.cumsum(a)
         totals = self.units + numpy.arange(1, len(a) + 1)
         invalid = design.srm_log_bayes_factor(
             counts, totals, self.plan.assignment
@@ -303,13 +303,13 @@ class Rollout:
         if first_bad is not None and (
             first_win is None or first_bad <= first_win
         ):
-            self.status, self.done_at = HOLD_INVALID, self.units + first_bad + 1
+            self.status, self.stopped = HOLD_INVALID, self.units + first_bad + 1
         elif first_win is not None:
-            self.status, self.done_at = PROMOTE, self.units + first_win + 1
+            self.status, self.stopped = PROMOTE, self.units + first_win + 1
         self.units += len(a)
-        self.challenger_units += int(a.sum())
+        self.assigned += int(a.sum())
         if self.status == HOLD and self.units >= self.plan.limit:
-            self.status, self.done_at = HOLD_FINAL, self.units
+            self.status, self.stopped = HOLD_FINAL, self.units
         return self.decision()
 
     def decision(self) -> Decision:
@@ -322,26 +322,24 @@ class Rollout:
             invalid hold, the bound uses only the units up to the decision.
         """
         scale = self.plan.high - self.plan.low
-        stream = metric_stream(self.plan, None)
+        stream = feed(self.plan, None)
         z = (
             numpy.concatenate(self.primary_z)
             if self.primary_z
             else numpy.zeros(0)
         )
-        if self.done_at and self.status in (PROMOTE, HOLD_INVALID):
-            z = z[: self.done_at]
+        if self.stopped and self.status in (PROMOTE, HOLD_INVALID):
+            z = z[: self.stopped]
         bound = (
-            anytime.confidence_bound(z, stream, self.level) * scale
-            if z.size
-            else -scale
+            anytime.bound(z, stream, self.level) * scale if z.size else -scale
         )
         return Decision(
             status=self.status,
-            units=self.done_at or self.units,
+            units=self.stopped or self.units,
             level=self.level,
-            log_e={n: p.log_e for n, p in self.processes.items()},
-            lower_bound=bound,
-            challenger_units=self.challenger_units,
+            evalues={n: p.log_e for n, p in self.processes.items()},
+            lower=bound,
+            challenger=self.assigned,
             tier="confirmed" if self.status == PROMOTE else "unverified",
         )
 
@@ -356,14 +354,14 @@ class Watchdog:
     Attributes:
         status: `hold` or `rollback`.
         units: Units observed so far.
-        done_at: The unit at which the monitor rolled back, or 0.
+        stopped: The unit at which the monitor rolled back, or 0.
     """
 
     def __init__(
         self,
         tolerance: float,
         alpha_rollback: float,
-        new_prob: float = 0.5,
+        prob: float = 0.5,
         low: float = 0.0,
         high: float = 1.0,
     ) -> None:
@@ -376,21 +374,21 @@ class Watchdog:
                 rollback once it reaches `1 / alpha_rollback`, and a champion
                 no worse than `tolerance` is rolled back with probability at
                 most this value.
-            new_prob: Probability that a unit is served the new champion.
+            prob: Probability that a unit is served the new champion.
             low: Smallest value of the metric.
             high: Largest value of the metric.
         """
         scale = high - low
         self.low, self.high = low, high
-        self.new_prob = new_prob
+        self.prob = prob
         self.target = -math.log(alpha_rollback)
-        self.stream = anytime.deviations(new_prob, -tolerance / scale, "less")
+        self.stream = anytime.deviations(prob, -tolerance / scale, "less")
         self.carry = (0.0, 0)
         self.process = anytime.Martingale(self.stream)
         self.alpha = alpha_rollback
         self.units = 0
         self.status = HOLD
-        self.done_at = 0
+        self.stopped = 0
 
     def observe(self, arm: ArrayLike, outcome: ArrayLike) -> str:
         """Adds a batch (arm 1 is the new champion); returns the status.
@@ -409,10 +407,10 @@ class Watchdog:
         y = (numpy.asarray(outcome, dtype=float) - self.low) / (
             self.high - self.low
         )
-        z = anytime.pseudo_outcomes(
+        z = anytime.transform(
             numpy.asarray(arm, dtype=float),
             y,
-            self.new_prob,
+            self.prob,
             anytime.centers(y, carry=self.carry),
         )
         self.carry = (self.carry[0] + float(y.sum()), self.carry[1] + len(y))
@@ -420,7 +418,7 @@ class Watchdog:
         hit = self.process.path >= self.target
         if hit.any():
             self.status = ROLLBACK
-            self.done_at = self.units + int(numpy.argmax(hit)) + 1
+            self.stopped = self.units + int(numpy.argmax(hit)) + 1
         self.units += len(z)
         return self.status
 
@@ -460,7 +458,7 @@ class Journal:
             "body": dict(body),
             "previous": previous,
         }
-        record["hash"] = row_hash(record)
+        record["hash"] = digest(record)
         self.rows.append(record)
         return record
 
@@ -475,7 +473,7 @@ class Journal:
         for index, row in enumerate(self.rows):
             if row["seq"] != index or row["previous"] != previous:
                 return False
-            if row["hash"] != row_hash(row):
+            if row["hash"] != digest(row):
                 return False
             previous = row["hash"]
         return True
@@ -508,7 +506,7 @@ class Journal:
         return log
 
 
-def row_hash(record: Mapping[str, Any]) -> str:
+def digest(record: Mapping[str, Any]) -> str:
     """SHA-256 of a row without its own hash.
 
     Args:

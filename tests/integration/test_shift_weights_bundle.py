@@ -22,8 +22,8 @@ def result(tmp_path_factory):
     return support.make_project(
         world(500, 0),
         "y",
-        time_budget=300,
-        output_dir=tmp_path_factory.mktemp("shift"),
+        budget=300,
+        directory=tmp_path_factory.mktemp("shift"),
     ).run()
 
 
@@ -43,7 +43,7 @@ def test_weighted_intervals_need_attached_weights(result):
     )
     with pytest.raises(errors.ArtifactError, match="conformal"):
         plain.predict_interval(world(5, 3)[["x"]], shift=True)
-    result.bundle.shift_weights = None
+    result.bundle.weights = None
     with pytest.raises(errors.ArtifactError, match="no shift weights"):
         result.bundle.predict_interval(world(5, 3)[["x"]], shift=True)
 
@@ -80,11 +80,11 @@ def test_a_changed_weights_file_is_refused(result, tmp_path):
 
 
 def test_an_extreme_shift_is_refused_and_nothing_is_stored(result):
-    result.bundle.shift_weights = None
+    result.bundle.weights = None
     rows = calibration_rows(result)
     with pytest.raises(shift_weights.RefusedError):
         result.bundle.tilt(rows[["x"]], world(400, 8, centre=6.0)[["x"]])
-    assert result.bundle.shift_weights is None
+    assert result.bundle.weights is None
 
 
 def test_residual_is_the_only_method_with_weights(result):

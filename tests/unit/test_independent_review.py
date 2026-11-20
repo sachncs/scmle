@@ -56,7 +56,7 @@ def test_review_round_trips_and_accepts_exact_signed_proof():
     restored = review.Signoff.from_dict(original.to_dict())
 
     assert restored == original
-    assert restored.verify_signature("release-key")
+    assert restored.verify("release-key")
     assert restored.accepted(
         "abc1234",
         (
@@ -67,7 +67,7 @@ def test_review_round_trips_and_accepts_exact_signed_proof():
         "release-key",
     )
     assert not restored.accepted("different", (), "release-key")
-    assert not restored.verify_signature("wrong-key")
+    assert not restored.verify("wrong-key")
 
 
 def test_signed_review_writes_atomically_and_cli_verifies_exact_commit(

@@ -60,7 +60,7 @@ def test_plan_closes_the_preview_test_set(monkeypatch):
     project = scmle.api.project.Project(
         data=pandas.DataFrame({"feature": list(range(80)), "y": [0, 1] * 40}),
         target="y",
-        time_budget=30,
+        budget=30,
     )
 
     project.plan()

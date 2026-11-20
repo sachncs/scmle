@@ -141,7 +141,7 @@ class Threshold:
             when none was rejected.
         risk: Observed unweighted mean loss of the cases answered at `tau`
             (NaN when none was rejected, since nothing is answered).
-        r_star: Target risk.
+        target: Target risk.
         delta: Level of the guarantee.
         weighted: Whether Kish effective sizes were used (approximate).
         steps: The sequence in the order visited, including thresholds
@@ -157,7 +157,7 @@ class Threshold:
     tau: float
     coverage: float
     risk: float
-    r_star: float
+    target: float
     delta: float
     weighted: bool
     steps: tuple[Step, ...]
@@ -179,7 +179,7 @@ class Threshold:
                 "tau": None if self.saturated else self.tau,
                 "coverage": self.coverage,
                 "risk": None if math.isnan(self.risk) else self.risk,
-                "r_star": self.r_star,
+                "r_star": self.target,
                 "delta": self.delta,
                 "weighted": self.weighted,
                 "steps": [dataclasses.asdict(s) for s in self.steps],
@@ -414,7 +414,7 @@ class Curve:
         }
 
 
-def risk_coverage(
+def sweep(
     score: Any, loss: Any, weights: Any = None, points: int = DEFAULT_GRID
 ) -> Curve:
     """Risk-coverage curve on a fixed grid, optionally weighted.

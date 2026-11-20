@@ -29,8 +29,8 @@ def test_a_custom_cost_metric_is_optimised_and_reported(
         binary_frame,
         "y",
         metric="business_cost",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
     ).run()
 
     assert result.evaluation["metric"] == "business_cost"
@@ -74,7 +74,7 @@ def test_a_regression_metric_can_be_user_defined(tmp_path):
     )
     try:
         result = support.make_project(
-            frame, "y", metric="mape", time_budget=300, output_dir=tmp_path
+            frame, "y", metric="mape", budget=300, directory=tmp_path
         ).run()
     finally:
         metrics.CATALOG.unregister("mape")

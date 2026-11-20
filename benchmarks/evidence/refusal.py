@@ -259,7 +259,7 @@ def censor(
     stops = rng.exponential(1.5, len(frame))
     frame["time"] = numpy.minimum(happens, stops)
     frame["event"] = (happens <= stops).astype(int)
-    return "time", {"task": "survival", "event_column": "event"}
+    return "time", {"task": "survival", "event": "event"}
 
 
 def grade(
@@ -279,7 +279,7 @@ def grade(
     latent = signal + rng.logistic(size=len(frame))
     cuts = numpy.quantile(latent, [0.25, 0.5, 0.75])
     frame["level"] = numpy.array(order)[numpy.searchsorted(cuts, latent)]
-    return "level", {"task": "ordinal", "ordinal_order": order}
+    return "level", {"task": "ordinal", "order": order}
 
 
 def rank(
@@ -300,7 +300,7 @@ def rank(
     frame["query"] = [f"q{i // QUERY}" for i in range(rows)]
     value = numpy.round(1.2 * frame.x1 + rng.normal(0, 0.6, rows))
     frame["grade"] = numpy.clip(value, 0, 3).astype(int)
-    return "grade", {"task": "ranking", "query_column": "query"}
+    return "grade", {"task": "ranking", "query": "query"}
 
 
 def tag(
@@ -362,7 +362,7 @@ def treat(
     effect = 0.35 * (frame.x1 > 0)
     frame["treated"] = arm
     frame["bought"] = (rng.random(rows) < 0.25 + arm * effect).astype(int)
-    return "bought", {"task": "uplift", "treatment_column": "treated"}
+    return "bought", {"task": "uplift", "treatment": "treated"}
 
 
 LABELERS: dict[
@@ -406,8 +406,8 @@ def forecast(
     options = {
         "task": "forecast",
         "horizon": 4,
-        "time_column": "date",
-        "seasonal_period": 7,
+        "timestamp": "date",
+        "period": 7,
     }
     return frame, "sales", options
 
@@ -590,7 +590,7 @@ def table(
 # Arguments a planted defect changes; the others edit a column.
 OVERRIDES: dict[str, dict[str, Any]] = {
     "identifier": {"task": "auto"},
-    "leak": {"leakage_policy": "block"},
+    "leak": {"leakage": "block"},
     "binary": {"task": "binary_classification"},
 }
 
@@ -1624,12 +1624,12 @@ def attempt(task: Task, budget: int = BUDGET) -> dict[str, Any]:
             result = scmle.api.project.Project(
                 frame,
                 target,
-                time_budget=budget,
-                output_dir=folder,
+                budget=budget,
+                directory=folder,
                 **options,
             ).run()
             record["outcome"] = "model"
-            record["model"] = result.selected_model
+            record["model"] = result.model
     except (errors.BlockedError, errors.LeakageError) as error:
         gate, site = locate(error, registry())
         record.update(

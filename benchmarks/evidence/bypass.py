@@ -377,9 +377,9 @@ def project(lab: Lab, frame: pandas.DataFrame, **settings: Any) -> Any:
     """
     import scmle.api.project
 
-    chosen = {"time_budget": BUDGET, **options(), **settings}
+    chosen = {"budget": BUDGET, **options(), **settings}
     return scmle.api.project.Project(
-        frame, "y", output_dir=lab.folder / "runs", **chosen
+        frame, "y", directory=lab.folder / "runs", **chosen
     )
 
 
@@ -393,14 +393,14 @@ def trained(result: Any) -> dict[str, Any]:
         Its selected model, its test metrics (a leak that was used shows as
         a near-perfect score) and its run directory.
     """
-    path = pathlib.Path(result.run_dir) / "evaluation.json"
+    path = pathlib.Path(result.directory) / "evaluation.json"
     evaluation = results.evaluation(
         json.loads(path.read_text(encoding="utf-8"))
     )
     return {
-        "model": result.selected_model,
+        "model": result.model,
         "test": evaluation.get("metrics"),
-        "run": pathlib.Path(result.run_dir).name,
+        "run": pathlib.Path(result.directory).name,
     }
 
 
@@ -554,7 +554,7 @@ def leak(form: str) -> Callable[[Lab], Callable[[], dict[str, Any]]]:
     def prepare(lab: Lab) -> Callable[[], dict[str, Any]]:
         frame = leaked(form)
         return lambda: trained(
-            project(lab, frame, leakage_policy="block").run()
+            project(lab, frame, leakage="block").run()
         )
 
     return prepare
@@ -563,7 +563,7 @@ def leak(form: str) -> Callable[[Lab], Callable[[], dict[str, Any]]]:
 def misspelled(lab: Lab) -> Callable[[], dict[str, Any]]:
     """A leak under `leakage_policy="BLOCK"`, hoping it reads as warn."""
     frame = leaked("copy")
-    return lambda: trained(project(lab, frame, leakage_policy="BLOCK").run())
+    return lambda: trained(project(lab, frame, leakage="BLOCK").run())
 
 
 def written(lab: Lab, frame: pandas.DataFrame) -> pathlib.Path:
@@ -689,14 +689,14 @@ def resume(
 def leakresume(lab: Lab) -> Callable[[], dict[str, Any]]:
     """Resumes a run the leakage policy refused, unchanged."""
     frame = leaked("copy")
-    run = refused(lambda: project(lab, frame, leakage_policy="block").run())
+    run = refused(lambda: project(lab, frame, leakage="block").run())
     return lambda: resume(run, frame)
 
 
 def leakedit(lab: Lab) -> Callable[[], dict[str, Any]]:
     """Resumes a refused leak run after setting the policy to warn."""
     frame = leaked("copy")
-    run = refused(lambda: project(lab, frame, leakage_policy="block").run())
+    run = refused(lambda: project(lab, frame, leakage="block").run())
     edit(run, lambda c: c.update(leakage="warn"))
     return lambda: resume(run, frame)
 
@@ -713,7 +713,7 @@ def budget(value: Any) -> Callable[[Lab], Callable[[], dict[str, Any]]]:
 
     def prepare(lab: Lab) -> Callable[[], dict[str, Any]]:
         frame = table()
-        return lambda: trained(project(lab, frame, time_budget=value).run())
+        return lambda: trained(project(lab, frame, budget=value).run())
 
     return prepare
 
@@ -728,7 +728,7 @@ def clibudget(lab: Lab) -> Callable[[], dict[str, Any]]:
 def budgetresume(lab: Lab) -> Callable[[], dict[str, Any]]:
     """Resumes a run the budget refused, unchanged."""
     frame = table()
-    run = refused(lambda: project(lab, frame, time_budget=1).run())
+    run = refused(lambda: project(lab, frame, budget=1).run())
     return lambda: resume(run, frame)
 
 
@@ -830,7 +830,7 @@ def finished(lab: Lab, frame: pandas.DataFrame, **settings: Any) -> Any:
     Returns:
         The run directory and its evaluation.
     """
-    run = pathlib.Path(project(lab, frame, **settings).run().run_dir)
+    run = pathlib.Path(project(lab, frame, **settings).run().directory)
     evaluation = results.evaluation(
         json.loads((run / "evaluation.json").read_text("utf-8"))
     )
@@ -984,7 +984,7 @@ def rerun(change: str) -> Callable[[Lab], Callable[[], dict[str, Any]]]:
         path = charter(lab)
         with environ(SCMLE_SIGNING_KEY=KEY):
             first = project(lab, frame, charter=path).run()
-        rows = confirmation(pathlib.Path(first.run_dir))
+        rows = confirmation(pathlib.Path(first.directory))
         second = lab
         if change == "elsewhere":
             second = Lab(lab.folder / "elsewhere", lab.bundle)
@@ -997,7 +997,7 @@ def rerun(change: str) -> Callable[[Lab], Callable[[], dict[str, Any]]]:
         def act() -> dict[str, Any]:
             with environ(SCMLE_SIGNING_KEY=KEY):
                 result = project(second, frame, charter=path).run()
-            run = pathlib.Path(result.run_dir)
+            run = pathlib.Path(result.directory)
             claims = json.loads(
                 (run / "confirmed_claims.json").read_text("utf-8")
             )
@@ -1017,7 +1017,7 @@ def charterresume(lab: Lab) -> Callable[[], dict[str, Any]]:
     frame = table(500)
     path = charter(lab)
     with environ(SCMLE_SIGNING_KEY=KEY):
-        run = pathlib.Path(project(lab, frame, charter=path).run().run_dir)
+        run = pathlib.Path(project(lab, frame, charter=path).run().directory)
     (run / "evaluation.json").unlink()
     (run / "complete.json").unlink()
 
@@ -2542,7 +2542,7 @@ def fixture(folder: pathlib.Path) -> pathlib.Path:
     """
     lab = Lab(folder)
     with environ(SCMLE_SIGNING_KEY=KEY):
-        run = pathlib.Path(project(lab, table()).run().run_dir)
+        run = pathlib.Path(project(lab, table()).run().directory)
     return run / "model"
 
 

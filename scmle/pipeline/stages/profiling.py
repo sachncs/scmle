@@ -190,9 +190,9 @@ class Profiling(impounding.Impounding):
             "feature set and exclusions fixed from the profile",
             ("dataset_profile.json",),
             {
-                "numeric": list(profile.feature_plan.numeric),
-                "categorical": list(profile.feature_plan.categorical),
-                "dropped": dict(profile.feature_plan.dropped),
+                "numeric": list(profile.plan.numeric),
+                "categorical": list(profile.plan.categorical),
+                "dropped": dict(profile.plan.dropped),
             },
         )
         board.journal.track(

@@ -208,10 +208,10 @@ for scenario in reliability.Contingency:
   <pre><code class="language-python">{`import glob
 import os
 
-from scmle.governance.registry import ModelRegistryStore, Sanction, Verdict
+from scmle.governance.registry import Registry, Sanction, Verdict
 from scmle.operations.lifecycle import Maintainer
 
-registry = ModelRegistryStore("registry")
+registry = Registry("registry")
 staged = registry.register(
     "customers",
     sorted(glob.glob("runs/run_*/model"))[-1],

@@ -113,7 +113,7 @@ def test_batch_scores_the_file_through_the_serving_path(saved, monkeypatch):
 
     class Batcher:
         def __init__(self, model, on_null, on_unseen):
-            calls.append((model.info.model_name, on_null, on_unseen))
+            calls.append((model.info.model, on_null, on_unseen))
 
         def score(self, data, output, chunk_rows, resume):
             calls.append((data, output, chunk_rows, resume))
@@ -168,8 +168,8 @@ def test_batch_scores_the_file_through_the_serving_path(saved, monkeypatch):
 def test_export_and_package_pass_their_options(monkeypatch, tmp_path):
     calls = []
     model = types.SimpleNamespace(
-        read_frame=lambda path: f"frame:{path}",
-        export_onnx=lambda output, check, tolerance, unverified: (
+        read=lambda path: f"frame:{path}",
+        export=lambda output, check, tolerance, unverified: (
             calls.append((output, check, tolerance, unverified)) or output
         ),
     )
@@ -212,7 +212,7 @@ def test_serve_hands_the_server_to_the_serving_loop(monkeypatch):
         def __init__(self, model, host, port, gateway, monitor, drain):
             events.append(("init", host, port, drain))
 
-    model = types.SimpleNamespace(info=types.SimpleNamespace(model_name="m"))
+    model = types.SimpleNamespace(info=types.SimpleNamespace(model="m"))
     monkeypatch.setattr(
         delivery.bundle.Bundle, "load", lambda path, trusted: model
     )
@@ -279,7 +279,7 @@ def test_catalog_prints_and_writes_the_evidence(tmp_path, capsys):
 
 
 def test_ingest_options_have_zero_tolerances_by_default():
-    args = parse(intake.IngestCommand, ["--sqlite", "d", "--tables", "a,b"])
+    args = parse(intake.Ingest, ["--sqlite", "d", "--tables", "a,b"])
     assert (args.eps_key, args.eps_null, args.eps_fk) == (0.0, 0.0, 0.0)
     assert args.output == "ingest"
     assert args.max_key_size == intake.grain.LEVELS
@@ -344,7 +344,7 @@ class Controller:
         self.saved = False
         self.loop = types.SimpleNamespace(
             suspend=lambda kind, detail: self.halted.append((kind, detail)),
-            save_state=lambda: setattr(self, "saved", True),
+            save=lambda: setattr(self, "saved", True),
         )
         self.envelopes = types.SimpleNamespace(
             revoke=self.revoke, grant=self.granted.append

@@ -64,7 +64,7 @@ def depot(tmp_path):
 
 @pytest.fixture
 def sink(tmp_path):
-    made = mocks.MetricsSink(tmp_path / "metrics.jsonl")
+    made = mocks.Collector(tmp_path / "metrics.jsonl")
     made.start()
     yield made
     made.stop()
@@ -125,7 +125,7 @@ def test_sanction_approves_one_version_with_the_demo_key():
         signed=True,
     )
     made = fixture.sanction(record, "fine", "report.json")
-    assert (made.model, made.version, made.content_id) == ("churn", 4, "a" * 64)
+    assert (made.model, made.version, made.content) == ("churn", 4, "a" * 64)
     assert made.reviewer == "demo-reviewer"
     assert made.decision is registry.Verdict.APPROVED
     assert made.evidence == ("report.json",)
@@ -161,14 +161,9 @@ def test_retrieve_and_post_return_errors_as_statuses(running):
     assert status == 200
     assert body["ready"] is True
     assert client.retrieve(f"{running.address}/nope")[0] == 404
-    status, body = client.post_json(
-        f"{running.address}/predict", {"records": [ROW]}
-    )
+    status, body = client.post(f"{running.address}/predict", {"records": [ROW]})
     assert (status, body["predictions"]) == (200, [1])
-    assert (
-        client.post_json(f"{running.address}/predict", {"records": []})[0]
-        == 400
-    )
+    assert client.post(f"{running.address}/predict", {"records": []})[0] == 400
 
 
 def test_settle_reports_readiness_or_a_dead_process(running):
@@ -296,9 +291,9 @@ def test_mirror_round_trips_a_service_folder(service, depot, tmp_path):
     log = journal.Transcript()
     fetched = stages.mirror(log, depot.address, service, tmp_path)
     assert fetched == tmp_path / "fetched-service"
-    assert provenance.bundle_digest(
-        fetched / "model"
-    ) == provenance.bundle_digest(service / "model")
+    assert provenance.digest(fetched / "model") == provenance.digest(
+        service / "model"
+    )
     step = log.steps[0]
     assert step.name == "object store round trip"
     assert step.ok is True

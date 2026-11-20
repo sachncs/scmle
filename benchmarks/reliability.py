@@ -6,7 +6,7 @@ it on synthetic data with known ground truth, and records the measured value
 next to the threshold it must meet:
 
 * `determinism`: the same seed gives the same selection and test score.
-* `replay`: `Project.verify_replay` classifies a rerun as `exact`.
+* `replay`: `Project.verify` classifies a rerun as `exact`.
 * `no_false_skill`: pure-noise labels never produce a convincing score.
 * `leak_detection`: a planted leaked column is flagged and can block the run.
 * `bundle_roundtrip`: a saved, signed bundle predicts identically when loaded.
@@ -169,7 +169,7 @@ def fast_project(
     kwargs.setdefault("time_budget", 120)
     kwargs.setdefault("leakage_policy", "warn")  # the checks set it themselves
     return scmle.api.project.Project(
-        data, target, output_dir=directory, **kwargs
+        data, target, directory=directory, **kwargs
     )
 
 
@@ -238,11 +238,11 @@ def check_determinism(directory: pathlib.Path) -> CheckRecord:
     ]
     scores = [r.evaluation["metrics"]["roc_auc"] for r in runs]
     record.measured = {
-        "models": [r.selected_model for r in runs],
+        "models": [r.model for r in runs],
         "score_difference": abs(scores[0] - scores[1]),
     }
     record.passed = (
-        runs[0].selected_model == runs[1].selected_model
+        runs[0].model == runs[1].model
         and record.measured["score_difference"] <= SCORE_TOLERANCE
     )
     return record
@@ -264,8 +264,8 @@ def rederive(directory: pathlib.Path) -> CheckRecord:
     )
     data = binary_data()
     result = fast_project(data, "y", directory / "original", seed=3).run()
-    verdict = scmle.api.project.Project.verify_replay(
-        result.run_dir, data=data, output_dir=directory / "rerun"
+    verdict = scmle.api.project.Project.verify(
+        result.directory, data=data, output_dir=directory / "rerun"
     )
     record.measured = {
         "level": verdict.level,
@@ -342,7 +342,7 @@ def check_leak_detection(directory: pathlib.Path) -> CheckRecord:
     )
     try:
         fast_project(
-            leaky, "y", directory / "block", leakage_policy="block"
+            leaky, "y", directory / "block", leakage="block"
         ).run()
         blocked = False
     except errors.BlockedError:
@@ -421,7 +421,7 @@ def check_tamper_detection(directory: pathlib.Path) -> CheckRecord:
             True if loading raises `ArtifactError`, otherwise False.
         """
         try:
-            scmle.api.predict.load_model(bundle_directory, signing_key=key)
+            scmle.api.predict.load(bundle_directory, signing_key=key)
         except errors.ArtifactError:
             return True
         return False

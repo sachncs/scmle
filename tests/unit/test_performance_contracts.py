@@ -62,7 +62,7 @@ def test_budget_requires_every_declared_operation_and_passes_complete_input():
             performance.Operation.INGEST: 2.0,
             performance.Operation.INFERENCE: 2.0,
         },
-        max_peak_memory_gb=2.0,
+        memory=2.0,
     )
 
     result = budget.evaluate(
@@ -84,7 +84,7 @@ def test_budget_fails_closed_for_missing_and_exceeded_observations():
             "ingest": 1.0,
             performance.Operation.FIT: 2.0,
         },
-        max_peak_memory_gb=1.0,
+        memory=1.0,
     )
 
     result = budget.evaluate(
@@ -104,7 +104,7 @@ def test_memory_budget_fails_closed_when_memory_was_not_measured():
     """A memory ceiling cannot pass without a peak-memory observation."""
     budget = performance.Budget(
         {performance.Operation.LOAD: 2.0},
-        max_peak_memory_gb=1.0,
+        memory=1.0,
     )
 
     result = budget.evaluate(
@@ -160,16 +160,16 @@ def test_repeated_baseline_compares_median_time_and_memory():
     """A repeated baseline compares current cost with stable central values."""
     baseline = performance.Baseline(
         (run("reference-1", 1.0, 1.0), run("reference-2", 1.1, 1.1)),
-        max_relative_regression=0.20,
+        regression=0.20,
     )
 
     result = baseline.evaluate(run("current", 1.2, 1.2))
 
     assert result.passed
-    assert result.baseline_run_count == 2
-    assert result.relative_regressions["ingest"][
-        "elapsed_seconds"
-    ] == pytest.approx((1.2 - 1.05) / 1.05)
+    assert result.baselines == 2
+    assert result.regressions["ingest"]["elapsed_seconds"] == pytest.approx(
+        (1.2 - 1.05) / 1.05
+    )
     assert result.to_dict()["run"] == "current"
 
 
@@ -177,7 +177,7 @@ def test_repeated_baseline_fails_time_and_memory_regressions():
     """A repeated baseline blocks a run beyond the declared regression limit."""
     baseline = performance.Baseline(
         (run("reference-1"), run("reference-2", 1.1, 1.1)),
-        max_relative_regression=0.10,
+        regression=0.10,
     )
 
     result = baseline.evaluate(run("current", 1.4, 1.4))

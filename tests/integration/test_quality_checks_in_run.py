@@ -20,7 +20,7 @@ def frame(rows=700, seed=0, flip_every=0, shift=0.0):
 
 
 def findings(result):
-    return " | ".join(result.profile.quality_findings)
+    return " | ".join(result.profile.quality)
 
 
 def test_noisy_labels_and_a_shifted_reference_are_reported(tmp_path):
@@ -31,7 +31,7 @@ def test_noisy_labels_and_a_shifted_reference_are_reported(tmp_path):
         frame(flip_every=6),
         "y",
         metric="roc_auc",
-        time_budget=45,
+        budget=45,
         reference=str(reference),
     ).run()
 
@@ -39,10 +39,10 @@ def test_noisy_labels_and_a_shifted_reference_are_reported(tmp_path):
     assert "label noise" in text
     assert "representativeness" in text and "'a'" in text
     report = json.loads(
-        (result.run_dir / "curation_report.json").read_text(encoding="utf-8")
+        (result.directory / "curation_report.json").read_text(encoding="utf-8")
     )
     profile = json.loads(
-        (result.run_dir / "dataset_profile.json").read_text(encoding="utf-8")
+        (result.directory / "dataset_profile.json").read_text(encoding="utf-8")
     )
     evidence_by_observation = {
         item["observation"]: item for item in profile["evidence"]
@@ -90,7 +90,7 @@ def test_clean_data_with_a_matching_reference_reports_nothing(tmp_path):
         frame(),
         "y",
         metric="roc_auc",
-        time_budget=45,
+        budget=45,
         reference=str(reference),
     ).run()
 

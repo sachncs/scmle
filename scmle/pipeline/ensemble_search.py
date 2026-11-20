@@ -50,19 +50,18 @@ class Stacker:
             Up to `size` trials of distinct, non-baseline, non-ensemble
             models, best first.
         """
-        sign = 1 if self.metric.greater_is_better else -1
+        sign = 1 if self.metric.maximize else -1
         eligible = [
             t
             for t in evaluated
             if t.status is experiments.Termination.OK
             and t.strategy == experiments.DEFAULT_STRATEGY
-            and t.model_name not in COMBINERS
-            and self.board.services.registry.get(t.model_name).family
-            != "baseline"
+            and t.model not in COMBINERS
+            and self.board.services.registry.get(t.model).family != "baseline"
         ]
         best: dict[str, experiments.Trial] = {}
-        for trial in sorted(eligible, key=lambda t: -sign * t.score_mean):
-            best.setdefault(trial.model_name, trial)
+        for trial in sorted(eligible, key=lambda t: -sign * t.score):
+            best.setdefault(trial.model, trial)
         return list(best.values())[:size]
 
     def search(self, evaluated: list[experiments.Trial]) -> None:
@@ -95,8 +94,7 @@ class Stacker:
             return
         params = {
             "members": [
-                {"model": t.model_name, "params": dict(t.params)}
-                for t in members
+                {"model": t.model, "params": dict(t.params)} for t in members
             ]
         }
         task = self.task
@@ -117,7 +115,7 @@ class Stacker:
                 combiner,
                 members[0],
                 outcome,
-                [t.model_name for t in members],
+                [t.model for t in members],
             )
 
     def judge(
@@ -145,12 +143,12 @@ class Stacker:
                 f"trial {outcome.status}: {outcome.error}",
             )
             return
-        sign = 1 if self.metric.greater_is_better else -1
-        gain = sign * (outcome.score_mean - leader.score_mean)
+        sign = 1 if self.metric.maximize else -1
+        gain = sign * (outcome.score - leader.score)
         self.board.journal.enter(
             combiner,
             experiments.Edict.INCLUDE if gain > 0 else experiments.Edict.REJECT,
             f"{combiner} of {', '.join(names)}: cv {self.metric.name} "
-            f"{outcome.score_mean:.4f} vs best member {leader.score_mean:.4f} "
+            f"{outcome.score:.4f} vs best member {leader.score:.4f} "
             f"({gain:+.4f} in the metric's favour)",
         )

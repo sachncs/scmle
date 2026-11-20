@@ -1,6 +1,6 @@
 """Experiment stores.
 
-`Store` is the tracking contract; `SqliteExperimentStore` is the
+`Store` is the tracking contract; `Sqlite` is the
 zero-service local backend, and `Null` is the do-nothing
 implementation that lets callers skip None checks. External trackers (for
 example MLflow) implement the same interface.
@@ -195,7 +195,7 @@ class Null(Store):
         return []
 
 
-class SqliteExperimentStore(Store):
+class Sqlite(Store):
     """Local SQLite tracking database (one file, no services).
 
     Attributes:
@@ -409,15 +409,15 @@ class SqliteExperimentStore(Store):
                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     run_id,
-                    trial.trial_id,
-                    trial.model_name,
+                    trial.identifier,
+                    trial.model,
                     str(trial.status),
                     trial.metric,
-                    trial.score_mean,
-                    trial.score_std,
-                    trial.fit_seconds,
+                    trial.score,
+                    trial.deviation,
+                    trial.fit,
                     json.dumps(trial.params, default=str),
-                    json.dumps(trial.fold_scores),
+                    json.dumps(trial.folds),
                     trial.error,
                     trial.strategy,
                 ),

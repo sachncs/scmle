@@ -71,7 +71,7 @@ and envelopes, `rules` the state machine of each row kind and `chain` the
 ledger itself.
 """
 
-from scmle.governance.deployment_ledger.chain import DeploymentLedger
+from scmle.governance.deployment_ledger.chain import Ledger
 from scmle.governance.deployment_ledger.grants import Attestation
 from scmle.governance.deployment_ledger.grants import Envelope
 from scmle.governance.deployment_ledger.kinds import ALARM
@@ -101,7 +101,7 @@ from scmle.governance.deployment_ledger.kinds import mapped
 from scmle.governance.deployment_ledger.kinds import MisuseError
 from scmle.governance.deployment_ledger.kinds import OBSERVE_SUMMARY
 from scmle.governance.deployment_ledger.kinds import OPEN
-from scmle.governance.deployment_ledger.kinds import parse_date
+from scmle.governance.deployment_ledger.kinds import parse
 from scmle.governance.deployment_ledger.kinds import PHASE_OPEN
 from scmle.governance.deployment_ledger.kinds import PHASE_TIMEOUT
 from scmle.governance.deployment_ledger.kinds import PROMOTION_PROPOSAL
@@ -157,12 +157,12 @@ __all__ = [
     "ROLLOUT_EXPERIMENT",
     "TICK",
     "Attestation",
-    "DeploymentLedger",
     "Envelope",
+    "Ledger",
     "MisuseError",
     "Reply",
     "mapped",
-    "parse_date",
+    "parse",
     "sequential_tests",
     "thumbprint",
 ]

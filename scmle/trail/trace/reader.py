@@ -18,9 +18,9 @@ class Reader:
         findings: Problems found so far.
         steps: Steps derived so far, by kind.
         cache: Retained JSON records already read, by relative path.
-        charter_hash: Digest of the charter, once derived.
-        content_id: SHA-256 of the model manifest file, once derived.
-        run_id: Identifier of the run that produced the model, as named in the
+        charter: Digest of the charter, once derived.
+        content: SHA-256 of the model manifest file, once derived.
+        run: Identifier of the run that produced the model, as named in the
             retained evaluation, once derived.
         inputs: The parsed ``inputs.json``; empty if it could not be read.
         derived: Derived reports by relative path or pseudo-file name.
@@ -41,9 +41,9 @@ class Reader:
         self.findings: list[finding.Finding] = []
         self.steps: dict[str, dict[str, Any]] = {}
         self.cache: dict[str, Any] = {}
-        self.charter_hash = ""
-        self.content_id = ""
-        self.run_id = ""
+        self.charter = ""
+        self.content = ""
+        self.run = ""
         self.inputs: dict[str, Any] = {}
         self.derived: dict[str, Any] = {}
 
@@ -93,7 +93,7 @@ class Reader:
         value = None
         if path is not None:
             try:
-                value = records.read_json(path)
+                value = records.read(path)
             except ValueError:
                 # handled: recorded as trace problem
                 self.problem(
@@ -119,7 +119,7 @@ class Reader:
         if path is None:
             return None
         try:
-            return records.read_lines(path)
+            return records.scan(path)
         except ValueError:
             # handled: recorded as trace problem
             self.problem(
@@ -228,7 +228,7 @@ class Reader:
             self.problem(finding.MISSING_LINK, name, f"{relative} is absent")
         else:
             try:
-                stored = records.read_json(stored_path)
+                stored = records.read(stored_path)
             except ValueError:
                 # handled: unparseable stored file reported as mismatch problem
                 stored = None

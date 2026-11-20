@@ -50,7 +50,7 @@ class Uncertainty:
             bundle: The model bundle, not yet saved.
         """
         if self.report is not None:
-            bundle.coverage_report = self.report
+            bundle.report = self.report
 
     def entries(self) -> records.Layout:
         """The evaluation record's coverage entry, when one was measured.
@@ -132,7 +132,7 @@ class Bracketing(diagnosis.Diagnosis):
         if cost.halt(board, selected, "quantile intervals"):
             return None
         split = partition.split
-        plan = partition.profile.feature_plan
+        plan = partition.profile.plan
         adapter = board.services.registry.get("hist_gradient_boosting")
         seed = board.services.spec.validation.seed
 

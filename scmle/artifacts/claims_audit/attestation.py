@@ -112,8 +112,8 @@ def vouch(run_dir: Path, signing_key: str | bytes | None) -> verdict.Finding:
         passing.
     """
     name = "causal attestations verify"
-    claims = files.read_optional(run_dir / files.CAUSAL_FILE)
-    record = files.read_optional(run_dir / files.CHARTER_FILE)
+    claims = files.read(run_dir / files.CAUSAL_FILE)
+    record = files.read(run_dir / files.CHARTER_FILE)
     if claims is None or record is None:
         return verdict.Finding(
             name, verdict.SKIPPED, "no causal claims or charter file"

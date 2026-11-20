@@ -24,20 +24,20 @@ def regression(tmp_path_factory):
     return support.make_project(
         regression_frame(),
         "y",
-        time_budget=300,
-        output_dir=tmp_path_factory.mktemp("covreg"),
+        budget=300,
+        directory=tmp_path_factory.mktemp("covreg"),
     ).run()
 
 
 def test_a_regression_run_writes_a_coverage_report(regression):
-    path = pathlib.Path(regression.run_dir) / "coverage_report.json"
+    path = pathlib.Path(regression.directory) / "coverage_report.json"
     report = json.loads(path.read_text())
     assert report["kind"] == "regression"
     assert {"residual", "quantile", "cv_plus"} <= set(report["methods"])
     entry = report["methods"]["residual"]["0.9"]
     assert entry["marginal"]["rows"] == report["rows"] > 0
     assert entry["tier"] in {"confirmed", "unverified"}
-    assert regression.bundle.coverage_report == report
+    assert regression.bundle.report == report
 
 
 def test_the_report_is_saved_with_the_bundle_and_checksummed(
@@ -45,7 +45,7 @@ def test_the_report_is_saved_with_the_bundle_and_checksummed(
 ):
     regression.bundle.save(tmp_path / "copy")
     loaded = scmle.artifacts.bundle.Bundle.load(tmp_path / "copy", trusted=True)
-    assert loaded.coverage_report == regression.bundle.coverage_report
+    assert loaded.report == regression.bundle.report
     path = tmp_path / "copy" / bundle.COVERAGE_FILE
     path.write_text(path.read_text().replace("0.9", "0.8", 1))
     with pytest.raises(errors.ArtifactError, match="coverage report"):
@@ -54,9 +54,9 @@ def test_the_report_is_saved_with_the_bundle_and_checksummed(
 
 def test_a_classification_run_reports_sets_by_class(tmp_path, binary_frame):
     result = support.make_project(
-        binary_frame, "y", time_budget=300, output_dir=tmp_path
+        binary_frame, "y", budget=300, directory=tmp_path
     ).run()
-    report = result.bundle.coverage_report
+    report = result.bundle.report
     assert report is not None and report["kind"] == "classification"
     entry = report["methods"]["class_conditional"]["0.9"]
     assert set(entry["by_class"]) == {"0", "1"}

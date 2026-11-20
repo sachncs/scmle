@@ -12,7 +12,7 @@ from tests.unit import test_workflow
 
 @pytest.fixture
 def store(tmp_path):
-    return objectstore.LocalObjectStore(tmp_path / "state")
+    return objectstore.Disk(tmp_path / "state")
 
 
 def test_a_transient_failure_is_retried_and_dependents_are_skipped(store):

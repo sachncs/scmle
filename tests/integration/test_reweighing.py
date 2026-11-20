@@ -52,9 +52,9 @@ def test_a_project_trained_on_the_weights_selects_more_evenly():
             frame,
             "y",
             metric="roc_auc",
-            time_budget=60,
-            weight_column=weight_column,
-            sensitive_columns=["group"],
+            budget=60,
+            weight=weight_column,
+            sensitive=["group"],
         ).run()
         scored = result.predict(frame.drop(columns="y"))
         rates = pandas.Series(scored).groupby(frame.group.to_numpy()).mean()
@@ -71,8 +71,8 @@ def test_the_fairness_option_reweights_development_rows_automatically():
             frame,
             "y",
             metric="roc_auc",
-            time_budget=60,
-            sensitive_columns=["group"],
+            budget=60,
+            sensitive=["group"],
             fairness=tasks.Parity(mitigation=mitigation),
         ).run()
         scored = result.predict(frame.drop(columns="y"))
@@ -84,7 +84,7 @@ def test_the_fairness_option_reweights_development_rows_automatically():
 
     assert narrow < wide
     log = json.loads(
-        (reweighed.run_dir / "diagnostics/decision_log.json").read_text()
+        (reweighed.directory / "diagnostics/decision_log.json").read_text()
     )
     notes = [
         o["reason"]
@@ -100,8 +100,8 @@ def test_reweighing_cannot_be_combined_with_a_weight_column():
         scmle.api.project.Project(
             biased().assign(w=1.0),
             "y",
-            weight_column="w",
-            sensitive_columns=["group"],
+            weight="w",
+            sensitive=["group"],
             fairness=tasks.Parity(mitigation="reweighing"),
         )
 
@@ -119,8 +119,8 @@ def test_a_regression_project_reweights_by_outcome_bins():
             frame,
             "y",
             task="regression",
-            time_budget=60,
-            sensitive_columns=["group"],
+            budget=60,
+            sensitive=["group"],
             fairness=tasks.Parity(mitigation=mitigation),
         ).run()
         scored = pandas.Series(result.predict(frame.drop(columns="y")))
@@ -131,9 +131,9 @@ def test_a_regression_project_reweights_by_outcome_bins():
     unchanged, wide = run("none")
 
     assert narrow < wide
-    assert unchanged.run_dir != reweighed.run_dir
+    assert unchanged.directory != reweighed.directory
     log = json.loads(
-        (reweighed.run_dir / "diagnostics/decision_log.json").read_text()
+        (reweighed.directory / "diagnostics/decision_log.json").read_text()
     )
     notes = [
         (o["action"], o["reason"])
@@ -190,7 +190,7 @@ def test_the_cli_mitigation_option_reweights_a_regression_run(tmp_path):
 
 def test_the_cli_refuses_an_unknown_mitigation(capsys):
     with pytest.raises(SystemExit) as caught:
-        cli.build_parser().parse_args(
+        cli.build().parse_args(
             ["run", "d.csv", "--target", "y", "--mitigation", "bogus"]
         )
 

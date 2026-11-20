@@ -83,7 +83,7 @@ class ProcessorMachine(RuleBasedStateMachine):
     def __init__(self):
         super().__init__()
         self.directory = tempfile.TemporaryDirectory()
-        self.store = objectstore.LocalObjectStore(
+        self.store = objectstore.Disk(
             pathlib.Path(self.directory.name) / "root"
         )
         self.objects = {}

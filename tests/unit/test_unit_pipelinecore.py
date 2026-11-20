@@ -58,7 +58,7 @@ class Board(journal.Journal):
         self.revised = []
         tracker = types.SimpleNamespace(
             transcribe=lambda run, outcome: self.tracked.append(
-                (run, outcome.trial_id)
+                (run, outcome.identifier)
             ),
             revise=lambda run, **fields: self.revised.append((run, fields)),
         )
@@ -101,7 +101,7 @@ def test_a_preview_journal_writes_nothing(tmp_path):
     board.transcribe(trial("t1"))
     assert board.tracked == []
     assert board.revised == []
-    assert [t.trial_id for t in board.trials] == ["t1"]
+    assert [t.identifier for t in board.trials] == ["t1"]
 
 
 def test_forgo_records_and_announces_the_skipped_work(tmp_path):
@@ -195,8 +195,8 @@ def situation(spec=None, rows=10, width=2, wide=()):
     )
     profile = types.SimpleNamespace(
         manifest=types.SimpleNamespace(rows=rows),
-        feature_plan=plan,
-        target_summary={"n_classes": 2},
+        plan=plan,
+        summary={"n_classes": 2},
     )
     return rules.Situation(spec or config(), profile, tasks.Task.BINARY)
 
@@ -442,7 +442,7 @@ class Tuner(hyperband.Hyperband):
     def __init__(self, folds=9, eta=3, configs=6, failing=(), skip=None):
         self.runner = Runner(folds, failing)
         self.search = types.SimpleNamespace(eta=eta, configs_per_model=configs)
-        self.metric = types.SimpleNamespace(greater_is_better=True)
+        self.metric = types.SimpleNamespace(maximize=True)
         self.recorded = []
         self.board = types.SimpleNamespace(
             services=types.SimpleNamespace(
@@ -487,10 +487,10 @@ def test_a_bracket_keeps_the_best_third_at_each_rung():
     pruned = [
         t for t in tuner.recorded if t.status is experiments.Termination.PRUNED
     ]
-    assert [t.trial_id for t in pruned] == ["t1", "t2", "t3", "t4", "t5"]
+    assert [t.identifier for t in pruned] == ["t1", "t2", "t3", "t4", "t5"]
     assert pruned[0].error == "pruned before the 3 rung"
     assert pruned[-1].error == "pruned before the full rung"
-    assert tuner.recorded[-1].trial_id == "t6"
+    assert tuner.recorded[-1].identifier == "t6"
     assert tuner.recorded[-1].status is experiments.Termination.OK
     assert optimizer.told[-1] == (6, 6.0)
     assert len(optimizer.told) == 6
@@ -508,7 +508,7 @@ def test_a_failed_survivor_is_recorded_without_telling_the_optimizer():
 
 def test_lower_is_better_keeps_the_smallest_scores():
     tuner = Tuner()
-    tuner.metric.greater_is_better = False
+    tuner.metric.maximize = False
     tuner.ascend("m", "default", Optimizer(), 3, [1, None])
     assert tuner.runner.calls[1] == [("t1", None)]
 
@@ -567,7 +567,7 @@ class Stacking(ensemble_search.Stacker):
             ),
         )
         self.metric = types.SimpleNamespace(
-            greater_is_better=greater, name="accuracy"
+            maximize=greater, name="accuracy"
         )
         self.runner = types.SimpleNamespace(
             run=lambda trial_id, combiner, params: trial(
@@ -588,14 +588,14 @@ def test_members_are_the_best_default_trial_of_each_model():
         trial("7", "d", 0.98, status=experiments.Termination.FAILED),
         trial("8", "e", 0.1),
     ]
-    assert [t.trial_id for t in stacker.members(evaluated, 3)] == [
+    assert [t.identifier for t in stacker.members(evaluated, 3)] == [
         "2",
         "3",
         "8",
     ]
-    assert [t.trial_id for t in stacker.members(evaluated, 2)] == ["2", "3"]
-    stacker.metric.greater_is_better = False
-    assert [t.trial_id for t in stacker.members(evaluated, 3)] == [
+    assert [t.identifier for t in stacker.members(evaluated, 2)] == ["2", "3"]
+    stacker.metric.maximize = False
+    assert [t.identifier for t in stacker.members(evaluated, 3)] == [
         "8",
         "1",
         "3",
@@ -629,7 +629,7 @@ def test_search_does_nothing_for_a_small_size_or_a_skip():
 def test_search_evaluates_and_judges_each_combiner():
     stacker = Stacking()
     stacker.search([trial("1", "a", 0.8), trial("2", "b", 0.7)])
-    assert [t.model_name for t in stacker.recorded] == ["stacking", "blending"]
+    assert [t.model for t in stacker.recorded] == ["stacking", "blending"]
     assert stacker.entered[0] == (
         "stacking",
         experiments.Edict.INCLUDE,
@@ -653,7 +653,7 @@ def test_search_rejects_a_combiner_its_adapter_objects_to_without_running_it():
         experiments.Edict.REJECT,
         "needs probabilities",
     )
-    assert [t.model_name for t in stacker.recorded] == ["blending"]
+    assert [t.model for t in stacker.recorded] == ["blending"]
 
 
 def test_a_stacker_reads_the_metric_and_task_from_its_runner():
@@ -677,7 +677,7 @@ def test_judge_rejects_a_tie_a_loss_and_a_failure():
         experiments.Edict.REJECT,
         "trial failed: boom",
     )
-    stacker.metric.greater_is_better = False
+    stacker.metric.maximize = False
     stacker.judge("blending", leader, trial("e", "blending", 0.5), ["a"])
     assert stacker.entered[-1][1] is experiments.Edict.INCLUDE
     assert "(+0.4000 in the metric's favour)" in stacker.entered[-1][2]

@@ -18,7 +18,7 @@ SYSTEM_KEY = "system-key"
 
 
 def make(path=None):
-    return chain.DeploymentLedger.create(
+    return chain.Ledger.create(
         path,
         charter_hash="c" * 64,
         policy={"r": 1},
@@ -110,11 +110,11 @@ def test_thumbprint_is_a_domain_separated_prefix():
 
 
 def test_parse_date_reads_iso_dates_only():
-    assert kinds.parse_date("2026-01-02", "d") == datetime.date(2026, 1, 2)
+    assert kinds.parse("2026-01-02", "d") == datetime.date(2026, 1, 2)
     with pytest.raises(kinds.MisuseError, match="d must be YYYY-MM-DD"):
-        kinds.parse_date("02/01/2026", "d")
+        kinds.parse("02/01/2026", "d")
     with pytest.raises(kinds.MisuseError, match="x must be YYYY-MM-DD"):
-        kinds.parse_date(None, "x")
+        kinds.parse(None, "x")
 
 
 # ---- grants ----------------------------------------------------------------
@@ -257,23 +257,23 @@ def test_load_reads_back_and_checks_the_head(tmp_path):
     path = tmp_path / kinds.FILE_NAME
     book = make(path)
     book.commit(kinds.ALARM, {"batch": 1})
-    again = chain.DeploymentLedger.load(path, expected_head=book.head)
+    again = chain.Ledger.load(path, expected_head=book.head)
     assert again.rows == book.rows
     with pytest.raises(kinds.MisuseError, match="does not match the recorded"):
-        chain.DeploymentLedger.load(path, expected_head="x")
+        chain.Ledger.load(path, expected_head="x")
 
 
 def test_load_refuses_missing_empty_and_garbled_files(tmp_path):
     with pytest.raises(kinds.MisuseError, match="does not exist"):
-        chain.DeploymentLedger.load(tmp_path / "none")
+        chain.Ledger.load(tmp_path / "none")
     empty = tmp_path / "empty"
     empty.write_text("\n\n")
     with pytest.raises(kinds.MisuseError, match="ledger is empty"):
-        chain.DeploymentLedger.load(empty)
+        chain.Ledger.load(empty)
     garbled = tmp_path / "bad"
     garbled.write_text("{")
     with pytest.raises(kinds.MisuseError, match="ledger row 0 is not JSON"):
-        chain.DeploymentLedger.load(garbled)
+        chain.Ledger.load(garbled)
 
 
 def test_ingest_refuses_broken_rows():
@@ -296,7 +296,7 @@ def test_ingest_refuses_broken_rows():
 
 
 def test_the_first_row_must_be_open():
-    empty = chain.DeploymentLedger(None)
+    empty = chain.Ledger(None)
     with pytest.raises(kinds.MisuseError, match="first ledger row must be"):
         empty.commit(kinds.ALARM, {})
 
@@ -325,11 +325,11 @@ def test_apply_open_checks_version_and_policy_hash():
     state = rules.Oversight(None)
     body = make().rows[0]["body"]
     with pytest.raises(kinds.MisuseError, match="unsupported ledger version"):
-        state.apply_open({**body, "ledger_version": 2})
+        state.apply({**body, "ledger_version": 2})
     with pytest.raises(kinds.MisuseError, match="does not match its hash"):
-        state.apply_open({**body, "policy": {"r": 2}})
-    state.apply_open(body)
-    assert state.system_keys == frozenset(body["system_keys"])
+        state.apply({**body, "policy": {"r": 2}})
+    state.apply(body)
+    assert state.keys == frozenset(body["system_keys"])
 
 
 def test_challengers_register_then_replay_their_decision():
@@ -463,7 +463,7 @@ def test_an_envelope_counts_uses_until_spent_or_revoked():
         book.commit(kinds.ENVELOPE_USED, {**use, "envelope_id": "env-9"})
     book.commit(kinds.ENVELOPE_USED, use)
     book.commit(kinds.ENVELOPE_USED, use)
-    assert book.envelope_uses["env-1"] == {"train_challenger": 2}
+    assert book.uses["env-1"] == {"train_challenger": 2}
     with pytest.raises(kinds.MisuseError, match="spent its 2 use"):
         book.commit(kinds.ENVELOPE_USED, use)
     book.commit(kinds.ENVELOPE_REVOKED, {"envelope_id": "env-1"})

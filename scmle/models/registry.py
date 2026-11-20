@@ -270,7 +270,7 @@ class Catalog:
             if not adapter.capabilities.standalone:
                 continue
             if (
-                not adapter.auto_candidate
+                not adapter.candidate
                 and adapter.name not in experimental_models
             ):
                 rejected[adapter.name] = (

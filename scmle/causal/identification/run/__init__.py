@@ -25,13 +25,13 @@ replace entries of `ADAPTERS`, the one registry `identify` reads.
 
 from scmle.causal.identification import tier
 from scmle.causal.identification.run.adjustment import Backdoor
-from scmle.causal.identification.run.adjustment import RandomizedEstimator
+from scmle.causal.identification.run.adjustment import Experiment
 from scmle.causal.identification.run.analysis import ADAPTERS
 from scmle.causal.identification.run.analysis import alphas
 from scmle.causal.identification.run.analysis import BATTERY_GATES
 from scmle.causal.identification.run.analysis import caveats
 from scmle.causal.identification.run.analysis import DESIGN_GATES
-from scmle.causal.identification.run.analysis import design_only
+from scmle.causal.identification.run.analysis import diagnose
 from scmle.causal.identification.run.analysis import fragility
 from scmle.causal.identification.run.analysis import identify
 from scmle.causal.identification.run.analysis import INTERVAL_GATES
@@ -48,15 +48,15 @@ from scmle.causal.identification.run.documents import refuse
 from scmle.causal.identification.run.estimator import Est
 from scmle.causal.identification.run.estimator import Estimator
 from scmle.causal.identification.run.estimator import waldify
+from scmle.causal.identification.run.exogeneity import Discontinuity
 from scmle.causal.identification.run.exogeneity import Instrument
-from scmle.causal.identification.run.exogeneity import RdEstimator
-from scmle.causal.identification.run.panel import DiD
+from scmle.causal.identification.run.panel import Differences
 from scmle.causal.identification.run.panel import Synth
 from scmle.causal.identification.run.strata import certify
+from scmle.causal.identification.run.strata import estimate
 from scmle.causal.identification.run.strata import MIN_STRATUM_ROWS
 from scmle.causal.identification.run.strata import replication
 from scmle.causal.identification.run.strata import stratify
-from scmle.causal.identification.run.strata import subgroup_results
 
 __all__ = [
     "ADAPTERS",
@@ -69,27 +69,27 @@ __all__ = [
     "NOT_ESTIMATED",
     "SENSITIVITY_GATES",
     "Backdoor",
-    "DiD",
+    "Differences",
+    "Discontinuity",
     "Est",
     "Estimator",
+    "Experiment",
     "Instrument",
     "Outcome",
-    "RandomizedEstimator",
-    "RdEstimator",
     "Synth",
     "alphas",
     "arbitrate",
     "assemble",
     "caveats",
     "certify",
-    "design_only",
+    "diagnose",
     "digest",
+    "estimate",
     "fragility",
     "identify",
     "prerequisites",
     "refuse",
     "replication",
     "stratify",
-    "subgroup_results",
     "waldify",
 ]

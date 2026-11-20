@@ -72,11 +72,11 @@ class Observation:
         """Returns reviewable evidence, including unknown values as ``null``."""
         environment = self.environment
         values = {
-            "cpu_cores": environment.cpu_cores,
-            "memory_gb": environment.memory_gb,
-            "disk_gb": environment.disk_gb,
-            "gpu_available": environment.gpu_available,
-            "network_available": environment.network_available,
+            "cpu_cores": environment.cores,
+            "memory_gb": environment.memory,
+            "disk_gb": environment.disk,
+            "gpu_available": environment.available,
+            "network_available": environment.online,
         }
         return {
             "schema_version": OBSERVATION_SCHEMA_VERSION,
@@ -84,7 +84,7 @@ class Observation:
             "disk_path": self.disk,
             "environment": {
                 **values,
-                "available_extras": sorted(environment.available_extras),
+                "available_extras": sorted(environment.extras),
             },
             "observations": {
                 name: {
@@ -127,14 +127,14 @@ def observe(
     disk_gb, disk_source = freespace(selected_path)
     extras, extra_observations, extra_sources = optionals()
     environment = capabilities.Environment(
-        available_extras=extras,
-        cpu_cores=cpu_cores,
-        memory_gb=memory_gb,
-        disk_gb=disk_gb,
+        extras=extras,
+        cores=cpu_cores,
+        memory=memory_gb,
+        disk=disk_gb,
         # These are intentionally not guessed here. A capability
         # that declares either requirement therefore fails closed.
-        gpu_available=None,
-        network_available=None,
+        available=None,
+        online=None,
     )
     return Observation(
         environment,

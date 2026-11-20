@@ -83,7 +83,7 @@ def persist(
     """
     path = run_dir / name
     run_dir.mkdir(parents=True, exist_ok=True)
-    durability.write_atomically(
+    durability.write(
         path, (json.dumps(document, indent=2, sort_keys=True) + "\n").encode()
     )
     return path

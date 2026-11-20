@@ -58,17 +58,17 @@ def run(table, tmp_path, charter, **kwargs):
     return support.make_project(
         table,
         "y",
-        time_budget=300,
-        output_dir=tmp_path / "out",
+        budget=300,
+        directory=tmp_path / "out",
         charter=charter,
-        group_column="entity",
-        baseline_column="current",
+        group="entity",
+        baseline="current",
         **kwargs,
     ).run()
 
 
 def read(result, name):
-    return json.loads((pathlib.Path(result.run_dir) / name).read_text())
+    return json.loads((pathlib.Path(result.directory) / name).read_text())
 
 
 def test_the_claim_is_registered_by_hash_and_tested_once_on_c(tmp_path):
@@ -82,7 +82,7 @@ def test_the_claim_is_registered_by_hash_and_tested_once_on_c(tmp_path):
     assert entry["kind"] == "baseline"
     assert entry["sha256"] == report["digests"]["registration"]
     ledger = scmle.assurance.ledger.ledger.Ledger.load(
-        pathlib.Path(result.run_dir) / scmle.assurance.ledger.ledger.FILE_NAME
+        pathlib.Path(result.directory) / scmle.assurance.ledger.ledger.FILE_NAME
     )
     assert (
         ledger.claims["baseline_vs_current_process"]["sha256"]
@@ -90,7 +90,7 @@ def test_the_claim_is_registered_by_hash_and_tested_once_on_c(tmp_path):
     )
     sealed = ledger.confirmation["attachments"]
     assert set(sealed) == {"baseline_report.json"}
-    log = (pathlib.Path(result.run_dir) / "custody_log.jsonl").read_text()
+    log = (pathlib.Path(result.directory) / "custody_log.jsonl").read_text()
     assert log.count('"event":"open"') + log.count('"event": "open"') == 1
 
 
@@ -138,13 +138,13 @@ def test_a_charter_run_without_the_column_is_unchanged(tmp_path):
     result = support.make_project(
         frame(),
         "y",
-        time_budget=300,
-        output_dir=tmp_path / "out",
+        budget=300,
+        directory=tmp_path / "out",
         charter=charter_file(tmp_path),
-        group_column="entity",
+        group="entity",
     ).run()
 
-    folder = pathlib.Path(result.run_dir)
+    folder = pathlib.Path(result.directory)
     assert not (folder / "baseline_report.json").exists()
     assert "registered_claims" not in read(result, "confirmed_claims.json")
 
@@ -152,26 +152,26 @@ def test_a_charter_run_without_the_column_is_unchanged(tmp_path):
 def test_claims_lists_and_verifies_the_registered_claim(tmp_path, capsys):
     result = run(frame(), tmp_path, charter_file(tmp_path))
 
-    rows = claims_audit.inventory(result.run_dir)
+    rows = claims_audit.inventory(result.directory)
     registered = [r for r in rows if r.get("kind") == "baseline"]
     assert len(registered) == 1
     assert registered[0]["status"] in {"issued", "not_shown"}
-    verified = claims_audit.verify(result.run_dir)
+    verified = claims_audit.verify(result.directory)
     names = {f.name: f.status for f in verified.findings}
     assert names["registered claims: files hash to the sealed ledger"] == "pass"
     assert verified.ok
-    assert cli.main(["claims", "list", str(result.run_dir)]) == 0
+    assert cli.main(["claims", "list", str(result.directory)]) == 0
     assert "registered baseline" in capsys.readouterr().out
 
-    folder = pathlib.Path(result.run_dir)
+    folder = pathlib.Path(result.directory)
     report = json.loads((folder / "baseline_report.json").read_text())
     report["issued"] = not report["issued"]
     (folder / "baseline_report.json").write_text(json.dumps(report))
-    assert not claims_audit.verify(result.run_dir).ok
+    assert not claims_audit.verify(result.directory).ok
 
 
 def kinds(result):
-    lines = (pathlib.Path(result.run_dir) / "events.jsonl").read_text()
+    lines = (pathlib.Path(result.directory) / "events.jsonl").read_text()
     return [json.loads(line)["kind"] for line in lines.splitlines()]
 
 
@@ -180,7 +180,7 @@ def test_the_selected_model_is_the_subject_of_the_claim(tmp_path):
         frame(),
         tmp_path,
         charter_file(tmp_path),
-        baseline_subject="selected_model",
+        subject="selected_model",
     )
 
     report = read(result, "baseline_report.json")
@@ -197,7 +197,7 @@ def test_the_selected_model_is_the_subject_of_the_claim(tmp_path):
     entry = claims["registered_claims"]["baseline_vs_current_process"]
     assert entry["sha256"] == report["digests"]["registration"]
     assert subject["selection_sha256"]
-    log = (pathlib.Path(result.run_dir) / "custody_log.jsonl").read_text()
+    log = (pathlib.Path(result.directory) / "custody_log.jsonl").read_text()
     assert log.count('"event":"open"') + log.count('"event": "open"') == 1
 
 

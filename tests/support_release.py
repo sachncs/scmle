@@ -66,13 +66,13 @@ def target(document=None, **changes):
 
 def golden():
     loaded = parity.goldens(GOLDEN)
-    return loaded, parity.read_json(GOLDEN / "expected.json")
+    return loaded, parity.read(GOLDEN / "expected.json")
 
 
 def run_live(document=None, **changes):
     document = document or recorded()
     loaded, expected = golden()
-    return livetests.run_checks(
+    return livetests.check(
         fetch_from(document), target(document, **changes), loaded, expected
     )
 
@@ -95,12 +95,12 @@ def approval(**changes):
     values = {
         "model": "churn",
         "version": 3,
-        "content_id": "9" * 64,
+        "content": "9" * 64,
         "reviewer": "reviewer-1",
         "decision": registry.Verdict.APPROVED,
         "reason": "evidence reviewed",
         "evidence": ("ticket-17",),
-        "approved_at": NOW,
+        "approved": NOW,
         "independent": True,
     }
     values.update(changes)
@@ -115,7 +115,7 @@ def seen(**changes):
         "image_digest": CONTAINER,
         "ready": True,
         "traffic": (observation.Traffic("serve:12", 100),),
-        "observed_at": NOW,
+        "observed": NOW,
     }
     values.update(changes)
     return observation.Observation(**values)
@@ -127,16 +127,16 @@ def candidate(environment="staging", **changes):
     values = {
         "environment": environment,
         "provider": "aws",
-        "source_commit": COMMIT,
+        "commit": COMMIT,
         "model": version(),
-        "model_digest": document["model_digest"],
+        "reported": document["model_digest"],
         "approval": approval(),
-        "container_digest": CONTAINER,
-        "config_digest": CONFIG,
-        "requested_by": "author",
+        "container": CONTAINER,
+        "digest": CONFIG,
+        "requester": "author",
         "approver": "release-manager",
-        "approved_at": NOW,
-        "scan": gate.ImageScan(CONTAINER, True, SCAN_REPORT),
+        "approved": NOW,
+        "scan": gate.Scan(CONTAINER, True, SCAN_REPORT),
         "checks": checks,
         "observation": seen(),
     }

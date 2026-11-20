@@ -272,14 +272,12 @@ class Stacking(models.Model):
     family = "ensemble"
     capabilities = models.Capabilities(
         tasks.STANDARD_TASKS,
-        needs_scaling=True,
+        scaling=True,
         standalone=False,
         cost=5,
     )
 
-    conformance_params = {
-        "members": [{"model": "decision_tree"}, {"model": "extra_trees"}]
-    }
+    params = {"members": [{"model": "decision_tree"}, {"model": "extra_trees"}]}
 
     def __init__(self, registry: models.Resolver) -> None:
         """Initializes the adapter.
@@ -346,10 +344,10 @@ class Stacking(models.Model):
             )
             for index, member in enumerate(members)
         ]
-        inner = inner_cv.tailor(plan, task.is_classification, STACK_FOLDS, seed)
+        inner = inner_cv.tailor(plan, task.classification, STACK_FOLDS, seed)
         meta = self.stacker(task, len(estimators))
         stack: models.Estimator
-        if task.is_classification:
+        if task.classification:
             stack = cast(
                 "models.Estimator",
                 ensemble.StackingClassifier(
@@ -379,7 +377,7 @@ class Stacking(models.Model):
             An unfitted logistic regression for classification, otherwise a
             cross-validated ridge regression.
         """
-        if task.is_classification:
+        if task.classification:
             return linear_model.LogisticRegression(max_iter=1000)
         return linear_model.RidgeCV()
 
@@ -413,7 +411,7 @@ class Stacking(models.Model):
         ]
         meta = self.stacker(task, len(estimators))
         stack: models.Estimator
-        if task.is_classification:
+        if task.classification:
             stack = cast(
                 "models.Estimator",
                 ensemble.StackingClassifier(
@@ -449,6 +447,6 @@ class Blending(Stacking):
             An unfitted classifier blender for classification, otherwise a
             regressor blender.
         """
-        if task.is_classification:
+        if task.classification:
             return ClassifierBlender(members)
         return RegressorBlender(members)

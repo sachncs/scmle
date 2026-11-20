@@ -23,8 +23,8 @@ def result(tmp_path_factory):
     return support.make_project(
         heteroscedastic(1500, 0),
         "y",
-        time_budget=300,
-        output_dir=tmp_path_factory.mktemp("quantile"),
+        budget=300,
+        directory=tmp_path_factory.mktemp("quantile"),
     ).run()
 
 

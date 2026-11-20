@@ -14,21 +14,21 @@ from scmle.contracts.evaluation import support
 
 def gates(**changes):
     values = {
-        "metric_gates": (
+        "metrics": (
             parts.Hurdle(
                 metric="roc_auc",
                 direction=support.Orientation.MAXIMIZE,
                 threshold=0.7,
             ),
         ),
-        "diagnostic_gates": (
+        "diagnostics": (
             parts.Requirement(
                 name="metric_uncertainty",
                 action=support.Remedy.BLOCK,
-                required_evidence=("ci.json",),
+                evidence=("ci.json",),
             ),
         ),
-        "required_evidence": ("run.json",),
+        "evidence": ("run.json",),
     }
     values.update(changes)
     return parts.Gates(**values)
@@ -37,7 +37,7 @@ def gates(**changes):
 def criteria(**changes):
     values = {
         "task": tasks.Task.BINARY,
-        "primary_metric": "roc_auc",
+        "metric": "roc_auc",
         "metrics": (
             parts.Declaration(
                 name="roc_auc", direction=support.Orientation.MAXIMIZE
@@ -48,15 +48,13 @@ def criteria(**changes):
                 required=False,
             ),
         ),
-        "uncertainty": parts.Uncertainty(method=support.UncertaintyMethod.NONE),
+        "uncertainty": parts.Uncertainty(method=support.Method.NONE),
         "calibration": parts.Calibration(method=support.Procedure.NONE),
         "fairness": parts.Fairness(method=support.Technique.NONE),
-        "small_groups": parts.Subgroups(
-            warning_threshold=30, blocking_threshold=10
-        ),
+        "small": parts.Subgroups(warning=30, blocking=10),
         "explanations": parts.Explanations(
             availability=support.Explicability.GLOBAL,
-            required_methods=("permutation_importance",),
+            methods=("permutation_importance",),
         ),
         "release": gates(),
     }
@@ -221,16 +219,14 @@ def test_uncertainty_requirements_are_complete(values, message):
 
 def test_complete_uncertainty_promises_are_accepted():
     assert parts.Uncertainty(
-        method="abstention", required=True, confidence_level=0.9
+        method="abstention", required=True, confidence=0.9
     ).required
-    assert (
-        parts.Uncertainty(method="conformal", minimum_rows=1).minimum_rows == 1
-    )
+    assert parts.Uncertainty(method="conformal", rows=1).rows == 1
     made = parts.Uncertainty(
         method="conformal",
         required=True,
-        confidence_level=0.9,
-        coverage_target=0.8,
+        confidence=0.9,
+        coverage=0.8,
     )
     assert made.model_dump(mode="json")["coverage"] == 0.8
 
@@ -249,7 +245,7 @@ def test_calibration_requirements_are_complete(values, message):
 
 
 def test_a_zero_calibration_error_is_allowed():
-    assert parts.Calibration(method="platt", required=True, maximum_error=0.0)
+    assert parts.Calibration(method="platt", required=True, error=0.0)
 
 
 @pytest.mark.parametrize(
@@ -304,7 +300,7 @@ def test_fairness_gates_need_one_bound_and_evidence(values, message):
 
 
 def test_a_fairness_gate_with_a_zero_maximum_is_allowed():
-    made = parts.Equity(metric="m", maximum=0.0, required_evidence=("e",))
+    made = parts.Equity(metric="m", maximum=0.0, evidence=("e",))
     assert made.minimum is None
 
 
@@ -324,8 +320,8 @@ def test_subgroup_thresholds_are_ordered(values, message):
 
 
 def test_subgroup_thresholds_on_their_edges_are_allowed():
-    assert parts.Subgroups(warning_threshold=1, blocking_threshold=1)
-    assert parts.Subgroups(warning_threshold=10, blocking_threshold=10)
+    assert parts.Subgroups(warning=1, blocking=1)
+    assert parts.Subgroups(warning=10, blocking=10)
 
 
 @pytest.mark.parametrize(
@@ -382,14 +378,14 @@ def test_explanation_requirements_are_complete(values, message):
 def test_complete_explanation_requirements_are_stored_nested():
     made = parts.Explanations(
         availability="global",
-        required_methods=("x",),
+        methods=("x",),
         require_stability=True,
         stability_threshold=0.8,
     )
     stored = made.model_dump(mode="json")
     assert stored["stability"] == {"required": True, "threshold": 0.8}
     assert stored["methods"] == ["x"]
-    assert parts.Explanations(availability="none").required_methods == ()
+    assert parts.Explanations(availability="none").methods == ()
 
 
 def test_a_diagnostic_gate_needs_evidence():
@@ -408,9 +404,7 @@ def test_a_diagnostic_gate_needs_evidence():
         required_evidence=("e",),
     )
     assert (
-        parts.Requirement(
-            name="d", action="warn", required_evidence=("e",)
-        ).decisive
+        parts.Requirement(name="d", action="warn", evidence=("e",)).decisive
         is False
     )
 
@@ -424,9 +418,7 @@ def test_a_diagnostic_gate_needs_evidence():
         (
             {
                 "diagnostic_gates": (
-                    parts.Requirement(
-                        name="d", action="warn", required_evidence=("e",)
-                    ),
+                    parts.Requirement(name="d", action="warn", evidence=("e",)),
                 )
             },
             "requires a blocking diagnostic",
@@ -452,11 +444,9 @@ def test_a_diagnostic_gate_needs_evidence():
             {
                 "diagnostic_gates": (
                     parts.Requirement(
-                        name="d", action="block", required_evidence=("e",)
+                        name="d", action="block", evidence=("e",)
                     ),
-                    parts.Requirement(
-                        name="d", action="warn", required_evidence=("e",)
-                    ),
+                    parts.Requirement(name="d", action="warn", evidence=("e",)),
                 )
             },
             "release diagnostic gates must be unique",
@@ -464,12 +454,8 @@ def test_a_diagnostic_gate_needs_evidence():
         (
             {
                 "fairness_gates": (
-                    parts.Equity(
-                        metric="f", maximum=0.1, required_evidence=("e",)
-                    ),
-                    parts.Equity(
-                        metric="f", maximum=0.2, required_evidence=("e",)
-                    ),
+                    parts.Equity(metric="f", maximum=0.1, evidence=("e",)),
+                    parts.Equity(metric="f", maximum=0.2, evidence=("e",)),
                 )
             },
             "release fairness gates must be unique",
@@ -586,7 +572,7 @@ def test_a_custom_metric_skips_the_support_table():
             {
                 "fairness": parts.Fairness(
                     method="intersectional_report",
-                    sensitive_columns=("s",),
+                    sensitive=("s",),
                     metrics=("demographic_parity_difference",),
                 )
             },
@@ -596,7 +582,7 @@ def test_a_custom_metric_skips_the_support_table():
             {
                 "fairness": parts.Fairness(
                     method="group_report",
-                    sensitive_columns=("s",),
+                    sensitive=("s",),
                     metrics=("odd",),
                 )
             },
@@ -605,7 +591,7 @@ def test_a_custom_metric_skips_the_support_table():
         (
             {
                 "release": gates(
-                    metric_gates=(
+                    metrics=(
                         parts.Hurdle(
                             metric="rmse",
                             direction=support.Orientation.MINIMIZE,
@@ -619,11 +605,11 @@ def test_a_custom_metric_skips_the_support_table():
         (
             {
                 "release": gates(
-                    diagnostic_gates=(
+                    diagnostics=(
                         parts.Requirement(
                             name="residuals",
                             action="block",
-                            required_evidence=("e",),
+                            evidence=("e",),
                         ),
                     )
                 )
@@ -643,7 +629,7 @@ def test_a_policy_refuses_choices_outside_the_task(changes, message):
         (
             {
                 "release": gates(
-                    metric_gates=(
+                    metrics=(
                         parts.Hurdle(
                             metric="f1",
                             direction=support.Orientation.MAXIMIZE,
@@ -657,7 +643,7 @@ def test_a_policy_refuses_choices_outside_the_task(changes, message):
         (
             {
                 "release": gates(
-                    metric_gates=(
+                    metrics=(
                         parts.Hurdle(
                             metric="roc_auc",
                             direction=support.Orientation.MINIMIZE,
@@ -671,10 +657,8 @@ def test_a_policy_refuses_choices_outside_the_task(changes, message):
         (
             {
                 "release": gates(
-                    fairness_gates=(
-                        parts.Equity(
-                            metric="x", maximum=0.1, required_evidence=("e",)
-                        ),
+                    fairness=(
+                        parts.Equity(metric="x", maximum=0.1, evidence=("e",)),
                     )
                 )
             },
@@ -684,7 +668,7 @@ def test_a_policy_refuses_choices_outside_the_task(changes, message):
             {
                 "fairness": parts.Fairness(
                     method="group_report",
-                    sensitive_columns=("s",),
+                    sensitive=("s",),
                     metrics=("demographic_parity_difference",),
                 )
             },
@@ -702,11 +686,11 @@ def test_fairness_gates_without_a_declaration_are_refused():
     with pytest.raises(pydantic.ValidationError, match="undeclared"):
         criteria(
             release=gates(
-                fairness_gates=(
+                fairness=(
                     parts.Equity(
                         metric="demographic_parity_difference",
                         maximum=0.1,
-                        required_evidence=("e",),
+                        evidence=("e",),
                     ),
                 )
             )
@@ -717,15 +701,15 @@ def test_a_declared_fairness_policy_with_gates_is_accepted():
     made = criteria(
         fairness=parts.Fairness(
             method="group_report",
-            sensitive_columns=("s",),
+            sensitive=("s",),
             metrics=("demographic_parity_difference",),
         ),
         release=gates(
-            fairness_gates=(
+            fairness=(
                 parts.Equity(
                     metric="demographic_parity_difference",
                     maximum=0.1,
-                    required_evidence=("e",),
+                    evidence=("e",),
                 ),
             )
         ),
@@ -748,7 +732,7 @@ def test_canonize_is_the_version_one_layout():
 def regression():
     return criteria(
         task=tasks.Task.REGRESSION,
-        primary_metric="rmse",
+        metric="rmse",
         metrics=(
             parts.Declaration(
                 name="rmse", direction=support.Orientation.MINIMIZE
@@ -756,7 +740,7 @@ def regression():
         ),
         explanations=parts.Explanations(availability="none"),
         release=gates(
-            metric_gates=(
+            metrics=(
                 parts.Hurdle(
                     metric="rmse",
                     direction=support.Orientation.MINIMIZE,
@@ -769,8 +753,8 @@ def regression():
 
 def test_a_registry_holds_one_policy_per_task():
     registry = policy.Registry([regression(), criteria()])
-    assert registry.require(tasks.Task.BINARY).primary_metric == "roc_auc"
-    assert [p.task.value for p in registry.list_policies()] == [
+    assert registry.require(tasks.Task.BINARY).metric == "roc_auc"
+    assert [p.task.value for p in registry.tabulate()] == [
         "binary_classification",
         "regression",
     ]
@@ -783,7 +767,7 @@ def test_a_registry_holds_one_policy_per_task():
 
 def test_a_registry_fails_closed_for_undeclared_tasks():
     registry = policy.Registry()
-    assert registry.list_policies() == ()
+    assert registry.tabulate() == ()
     with pytest.raises(
         support.UndeclaredError,
         match="no evaluation policy declared for task 'binary_classification'",

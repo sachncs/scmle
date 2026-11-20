@@ -33,7 +33,7 @@ class Contingency(enum.StrEnum):
     CHANGED_SNAPSHOT = "changed_snapshot"
 
 
-class SafeOutcome(enum.StrEnum):
+class Expectation(enum.StrEnum):
     """Safe outcome expected after a fault is injected."""
 
     RESUME_DURABLE_CHECKPOINT = "resume_durable_checkpoint"
@@ -240,7 +240,7 @@ class Plan:
     )
 
     scenario: Contingency
-    outcome: SafeOutcome
+    outcome: Expectation
     recoverability: Recoverability
     requirements: tuple[str, ...]
     blocking: bool
@@ -261,7 +261,7 @@ class Plan:
         """
         enum_fields = (
             ("scenario", self.scenario, Contingency),
-            ("outcome", self.outcome, SafeOutcome),
+            ("outcome", self.outcome, Expectation),
             ("recoverability", self.recoverability, Recoverability),
             ("verification", self.verification, Verification),
         )
@@ -320,7 +320,7 @@ class Plan:
         """
         return cls(
             scenario=Contingency(record["scenario"]),
-            outcome=SafeOutcome(record["outcome"]),
+            outcome=Expectation(record["outcome"]),
             recoverability=Recoverability(record["recoverability"]),
             requirements=tuple(record["requirements"]),
             blocking=bool(record["blocking"]),
@@ -554,7 +554,7 @@ class Registry:
         return registry
 
     @classmethod
-    def from_json(cls, serialized: str) -> Self:
+    def parse(cls, serialized: str) -> Self:
         """Rebuilds and validates a complete registry from canonical JSON.
 
         Args:
@@ -574,23 +574,23 @@ class Registry:
 
 
 SCENARIOS: tuple[
-    tuple[Contingency, SafeOutcome, Recoverability, tuple[str, ...]], ...
+    tuple[Contingency, Expectation, Recoverability, tuple[str, ...]], ...
 ] = (
     (
         Contingency.PROCESS_DEATH,
-        SafeOutcome.RESUME_DURABLE_CHECKPOINT,
+        Expectation.RESUME_DURABLE_CHECKPOINT,
         Recoverability.AUTOMATIC,
         ("process_termination", "checkpoint_resume", "artifact_integrity"),
     ),
     (
         Contingency.STALE_CHECKPOINT,
-        SafeOutcome.REJECT_STALE_CHECKPOINT,
+        Expectation.REJECT_STALE_CHECKPOINT,
         Recoverability.OPERATOR_ASSISTED,
         ("checkpoint_identity", "stale_checkpoint_rejection", "run_state"),
     ),
     (
         Contingency.DISK_FULL,
-        SafeOutcome.PRESERVE_DURABLE_ARTIFACT,
+        Expectation.PRESERVE_DURABLE_ARTIFACT,
         Recoverability.OPERATOR_ASSISTED,
         (
             "disk_capacity_exhaustion",
@@ -600,43 +600,43 @@ SCENARIOS: tuple[
     ),
     (
         Contingency.CORRUPT_ARTIFACT,
-        SafeOutcome.QUARANTINE_CORRUPT_ARTIFACT,
+        Expectation.QUARANTINE_CORRUPT_ARTIFACT,
         Recoverability.OPERATOR_ASSISTED,
         ("corruption_injection", "digest_mismatch", "quarantine_record"),
     ),
     (
         Contingency.WORKER_LOSS,
-        SafeOutcome.RETRY_IDEMPOTENT_WORK,
+        Expectation.RETRY_IDEMPOTENT_WORK,
         Recoverability.AUTOMATIC,
         ("worker_termination", "idempotent_retry", "event_deduplication"),
     ),
     (
         Contingency.TIMEOUT,
-        SafeOutcome.CANCEL_AND_RECORD_TERMINAL_FAILURE,
+        Expectation.CANCEL_AND_RECORD_TERMINAL_FAILURE,
         Recoverability.OPERATOR_ASSISTED,
         ("timeout_injection", "cancellation_record", "resource_error"),
     ),
     (
         Contingency.MEMORY_EXHAUSTION,
-        SafeOutcome.ABORT_BEFORE_PUBLICATION,
+        Expectation.ABORT_BEFORE_PUBLICATION,
         Recoverability.OPERATOR_ASSISTED,
         ("memory_pressure", "publication_absence", "resource_error"),
     ),
     (
         Contingency.PARTIAL_WRITE,
-        SafeOutcome.PRESERVE_DURABLE_ARTIFACT,
+        Expectation.PRESERVE_DURABLE_ARTIFACT,
         Recoverability.AUTOMATIC,
         ("write_interruption", "atomicity_check", "artifact_integrity"),
     ),
     (
         Contingency.DEPENDENCY_MISMATCH,
-        SafeOutcome.REJECT_INCOMPATIBLE_DEPENDENCY,
+        Expectation.REJECT_INCOMPATIBLE_DEPENDENCY,
         Recoverability.OPERATOR_ASSISTED,
         ("environment_identity", "dependency_rejection", "run_state"),
     ),
     (
         Contingency.INVALID_SIGNATURE,
-        SafeOutcome.REJECT_UNTRUSTED_ARTIFACT,
+        Expectation.REJECT_UNTRUSTED_ARTIFACT,
         Recoverability.OPERATOR_ASSISTED,
         (
             "signature_tampering",
@@ -646,31 +646,31 @@ SCENARIOS: tuple[
     ),
     (
         Contingency.RETRY_EXHAUSTION,
-        SafeOutcome.TERMINATE_AFTER_RETRY_EXHAUSTION,
+        Expectation.TERMINATE_AFTER_RETRY_EXHAUSTION,
         Recoverability.TERMINAL_SAFE_FAILURE,
         ("retry_history", "terminal_event", "partial_publication_check"),
     ),
     (
         Contingency.DUPLICATE_EVENT,
-        SafeOutcome.IGNORE_DUPLICATE_EVENT,
+        Expectation.IGNORE_DUPLICATE_EVENT,
         Recoverability.AUTOMATIC,
         ("duplicate_event", "idempotency_key", "state_transition"),
     ),
     (
         Contingency.INCOMPLETE_LINEAGE,
-        SafeOutcome.BLOCK_RELEASE_FOR_MISSING_LINEAGE,
+        Expectation.BLOCK_RELEASE_FOR_MISSING_LINEAGE,
         Recoverability.TERMINAL_SAFE_FAILURE,
         ("lineage_gap", "release_block", "audit_record"),
     ),
     (
         Contingency.REJECTED_APPROVAL,
-        SafeOutcome.BLOCK_RELEASE_FOR_REJECTED_APPROVAL,
+        Expectation.BLOCK_RELEASE_FOR_REJECTED_APPROVAL,
         Recoverability.TERMINAL_SAFE_FAILURE,
         ("approval_rejection", "release_block", "audit_record"),
     ),
     (
         Contingency.CHANGED_SNAPSHOT,
-        SafeOutcome.INVALIDATE_CHANGED_SNAPSHOT,
+        Expectation.INVALIDATE_CHANGED_SNAPSHOT,
         Recoverability.OPERATOR_ASSISTED,
         ("snapshot_digest_change", "run_invalidation", "lineage_record"),
     ),

@@ -32,12 +32,12 @@ def review(**changes):
     values = {
         "model": "m",
         "version": 1,
-        "content_id": "c" * 64,
+        "content": "c" * 64,
         "reviewer": "r",
         "decision": registry.Verdict.APPROVED,
         "reason": "ok",
         "evidence": ("e1", "e2"),
-        "approved_at": "2026-01-01T00:00:00+00:00",
+        "approved": "2026-01-01T00:00:00+00:00",
     }
     values.update(changes)
     return registry.Sanction(**values)
@@ -203,25 +203,25 @@ def test_the_content_id_is_the_hash_of_the_manifest(trained, tmp_path):
 
 
 def test_a_new_store_creates_its_root_and_has_an_empty_index(tmp_path):
-    store = registry.ModelRegistryStore(tmp_path / "a" / "b")
+    store = registry.Registry(tmp_path / "a" / "b")
     assert store.root == tmp_path / "a" / "b" and store.root.is_dir()
     assert store.guard is None and store.scope == "stream"
     assert store.lock is durability.latch(store.root)
-    assert store.read_index() == {"models": {}}
+    assert store.read() == {"models": {}}
     assert not (store.root / registry.INDEX_FILE).exists()
 
 
 def test_the_index_is_written_as_indented_json_and_read_back(tmp_path):
-    store = registry.ModelRegistryStore(tmp_path)
+    store = registry.Registry(tmp_path)
     index = {"models": {"m": {"versions": {}, "aliases": {}}}}
-    store.write_index(index)
+    store.write(index)
     text = (tmp_path / registry.INDEX_FILE).read_text(encoding="utf-8")
     assert text == json.dumps(index, indent=2)
-    assert store.read_index() == index
+    assert store.read() == index
 
 
 def test_audit_records_are_appended_one_json_line_each(tmp_path):
-    store = registry.ModelRegistryStore(tmp_path)
+    store = registry.Registry(tmp_path)
     store.audit("first", model="m", path=pathlib.Path("p"))
     store.audit("second")
     lines = (tmp_path / registry.AUDIT_FILE).read_text(encoding="utf-8")
@@ -236,13 +236,13 @@ def test_audit_records_are_appended_one_json_line_each(tmp_path):
 
 
 def test_attaching_a_guard_sets_it_and_its_scope(tmp_path):
-    store = registry.ModelRegistryStore(tmp_path)
+    store = registry.Registry(tmp_path)
     sentinel = object()
     store.attach(sentinel, "scope-1")
     assert store.guard is sentinel and store.scope == "scope-1"
     store.attach(None, "s2")
     assert store.guard is None and store.scope == "s2"
-    guarded = registry.ModelRegistryStore(tmp_path, sentinel, "s3")
+    guarded = registry.Registry(tmp_path, sentinel, "s3")
     assert guarded.guard is sentinel and guarded.scope == "s3"
 
 
@@ -250,7 +250,7 @@ def test_registering_records_the_version_the_index_and_the_audit(
     trained, tmp_path
 ):
     root = trained.save(tmp_path / "b", signing_key=KEY)
-    store = registry.ModelRegistryStore(tmp_path / "reg")
+    store = registry.Registry(tmp_path / "reg")
     record = store.register(
         "m",
         root,
@@ -265,7 +265,7 @@ def test_registering_records_the_version_the_index_and_the_audit(
     assert record.content_id == registry.identify(root)
     assert record.signed is True and record.registered_at
     assert (store.root / "m" / "v1" / bundle.MANIFEST_FILE).is_file()
-    index = store.read_index()
+    index = store.read()
     assert index["models"]["m"] == {
         "versions": {"1": dataclasses.asdict(record)},
         "aliases": {},
@@ -281,10 +281,10 @@ def test_an_unsigned_bundle_needs_to_be_vouched_for_and_is_marked_so(
 ):
     monkeypatch.delenv("SCMLE_SIGNING_KEY", raising=False)
     root = trained.save(tmp_path / "b")
-    store = registry.ModelRegistryStore(tmp_path / "reg")
+    store = registry.Registry(tmp_path / "reg")
     with pytest.raises(errors.ArtifactError):
         store.register("m", root)
-    assert store.read_index() == {"models": {}}
+    assert store.read() == {"models": {}}
     record = store.register("m", root, trusted=True)
     assert record.signed is False
     assert record.metrics == {} and record.config == {} and record.run_id == ""
@@ -295,7 +295,7 @@ def test_the_same_content_is_not_registered_twice_and_new_content_is(
 ):
     first = trained.save(tmp_path / "one", signing_key=KEY)
     second = other.save(tmp_path / "two", signing_key=KEY)
-    store = registry.ModelRegistryStore(tmp_path / "reg")
+    store = registry.Registry(tmp_path / "reg")
     one = store.register("m", first, signing_key=KEY)
     again = store.register("m", first, signing_key=KEY, run_id="later")
     assert again == one
@@ -317,7 +317,7 @@ def test_the_next_version_follows_the_highest_not_the_count(trained, tmp_path):
 def test_a_tampered_bundle_is_refused_and_leaves_no_trace(trained, tmp_path):
     root = trained.save(tmp_path / "b", signing_key=KEY)
     (root / bundle.MODEL_FILE).write_bytes(b"x")
-    store = registry.ModelRegistryStore(tmp_path / "reg")
+    store = registry.Registry(tmp_path / "reg")
     with pytest.raises(errors.ArtifactError):
         store.register("m", root, signing_key=KEY)
     assert not (store.root / "m").exists()
@@ -337,9 +337,9 @@ def test_aliases_are_integers_and_empty_for_an_unknown_model(tmp_path):
     store = make_registry(tmp_path / "reg")
     assert store.aliases("nobody") == {}
     assert store.aliases("churn") == {}
-    index = store.read_index()
+    index = store.read()
     index["models"]["churn"]["aliases"] = {"champion": "2", "challenger": 3}
-    store.write_index(index)
+    store.write(index)
     assert store.aliases("churn") == {"champion": 2, "challenger": 3}
 
 
@@ -419,7 +419,7 @@ def test_check_promotion_returns_the_entry_and_reads_the_index_when_not_given(
     with pytest.raises(errors.ArtifactError):
         store.vet("churn", 1, "challenger", None, None, index)
     good = store.vet(
-        "churn", 2, "champion", sanction(2), KEY, store.read_index()
+        "churn", 2, "champion", sanction(2), KEY, store.read()
     )
     assert "2" in good["versions"]
 
@@ -537,9 +537,9 @@ def test_a_version_is_resolved_by_number_digits_or_alias(tmp_path):
 
 def test_an_alias_pointing_at_a_removed_version_is_reported(tmp_path):
     store = make_registry(tmp_path / "reg")
-    index = store.read_index()
+    index = store.read()
     index["models"]["churn"]["aliases"]["champion"] = 8
-    store.write_index(index)
+    store.write(index)
     with pytest.raises(
         errors.ArtifactError, match=r"^churn v8 is not registered$"
     ):
@@ -551,12 +551,12 @@ def test_a_registered_bundle_loads_by_alias_and_version(
 ):
     monkeypatch.delenv("SCMLE_SIGNING_KEY", raising=False)
     root = trained.save(tmp_path / "b", signing_key=KEY)
-    store = registry.ModelRegistryStore(tmp_path / "reg")
+    store = registry.Registry(tmp_path / "reg")
     record = store.register("m", root, signing_key=KEY)
     store.promote(
         "m",
         1,
-        approval=review(content_id=record.content_id).sign(KEY),
+        approval=review(content=record.content_id).sign(KEY),
         signing_key=KEY,
     )
     by_alias = store.load("m", signing_key=KEY)
@@ -576,7 +576,7 @@ def test_a_bundle_registered_as_vouched_loads_as_vouched(
     monkeypatch.delenv("SCMLE_SIGNING_KEY", raising=False)
     monkeypatch.delenv("SCMLE_ENV", raising=False)
     root = trained.save(tmp_path / "b")
-    store = registry.ModelRegistryStore(tmp_path / "reg")
+    store = registry.Registry(tmp_path / "reg")
     store.register("m", root, trusted=True)
     rows = traffic(20, seed=4).drop(columns="y")
     assert (store.load("m", 1).predict(rows) == trained.predict(rows)).all()
@@ -598,8 +598,8 @@ def test_the_move_is_checked_again_under_the_lock_for_the_named_alias(tmp_path):
 
 
 def test_the_index_is_read_as_utf8(tmp_path, monkeypatch):
-    store = registry.ModelRegistryStore(tmp_path)
-    store.write_index({"models": {"é": {"versions": {}, "aliases": {}}}})
+    store = registry.Registry(tmp_path)
+    store.write({"models": {"é": {"versions": {}, "aliases": {}}}})
     seen = []
     real = pathlib.Path.read_text
 
@@ -608,5 +608,5 @@ def test_the_index_is_read_as_utf8(tmp_path, monkeypatch):
         return real(self, encoding=encoding, errors=errors)
 
     monkeypatch.setattr(pathlib.Path, "read_text", spy)
-    assert "é" in store.read_index()["models"]
+    assert "é" in store.read()["models"]
     assert seen == ["utf-8"]

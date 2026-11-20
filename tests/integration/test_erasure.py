@@ -48,9 +48,9 @@ def template(tmp_path_factory):
         support.make_project(
             base / name,
             "y",
-            id_columns=["id"],
-            output_dir=base / "project",
-            time_budget=30,
+            identifiers=["id"],
+            directory=base / "project",
+            budget=30,
         ).run()
     return base
 
@@ -116,7 +116,7 @@ def test_forgetting_a_dataset_erases_its_run_and_keeps_custody(world):
 
 def test_forgetting_finds_registry_copies_and_prediction_logs(world):
     base, project, people = world.base, world.project, world.people
-    store = registry.ModelRegistryStore(base / "registry")
+    store = registry.Registry(base / "registry")
     release = store.register("churn", people / "model", trusted=True)
     loaded = bundle.Bundle.load(people / "model", trusted=True)
     log = base / "scores" / "scored.csv"
@@ -142,9 +142,9 @@ def test_forgetting_finds_registry_copies_and_prediction_logs(world):
     assert not log.exists()
     assert not log.with_name("scored.csv.manifest.json").exists()
     assert unrelated.is_file()
-    machine = release_state.ReleaseRegistry(store)
+    machine = release_state.Registry(store)
     assert machine.lookup("churn", release.version) is (
-        release_state.ReleaseState.RETIRED
+        release_state.State.RETIRED
     )
     audit = (base / "registry" / "audit.jsonl").read_text("utf-8")
     assert receipt.identifier in audit
@@ -257,7 +257,7 @@ def test_deleting_a_project_keeps_custody_and_foreign_files(world):
 
 def test_retiring_a_registered_version_refuses_serving(world):
     base, other = world.base, world.other
-    store = registry.ModelRegistryStore(base / "registry")
+    store = registry.Registry(base / "registry")
     release = store.register("churn", other / "model", trusted=True)
     job = erasure.Retirement(
         base / "registry", base / "receipts", "drift", "churn", release.version

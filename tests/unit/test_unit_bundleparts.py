@@ -80,7 +80,7 @@ def test_a_shasum_is_the_sha256_of_the_whole_file(tmp_path):
 
 
 def test_the_layout_names_the_format_and_every_member():
-    assert layout.BUNDLE_FORMAT == 6
+    assert layout.BUNDLE_FORMAT == 7
     assert layout.MODEL_FILE == "pipeline.joblib"
     assert layout.SCHEMA_FILE == "schema.json"
     assert layout.MANIFEST_FILE == "model_manifest.json"
@@ -104,9 +104,9 @@ def signed(tmp_path, record):
 
 
 def test_an_unsigned_bundle_or_a_missing_key_does_not_verify(tmp_path):
-    assert seal.verify_signature(tmp_path, KEY) is False
+    assert seal.verify(tmp_path, KEY) is False
     signed(tmp_path, {"algorithm": "hmac-sha256", "signature": "x"})
-    assert seal.verify_signature(tmp_path, None) is False
+    assert seal.verify(tmp_path, None) is False
 
 
 def test_a_matching_signature_verifies(tmp_path):
@@ -114,28 +114,28 @@ def test_a_matching_signature_verifies(tmp_path):
         tmp_path,
         {"algorithm": "hmac-sha256", "signature": seal.sign(b"{}", KEY)},
     )
-    assert seal.verify_signature(root, KEY) is True
+    assert seal.verify(root, KEY) is True
 
 
 def test_a_signature_of_other_bytes_is_refused(tmp_path):
     root = signed(tmp_path, {"algorithm": "hmac-sha256", "signature": "0"})
     with pytest.raises(errors.ArtifactError, match="signature is invalid"):
-        seal.verify_signature(root, KEY)
+        seal.verify(root, KEY)
 
 
 def test_an_unknown_signature_algorithm_is_named(tmp_path):
     root = signed(tmp_path, {"algorithm": "md5", "signature": "0"})
     with pytest.raises(errors.ArtifactError, match="algorithm 'md5'"):
-        seal.verify_signature(root, KEY)
+        seal.verify(root, KEY)
 
 
 def test_unreadable_signature_metadata_is_refused(tmp_path):
     (tmp_path / seal.SIGNATURE_FILE).write_text("[1]", encoding="utf-8")
     with pytest.raises(errors.ArtifactError, match="invalid bundle signature"):
-        seal.verify_signature(tmp_path, KEY)
+        seal.verify(tmp_path, KEY)
     (tmp_path / seal.SIGNATURE_FILE).write_text("{", encoding="utf-8")
     with pytest.raises(errors.ArtifactError, match="invalid bundle signature"):
-        seal.verify_signature(tmp_path, KEY)
+        seal.verify(tmp_path, KEY)
 
 
 def test_the_inventory_is_sorted_and_normalised():
@@ -271,14 +271,14 @@ def test_stamp_records_the_build_and_its_inputs():
     info = model.stamp(
         "lr", "v2", "auc", None, "s", 0.4, 7, "cfg", "data", "split"
     )
-    assert (info.model_name, info.model_version, info.metric) == (
+    assert (info.model, info.version, info.metric) == (
         "lr",
         "v2",
         "auc",
     )
-    assert info.model_params == {}
+    assert info.params == {}
     assert info.strategy == "s"
-    assert info.decision_threshold == 0.4
+    assert info.threshold == 0.4
     assert info.seed == 7
     assert (info.configuration, info.dataset, info.split) == (
         "cfg",
@@ -304,10 +304,10 @@ def test_core_predicts_through_the_pipeline_in_schema_order(binary):
 def test_core_reads_a_table_from_a_path(binary, tmp_path):
     bundle, features = binary[0], binary[1]
     features.to_csv(tmp_path / "x.csv", index=False)
-    frame = bundle.read_frame(tmp_path / "x.csv")
+    frame = bundle.read(tmp_path / "x.csv")
     assert list(frame.columns) == ["num", "cat"]
     assert len(frame) == len(features)
-    copy = bundle.read_frame(features)
+    copy = bundle.read(features)
     assert copy is not features
 
 
@@ -413,9 +413,9 @@ def test_a_signed_bundle_loads_without_trust(binary, tmp_path):
     numpy.testing.assert_array_equal(
         loaded.predict(features), bundle.predict(features)
     )
-    assert loaded.cv_plus is None
-    assert loaded.coverage_report is None
-    assert loaded.shift_weights is None
+    assert loaded.plus is None
+    assert loaded.report is None
+    assert loaded.weights is None
 
 
 def test_an_unsigned_bundle_is_refused_unless_trusted(binary, tmp_path):
@@ -424,7 +424,7 @@ def test_an_unsigned_bundle_is_refused_unless_trusted(binary, tmp_path):
     assert not (root / seal.SIGNATURE_FILE).exists()
     with pytest.raises(errors.ArtifactError, match="unauthenticated bundle"):
         model.Bundle.load(root)
-    assert model.Bundle.load(root, trusted=True).info.model_name == "lr"
+    assert model.Bundle.load(root, trusted=True).info.model == "lr"
 
 
 def test_a_signed_bundle_without_a_key_is_refused_even_trusted(
@@ -463,7 +463,7 @@ def test_admit_refuses_another_format(binary, tmp_path):
     document = manifest(binary, tmp_path)[1]
     info, legacy = archive.admit(document, False, False)
     assert legacy is False
-    assert info.model_name == "lr"
+    assert info.model == "lr"
     for value in (5, 7, None):
         with pytest.raises(errors.ArtifactError, match=f"format {value}"):
             archive.admit({**document, "format": value}, True, True)
@@ -524,9 +524,9 @@ def test_the_signature_covers_the_manifest_bytes_that_were_parsed(
 ):
     root = binary[0].save(tmp_path / "b", signing_key=KEY)
     snapshot = archive.unpack(root)
-    assert seal.verify_signature(root, KEY, snapshot.text) is True
+    assert seal.verify(root, KEY, snapshot.text) is True
     with pytest.raises(errors.ArtifactError, match="signature is invalid"):
-        seal.verify_signature(root, KEY, snapshot.text + b" ")
+        seal.verify(root, KEY, snapshot.text + b" ")
 
 
 def test_unpack_reads_the_manifest_and_schema_bytes_once(binary, tmp_path):
@@ -576,10 +576,10 @@ def test_every_optional_member_round_trips(regressor, tmp_path):
     bundle.conformal = scmle.evaluation.conformal.ConformalCalibrator.calibrate(
         numpy.arange(40.0), numpy.arange(40.0) + 1.0
     )
-    bundle.coverage_report = {"b": 2, "a": 1}
+    bundle.report = {"b": 2, "a": 1}
     bundle.quantile = {"q": 1}
-    bundle.cv_plus = {"c": 1}
-    bundle.shift_weights = {"w": 1}
+    bundle.plus = {"c": 1}
+    bundle.weights = {"w": 1}
     bundle.novelty = {"n": 1}
     bundle.calibrator = {"k": 1}
     bundle.history = pandas.DataFrame({"num": [1.0]})
@@ -604,11 +604,11 @@ def test_every_optional_member_round_trips(regressor, tmp_path):
     )
     loaded = model.Bundle.load(root, trusted=True)
     assert loaded.quantile == {"q": 1}
-    assert loaded.cv_plus == {"c": 1}
-    assert loaded.shift_weights == {"w": 1}
+    assert loaded.plus == {"c": 1}
+    assert loaded.weights == {"w": 1}
     assert loaded.novelty == {"n": 1}
     assert loaded.calibrator == {"k": 1}
-    assert loaded.coverage_report == {"a": 1, "b": 2}
+    assert loaded.report == {"a": 1, "b": 2}
     assert loaded.history.to_dict() == {"num": {0: 1.0}}
     assert loaded.conformal.scores == bundle.conformal.scores
     bundle.calibrator = None
@@ -620,7 +620,7 @@ def test_every_optional_member_round_trips(regressor, tmp_path):
 
 def test_a_modified_optional_member_is_refused_on_load(regressor, tmp_path):
     bundle = regressor[0]
-    bundle.coverage_report = {"a": 1}
+    bundle.report = {"a": 1}
     root = bundle.save(tmp_path / "b")
     (root / layout.COVERAGE_FILE).write_text("{}", encoding="utf-8")
     with pytest.raises(errors.ArtifactError, match="coverage report was"):
@@ -631,10 +631,10 @@ def test_rotation_re_signs_and_retires_the_old_key(binary, tmp_path):
     bundle = binary[0]
     root = bundle.save(tmp_path / "b", signing_key=KEY)
     other = b"fedcba9876543210fedcba9876543210"
-    assert archive.Archive.rotate_signing_key(root, KEY, other) == root
-    assert seal.verify_signature(root, other) is True
+    assert archive.Archive.rotate(root, KEY, other) == root
+    assert seal.verify(root, other) is True
     with pytest.raises(errors.ArtifactError, match="signature is invalid"):
-        seal.verify_signature(root, KEY)
+        seal.verify(root, KEY)
     assert not [p for p in root.iterdir() if p.name.startswith(".signature")]
 
 
@@ -642,11 +642,11 @@ def test_rotation_refuses_empty_keys_and_unsigned_bundles(binary, tmp_path):
     bundle = binary[0]
     root = bundle.save(tmp_path / "b")
     with pytest.raises(errors.ArtifactError, match="non-empty current"):
-        archive.Archive.rotate_signing_key(root, "", KEY)
+        archive.Archive.rotate(root, "", KEY)
     with pytest.raises(errors.ArtifactError, match="unauthenticated"):
-        archive.Archive.rotate_signing_key(root, KEY, KEY)
+        archive.Archive.rotate(root, KEY, KEY)
     with pytest.raises(errors.ArtifactError, match="incomplete"):
-        archive.Archive.rotate_signing_key(tmp_path / "none", KEY, KEY)
+        archive.Archive.rotate(tmp_path / "none", KEY, KEY)
 
 
 def test_roundtrip_reports_rows_tolerance_and_the_difference(binary, tmp_path):
@@ -716,7 +716,7 @@ def test_rank_orders_rows_within_each_query(regressor):
 
 def test_the_environment_lock_is_written_when_asked(binary, tmp_path):
     bundle = binary[0]
-    text = bundle.environment_lock(tmp_path / "lock.txt")
+    text = bundle.pin(tmp_path / "lock.txt")
     assert (tmp_path / "lock.txt").read_text("utf-8") == text
     assert f"numpy=={numpy.__version__}" in text.splitlines()
 

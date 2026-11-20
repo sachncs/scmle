@@ -85,7 +85,7 @@ def opened(tmp_path):
     )
     assert code == cli.EXIT_OK
     loop.Loop.resume(deploy).escalate("needs_a_person", {"why": "test"})
-    (pending,) = loop.Loop.resume(deploy).pending_escalations()
+    (pending,) = loop.Loop.resume(deploy).survey()
     return deploy, pending
 
 
@@ -142,16 +142,16 @@ def test_no_model_that_can_enforce_the_monotonic_rule_blocks():
     """
     context = types.SimpleNamespace(
         spec=types.SimpleNamespace(
-            data=types.SimpleNamespace(monotonic_constraints={"a": 1})
+            data=types.SimpleNamespace(constraints={"a": 1})
         ),
         task=tasks.Task.BINARY,
     )
     candidates = [
         types.SimpleNamespace(
-            name="forest", family="tree", monotonic_param=None
+            name="forest", family="tree", param=None
         ),
         types.SimpleNamespace(
-            name="prior", family="baseline", monotonic_param=None
+            name="prior", family="baseline", param=None
         ),
     ]
     with pytest.raises(errors.BlockedError, match="no available model"):
@@ -270,7 +270,7 @@ def test_every_one_of_the_eleven_never_list_actions_needs_a_person(tmp_path):
     )
     calls = []
     for action in never_list.Forbidden:
-        with pytest.raises(never_list.AttestationRequired):
+        with pytest.raises(never_list.UnattestedError):
             guarded.perform(action, {"case": action.value}, calls.append)
     assert calls == []
 

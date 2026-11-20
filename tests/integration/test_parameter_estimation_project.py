@@ -48,10 +48,10 @@ def project_with_estimation(output_dir) -> scmle.api.project.Project:
         estimation_frame(),
         "outcome",
         task="regression",
-        time_budget=30,
+        budget=30,
         estimand=declared_estimand(),
-        estimation_policy=Config(estimator="linear"),
-        output_dir=output_dir,
+        policy=Config(estimator="linear"),
+        directory=output_dir,
     )
 
 
@@ -65,40 +65,40 @@ def test_project_run_persists_separate_estimation_evidence(tmp_path):
         estimation_frame(),
         "outcome",
         task="regression",
-        time_budget=30,
+        budget=30,
         estimand=declared_estimand(),
-        estimation_policy=Config(
+        policy=Config(
             estimator="linear", covariance="clustered", cluster="site"
         ),
-        output_dir=tmp_path,
+        directory=tmp_path,
     )
 
     result = project.run()
 
-    artifact = result.run_dir / "parameter_estimation.json"
+    artifact = result.directory / "parameter_estimation.json"
     assert artifact.exists()
     assert result.estimation is not None
     restored = Estimation.read(artifact)
     assert restored.digest() == result.estimation.digest()
     assert restored.policy.covariance == "clustered"
-    assert result.evaluation["selected"]["model"] == result.selected_model
+    assert result.evaluation["selected"]["model"] == result.model
     assert result.evaluation["parameter_estimation"] == {
         "artifact": "parameter_estimation.json",
         "digest": restored.digest(),
     }
     persisted_evaluation = json.loads(
-        (result.run_dir / "evaluation.json").read_text(encoding="utf-8")
+        (result.directory / "evaluation.json").read_text(encoding="utf-8")
     )
     assert (
         persisted_evaluation["parameter_estimation"]
         == result.evaluation["parameter_estimation"]
     )
-    graph = Linker.load(result.run_dir / "evidence_graph.json")
+    graph = Linker.load(result.directory / "evidence_graph.json")
     parameter_node = graph.nodes["parameter-estimation"]
     assert parameter_node.digest == restored.digest()
     assert parameter_node.attributes["artifact"] == "parameter_estimation.json"
     assert graph.nodes["evaluation"].digest == bundle.shasum(
-        result.run_dir / "evaluation.json"
+        result.directory / "evaluation.json"
     )
     assert graph.reachable("snapshot", "parameter-estimation")
     assert graph.reachable("evaluation", "parameter-estimation")
@@ -106,14 +106,14 @@ def test_project_run_persists_separate_estimation_evidence(tmp_path):
     assert identity["source_identity"] is None
     assert identity["snapshot_id"].startswith("snap_")
     declaration = json.loads(
-        (result.run_dir / "parameter_estimation_declaration.json").read_text(
+        (result.directory / "parameter_estimation_declaration.json").read_text(
             encoding="utf-8"
         )
     )
     assert declaration["enabled"] is True
     assert declaration["project_config_hash"] == project.spec.config_hash()
     assert declaration["digest"] == (
-        (result.run_dir / "parameter_estimation_declaration.lock")
+        (result.directory / "parameter_estimation_declaration.lock")
         .read_text(encoding="utf-8")
         .strip()
     )
@@ -152,11 +152,11 @@ def test_project_dispatches_and_serializes_bayesian_ate(tmp_path):
         frame,
         "outcome",
         task="uplift",
-        treatment_column="treatment",
-        time_budget=30,
+        treatment="treatment",
+        budget=30,
         estimand=estimand,
-        estimation_policy=policy,
-        output_dir=tmp_path,
+        policy=policy,
+        directory=tmp_path,
     )
 
     result = project.run()
@@ -164,7 +164,7 @@ def test_project_dispatches_and_serializes_bayesian_ate(tmp_path):
     assert result.estimation is not None
     assert result.estimation.policy == policy
     declaration = json.loads(
-        (result.run_dir / "parameter_estimation_declaration.json").read_text(
+        (result.directory / "parameter_estimation_declaration.json").read_text(
             encoding="utf-8"
         )
     )
@@ -305,11 +305,11 @@ def test_estimation_fails_closed_without_both_declarations(tmp_path):
     Also enforces website/src/pages/docs/modeling.astro:167.
     """
     project = scmle.api.project.Project(
-        estimation_frame(), "outcome", output_dir=tmp_path
+        estimation_frame(), "outcome", directory=tmp_path
     )
 
     with pytest.raises(errors.ConfigError, match="declare both"):
-        project.estimate_parameters()
+        project.estimate()
 
 
 def test_partial_estimation_declaration_is_rejected(tmp_path):
@@ -322,7 +322,7 @@ def test_partial_estimation_declaration_is_rejected(tmp_path):
             estimation_frame(),
             "outcome",
             estimand=declared_estimand(),
-            output_dir=tmp_path,
+            directory=tmp_path,
         )
 
 
@@ -343,10 +343,10 @@ def test_incompatible_likelihood_fails_before_model_selection(tmp_path):
         estimation_frame(),
         "outcome",
         task="regression",
-        time_budget=30,
+        budget=30,
         estimand=estimand,
-        estimation_policy=Config(estimator="linear"),
-        output_dir=tmp_path,
+        policy=Config(estimator="linear"),
+        directory=tmp_path,
     )
 
     with pytest.raises(ValueError, match="expected gaussian"):
@@ -381,12 +381,12 @@ def test_ipw_declaration_binds_the_project_treatment_column(tmp_path):
         frame,
         "outcome",
         estimand=estimand,
-        estimation_policy=policy,
-        output_dir=tmp_path,
+        policy=policy,
+        directory=tmp_path,
     )
 
     with pytest.raises(errors.ConfigError, match="treatment_column"):
-        project.estimate_parameters()
+        project.estimate()
 
 
 def test_project_rejects_missing_cluster_and_missingness_columns(tmp_path):
@@ -395,13 +395,13 @@ def test_project_rejects_missing_cluster_and_missingness_columns(tmp_path):
         estimation_frame(),
         "outcome",
         estimand=declared_estimand(),
-        estimation_policy=Config(
+        policy=Config(
             estimator="linear", covariance="clustered", cluster="missing"
         ),
-        output_dir=tmp_path,
+        directory=tmp_path,
     )
     with pytest.raises(errors.DataError, match="columns are missing"):
-        project.estimate_parameters()
+        project.estimate()
 
     missing_frame = estimation_frame()
     missing_frame.loc[0, "signal"] = numpy.nan
@@ -409,11 +409,11 @@ def test_project_rejects_missing_cluster_and_missingness_columns(tmp_path):
         missing_frame,
         "outcome",
         estimand=declared_estimand(),
-        estimation_policy=Config(estimator="linear"),
-        output_dir=tmp_path,
+        policy=Config(estimator="linear"),
+        directory=tmp_path,
     )
     with pytest.raises(errors.DataError, match="missing values"):
-        project.estimate_parameters()
+        project.estimate()
 
 
 def test_complete_case_binds_missingness_and_run_artifact_to_result(tmp_path):
@@ -424,15 +424,15 @@ def test_complete_case_binds_missingness_and_run_artifact_to_result(tmp_path):
         frame,
         "outcome",
         task="regression",
-        time_budget=30,
+        budget=30,
         estimand=declared_estimand(),
-        estimation_policy=Config(estimator="linear", missing="complete_case"),
-        output_dir=tmp_path,
+        policy=Config(estimator="linear", missing="complete_case"),
+        directory=tmp_path,
     )
 
     result = project.run()
 
-    artifact = result.run_dir / "parameter_estimation.json"
+    artifact = result.directory / "parameter_estimation.json"
     restored = Estimation.read(artifact)
     assert result.estimation is not None
     assert result.estimation.digest() == restored.digest()
@@ -454,11 +454,11 @@ def test_project_estimation_records_file_source_identity(tmp_path):
         source,
         "outcome",
         estimand=declared_estimand(),
-        estimation_policy=Config(estimator="linear"),
-        output_dir=tmp_path / "runs",
+        policy=Config(estimator="linear"),
+        directory=tmp_path / "runs",
     )
 
-    result = project.estimate_parameters()
+    result = project.estimate()
 
     identity = result.diagnostics["data_identity"]
     assert identity["source_identity"].startswith("src_")
@@ -470,8 +470,8 @@ def test_verify_replay_preserves_parameter_estimation_evidence(tmp_path):
     project = project_with_estimation(tmp_path)
     original = project.run()
 
-    verdict = scmle.api.project.Project.verify_replay(
-        original.run_dir,
+    verdict = scmle.api.project.Project.verify(
+        original.directory,
         data=estimation_frame(),
         output_dir=tmp_path / "replay",
     )

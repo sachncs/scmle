@@ -115,8 +115,8 @@ def test_the_findings_are_the_profilers_portrait():
         frame, manifest, tasks.Task.BINARY, 0.5
     )
     assert isinstance(found, scmle.contracts.data.Portrait)
-    assert found.feature_plan == expected.feature_plan
-    assert found.quality_findings == expected.quality_findings
+    assert found.plan == expected.plan
+    assert found.quality == expected.quality
 
 
 def test_the_split_constraints_are_the_splitter_of_the_spec():

@@ -394,7 +394,7 @@ class Boundary:
 
 
 TABULAR_TRANSFORMER_CONTRACT = Boundary(
-    family=capabilities.ModelFamily.TRANSFORMER.value,
+    family=capabilities.Family.TRANSFORMER.value,
     status=capabilities.Status.EXPERIMENTAL,
     modalities=(capabilities.Modality.TABULAR,),
     extras=("deeplearning",),
@@ -431,7 +431,7 @@ TABULAR_TRANSFORMER_CONTRACT = Boundary(
 
 
 TABULAR_JEPA_CONTRACT = Boundary(
-    family=capabilities.ModelFamily.JEPA.value,
+    family=capabilities.Family.JEPA.value,
     status=capabilities.Status.EXPERIMENTAL,
     modalities=(capabilities.Modality.TABULAR,),
     extras=("deeplearning",),

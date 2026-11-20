@@ -60,7 +60,7 @@ def test_adapter_rejection_reasons():
         name = "probe"
         family = "x"
         capabilities = models.Capabilities(
-            frozenset({tasks.Task.BINARY}), max_rows=10
+            frozenset({tasks.Task.BINARY}), scale=10
         )
         requires = ("definitely_not_installed_pkg",)
 

@@ -79,9 +79,7 @@ def test_tabular_beta_plan_has_an_explicit_library_capability_path():
     assert {declaration.key.inference for declaration in declarations} == {
         capabilities.Inference.LIBRARY
     }
-    family = board.services.capabilities.find(
-        capabilities.ModelFamily.JEPA.value
-    )
+    family = board.services.capabilities.find(capabilities.Family.JEPA.value)
     assert family is not None
     assert family.status is capabilities.Status.EXPERIMENTAL
     assert family.modalities == (capabilities.Modality.TABULAR,)
@@ -99,14 +97,14 @@ def test_deep_learning_paths_declare_their_optional_extra():
         key = capabilities.Coordinate(
             modality=capabilities.Modality.TABULAR,
             task=task,
-            model_family="deep_learning",
+            family="deep_learning",
             evaluation=capabilities.Evaluation.STANDARD,
             uncertainty=capabilities.Uncertainty.NONE,
             fairness=capabilities.Fairness.NONE,
             explainability=capabilities.Explainability.NONE,
             inference=capabilities.Inference.LIBRARY,
         )
-        assert registry.require(key).required_extras == ("deeplearning",)
+        assert registry.require(key).extras == ("deeplearning",)
 
 
 def test_ft_transformer_uses_an_experimental_tabular_boundary():
@@ -114,7 +112,7 @@ def test_ft_transformer_uses_an_experimental_tabular_boundary():
     adapter = networks.FT_TRANSFORMER
     assert adapter.family == "deep_learning"
     assert adapter.architecture == "ft_transformer"
-    assert adapter.capability_family == "transformer"
+    assert adapter.boundary == "transformer"
 
     registry = roster.enrol()
     declaration = registry.find("transformer")
@@ -123,9 +121,7 @@ def test_ft_transformer_uses_an_experimental_tabular_boundary():
     assert declaration.modalities == (capabilities.Modality.TABULAR,)
 
     board = profiled()
-    key = stages.requisition(
-        board, tasks.Task.BINARY, adapter.capability_family
-    )
+    key = stages.requisition(board, tasks.Task.BINARY, adapter.boundary)
     diagnostics = registry.diagnose(key, row_count=120)
     assert {item.code for item in diagnostics} == {
         "status_not_allowed",
@@ -201,7 +197,7 @@ def test_unimplemented_contract_dimensions_are_not_promoted():
     key = capabilities.Coordinate(
         modality=capabilities.Modality.TABULAR,
         task=tasks.Task.BINARY,
-        model_family="linear",
+        family="linear",
         evaluation=capabilities.Evaluation.STANDARD,
         uncertainty=capabilities.Uncertainty.NONE,
         fairness=capabilities.Fairness.NONE,

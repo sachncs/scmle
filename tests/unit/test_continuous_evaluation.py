@@ -58,7 +58,7 @@ def test_the_f13_alarm_escalates_for_investigation_and_trains_nothing(tmp_path):
         loop, deployment_ledger.RETRAIN
     )
     assert not called and loop.policy.retrain is False
-    actions = [e.question["action"] for e in loop.pending_escalations()]
+    actions = [e.question["action"] for e in loop.survey()]
     assert "l1_alarm_investigate" in actions
 
 
@@ -69,7 +69,7 @@ def test_a_recommendation_reaches_a_person_and_trains_only_after_approval(
     decision = ev.review(loss_signals(0.4))
     assert decision.action == "recommend" and decision.escalation
     assert decision.retrain is False and not called
-    pending = {e.id: e for e in loop.pending_escalations()}
+    pending = {e.id: e for e in loop.survey()}
     question = pending[decision.escalation].question
     assert question["action"] == continuous.RETRAIN_QUESTION
     assert pending[decision.escalation].proposed_default == "no_retrain"
@@ -93,7 +93,7 @@ def test_a_rejecting_reply_does_not_start_a_retrain(tmp_path):
     loop, ev, ignored, called = degraded(tmp_path)
     decision = ev.review(loss_signals(0.4))
     target = next(
-        e for e in loop.pending_escalations() if e.id == decision.escalation
+        e for e in loop.survey() if e.id == decision.escalation
     )
     loop.reply(target.id, reply_to(target, "reject"))
     with pytest.raises(ValueError):
@@ -123,7 +123,7 @@ def test_a_proposal_is_not_repeated_during_the_cooldown(tmp_path):
     again = ev.review(loss_signals(0.4))
     assert first.action == "recommend" and again.action == "none"
     assert "cooldown" in again.withheld
-    assert [e.question["action"] for e in loop.pending_escalations()].count(
+    assert [e.question["action"] for e in loop.survey()].count(
         continuous.RETRAIN_QUESTION
     ) == 1
 
@@ -184,7 +184,7 @@ def test_a_held_back_reason_is_recorded_and_nothing_is_escalated(tmp_path):
     ]
     decision = ev.review(rows)
     assert decision.action == "none" and "infrastructure" in decision.withheld
-    assert not loop.pending_escalations()
+    assert not loop.survey()
     assert ev.history.select("retrain_review")
 
 
@@ -213,7 +213,7 @@ def test_business_outcomes_become_bounded_losses_and_are_kept(tmp_path):
         ["approve"] * 3,
     )
     assert ev.feed({"a": 0.0, "b": 50.0, "c": 400.0}, cap=100.0) == 3
-    stored = loop.pending_batches[0]["labels"]
+    stored = loop.batches[0]["labels"]
     assert stored == {"a": 0.0, "b": 0.5, "c": 1.0}
     kept = [
         json.loads(line)
@@ -310,7 +310,7 @@ def test_a_new_model_deploys_only_after_the_proposal_the_gate_and_the_approval(
         good, scan=dataclasses.replace(good.scan, passed=False)
     )
     unapproved = dataclasses.replace(good, approval=None)
-    self_approved = dataclasses.replace(good, approver=good.requested_by)
+    self_approved = dataclasses.replace(good, approver=good.requester)
     for name, bad in {
         "unsigned": unsigned,
         "scan": failed_scan,

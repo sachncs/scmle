@@ -153,9 +153,9 @@ class Charter:
                 `costs`; or `purpose` is set and not in
                 `UNITS_OF_PREDICTION`.
         """
-        evidence.require_text(self.question, "question")
-        evidence.require_text(self.unit, "unit")
-        evidence.require_text(self.population, "population")
+        evidence.require(self.question, "question")
+        evidence.require(self.unit, "unit")
+        evidence.require(self.population, "population")
         for name in ("gates", "triggers", "multiverse"):
             qualification.tupled(getattr(self, name), name)
         parts.positive(self.effect, "effect")

@@ -46,45 +46,45 @@ class Inputs:
         identified: The selector found an eligible strategy.
         needed: Assumptions the strategy needs.
         attestors: Assumption to the named attestor (empty text is none).
-        estimated_on_c: The estimate used `C`, opened once.
-        design_passed: Every design diagnostic passed its threshold.
-        design_gates: Certificate gates the design diagnostics rest on.
-        interval_gate: Certificate gate of the strategy's interval.
-        battery_ran: At least one falsification test ran.
-        battery_passed: No test was rejected at `alpha_falsify`.
-        negative_control_declared: The charter declared a negative control.
-        battery_gate: Certificate gate of the battery.
-        replication_passed: Two or more strata with one sign, no
+        confirmatory: The estimate used `C`, opened once.
+        sound: Every design diagnostic passed its threshold.
+        gates: Certificate gates the design diagnostics rest on.
+        interval: Certificate gate of the strategy's interval.
+        ran: At least one falsification test ran.
+        passed: No test was rejected at `alpha_falsify`.
+        negative: The charter declared a negative control.
+        gate: Certificate gate of the battery.
+        replicated: Two or more strata with one sign, no
             heterogeneity; None when not run.
-        sensitivity_holds: The sensitivity gate holds; None when it was not
+        holds: The sensitivity gate holds; None when it was not
             declared or could not run.
-        sensitivity_gate: Certificate gate of the sensitivity analysis, or
+        sensitivity: Certificate gate of the sensitivity analysis, or
             None when the strategy needs none.
-        single_unit: One treated unit (nothing to hold out).
-        weak_instrument: The first stage failed its threshold.
+        unit: One treated unit (nothing to hold out).
+        instrument: The first stage failed its threshold.
         certified: Gates with a current passing certificate.
-        adjustment_checked: The back-door adjustment set was verified against
+        checked: The back-door adjustment set was verified against
             a declared DAG (True for strategies that have no such set).
     """
 
     identified: bool
     needed: tuple[str, ...]
     attestors: Mapping[str, str]
-    estimated_on_c: bool
-    design_passed: bool
-    design_gates: tuple[str, ...]
-    interval_gate: str
-    battery_ran: bool
-    battery_passed: bool
-    negative_control_declared: bool
-    battery_gate: str
-    replication_passed: bool | None
-    sensitivity_holds: bool | None
-    sensitivity_gate: str | None
-    single_unit: bool
-    weak_instrument: bool
+    confirmatory: bool
+    sound: bool
+    gates: tuple[str, ...]
+    interval: str
+    ran: bool
+    passed: bool
+    negative: bool
+    gate: str
+    replicated: bool | None
+    holds: bool | None
+    sensitivity: str | None
+    unit: bool
+    instrument: bool
     certified: Collection[str]
-    adjustment_checked: bool = True
+    checked: bool = True
 
 
 @dataclasses.dataclass(frozen=True)
@@ -132,24 +132,21 @@ def assess(facts: Inputs, certified: Collection[str]) -> dict[str, bool]:
     Returns:
         Whether each of the five conditions holds.
     """
-    gates_ok = all(g in certified for g in facts.design_gates)
+    gates_ok = all(g in certified for g in facts.gates)
     return {
-        "estimated_on_c": facts.estimated_on_c and not facts.single_unit,
-        "design_diagnostics": facts.design_passed
-        and facts.adjustment_checked
+        "estimated_on_c": facts.confirmatory and not facts.unit,
+        "design_diagnostics": facts.sound
+        and facts.checked
         and gates_ok
-        and facts.interval_gate in certified
-        and not facts.weak_instrument,
-        "falsification_battery": facts.battery_ran
-        and facts.battery_passed
-        and facts.negative_control_declared
-        and facts.battery_gate in certified,
-        "replication": bool(facts.replication_passed),
-        "sensitivity": bool(facts.sensitivity_holds)
-        and (
-            facts.sensitivity_gate is None
-            or facts.sensitivity_gate in certified
-        ),
+        and facts.interval in certified
+        and not facts.instrument,
+        "falsification_battery": facts.ran
+        and facts.passed
+        and facts.negative
+        and facts.gate in certified,
+        "replication": bool(facts.replicated),
+        "sensitivity": bool(facts.holds)
+        and (facts.sensitivity is None or facts.sensitivity in certified),
     }
 
 
@@ -172,23 +169,23 @@ def shortfalls(
     if not conditions["estimated_on_c"]:
         reasons.append(
             "one treated unit: nothing to hold out"
-            if facts.single_unit
+            if facts.unit
             else "the estimate did not use C"
         )
-    if facts.weak_instrument:
+    if facts.instrument:
         reasons.append("weak instrument: only the robust interval is valid")
-    if not facts.adjustment_checked:
+    if not facts.checked:
         reasons.append(
             "the adjustment set is an unchecked attestation (no declared "
             "DAG confirms it)"
         )
-    gates_ok = all(g in certified for g in facts.design_gates)
-    if not gates_ok or facts.interval_gate not in certified:
+    gates_ok = all(g in certified for g in facts.gates)
+    if not gates_ok or facts.interval not in certified:
         reasons.append("a design gate has no passing certificate")
     return reasons
 
 
-def evidence_shortfalls(
+def diagnose(
     facts: Inputs, conditions: Mapping[str, bool], certified: Collection[str]
 ) -> list[str]:
     """Lists why the falsification, replication and sensitivity fall short.
@@ -203,17 +200,17 @@ def evidence_shortfalls(
         and the sensitivity analysis, in that order.
     """
     reasons: list[str] = []
-    if not facts.battery_ran or not facts.negative_control_declared:
+    if not facts.ran or not facts.negative:
         reasons.append("no negative control ran")
-    elif facts.battery_gate not in certified:
+    elif facts.gate not in certified:
         reasons.append("the battery has no passing certificate")
-    if facts.replication_passed is None:
+    if facts.replicated is None:
         reasons.append("replication did not run (fewer than two strata)")
-    elif not facts.replication_passed:
+    elif not facts.replicated:
         reasons.append("strata disagree or are heterogeneous")
-    if facts.sensitivity_holds is None:
+    if facts.holds is None:
         reasons.append("no sensitivity analysis was declared or possible")
-    elif not facts.sensitivity_holds:
+    elif not facts.holds:
         reasons.append("the sensitivity gate failed at the declared strength")
     elif conditions["sensitivity"] is False:
         reasons.append("the sensitivity analysis has no passing certificate")
@@ -251,9 +248,9 @@ def decide(facts: Inputs) -> Assignment:
     reasons: list[str] = []
     if unnamed:
         reasons.append("no named attestor for: " + ", ".join(unnamed))
-    if not facts.design_passed:
+    if not facts.sound:
         reasons.append("a design diagnostic failed")
-    if facts.battery_ran and not facts.battery_passed:
+    if facts.ran and not facts.passed:
         reasons.append("a falsification test rejected")
     if reasons:
         return Assignment(
@@ -264,7 +261,7 @@ def decide(facts: Inputs) -> Assignment:
             "downgrade_tier",
         )
     reasons.extend(shortfalls(facts, conditions, certified))
-    reasons.extend(evidence_shortfalls(facts, conditions, certified))
+    reasons.extend(diagnose(facts, conditions, certified))
     if all(conditions.values()):
         return Assignment(
             qualification.Tier.CONFIRMED, "identified", conditions, (), ""

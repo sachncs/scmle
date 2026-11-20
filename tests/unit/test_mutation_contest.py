@@ -95,11 +95,11 @@ def test_a_rollback_proposal_ends_the_watch_and_escalates_a_second(tmp_path):
     loop = open_loop(tmp_path, step=0.05)
     crossed = types.SimpleNamespace(crossed=True, e_value=40.0)
     loop.batch = 3
-    loop.rollback_watch = {"previous": "old", "process": crossed}
+    loop.watch = {"previous": "old", "process": crossed}
 
     assert loop.propose() is None
-    assert loop.rollback_watch is None
-    loop.rollback_watch = {"previous": "old", "process": crossed}
+    assert loop.watch is None
+    loop.watch = {"previous": "old", "process": crossed}
     second = loop.propose()
 
     assert second.question == {

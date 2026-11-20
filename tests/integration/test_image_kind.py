@@ -96,9 +96,9 @@ def project(
         target=target,
         modality=extra.pop("modality", "image"),
         models=support.optin(task),
-        time_budget=40,
+        budget=40,
         folds=3,
-        output_dir=str(output),
+        directory=str(output),
         search=tasks.Search(top_models=0),
         strategies=tasks.Strategies(top_models=0),
         ensemble=tasks.Stacking(size=0),
@@ -123,7 +123,7 @@ def shape(value):
 
 def capture(run) -> dict[str, object]:
     """What the golden records of a media run."""
-    run_dir = pathlib.Path(run.run_dir)
+    run_dir = pathlib.Path(run.directory)
     kinds_seen = events(run_dir)
     return {
         "stages": sorted(
@@ -184,7 +184,7 @@ def test_an_image_directory_runs_the_shared_stages_end_to_end(
     run = project(
         tmp_path / "pictures", "animal", tmp_path / "runs", tasks.Task.BINARY
     ).run()
-    run_dir = pathlib.Path(run.run_dir)
+    run_dir = pathlib.Path(run.directory)
     assert run.evaluation["task"] == "binary_classification"
     assert run.evaluation["opened"] is True
     assert run.evaluation["confidence"]["available"] is True

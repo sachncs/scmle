@@ -32,7 +32,7 @@ def sweep(result, column="missed"):
 
 def run(frame, tmp_path, **kwargs):
     return support.make_project(
-        frame, "y", time_budget=300, output_dir=tmp_path, **kwargs
+        frame, "y", budget=300, directory=tmp_path, **kwargs
     ).run()
 
 
@@ -40,7 +40,7 @@ def test_constrained_predictions_never_fall_as_the_feature_rises(tmp_path):
     result = run(
         noisy_frame(),
         tmp_path,
-        monotonic_constraints={"missed": 1},
+        constraints={"missed": 1},
         models=tasks.Candidates(exclude_families=["deep_learning"]),
     )
 
@@ -59,9 +59,9 @@ def test_only_models_that_can_enforce_the_constraint_are_planned(tmp_path):
     project = support.make_project(
         noisy_frame(),
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
-        monotonic_constraints={"missed": 1},
+        budget=300,
+        directory=tmp_path,
+        constraints={"missed": 1},
     )
 
     plan = project.plan()
@@ -77,7 +77,7 @@ def test_a_decreasing_constraint_is_respected_too(tmp_path):
     frame = noisy_frame()
     frame["y"] = 1 - frame["y"]
 
-    result = run(frame, tmp_path, monotonic_constraints={"missed": -1})
+    result = run(frame, tmp_path, constraints={"missed": -1})
 
     assert numpy.all(numpy.diff(sweep(result)) <= 1e-9)
 
@@ -89,7 +89,7 @@ def test_constraints_on_unusable_columns_or_multiclass_tasks_are_refused(
     # Enforces website/src/learn/when-things-go-wrong.html:87.
     with pytest.raises(errors.BlockedError, match="numeric feature"):
         support.make_project(
-            noisy_frame(), "y", monotonic_constraints={"nope": 1}
+            noisy_frame(), "y", constraints={"nope": 1}
         ).plan()
     with pytest.raises(ValueError, match=r"\+1 or -1"):
         tasks.Config(
@@ -104,5 +104,5 @@ def test_constraints_on_unusable_columns_or_multiclass_tasks_are_refused(
             multi,
             "y",
             task="classification",
-            monotonic_constraints={"missed": 1},
+            constraints={"missed": 1},
         ).plan()

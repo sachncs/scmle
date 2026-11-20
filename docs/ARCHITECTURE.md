@@ -92,7 +92,7 @@ store (`workflow.executor.records.Bucket`).
   `enforcement="hard"` every trial runs supervised in its own process and is
   killed at a hard time ceiling or memory limit; `enforcement="cooperative"`
   only stops new trials from starting.
-* **Replay verification** (`Project.verify_replay`) classifies a rerun as
+* **Replay verification** (`Project.verify`) classifies a rerun as
   `exact`, `comparable` or `different`.
 
 ## Raw-data ingestion
@@ -162,7 +162,7 @@ two-level columns, tested jointly while there are no more pairs than
 columns; a leak over three or more columns, or over two columns with more
 levels, is not seen.
 
-`leakage_policy="block"` (opt-in; the default is `warn`) blocks the run on any
+`leakage="block"` (opt-in; the default is `warn`) blocks the run on any
 suspect, and on a screen that could not check its columns. The published
 certificates (`scmle/assurance/admissibility/screen_certificates.json`, produced by
 `python -m benchmarks.qualification.screen_certify --write`) are evidence
@@ -188,7 +188,7 @@ decision boundary, not merely rename a function call.
 | a file format | `tabular.Reader` | `Loader(readers=...)` |
 | a column family | `Family` | `columns.KINDS` |
 | a feature operation | `Operation` | `feature_graph.OPS` |
-| a synthetic-data generator | `Synthesizer` | `GeneratorOverSampler.generator_class` |
+| a synthetic-data generator | `Synthesizer` | `Generator.generator` |
 | a validation protocol | `Partitioner` | `splitting.STRATEGIES` |
 | a model family | `Model` | `plugins.REGISTRY.enrol(plugins.Kind.ESTIMATORS, ...)`, `Catalog.register` or the `scmle.models` entry point |
 | a metric | `Metric` | `plugins.REGISTRY.enrol(plugins.Kind.METRICS, ...)` |
@@ -250,7 +250,7 @@ on the free-threaded build (`tests/unit/test_thread_safety.py`).
   `history_lock`; `calibrate` and other methods that replace fitted parts are
   setup steps, not safe to run beside predictions.
 * **Files.** `durability.latch(path)` gives every writer of one file the
-  same re-entrant lock, and `durability.append_text` appends whole records.
+  same re-entrant lock, and `durability.append` appends whole records.
   The model registry store, lifecycle state, incident journal, alert
   journal, prediction log and SQLite schema migration use them. Their
   read-modify-write steps (assign a version, move an alias, chain an

@@ -106,21 +106,21 @@ def substantiate(
         model_fingerprint=model_fingerprint,
         bundle_digest=bundle_digest,
         input_fingerprint=input_fingerprint,
-        dataset_snapshot=dataset_snapshot,
-        feature_graph=feature_graph,
+        snapshot=dataset_snapshot,
+        lineage=feature_graph,
         method=explanations.Method(
             name=method_name,
             parameters=dict(method_parameters),
         ),
         output=dict(result),
         timestamp=timestamp,
-        software_version=software_version,
+        software=software_version,
         uncertainty=dict(uncertainty),
         stability=dict(stability),
         limitations=tuple(limitations),
-        causal_warning=causal_warning,
-        privacy_decision=privacy_decision,
-        evidence_links=tuple(evidence_links),
+        caveat=causal_warning,
+        clearance=privacy_decision,
+        links=tuple(evidence_links),
     )
 
 

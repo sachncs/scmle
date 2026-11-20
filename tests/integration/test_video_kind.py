@@ -112,9 +112,9 @@ def test_a_timed_video_listing_runs_the_shared_stages_end_to_end(
         tmp_path / "runs",
         tasks.Task.BINARY,
         modality="video",
-        time_column="when",
+        timestamp="when",
     ).run()
-    run_dir = pathlib.Path(run.run_dir)
+    run_dir = pathlib.Path(run.directory)
     split = test_image_kind.manifest(run_dir)
     assert split["strategy"] == "temporal"
     assert split["folds"] and all(fold["val"] for fold in split["folds"])

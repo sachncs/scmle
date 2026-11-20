@@ -150,7 +150,7 @@ def winning_challenger(tmp_path):
     loop, ev, stream, ignored = degraded(tmp_path)
     decision = ev.review(loss_signals(0.4))
     target = next(
-        e for e in loop.pending_escalations() if e.id == decision.escalation
+        e for e in loop.survey() if e.id == decision.escalation
     )
     loop.reply(target.id, reply_to(target))
     ev.execute(target.id)
@@ -160,9 +160,7 @@ def winning_challenger(tmp_path):
 
 def release_world(tmp_path):
     store = support_runtime.make_registry(tmp_path / "registry")
-    release = release_state.ReleaseRegistry(
-        store, None, support_runtime.NO_WAIT
-    )
+    release = release_state.Registry(store, None, support_runtime.NO_WAIT)
     release.approve(MODEL, 1, support_runtime.sanction(1), support_release.KEY)
     release.approve(MODEL, 2, support_runtime.sanction(2), support_release.KEY)
     plane = support_runtime.MemoryPlane()

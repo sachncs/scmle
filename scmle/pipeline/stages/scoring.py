@@ -138,7 +138,7 @@ def appraise(
         and board.services.spec.data.group_column
         else None
     )
-    guard = netbenefit.FinalNetBenefit(decision["f11"]["rule_hash"])
+    guard = netbenefit.Examiner(decision["f11"]["rule_hash"])
     report = guard.evaluate(
         decision["f11"]["rule_hash"],
         (target == positive).to_numpy(dtype=float),
@@ -175,8 +175,8 @@ def pin(selected: Any, decision: Mapping[str, Any] | None) -> str:
         as canonical JSON.
     """
     frozen = {
-        "trial": selected.trial_id,
-        "model": selected.model_name,
+        "trial": selected.identifier,
+        "model": selected.model,
         "strategy": selected.strategy,
         "params": selected.params,
         "decision": decision,
@@ -229,8 +229,8 @@ def choose(
             board.journal.forgo("decision threshold", reason)
             return fitted, None
     strategy = strategies.lookup(selected.strategy)
-    adapter = board.services.registry.get(selected.model_name)
-    plan = partition.profile.feature_plan
+    adapter = board.services.registry.get(selected.model)
+    plan = partition.profile.plan
     seed = board.services.spec.validation.seed
     return scmle.decision.threshold.choose(
         fitted,

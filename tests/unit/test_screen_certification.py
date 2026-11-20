@@ -32,7 +32,7 @@ def table(rows=240, seed=0, leak=False):
 
 def build(tmp_path, policy, frame):
     return support.make_project(
-        frame, "y", output_dir=tmp_path, leakage_policy=policy
+        frame, "y", directory=tmp_path, leakage=policy
     )
 
 

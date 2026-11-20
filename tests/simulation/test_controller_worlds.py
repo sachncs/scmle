@@ -49,7 +49,7 @@ def run(world, ticks, controller, **deliveries):
 
 
 def check_properties(world, trainer=None, limit=0):
-    ledger = deployment_ledger.DeploymentLedger.load(
+    ledger = deployment_ledger.Ledger.load(
         world.deploy / deployment_ledger.FILE_NAME
     )  # on disk
     assert {
@@ -91,7 +91,7 @@ def test_a_stable_world_raises_nothing(tmp_path):
     ledger = check_properties(world, trainer, limit=2)
     assert not tests.simulation.world.kinds(ledger, deployment_ledger.ALARM)
     assert trainer.calls == 0
-    assert not controller.loop.pending_escalations()
+    assert not controller.loop.survey()
 
 
 def test_an_abrupt_rise_trains_one_challenger_inside_the_envelope(tmp_path):
@@ -134,7 +134,7 @@ def test_without_an_envelope_the_alarm_trains_nothing_and_asks(tmp_path):
     check_properties(world, trainer, limit=0)
     assert trainer.calls == 0
     actions = {
-        e.question["action"] for e in controller.loop.pending_escalations()
+        e.question["action"] for e in controller.loop.survey()
     }
     assert "retrain_not_authorized" in actions
 
@@ -153,7 +153,7 @@ def test_an_uncertified_alarm_never_reaches_the_envelope(tmp_path):
     assert trainer.calls == 0
     assert controller.envelopes.remaining("e1") == {"train_challenger": 3}
     actions = {
-        e.question["action"] for e in controller.loop.pending_escalations()
+        e.question["action"] for e in controller.loop.survey()
     }
     assert "l1_alarm_investigate" in actions
 
@@ -170,7 +170,7 @@ def test_a_failing_training_is_escalated_and_the_loop_goes_on(tmp_path):
     result = run(world, 80, controller)
     assert result.status != "halted"
     actions = {
-        e.question["action"] for e in controller.loop.pending_escalations()
+        e.question["action"] for e in controller.loop.survey()
     }
     assert "retrain_failed" in actions
     check_properties(world, None, limit=1)
@@ -182,7 +182,7 @@ def test_an_envelope_without_a_trainer_asks_instead(tmp_path):
     controller.envelopes.grant(tests.simulation.world.envelope(limit=1))
     run(world, 80, controller)
     actions = {
-        e.question["action"] for e in controller.loop.pending_escalations()
+        e.question["action"] for e in controller.loop.survey()
     }
     assert "retrain_not_configured" in actions
 
@@ -225,7 +225,7 @@ def test_a_label_outage_carries_on_and_asks(tmp_path):
     assert not controller.loop.halted
     assert trainer.calls == 0
     actions = {
-        e.question["action"] for e in controller.loop.pending_escalations()
+        e.question["action"] for e in controller.loop.survey()
     }
     assert "controller_labels_not_arriving" in actions
     check_properties(world, trainer, limit=1)
@@ -243,7 +243,7 @@ def test_a_corrupted_batch_is_set_aside_and_the_rest_applied(tmp_path):
     assert len(controller.loop.ledger.rejected) == 1
     assert not controller.loop.halted
     actions = [
-        e.question["action"] for e in controller.loop.pending_escalations()
+        e.question["action"] for e in controller.loop.survey()
     ]
     assert actions == ["controller_input_rejected"]
     check_properties(world, None, limit=0)
@@ -349,6 +349,6 @@ def test_killed_at_any_checkpoint_it_ends_where_an_uninterrupted_run_ends(
             seen[kill],
         )
         assert controller.loop.batch == ticks
-        deployment_ledger.DeploymentLedger.load(
+        deployment_ledger.Ledger.load(
             world.deploy / deployment_ledger.FILE_NAME
         )

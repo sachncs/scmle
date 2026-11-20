@@ -37,13 +37,13 @@ def fingerprint(
     Returns:
         A mapping with one float per entry of `FIELDS`.
     """
-    plan = profile.feature_plan
-    stats = profile.column_statistics
+    plan = profile.plan
+    stats = profile.statistics
     features = tuple(c for c in plan.features if c in stats)
     numeric_skews = [
         abs(stats[c].get("skew", 0.0)) for c in plan.numeric if c in stats
     ]
-    imbalance = profile.target_summary.get("imbalance_ratio", 1.0)
+    imbalance = profile.summary.get("imbalance_ratio", 1.0)
     missing_rate = (
         float(numpy.mean([stats[c]["missing_rate"] for c in features]))
         if features

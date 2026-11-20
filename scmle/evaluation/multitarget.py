@@ -150,7 +150,7 @@ class Joint(scmle.contracts.metrics.Metric):
             ignored.
         """
         function = FUNCTIONS[self.kind]
-        sign = 1.0 if self.greater_is_better else -1.0
+        sign = 1.0 if self.maximize else -1.0
 
         def score(
             estimator: Any,

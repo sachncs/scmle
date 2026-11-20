@@ -28,7 +28,7 @@ def release(tmp_path):
         ),
         encoding="utf-8",
     )
-    digest = provenance.bundle_digest(bundle)
+    digest = provenance.digest(bundle)
     (root / "approval.json").write_text(
         json.dumps(support_release.approval().to_dict()), encoding="utf-8"
     )

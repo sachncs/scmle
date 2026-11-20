@@ -122,7 +122,7 @@ class Labelling(interface.Stage):
         if (
             unlabeled is not None
             and spec.data.unlabeled == "pseudo_label"
-            and not task.is_classification
+            and not task.classification
         ):
             raise errors.ConfigError(
                 "unlabeled='pseudo_label' supports classification only"

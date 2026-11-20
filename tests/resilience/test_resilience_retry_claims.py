@@ -18,7 +18,7 @@ POLICY = retry.Retries(attempts=4, base_delay_seconds=0.5, factor=2.0)
 
 @pytest.fixture
 def store(tmp_path):
-    local = objectstore.LocalObjectStore(tmp_path / "root")
+    local = objectstore.Disk(tmp_path / "root")
     failpoints.seed(local, gated=True)
     return local
 
@@ -52,7 +52,7 @@ def test_a_transient_failure_checking_the_quarantine_marker_is_retried(
 
 
 def test_a_transient_failure_recording_a_repeated_upload_is_retried(tmp_path):
-    local = objectstore.LocalObjectStore(tmp_path / "root")
+    local = objectstore.Disk(tmp_path / "root")
     failpoints.seed(local)
     # Writes 0 to 3 record the four objects; write 4 records the copy.
     faulty = faulty_store.FaultyStore(
@@ -65,7 +65,7 @@ def test_a_transient_failure_recording_a_repeated_upload_is_retried(tmp_path):
 
 
 def test_a_transient_failure_reading_the_checkpoint_is_retried(tmp_path):
-    local = objectstore.LocalObjectStore(tmp_path / "root")
+    local = objectstore.Disk(tmp_path / "root")
     failpoints.seed(local)
     failpoints.processor(local).run(max_objects=2)
     faulty = faulty_store.FaultyStore(
@@ -78,7 +78,7 @@ def test_a_transient_failure_reading_the_checkpoint_is_retried(tmp_path):
 
 
 def test_a_transient_failure_releasing_the_lock_is_retried(tmp_path):
-    local = objectstore.LocalObjectStore(tmp_path / "root")
+    local = objectstore.Disk(tmp_path / "root")
     failpoints.seed(local)
     faulty = faulty_store.FaultyStore(
         local, 1, operations=("delete",), prefix=failpoints.LOCK_KEY

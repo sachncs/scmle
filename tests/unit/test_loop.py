@@ -157,7 +157,7 @@ def test_state_that_does_not_match_the_ledger_starts_halted(tmp_path):
     state.write_text(saved)
     again = open_loop(tmp_path)
     assert again.halted
-    assert again.halt_reason == scmle.governance.loop.HALT_STATE
+    assert again.reason == scmle.governance.loop.HALT_STATE
     routed = again.observe(
         batch_frame(stream, 0), numpy.zeros(50), ["approve"] * 50
     )
@@ -320,7 +320,7 @@ def test_mnar_without_an_audit_slice_never_retrains_and_halts_on_an_alarm(
     assert loop.ledger.halted
     assert any(
         e.question["action"] == "l1_alarm_unverified_label_mechanism"
-        for e in loop.pending_escalations()
+        for e in loop.survey()
     )
     label_file = json.loads(
         (
@@ -419,7 +419,7 @@ def test_a_challenger_without_evidence_escalates_at_the_label_budget(tmp_path):
     assert not rows(loop, deployment_ledger.PROMOTION_PROPOSAL)
     assert any(
         e.question["action"] == "challenger_evidence_insufficient"
-        for e in loop.pending_escalations()
+        for e in loop.survey()
     )
 
 
@@ -432,7 +432,7 @@ def test_a_worse_new_champion_creates_a_rollback_proposal_and_tightens_tau(
     feed(loop, stream, challengers={"previous": sequence.challengers[0]})
     assert len(rows(loop, deployment_ledger.ROLLBACK_PROPOSAL)) == 1
     assert loop.tau == pytest.approx(0.55)
-    assert loop.rollback_watch is None
+    assert loop.watch is None
 
 
 def test_two_consecutive_rollbacks_escalate(tmp_path):
@@ -440,12 +440,12 @@ def test_two_consecutive_rollbacks_escalate(tmp_path):
     for seed in (1, 2):
         stream, sequence = paired([0.12], seed=seed)
         loop.surveil("previous")
-        loop.pending_batches = []
+        loop.batches = []
         loop.batch = 0
         feed(loop, stream, challengers={"previous": sequence.challengers[0]})
     assert any(
         e.question["action"] == "two_consecutive_rollbacks"
-        for e in loop.pending_escalations()
+        for e in loop.survey()
     )
 
 
@@ -459,12 +459,12 @@ def test_selective_risk_above_target_halts_and_coverage_goes_to_zero(tmp_path):
     stream = streams.simulate(spec(base=0.3, batches=60, seed=8))
     feed(loop, stream)
     assert loop.ledger.halted
-    assert loop.halt_reason == scmle.governance.loop.HALT_SELECTIVE
+    assert loop.reason == scmle.governance.loop.HALT_SELECTIVE
     after = loop.observe(batch_frame(stream, 0), numpy.zeros(50), ["a"] * 50)
     assert after.routing.coverage == 0.0
     assert any(
         e.question["action"] == "halt_selective_risk"
-        for e in loop.pending_escalations()
+        for e in loop.survey()
     )
 
 
@@ -489,7 +489,7 @@ def test_lowering_tau_after_the_first_calibration_needs_an_attestation(
     data = streams.draw_calibration(3000, 0.05, seed=1)
     first = loop.calibrate(data["score"], data["loss"])
     loop.tau = min(1.0, first.tau + 0.2)
-    with pytest.raises(never_list.AttestationRequired):
+    with pytest.raises(never_list.UnattestedError):
         loop.calibrate(data["score"], data["loss"])
 
 
@@ -505,7 +505,7 @@ def test_coverage_and_novelty_triggers_escalate(tmp_path):
             covered={i: float(n % 2) for n, i in enumerate(ids)},
         )
         loop.step()
-    actions = {e.question["action"] for e in loop.pending_escalations()}
+    actions = {e.question["action"] for e in loop.survey()}
     assert {
         "coverage_below_nominal",
         "out_of_support_rate_above_bound",
@@ -517,20 +517,20 @@ def test_coverage_and_novelty_triggers_escalate(tmp_path):
 
 def pending_one(tmp_path):
     loop = open_loop(tmp_path)
-    with pytest.raises(never_list.AttestationRequired):
-        loop.move_champion(
+    with pytest.raises(never_list.UnattestedError):
+        loop.move(
             types.SimpleNamespace(promote=lambda *a, **k: "moved"), "m", 3, None
         )
-    return loop, loop.pending_escalations()[0]
+    return loop, loop.survey()[0]
 
 
 def test_a_valid_reply_is_recorded_and_attests_the_decision(tmp_path):
     loop, esc = pending_one(tmp_path)
     outcome = loop.reply(esc.id, reply_to(esc))
     assert outcome.tier is qualification.Tier.ATTESTED
-    assert loop.pending_escalations() == []
+    assert loop.survey() == []
     registry = types.SimpleNamespace(promote=lambda *a, **k: "moved")
-    assert loop.move_champion(registry, "m", 3, None) == "moved"
+    assert loop.move(registry, "m", 3, None) == "moved"
 
 
 def test_rejecting_or_undecided_replies_apply_the_safe_default(tmp_path):
@@ -538,8 +538,8 @@ def test_rejecting_or_undecided_replies_apply_the_safe_default(tmp_path):
     outcome = loop.reply(esc.id, reply_to(esc, decision="cannot_decide"))
     assert outcome.tier is qualification.Tier.UNVERIFIED
     assert outcome.safe_default_applies
-    with pytest.raises(never_list.AttestationRequired):
-        loop.move_champion(
+    with pytest.raises(never_list.UnattestedError):
+        loop.move(
             types.SimpleNamespace(promote=lambda *a, **k: 1), "m", 3, None
         )
 
@@ -560,7 +560,7 @@ def test_replies_that_do_not_fit_are_refused(tmp_path, changes, message):
     loop, esc = pending_one(tmp_path)
     with pytest.raises(scmle.governance.loop.RefusalError, match=message):
         loop.reply(esc.id, reply_to(esc, **changes))
-    assert len(loop.pending_escalations()) == 1
+    assert len(loop.survey()) == 1
 
 
 def test_signature_key_and_system_key_checks(tmp_path):
@@ -587,11 +587,11 @@ def test_signature_key_and_system_key_checks(tmp_path):
 
 def test_unanswered_escalations_time_out_with_the_safe_default(tmp_path):
     loop = open_loop(tmp_path, make_policy(timeout=3))
-    with pytest.raises(never_list.AttestationRequired):
+    with pytest.raises(never_list.UnattestedError):
         loop.rewrite(lambda: None, {"op": "truncate"})
     stream = streams.simulate(spec(batches=6, seed=1))
     feed(loop, stream, 0, 6)
-    assert loop.pending_escalations() == []
+    assert loop.survey() == []
     closing = [
         r
         for r in rows(loop, deployment_ledger.ESCALATION)
@@ -609,7 +609,7 @@ def test_a_tampered_ledger_halts_the_loop(tmp_path):
     path.write_text("\n".join([lines[0], *lines[2:]]) + "\n")
     result = loop.step()
     assert result.status == scmle.governance.loop.HALTED
-    assert loop.halt_reason == scmle.governance.loop.HALT_LEDGER
+    assert loop.reason == scmle.governance.loop.HALT_LEDGER
     assert (
         loop.observe(
             batch_frame(stream, 0), numpy.zeros(50), ["a"] * 50
@@ -626,7 +626,7 @@ def attested_loop(tmp_path):
 
 
 NEVER_CASES = {
-    "move_champion": lambda loop, calls: loop.move_champion(
+    "move_champion": lambda loop, calls: loop.move(
         types.SimpleNamespace(promote=lambda *a, **k: calls.append("promote")),
         "m",
         2,
@@ -635,21 +635,21 @@ NEVER_CASES = {
     "rollback": lambda loop, calls: loop.revert(
         lambda: calls.append("rb"), {"to": 1}
     ),
-    "reopen_sealed": lambda loop, calls: loop.reopen_sealed(
+    "reopen_sealed": lambda loop, calls: loop.reopen(
         lambda: calls.append("c"), {"set": "C"}
     ),
-    "change_charter": lambda loop, calls: loop.amend_policy(fallback="approve"),
+    "change_charter": lambda loop, calls: loop.amend(fallback="approve"),
     "rewrite_ledger": lambda loop, calls: loop.rewrite(
         lambda: calls.append("x"), {"op": "rm"}
     ),
-    "relax_threshold": lambda loop, calls: loop.amend_policy(target=0.9),
-    "act_on_unverified": lambda loop, calls: loop.act_on_unverified(
+    "relax_threshold": lambda loop, calls: loop.amend(target=0.9),
+    "act_on_unverified": lambda loop, calls: loop.act(
         "retrain", lambda: calls.append("r")
     ),
     "silence_alert": lambda loop, calls: loop.silence(
         "slo", lambda: calls.append("s")
     ),
-    "change_label_policy": lambda loop, calls: loop.change_label_policy(
+    "change_label_policy": lambda loop, calls: loop.relabel(
         {"epsilon": 0.0}, lambda: calls.append("l")
     ),
     "delete_or_send": lambda loop, calls: loop.delete_or_send(
@@ -670,13 +670,13 @@ def test_never_list_action_without_attestation_raises_and_escalates(
     loop = attested_loop(tmp_path)
     calls = []
     before = len(rows(loop, deployment_ledger.ESCALATION))
-    with pytest.raises(never_list.AttestationRequired) as caught:
+    with pytest.raises(never_list.UnattestedError) as caught:
         NEVER_CASES[name](loop, calls)
     assert calls == []
     assert len(rows(loop, deployment_ledger.ESCALATION)) == before + 1
-    assert caught.value.escalation_id == loop.pending_escalations()[-1].id
+    assert caught.value.escalation == loop.survey()[-1].id
     # asking again does not pile up a second identical escalation
-    with pytest.raises(never_list.AttestationRequired):
+    with pytest.raises(never_list.UnattestedError):
         NEVER_CASES[name](loop, calls)
     assert len(rows(loop, deployment_ledger.ESCALATION)) == before + 1
 
@@ -686,7 +686,7 @@ def test_high_impact_answer_is_blocked_in_routing_and_guarded_as_an_action(
 ):
     # Enforces docs/AUTONOMY.md:47.
     loop = attested_loop(tmp_path)
-    with pytest.raises(never_list.AttestationRequired):
+    with pytest.raises(never_list.UnattestedError):
         loop.perform(
             never_list.Forbidden.ANSWER_HIGH_IMPACT,
             {"case": "c1"},
@@ -707,11 +707,11 @@ def test_the_system_cannot_attest_for_itself(tmp_path):
     os.environ["SCMLE_SIGNING_KEY"] = environment_key
     try:
         other = open_loop(tmp_path / "second")
-        with pytest.raises(never_list.AttestationRequired):
-            other.move_champion(
+        with pytest.raises(never_list.UnattestedError):
+            other.move(
                 types.SimpleNamespace(promote=lambda *a, **k: 1), "m", 3, None
             )
-        esc2 = other.pending_escalations()[0]
+        esc2 = other.survey()[0]
         with pytest.raises(scmle.governance.loop.RefusalError):
             other.reply(
                 esc2.id,
@@ -724,26 +724,26 @@ def test_the_system_cannot_attest_for_itself(tmp_path):
 
 def test_tightening_is_free_and_loosening_is_not(tmp_path):
     loop = open_loop(tmp_path)
-    updated = loop.amend_policy(target=0.03, promotion={"delta": 0.01})
+    updated = loop.amend(target=0.03, promotion={"delta": 0.01})
     assert updated.target == 0.03
-    with pytest.raises(never_list.AttestationRequired):
-        loop.amend_policy(target=0.9)
-    esc = loop.pending_escalations()[-1]
+    with pytest.raises(never_list.UnattestedError):
+        loop.amend(target=0.9)
+    esc = loop.survey()[-1]
     loop.reply(esc.id, reply_to(esc))
-    assert loop.amend_policy(target=0.9).target == 0.9
+    assert loop.amend(target=0.9).target == 0.9
     again = open_loop(tmp_path, loop.policy)
     assert again.policy.target == 0.9
     with pytest.raises(ValueError, match="unknown"):
-        loop.amend_policy(nothing=1)
+        loop.amend(nothing=1)
 
 
 def test_attestation_is_specific_to_its_exact_request(tmp_path):
     loop, esc = pending_one(tmp_path)
     loop.reply(esc.id, reply_to(esc))
     registry = types.SimpleNamespace(promote=lambda *a, **k: "moved")
-    assert loop.move_champion(registry, "m", 3, None) == "moved"
-    with pytest.raises(never_list.AttestationRequired):
-        loop.move_champion(registry, "m", 4, None)
+    assert loop.move(registry, "m", 3, None) == "moved"
+    with pytest.raises(never_list.UnattestedError):
+        loop.move(registry, "m", 4, None)
 
 
 def test_an_expired_attestation_no_longer_allows(tmp_path):
@@ -757,14 +757,14 @@ def test_an_expired_attestation_no_longer_allows(tmp_path):
         today=lambda: clock["today"],
     )
     registry = types.SimpleNamespace(promote=lambda *a, **k: "moved")
-    with pytest.raises(never_list.AttestationRequired):
-        loop.move_champion(registry, "m", 3, None)
-    esc = loop.pending_escalations()[0]
+    with pytest.raises(never_list.UnattestedError):
+        loop.move(registry, "m", 3, None)
+    esc = loop.survey()[0]
     loop.reply(esc.id, reply_to(esc))
-    assert loop.move_champion(registry, "m", 3, None) == "moved"
+    assert loop.move(registry, "m", 3, None) == "moved"
     clock["today"] = datetime.date(2027, 1, 1)
-    with pytest.raises(never_list.AttestationRequired):
-        loop.move_champion(registry, "m", 3, None)
+    with pytest.raises(never_list.UnattestedError):
+        loop.move(registry, "m", 3, None)
 
 
 def single_use_loop(tmp_path):
@@ -783,40 +783,40 @@ def test_a_single_use_attestation_allows_one_action_and_is_ledgered(tmp_path):
     # Enforces website/src/pages/docs/operating-loop.astro:49.
     loop = single_use_loop(tmp_path)
     registry = types.SimpleNamespace(promote=lambda *a, **k: "moved")
-    with pytest.raises(never_list.AttestationRequired):
-        loop.move_champion(registry, "m", 3, None)
-    esc = loop.pending_escalations()[0]
+    with pytest.raises(never_list.UnattestedError):
+        loop.move(registry, "m", 3, None)
+    esc = loop.survey()[0]
     loop.reply(esc.id, reply_to(esc))
-    assert loop.move_champion(registry, "m", 3, None) == "moved"
+    assert loop.move(registry, "m", 3, None) == "moved"
     assert len(rows(loop, deployment_ledger.ATTESTATION_USED)) == 1
-    with pytest.raises(never_list.AttestationRequired):
-        loop.move_champion(registry, "m", 3, None)
+    with pytest.raises(never_list.UnattestedError):
+        loop.move(registry, "m", 3, None)
     # asking again needs a new escalation and a new reply
-    assert len(loop.pending_escalations()) == 1
+    assert len(loop.survey()) == 1
 
 
 def test_the_default_keeps_an_attestation_valid_until_it_expires(tmp_path):
     loop, esc = pending_one(tmp_path)
     loop.reply(esc.id, reply_to(esc))
     registry = types.SimpleNamespace(promote=lambda *a, **k: "moved")
-    assert loop.move_champion(registry, "m", 3, None) == "moved"
-    assert loop.move_champion(registry, "m", 3, None) == "moved"
+    assert loop.move(registry, "m", 3, None) == "moved"
+    assert loop.move(registry, "m", 3, None) == "moved"
     assert rows(loop, deployment_ledger.ATTESTATION_USED) == []
 
 
 def test_a_used_marker_survives_reopening_the_ledger(tmp_path):
     loop = single_use_loop(tmp_path)
     registry = types.SimpleNamespace(promote=lambda *a, **k: "moved")
-    with pytest.raises(never_list.AttestationRequired):
-        loop.move_champion(registry, "m", 3, None)
+    with pytest.raises(never_list.UnattestedError):
+        loop.move(registry, "m", 3, None)
     loop.reply(
-        loop.pending_escalations()[0].id,
-        reply_to(loop.pending_escalations()[0]),
+        loop.survey()[0].id,
+        reply_to(loop.survey()[0]),
     )
-    loop.move_champion(registry, "m", 3, None)
+    loop.move(registry, "m", 3, None)
     again = single_use_loop(tmp_path)
-    with pytest.raises(never_list.AttestationRequired):
-        again.move_champion(registry, "m", 3, None)
+    with pytest.raises(never_list.UnattestedError):
+        again.move(registry, "m", 3, None)
 
 
 def test_a_used_marker_for_an_unanswered_escalation_is_refused(tmp_path):
@@ -845,14 +845,14 @@ def test_an_uncertified_alarm_escalates_instead_of_retraining(tmp_path):
     )
     assert any(
         e.question["action"] == "l1_alarm_investigate"
-        for e in loop.pending_escalations()
+        for e in loop.survey()
     )
 
 
 def test_a_rollback_proposal_never_lowers_an_infinite_tau(tmp_path):
     loop = open_loop(tmp_path)
     loop.tau = math.inf
-    loop.rollback_watch = {
+    loop.watch = {
         "previous": "v1",
         "process": types.SimpleNamespace(crossed=True, e_value=50.0),
     }

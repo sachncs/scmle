@@ -15,7 +15,7 @@ def test_a_constructor_without_a_target_builds_nothing() -> None:
 
 
 def test_the_selector_is_seeded_with_zero_by_default() -> None:
-    assert selection.SparseSelector().random_state == 0
+    assert selection.Selector().random_state == 0
 
 
 def test_the_selector_seeds_its_classifier(monkeypatch) -> None:
@@ -30,7 +30,7 @@ def test_the_selector_seeds_its_classifier(monkeypatch) -> None:
     rng = numpy.random.default_rng(0)
     matrix = rng.normal(size=(60, 3))
     target = (matrix[:, 0] > 0).astype(int)
-    selection.SparseSelector(random_state=4).fit(matrix, target)
+    selection.Selector(random_state=4).fit(matrix, target)
     assert seen == [4]
 
 
@@ -38,6 +38,6 @@ def test_a_fully_penalised_classifier_keeps_its_strongest_column() -> None:
     rng = numpy.random.default_rng(1)
     matrix = rng.normal(size=(80, 3))
     target = numpy.where(matrix[:, 2] > 0, "yes", "no")
-    chooser = selection.SparseSelector(strength=1e-9).fit(matrix, target)
+    chooser = selection.Selector(strength=1e-9).fit(matrix, target)
     assert chooser.support_.tolist() == [False, False, True]
     assert chooser.n_features_in_ == 3

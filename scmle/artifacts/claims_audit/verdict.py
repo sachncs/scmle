@@ -41,7 +41,7 @@ class Verification:
     """The result of `verify`.
 
     Attributes:
-        run_dir: The directory verified.
+        directory: The directory verified.
         findings: Every step, in order.
         KEYS: Version-1 keys to the written ones (`directory`); `downgrade`
             restores version 1.
@@ -51,7 +51,7 @@ class Verification:
         renames={"run_dir": "directory"}
     )
 
-    run_dir: str
+    directory: str
     findings: tuple[Finding, ...]
 
     @property
@@ -73,7 +73,7 @@ class Verification:
         """
         return self.KEYS.upgrade(
             {
-                "run_dir": self.run_dir,
+                "run_dir": self.directory,
                 "ok": self.ok,
                 "passed": self.verified,
                 "findings": [f.to_dict() for f in self.findings],

@@ -266,7 +266,7 @@ class Inspection:
             `MIN_BALANCE_CLASSES` classes, at least `MIN_BALANCE_ROWS` rows
             and all classes have the same count; otherwise an empty list.
         """
-        if not task.is_classification or len(target) < MIN_BALANCE_ROWS:
+        if not task.classification or len(target) < MIN_BALANCE_ROWS:
             return []
         counts = target.value_counts()
         if (
@@ -305,7 +305,7 @@ class Inspection:
         if not duplicates:
             return []
         findings = [f"{duplicates} duplicate rows"]
-        if feature_columns and task.is_classification:
+        if feature_columns and task.classification:
             labels = frame.groupby(
                 feature_columns, dropna=False, observed=True
             )[data.target].nunique()
@@ -340,7 +340,7 @@ class Inspection:
         """
         data = self.spec.data
         target = frame[data.target]
-        if task.is_classification:
+        if task.classification:
             kind = "classification"
         elif pandas.api.types.is_numeric_dtype(target):
             kind = "regression"

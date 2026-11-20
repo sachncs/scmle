@@ -3,7 +3,9 @@
 Each part is nested in a `policy.Criteria` record and versioned with it, so
 it carries no version of its own. A part whose stored keys are single words
 while its fields keep their longer names is `records.Spelled`: its
-`spelling` maps the field names to the stored keys.
+`spelling` maps the field names to the stored keys. `former` maps the
+version-1 keys of a part to the current ones, for `policy.Criteria`'s
+migration.
 """
 
 from typing import Annotated
@@ -156,7 +158,7 @@ class Hurdle(records.Schema):
 class Uncertainty(records.Spelled):
     """Task-specific uncertainty promise and statistical requirements."""
 
-    spelling: ClassVar[records.Migration] = records.Migration(
+    former: ClassVar[records.Migration] = records.Migration(
         renames={
             "confidence_level": "confidence",
             "coverage_target": "coverage",
@@ -164,11 +166,11 @@ class Uncertainty(records.Spelled):
         }
     )
 
-    method: support.UncertaintyMethod
+    method: support.Method
     required: pydantic.StrictBool = False
-    confidence_level: Finite | None = None
-    coverage_target: Finite | None = None
-    minimum_rows: Count | None = None
+    confidence: Finite | None = None
+    coverage: Finite | None = None
+    rows: Count | None = None
 
     @pydantic.model_validator(mode="after")
     def check(self) -> Self:
@@ -184,32 +186,32 @@ class Uncertainty(records.Spelled):
                 no confidence level, or a required prediction-interval,
                 conformal or survival-curve method has no coverage target.
         """
-        none = support.UncertaintyMethod.NONE
+        none = support.Method.NONE
         if self.method is none and self.required:
             raise errors.InputError(
                 "uncertainty cannot be required when method is none"
             )
-        if self.confidence_level is not None:
-            confine(self.confidence_level, "uncertainty.confidence_level")
-        if self.coverage_target is not None:
-            confine(self.coverage_target, "uncertainty.coverage_target")
-        if self.minimum_rows is not None and self.minimum_rows < 1:
+        if self.confidence is not None:
+            confine(self.confidence, "uncertainty.confidence_level")
+        if self.coverage is not None:
+            confine(self.coverage, "uncertainty.coverage_target")
+        if self.rows is not None and self.rows < 1:
             raise errors.InputError(
                 "uncertainty.minimum_rows must be at least 1"
             )
         if self.method is not none and self.required:
-            if self.confidence_level is None:
+            if self.confidence is None:
                 raise errors.InputError(
                     "required uncertainty needs confidence_level"
                 )
             if (
                 self.method
                 in {
-                    support.UncertaintyMethod.PREDICTION_INTERVAL,
-                    support.UncertaintyMethod.CONFORMAL,
-                    support.UncertaintyMethod.SURVIVAL_CURVE,
+                    support.Method.PREDICTION_INTERVAL,
+                    support.Method.CONFORMAL,
+                    support.Method.SURVIVAL_CURVE,
                 }
-                and self.coverage_target is None
+                and self.coverage is None
             ):
                 raise errors.InputError(
                     "required interval uncertainty needs coverage_target"
@@ -220,13 +222,13 @@ class Uncertainty(records.Spelled):
 class Calibration(records.Spelled):
     """Task-specific calibration method and release error threshold."""
 
-    spelling: ClassVar[records.Migration] = records.Migration(
+    former: ClassVar[records.Migration] = records.Migration(
         renames={"maximum_error": "error"}
     )
 
     method: support.Procedure
     required: pydantic.StrictBool = False
-    maximum_error: Finite | None = None
+    error: Finite | None = None
 
     @pydantic.model_validator(mode="after")
     def check(self) -> Self:
@@ -241,13 +243,13 @@ class Calibration(records.Spelled):
                 error is negative.
         """
         if self.method is support.Procedure.NONE:
-            if self.required or self.maximum_error is not None:
+            if self.required or self.error is not None:
                 raise errors.InputError(
                     "calibration requirements need a calibration method"
                 )
-        elif self.required and self.maximum_error is None:
+        elif self.required and self.error is None:
             raise errors.InputError("required calibration needs maximum_error")
-        if self.maximum_error is not None and self.maximum_error < 0:
+        if self.error is not None and self.error < 0:
             raise errors.InputError(
                 "calibration.maximum_error must not be negative"
             )
@@ -257,12 +259,12 @@ class Calibration(records.Spelled):
 class Fairness(records.Spelled):
     """Sensitive-group evaluation or mitigation declaration."""
 
-    spelling: ClassVar[records.Migration] = records.Migration(
+    former: ClassVar[records.Migration] = records.Migration(
         renames={"sensitive_columns": "sensitive"}
     )
 
     method: support.Technique
-    sensitive_columns: tuple[str, ...] = ()
+    sensitive: tuple[str, ...] = ()
     metrics: tuple[str, ...] = ()
 
     @pydantic.model_validator(mode="after")
@@ -277,14 +279,14 @@ class Fairness(records.Spelled):
                 a method of none comes with columns or metrics, or any other
                 method comes without sensitive columns or metrics.
         """
-        vet(self.sensitive_columns, "fairness.sensitive_columns")
+        vet(self.sensitive, "fairness.sensitive_columns")
         vet(self.metrics, "fairness.metrics")
         if self.method is support.Technique.NONE:
-            if self.sensitive_columns or self.metrics:
+            if self.sensitive or self.metrics:
                 raise errors.InputError(
                     "fairness fields must be empty when method is none"
                 )
-        elif not self.sensitive_columns:
+        elif not self.sensitive:
             raise errors.InputError("fairness requires sensitive_columns")
         elif not self.metrics:
             raise errors.InputError("fairness requires metrics")
@@ -294,14 +296,14 @@ class Fairness(records.Spelled):
 class Equity(records.Spelled):
     """Explicit release threshold for one fairness diagnostic metric."""
 
-    spelling: ClassVar[records.Migration] = records.Migration(
+    former: ClassVar[records.Migration] = records.Migration(
         renames={"required_evidence": "evidence"}
     )
 
     metric: str
     maximum: Finite | None = None
     minimum: Finite | None = None
-    required_evidence: tuple[str, ...] = ()
+    evidence: tuple[str, ...] = ()
 
     @pydantic.model_validator(mode="after")
     def check(self) -> Self:
@@ -322,8 +324,8 @@ class Equity(records.Spelled):
             raise errors.InputError(
                 "fairness_gate.maximum must not be negative"
             )
-        vet(self.required_evidence, "fairness_gate.required_evidence")
-        if not self.required_evidence:
+        vet(self.evidence, "fairness_gate.required_evidence")
+        if not self.evidence:
             raise errors.InputError("fairness gates require evidence")
         return self
 
@@ -331,15 +333,15 @@ class Equity(records.Spelled):
 class Subgroups(records.Spelled):
     """Power warning and release-blocking thresholds for subgroup reports."""
 
-    spelling: ClassVar[records.Migration] = records.Migration(
+    former: ClassVar[records.Migration] = records.Migration(
         renames={
             "warning_threshold": "warning",
             "blocking_threshold": "blocking",
         }
     )
 
-    warning_threshold: Count
-    blocking_threshold: Count | None = None
+    warning: Count
+    blocking: Count | None = None
 
     @pydantic.model_validator(mode="after")
     def check(self) -> Self:
@@ -352,14 +354,11 @@ class Subgroups(records.Spelled):
             InputError: If the warning threshold is below one, or the blocking
                 threshold is not between one and the warning threshold.
         """
-        if self.warning_threshold < 1:
+        if self.warning < 1:
             raise errors.InputError(
                 "small-group warning_threshold must be at least 1"
             )
-        if (
-            self.blocking_threshold is not None
-            and not 1 <= self.blocking_threshold <= self.warning_threshold
-        ):
+        if self.blocking is not None and not 1 <= self.blocking <= self.warning:
             raise errors.InputError(
                 "small-group blocking_threshold must be between one and "
                 "warning_threshold"
@@ -367,29 +366,34 @@ class Subgroups(records.Spelled):
         return self
 
 
+GROUPS = {
+    "stability": {
+        "require_stability": "required",
+        "stability_threshold": "threshold",
+    },
+    "fidelity": {
+        "require_fidelity": "required",
+        "fidelity_threshold": "threshold",
+    },
+}
+"""The stability and fidelity requirements, stored as nested objects."""
+
+
 class Explanations(records.Spelled):
     """Availability and evidence requirements for model explanations."""
 
-    spelling: ClassVar[records.Migration] = records.nest(
+    spelling: ClassVar[records.Migration] = records.nest({}, groups=GROUPS)
+    former: ClassVar[records.Migration] = records.nest(
         renames={
             "required_methods": "methods",
             "required_evidence": "evidence",
         },
-        groups={
-            "stability": {
-                "require_stability": "required",
-                "stability_threshold": "threshold",
-            },
-            "fidelity": {
-                "require_fidelity": "required",
-                "fidelity_threshold": "threshold",
-            },
-        },
+        groups=GROUPS,
     )
 
     availability: support.Explicability
-    required_methods: tuple[str, ...] = ()
-    required_evidence: tuple[str, ...] = ()
+    methods: tuple[str, ...] = ()
+    evidence: tuple[str, ...] = ()
     require_stability: pydantic.StrictBool = False
     require_fidelity: pydantic.StrictBool = False
     stability_threshold: Finite | None = None
@@ -408,8 +412,8 @@ class Explanations(records.Spelled):
                 threshold, requirements come with availability none, or an
                 availability level other than none has no required methods.
         """
-        vet(self.required_methods, "explanation.required_methods")
-        vet(self.required_evidence, "explanation.required_evidence")
+        vet(self.methods, "explanation.required_methods")
+        vet(self.evidence, "explanation.required_evidence")
         if self.stability_threshold is not None:
             qualify(
                 self.stability_threshold,
@@ -432,15 +436,15 @@ class Explanations(records.Spelled):
             raise errors.InputError("require_fidelity needs fidelity_threshold")
         if self.availability is support.Explicability.NONE:
             if (
-                self.required_methods
-                or self.required_evidence
+                self.methods
+                or self.evidence
                 or self.require_stability
                 or self.require_fidelity
             ):
                 raise errors.InputError(
                     "explanation requirements need an availability level"
                 )
-        elif not self.required_methods:
+        elif not self.methods:
             raise errors.InputError(
                 "explanation availability requires required_methods"
             )
@@ -453,22 +457,22 @@ class Requirement(records.Spelled):
     Attributes:
         name: The diagnostic.
         action: What a failed or missing report does to the release.
-        required_evidence: Files the report rests on.
+        evidence: Files the report rests on.
         decisive: Whether the report must carry a boolean pass verdict. A
             presence gate (a report without error, such as an interval) is
             not decisive; a gate on a test that passes or fails is, and a
             report that omits its verdict then fails it (ERR-5).
-        spelling: Field names to stored keys (`required_evidence` is
-            stored as `evidence`).
+        former: Version-1 stored keys to the field names, for the
+            policy's migration.
     """
 
-    spelling: ClassVar[records.Migration] = records.Migration(
+    former: ClassVar[records.Migration] = records.Migration(
         renames={"required_evidence": "evidence"}
     )
 
     name: str
     action: support.Remedy
-    required_evidence: tuple[str, ...]
+    evidence: tuple[str, ...]
     decisive: pydantic.StrictBool = False
 
     @pydantic.model_validator(mode="after")
@@ -483,8 +487,8 @@ class Requirement(records.Spelled):
                 repeats, or there is no required evidence.
         """
         sanitize(self.name, "diagnostic_gate.name")
-        vet(self.required_evidence, "diagnostic_gate.required_evidence")
-        if not self.required_evidence:
+        vet(self.evidence, "diagnostic_gate.required_evidence")
+        if not self.evidence:
             raise errors.InputError("diagnostic gates require evidence")
         return self
 
@@ -492,7 +496,7 @@ class Requirement(records.Spelled):
 class Gates(records.Spelled):
     """Evidence-backed thresholds required before a model is released."""
 
-    spelling: ClassVar[records.Migration] = records.Migration(
+    former: ClassVar[records.Migration] = records.Migration(
         renames={
             "metric_gates": "metrics",
             "diagnostic_gates": "diagnostics",
@@ -501,10 +505,10 @@ class Gates(records.Spelled):
         }
     )
 
-    metric_gates: tuple[Hurdle, ...]
-    diagnostic_gates: tuple[Requirement, ...]
-    fairness_gates: tuple[Equity, ...] = ()
-    required_evidence: tuple[str, ...]
+    metrics: tuple[Hurdle, ...]
+    diagnostics: tuple[Requirement, ...]
+    fairness: tuple[Equity, ...] = ()
+    evidence: tuple[str, ...]
 
     @pydantic.model_validator(mode="after")
     def check(self) -> Self:
@@ -519,24 +523,23 @@ class Gates(records.Spelled):
                 gate blocks, or a metric, diagnostic or fairness gate names
                 the same metric or diagnostic twice.
         """
-        if not self.metric_gates:
+        if not self.metrics:
             raise errors.InputError("release policy requires metric_gates")
-        if not self.diagnostic_gates:
+        if not self.diagnostics:
             raise errors.InputError("release policy requires diagnostic_gates")
-        vet(self.required_evidence, "release.required_evidence")
-        if not self.required_evidence:
+        vet(self.evidence, "release.required_evidence")
+        if not self.evidence:
             raise errors.InputError("release policy requires evidence")
         if not any(
-            gate.action is support.Remedy.BLOCK
-            for gate in self.diagnostic_gates
+            gate.action is support.Remedy.BLOCK for gate in self.diagnostics
         ):
             raise errors.InputError(
                 "release policy requires a blocking diagnostic"
             )
         for kind, names in (
-            ("metric", [gate.metric for gate in self.metric_gates]),
-            ("diagnostic", [gate.name for gate in self.diagnostic_gates]),
-            ("fairness", [gate.metric for gate in self.fairness_gates]),
+            ("metric", [gate.metric for gate in self.metrics]),
+            ("diagnostic", [gate.name for gate in self.diagnostics]),
+            ("fairness", [gate.metric for gate in self.fairness]),
         ):
             if len(names) != len(set(names)):
                 raise errors.InputError(f"release {kind} gates must be unique")

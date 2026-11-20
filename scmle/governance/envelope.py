@@ -70,31 +70,29 @@ class Guard:
 
     def __init__(
         self,
-        ledger: deployment_ledger.DeploymentLedger,
+        ledger: deployment_ledger.Ledger,
         today: Callable[[], datetime.date] = datetime.date.today,
-        verification_keys: Mapping[str, str | bytes] | None = None,
+        keys: Mapping[str, str | bytes] | None = None,
     ) -> None:
         """Creates the guard.
 
         Args:
             ledger: The deployment ledger.
             today: Clock, replaceable in tests.
-            verification_keys: Optional map from key id to the key that
+            keys: Optional map from key id to the key that
                 verifies envelopes signed under it. When given (even empty), a
                 grant needs a verifying signature and every use checks it
                 again; None relies on the grant row.
         """
         self.ledger = ledger
         self.today = today
-        self.verification_keys = (
-            None if verification_keys is None else dict(verification_keys)
-        )
-        self.on_write: Callable[[], None] | None = None
+        self.keys = None if keys is None else dict(keys)
+        self.observer: Callable[[], None] | None = None
 
     def wrote(self) -> None:
         """Tells the owner of the running state that the ledger moved."""
-        if self.on_write is not None:
-            self.on_write()
+        if self.observer is not None:
+            self.observer()
 
     def verifies(self, grant: deployment_ledger.Envelope) -> bool:
         """Whether the signature verifies, when keys were supplied.
@@ -106,9 +104,9 @@ class Guard:
             True if no verification keys were supplied, or the grant's key is
             known and its signature verifies.
         """
-        if self.verification_keys is None:
+        if self.keys is None:
             return True
-        key = self.verification_keys.get(grant.key_id)
+        key = self.keys.get(grant.key_id)
         return key is not None and grant.verify(key)
 
     def grant(self, envelope: deployment_ledger.Envelope) -> dict[str, Any]:
@@ -167,9 +165,9 @@ class Guard:
             never below zero.
         """
         grant = self.ledger.envelopes.get(envelope_id)
-        if grant is None or envelope_id in self.ledger.envelope_revoked:
+        if grant is None or envelope_id in self.ledger.revoked:
             return {}
-        used = self.ledger.envelope_uses[envelope_id]
+        used = self.ledger.uses[envelope_id]
         return {
             action: max(limit - used.get(action, 0), 0)
             for action, limit in grant["limits"].items()
@@ -186,8 +184,8 @@ class Guard:
             verify`` for a bad signature, otherwise None.
         """
         today = self.today()
-        issued = deployment_ledger.parse_date(grant["date"], "date")
-        expires = deployment_ledger.parse_date(grant["expires"], "expires")
+        issued = deployment_ledger.parse(grant["date"], "date")
+        expires = deployment_ledger.parse(grant["expires"], "expires")
         if not issued <= today <= expires:
             return "not valid today"
         if not self.verifies(deployment_ledger.Envelope.from_dict(grant)):
@@ -210,7 +208,7 @@ class Guard:
             valid today, signature fails, uses spent), or None if the envelope
             allows the request.
         """
-        if identity in self.ledger.envelope_revoked:
+        if identity in self.ledger.revoked:
             return "revoked"
         if grant["scope"] != scope:
             return "a different scope"

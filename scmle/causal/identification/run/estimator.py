@@ -73,11 +73,11 @@ class Estimator:
         x: Exploration rows.
         seed: Seed of the learners.
         learner: `linear` or `boosted` nuisance learners.
-        alpha_falsify: Familywise level of the falsification battery.
+        falsify: Familywise level of the falsification battery.
         design: Design diagnostics for the report.
         refusal: Why the claim must be refused, or None.
         weak: Whether the instrument was found weak.
-        single_unit: Whether there is a single treated unit (nothing to hold
+        unit: Whether there is a single treated unit (nothing to hold
             out).
         notes: Remarks for the report.
     """
@@ -90,7 +90,7 @@ class Estimator:
         x: pandas.DataFrame,
         seed: int,
         learner: str,
-        alpha_falsify: float,
+        falsify: float,
     ) -> None:
         """Stores the settings of the strategy.
 
@@ -99,17 +99,17 @@ class Estimator:
             x: Exploration rows.
             seed: Seed of the learners.
             learner: `linear` or `boosted` nuisance learners.
-            alpha_falsify: Familywise level of the falsification battery.
+            falsify: Familywise level of the falsification battery.
         """
         self.spec = spec
         self.x = x
         self.seed = seed
         self.learner = learner
-        self.alpha_falsify = alpha_falsify
+        self.falsify = falsify
         self.design: dict[str, Any] = {}
         self.refusal: str | None = None
         self.weak = False
-        self.single_unit = False
+        self.unit = False
         self.notes: list[str] = []
 
     def prepare(self) -> None:

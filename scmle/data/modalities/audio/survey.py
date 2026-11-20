@@ -36,7 +36,7 @@ def confidence(
     return [
         flaw(
             "quality.audio-transcript-confidence-missing",
-            data.FindingSeverity.WARNING,
+            data.Severity.WARNING,
             {
                 "sources": [
                     sample.source
@@ -76,7 +76,7 @@ def drift(
         quality_findings.append(
             flaw(
                 "quality.audio-format-drift",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"sources": [profile.source for profile in profiles]},
                 {"formats": formats},
                 "Select an explicit codec normalization policy before "
@@ -88,7 +88,7 @@ def drift(
         quality_findings.append(
             flaw(
                 "quality.audio-shape-drift",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"sources": [profile.source for profile in profiles]},
                 {
                     "sample_rates": sample_rates,
@@ -123,7 +123,7 @@ def risks(
         risk_findings.append(
             flaw(
                 "risk.audio-mixed-label-state",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"dataset": content_hash},
                 {"label_counts": labels},
                 "Declare whether unlabeled clips are valid for the "
@@ -135,7 +135,7 @@ def risks(
         risk_findings.append(
             flaw(
                 "risk.audio-conflicting-duplicate-labels",
-                data.FindingSeverity.ERROR,
+                data.Severity.ERROR,
                 {"dataset": content_hash},
                 {"groups": list(conflicts)},
                 "Resolve the label conflict or explicitly exclude the "

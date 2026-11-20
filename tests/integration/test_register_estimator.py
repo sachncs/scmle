@@ -48,10 +48,10 @@ def test_a_registered_classifier_competes_in_a_run(tmp_path):
     )
 
     result = support.make_project(
-        frame(), "y", time_budget=300, output_dir=tmp_path
+        frame(), "y", budget=300, directory=tmp_path
     ).run()
 
-    ran = [t for t in result.trials if t.model_name == "gaussian_nb"]
+    ran = [t for t in result.trials if t.model == "gaussian_nb"]
     assert ran and ran[0].status.value == "ok"
 
 
@@ -70,12 +70,12 @@ def test_a_registered_regressor_gets_a_search_space(tmp_path):
         data,
         "y",
         task="regression",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
     ).run()
 
-    assert adapter.search_space is space
-    assert any(t.model_name == "bayes_ridge" for t in result.trials)
+    assert adapter.space is space
+    assert any(t.model == "bayes_ridge" for t in result.trials)
 
 
 def test_an_estimator_that_breaks_the_contract_is_refused_with_the_check():
@@ -129,10 +129,10 @@ def test_a_registered_model_runs_under_hard_enforcement(tmp_path):
     result = support.make_project(
         frame(),
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
         enforcement="hard",
     ).run()
 
-    ran = [t for t in result.trials if t.model_name == "gaussian_nb"]
+    ran = [t for t in result.trials if t.model == "gaussian_nb"]
     assert ran and ran[0].status.value == "ok"

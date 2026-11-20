@@ -603,7 +603,7 @@ class Incidents:
             )
             handle.flush()
             os.fsync(handle.fileno())
-        durability.sync_directory(self.path.parent)
+        durability.flush(self.path.parent)
 
 
 __all__ = [

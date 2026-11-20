@@ -40,7 +40,7 @@ STAGING = "staging"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ImageScan:
+class Scan:
     """The result of scanning one image.
 
     Attributes:
@@ -49,9 +49,9 @@ class ImageScan:
         report_digest: Digest of the scan report.
     """
 
-    container_digest: str
+    digest: str
     passed: bool
-    report_digest: str
+    report: str
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -61,41 +61,41 @@ class Candidate:
     Attributes:
         environment: ``staging`` or ``production``.
         provider: ``aws`` or ``gcp``.
-        source_commit: Commit the image was built from.
+        commit: Commit the image was built from.
         model: The registered version being released.
-        model_digest: Digest the service reports for this model; compute it
-            with `model_digest_of`.
+        reported: Digest the service reports for this model; compute it
+            with `fingerprint`.
         approval: The independent promotion review of this exact bundle.
-        container_digest: Digest of the image being deployed.
-        config_digest: Digest of the deployment configuration.
-        requested_by: Who started the release.
+        container: Digest of the image being deployed.
+        digest: Digest of the deployment configuration.
+        requester: Who started the release.
         approver: Who approved it in the protected environment.
-        approved_at: UTC time of that approval.
+        approved: UTC time of that approval.
         scan: The image scan result.
         checks: Live check results (needed by `certify`).
         observation: What the platform reports as running (for `certify`).
-        staging_record: The signed staging record (needed for production).
+        record: The signed staging record (needed for production).
     """
 
     environment: str
     provider: str
-    source_commit: str
+    commit: str
     model: registry.Release
-    model_digest: str
+    reported: str
     approval: registry.Sanction | None
-    container_digest: str
-    config_digest: str
-    requested_by: str
+    container: str
+    digest: str
+    requester: str
     approver: str
-    approved_at: str
-    scan: ImageScan | None = None
+    approved: str
+    scan: Scan | None = None
     checks: Sequence[livetests.Check] = ()
     observation: scmle.deploy.observation.Observation | None = None
-    staging_record: scmle.deploy.record.Record | None = None
+    record: scmle.deploy.record.Record | None = None
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GateDecision:
+class Decision:
     """The outcome: allowed or not, every reason, and the record if any.
 
     Attributes:
@@ -122,9 +122,7 @@ class GateDecision:
         }
 
 
-def model_digest_of(
-    store: registry.ModelRegistryStore, version: registry.Release
-) -> str:
+def fingerprint(store: registry.Registry, version: registry.Release) -> str:
     """Computes the digest a service running this registered bundle reports.
 
     Args:
@@ -134,7 +132,7 @@ def model_digest_of(
     Returns:
         The bundle digest of the version's directory in the registry.
     """
-    return provenance.bundle_digest(store.root / version.path)
+    return provenance.digest(store.root / version.path)
 
 
 def veto(candidate: Candidate, key: str | bytes) -> list[str]:
@@ -166,7 +164,7 @@ def veto(candidate: Candidate, key: str | bytes) -> list[str]:
             # text
             problems.append(f"the model approval is not valid: {error}")
     try:
-        contract.require_digest(candidate.model_digest, "model_digest")
+        contract.require(candidate.reported, "model_digest")
     except errors.ConfigError as error:
         # handled: returned as failed finding/problem/refusal with error text
         problems.append(str(error))
@@ -186,21 +184,18 @@ def objections(candidate: Candidate, key: str | bytes) -> list[str]:
     problems = veto(candidate, key)
     if candidate.environment not in scmle.deploy.record.ENVIRONMENTS:
         problems.append(f"unknown environment {candidate.environment!r}")
-    if (
-        scmle.deploy.record.COMMIT_PATTERN.fullmatch(candidate.source_commit)
-        is None
-    ):
+    if scmle.deploy.record.COMMIT_PATTERN.fullmatch(candidate.commit) is None:
         problems.append("the source commit is not a full commit hash")
     scan = candidate.scan
     if scan is None:
         problems.append("the image has no scan result")
-    elif scan.container_digest != candidate.container_digest:
+    elif scan.digest != candidate.container:
         problems.append("the scan result is for a different image")
     elif not scan.passed:
         problems.append("the image scan did not pass")
     if not candidate.approver.strip():
         problems.append("no approver is recorded")
-    elif candidate.approver == candidate.requested_by:
+    elif candidate.approver == candidate.requester:
         problems.append("the approver is the person who requested the release")
     if candidate.environment == PRODUCTION:
         problems.extend(audit(candidate, key))
@@ -217,7 +212,7 @@ def audit(candidate: Candidate, key: str | bytes) -> list[str]:
     Returns:
         One message per problem; empty if the record supports the release.
     """
-    staged = candidate.staging_record
+    staged = candidate.record
     if staged is None:
         return ["production needs a staging deployment record"]
     problems = []
@@ -226,11 +221,11 @@ def audit(candidate: Candidate, key: str | bytes) -> list[str]:
     if staged.environment != STAGING:
         problems.append("the staging record is not for staging")
     expected = {
-        "commit": (staged.commit, candidate.source_commit),
-        "model digest": (staged.digests["model"], candidate.model_digest),
+        "commit": (staged.commit, candidate.commit),
+        "model digest": (staged.digests["model"], candidate.reported),
         "container digest": (
             staged.digests["container"],
-            candidate.container_digest,
+            candidate.container,
         ),
         "provider": (staged.provider, candidate.provider),
     }
@@ -266,9 +261,9 @@ def vet(candidate: Candidate) -> list[str]:
             problems.append(f"live check {name} failed: {detail}")
         bound = (
             result.environment == candidate.environment
-            and result.commit == candidate.source_commit
-            and result.digests["container"] == candidate.container_digest
-            and result.digests["model"] == candidate.model_digest
+            and result.commit == candidate.commit
+            and result.digests["container"] == candidate.container
+            and result.digests["model"] == candidate.reported
         )
         if not bound:
             problems.append(f"live check {name} was run for a different build")
@@ -291,17 +286,16 @@ def absences(candidate: Candidate) -> list[str]:
     problems = []
     if seen.provider != candidate.provider:
         problems.append("the observation is from another provider")
-    if seen.image_digest != candidate.container_digest:
+    if seen.image_digest != candidate.container:
         problems.append(
-            f"the platform runs {seen.image_digest}, "
-            f"not {candidate.container_digest}"
+            f"the platform runs {seen.image_digest}, not {candidate.container}"
         )
     if not seen.ready:
         problems.append("the platform does not report the service ready")
     return problems
 
 
-def admit(candidate: Candidate, key: str | bytes) -> GateDecision:
+def admit(candidate: Candidate, key: str | bytes) -> Decision:
     """Decides whether the build may be deployed.
 
     Args:
@@ -312,12 +306,12 @@ def admit(candidate: Candidate, key: str | bytes) -> GateDecision:
         The decision with every reason for a refusal.
     """
     problems = objections(candidate, key)
-    return GateDecision(not problems, tuple(problems))
+    return Decision(not problems, tuple(problems))
 
 
 def certify(
     candidate: Candidate, key: str | bytes, now: str | None = None
-) -> GateDecision:
+) -> Decision:
     """Decides whether the deploy passed, and signs its record if so.
 
     All admission, live-check and runtime problems are collected first.
@@ -335,24 +329,24 @@ def certify(
     problems.extend(absences(candidate))
     seen = candidate.observation
     if problems or seen is None:
-        return GateDecision(allowed=False, reasons=tuple(problems))
+        return Decision(allowed=False, reasons=tuple(problems))
     results = {item.name: item.digests["evidence"] for item in candidate.checks}
     unsigned = scmle.deploy.record.Record(
-        commit=candidate.source_commit,
+        commit=candidate.commit,
         model=candidate.model.model,
         version=candidate.model.version,
         digests={
-            "model": candidate.model_digest,
-            "container": candidate.container_digest,
-            "config": candidate.config_digest,
+            "model": candidate.reported,
+            "container": candidate.container,
+            "config": candidate.digest,
         },
         environment=candidate.environment,
         provider=candidate.provider,
-        requester=candidate.requested_by,
+        requester=candidate.requester,
         approver=candidate.approver,
-        approved=candidate.approved_at,
+        approved=candidate.approved,
         evidence=tuple(sorted(results.items())),
         revision=seen.revision,
         recorded=now or events.stamp(),
     )
-    return GateDecision(allowed=True, reasons=(), record=unsigned.signed(key))
+    return Decision(allowed=True, reasons=(), record=unsigned.signed(key))

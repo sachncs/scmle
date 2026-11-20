@@ -103,18 +103,18 @@ def library(monkeypatch):
 
 
 def make(library, uri=None, experiment="scmle"):
-    return mlflow_store.MlflowExperimentStore(uri, experiment)
+    return mlflow_store.Mlflow(uri, experiment)
 
 
 def trial(identifier="t1", status="ok", score=0.5, **kwargs):
     return experiments.Trial(
-        trial_id=identifier,
-        model_name="ridge",
+        identifier=identifier,
+        model="ridge",
         status=experiments.Termination(status),
         metric="auc",
-        score_mean=score,
-        score_std=0.1,
-        fit_seconds=2.0,
+        score=score,
+        deviation=0.1,
+        fit=2.0,
         **kwargs,
     )
 
@@ -122,27 +122,27 @@ def trial(identifier="t1", status="ok", score=0.5, **kwargs):
 def test_the_store_needs_mlflow(monkeypatch):
     monkeypatch.setitem(sys.modules, "mlflow", None)
     with pytest.raises(errors.ConfigError, match="'tracking' extra"):
-        mlflow_store.MlflowExperimentStore()
+        mlflow_store.Mlflow()
 
 
 def test_the_store_creates_or_reuses_its_experiment(library, tmp_path):
     uri = f"sqlite:///{tmp_path}/m.db"
     store = make(library, uri)
     assert library == [uri]
-    assert store.experiment_id == "e0"
+    assert store.experiment == "e0"
     assert store.client.tracking_uri == uri
     assert Client.created == [
         ("scmle", (tmp_path / "m-artifacts").resolve().as_uri())
     ]
     again = make(library, None)
-    assert again.experiment_id == "e0"
+    assert again.experiment == "e0"
     assert library == [uri]
     assert len(Client.created) == 1
     assert again.parents == {}
 
 
 def test_locate_puts_artifacts_beside_a_sqlite_file(tmp_path):
-    locate = mlflow_store.MlflowExperimentStore.locate
+    locate = mlflow_store.Mlflow.locate
     assert locate(None) is None
     assert locate("http://server") is None
     assert locate("sqlite://relative.db") is None
@@ -284,7 +284,7 @@ def test_transcribe_skips_a_missing_score(library):
     store.transcribe("run1", trial(score=float("nan")))
     assert store.client.runs["r1"].data.metrics == {"fit_seconds": 2.0}
     unnamed = experiments.Trial(
-        "t2", "ridge", experiments.Termination.OK, score_mean=0.3
+        "t2", "ridge", experiments.Termination.OK, score=0.3
     )
     store.transcribe("run1", unnamed)
     assert store.client.runs["r2"].data.metrics["score"] == 0.3
@@ -332,7 +332,7 @@ def test_history_keeps_completed_fingerprinted_runs(library):
     assert record.selected_strategy == "default"
     assert record.cv_score == 0.7
     assert record.task == "binary"
-    assert record.dataset_id == ""
+    assert record.dataset == ""
     store.revise("a", cv_score=None)
     store.client.runs[store.parents["a"]].data.metrics.clear()
     assert store.history()[0].cv_score != store.history()[0].cv_score

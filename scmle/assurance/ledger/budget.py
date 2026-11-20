@@ -167,7 +167,7 @@ class Tolerance:
         A blank detector id or a rate that is not a finite number in [0, 1]
         is refused with a `ValueError` by the checks it calls.
         """
-        evidence.require_text(self.detector, "detector")
+        evidence.require(self.detector, "detector")
         qualification.probability(self.alarms, "alarms")
         qualification.probability(self.recall, "recall")
 
@@ -391,7 +391,7 @@ def apportion(budget: Alpha, weights: Mapping[str, Number]) -> dict[str, Alpha]:
         raise errors.InputError("weights must not be empty")
     exact_weights: dict[str, Fraction] = {}
     for name, weight in weights.items():
-        evidence.require_text(name, "family name")
+        evidence.require(name, "family name")
         value = exact(weight, f"weight[{name}]")
         if value <= 0:
             raise errors.InputError(f"weight[{name}] must be positive")
@@ -647,7 +647,7 @@ def enroll(
         ExhaustedError: If the level would take the total past
             `promotion`, or the horizon is used up.
     """
-    evidence.require_text(experiment_id, "experiment_id")
+    evidence.require(experiment_id, "experiment_id")
     if any(pair[0] == experiment_id for pair in budget.assigned):
         raise errors.InputError(
             f"experiment {experiment_id} already has a level"
@@ -691,7 +691,7 @@ def watch(budget: Decision, champion_id: str) -> tuple[Decision, Fraction]:
     Raises:
         ValueError: If the id is blank or already monitored.
     """
-    evidence.require_text(champion_id, "champion_id")
+    evidence.require(champion_id, "champion_id")
     if champion_id in budget.monitored:
         raise errors.InputError(f"champion {champion_id} is already monitored")
     return (

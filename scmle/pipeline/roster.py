@@ -46,14 +46,14 @@ def describe(
     return capabilities.Capability(
         key=key,
         status=capabilities.Status.EXTENSION_ONLY,
-        required_extras=(),
-        resources=capabilities.Resources(memory_gb=1.0),
-        failure_modes=(
+        extras=(),
+        resources=capabilities.Resources(memory=1.0),
+        modes=(
             "adapter conformance or dependency failure",
             "resource limits exceeded",
             "missing end-to-end lifecycle evidence",
         ),
-        evidence_links=("explicit adapter registration",),
+        links=("explicit adapter registration",),
         limitations=(
             "not covered by the built-in production-beta guarantee",
             "model-specific evaluation and recovery evidence is caller-owned",

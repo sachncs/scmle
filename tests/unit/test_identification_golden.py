@@ -55,7 +55,7 @@ def case_aipw():
                 "y",
                 estimand,
             )
-    out["naive"] = aipw.difference_in_means(
+    out["naive"] = aipw.contrast(
         test_identification_aipw.planted(800, 3, confound=1.5), "t", "y"
     )
     t = numpy.array([1.0, 0.0, 1.0, 0.0])
@@ -157,7 +157,7 @@ def case_sensitivity():
             sensitivity.evalues(0.5, 0.3, 0.8),
             sensitivity.evalues(1.3, 0.9, 1.9),
         ],
-        "smd": [sensitivity.smd_to_rr(d) for d in (0.2, -0.5)],
+        "smd": [sensitivity.convert(d) for d in (0.2, -0.5)],
         "partial": sensitivity.rsquared(4.184, 783),
         "rv": [
             sensitivity.rvalue(4.184, 783, 1.0),
@@ -206,9 +206,9 @@ def case_battery():
         battery.wald("c", "placebo", -1.5, 1.0),
     ]
     return {
-        "report": battery.run_battery(tests, 0.05),
-        "clean": battery.run_battery(tests[:1], 0.05),
-        "empty": battery.run_battery([], 0.05),
+        "report": battery.correct(tests, 0.05),
+        "clean": battery.correct(tests[:1], 0.05),
+        "empty": battery.correct([], 0.05),
         "replicate": battery.replicate(
             {"x": (1.0, 0.2), "y": (1.2, 0.3), "z": (0.8, 0.25)}, 1.0
         ),

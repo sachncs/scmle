@@ -31,7 +31,7 @@ def golden():
 
 @pytest.fixture(scope="module")
 def expected():
-    return parity.read_json(GOLDEN / "expected.json")
+    return parity.read(GOLDEN / "expected.json")
 
 
 @pytest.fixture(scope="module")
@@ -85,10 +85,10 @@ def test_the_reference_matches_the_closed_form_in_process(
         expected,
         bundle.predict(frame).tolist(),
         bundle.predict_proba(frame).tolist(),
-        golden.same_process,
+        golden.process,
     )
     assert report.passed, report.mismatches
-    assert report.max_probability_error < 1e-12
+    assert report.error < 1e-12
 
 
 def test_the_committed_expected_outputs_are_the_closed_form(golden, expected):
@@ -108,7 +108,7 @@ def test_online_serving_matches_the_golden_records(golden, expected, running):
         expected,
         body["predictions"],
         body["probabilities"],
-        golden.same_process,
+        golden.process,
     )
     assert report.passed, report.mismatches
     assert headers["X-Request-ID"] == body["request_id"]
@@ -132,7 +132,7 @@ def test_batch_serving_shares_the_online_path(
         expected,
         scored["prediction"].tolist(),
         scored[["proba_0", "proba_1"]].to_numpy().tolist(),
-        golden.same_process,
+        golden.process,
     )
     assert report.passed, report.mismatches
     manifest = json.loads(
@@ -171,11 +171,11 @@ def test_every_response_carries_version_and_artifact_digest(
 def test_the_artifact_digest_names_the_saved_manifest(bundle, tmp_path):
     folder = bundle.save(tmp_path / "saved")
     loaded = scmle.artifacts.bundle.Bundle.load(folder, trusted=True)
-    assert provenance.bundle_digest(folder) == provenance.manifest_digest(
+    assert provenance.digest(folder) == provenance.manifest_digest(
         loaded.info.to_dict()
     )
     assert scmle.serving.server.Service(loaded).digest == (
-        provenance.bundle_digest(folder)
+        provenance.digest(folder)
     )
 
 
@@ -711,7 +711,7 @@ def test_the_batch_command_scores_a_file_and_writes_a_manifest(
         expected,
         scored["prediction"].tolist(),
         scored[["proba_0", "proba_1"]].to_numpy().tolist(),
-        golden.same_process,
+        golden.process,
     )
     assert report.passed, report.mismatches
     strict = cli.main(

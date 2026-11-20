@@ -36,10 +36,10 @@ def run(tmp_path, frame, **kwargs):
         "sales",
         task="forecast",
         horizon=HORIZON,
-        time_column="date",
-        seasonal_period=PERIOD,
-        time_budget=300,
-        output_dir=tmp_path,
+        timestamp="date",
+        period=PERIOD,
+        budget=300,
+        directory=tmp_path,
         **kwargs,
     ).run()
 
@@ -68,14 +68,14 @@ def test_each_rolling_origin_is_reported_per_step(result):
     for origin in origins:
         assert len(origin["model_mae"]) == HORIZON
         assert len(origin["last_value_mae"]) == HORIZON
-    path = result.run_dir / "diagnostics" / "forecast_backtest.json"
+    path = result.directory / "diagnostics" / "forecast_backtest.json"
     assert json.loads(path.read_text())["origins"]
 
 
 def test_training_targets_never_reach_into_the_locked_period(result):
     frame = series()
     manifest = json.loads(
-        (result.run_dir / "validation_manifest.json").read_text()
+        (result.directory / "validation_manifest.json").read_text()
     )
     usable = frame.iloc[: len(frame) - HORIZON].reset_index(drop=True)
     last_training = usable["date"].iloc[manifest["training"]].max()
@@ -109,7 +109,7 @@ def test_forecasts_need_a_time_column_and_a_horizon(tmp_path):
     frame = series().drop(columns="shop")
     with pytest.raises(ValueError, match="time_column"):
         support.make_project(
-            frame, "sales", task="forecast", horizon=3, output_dir=tmp_path
+            frame, "sales", task="forecast", horizon=3, directory=tmp_path
         )
     with pytest.raises(ValueError, match="horizon"):
         support.make_project(
@@ -117,8 +117,8 @@ def test_forecasts_need_a_time_column_and_a_horizon(tmp_path):
             "sales",
             task="regression",
             horizon=3,
-            time_column="date",
-            output_dir=tmp_path,
+            timestamp="date",
+            directory=tmp_path,
         )
 
 
@@ -132,11 +132,11 @@ def test_many_series_are_forecast_together(tmp_path):
         "sales",
         task="forecast",
         horizon=3,
-        time_column="date",
-        group_column="shop",
-        seasonal_period=PERIOD,
-        time_budget=300,
-        output_dir=tmp_path,
+        timestamp="date",
+        group="shop",
+        period=PERIOD,
+        budget=300,
+        directory=tmp_path,
     ).run()
     forecast = result.bundle.forecast(frame.drop(columns=[]))
 

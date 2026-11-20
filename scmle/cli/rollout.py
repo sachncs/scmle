@@ -210,7 +210,7 @@ class Operation(command.Command):
         """
         controller = cls.open(args.deploy_dir)
         controller.loop.suspend("operator_halt", {"reason": args.reason})
-        controller.loop.save_state()
+        controller.loop.save()
         print(json.dumps(controller.status()))
         return command.EXIT_OK
 
@@ -343,9 +343,9 @@ class Deployment(command.Command):
             read_only_token=read_only,
         )
         golden = parity.goldens(args.golden)
-        expected = parity.read_json(pathlib.Path(args.golden) / "expected.json")
-        results = livetests.run_checks(
-            livetests.http_fetch(args.url, args.timeout),
+        expected = parity.read(pathlib.Path(args.golden) / "expected.json")
+        results = livetests.check(
+            livetests.fetch(args.url, args.timeout),
             target,
             golden,
             expected,
@@ -386,7 +386,7 @@ class Deployment(command.Command):
         if not decision.allowed:
             return command.EXIT_BLOCKED
         if decision.record is not None and args.output:
-            scmle.deploy.record.write_record(args.output, decision.record)
+            scmle.deploy.record.write(args.output, decision.record)
         return command.EXIT_OK
 
     @staticmethod
@@ -401,16 +401,12 @@ class Deployment(command.Command):
         Returns:
             EXIT_OK (0) if they agree, else EXIT_FAILED (1).
         """
-        store = registry.ModelRegistryStore(args.registry)
+        store = registry.Registry(args.registry)
         ledger = (
-            deployment_ledger.DeploymentLedger.load(args.ledger)
-            if args.ledger
-            else None
+            deployment_ledger.Ledger.load(args.ledger) if args.ledger else None
         )
-        seen = release.rebuild(
-            release.read_json(pathlib.Path(args.observation))
-        )
-        report = release_state.ReleaseRegistry(store, ledger).reconcile(
+        seen = release.rebuild(release.read(pathlib.Path(args.observation)))
+        report = release_state.Registry(store, ledger).reconcile(
             args.model, args.environment, seen
         )
         text = json.dumps(report.to_dict(), indent=2, sort_keys=True)
@@ -431,9 +427,9 @@ class Deployment(command.Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        store = registry.ModelRegistryStore(args.registry)
+        store = registry.Registry(args.registry)
         version = store.resolve(args.model, args.version)
-        print(gate.model_digest_of(store, version))
+        print(gate.fingerprint(store, version))
         return command.EXIT_OK
 
     @staticmethod
@@ -446,7 +442,7 @@ class Deployment(command.Command):
         Returns:
             EXIT_OK (0) if the signature verifies, else EXIT_FAILED (1).
         """
-        record = scmle.deploy.record.read_record(args.record)
+        record = scmle.deploy.record.read(args.record)
         valid = record.verify(Deployment.read(args.key_file))
         print(json.dumps({"valid": valid, "digest": record.digest()}))
         return command.EXIT_OK if valid else command.EXIT_FAILED

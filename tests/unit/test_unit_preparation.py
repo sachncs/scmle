@@ -112,7 +112,7 @@ def chain():
 def test_the_survival_wrapper_hands_events_only_to_the_model():
     frame = pandas.DataFrame({"x": [1.0, 2.0, 3.0], "e": [1, 0, 1]})
     template = chain()
-    fitted = survival.EventAwareEstimator(template, "e").fit(frame, [5, 6, 7])
+    fitted = survival.Estimator(template, "e").fit(frame, [5, 6, 7])
     model = fitted.model_
     assert model.features_.tolist() == [[1.0], [2.0], [3.0]]
     assert model.target_.tolist() == [5.0, 6.0, 7.0]
@@ -127,7 +127,7 @@ def test_the_survival_wrapper_hands_events_only_to_the_model():
 
 def test_the_uplift_wrapper_hands_treatment_only_to_the_model():
     frame = pandas.DataFrame({"x": [1.0, 2.0], "arm": [1.0, 0.0]})
-    fitted = uplift.TreatmentAwareEstimator(chain(), "arm").fit(frame, [0, 1])
+    fitted = uplift.Estimator(chain(), "arm").fit(frame, [0, 1])
     model = fitted.model_
     assert model.features_.tolist() == [[1.0], [2.0]]
     assert model.target_.tolist() == [0, 1]

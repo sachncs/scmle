@@ -25,7 +25,7 @@ const surfaces = [
   <p>The package root exports nothing but <code>__version__</code>. Every public name is imported from the module that defines it, one name and one import path:</p>
   <ul>
     <li><code>scmle.api.project.Project</code>, <code>scmle.artifacts.results.Run</code> and <code>scmle.artifacts.bundle.Bundle</code> for lifecycle and artifacts;</li>
-    <li><code>scmle.api.predict.load_model</code> and <code>scmle.api.predict.predict</code> for inference;</li>
+    <li><code>scmle.api.predict.load</code> and <code>scmle.api.predict.predict</code> for inference;</li>
     <li><code>register</code> and <code>unregister</code> in <code>scmle.models.custom</code> and <code>register</code> in <code>scmle.evaluation.metrics</code>, for extension.</li>
   </ul>
   <p>A test pins these names against a committed snapshot. Removing or changing one requires a changelog entry, a migration note, and a deliberate versioning decision. Modules below <code>scmle.pipeline</code>, <code>scmle.data</code>, <code>scmle.models</code> and the other package namespaces are extension surfaces for advanced users, but their concrete internals are not stable until they are promoted to the top level or documented as a contract. The <a href={`${base}/docs/api/`}>Python API</a> page shows the supported objects in use.</p>

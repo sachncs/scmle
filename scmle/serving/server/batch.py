@@ -229,7 +229,7 @@ class Batcher(contract.Server):
                     continue
                 rest = chunk.iloc[skipped:].reset_index(drop=True)
                 digest.update(self.append(out, self.infer(rest), state))
-                durability.write_atomically(journal, state.encode(mark))
+                durability.write(journal, state.encode(mark))
                 # Scoring leaves reference cycles (scikit-learn routing,
                 # joblib) the generational collector frees only after many
                 # more allocations; collecting here holds memory at a chunk.
@@ -285,17 +285,17 @@ class Batcher(contract.Server):
                 origin, partial, journal, chunk_rows, self.fingerprint(origin)
             )
         durability.swap(partial, target)
-        durability.sync_directory(target.parent)
+        durability.flush(target.parent)
         manifest = {
             "schema_version": serving.SCHEMA_VERSION,
-            "model_version": self.bundle.info.model_version,
+            "model_version": self.bundle.info.version,
             "artifact_digest": self.digest,
             "schema_digest": self.layout,
             "rows": state.rows,
             "output_sha256": digest,
             **state.flagged,
         }
-        durability.write_atomically(
+        durability.write(
             target.with_name(target.name + ".manifest.json"),
             json.dumps(manifest, indent=2, sort_keys=True).encode("utf-8"),
         )

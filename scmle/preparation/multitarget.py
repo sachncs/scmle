@@ -76,7 +76,7 @@ class Multitarget(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn shi
         return predictions
 
 
-class MultiLabelEstimator(base.ClassifierMixin, Multitarget):  # type: ignore[misc]  # scikit-learn ships no type information
+class Multilabel(base.ClassifierMixin, Multitarget):  # type: ignore[misc]  # scikit-learn ships no type information
     """Multi-label flavour: also provides per-label probabilities."""
 
     def predict_proba(self, features: Any) -> numpy.ndarray:

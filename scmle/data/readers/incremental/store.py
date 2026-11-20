@@ -42,7 +42,7 @@ def publish(target: pathlib.Path, record: Mapping[str, Any]) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         pathlib.Path(temporary_name).replace(target)
-        durability.sync_directory(target.parent)
+        durability.flush(target.parent)
     except BaseException:
         pathlib.Path(temporary_name).unlink(missing_ok=True)
         raise
@@ -227,7 +227,7 @@ class Ledger(sidecar.Sidecar):
         Nothing is removed if no acknowledgement is staged.
         """
         self.pending.unlink(missing_ok=True)
-        durability.sync_directory(self.pending.parent)
+        durability.flush(self.pending.parent)
 
     def commit(self, batch: timeline.Batch) -> evidence.Settlement:
         """Atomically publishes a processed batch's IDs and checkpoint.

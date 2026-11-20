@@ -765,10 +765,10 @@ def main():
     project = scmle.api.project.Project(
         data,
         target="survived",
-        unavailable_at_prediction=["boat", "body"],
-        time_budget=120,
+        unavailable=["boat", "body"],
+        budget=120,
         workers=2,
-        output_dir="runs_bad",
+        directory="runs_bad",
     )
     result = project.run()
     print(result.summary())

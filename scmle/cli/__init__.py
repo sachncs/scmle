@@ -34,7 +34,7 @@ from scmle.cli.governance import Trail
 from scmle.cli.intake import Cataloging
 from scmle.cli.intake import Charter
 from scmle.cli.intake import Frame
-from scmle.cli.intake import IngestCommand
+from scmle.cli.intake import Ingest
 from scmle.cli.maintenance import Records
 from scmle.cli.rollout import Deployment
 from scmle.cli.rollout import Operation
@@ -68,7 +68,7 @@ __all__ = [
     "Export",
     "Forgetting",
     "Frame",
-    "IngestCommand",
+    "Ingest",
     "Loop",
     "Operation",
     "Packaging",
@@ -83,7 +83,7 @@ __all__ = [
     "Serve",
     "Storage",
     "Trail",
-    "build_parser",
+    "build",
     "main",
     "report",
     "validators",
@@ -103,7 +103,7 @@ COMMANDS: tuple[Command, ...] = (
     Serve(),
     Export(),
     Packaging(),
-    IngestCommand(),
+    Ingest(),
     Charter(),
     Claims(),
     Frame(),
@@ -120,7 +120,7 @@ COMMANDS: tuple[Command, ...] = (
 )
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build() -> argparse.ArgumentParser:
     """Builds the argument parser from the registered commands.
 
     Returns:
@@ -173,7 +173,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         defect. A bad command line exits with `EXIT_USAGE`. With `--debug`
         every failure is logged with its traceback, causes and details.
     """
-    args = build_parser().parse_args(argv)
+    args = build().parse_args(argv)
     level = logging.DEBUG if args.debug else args.log_level
     logs.configure(level, structured=args.log_json)
     if args.trace or os.environ.get(tracing.SWITCH):

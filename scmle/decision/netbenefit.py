@@ -45,7 +45,7 @@ class RepeatError(RuntimeError):
     """A frozen rule was evaluated on the final table a second time."""
 
 
-def rule_hash(label: str, threshold: float) -> str:
+def digest(label: str, threshold: float) -> str:
     """SHA-256 of a frozen rule's label and threshold.
 
     The rule is identified by what fixed it on development data, never by
@@ -179,7 +179,7 @@ class Benefit:
     Attributes:
         thresholds: The grid of `t`.
         rule: Net benefit of the rule on the grid.
-        treat_all: Net benefit of acting on every row.
+        everyone: Net benefit of acting on every row.
         incumbent: Net benefit of the incumbent, or None.
         baselines: Names of the baselines compared, in order.
         difference: Point differences, shape `(baselines, grid)`.
@@ -190,7 +190,7 @@ class Benefit:
         rows: Rows in the table.
         clusters: Clusters (equal to `rows` when rows are independent).
         claim: `useful` or `not_useful_in_range`.
-        useful_range: First and last grid value of the longest run of
+        useful: First and last grid value of the longest run of
             consecutive grid points at which the lower bound is positive
             against every baseline (the earliest run if several tie), or
             None if there is no such point.
@@ -198,7 +198,7 @@ class Benefit:
 
     thresholds: tuple[float, ...]
     rule: tuple[float, ...]
-    treat_all: tuple[float, ...]
+    everyone: tuple[float, ...]
     incumbent: tuple[float, ...] | None
     baselines: tuple[str, ...]
     difference: tuple[tuple[float, ...], ...]
@@ -209,7 +209,7 @@ class Benefit:
     rows: int
     clusters: int
     claim: str
-    useful_range: tuple[float, float] | None
+    useful: tuple[float, float] | None
 
     KEYS: ClassVar[records.Migration] = records.Migration(
         renames={
@@ -375,7 +375,7 @@ def lowerband(
     return Benefit(
         thresholds=tuple(float(t) for t in grid),
         rule=curve(mean_row, 0, weights),
-        treat_all=curve(mean_row, 2, weights),
+        everyone=curve(mean_row, 2, weights),
         incumbent=None if base is None else curve(mean_row, 4, weights),
         baselines=names,
         difference=tuple(tuple(float(v) for v in row) for row in point),
@@ -386,11 +386,11 @@ def lowerband(
         rows=len(outcomes),
         clusters=n_clusters,
         claim=claim,
-        useful_range=stretch(grid, positive),
+        useful=stretch(grid, positive),
     )
 
 
-class FinalNetBenefit:
+class Examiner:
     """Evaluates one frozen rule on the final table exactly once.
 
     The rule is registered by its hash before the final table is read; the

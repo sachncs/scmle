@@ -411,18 +411,18 @@ def outcome(run):
     from the locked rows, and the custody log of the one opening.
     """
     evaluation = json.loads(
-        (run.run_dir / "evaluation.json").read_text(encoding="utf-8")
+        (run.directory / "evaluation.json").read_text(encoding="utf-8")
     )
     validation = json.loads(
-        (run.run_dir / "validation_manifest.json").read_text(encoding="utf-8")
+        (run.directory / "validation_manifest.json").read_text(encoding="utf-8")
     )
     coverage = json.loads(
-        (run.run_dir / "coverage_report.json").read_text(encoding="utf-8")
+        (run.directory / "coverage_report.json").read_text(encoding="utf-8")
     )
-    custody = run.run_dir.parent / "custody" / f"{run.run_id}.jsonl"
+    custody = run.directory.parent / "custody" / f"{run.run_id}.jsonl"
     return {
         "artifacts": sorted(
-            path.name for path in run.run_dir.iterdir() if path.name in KEPT
+            path.name for path in run.directory.iterdir() if path.name in KEPT
         ),
         "strategy": validation["strategy"],
         "evaluation": sorted(key for key in evaluation if key in EVALUATED),
@@ -459,8 +459,8 @@ def test_a_classification_run_takes_the_shared_stages(registered, tmp_path):
         target="label",
         modality="audio",
         models=support.optin(tasks.Task.MULTICLASS),
-        time_budget=60,
-        output_dir=str(tmp_path / "out"),
+        budget=60,
+        directory=str(tmp_path / "out"),
     ).run()
 
     found = outcome(run)
@@ -469,7 +469,7 @@ def test_a_classification_run_takes_the_shared_stages(registered, tmp_path):
         golden.write_text(json.dumps(found, indent=1) + "\n", encoding="utf-8")
     assert found == json.loads(golden.read_text(encoding="utf-8"))
     assert run.evaluation["opened"]
-    assert rows.KEY not in run.profile.feature_plan.numeric
+    assert rows.KEY not in run.profile.plan.numeric
 
     rng = numpy.random.default_rng(7)
     fresh = [
@@ -497,8 +497,8 @@ def test_a_regression_run_takes_the_shared_stages(registered, tmp_path):
         target="level",
         modality="audio",
         models=support.optin(tasks.Task.REGRESSION),
-        time_budget=60,
-        output_dir=str(tmp_path / "out"),
+        budget=60,
+        directory=str(tmp_path / "out"),
     ).run()
 
     assert run.evaluation["task"] == tasks.Task.REGRESSION.value

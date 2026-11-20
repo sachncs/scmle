@@ -31,7 +31,7 @@ Rules this module enforces:
 * ``rollback`` restores the previous known-good revision and changes the
   registry only after the platform confirms it.
 * ``live`` answers "what does the registry say is deployed" only
-  when an observation agrees; otherwise it raises `RuntimeDisagrees`, so an
+  when an observation agrees; otherwise it raises `DisagreementError`, so an
   alias can never be read as "deployed" against the runtime.
 * ``reconcile`` lists every disagreement between the registry, the ledger
   and an observation.
@@ -43,11 +43,12 @@ separate file next to ``registry.json`` and does not change its format.
 `records` the state file and event log, `approval` the hand transitions and
 approvals, `rollout` the confirmed traffic moves, `promotion` and `rollback`
 the two releases the runtime confirms, and `reconcile` the
-`ReleaseRegistry` that joins them.
+`Registry` that joins them.
 """
 
-from scmle.deploy.release_state.reconcile import ReleaseRegistry
+from scmle.deploy.release_state.reconcile import Registry
 from scmle.deploy.release_state.status import ALLOWED
+from scmle.deploy.release_state.status import DisagreementError
 from scmle.deploy.release_state.status import Finding
 from scmle.deploy.release_state.status import FULL_ROLLOUT
 from scmle.deploy.release_state.status import halt
@@ -57,8 +58,7 @@ from scmle.deploy.release_state.status import Outcome
 from scmle.deploy.release_state.status import predecessor
 from scmle.deploy.release_state.status import PRODUCTION_ENVIRONMENT
 from scmle.deploy.release_state.status import Reconciliation
-from scmle.deploy.release_state.status import ReleaseState
-from scmle.deploy.release_state.status import RuntimeDisagrees
+from scmle.deploy.release_state.status import State
 from scmle.deploy.release_state.status import STATE_FILE
 from scmle.deploy.release_state.status import STATE_FORMAT
 
@@ -69,13 +69,13 @@ __all__ = [
     "PRODUCTION_ENVIRONMENT",
     "STATE_FILE",
     "STATE_FORMAT",
+    "DisagreementError",
     "Finding",
     "Health",
     "Outcome",
     "Reconciliation",
-    "ReleaseRegistry",
-    "ReleaseState",
-    "RuntimeDisagrees",
+    "Registry",
+    "State",
     "halt",
     "predecessor",
 ]

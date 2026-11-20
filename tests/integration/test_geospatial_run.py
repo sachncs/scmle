@@ -65,7 +65,7 @@ def accepted(task):
     return sorted(
         name
         for name, adapter in adapters.items()
-        if adapter.auto_candidate
+        if adapter.candidate
         and adapter.capabilities.standalone
         and adapter.objection(task, ROWS) is None
     )
@@ -82,13 +82,13 @@ def test_a_geojson_file_runs_through_the_shared_engine(
     result = project.Project(
         str(path),
         "y",
-        time_budget=60,
+        budget=60,
         modality="geospatial",
         enforcement="cooperative",
         models=tasks.Candidates(experimental_models=accepted(task)),
-        output_dir=str(tmp_path / "runs"),
+        directory=str(tmp_path / "runs"),
     ).run()
-    folder = result.run_dir
+    folder = result.directory
     split = json.loads((folder / "validation_manifest.json").read_text())
     assert split["strategy"] == "group"
     assert any("spatial blocks of" in note for note in split["notes"])
@@ -115,10 +115,10 @@ def test_without_the_opt_in_the_experimental_kind_is_refused(
     declared = project.Project(
         str(path),
         "y",
-        time_budget=60,
+        budget=60,
         modality="geospatial",
         enforcement="cooperative",
-        output_dir=str(tmp_path / "runs"),
+        directory=str(tmp_path / "runs"),
     )
     with pytest.raises(capabilities.UnsupportedError, match="experimental"):
         declared.run()

@@ -315,12 +315,12 @@ def test_inspect_lists_quality_findings_in_order():
 
 
 def data_severity(name):
-    return getattr(data.FindingSeverity, name)
+    return getattr(data.Severity, name)
 
 
 def test_review_flaw_builds_an_open_finding():
     finding = review.flaw(
-        "x", data.FindingSeverity.ERROR, {"a": 1}, {"b": 2}, "fix", True
+        "x", data.Severity.ERROR, {"a": 1}, {"b": 2}, "fix", True
     )
     assert finding.rule == "document-curation.v1"
     assert finding.owner == "data-curation"

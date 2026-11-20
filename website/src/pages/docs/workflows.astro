@@ -40,12 +40,12 @@ project = Project(
     target="renewed",
     task="binary_classification",
     metric="roc_auc",
-    group_column="account_id",
-    time_column="observed_at",
-    unavailable_at_prediction=["renewal_reason"],
+    group="account_id",
+    timestamp="observed_at",
+    unavailable=["renewal_reason"],
     validation="group",
-    time_budget=900,
-    output_dir="runs/orders",
+    budget=900,
+    directory="runs/orders",
 )</code></pre>
   <p>The important fields are the constraints around the model. <code>group_column</code> prevents one account leaking across splits. <code>time_column</code> preserves ordering. <code>unavailable_at_prediction</code> makes post-outcome columns explicit instead of relying on a reviewer to notice them later.</p>
 

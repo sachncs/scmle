@@ -30,9 +30,9 @@ def run(tmp_path, data, **kwargs):
     return support.make_project(
         data,
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
-        sensitive_columns=["group"],
+        budget=300,
+        directory=tmp_path,
+        sensitive=["group"],
         models=tasks.Candidates(exclude_families=["deep_learning"]),
         **kwargs,
     ).run()
@@ -64,7 +64,7 @@ def test_the_gap_on_the_released_rows_shrinks_and_the_cost_is_reported(
 
 def test_the_decision_is_logged_with_its_evidence(mitigated):
     log = json.loads(
-        (mitigated.run_dir / "diagnostics/decision_log.json").read_text()
+        (mitigated.directory / "diagnostics/decision_log.json").read_text()
     )
 
     entries = [o for o in log["outcomes"] if o["technique"] == "fairness:group"]
@@ -74,7 +74,7 @@ def test_the_decision_is_logged_with_its_evidence(mitigated):
 
 
 def test_thresholds_apply_only_when_the_group_is_supplied(tmp_path):
-    result = run(tmp_path, biased(), fairness=SPEC, excluded_columns=["group"])
+    result = run(tmp_path, biased(), fairness=SPEC, excluded=["group"])
     rows = biased(1500, seed=5).drop(columns="y")
 
     with_group = result.bundle.predict(rows)
@@ -109,7 +109,7 @@ def test_mitigation_needs_a_sensitive_column(tmp_path):
         support.make_project(
             biased(200),
             "y",
-            output_dir=tmp_path,
+            directory=tmp_path,
             fairness=SPEC,
         )
 

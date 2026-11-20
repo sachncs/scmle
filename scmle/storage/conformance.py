@@ -404,14 +404,14 @@ def check_listing(store: objectstore.Depot, base: str) -> None:
     """
     for name in ("b/2", "a/1", "a/3", "ab/1", "c"):
         store.put(f"{base}/{name}", name.encode())
-    keys = [m.key for m in store.list_objects(f"{base}/")]
+    keys = [m.key for m in store.catalog(f"{base}/")]
     expected = [f"{base}/{n}" for n in ("a/1", "a/3", "ab/1", "b/2", "c")]
     require(keys == expected, f"listing {keys}")
-    nested = [m.key for m in store.list_objects(f"{base}/a/")]
+    nested = [m.key for m in store.catalog(f"{base}/a/")]
     require(
         nested == [f"{base}/a/1", f"{base}/a/3"], f"prefix a/ gave {nested}"
     )
-    require(store.list_objects(f"{base}/zzz") == [], "empty prefix not empty")
+    require(store.catalog(f"{base}/zzz") == [], "empty prefix not empty")
 
 
 def paginate(store: objectstore.Depot, base: str) -> None:
@@ -428,12 +428,12 @@ def paginate(store: objectstore.Depot, base: str) -> None:
     for name in names:
         store.put(name, name.encode())
     require(
-        [m.key for m in store.list_objects(f"{base}/page/")] == names,
+        [m.key for m in store.catalog(f"{base}/page/")] == names,
         "paginated listing lost or repeated keys",
     )
 
 
-def check_delete(store: objectstore.Depot, base: str) -> None:
+def check(store: objectstore.Depot, base: str) -> None:
     """Delete removes the object and is idempotent.
 
     The check fails with `ConformanceError` (through `require`) if the
@@ -488,8 +488,7 @@ def check_isolation(store: objectstore.Depot, base: str) -> None:
     store.put(f"{base}/left/x", b"l")
     store.put(f"{base}/right/x", b"r")
     require(
-        [m.key for m in store.list_objects(f"{base}/left/")]
-        == [f"{base}/left/x"],
+        [m.key for m in store.catalog(f"{base}/left/")] == [f"{base}/left/x"],
         "a sibling prefix leaked into the listing",
     )
 
@@ -507,15 +506,13 @@ CHECKS: tuple[Callable[[objectstore.Depot, str], None], ...] = (
     check_if_version_race,
     check_listing,
     paginate,
-    check_delete,
+    check,
     check_key_rules,
     check_isolation,
 )
 
 
-def run_conformance(
-    store: objectstore.Depot, run_id: str | None = None
-) -> Conformance:
+def certify(store: objectstore.Depot, run_id: str | None = None) -> Conformance:
     """Runs every check against `store`.
 
     Args:
@@ -538,7 +535,7 @@ def run_conformance(
             outcome, detail = False, f"{type(error).__name__}: {error}"
         finally:
             with contextlib.suppress(objectstore.StoreError):
-                for meta in store.list_objects(base + "/"):
+                for meta in store.catalog(base + "/"):
                     store.delete(meta.key)
         results.append(
             Outcome(

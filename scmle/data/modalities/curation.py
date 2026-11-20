@@ -691,7 +691,7 @@ def conflict(
 
 def flaw(
     finding_id: str,
-    severity: data.FindingSeverity,
+    severity: data.Severity,
     scope: Mapping[str, Any],
     evidence: Mapping[str, Any],
     remediation: str,

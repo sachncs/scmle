@@ -148,7 +148,7 @@ class Strata(splitters.splits.Group):
         folds = self.validation.folds
         strata = (
             cohorts.consensus(groups.tolist(), frame[self.data.target].tolist())
-            if self.task.is_classification
+            if self.task.classification
             else None
         )
         test = curation.allocate(
@@ -164,7 +164,7 @@ class Strata(splitters.splits.Group):
         dev_groups = groups[dev_ids]
         count = min(folds, len(set(dev_groups)))
         notes: list[str] = ["test groups drawn stratified by label"]
-        if not self.task.is_classification:
+        if not self.task.classification:
             return splitters.Partition(
                 dev_ids,
                 test_ids,
@@ -585,7 +585,7 @@ class Rows(abc.ABC):
         self,
         spec: tasks.Config,
         frame: pandas.DataFrame,
-        manifest: scmle.contracts.data.DatasetManifest,
+        manifest: scmle.contracts.data.Manifest,
         task: tasks.Task,
         seconds: float = 0.0,
         total: int | None = None,
@@ -613,7 +613,7 @@ class Rows(abc.ABC):
         )
         return dataclasses.replace(
             portrait,
-            quality_findings=(*portrait.quality_findings, *self.notice(frame)),
+            quality=(*portrait.quality, *self.notice(frame)),
         )
 
     def constrain(
@@ -643,9 +643,9 @@ class Rows(abc.ABC):
 
         Returns:
             The unfitted column transformer
-            (`preprocessing.build_preprocessor`).
+            (`preprocessing.build`).
         """
-        return preprocessing.build_preprocessor(plan, options)
+        return preprocessing.build(plan, options)
 
     def decode(self, labels: tuple[Any, ...] | None) -> tuple[Any, ...] | None:
         """Ordinal ranks decode to the recorded labels; else the classes.
@@ -689,7 +689,7 @@ class Rows(abc.ABC):
                 key=capabilities.Coordinate(
                     modality=capabilities.Modality(self.name),
                     task=task,
-                    model_family=family,
+                    family=family,
                     evaluation=capabilities.Evaluation.STANDARD,
                     uncertainty=capabilities.Uncertainty.NONE,
                     fairness=fairness,
@@ -697,10 +697,10 @@ class Rows(abc.ABC):
                     inference=capabilities.Inference.LIBRARY,
                 ),
                 status=self.status,
-                required_extras=self.extras,
-                resources=capabilities.Resources(memory_gb=1.0),
-                failure_modes=self.failures,
-                evidence_links=(self.evidence,),
+                extras=self.extras,
+                resources=capabilities.Resources(memory=1.0),
+                modes=self.failures,
+                links=(self.evidence,),
                 limitations=(*self.limits(), *self.reasons),
             )
             for task in TASKS

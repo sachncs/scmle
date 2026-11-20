@@ -142,7 +142,7 @@ class Key:
         secret: HMAC secret (HS256 only).
         modulus: RSA modulus (RS256 only).
         exponent: RSA public exponent (RS256 only).
-        not_before: Epoch seconds before which the key is not yet valid.
+        activation: Epoch seconds before which the key is not yet valid.
         expires: Epoch seconds from which the key no longer verifies.
         tenant: The one tenant whose tokens the key may verify, or None for
             a key not bound to a tenant.
@@ -153,7 +153,7 @@ class Key:
     secret: bytes = b""
     modulus: int = 0
     exponent: int = 0
-    not_before: float | None = None
+    activation: float | None = None
     expires: float | None = None
     tenant: str | None = None
 
@@ -215,7 +215,7 @@ class Key:
             kid = str(entry["kid"])
             kind = entry["kty"]
             window: dict[str, Any] = {
-                "not_before": coerce(entry.get("nbf")),
+                "activation": coerce(entry.get("nbf")),
                 "expires": coerce(entry.get("exp")),
                 "tenant": entry.get("tenant"),
             }
@@ -240,10 +240,10 @@ class Key:
             now: Epoch seconds.
 
         Raises:
-            TokenError: `key_not_yet_valid` before `not_before`, `key_expired`
+            TokenError: `key_not_yet_valid` before `activation`, `key_expired`
                 from `expires` on.
         """
-        if self.not_before is not None and now < self.not_before:
+        if self.activation is not None and now < self.activation:
             raise TokenError(KEY_NOT_YET_VALID)
         if self.expires is not None and now >= self.expires:
             raise TokenError(KEY_EXPIRED)
@@ -332,7 +332,7 @@ class Keystore:
         return cls([Key.jwk(entry) for entry in entries])
 
     @classmethod
-    def from_file(cls, path: str | pathlib.Path) -> Self:
+    def read(cls, path: str | pathlib.Path) -> Self:
         """Reads a JWKS file.
 
         Args:
@@ -370,7 +370,7 @@ class Keystore:
         return key
 
 
-class RevocationList:
+class Revocations:
     """Tokens (`jti`), subjects and keys (`kid`) that are no longer accepted.
 
     Attributes:
@@ -383,21 +383,21 @@ class RevocationList:
         self,
         tokens: Sequence[str] = (),
         subjects: Sequence[str] = (),
-        key_ids: Sequence[str] = (),
+        keys: Sequence[str] = (),
     ) -> None:
         """Initializes the list.
 
         Args:
             tokens: Revoked `jti` values.
             subjects: Revoked `sub` values (every token of the subject).
-            key_ids: Revoked `kid` values (every token the key signed).
+            keys: Revoked `kid` values (every token the key signed).
         """
         self.tokens = set(tokens)
         self.subjects = set(subjects)
-        self.key_ids = set(key_ids)
+        self.keys = set(keys)
 
     @classmethod
-    def from_file(cls, path: str | pathlib.Path) -> Self:
+    def read(cls, path: str | pathlib.Path) -> Self:
         """Reads `{"tokens": [], "subjects": [], "key_ids": []}`.
 
         Args:
@@ -434,7 +434,7 @@ class RevocationList:
             True if its `kid` or `sub` is revoked, or its `jti` is.
         """
         return (
-            header.get("kid") in self.key_ids
+            header.get("kid") in self.keys
             or claims.get("sub") in self.subjects
             or (claims.get("jti") is not None and claims["jti"] in self.tokens)
         )
@@ -449,7 +449,7 @@ class Principal:
         tenant: The token's tenant claim if it is a non-empty string, else
             None.
         scopes: Granted scopes.
-        token_id: The token's `jti`, or None.
+        token: The token's `jti`, or None.
         key_id: The key that verified it.
         expires: Token expiry, epoch seconds.
     """
@@ -457,7 +457,7 @@ class Principal:
     subject: str
     tenant: str | None
     scopes: frozenset[str]
-    token_id: str | None
+    token: str | None
     key_id: str
     expires: float
 
@@ -470,7 +470,7 @@ class Verifier:
         issuer: Required `iss`.
         audience: Required member of `aud`.
         revocations: A list, a callable returning the current list, or None.
-        tenant_claim: Name of the tenant claim.
+        claim: Name of the tenant claim.
         leeway: Clock skew tolerated, in seconds.
         clock: Source of epoch seconds.
     """
@@ -481,10 +481,8 @@ class Verifier:
         issuer: str,
         audience: str,
         *,
-        revocations: RevocationList
-        | Callable[[], RevocationList]
-        | None = None,
-        tenant_claim: str = "tenant",
+        revocations: Revocations | Callable[[], Revocations] | None = None,
+        claim: str = "tenant",
         leeway_seconds: float = DEFAULT_LEEWAY_SECONDS,
         clock: Callable[[], float] = time.time,
     ) -> None:
@@ -496,7 +494,7 @@ class Verifier:
             audience: Required member of `aud`.
             revocations: A list, or a callable returning the current list
                 (so a file can be re-read).
-            tenant_claim: Name of the tenant claim.
+            claim: Name of the tenant claim.
             leeway_seconds: Clock skew tolerated on `exp`, `nbf`, `iat`.
             clock: Source of epoch seconds (injectable for tests).
 
@@ -511,11 +509,11 @@ class Verifier:
         self.issuer = issuer
         self.audience = audience
         self.revocations = revocations
-        self.tenant_claim = tenant_claim
+        self.claim = claim
         self.leeway = leeway_seconds
         self.clock = clock
 
-    def denylist(self) -> RevocationList | None:
+    def denylist(self) -> Revocations | None:
         """Returns the revocation list now in force.
 
         Returns:
@@ -636,7 +634,7 @@ class Verifier:
         revocations = self.denylist()
         if revocations is not None and revocations.revokes(header, claims):
             raise TokenError(REVOKED)
-        claimed = claims.get(self.tenant_claim)
+        claimed = claims.get(self.claim)
         tenant = claimed if isinstance(claimed, str) and claimed else None
         if key.tenant is not None and tenant != key.tenant:
             raise TokenError(WRONG_TENANT)
@@ -645,7 +643,7 @@ class Verifier:
             subject=subject,
             tenant=tenant,
             scopes=scopes,
-            token_id=str(claims["jti"]) if "jti" in claims else None,
+            token=str(claims["jti"]) if "jti" in claims else None,
             key_id=key.kid,
             expires=float(expiry),
         )
@@ -691,7 +689,7 @@ def collect(claims: Mapping[str, Any]) -> frozenset[str]:
     return frozenset(found)
 
 
-def sign_hs256(secret: bytes, kid: str, claims: Mapping[str, Any]) -> str:
+def sign(secret: bytes, kid: str, claims: Mapping[str, Any]) -> str:
     """Mints an HS256 token (for the local demo and for tests).
 
     Args:

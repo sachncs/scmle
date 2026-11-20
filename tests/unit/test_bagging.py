@@ -56,4 +56,4 @@ def test_capabilities_follow_the_base_model_with_higher_cost():
 
     assert adapter.capabilities.tasks == adapter.base.capabilities.tasks
     assert adapter.capabilities.cost == adapter.base.capabilities.cost + 1
-    assert not adapter.capabilities.sparse_input
+    assert not adapter.capabilities.sparse

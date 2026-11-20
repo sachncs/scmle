@@ -188,7 +188,7 @@ class Loop(command.Command):
                         "evidence": list(e.evidence),
                         "proposed_default": e.proposed_default,
                     }
-                    for e in loop.pending_escalations()
+                    for e in loop.survey()
                 ],
                 indent=2,
             )
@@ -245,7 +245,7 @@ class Loop(command.Command):
         """
         path = pathlib.Path(args.deploy_dir) / deployment_ledger.FILE_NAME
         try:
-            ledger = deployment_ledger.DeploymentLedger.load(path)
+            ledger = deployment_ledger.Ledger.load(path)
         except deployment_ledger.MisuseError as error:
             raise errors.ArtifactError(
                 f"ledger verification failed: {error}"

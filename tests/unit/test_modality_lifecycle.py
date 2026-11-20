@@ -66,7 +66,7 @@ class GroundTruthTextAdapter(modality_lifecycle.Plaintext):
         return quality.Truth(
             method="synthetic_feature_oracle",
             reference="fixture://text-feature-oracle-v1",
-            expected_features=tuple(feature_names),
+            features=tuple(feature_names),
         )
 
 
@@ -1334,7 +1334,7 @@ def test_lifecycle_enforces_declared_performance_budget(tmp_path: Path):
     adapter = document_adapter()
     budget = performance.Budget(
         dict.fromkeys(performance.Operation, 30.0),
-        max_peak_memory_gb=1024.0,
+        memory=1024.0,
     )
     report = modality_lifecycle.Lifecycle().run(
         adapter,
@@ -1387,9 +1387,7 @@ def test_lifecycle_compares_against_a_repeated_performance_baseline(
         )
         for index, report in enumerate(reference_reports)
     )
-    baseline = performance.Baseline(
-        reference_runs, max_relative_regression=10.0
-    )
+    baseline = performance.Baseline(reference_runs, regression=10.0)
 
     report = modality_lifecycle.Lifecycle().run(
         adapter,
@@ -1416,9 +1414,7 @@ def test_lifecycle_compares_against_a_repeated_performance_baseline(
         )
         for index, reference_run in enumerate(reference_runs)
     )
-    failing_baseline = performance.Baseline(
-        fast_reference_runs, max_relative_regression=0.0
-    )
+    failing_baseline = performance.Baseline(fast_reference_runs, regression=0.0)
     failing_package = tmp_path / "failing-baseline-package"
     failing_report = tmp_path / "failing-baseline-report.json"
     with pytest.raises(ValueError, match="performance baseline failed"):

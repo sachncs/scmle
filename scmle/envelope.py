@@ -112,7 +112,7 @@ def seal(
     line = json.dumps(header, sort_keys=True).encode("utf-8") + b"\n"
     destination = pathlib.Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    durability.write_atomically(destination, MAGIC + line + payload)
+    durability.write(destination, MAGIC + line + payload)
     return destination
 
 

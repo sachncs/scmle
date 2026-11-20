@@ -42,7 +42,7 @@ def emplace(path: pathlib.Path, content: bytes) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.link(temporary_name, path)
-        durability.sync_directory(path.parent)
+        durability.flush(path.parent)
     finally:
         with contextlib.suppress(FileNotFoundError):
             pathlib.Path(temporary_name).unlink()
@@ -125,25 +125,25 @@ class Curator:
 
     Attributes:
         adapter: Adapter that owns source identity and curation policy.
-        signing_key: Key that authenticates the evidence.
-        output_dir: Directory where curation evidence is written.
+        key: Key that authenticates the evidence.
+        directory: Directory where curation evidence is written.
         manifest: Source, lineage, privacy and task contract, if any.
     """
 
     def __init__(
         self,
         adapter: modality_lifecycle.Curator,
-        signing_key: str | bytes,
+        key: str | bytes,
         *,
-        output_dir: str | pathlib.Path = "runs",
+        directory: str | pathlib.Path = "runs",
         manifest: scmle.contracts.data.Passport | None = None,
     ) -> None:
         """Defines a curation-only run over a typed modality adapter.
 
         Args:
             adapter: Adapter that owns source identity and curation policy.
-            signing_key: Non-empty key used to authenticate the evidence.
-            output_dir: Directory where curation evidence is written.
+            key: Non-empty key used to authenticate the evidence.
+            directory: Directory where curation evidence is written.
             manifest: Optional source, lineage, privacy, and task contract.
 
         Raises:
@@ -152,15 +152,15 @@ class Curator:
         """
         if not isinstance(adapter, modality_lifecycle.Curator):
             raise errors.KindError("adapter must be a Curator")
-        if not signing_key:
+        if not key:
             raise errors.InputError("signing_key must not be empty")
         if manifest is not None and not isinstance(
             manifest, scmle.contracts.data.Passport
         ):
             raise errors.KindError("manifest must be Passport")
         self.adapter = adapter
-        self.signing_key = signing_key
-        self.output_dir = pathlib.Path(output_dir)
+        self.key = key
+        self.directory = pathlib.Path(directory)
         self.manifest = manifest
 
     def examine(
@@ -209,7 +209,7 @@ class Curator:
             existing one.
 
         Raises:
-            ValueError: If `output_dir` exists and is not a directory, the
+            ValueError: If `directory` exists and is not a directory, the
                 manifest or the curation report disagrees with the adapter, or
                 an existing artifact is unreadable, is not an object, or differs
                 from the current adapter's modality, dataset hash, sample count
@@ -217,7 +217,7 @@ class Curator:
             TypeError: If the adapter's `curate()` does not return a modality
                 curation report.
         """
-        if self.output_dir.exists() and not self.output_dir.is_dir():
+        if self.directory.exists() and not self.directory.is_dir():
             raise errors.InputError("output_dir must be a directory")
         sample_count = len(self.adapter.samples)
         modality = modalities.serialise(self.adapter.modality)
@@ -239,9 +239,9 @@ class Curator:
             "curation": curation_payload,
             "card": card.to_dict(),
         }
-        signature = signing.mac(unsigned, self.signing_key)
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-        path = self.output_dir / "modality_curation.json"
+        signature = signing.mac(unsigned, self.key)
+        self.directory.mkdir(parents=True, exist_ok=True)
+        path = self.directory / "modality_curation.json"
         candidate = modality_lifecycle.Curation(
             modality=modality,
             digests={"dataset": dataset_hash},
@@ -260,5 +260,5 @@ class Curator:
         except FileExistsError:
             # handled: existing artifact verified and returned (idempotent
             # publish)
-            return verify(path, self.signing_key, candidate)
+            return verify(path, self.key, candidate)
         return candidate

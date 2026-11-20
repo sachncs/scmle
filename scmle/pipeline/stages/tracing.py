@@ -48,7 +48,7 @@ class Tracing(bracketing.Bracketing):
 
         split_parent = self.originate(board, store, graph)
 
-        graph.add_node(
+        graph.add(
             lineage.Node(
                 "split",
                 lineage.Kind.SPLIT,
@@ -62,16 +62,16 @@ class Tracing(bracketing.Bracketing):
         model_manifest_path = store.path(
             f"model/{scmle.artifacts.bundle.MANIFEST_FILE}"
         )
-        graph.add_node(
+        graph.add(
             lineage.Node(
                 "model",
                 lineage.Kind.MODEL,
                 scmle.artifacts.bundle.shasum(pipeline_path),
-                {"model_family": selected.model_name},
+                {"model_family": selected.model},
             )
         )
         graph.connect(lineage.Edge("split", "model", "trains"))
-        graph.add_node(
+        graph.add(
             lineage.Node(
                 "evaluation",
                 lineage.Kind.EVALUATION,
@@ -83,7 +83,7 @@ class Tracing(bracketing.Bracketing):
 
         explained = self.annotate(store, graph)
 
-        graph.add_node(
+        graph.add(
             lineage.Node(
                 "bundle",
                 lineage.Kind.BUNDLE,
@@ -119,7 +119,7 @@ class Tracing(bracketing.Bracketing):
         raw_digest = manifest.lineage.digests.get(
             "raw-source", manifest.digests["data"]
         )
-        graph.add_node(
+        graph.add(
             lineage.Node(
                 "raw-source",
                 lineage.Kind.RAW_SOURCE,
@@ -127,7 +127,7 @@ class Tracing(bracketing.Bracketing):
                 {"uri": manifest.uri},
             )
         )
-        graph.add_node(
+        graph.add(
             lineage.Node(
                 "snapshot",
                 lineage.Kind.SNAPSHOT,
@@ -136,7 +136,7 @@ class Tracing(bracketing.Bracketing):
             )
         )
         graph.connect(lineage.Edge("raw-source", "snapshot", "materializes"))
-        graph.add_node(
+        graph.add(
             lineage.Node(
                 "curation",
                 lineage.Kind.CURATION,
@@ -149,7 +149,7 @@ class Tracing(bracketing.Bracketing):
         graph.connect(lineage.Edge("snapshot", "curation", "curated"))
 
         if board.services.spec.feature_graph.nodes:
-            graph.add_node(
+            graph.add(
                 lineage.Node(
                     "feature-graph",
                     lineage.Kind.FEATURE_GRAPH,
@@ -185,7 +185,7 @@ class Tracing(bracketing.Bracketing):
                     for path in explanation_paths
                 ).encode("utf-8")
             ).hexdigest()
-            graph.add_node(
+            graph.add(
                 lineage.Node(
                     "explanations",
                     lineage.Kind.EXPLANATION,

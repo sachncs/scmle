@@ -188,7 +188,7 @@ class Geospatial(rows.Rows):
         gram = blocks.variogram(
             points,
             blocks.encode(
-                frame[spec.data.target], categorical=task.is_classification
+                frame[spec.data.target], categorical=task.classification
             ),
             spec.validation.seed,
         )

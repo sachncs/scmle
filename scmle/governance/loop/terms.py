@@ -89,7 +89,7 @@ VERSION = records.ORIGIN + len(MIGRATIONS)
 
 @dataclasses.dataclass(frozen=True)
 class Preregistration:
-    """Pre-registered inputs of the loop (changed only by `Loop.amend_policy`).
+    """Pre-registered inputs of the loop (changed only by `Loop.amend`).
 
     Risks, tolerances and margins are in loss units, alphas and ``delta``
     are probabilities, and times are counted in batches.
@@ -355,7 +355,7 @@ class Hooks:
             None if it staged none.
         open_incident: Called with the reason when the loop halts, after the
             loop has written its own `incident` ledger row
-            (`Loop.record_incident`); the loop needs no hook for that.
+            (`Loop.record`); the loop needs no hook for that.
     """
 
     retrain: Callable[[], str | None] | None = None
@@ -387,7 +387,7 @@ def jsonify(value: Any) -> Any:
     return value
 
 
-def amend(ledger: deployment_ledger.DeploymentLedger) -> Mapping[str, Any]:
+def amend(ledger: deployment_ledger.Ledger) -> Mapping[str, Any]:
     """Returns the ledger's policy with every recorded amendment applied.
 
     Only amendment rows carry `policy_amendment`; other observe summaries

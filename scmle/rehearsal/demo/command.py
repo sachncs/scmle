@@ -55,7 +55,7 @@ def run(
             own_store.start()
             store_url = own_store.address
         if metrics_url is None:
-            own_sink = mocks.MetricsSink(workdir / "metrics.jsonl")
+            own_sink = mocks.Collector(workdir / "metrics.jsonl")
             own_sink.start()
             metrics_url = own_sink.address
         paths = stages.prepare(workdir, data, transcript)

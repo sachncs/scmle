@@ -8,8 +8,8 @@ model) and serving cannot write `runs/` (so it cannot alter a training
 record). Releasing a bundle is a third act that needs an approval, outside
 both roles.
 
-`RoleStore` enforces a role in process; on shared infrastructure the same
-table is the policy of two distinct identities (`check_distinct` refuses to
+`Store` enforces a role in process; on shared infrastructure the same
+table is the policy of two distinct identities (`check` refuses to
 run a job with the serving identity).
 """
 
@@ -19,7 +19,7 @@ from scmle.contracts import errors
 from scmle.storage import objectstore
 
 
-class RoleDeniedError(errors.ScmleError):
+class DeniedError(errors.ScmleError):
     """A role tried to touch a prefix it was not given."""
 
     category = "role_denied"
@@ -39,7 +39,7 @@ class Role:
     reads: tuple[str, ...]
     writes: tuple[str, ...]
 
-    def allows_read(self, key: str) -> bool:
+    def read(self, key: str) -> bool:
         """Reports whether `key` may be read.
 
         Args:
@@ -74,7 +74,7 @@ SERVING_ROLE = Role(
 )
 
 
-def check_separation(training: Role, serving: Role) -> None:
+def separate(training: Role, serving: Role) -> None:
     """Refuses roles that overlap where they must not.
 
     Args:
@@ -99,7 +99,7 @@ def check_separation(training: Role, serving: Role) -> None:
         raise errors.ConfigError("serving must not write training records")
 
 
-def check_distinct(training_identity: str, serving_identity: str) -> None:
+def check(training_identity: str, serving_identity: str) -> None:
     """Refuses to run training as the serving identity.
 
     Args:
@@ -117,7 +117,7 @@ def check_distinct(training_identity: str, serving_identity: str) -> None:
         )
 
 
-class RoleStore(objectstore.Depot):
+class Store(objectstore.Depot):
     """A store that refuses what its role does not allow.
 
     Attributes:
@@ -137,7 +137,7 @@ class RoleStore(objectstore.Depot):
         self.inner = inner
         self.role = role
 
-    def need_read(self, key: str) -> None:
+    def read(self, key: str) -> None:
         """Raises unless the role may read `key`.
 
         Args:
@@ -146,8 +146,8 @@ class RoleStore(objectstore.Depot):
         Raises:
             RoleDeniedError: If the role may not read it.
         """
-        if not self.role.allows_read(key):
-            raise RoleDeniedError(f"role {self.role.name} may not read {key}")
+        if not self.role.read(key):
+            raise DeniedError(f"role {self.role.name} may not read {key}")
 
     def permit(self, key: str) -> None:
         """Raises unless the role may write `key`.
@@ -159,7 +159,7 @@ class RoleStore(objectstore.Depot):
             RoleDeniedError: If the role may not write it.
         """
         if not self.role.permits(key):
-            raise RoleDeniedError(f"role {self.role.name} may not write {key}")
+            raise DeniedError(f"role {self.role.name} may not write {key}")
 
     def put(
         self,
@@ -168,7 +168,7 @@ class RoleStore(objectstore.Depot):
         *,
         if_absent: bool = False,
         if_version: str | None = None,
-    ) -> objectstore.ObjectMeta:
+    ) -> objectstore.Metadata:
         """Stores `data` if the role may write `key` (see `Depot.put`).
 
         Args:
@@ -185,7 +185,7 @@ class RoleStore(objectstore.Depot):
             key, data, if_absent=if_absent, if_version=if_version
         )
 
-    def get(self, key: str) -> tuple[bytes, objectstore.ObjectMeta]:
+    def get(self, key: str) -> tuple[bytes, objectstore.Metadata]:
         """Reads an object if the role may read it (see `Depot.get`).
 
         Args:
@@ -194,10 +194,10 @@ class RoleStore(objectstore.Depot):
         Returns:
             The content and the object's metadata.
         """
-        self.need_read(key)
+        self.read(key)
         return self.inner.get(key)
 
-    def head(self, key: str) -> objectstore.ObjectMeta:
+    def head(self, key: str) -> objectstore.Metadata:
         """Reads metadata if the role may read the key (see `Depot.head`).
 
         Args:
@@ -206,14 +206,14 @@ class RoleStore(objectstore.Depot):
         Returns:
             The object's metadata.
         """
-        self.need_read(key)
+        self.read(key)
         return self.inner.head(key)
 
-    def list_objects(self, prefix: str = "") -> list[objectstore.ObjectMeta]:
+    def catalog(self, prefix: str = "") -> list[objectstore.Metadata]:
         """Lists objects if the role may read the prefix (see `Depot`).
 
         A prefix the role may not read raises RoleDeniedError from
-        `need_read`.
+        `read`.
 
         Args:
             prefix: Key prefix to list.
@@ -221,8 +221,8 @@ class RoleStore(objectstore.Depot):
         Returns:
             The metadata of the matching objects.
         """
-        self.need_read(prefix)
-        return self.inner.list_objects(prefix)
+        self.read(prefix)
+        return self.inner.catalog(prefix)
 
     def delete(self, key: str, *, if_version: str | None = None) -> None:
         """Deletes an object if the role may write the key (see `Depot`).

@@ -33,9 +33,9 @@ def run(tmp_path, frame, **kwargs):
         frame,
         "time",
         task="survival",
-        event_column="event",
-        time_budget=300,
-        output_dir=tmp_path,
+        event="event",
+        budget=300,
+        directory=tmp_path,
         **kwargs,
     ).run()
 
@@ -47,8 +47,8 @@ def result(tmp_path_factory):
 
 def test_the_selected_model_orders_risk_well_beyond_chance(result):
     assert result.evaluation["metrics"]["c_index"] > 0.7
-    baseline = next(t for t in result.trials if t.model_name == "dummy")
-    assert baseline.score_mean == pytest.approx(0.5)
+    baseline = next(t for t in result.trials if t.model == "dummy")
+    assert baseline.score == pytest.approx(0.5)
 
 
 def test_the_event_column_is_never_a_feature(result):
@@ -82,7 +82,7 @@ def test_survival_curves_fall_over_time_and_start_near_one(result):
 def test_survival_needs_an_event_column(tmp_path):
     with pytest.raises(ValueError, match="event_column"):
         support.make_project(
-            censored_frame(100), "time", task="survival", output_dir=tmp_path
+            censored_frame(100), "time", task="survival", directory=tmp_path
         )
 
 
@@ -115,8 +115,8 @@ def test_other_tasks_refuse_survival_curves(tmp_path):
     classified = support.make_project(
         frame.drop(columns=["time", "event"]),
         "target",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
     ).run()
 
     with pytest.raises(errors.ArtifactError, match="not a survival"):
@@ -127,7 +127,7 @@ def test_survival_works_with_a_weight_column(tmp_path):
     frame = censored_frame(800)
     frame["w"] = numpy.random.default_rng(2).uniform(0.5, 2.0, len(frame))
 
-    result = run(tmp_path, frame, weight_column="w")
+    result = run(tmp_path, frame, weight="w")
 
     assert result.evaluation["metrics"]["c_index"] > 0.65
     assert "w" not in result.bundle.features

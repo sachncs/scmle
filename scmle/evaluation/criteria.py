@@ -116,7 +116,7 @@ def check(
                 f"reported: {sorted(test_metrics)}"
             )
         achieved = float(test_metrics[name])
-        higher = catalog.metrics[name].greater_is_better
+        higher = catalog.metrics[name].maximize
         met = achieved >= required if higher else achieved <= required
         results.append(
             Criterion(name, float(required), achieved, higher, bool(met))

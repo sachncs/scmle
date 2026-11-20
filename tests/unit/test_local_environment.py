@@ -172,9 +172,9 @@ def test_the_object_store_round_trips_and_checks_digests(tmp_path):
         data = b"model bytes"
         etag = mocks.deposit(store.address, "models/a/b.bin", data)
         assert etag == provenance.sha256_digest(data)
-        assert mocks.get_object(store.address, "models/a/b.bin", etag) == data
+        assert mocks.download(store.address, "models/a/b.bin", etag) == data
         with pytest.raises(errors.ArtifactError, match="does not match"):
-            mocks.get_object(
+            mocks.download(
                 store.address, "models/a/b.bin", "sha256:" + "1" * 64
             )
         request = urllib.request.Request(
@@ -215,7 +215,7 @@ def test_safe_keys_refuse_traversal():
 
 
 def test_the_metrics_sink_stores_valid_samples_and_refuses_bad_ones(tmp_path):
-    sink = mocks.MetricsSink(tmp_path / "m.jsonl")
+    sink = mocks.Collector(tmp_path / "m.jsonl")
     sink.start()
     try:
         sample = observability.Sample(

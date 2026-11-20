@@ -14,8 +14,8 @@ def run(frame, tmp_path, selection=None, **kwargs):
     return support.make_project(
         frame,
         "y",
-        time_budget=600,
-        output_dir=tmp_path,
+        budget=600,
+        directory=tmp_path,
         selection=selection,
         **kwargs,
     ).run()
@@ -34,7 +34,7 @@ def test_size_limit_forces_a_smaller_model(binary_frame, tmp_path):
     constrained = run(binary_frame, tmp_path / "limited", limit)
     assert constrained.evaluation["resources"]["size"] <= 0.05
     log = json.loads(
-        (constrained.run_dir / "diagnostics" / "decision_log.json").read_text()
+        (constrained.directory / "diagnostics" / "decision_log.json").read_text()
     )
     assert any("within serving limits" in o["reason"] for o in log["outcomes"])
     if free.evaluation["resources"]["size"] > 0.05:

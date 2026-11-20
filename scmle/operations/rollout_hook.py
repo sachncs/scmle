@@ -55,7 +55,7 @@ class Sentinel:
 
     manager: lifecycle.Maintainer
     plan: scmle.assurance.charter.decision.Experiment
-    ledger: deployment_ledger.DeploymentLedger
+    ledger: deployment_ledger.Ledger
     budget: scmle.assurance.ledger.budget.Decision
     log: rollout.Journal
     study: str | None
@@ -136,7 +136,7 @@ class Sentinel:
                     "model": self.manager.model,
                     "champion": self.champion,
                     "source": "rollback e-process",
-                    "units": self.monitor.done_at,
+                    "units": self.monitor.stopped,
                 },
             )
             self.ledger.commit(
@@ -145,13 +145,13 @@ class Sentinel:
                     "experiment_id": self.study,
                     "stage": "rollback",
                     "status": status,
-                    "units": self.monitor.done_at,
+                    "units": self.monitor.stopped,
                     "champion": self.champion,
                 },
             )
             self.log.append(
                 "rollback_decision",
-                {"champion": self.champion, "units": self.monitor.done_at},
+                {"champion": self.champion, "units": self.monitor.stopped},
             )
         return status
 
@@ -191,7 +191,7 @@ class Hook(Sentinel):
         self,
         manager: lifecycle.Maintainer,
         plan: scmle.assurance.charter.decision.Experiment,
-        ledger: deployment_ledger.DeploymentLedger,
+        ledger: deployment_ledger.Ledger,
         *,
         budget: scmle.assurance.ledger.budget.Decision | None = None,
         log: rollout.Journal | None = None,

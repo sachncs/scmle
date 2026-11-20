@@ -25,12 +25,12 @@ from scmle.contracts.evaluation.parts import Uncertainty
 from scmle.contracts.evaluation.policy import Criteria
 from scmle.contracts.evaluation.policy import Registry
 from scmle.contracts.evaluation.support import Explicability
+from scmle.contracts.evaluation.support import Method
 from scmle.contracts.evaluation.support import METRIC_DIRECTIONS
 from scmle.contracts.evaluation.support import Orientation
 from scmle.contracts.evaluation.support import Procedure
 from scmle.contracts.evaluation.support import Remedy
 from scmle.contracts.evaluation.support import Technique
-from scmle.contracts.evaluation.support import UncertaintyMethod
 from scmle.contracts.evaluation.support import UndeclaredError
 from scmle.contracts.evaluation.support import UnsupportedError
 
@@ -45,6 +45,7 @@ __all__ = [
     "Fairness",
     "Gates",
     "Hurdle",
+    "Method",
     "Orientation",
     "Procedure",
     "Registry",
@@ -53,7 +54,6 @@ __all__ = [
     "Subgroups",
     "Technique",
     "Uncertainty",
-    "UncertaintyMethod",
     "UndeclaredError",
     "UnsupportedError",
 ]

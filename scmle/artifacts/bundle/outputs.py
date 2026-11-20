@@ -61,14 +61,14 @@ class Outputs(core.Core):
             categories). Classifiers also get `classes` and `probabilities`,
             and a bundle with a novelty detector gets `out_of_distribution`.
         """
-        frame = self.read_frame(data)
+        frame = self.read(data)
         if mapping is not None:
             frame = mapping.apply(frame, [*self.features, self.schema.target])
         report = self.validate(frame)
         predictions = self.predict(frame)
         result: dict[str, Any] = {
             "predictions": numpy.asarray(predictions).tolist(),
-            "model_version": self.info.model_version,
+            "model_version": self.info.version,
             "schema_valid": report.valid,
             "diagnostics": {
                 "ignored_columns": list(report.extra),
@@ -85,7 +85,7 @@ class Outputs(core.Core):
             ].tolist()
         return result
 
-    def environment_lock(self, path: str | pathlib.Path | None = None) -> str:
+    def pin(self, path: str | pathlib.Path | None = None) -> str:
         """Returns the build environment as pinned requirements.
 
         Args:
@@ -96,12 +96,12 @@ class Outputs(core.Core):
             version, then every distribution installed when the model was
             built as `name==version`, ready for `pip install -r`.
         """
-        text = self.info.environment_lock()
+        text = self.info.lock()
         if path is not None:
             pathlib.Path(path).write_text(text, encoding="utf-8", newline="\n")
         return text
 
-    def export_onnx(
+    def export(
         self,
         path: str | pathlib.Path,
         check: pandas.DataFrame | None = None,
@@ -222,7 +222,7 @@ class Outputs(core.Core):
             raise errors.ArtifactError(
                 f"this model forecasts 1 to {horizon} steps ahead"
             )
-        frame = self.read_frame(history)
+        frame = self.read(history)
         if mapping is not None:
             frame = mapping.apply(frame, self.features)
         clock, entity = self.schema.time, self.schema.group
@@ -283,7 +283,7 @@ class Outputs(core.Core):
         """
         if self.schema.task != tasks.Task.RANKING.value:
             raise errors.ArtifactError("this bundle is not a ranking model")
-        frame = self.read_frame(data)
+        frame = self.read(data)
         if query_column not in frame.columns:
             raise errors.ArtifactError(
                 f"query column '{query_column}' is not in the data"

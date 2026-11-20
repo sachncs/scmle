@@ -55,15 +55,15 @@ def test_a_known_polynomial_is_fitted_exactly_without_noise():
     out = rd.estimate(
         pandas.DataFrame({"x": x, "y": y}), "x", "y", 0.0, bandwidth=0.8
     )
-    assert out.bias_corrected == pytest.approx(5.0, abs=1e-8)
+    assert out.corrected == pytest.approx(5.0, abs=1e-8)
     assert out.estimate == pytest.approx(5.0, abs=0.2)
 
 
 def test_sorting_at_the_cutoff_trips_the_density_check():
     clean = rd.estimate(world(3000, 1), "x", "y", 0.0)
     sorted_ = rd.estimate(world(3000, 1, sort=0.15), "x", "y", 0.0)
-    assert clean.density_p > 0.01
-    assert sorted_.density_p < 0.001
+    assert clean.density > 0.01
+    assert sorted_.density < 0.001
 
 
 def test_placebo_cutoffs_and_balance_and_sensitivity_are_reported():

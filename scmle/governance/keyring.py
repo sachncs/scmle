@@ -48,7 +48,7 @@ class State(enum.StrEnum):
     REVOKED = "revoked"
 
 
-def require_text(value: object, field_name: str) -> str:
+def require(value: object, field_name: str) -> str:
     """Returns a non-empty string suitable for a key record.
 
     Args:
@@ -66,7 +66,7 @@ def require_text(value: object, field_name: str) -> str:
     return value.strip()
 
 
-def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
+def parse(value: str, field_name: str) -> datetime.datetime:
     """Parses an offset-aware ISO-8601 timestamp.
 
     Args:
@@ -123,11 +123,11 @@ class Credential:
                 reason, the change precedes creation, or the replacement key
                 is blank or the key itself.
         """
-        require_text(self.key_id, "key_id")
-        require_text(self.owner, "owner")
-        created = parse_timestamp(self.created, "created")
+        require(self.key_id, "key_id")
+        require(self.owner, "owner")
+        created = parse(self.created, "created")
         if self.expires is not None:
-            expires = parse_timestamp(self.expires, "expires")
+            expires = parse(self.expires, "expires")
             if expires <= created:
                 raise errors.InputError("expires must be after created")
         state: Any = self.state  # may be text from a persisted record
@@ -136,14 +136,14 @@ class Credential:
         if self.state is not State.ACTIVE:
             if self.changed is None:
                 raise errors.InputError("non-active keys require changed")
-            parse_timestamp(self.changed, "changed")
-            require_text(self.reason, "reason")
+            parse(self.changed, "changed")
+            require(self.reason, "reason")
         if self.changed is not None:
-            changed = parse_timestamp(self.changed, "changed")
+            changed = parse(self.changed, "changed")
             if changed < created:
                 raise errors.InputError("changed must not precede created")
         if self.successor is not None:
-            require_text(self.successor, "successor")
+            require(self.successor, "successor")
             if self.successor == self.key_id:
                 raise errors.InputError("successor must differ from key_id")
 
@@ -157,12 +157,10 @@ class Credential:
             True if the key is active, already created and not yet expired at
             that time.
         """
-        observed = parse_timestamp(observed_at, "observed_at")
-        created = parse_timestamp(self.created, "created")
+        observed = parse(observed_at, "observed_at")
+        created = parse(self.created, "created")
         expires = (
-            parse_timestamp(self.expires, "expires")
-            if self.expires is not None
-            else None
+            parse(self.expires, "expires") if self.expires is not None else None
         )
         return (
             self.state is State.ACTIVE
@@ -193,13 +191,13 @@ class Credential:
         Returns:
             True if the signature is acceptable under the key's lifecycle.
         """
-        signed = parse_timestamp(signed_at, "signed_at")
-        observed = parse_timestamp(observed_at, "observed_at")
-        created = parse_timestamp(self.created, "created")
+        signed = parse(signed_at, "signed_at")
+        observed = parse(observed_at, "observed_at")
+        created = parse(self.created, "created")
         if self.state is State.REVOKED or signed < created:
             return False
         if self.expires is not None:
-            expires = parse_timestamp(self.expires, "expires")
+            expires = parse(self.expires, "expires")
             if signed >= expires:
                 return False
             if observed >= expires and not historical:
@@ -208,7 +206,7 @@ class Credential:
             return True
         if not historical or self.changed is None:
             return False
-        changed = parse_timestamp(self.changed, "changed")
+        changed = parse(self.changed, "changed")
         return signed < changed
 
     def to_dict(self) -> dict[str, Any]:
@@ -292,9 +290,9 @@ class Wrapper:
             ValueError: If the key id or value is blank, the timestamp is
                 invalid, or the algorithm is unsupported.
         """
-        require_text(self.key_id, "key_id")
-        parse_timestamp(self.issued, "issued")
-        require_text(self.value, "value")
+        require(self.key_id, "key_id")
+        parse(self.issued, "issued")
+        require(self.value, "value")
         if self.algorithm != signing.SIGNATURE_ALGORITHM:
             raise errors.InputError("unsupported signature algorithm")
 
@@ -619,7 +617,7 @@ class Keyring(Roster):
         return cls(Credential.from_dict(item) for item in layout["keys"])
 
     @classmethod
-    def from_json(cls, value: str) -> Self:
+    def parse(cls, value: str) -> Self:
         """Parses and validates registry JSON.
 
         Args:
@@ -660,7 +658,7 @@ class Keyring(Roster):
                 stream.flush()
                 os.fsync(stream.fileno())
             temporary.replace(target)
-            durability.sync_directory(target.parent)
+            durability.flush(target.parent)
         except Exception:
             if temporary.exists():
                 temporary.unlink()
@@ -671,7 +669,7 @@ class Keyring(Roster):
         """Reads and validates a persisted registry.
 
         A missing file raises `OSError`; invalid content raises the
-        `ValueError` of `from_json`.
+        `ValueError` of `parse`.
 
         Args:
             path: The file written by `write`.
@@ -679,7 +677,7 @@ class Keyring(Roster):
         Returns:
             The registry.
         """
-        return cls.from_json(Path(path).read_text(encoding="utf-8"))
+        return cls.parse(Path(path).read_text(encoding="utf-8"))
 
 
 __all__ = [
@@ -688,6 +686,6 @@ __all__ = [
     "Roster",
     "State",
     "Wrapper",
-    "parse_timestamp",
-    "require_text",
+    "parse",
+    "require",
 ]

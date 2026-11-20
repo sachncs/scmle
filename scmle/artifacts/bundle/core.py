@@ -74,15 +74,15 @@ class Core:
         self.quantile = quantile
         # The fold models behind `predict_interval(method="cv_plus")`; set
         # by the run or by `load`, kept out of the constructor signature.
-        self.cv_plus: cv_plus.Ensemble | None = None
+        self.plus: cv_plus.Ensemble | None = None
         # Calibration weights for covariate shift, attached on demand by
         # `tilt`.
-        self.shift_weights: shift_weights.Weights | None = None
+        self.weights: shift_weights.Weights | None = None
         # Measured coverage of the stored intervals or sets on the final test
         # rows (`coverage_run.report`), set by the run.
-        self.coverage_report: dict[str, Any] | None = None
+        self.report: dict[str, Any] | None = None
         # Serializes `remember`, which rewrites `history` from itself.
-        self.history_lock = threading.RLock()
+        self.lock = threading.RLock()
 
     @property
     def features(self) -> list[str]:
@@ -94,7 +94,7 @@ class Core:
         """Class labels, or None for regression."""
         return self.schema.classes
 
-    def read_frame(
+    def read(
         self, data: str | pathlib.Path | pandas.DataFrame
     ) -> pandas.DataFrame:
         """Loads inference input from a path or converts an in-memory table.
@@ -125,7 +125,7 @@ class Core:
             A report of missing and extra columns, missing-value counts and
             unseen categories; problems are reported, not raised.
         """
-        frame = self.read_frame(data)
+        frame = self.read(data)
         if mapping is not None:
             frame = mapping.apply(frame, [*self.features, self.schema.target])
         return validation.Validator(self.schema).report(frame)
@@ -148,7 +148,7 @@ class Core:
             The pipeline's input columns in schema order (with series features
             computed), followed by any optional inputs that are present.
         """
-        frame = self.read_frame(data)
+        frame = self.read(data)
         if mapping is not None:
             frame = mapping.apply(frame, [*self.features, self.schema.target])
         validation.Validator(self.schema).check(frame)
@@ -254,9 +254,9 @@ class Core:
         """
         if not self.schema.series:
             return
-        with self.history_lock:  # Read-modify-write of `history`.
+        with self.lock:  # Read-modify-write of `history`.
             builder = self.assemble()
-            frame = self.read_frame(data)
+            frame = self.read(data)
             columns = builder.historical
             parts = [frame[columns]]
             if self.history is not None:

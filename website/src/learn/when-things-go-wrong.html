@@ -39,7 +39,7 @@ from scmle.api import project
 
 def main():
     data = datasets.load_breast_cancer(as_frame=True).frame
-    result = project.Project(data, "target", time_budget=60).run()
+    result = project.Project(data, "target", budget=60).run()
     print(result.summary())
 
 

@@ -238,7 +238,7 @@ def resolve(
     """
     decompose(image)
     digest = (fetch or query)(image)
-    contract.require_digest(digest, "resolved digest")
+    contract.require(digest, "resolved digest")
     if digest == PLACEHOLDER:
         raise errors.ConfigError("the registry returned the placeholder")
     return {
@@ -274,7 +274,7 @@ def peruse(path: str | pathlib.Path) -> dict[str, str]:
         raise errors.ArtifactError(
             f"cannot read base image lock {path}"
         ) from error
-    contract.require_digest(digest, "base image lock digest")
+    contract.require(digest, "base image lock digest")
     if digest == PLACEHOLDER:
         raise errors.ArtifactError(
             "the base image digest is still the placeholder: run "

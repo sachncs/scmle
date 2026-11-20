@@ -317,45 +317,45 @@ class ProjectCommand(command.Command):
             modality=args.modality,
             task=args.task,
             metric=args.metric,
-            time_budget=args.budget,
+            budget=args.budget,
             workers=args.workers,
-            id_columns=args.identifiers,
-            group_column=args.group,
-            weight_column=args.weight,
-            event_column=args.event,
-            query_column=args.query,
-            treatment_column=args.treatment,
+            identifiers=args.identifiers,
+            group=args.group,
+            weight=args.weight,
+            event=args.event,
+            query=args.query,
+            treatment=args.treatment,
             memory_budget_gb=args.memory,
             training=args.training,
             horizon=args.horizon,
-            seasonal_period=args.period,
-            ordinal_order=args.order,
+            period=args.period,
+            order=args.order,
             unlabeled=args.unlabeled,
-            time_column=args.time,
+            timestamp=args.time,
             time_as_feature=args.temporal,
-            excluded_columns=args.exclude,
+            excluded=args.exclude,
             seed=args.seed,
             validation=args.validation,
             folds=args.folds,
-            test_fraction=args.test,
-            embargo_rows=args.embargo,
-            sensitive_columns=args.sensitive,
-            monotonic_constraints=parse(args.monotonic),
-            horizon_rows=args.rolling_horizon,
-            window_rows=args.rolling_window,
-            feature_delays=parse(args.delay),
-            unavailable_at_prediction=args.unavailable,
+            holdout=args.test,
+            rows=args.embargo,
+            sensitive=args.sensitive,
+            constraints=parse(args.monotonic),
+            span=args.rolling_horizon,
+            window=args.rolling_window,
+            delays=parse(args.delay),
+            unavailable=args.unavailable,
             enforcement=args.enforcement,
-            leakage_policy=args.leakage,
+            leakage=args.leakage,
             charter=args.charter,
-            leakage_attestations=args.attestations,
-            baseline_column=args.baseline,
-            baseline_subject=args.comparator,
-            framing_draft=args.draft,
-            propensity_column=args.propensity,
-            logged_action_column=args.action,
-            ingest_plan=args.ingest,
-            output_dir=args.output_dir,
+            attestations=args.attestations,
+            baseline=args.baseline,
+            subject=args.comparator,
+            draft=args.draft,
+            propensity=args.propensity,
+            action=args.action,
+            ingest=args.ingest,
+            directory=args.output_dir,
             **sections,
         )
 
@@ -398,7 +398,7 @@ class Run(ProjectCommand):
         LOGGER.info("%s", result.summary())
         if result.estimation is not None:
             announce(result.estimation)
-        LOGGER.info("artifacts: %s", result.run_dir)
+        LOGGER.info("artifacts: %s", result.directory)
         return command.EXIT_OK
 
 
@@ -465,14 +465,14 @@ class Estimation(command.Command):
         declared = project.Project(
             args.data,
             estimand.outcome,
-            treatment_column=args.treatment,
+            treatment=args.treatment,
             estimand=estimand,
-            estimation_policy=policy,
-            output_dir=args.output_dir,
+            policy=policy,
+            directory=args.output_dir,
         )
         folder = pathlib.Path(args.output_dir)
         try:
-            found = declared.estimate_parameters(folder)
+            found = declared.estimate(folder)
         except estimation.REFUSALS as error:
             raise errors.BlockedError(
                 f"parameter estimation refused: {error}",
@@ -515,5 +515,5 @@ class Resumption(command.Command):
         except FileNotFoundError as error:
             raise errors.ArtifactError(str(error)) from error
         LOGGER.info("%s", result.summary())
-        LOGGER.info("artifacts: %s", result.run_dir)
+        LOGGER.info("artifacts: %s", result.directory)
         return command.EXIT_OK

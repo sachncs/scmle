@@ -316,7 +316,7 @@ def test_hold_reloads_on_sighup_and_drains_on_sigterm(
     driver.start()
     runtime.hold(adapter, monitor, written, 60.0, tracked)
     driver.join(20)
-    assert adapter.loaded.info.model_version == "golden-2"
+    assert adapter.loaded.info.version == "golden-2"
     assert adapter.httpd is None and adapter.draining
     lines = written.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1 and "signals" in json.loads(lines[0])
@@ -511,7 +511,7 @@ def test_the_monitor_follows_the_reference_of_the_bundle_served(
     adapter = server.Service(first, monitor=monitor)
     assert monitor.profile is first.reference
     adapter.reload(runtime.fetch(folder, trusted=True))
-    assert adapter.loaded.info.model_version == "golden-2"
+    assert adapter.loaded.info.version == "golden-2"
     assert monitor.profile.to_dict() == second.reference.to_dict()
     monitor.sense(support_ops.START, support_ops.frame(400, seed=3, shift=25))
     names = {item.name for item in monitor.evaluate(support_ops.START + 1)}
@@ -551,7 +551,7 @@ def test_a_monitor_failing_on_a_new_bundle_is_logged(bundle, caplog):
 
 
 def test_the_serve_command_takes_the_signals_window():
-    parser = cli.build_parser()
+    parser = cli.build()
     args = parser.parse_args(["serve", "model", "--signals-window", "45"])
     assert args.signals_window == 45.0
     assert parser.parse_args(["serve", "model"]).signals_window == 300.0

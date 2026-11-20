@@ -23,7 +23,7 @@ def test_the_longest_run_wins_over_an_earlier_shorter_one() -> None:
 
 
 def test_a_second_look_is_refused_word_for_word() -> None:
-    guard = netbenefit.FinalNetBenefit("abc")
+    guard = netbenefit.Examiner("abc")
     with pytest.raises(errors.InputError):
         guard.evaluate("abc", [0, 1], [0, 1], (0.0, 0.3))
     with pytest.raises(

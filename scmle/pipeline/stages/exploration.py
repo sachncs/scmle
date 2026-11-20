@@ -265,7 +265,7 @@ class Exploration(admission.Admission):
             charter=charter,
             features=view.features,
             target=view.target,
-            classification=task.is_classification,
+            classification=task.classification,
             run_dir=board.services.store.directory
             if board.services.store is not None
             else None,

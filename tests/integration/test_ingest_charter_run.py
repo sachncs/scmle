@@ -129,17 +129,17 @@ def run(tmp_path, **kwargs):
     return support.make_project(
         table(rate),
         "y",
-        time_budget=300,
-        output_dir=tmp_path / "out",
+        budget=300,
+        directory=tmp_path / "out",
         charter=kwargs.pop("charter", None) or charter_file(tmp_path),
-        id_columns=["customer_id", "moment"],
-        ingest_plan=kwargs.pop("plan", None) or plan_file(tmp_path),
+        identifiers=["customer_id", "moment"],
+        ingest=kwargs.pop("plan", None) or plan_file(tmp_path),
         **kwargs,
     ).run()
 
 
 def read(result, name):
-    return json.loads((pathlib.Path(result.run_dir) / name).read_text())
+    return json.loads((pathlib.Path(result.directory) / name).read_text())
 
 
 def test_features_come_from_the_database_and_reach_the_ledger(tmp_path):
@@ -148,7 +148,7 @@ def test_features_come_from_the_database_and_reach_the_ledger(tmp_path):
     # Enforces website/src/pages/docs/artifacts.astro:114.
     # Enforces website/src/pages/docs/causal-decision.astro:52.
     result = run(tmp_path)
-    folder = pathlib.Path(result.run_dir)
+    folder = pathlib.Path(result.directory)
 
     manifest = read(result, "feature_manifest.json")
     kept = [f["name"] for f in manifest["features"] if f["kept"]]
@@ -176,11 +176,11 @@ def test_an_unknown_unit_stops_the_run_with_questions(tmp_path):
         support.make_project(
             table(rate),
             "y",
-            time_budget=300,
-            output_dir=tmp_path / "out",
+            budget=300,
+            directory=tmp_path / "out",
             charter=charter_file(tmp_path),
-            id_columns=["customer_id", "moment"],
-            ingest_plan=plan_file(tmp_path, unit="household"),
+            identifiers=["customer_id", "moment"],
+            ingest=plan_file(tmp_path, unit="household"),
         ).run()
 
 
@@ -190,17 +190,17 @@ def test_the_plan_and_the_charter_block_must_come_together(tmp_path):
         support.make_project(
             table(rate),
             "y",
-            time_budget=300,
-            output_dir=tmp_path / "out",
+            budget=300,
+            directory=tmp_path / "out",
             charter=charter_file(tmp_path, block=False),
-            ingest_plan=plan_file(tmp_path),
+            ingest=plan_file(tmp_path),
         ).run()
     with pytest.raises(errors.ConfigError, match="data\\.ingest_plan"):
         support.make_project(
             table(rate),
             "y",
-            time_budget=300,
-            output_dir=tmp_path / "out2",
+            budget=300,
+            directory=tmp_path / "out2",
             charter=charter_file(tmp_path),
         ).run()
 
@@ -245,12 +245,12 @@ def run_with_emails(tmp_path, entity):
     return support.make_project(
         with_emails(table(rate)),
         "y",
-        time_budget=300,
-        output_dir=tmp_path / "out",
+        budget=300,
+        directory=tmp_path / "out",
         charter=charter_file(tmp_path, entity=entity),
-        id_columns=["customer_id", "moment", "email"],
-        ingest_plan=plan_file(tmp_path),
-        group_column=None,
+        identifiers=["customer_id", "moment", "email"],
+        ingest=plan_file(tmp_path),
+        group=None,
     ).run()
 
 
@@ -295,11 +295,11 @@ def run_reconciled(tmp_path, rows_off):
     return support.make_project(
         table(rate),
         "y",
-        time_budget=300,
-        output_dir=tmp_path / "out",
+        budget=300,
+        directory=tmp_path / "out",
         charter=charter_file(tmp_path, reconcile=block),
-        id_columns=["customer_id", "moment"],
-        ingest_plan=plan_file(tmp_path),
+        identifiers=["customer_id", "moment"],
+        ingest=plan_file(tmp_path),
     ).run()
 
 

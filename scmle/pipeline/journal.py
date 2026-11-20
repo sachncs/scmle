@@ -65,7 +65,7 @@ class Journal:
         """
         with self.lock:
             if self.store is not None:
-                self.store.write_json(relative, payload)
+                self.store.write(relative, payload)
 
     def write_text(self, relative: str, text: str) -> None:
         """Writes a text artifact if the run is persisted.
@@ -97,7 +97,7 @@ class Journal:
             if self.log is not None and self.store is not None:
                 self.log.emit(
                     events.Event(
-                        self.store.run_id,
+                        self.store.run,
                         kind,
                         reason,
                         self.spec.config_hash(),
@@ -166,17 +166,17 @@ class Journal:
                 which would overwrite its checkpoint.
         """
         with self.lock:
-            if any(t.trial_id == outcome.trial_id for t in self.trials):
+            if any(t.identifier == outcome.identifier for t in self.trials):
                 raise errors.ScmleError(
-                    f"duplicate trial id {outcome.trial_id}",
-                    {"trial_id": outcome.trial_id},
+                    f"duplicate trial id {outcome.identifier}",
+                    {"trial_id": outcome.identifier},
                 )
             self.trials.append(outcome)
-            path = f"trials/{outcome.trial_id}.json"
+            path = f"trials/{outcome.identifier}.json"
             self.write(path, outcome.to_dict())
-            self.emit(f"trial.{outcome.status}", outcome.model_name, (path,))
+            self.emit(f"trial.{outcome.status}", outcome.model, (path,))
             if self.store is not None:
-                self.tracker.transcribe(self.store.run_id, outcome)
+                self.tracker.transcribe(self.store.run, outcome)
 
     def track(self, **fields: Any) -> None:
         """Updates the tracked run row if the run is persisted.
@@ -186,4 +186,4 @@ class Journal:
         """
         with self.lock:
             if self.store is not None:
-                self.tracker.revise(self.store.run_id, **fields)
+                self.tracker.revise(self.store.run, **fields)

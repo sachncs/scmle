@@ -21,7 +21,7 @@ def read_kinds(run_dir):
 
 def run(frame, tmp_path, **kwargs):
     project = support.make_project(
-        frame, "y", time_budget=120, output_dir=tmp_path, **kwargs
+        frame, "y", budget=120, directory=tmp_path, **kwargs
     )
     return project.run()
 
@@ -56,14 +56,14 @@ def test_binary_end_to_end_artifacts_and_inference(binary_frame, tmp_path):
         "trials/trial_001.json",
     ]
     for relative in expected:
-        assert (result.run_dir / relative).exists(), relative
+        assert (result.directory / relative).exists(), relative
     evidence_graph = json.loads(
-        (result.run_dir / "evidence_graph.json").read_text()
+        (result.directory / "evidence_graph.json").read_text()
     )
     assert evidence_graph["graph_digest"]
     assert evidence_graph["topological_order"][0] == "raw-source"
     assert evidence_graph["topological_order"][-1] == "bundle"
-    states = [k for k in read_kinds(result.run_dir) if k.startswith("state.")]
+    states = [k for k in read_kinds(result.directory) if k.startswith("state.")]
     assert states == [
         f"state.{name}"
         for name in (
@@ -79,7 +79,7 @@ def test_binary_end_to_end_artifacts_and_inference(binary_frame, tmp_path):
         )
     ]
     assert result.leaderboard().iloc[0]["selected"]
-    assert "trial.ok" in read_kinds(result.run_dir)
+    assert "trial.ok" in read_kinds(result.directory)
 
     exported = result.save(tmp_path / "exported")
     loaded = scmle.artifacts.bundle.Bundle.load(exported, trusted=True)
@@ -113,7 +113,7 @@ def test_regression_is_ranked_by_lower_rmse(regression_frame, tmp_path):
 def test_csv_input_and_plan_without_side_effects(binary_frame, tmp_path):
     binary_frame.to_csv(tmp_path / "d.csv", index=False)
     project = support.make_project(
-        tmp_path / "d.csv", "y", output_dir=tmp_path / "runs"
+        tmp_path / "d.csv", "y", directory=tmp_path / "runs"
     )
     plan = project.plan()
     assert not (tmp_path / "runs").exists()
@@ -122,12 +122,12 @@ def test_csv_input_and_plan_without_side_effects(binary_frame, tmp_path):
 
 
 def test_approved_plan_restricts_models(binary_frame, tmp_path):
-    project = support.make_project(binary_frame, "y", output_dir=tmp_path)
+    project = support.make_project(binary_frame, "y", directory=tmp_path)
     plan = dataclasses.replace(
         project.plan(), candidates=("dummy", "logistic_regression")
     )
     result = project.run(plan)
-    assert {t.model_name for t in result.trials} == {
+    assert {t.model for t in result.trials} == {
         "dummy",
         "logistic_regression",
     }
@@ -139,11 +139,11 @@ def test_group_and_temporal_runs(binary_frame, tmp_path):
         t=numpy.arange(len(binary_frame)),
     )
     assert (
-        run(frame, tmp_path, group_column="g").evaluation["validation"]
+        run(frame, tmp_path, group="g").evaluation["validation"]
         == "group"
     )
     assert (
-        run(frame, tmp_path, time_column="t").evaluation["validation"]
+        run(frame, tmp_path, timestamp="t").evaluation["validation"]
         == "temporal"
     )
 
@@ -169,7 +169,7 @@ def test_unknown_metric_fails_fast_and_is_recorded(binary_frame, tmp_path):
 
 def test_reruns_are_isolated_and_reproducible(binary_frame, tmp_path):
     first, second = run(binary_frame, tmp_path), run(binary_frame, tmp_path)
-    assert first.run_dir != second.run_dir
+    assert first.directory != second.directory
     assert (
         first.evaluation["digests"]["split"]
         == second.evaluation["digests"]["split"]
@@ -204,11 +204,11 @@ def test_diagnostics_are_written_and_exposed(binary_frame, tmp_path):
         "permutation_importance",
     } <= names
     for name in names:
-        assert (result.run_dir / "diagnostics" / f"{name}.json").exists()
+        assert (result.directory / "diagnostics" / f"{name}.json").exists()
     importance = result.salience()
     assert list(importance.columns) == ["feature", "importance", "std"]
     assert importance.iloc[0]["feature"] in {"a", "b", "c"}
-    html = (result.run_dir / "report.html").read_text()
+    html = (result.directory / "report.html").read_text()
     assert "Feature importance" in html and "Brier score" in html
 
 
@@ -240,10 +240,10 @@ def test_confidence_intervals_follow_the_data_structure(binary_frame, tmp_path):
         t=numpy.arange(len(binary_frame)),
     )
     plain = run(frame, tmp_path / "p").diagnostics["metric_uncertainty"]
-    grouped = run(frame, tmp_path / "g", group_column="g").diagnostics[
+    grouped = run(frame, tmp_path / "g", group="g").diagnostics[
         "metric_uncertainty"
     ]
-    temporal = run(frame, tmp_path / "t", time_column="t").diagnostics[
+    temporal = run(frame, tmp_path / "t", timestamp="t").diagnostics[
         "metric_uncertainty"
     ]
     assert plain["resampling_unit"] == "rows"
@@ -263,15 +263,15 @@ def test_time_series_contracts_end_to_end(binary_frame, tmp_path):
     project = support.make_project(
         frame,
         "y",
-        time_budget=300,
-        time_column="t",
-        unavailable_at_prediction=["outcome_code"],
-        output_dir=tmp_path,
+        budget=300,
+        timestamp="t",
+        unavailable=["outcome_code"],
+        directory=tmp_path,
     )
     result = project.run()
     assert "outcome_code" not in result.bundle.features
     assert (
-        "not available" in result.profile.feature_plan.dropped["outcome_code"]
+        "not available" in result.profile.plan.dropped["outcome_code"]
     )
     assert result.evaluation["validation"] == "temporal"
 
@@ -279,7 +279,7 @@ def test_time_series_contracts_end_to_end(binary_frame, tmp_path):
 def test_a_modified_plan_changes_validation_budget_and_metric(
     binary_frame, tmp_path
 ):
-    project = support.make_project(binary_frame, "y", output_dir=tmp_path)
+    project = support.make_project(binary_frame, "y", directory=tmp_path)
     plan = project.plan()
     modified = dataclasses.replace(
         plan,
@@ -291,11 +291,11 @@ def test_a_modified_plan_changes_validation_budget_and_metric(
     result = project.run(modified)
     assert result.evaluation["validation"] == "random"
     assert result.evaluation["metric"] == "pr_auc"
-    saved = json.loads((result.run_dir / "config.json").read_text())
+    saved = json.loads((result.directory / "config.json").read_text())
     assert saved["validation"]["strategy"] == "random"
     assert saved["resources"]["budget"] == 250
     assert saved["metric"] == "pr_auc"
-    assert {t.model_name for t in result.trials} == {
+    assert {t.model for t in result.trials} == {
         "dummy",
         "logistic_regression",
     }
@@ -306,14 +306,14 @@ def test_a_plan_for_another_task_or_an_impossible_strategy_is_refused(
 ):
     import pydantic
 
-    project = support.make_project(binary_frame, "y", output_dir=tmp_path)
+    project = support.make_project(binary_frame, "y", directory=tmp_path)
     plan = project.plan()
     wrong_task = dataclasses.replace(plan, task="regression")
     with pytest.raises(errors.ConfigError, match="approved plan is for"):
         project.run(wrong_task)
     impossible = dataclasses.replace(plan, validation="group")
     with pytest.raises(pydantic.ValidationError, match="group_column"):
-        support.make_project(binary_frame, "y", output_dir=tmp_path / "x").run(
+        support.make_project(binary_frame, "y", directory=tmp_path / "x").run(
             impossible
         )
 
@@ -322,7 +322,7 @@ def test_a_run_explains_individual_predictions_against_a_background(
     binary_frame, tmp_path
 ):
     result = support.make_project(
-        binary_frame, "y", time_budget=300, output_dir=tmp_path
+        binary_frame, "y", budget=300, directory=tmp_path
     ).run()
     rows = binary_frame.drop(columns="y").head(3)
     background = binary_frame.drop(columns="y").iloc[100:160]
@@ -339,7 +339,7 @@ def test_planning_writes_recommendations_the_project_can_return(
     binary_frame, tmp_path
 ):
     project = support.make_project(
-        binary_frame.head(150), "y", time_budget=300, output_dir=tmp_path
+        binary_frame.head(150), "y", budget=300, directory=tmp_path
     )
 
     advice = project.recommendations()
@@ -347,7 +347,7 @@ def test_planning_writes_recommendations_the_project_can_return(
 
     assert any(item.topic == "small data" for item in advice)
     written = json.loads(
-        (result.run_dir / "diagnostics" / "recommendations.json").read_text()
+        (result.directory / "diagnostics" / "recommendations.json").read_text()
     )
     assert [item["topic"] for item in written] == [i.topic for i in advice]
 
@@ -356,7 +356,7 @@ def test_fit_health_is_recorded_for_the_selected_model_and_each_trial(
     binary_frame, tmp_path
 ):
     result = support.make_project(
-        binary_frame, "y", time_budget=300, output_dir=tmp_path
+        binary_frame, "y", budget=300, directory=tmp_path
     ).run()
 
     health = result.evaluation["health"]
@@ -371,19 +371,19 @@ def test_fit_health_is_recorded_for_the_selected_model_and_each_trial(
         "unstable",
     }
     assert "training" not in board.columns
-    assert all(len(t.train_scores) == len(t.fold_scores) for t in result.trials)
+    assert all(len(t.training) == len(t.folds) for t in result.trials)
 
 
 def test_reliability_checks_run_and_reach_the_report(binary_frame, tmp_path):
     result = support.make_project(
-        binary_frame, "y", time_budget=300, output_dir=tmp_path
+        binary_frame, "y", budget=300, directory=tmp_path
     ).run()
 
     assert {"slice_performance", "robustness", "adversarial_validation"} <= set(
         result.diagnostics
     )
     assert result.diagnostics["adversarial_validation"]["available"] is True
-    page = (result.run_dir / "report.html").read_text()
+    page = (result.directory / "report.html").read_text()
     assert "Reliability checks" in page and "Fit health" in page
     assert "Development versus test rows" in page
 
@@ -393,7 +393,7 @@ def test_regression_bundles_return_calibrated_intervals(tmp_path):
     frame = pandas.DataFrame({"x": rng.normal(size=900)})
     frame["y"] = 4 * frame.x + rng.normal(0, 1.0, 900)
     result = support.make_project(
-        frame, "y", time_budget=300, output_dir=tmp_path
+        frame, "y", budget=300, directory=tmp_path
     ).run()
 
     new = pandas.DataFrame({"x": rng.normal(size=3000)})
@@ -414,10 +414,10 @@ def test_classification_bundles_return_prediction_sets_that_survive_saving(
     binary_frame, tmp_path
 ):
     result = support.make_project(
-        binary_frame, "y", time_budget=300, output_dir=tmp_path
+        binary_frame, "y", budget=300, directory=tmp_path
     ).run()
     result.save(tmp_path / "model")
-    reloaded = scmle.api.predict.load_model(tmp_path / "model", trusted=True)
+    reloaded = scmle.api.predict.load(tmp_path / "model", trusted=True)
     rows = binary_frame.drop(columns="y")
 
     sets = reloaded.predict_set(rows, coverage=0.9)
@@ -460,18 +460,18 @@ def test_rolling_validation_runs_end_to_end_with_a_time_aware_report(tmp_path):
     result = support.make_project(
         frame,
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
-        time_column="when",
+        budget=300,
+        directory=tmp_path,
+        timestamp="when",
         validation="rolling",
         folds=3,
-        horizon_rows=60,
-        window_rows=200,
-        excluded_columns=["report"],
+        span=60,
+        window=200,
+        excluded=["report"],
     ).run()
 
     manifest = json.loads(
-        (result.run_dir / "validation_manifest.json").read_text()
+        (result.directory / "validation_manifest.json").read_text()
     )
     assert manifest["strategy"] == "rolling" and len(manifest["folds"]) == 3
     assert result.evaluation["confidence"]["note"]
@@ -482,14 +482,14 @@ def test_a_delayed_column_is_used_only_through_its_lagged_copy(tmp_path):
     project = support.make_project(
         frame,
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
-        time_column="when",
-        feature_delays={"report": 3},
+        budget=300,
+        directory=tmp_path,
+        timestamp="when",
+        delays={"report": 3},
     )
     result = project.run()
 
-    features = result.profile.feature_plan
+    features = result.profile.plan
     assert "report" not in features.numeric
     assert "report" in project.spec.data.excluded_columns
     assert any(
@@ -514,7 +514,7 @@ def test_datetime_features_train_and_predict_from_raw_timestamps(tmp_path):
         + (rng.random(rows) < 0.05)
     ).clip(0, 1)
     result = support.make_project(
-        frame, "y", time_budget=300, output_dir=tmp_path
+        frame, "y", budget=300, directory=tmp_path
     ).run()
 
     assert result.evaluation["metrics"]["roc_auc"] > 0.9
@@ -554,10 +554,10 @@ def test_free_text_is_encoded_and_scored_from_raw_strings(tmp_path):
         }
     )
     result = support.make_project(
-        frame, "y", time_budget=300, output_dir=tmp_path
+        frame, "y", budget=300, directory=tmp_path
     ).run()
 
-    assert "review" in result.profile.feature_plan.text
+    assert "review" in result.profile.plan.text
     assert result.evaluation["metrics"]["roc_auc"] > 0.95
     fresh = pandas.DataFrame(
         {
@@ -574,23 +574,23 @@ def test_the_fairness_report_names_the_sensitive_columns_and_reaches_the_report(
     result = support.make_project(
         binary_frame,
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
-        sensitive_columns=["c"],
+        budget=300,
+        directory=tmp_path,
+        sensitive=["c"],
     ).run()
 
     report = result.diagnostics["fairness"]
     assert report["available"] is True and "c" in report["columns"]
     groups = set(report["columns"]["c"]["groups"])
     assert groups and groups <= {"x", "y", "z"}
-    assert (result.run_dir / "diagnostics" / "fairness.json").exists()
+    assert (result.directory / "diagnostics" / "fairness.json").exists()
 
 
 def test_bundles_flag_rows_unlike_the_training_data_and_keep_the_detector(
     binary_frame, tmp_path
 ):
     result = support.make_project(
-        binary_frame, "y", time_budget=300, output_dir=tmp_path
+        binary_frame, "y", budget=300, directory=tmp_path
     ).run()
     rows = binary_frame.drop(columns="y").head(5).copy()
     rows.loc[rows.index[0], "b"] = 500.0
@@ -598,7 +598,7 @@ def test_bundles_flag_rows_unlike_the_training_data_and_keep_the_detector(
     flags = result.bundle.atypical(rows)["out_of_distribution"]
     scored = result.bundle.score(rows)
     result.save(tmp_path / "net")
-    reloaded = scmle.api.predict.load_model(tmp_path / "net", trusted=True)
+    reloaded = scmle.api.predict.load(tmp_path / "net", trusted=True)
 
     assert bool(flags.iloc[0]) is True
     assert scored["out_of_distribution"][0] is True
@@ -609,10 +609,10 @@ def test_bundles_flag_rows_unlike_the_training_data_and_keep_the_detector(
 
 def test_the_run_reports_whether_more_data_would_help(binary_frame, tmp_path):
     result = support.make_project(
-        binary_frame, "y", time_budget=300, output_dir=tmp_path
+        binary_frame, "y", budget=300, directory=tmp_path
     ).run()
 
     curve = result.evaluation["learning"]
     assert curve["verdict"] in {"more data likely helps", "plateau", "unclear"}
     assert len(curve["sizes"]) == 5 and curve["sizes"] == sorted(curve["sizes"])
-    assert "Learning curve" in (result.run_dir / "report.html").read_text()
+    assert "Learning curve" in (result.directory / "report.html").read_text()

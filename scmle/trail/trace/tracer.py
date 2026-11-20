@@ -58,7 +58,7 @@ def derive(
     path = folder / records.INPUTS
     if path.is_file():
         try:
-            tracer.inputs = records.read_json(path)
+            tracer.inputs = records.read(path)
         except ValueError:
             # handled: recorded as trace problem
             tracer.problem(

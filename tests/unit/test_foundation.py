@@ -151,7 +151,7 @@ def test_the_adapter_is_rejected_without_the_package_and_explains_why():
 
     assert reason is not None and "missing dependency: tabpfn" in reason
     assert adapter.family == "foundation"
-    assert adapter.capabilities.max_rows == foundation.MAX_ROWS
+    assert adapter.capabilities.scale == foundation.MAX_ROWS
 
 
 def test_the_adapter_stays_extension_only_when_its_package_is_available(

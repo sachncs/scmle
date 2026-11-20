@@ -198,7 +198,7 @@ def test_memory_characteristics_drive_rejection_under_a_tight_limit(planner):
 
 def test_every_adapter_declares_a_positive_memory_factor():
     for adapter in registry.Catalog.stock().adapters.values():
-        assert adapter.capabilities.memory_factor >= 1.0, adapter.name
+        assert adapter.capabilities.factor >= 1.0, adapter.name
 
 
 def test_excluded_models_and_families_are_not_planned_and_are_explained(

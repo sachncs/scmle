@@ -252,7 +252,7 @@ def replicate(model: LogisticRegression, batch: containers.Batch) -> float:
             "linear explanation reference shape does not match model "
             "decision output"
         )
-    return quality.fidelity_score(
+    return quality.score(
         decision_values.astype(float).reshape(-1).tolist(),
         reference_values.astype(float).reshape(-1).tolist(),
     )
@@ -416,8 +416,8 @@ class Explainability(state.Stage):
             method="linear_reference_zero_ablation_and_perturbation",
             sample_count=len(batch.sample_ids),
             thresholds=quality.Thresholds(
-                stability_minimum=0.9,
-                fidelity_minimum=0.999999,
+                stability=0.9,
+                minimum=0.999999,
             ),
             stability=repeated_stability,
             fidelity=fidelity,

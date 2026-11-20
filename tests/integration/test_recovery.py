@@ -42,23 +42,23 @@ def read_events(run_dir):
 def project_with(adapter, frame, tmp_path, **kwargs):
     registry = scmle.models.registry.Catalog.stock()
     registry.register(adapter)
-    project = support.make_project(frame, "y", output_dir=tmp_path, **kwargs)
+    project = support.make_project(frame, "y", directory=tmp_path, **kwargs)
     project.orchestrator.registry = registry
     return project
 
 
 def test_failed_trial_is_isolated(binary_frame, tmp_path):
     result = project_with(ExplodingAdapter(), binary_frame, tmp_path).run()
-    failed = next(t for t in result.trials if t.model_name == "exploding")
+    failed = next(t for t in result.trials if t.model == "exploding")
     assert failed.status == "failed" and "boom" in failed.error
-    assert result.selected_model != "exploding"
-    assert failed.trial_id in result.leaderboard()["identifier"].tolist()
-    assert "trial.failed" in [e["kind"] for e in read_events(result.run_dir)]
+    assert result.model != "exploding"
+    assert failed.identifier in result.leaderboard()["identifier"].tolist()
+    assert "trial.failed" in [e["kind"] for e in read_events(result.directory)]
 
 
 def test_all_trials_failing_ends_in_failed_state(binary_frame, tmp_path):
     registry = scmle.models.registry.Catalog((ExplodingAdapter(),))
-    project = support.make_project(binary_frame, "y", output_dir=tmp_path)
+    project = support.make_project(binary_frame, "y", directory=tmp_path)
     project.orchestrator.registry = registry
     with pytest.raises(errors.ScmleError, match="all trials failed") as caught:
         project.run()
@@ -101,11 +101,11 @@ def test_a_budget_below_the_minimum_run_is_refused_before_work(
     # minimum cannot fit is refused, naming the smallest budget that fits.
     with pytest.raises(errors.BlockedError, match="smallest budget") as caught:
         support.make_project(
-            binary_frame, "y", time_budget=1, output_dir=tmp_path
+            binary_frame, "y", budget=1, directory=tmp_path
         ).run()
     smallest = caught.value.details["smallest_budget_seconds"]
     result = support.make_project(
-        binary_frame, "y", time_budget=smallest, output_dir=tmp_path / "b"
+        binary_frame, "y", budget=smallest, directory=tmp_path / "b"
     ).run()
     assert result.trials[0].status == "ok" and result.state == "COMPLETED"
     skipped = [t for t in result.trials if t.status == "skipped"]
@@ -118,7 +118,7 @@ def test_custom_stage_sequence_is_polymorphic(binary_frame, tmp_path):
 
         def execute(self, board):
             choice = board.get(selecting.Choice)
-            Recording.calls.append(choice.selected.model_name)
+            Recording.calls.append(choice.selected.model)
             return super().execute(board)
 
     stages = (*scmle.pipeline.stages.sequence()[:-1], Recording())
@@ -126,7 +126,7 @@ def test_custom_stage_sequence_is_polymorphic(binary_frame, tmp_path):
     result = orchestrator.Orchestrator(spec, binary_frame, stages=stages).run(
         tmp_path
     )
-    assert Recording.calls == [result.selected_model]
+    assert Recording.calls == [result.model]
 
 
 def test_failed_and_blocked_runs_list_their_recoverable_trials(
@@ -158,5 +158,5 @@ def test_failed_and_blocked_runs_list_their_recoverable_trials(
     ambiguous = binary_frame.assign(y=range(len(binary_frame)))
     ambiguous["y"] = ambiguous["y"] % 5
     with pytest.raises(errors.BlockedError) as blocked:
-        support.make_project(ambiguous, "y", output_dir=tmp_path / "b").run()
+        support.make_project(ambiguous, "y", directory=tmp_path / "b").run()
     assert blocked.value.details["recoverable_trials"] == []

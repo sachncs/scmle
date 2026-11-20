@@ -822,7 +822,7 @@ class Lease(Model):
             The steps where the real store, clock or fences differ from
             the model's, or where the real code made another store call.
         """
-        gate = Gate(objectstore.LocalObjectStore(folder / "state"))
+        gate = Gate(objectstore.Disk(folder / "state"))
         moment = [0]
         executors = [
             executor.Executor(
@@ -1103,27 +1103,27 @@ class Gate(objectstore.Depot):
         *,
         if_absent: bool = False,
         if_version: str | None = None,
-    ) -> objectstore.ObjectMeta:
+    ) -> objectstore.Metadata:
         """Stores an object on the channel's turn."""
         self.enter("put", key)
         return self.inner.put(
             key, data, if_absent=if_absent, if_version=if_version
         )
 
-    def get(self, key: str) -> tuple[bytes, objectstore.ObjectMeta]:
+    def get(self, key: str) -> tuple[bytes, objectstore.Metadata]:
         """Reads an object on the channel's turn."""
         self.enter("get", key)
         return self.inner.get(key)
 
-    def head(self, key: str) -> objectstore.ObjectMeta:
+    def head(self, key: str) -> objectstore.Metadata:
         """Reads metadata on the channel's turn."""
         self.enter("head", key)
         return self.inner.head(key)
 
-    def list_objects(self, prefix: str = "") -> list[objectstore.ObjectMeta]:
+    def catalog(self, prefix: str = "") -> list[objectstore.Metadata]:
         """Lists objects on the channel's turn."""
         self.enter("list", prefix)
-        return self.inner.list_objects(prefix)
+        return self.inner.catalog(prefix)
 
     def delete(self, key: str, *, if_version: str | None = None) -> None:
         """Removes an object on the channel's turn."""
@@ -1503,9 +1503,9 @@ class Custody(Journal):
         Link(
             "write",
             "scmle.assurance.custody.journal:Journal.append",
-            'durability.append_text(self.path, line + "\\n")',
+            'durability.append(self.path, line + "\\n")',
         ),
-        Link("write", "scmle.durability:append_text", 'target.open("a"'),
+        Link("write", "scmle.durability:append", 'target.open("a"'),
         Link(
             "sync",
             "scmle.assurance.custody.journal:Journal.append",
@@ -1577,9 +1577,9 @@ class Erasure(Journal):
         Link(
             "write",
             "scmle.api.erasure.receipts:Journal.finish",
-            'durability.append_text(path, ("\\n" if torn else "") + line',
+            'durability.append(path, ("\\n" if torn else "") + line',
         ),
-        Link("write", "scmle.durability:append_text", 'target.open("a"'),
+        Link("write", "scmle.durability:append", 'target.open("a"'),
         Link(
             "sync",
             "scmle.api.erasure.receipts:Journal.finish",

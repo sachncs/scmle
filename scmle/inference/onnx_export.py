@@ -58,7 +58,7 @@ INSTALL_HINT = "install the 'onnx' extra (skl2onnx, onnxruntime)"
 WRAPPERS = (
     weighting.Reweighter,
     resampling.ResamplingClassifier,
-    resampling.DensityWeightedRegressor,
+    resampling.Density,
 )
 
 
@@ -86,8 +86,8 @@ def load() -> tuple[Any, Any]:
 MODEL_WRAPPERS = (
     early_stopping.Holdout,
     wrappers.Encoded,
-    wrappers.FlatPredictionClassifier,
-    wrappers.FitParamsClassifier,
+    wrappers.Flattener,
+    wrappers.Forwarder,
     wrappers.Curried,
     wrappers.MonotoneEstimator,
 )
@@ -333,7 +333,7 @@ def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
     except Exception as error:  # The converter raises many types.
         raise errors.ArtifactError(
             f"ONNX export is not supported for model "
-            f"'{bundle.info.model_name}': {error}. "
+            f"'{bundle.info.model}': {error}. "
             "scmle.deploy.packaging.scaffold(bundle, directory) packages "
             "any model as a ready-to-run service instead"
         ) from error
@@ -341,7 +341,7 @@ def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
         entry = model.metadata_props.add()
         entry.key, entry.value = CODES_KEY, "1"
     destination = pathlib.Path(path)
-    durability.write_atomically(destination, model.SerializeToString())
+    durability.write(destination, model.SerializeToString())
     return destination
 
 
@@ -522,7 +522,7 @@ def record(
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     document = {
         "graph_sha256": f"sha256:{digest}",
-        "model_name": bundle.info.model_name,
+        "model_name": bundle.info.model,
         "verified": report is not None,
         "tolerance": tolerance,
         "rows": None if report is None else int(report["rows"]),
@@ -533,5 +533,5 @@ def record(
     }
     manifest = path.with_name(path.name + MANIFEST)
     content = json.dumps(document, indent=2, sort_keys=True) + "\n"
-    durability.write_atomically(manifest, content.encode("utf-8"))
+    durability.write(manifest, content.encode("utf-8"))
     return manifest

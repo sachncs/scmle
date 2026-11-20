@@ -35,7 +35,7 @@ def trained(tmp_path_factory):
     directory = tmp_path_factory.mktemp("monitoring")
     frame = make_frame(800, 0)
     return support.make_project(
-        frame, "y", time_budget=300, output_dir=directory
+        frame, "y", budget=300, directory=directory
     ).run()
 
 
@@ -99,7 +99,7 @@ def test_prediction_log_joins_late_outcomes(trained, tmp_path):
     logged = log.chronicle(trained.bundle, frame.drop(columns="y"))
     assert (
         len(logged) == 60
-        and logged[0].model_version == trained.bundle.info.model_version
+        and logged[0].version == trained.bundle.info.version
     )
     assert logged[0].probability is not None
     truth = {
@@ -120,13 +120,13 @@ def test_prediction_log_can_emit_redacted_observability_sidecar(
     trained, tmp_path
 ):
     policy = observability.Requirements(
-        retention_days=30,
-        required_signals=(
+        retention=30,
+        signals=(
             observability.Indicator.LATENCY,
             observability.Indicator.ERROR,
         ),
-        redacted_fields=("features",),
-        alert_thresholds={},
+        fields=("features",),
+        thresholds={},
     )
     log = events.Journal(
         tmp_path / "log" / "events.jsonl",
@@ -182,13 +182,13 @@ def test_advisor_combines_rules_and_keeps_all_reasons():
 def test_champion_challenger_promotes_only_a_clearly_better_model(tmp_path):
     train = make_frame(1500, 7)
     strong = support.make_project(
-        train, "y", time_budget=300, output_dir=tmp_path / "s"
+        train, "y", budget=300, directory=tmp_path / "s"
     ).run()
     weak = support.make_project(
         train.drop(columns=["a"]),
         "y",
-        time_budget=300,
-        output_dir=tmp_path / "w",
+        budget=300,
+        directory=tmp_path / "w",
     ).run()
     holdout = make_frame(1500, 8)
     features = holdout.drop(columns="y")
@@ -215,7 +215,7 @@ def test_comparison_validates_inputs(trained, tmp_path):
         make_frame(300, 9).assign(y=lambda f: f.a * 2),
         "y",
         task="regression",
-        output_dir=tmp_path,
+        directory=tmp_path,
     ).run()
     with pytest.raises(errors.ConfigError, match="different tasks"):
         champion.Referee(trained.bundle, regression.bundle)

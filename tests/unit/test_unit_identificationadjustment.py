@@ -187,14 +187,14 @@ def randomized():
     )
     c = observational(800, 3)
     c["t"] = (numpy.arange(len(c)) % 2).astype(float)
-    return adjustment.RandomizedEstimator(spec, c, 0, "linear", 0.01), c
+    return adjustment.Experiment(spec, c, 0, "linear", 0.01), c
 
 
 def test_a_randomized_estimate_is_the_difference_in_means():
     adapter, c = randomized()
-    assert adjustment.RandomizedEstimator.name == "randomized_diff"
+    assert adjustment.Experiment.name == "randomized_diff"
     est = adapter.estimate(c, 0.9)
-    direct = aipw.difference_in_means(c, "t", "y", 0.9)
+    direct = aipw.contrast(c, "t", "y", 0.9)
     assert (est.estimate, est.se, est.low, est.high, est.n, est.df) == (
         direct.estimate,
         direct.se,
@@ -204,9 +204,7 @@ def test_a_randomized_estimate_is_the_difference_in_means():
         direct.df,
     )
     other = adapter.reckon(c, 0.9, "nco")
-    assert (
-        other.estimate == aipw.difference_in_means(c, "t", "nco", 0.9).estimate
-    )
+    assert other.estimate == aipw.contrast(c, "t", "nco", 0.9).estimate
     assert adapter.reckon(c, 0.9).estimate == est.estimate
 
 

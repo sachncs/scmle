@@ -140,7 +140,7 @@ class Journal:
                 run=self.run, time=events.stamp(), previous=previous
             )
             line = json.dumps(entry | Entry(digest=digest(entry)))
-            durability.append_text(self.path, line + "\n")
+            durability.append(self.path, line + "\n")
             durability.sync(self.path)
 
     def current(self) -> list[Entry]:

@@ -146,7 +146,7 @@ class Receipt:
             path: The file.
         """
         text = json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n"
-        durability.write_atomically(path, text.encode("utf-8"))
+        durability.write(path, text.encode("utf-8"))
 
     @classmethod
     def read(cls, path: str | pathlib.Path) -> Self:
@@ -217,7 +217,7 @@ class Journal:
         """
         self.folder.mkdir(parents=True, exist_ok=True)
         text = json.dumps(plan, indent=2, sort_keys=True) + "\n"
-        durability.write_atomically(self.folder / PLAN, text.encode("utf-8"))
+        durability.write(self.folder / PLAN, text.encode("utf-8"))
 
     def done(self) -> dict[int, records.Layout]:
         """Returns the finished steps and their results.
@@ -251,5 +251,5 @@ class Journal:
         path = self.folder / JOURNAL
         line = json.dumps({"step": index, "result": result}, sort_keys=True)
         torn = path.is_file() and not path.read_bytes().endswith(b"\n")
-        durability.append_text(path, ("\n" if torn else "") + line + "\n")
+        durability.append(path, ("\n" if torn else "") + line + "\n")
         durability.sync(path)

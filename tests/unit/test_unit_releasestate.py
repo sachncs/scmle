@@ -23,7 +23,7 @@ MODEL = "churn"
 
 
 def ledger():
-    return deployment_ledger.DeploymentLedger.create(
+    return deployment_ledger.Ledger.create(
         None, charter_hash="c" * 8, policy={}, alpha_promo="1/20"
     )
 
@@ -31,7 +31,7 @@ def ledger():
 @pytest.fixture
 def release(tmp_path):
     store = support_runtime.make_registry(tmp_path / "registry")
-    made = reconcile.ReleaseRegistry(store, ledger(), support_runtime.NO_WAIT)
+    made = reconcile.Registry(store, ledger(), support_runtime.NO_WAIT)
     for number in (1, 2):
         made.approve(
             MODEL, number, support_runtime.sanction(number), support_release.KEY
@@ -76,8 +76,8 @@ def test_status_constants_are_the_documented_values():
     assert status.PRODUCTION_ENVIRONMENT == "production"
     assert status.FULL_ROLLOUT == 100
     assert {
-        status.ReleaseState.CHALLENGER,
-        status.ReleaseState.RETIRED,
+        status.State.CHALLENGER,
+        status.State.RETIRED,
     } == status.MANUAL
 
 
@@ -86,8 +86,8 @@ def test_only_promotion_and_rollback_paths_lead_into_production():
         s for s, targets in status.ALLOWED.items() if "production" in targets
     ]
     assert sorted(into) == ["approved", "retired"]
-    assert status.ALLOWED[status.ReleaseState.PRODUCTION] == {"retired"}
-    assert status.ALLOWED[status.ReleaseState.CHALLENGER] == {
+    assert status.ALLOWED[status.State.PRODUCTION] == {"retired"}
+    assert status.ALLOWED[status.State.CHALLENGER] == {
         "approved",
         "retired",
     }
@@ -95,7 +95,7 @@ def test_only_promotion_and_rollback_paths_lead_into_production():
 
 def test_halt_names_the_share_and_every_reason():
     with pytest.raises(
-        control.RuntimeUnconfirmed,
+        control.UnconfirmedError,
         match="health stopped the rollout at 25%: slow; errors",
     ):
         status.halt(25, ["slow", "errors"])
@@ -127,7 +127,7 @@ def test_outcomes_and_reconciliations_dump_their_fields():
         "findings": [{"kind": "not_ready", "detail": "x"}],
     }
     assert status.Reconciliation("m", "p", ()).consistent
-    assert status.RuntimeDisagrees.category == "runtime"
+    assert status.DisagreementError.category == "runtime"
 
 
 # ---- records ---------------------------------------------------------------
@@ -139,7 +139,7 @@ def test_a_new_state_file_reads_as_empty(tmp_path):
     assert keeper.read() == {"format": 1, "models": {}}
     assert keeper.ledger is None
     assert keeper.policy == control.Polling()
-    assert keeper.lookup(MODEL, 1) is status.ReleaseState.CANDIDATE
+    assert keeper.lookup(MODEL, 1) is status.State.CANDIDATE
     assert keeper.environment(MODEL, "production") is None
 
 
@@ -165,9 +165,9 @@ def test_move_records_where_a_version_came_from(tmp_path):
     keeper.move(
         entry,
         2,
-        status.ReleaseState.CHALLENGER,
+        status.State.CHALLENGER,
         "why",
-        status.ReleaseState.CANDIDATE,
+        status.State.CANDIDATE,
     )
     record = entry["versions"]["2"]
     assert record["state"] == "challenger"
@@ -180,9 +180,9 @@ def test_move_records_where_a_version_came_from(tmp_path):
     )
     keeper.write(state)
     assert keeper.states(MODEL) == {
-        1: status.ReleaseState.CANDIDATE,
-        2: status.ReleaseState.CHALLENGER,
-        3: status.ReleaseState.CANDIDATE,
+        1: status.State.CANDIDATE,
+        2: status.State.CHALLENGER,
+        3: status.State.CANDIDATE,
     }
 
 
@@ -231,21 +231,21 @@ def test_log_without_a_ledger_still_audits(tmp_path, plane):
 
 def test_production_and_approval_cannot_be_set_by_hand(release):
     for target in (
-        status.ReleaseState.PRODUCTION,
-        status.ReleaseState.APPROVED,
+        status.State.PRODUCTION,
+        status.State.APPROVED,
     ):
         with pytest.raises(errors.ArtifactError, match="cannot be set by hand"):
             release.transition(MODEL, 3, target, "x")
 
 
 def test_a_hand_transition_follows_the_allowed_moves(release):
-    release.transition(MODEL, 3, status.ReleaseState.CHALLENGER, "compare")
-    assert release.lookup(MODEL, 3) is status.ReleaseState.CHALLENGER
-    release.transition(MODEL, 3, status.ReleaseState.RETIRED, "drop")
+    release.transition(MODEL, 3, status.State.CHALLENGER, "compare")
+    assert release.lookup(MODEL, 3) is status.State.CHALLENGER
+    release.transition(MODEL, 3, status.State.RETIRED, "drop")
     with pytest.raises(
         errors.ArtifactError, match="churn v3: retired -> challenger"
     ):
-        release.transition(MODEL, 3, status.ReleaseState.CHALLENGER, "again")
+        release.transition(MODEL, 3, status.State.CHALLENGER, "again")
 
 
 def test_an_approval_is_stored_with_the_version(release):
@@ -267,7 +267,7 @@ def test_an_approval_for_another_bundle_is_refused(release):
         release.approve(
             MODEL, 3, support_runtime.sanction(2), support_release.KEY
         )
-    assert release.lookup(MODEL, 3) is status.ReleaseState.CANDIDATE
+    assert release.lookup(MODEL, 3) is status.State.CANDIDATE
 
 
 def test_an_unsigned_bundle_cannot_be_approved(tmp_path):
@@ -314,13 +314,13 @@ def test_present_checks_the_revision_and_its_digest(plane):
 def test_shift_splits_with_the_previous_revision_below_full(release, plane):
     revision = plane.deploy(support_runtime.NEW)
     asked = []
-    original = plane.set_traffic
+    original = plane.route
 
     def record(allocation):
         asked.append(dict(allocation))
         original(allocation)
 
-    plane.set_traffic = record
+    plane.route = record
     release.shift(
         plane,
         revision,
@@ -340,7 +340,7 @@ def test_shift_stops_when_health_objects(release, plane):
         seen.append(percent)
         return ["too many errors"] if percent == 50 else []
 
-    with pytest.raises(control.RuntimeUnconfirmed, match="at 50%"):
+    with pytest.raises(control.UnconfirmedError, match="at 50%"):
         release.shift(
             plane,
             revision,
@@ -358,7 +358,7 @@ def test_shift_stops_when_health_objects(release, plane):
 def test_a_promotion_moves_the_registry_only_after_confirmation(release, plane):
     outcome = ship(release, plane, 1)
     assert outcome == status.Outcome(True, (), None, 1, "serve-2")
-    assert release.lookup(MODEL, 1) is status.ReleaseState.PRODUCTION
+    assert release.lookup(MODEL, 1) is status.State.PRODUCTION
     assert release.store.aliases(MODEL)[registry.CHAMPION] == 1
     record = release.environment(MODEL, "production")
     assert record["revision"] == "serve-2"
@@ -375,8 +375,8 @@ def test_a_second_promotion_retires_the_first_and_keeps_it_known_good(
     outcome = ship(release, plane, 2, other, steps=(25, 100))
     assert outcome.done
     assert outcome.revision == "serve-3"
-    assert release.lookup(MODEL, 1) is status.ReleaseState.RETIRED
-    assert release.lookup(MODEL, 2) is status.ReleaseState.PRODUCTION
+    assert release.lookup(MODEL, 1) is status.State.RETIRED
+    assert release.lookup(MODEL, 2) is status.State.PRODUCTION
     assert release.environment(MODEL, "production")["known_good"] == [
         {
             "version": 1,
@@ -431,7 +431,7 @@ def test_a_promotion_outside_production_leaves_the_alias(release, plane):
     outcome = ship(release, plane, 1, environment="staging")
     assert outcome.done
     assert registry.CHAMPION not in release.store.aliases(MODEL)
-    assert release.lookup(MODEL, 1) is status.ReleaseState.APPROVED
+    assert release.lookup(MODEL, 1) is status.State.APPROVED
 
 
 def test_history_appends_the_previous_record_last():
@@ -465,8 +465,8 @@ def test_a_confirmed_rollback_restores_the_previous_version(release, plane):
     ship(release, plane, 2, "sha256:" + "7" * 64)
     outcome = release.rollback(MODEL, "production", plane, support_release.KEY)
     assert outcome == status.Outcome(True, (), None, 1, "serve-2")
-    assert release.lookup(MODEL, 1) is status.ReleaseState.PRODUCTION
-    assert release.lookup(MODEL, 2) is status.ReleaseState.RETIRED
+    assert release.lookup(MODEL, 1) is status.State.PRODUCTION
+    assert release.lookup(MODEL, 2) is status.State.RETIRED
     assert release.store.aliases(MODEL)[registry.CHAMPION] == 1
     record = release.environment(MODEL, "production")
     assert record["version"] == 1
@@ -481,13 +481,13 @@ def test_an_unconfirmed_rollback_puts_the_serving_revision_back(release, plane):
     outcome = release.rollback(MODEL, "production", plane, support_release.KEY)
     assert not outcome.done
     assert outcome.restored is True
-    assert release.lookup(MODEL, 2) is status.ReleaseState.PRODUCTION
+    assert release.lookup(MODEL, 2) is status.State.PRODUCTION
     assert events(release)[-1] == "rollback_rejected"
 
 
 def test_rollback_is_part_of_the_release_registry():
-    assert issubclass(reconcile.ReleaseRegistry, rollback.Rollback)
-    assert issubclass(reconcile.ReleaseRegistry, promotion.Promotion)
+    assert issubclass(reconcile.Registry, rollback.Rollback)
+    assert issubclass(reconcile.Registry, promotion.Promotion)
 
 
 # ---- reconcile -------------------------------------------------------------
@@ -504,7 +504,9 @@ def test_live_returns_the_confirmed_version(release, plane):
 
 def test_live_without_a_record_disagrees(release, plane):
     seen = plane.observe()
-    with pytest.raises(status.RuntimeDisagrees, match="not confirmed deployed"):
+    with pytest.raises(
+        status.DisagreementError, match="not confirmed deployed"
+    ):
         release.live(MODEL, "production", seen)
     report = release.reconcile(MODEL, "production", seen)
     assert [f.kind for f in report.findings] == ["no_registry_record"]
@@ -526,7 +528,7 @@ def test_every_drift_is_a_finding(release, plane):
             observation.Traffic("serve-1", 60),
             observation.Traffic("serve-2", 40),
         ),
-        observed_at=support_release.NOW,
+        observed=support_release.NOW,
         revisions=(
             ("serve-1", support_runtime.OLD),
             ("serve-2", support_runtime.NEW),
@@ -564,7 +566,7 @@ def test_a_state_file_out_of_step_is_a_state_mismatch(release, plane):
 
 def test_an_alias_and_a_ledger_out_of_step_are_findings(tmp_path, plane):
     store = support_runtime.make_registry(tmp_path)
-    bare = reconcile.ReleaseRegistry(store, None, support_runtime.NO_WAIT)
+    bare = reconcile.Registry(store, None, support_runtime.NO_WAIT)
     bare.approve(MODEL, 1, support_runtime.sanction(1), support_release.KEY)
     bare.promote(
         MODEL,

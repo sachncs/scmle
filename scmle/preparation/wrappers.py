@@ -75,7 +75,7 @@ class Encoded(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc]  
         return probabilities
 
 
-class FlatPredictionClassifier(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Flattener(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Guarantees 1-D predictions from libraries that return column vectors.
 
     CatBoost's multiclass `predict` returns shape `(n, 1)`; the framework's
@@ -135,7 +135,7 @@ class FlatPredictionClassifier(base.ClassifierMixin, base.BaseEstimator):  # typ
         return probabilities
 
 
-class FitParamsClassifier(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Forwarder(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Passes fixed keyword arguments to the wrapped classifier's `fit`.
 
     Some libraries take dataset properties (for example which columns are

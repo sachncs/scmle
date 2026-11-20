@@ -47,8 +47,8 @@ class Estimate:
         ratio: Post over pre RMSPE.
         p_value: Placebo-in-space rank p-value.
         donors: Donors in the pool.
-        min_p: Smallest attainable p-value, `1 / (donors + 1)`.
-        placebo_ratios: Ratio per donor.
+        floor: Smallest attainable p-value, `1 / (donors + 1)`.
+        placebos: Ratio per donor.
         alpha: Level the donor count was checked against.
     """
 
@@ -60,8 +60,8 @@ class Estimate:
     ratio: float
     p_value: float
     donors: int
-    min_p: float
-    placebo_ratios: dict[str, float]
+    floor: float
+    placebos: dict[str, float]
     alpha: float
 
     KEYS: ClassVar[records.Migration] = records.nest(
@@ -121,7 +121,7 @@ def weigh(target: numpy.ndarray, donors: numpy.ndarray) -> numpy.ndarray:
     return shares
 
 
-def ratio_for(
+def gauge(
     pre: numpy.ndarray, post: numpy.ndarray, treated: int, pool: list[int]
 ) -> tuple[float, float, float, numpy.ndarray, numpy.ndarray]:
     """Fits one unit on a donor pool and measures its prediction error.
@@ -242,13 +242,11 @@ def estimate(
     pre, post = values[is_pre], values[~is_pre]
     index = {u: i for i, u in enumerate(units)}
     pool = [index[u] for u in donors]
-    pre_r, post_r, ratio, gap, w = ratio_for(
-        pre, post, index[treated_unit], pool
-    )
+    pre_r, post_r, ratio, gap, w = gauge(pre, post, index[treated_unit], pool)
     placebos = {}
     for donor in donors:
         others = [index[u] for u in donors if u != donor]
-        placebos[str(donor)] = ratio_for(pre, post, index[donor], others)[2]
+        placebos[str(donor)] = gauge(pre, post, index[donor], others)[2]
     exceed = sum(1 for r in placebos.values() if r >= ratio)
     p_value = (1 + exceed) / (len(donors) + 1)
     return Estimate(
@@ -264,7 +262,7 @@ def estimate(
         ratio=ratio,
         p_value=p_value,
         donors=len(donors),
-        min_p=1.0 / (len(donors) + 1),
-        placebo_ratios=placebos,
+        floor=1.0 / (len(donors) + 1),
+        placebos=placebos,
         alpha=alpha,
     )

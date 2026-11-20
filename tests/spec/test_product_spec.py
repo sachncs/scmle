@@ -71,15 +71,15 @@ def run(frame, tmp_path_factory):
         "y",
         task="classification",
         metric="roc_auc",
-        time_budget=600,
-        output_dir=tmp_path_factory.mktemp("spec"),
+        budget=600,
+        directory=tmp_path_factory.mktemp("spec"),
         decision=tasks.Threshold(threshold_objective="f1"),
     )
     return project, project.run()
 
 
 def events_of(result):
-    lines = (result.run_dir / "events.jsonl").read_text().splitlines()
+    lines = (result.directory / "events.jsonl").read_text().splitlines()
     return [json.loads(line) for line in lines]
 
 
@@ -122,18 +122,18 @@ def test_l15_l17_user_states_objective_framework_plans_executes_validates_docume
         "explanations/permutation_importance.html",  # explanation document
         "diagnostics/decision_log.json",
     ):
-        assert (result.run_dir / artifact).exists(), artifact
+        assert (result.directory / artifact).exists(), artifact
 
 
 def test_l19_conservative_when_ambiguous_and_transparent(frame, tmp_path):
     """Blocks on ambiguity; every experiment and decision is recorded."""
     ambiguous = frame.assign(y=numpy.arange(len(frame)) % 5)
     with pytest.raises(errors.BlockedError):
-        support.make_project(ambiguous, "y", output_dir=tmp_path).run()
-    result = support.make_project(frame, "y", output_dir=tmp_path / "ok").run()
-    trial_files = list((result.run_dir / "trials").glob("trial_*.json"))
+        support.make_project(ambiguous, "y", directory=tmp_path).run()
+    result = support.make_project(frame, "y", directory=tmp_path / "ok").run()
+    trial_files = list((result.directory / "trials").glob("trial_*.json"))
     assert len(trial_files) == len(result.trials) > 1
-    assert (result.run_dir / "diagnostics" / "decision_log.json").exists()
+    assert (result.directory / "diagnostics" / "decision_log.json").exists()
 
 
 def test_l23_to_l39_decision_table(run):
@@ -157,9 +157,9 @@ def test_l23_to_l39_decision_table(run):
     }  # local-first, distributed-capable
     assert (
         result.evaluation["digests"]["split"]
-        and (result.run_dir / "environment.lock").read_text()
+        and (result.directory / "environment.lock").read_text()
     )  # reproducibility: config, data fingerprints, seeds, env
-    assert (result.run_dir / "events.jsonl").exists()  # event-driven telemetry
+    assert (result.directory / "events.jsonl").exists()  # event-driven telemetry
     assert "content_id" in {
         f.name
         for f in dataclasses.fields(
@@ -319,7 +319,7 @@ def test_l186_l194_explicit_versioned_serializable_hashable_saved_spec(run):
         and spec.config_hash() == spec.config_hash()
     )
     saved = tasks.Config.model_validate_json(
-        (result.run_dir / "config.json").read_text()
+        (result.directory / "config.json").read_text()
     )
     assert saved.config_hash() == spec.config_hash()
 
@@ -417,9 +417,9 @@ def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
         split.manifest.test
     )  # splitting
     assert {t.status for t in result.trials} >= {experiments.Termination.OK}
-    assert result.selected_model  # selector: defined policy
+    assert result.model  # selector: defined policy
     assert (
-        result.run_dir / "model" / "model_manifest.json"
+        result.directory / "model" / "model_manifest.json"
     ).exists()  # artifact builder
     bundle = scmle.artifacts.bundle.Bundle.load(
         result.save(tmp_path / "b"), trusted=True
@@ -488,7 +488,7 @@ def test_l234_to_l264_flow_with_locked_test_and_single_final_evaluation(run):
     assert attempted <= planned  # nothing outside the execution plan was tried
     assert bool(attempted) == bool(planned)  # applicable strategies were tried
     assert (
-        result.run_dir / "model"
+        result.directory / "model"
     ).exists()  # artifact verification and registration
 
 
@@ -534,17 +534,17 @@ def test_l278_l288_orchestrator_support(frame, tmp_path):
     from scmle.pipeline import orchestrator
 
     project = support.make_project(
-        frame, "y", time_budget=300, output_dir=tmp_path
+        frame, "y", budget=300, directory=tmp_path
     )
     first = project.run()
     resumed = scmle.api.project.Project.resume(
         support.interrupt(project), data=frame
     )  # idempotent retry / restart
-    assert [t.trial_id for t in resumed.trials] == [
-        t.trial_id for t in first.trials
+    assert [t.identifier for t in resumed.trials] == [
+        t.identifier for t in first.trials
     ]  # deterministic ordering
     assert list(
-        (first.run_dir / "trials").glob("trial_*.json")
+        (first.directory / "trials").glob("trial_*.json")
     )  # checkpointing
     pending = orchestrator.Orchestrator(project.spec, frame)
     pending.cancel()
@@ -556,7 +556,7 @@ def test_l278_l288_orchestrator_support(frame, tmp_path):
     )  # consistent failure reporting
     with pytest.raises(errors.BlockedError, match="smallest budget"):
         support.make_project(
-            frame, "y", time_budget=1, output_dir=tmp_path / "b"
+            frame, "y", budget=1, directory=tmp_path / "b"
         ).run()  # budget exhaustion handled: refused before any work
     assert scheduler.Pool(2).map(abs, [-1, -2]) == [
         1,
@@ -573,7 +573,7 @@ def test_l278_l288_orchestrator_support(frame, tmp_path):
 def test_l293_l307_fingerprint_dimensions(run):
     """All eleven fingerprint dimensions."""
     result = run[1]
-    dims = set(result.profile.dataset_statistics)
+    dims = set(result.profile.overview)
     assert {
         "shape",
         "types",
@@ -587,16 +587,16 @@ def test_l293_l307_fingerprint_dimensions(run):
         "operational",
         "risk",
     } <= dims
-    difficulty = result.profile.dataset_statistics["ml_difficulty"]
+    difficulty = result.profile.overview["ml_difficulty"]
     assert difficulty["available"]  # ML difficulty: baselines and headroom
     assert {
         "constant_baseline",
         "linear_baseline",
         "nonlinearity_gain",
     } <= set(difficulty)
-    stats = result.profile.column_statistics["a"]
+    stats = result.profile.statistics["a"]
     assert {"outlier_rate", "std"} <= set(stats)  # scale, outliers
-    assert result.profile.dataset_statistics["shape"]["effective_samples"] > 0
+    assert result.profile.overview["shape"]["effective_samples"] > 0
     assert columns.entropy(pandas.Series(list("aabb"))) == pytest.approx(
         1.0
     )  # entropy
@@ -607,7 +607,7 @@ def test_l309_statistics_preserve_uncertainty_about_leakage():
     rng = numpy.random.default_rng(1)
     frame = pandas.DataFrame({"x": rng.normal(size=300)})
     frame["y"] = (frame.x > 0).astype(int)
-    result = support.make_project(frame, "y", leakage_policy="warn").plan()
+    result = support.make_project(frame, "y", leakage="warn").plan()
     findings = " ".join(result.warnings)
     assert "leakage suspect" in findings
     assert "a suspicion, not proof" in findings
@@ -619,7 +619,7 @@ def test_l311_l321_decision_policy_examples():
     frame = pandas.DataFrame({"x": rng.normal(size=300)})
     frame["c"] = rng.choice([f"k{i}" for i in range(200)], 300)
     frame["y"] = (rng.random(300) < 0.05).astype(int)
-    plan = scmle.api.project.Project(frame, "y", time_budget=60).plan()
+    plan = scmle.api.project.Project(frame, "y", budget=60).plan()
     names = set(plan.candidates)
     assert (
         "dummy" in names and "logistic_regression" in names
@@ -641,15 +641,15 @@ def test_l311_l321_decision_policy_examples():
 def test_l327_l345_stages_a_to_e(run):
     """Baselines, screening, optimization, ensembles, select+package."""
     project, result = run
-    models_run = {t.model_name for t in result.trials}
+    models_run = {t.model for t in result.trials}
     assert "dummy" in models_run  # A
     assert len(models_run) > 3  # B
     assert (
         any(t.params for t in result.trials)
         or project.spec.search.top_models == 0
     )  # C
-    assert any(t.model_name == "stacking" for t in result.trials)  # D
-    assert result.selected_model and (result.run_dir / "model").exists()  # E
+    assert any(t.model == "stacking" for t in result.trials)  # D
+    assert result.model and (result.directory / "model").exists()  # E
 
 
 def test_l347_l356_model_family_registry():
@@ -687,7 +687,7 @@ def test_l358_adapter_capability_declarations():
         "serializable",
     } <= declared
     for adapter in scmle.models.registry.Catalog.stock().adapters.values():
-        assert adapter.capabilities.memory_factor >= 1.0
+        assert adapter.capabilities.factor >= 1.0
 
 
 def test_l360_planner_reads_capabilities_not_library_names():
@@ -797,7 +797,7 @@ def test_l409_confidence_respects_independent_units(frame, tmp_path):
     """Uncertainty follows groups / time structure."""
     framed = frame.assign(g=numpy.arange(len(frame)) % 30)
     result = support.make_project(
-        framed, "y", group_column="g", output_dir=tmp_path
+        framed, "y", group="g", directory=tmp_path
     ).run()
     assert (
         result.diagnostics["metric_uncertainty"]["resampling_unit"] == "groups"
@@ -811,7 +811,7 @@ def test_l411_l417_selection_constraints_measured_on_this_machine(
     result = support.make_project(
         frame,
         "y",
-        output_dir=tmp_path,
+        directory=tmp_path,
         selection=tasks.Selection(max_model_mb=50, max_p95_latency_ms=1000),
     ).run()
     usage = result.evaluation["resources"]
@@ -826,7 +826,7 @@ def test_l421_l437_leakage_invariants(run, frame, tmp_path):
     """Structural protections 1-5."""
     project, result = run
     manifest = json.loads(
-        (result.run_dir / "validation_manifest.json").read_text()
+        (result.directory / "validation_manifest.json").read_text()
     )
     assert (
         manifest["training"] and manifest["test"]
@@ -838,7 +838,7 @@ def test_l421_l437_leakage_invariants(run, frame, tmp_path):
         and splitters.Manifest.__dataclass_params__.frozen
     )
     ledger = json.loads(
-        (result.run_dir / "diagnostics" / "data_access.json").read_text()
+        (result.directory / "diagnostics" / "data_access.json").read_text()
     )
     assert all(
         ledger["verified"].values()
@@ -865,10 +865,10 @@ def test_l439_deployment_scenario_splits(frame):
     from scmle.data.splitting import splitters
 
     with_time = support.make_project(
-        frame.assign(t=range(len(frame))), "y", time_column="t"
+        frame.assign(t=range(len(frame))), "y", timestamp="t"
     ).spec
     with_group = support.make_project(
-        frame.assign(g=numpy.arange(len(frame)) % 40), "y", group_column="g"
+        frame.assign(g=numpy.arange(len(frame)) % 40), "y", group="g"
     ).spec
     assert splitters.scheme(with_time, tasks.Task.BINARY) == "temporal"
     assert splitters.scheme(with_group, tasks.Task.BINARY) == "group"
@@ -899,9 +899,9 @@ def test_l443_l466_run_directory_layout(run):
         "explanations/permutation_importance.html",
         "report.html",
     ):
-        assert (result.run_dir / rel).exists(), rel
+        assert (result.directory / rel).exists(), rel
     assert list(
-        (result.run_dir / "model").glob("pipeline.*")
+        (result.directory / "model").glob("pipeline.*")
     )  # logical pipeline artifact
 
 
@@ -937,7 +937,7 @@ def test_l476_exact_replay_vs_comparable_rerun(run):
         reproducibility.DIFFERENT,
     } == {"exact", "comparable", "different"}
     assert "reproducibility" in run[1].evaluation
-    assert hasattr(scmle.api.project.Project, "verify_replay")
+    assert hasattr(scmle.api.project.Project, "verify")
 
 
 def test_l480_l496_inference_contract(run, frame, tmp_path):
@@ -1023,9 +1023,9 @@ def test_core_deliverables_are_observable(frame, tmp_path):
     from scmle.data.readers import tabular
 
     assert tabular.read
-    result = support.make_project(frame, "y", output_dir=tmp_path).run()
+    result = support.make_project(frame, "y", directory=tmp_path).run()
     assert result.predict(frame.drop(columns="y")).shape[0] == len(frame)
-    assert len({t.model_name for t in result.trials}) > 3
+    assert len({t.model for t in result.trials}) > 3
     assert (tmp_path / "experiments.sqlite").exists()
     plan = support.make_project(frame, "y").plan()
     assert any(
@@ -1054,7 +1054,7 @@ def test_l610_l629_backlog_priorities(run):
         make_frame()
     )  # project API and inference-ready artifact
     assert issubclass(server.Service, server.Server)  # serving
-    assert callable(registry.ModelRegistryStore.promote)  # deployment
+    assert callable(registry.Registry.promote)  # deployment
     report = monitor.Watcher(result.bundle).assess(
         make_frame(seed=3).drop(columns="y"), make_frame(seed=3)["y"]
     )
@@ -1083,8 +1083,8 @@ def test_l637_l669_test_categories_and_quality_gates(run):
     ):  # benchmark
         assert (ROOT / rel).exists(), rel
     result = run[1]
-    assert (result.run_dir / "dataset_manifest.json").exists() and (
-        result.run_dir / "diagnostics" / "decision_log.json"
+    assert (result.directory / "dataset_manifest.json").exists() and (
+        result.directory / "diagnostics" / "decision_log.json"
     ).exists()  # manifest + decision log
     assert (
         "limits" in result.evaluation
@@ -1123,7 +1123,7 @@ def test_l679_l735_v01_scope_matches_the_spec(frame, tmp_path):
         (reg, "regression"),
     ):
         result = support.make_project(
-            data, "y", task=task, output_dir=tmp_path / task
+            data, "y", task=task, directory=tmp_path / task
         ).run()
         assert result.state == "COMPLETED"
     assert issubclass(
@@ -1147,13 +1147,13 @@ def test_l739_l747_first_sprint_outcomes(run):
     profile = profiler.Profiler(
         tasks.Config(data=tasks.Dataset(uri="x", target="y"))
     ).profile(frame, manifest, tasks.Task.BINARY)
-    assert set(profile.feature_plan.features) == {"a", "b", "c"}  # profiling
+    assert set(profile.plan.features) == {"a", "b", "c"}  # profiling
     assert {"stratified", "random", "group", "temporal"} <= set(
         splitters.STRATEGIES
     )  # 4 split manager
     result = run[1]
     assert (
-        result.state == "COMPLETED" and (result.run_dir / "model").exists()
+        result.state == "COMPLETED" and (result.directory / "model").exists()
     )  # 5 end-to-end training path with saved artifacts
 
 
@@ -1163,9 +1163,9 @@ def test_l751_l761_frozen_api(frame, tmp_path):
         frame,
         "y",
         task="classification",
-        time_budget=600,
+        budget=600,
         metric="roc_auc",
-        output_dir=tmp_path,
+        directory=tmp_path,
     )
     plan = project.plan()
     assert isinstance(plan.summary(), str)  # print(plan.summary())
@@ -1184,7 +1184,7 @@ def test_l751_l761_frozen_api(frame, tmp_path):
     modified = dataclasses.replace(
         plan, candidates=("dummy", "logistic_regression")
     )
-    assert {t.model_name for t in project.run(modified).trials} == {
+    assert {t.model for t in project.run(modified).trials} == {
         "dummy",
         "logistic_regression",
     }
@@ -1232,15 +1232,15 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     profile = scmle.api.project.Project(
         series.drop(columns="a").assign(b=numpy.arange(120.0) % 7),
         "y",
-        time_column="t",
+        timestamp="t",
     )
     profile.plan()
-    assert "t" not in profile.profile.feature_plan.features
+    assert "t" not in profile.profile.plan.features
 
     generator = synthesis.Copula().fit(frame[["a", "b"]])
     fake = generator.sample(40, numpy.random.default_rng(0))
     assert fake.shape == (40, 2)
-    assert issubclass(synthesis.GeneratorOverSampler, resampling.Resampler)
+    assert issubclass(synthesis.Generator, resampling.Resampler)
 
     one = tasks.Derivation(
         nodes=[tasks.Node(name="sq", op="square", inputs=["b"])]
@@ -1260,7 +1260,7 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
 
     rejecting = policies.Callback(lambda review: False)
     gated = scmle.api.project.Project(
-        frame, "y", output_dir=tmp_path, checkpoints=(rejecting,)
+        frame, "y", directory=tmp_path, checkpoints=(rejecting,)
     )
     with pytest.raises(errors.BlockedError):
         gated.run()  # human approval: a rejection stops the run
@@ -1297,7 +1297,7 @@ def test_l786_l801_risks_have_mitigations_and_candidates_are_whole_pipelines(
     plan = scmle.api.project.Project(frame, "y").plan()
     profile = scmle.api.project.Project(frame, "y")
     profile.plan()
-    feature_plan = profile.profile.feature_plan
+    feature_plan = profile.profile.plan
     candidate = strategies.STRATEGIES["default"].build(
         feature_plan,
         registry.get("random_forest"),
@@ -1327,7 +1327,7 @@ def test_l805_l829_five_abstractions_and_the_core_path(run):
 
     result = run[1]
     assert isinstance(
-        result.profile.manifest, scmle.contracts.data.DatasetManifest
+        result.profile.manifest, scmle.contracts.data.Manifest
     )  # Dataset
     assert isinstance(result.plan, experiments.Plan)  # Plan
     assert all(
@@ -1336,4 +1336,4 @@ def test_l805_l829_five_abstractions_and_the_core_path(run):
     assert isinstance(
         result.bundle, scmle.artifacts.bundle.Bundle
     )  # Model Bundle
-    assert registry.ModelRegistryStore and lifecycle.Maintainer  # Lifecycle
+    assert registry.Registry and lifecycle.Maintainer  # Lifecycle

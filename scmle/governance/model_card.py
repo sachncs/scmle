@@ -100,24 +100,24 @@ class Card:
         ),
     )
 
-    model_name: str
-    model_version: str
-    model_fingerprint: str
+    model: str
+    version: str
+    fingerprint: str
     task: str
     metric: str
-    dataset_id: str
-    snapshot_id: str
-    intended_use: str
-    out_of_scope: tuple[str, ...]
+    dataset: str
+    snapshot: str
+    use: str
+    excluded: tuple[str, ...]
     limitations: tuple[str, ...]
-    feature_names: tuple[str, ...]
+    features: tuple[str, ...]
     evaluation: Mapping[str, Any]
     resources: Mapping[str, Any]
-    evidence_artifacts: tuple[str, ...]
-    support_status: str
-    review_status: str = "machine_generated_unreviewed"
+    artifacts: tuple[str, ...]
+    support: str
+    status: str = "machine_generated_unreviewed"
     schema_version: int = records.ORIGIN + 1
-    generated_at: str = dataclasses.field(
+    generated: str = dataclasses.field(
         default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat()
     )
 
@@ -129,31 +129,31 @@ class Card:
                 below 1, or the out-of-scope or limitations list is empty.
         """
         for name in (
-            "model_name",
-            "model_version",
-            "model_fingerprint",
+            "model",
+            "version",
+            "fingerprint",
             "task",
             "metric",
-            "dataset_id",
-            "snapshot_id",
-            "intended_use",
-            "support_status",
-            "review_status",
-            "generated_at",
+            "dataset",
+            "snapshot",
+            "use",
+            "support",
+            "status",
+            "generated",
         ):
             if not getattr(self, name).strip():
                 raise errors.InputError(f"{name} must not be empty")
         if self.schema_version < 1:
             raise errors.InputError("schema_version must be positive")
-        if not self.out_of_scope:
+        if not self.excluded:
             raise errors.InputError("out_of_scope must not be empty")
         if not self.limitations:
             raise errors.InputError("limitations must not be empty")
 
     @classmethod
-    def from_run(
+    def assemble(
         cls,
-        manifest: data.DatasetManifest,
+        manifest: data.Manifest,
         profile: data.Portrait,
         bundle: scmle.artifacts.bundle.Bundle,
         evaluation: Mapping[str, Any],
@@ -181,25 +181,25 @@ class Card:
         """
         release = evaluation.get("release_evaluation")
         return cls(
-            model_name=bundle.info.model_name,
-            model_version=bundle.info.model_version,
-            model_fingerprint=model_fingerprint,
+            model=bundle.info.model,
+            version=bundle.info.version,
+            fingerprint=model_fingerprint,
             task=bundle.schema.task,
             metric=bundle.info.metric,
-            dataset_id=manifest.identifier,
-            snapshot_id=manifest.snapshot,
-            intended_use=(
+            dataset=manifest.identifier,
+            snapshot=manifest.snapshot,
+            use=(
                 f"Inference for the declared {bundle.schema.task} task using "
                 "the packaged schema and preprocessing pipeline."
             ),
-            out_of_scope=EXCLUSIONS,
+            excluded=EXCLUSIONS,
             limitations=caveat(release),
-            feature_names=tuple(
+            features=tuple(
                 dict.fromkeys(
                     (
-                        *profile.feature_plan.features,
-                        *profile.feature_plan.text,
-                        *profile.feature_plan.extra_inputs,
+                        *profile.plan.features,
+                        *profile.plan.text,
+                        *profile.plan.extras,
                     )
                 )
             ),
@@ -211,8 +211,8 @@ class Card:
                 "release_evaluation": release,
             },
             resources=dict(evaluation.get("resources", {})),
-            evidence_artifacts=ARTIFACTS,
-            support_status="tabular_beta_library_inference",
+            artifacts=ARTIFACTS,
+            support="tabular_beta_library_inference",
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -223,23 +223,23 @@ class Card:
             set to the current version.
         """
         layout = {
-            "model_name": self.model_name,
-            "model_version": self.model_version,
-            "model_fingerprint": self.model_fingerprint,
+            "model_name": self.model,
+            "model_version": self.version,
+            "model_fingerprint": self.fingerprint,
             "task": self.task,
             "metric": self.metric,
-            "dataset_id": self.dataset_id,
-            "snapshot_id": self.snapshot_id,
-            "intended_use": self.intended_use,
-            "out_of_scope": list(self.out_of_scope),
+            "dataset_id": self.dataset,
+            "snapshot_id": self.snapshot,
+            "intended_use": self.use,
+            "out_of_scope": list(self.excluded),
             "limitations": list(self.limitations),
-            "feature_names": list(self.feature_names),
+            "feature_names": list(self.features),
             "evaluation": dict(self.evaluation),
             "resources": dict(self.resources),
-            "evidence_artifacts": list(self.evidence_artifacts),
-            "support_status": self.support_status,
-            "review_status": self.review_status,
-            "generated_at": self.generated_at,
+            "evidence_artifacts": list(self.artifacts),
+            "support_status": self.support,
+            "review_status": self.status,
+            "generated_at": self.generated,
         }
         return {
             records.KEY: records.ORIGIN + len(self.migrations),

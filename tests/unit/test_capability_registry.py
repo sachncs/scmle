@@ -14,7 +14,7 @@ def make_key(**overrides):
     values = {
         "modality": capabilities.Modality.TABULAR,
         "task": tasks.Task.BINARY,
-        "model_family": "tree",
+        "family": "tree",
         "evaluation": capabilities.Evaluation.CALIBRATED,
         "uncertainty": capabilities.Uncertainty.CALIBRATED_PROBABILITY,
         "fairness": capabilities.Fairness.GROUP_REPORT,
@@ -32,15 +32,15 @@ def make_capability(
     return capabilities.Capability(
         key=key or make_key(),
         status=status,
-        required_extras=("core",),
+        extras=("core",),
         resources=capabilities.Resources(
-            cpu_cores=2,
-            memory_gb=4.0,
-            disk_gb=1.0,
+            cores=2,
+            memory=4.0,
+            disk=1.0,
             notes=("uses bounded in-memory batches",),
         ),
-        failure_modes=("missing sensitive columns", "calibration failure"),
-        evidence_links=("tests/unit/test_capability_registry.py",),
+        modes=("missing sensitive columns", "calibration failure"),
+        links=("tests/unit/test_capability_registry.py",),
         limitations=("library inference only",),
     )
 
@@ -113,7 +113,7 @@ def test_unknown_combination_fails_before_training_with_structured_diagnostic():
     registered = make_capability()
     requested = make_key(
         modality=capabilities.Modality.IMAGE,
-        model_family="vision",
+        family="vision",
         inference=capabilities.Inference.BATCH,
     )
     registry = capabilities.Registry((registered,))
@@ -141,9 +141,9 @@ def test_duplicate_keys_and_incomplete_declarations_are_rejected():
         capabilities.Capability(
             key=record.key,
             status=capabilities.Status.SUPPORTED,
-            required_extras=("core",),
+            extras=("core",),
             resources=record.resources,
-            failure_modes=record.failure_modes,
+            modes=record.modes,
         )
 
 
@@ -151,9 +151,9 @@ def test_contract_rejects_noncanonical_dimensions_and_resources():
     with pytest.raises(TypeError, match="modality"):
         make_key(modality="tabular")
     with pytest.raises(ValueError, match="model_family"):
-        make_key(model_family=" Tree ")
+        make_key(family=" Tree ")
     with pytest.raises(ValueError, match="memory_gb"):
-        capabilities.Resources(memory_gb=0)
+        capabilities.Resources(memory=0)
 
 
 def test_registry_serialization_is_canonical_across_registration_order():
@@ -178,51 +178,47 @@ def test_transformer_and_jepa_family_statuses_are_explicit():
     """
     registry = capabilities.Registry.seed()
 
-    families = {
-        item.model_family: item for item in registry.list_model_families()
-    }
+    families = {item.family: item for item in registry.inventory()}
     assert {
-        capabilities.ModelFamily.TRANSFORMER.value,
-        capabilities.ModelFamily.TEXT_TRANSFORMER.value,
-        capabilities.ModelFamily.VISION_TRANSFORMER.value,
-        capabilities.ModelFamily.AUDIO_TRANSFORMER.value,
-        capabilities.ModelFamily.VIDEO_TRANSFORMER.value,
-        capabilities.ModelFamily.MULTIMODAL_TRANSFORMER.value,
-        capabilities.ModelFamily.JEPA.value,
+        capabilities.Family.TRANSFORMER.value,
+        capabilities.Family.TEXT_TRANSFORMER.value,
+        capabilities.Family.VISION_TRANSFORMER.value,
+        capabilities.Family.AUDIO_TRANSFORMER.value,
+        capabilities.Family.VIDEO_TRANSFORMER.value,
+        capabilities.Family.MULTIMODAL_TRANSFORMER.value,
+        capabilities.Family.JEPA.value,
     } <= families.keys()
-    assert families[capabilities.ModelFamily.JEPA.value].status is (
+    assert families[capabilities.Family.JEPA.value].status is (
         capabilities.Status.EXPERIMENTAL
     )
-    assert families[capabilities.ModelFamily.JEPA.value].modalities == (
+    assert families[capabilities.Family.JEPA.value].modalities == (
         capabilities.Modality.TABULAR,
     )
-    assert families[capabilities.ModelFamily.JEPA.value].required_extras == (
-        "deeplearning",
-    )
-    assert families[capabilities.ModelFamily.TRANSFORMER.value].status is (
+    assert families[capabilities.Family.JEPA.value].extras == ("deeplearning",)
+    assert families[capabilities.Family.TRANSFORMER.value].status is (
         capabilities.Status.EXPERIMENTAL
     )
-    assert families[capabilities.ModelFamily.TRANSFORMER.value].modalities == (
+    assert families[capabilities.Family.TRANSFORMER.value].modalities == (
         capabilities.Modality.TABULAR,
     )
-    assert families[capabilities.ModelFamily.TRANSFORMER.value].accommodates(
+    assert families[capabilities.Family.TRANSFORMER.value].accommodates(
         capabilities.Modality.TABULAR
     )
-    assert not families[
-        capabilities.ModelFamily.TRANSFORMER.value
-    ].accommodates(capabilities.Modality.IMAGE)
+    assert not families[capabilities.Family.TRANSFORMER.value].accommodates(
+        capabilities.Modality.IMAGE
+    )
     for family_name in (
-        capabilities.ModelFamily.TEXT_TRANSFORMER.value,
-        capabilities.ModelFamily.VISION_TRANSFORMER.value,
-        capabilities.ModelFamily.AUDIO_TRANSFORMER.value,
-        capabilities.ModelFamily.VIDEO_TRANSFORMER.value,
-        capabilities.ModelFamily.MULTIMODAL_TRANSFORMER.value,
+        capabilities.Family.TEXT_TRANSFORMER.value,
+        capabilities.Family.VISION_TRANSFORMER.value,
+        capabilities.Family.AUDIO_TRANSFORMER.value,
+        capabilities.Family.VIDEO_TRANSFORMER.value,
+        capabilities.Family.MULTIMODAL_TRANSFORMER.value,
     ):
         assert families[family_name].status is (
             capabilities.Status.EXTENSION_ONLY
         )
 
-    diagnostic = registry.diagnose(make_key(model_family="jepa"))
+    diagnostic = registry.diagnose(make_key(family="jepa"))
     assert diagnostic[0].code == "missing_declaration"
     assert diagnostic[0].observed == {"model_family_status": "experimental"}
 
@@ -230,13 +226,13 @@ def test_transformer_and_jepa_family_statuses_are_explicit():
 @pytest.mark.parametrize(
     ("model_family", "modality"),
     [
-        (capabilities.ModelFamily.JEPA.value, capabilities.Modality.IMAGE),
+        (capabilities.Family.JEPA.value, capabilities.Modality.IMAGE),
         (
-            capabilities.ModelFamily.TRANSFORMER.value,
+            capabilities.Family.TRANSFORMER.value,
             capabilities.Modality.TEXT,
         ),
         (
-            capabilities.ModelFamily.MULTIMODAL_TRANSFORMER.value,
+            capabilities.Family.MULTIMODAL_TRANSFORMER.value,
             capabilities.Modality.GRAPH,
         ),
     ],
@@ -246,7 +242,7 @@ def test_unsupported_family_modality_reports_structured_diagnostic(
 ):
     """Known families reject undeclared modalities before training."""
     registry = capabilities.Registry.seed()
-    key = make_key(model_family=model_family, modality=modality)
+    key = make_key(family=model_family, modality=modality)
 
     diagnostics = registry.diagnose(key)
 
@@ -272,7 +268,7 @@ def test_experimental_family_requires_explicit_status_opt_in():
     """
     registry = capabilities.Registry.seed()
     key = make_key(
-        model_family=capabilities.ModelFamily.TRANSFORMER.value,
+        family=capabilities.Family.TRANSFORMER.value,
         modality=capabilities.Modality.TABULAR,
     )
 
@@ -291,10 +287,10 @@ def test_environment_checks_collect_missing_extras_and_resources():
     record = make_capability()
     registry = capabilities.Registry((record,))
     environment = capabilities.Environment(
-        available_extras=frozenset(),
-        cpu_cores=1,
-        memory_gb=1.0,
-        disk_gb=0.0,
+        extras=frozenset(),
+        cores=1,
+        memory=1.0,
+        disk=0.0,
     )
 
     diagnostics = registry.diagnose(record.key, environment=environment)
@@ -315,22 +311,22 @@ def test_environment_checks_collect_missing_extras_and_resources():
 def test_required_resources_reject_unknown_runtime_facts():
     """Required GPU and network facts cannot be inferred optimistically."""
     record = make_capability()
-    gpu_key = make_key(model_family="vision_transformer")
+    gpu_key = make_key(family="vision_transformer")
     gpu_record = dataclasses.replace(
         record,
         key=gpu_key,
         resources=capabilities.Resources(
-            memory_gb=4.0,
-            gpu_required=True,
-            network_required=True,
+            memory=4.0,
+            required=True,
+            network=True,
         ),
     )
     registry = capabilities.Registry((gpu_record,))
     environment = capabilities.Environment(
-        available_extras=frozenset({"core"}),
-        cpu_cores=2,
-        memory_gb=4.0,
-        disk_gb=1.0,
+        extras=frozenset({"core"}),
+        cores=2,
+        memory=4.0,
+        disk=1.0,
     )
 
     diagnostics = registry.diagnose(
@@ -349,8 +345,8 @@ def test_row_limits_are_checked_before_training():
     record = dataclasses.replace(
         make_capability(),
         resources=capabilities.Resources(
-            memory_gb=4.0,
-            max_rows=10,
+            memory=4.0,
+            rows=10,
         ),
     )
     registry = capabilities.Registry((record,))

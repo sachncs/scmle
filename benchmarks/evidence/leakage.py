@@ -540,9 +540,9 @@ def attempt(case: Case) -> dict[str, Any]:
                 frame,
                 case.table.target,
                 task=case.table.task,  # type: ignore[arg-type]
-                leakage_policy="block",
+                leakage="block",
                 cutoff=case.cutoff or None,
-                output_dir=folder,
+                directory=folder,
                 **declared,
             )
             project.plan()

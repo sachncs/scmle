@@ -4,7 +4,7 @@ One typed specification says what runs (an image by digest, a model bundle by
 digest), how it is configured, which secrets it may read (by reference, never
 by value), how much it may use and how it proves it is alive and ready. An
 adapter for a platform (local, AWS, GCP) turns that spec into infrastructure
-calls and reports what is actually running; `conformance_problems` compares
+calls and reports what is actually running; `audit` compares
 the two. Adapters differ only in those calls. Nothing here talks to a cloud.
 
 `references` holds the pinned image, bundle and secret references and the
@@ -26,20 +26,20 @@ from scmle.deploy.contract.deployment import SECRET_WORDS
 from scmle.deploy.contract.deployment import SPEC_FORMAT
 from scmle.deploy.contract.deployment import TRUSTED_VARIABLE
 from scmle.deploy.contract.references import Architecture
-from scmle.deploy.contract.references import BundleRef
+from scmle.deploy.contract.references import Bundle
 from scmle.deploy.contract.references import DIGEST_PATTERN
+from scmle.deploy.contract.references import enforce
 from scmle.deploy.contract.references import Environment
-from scmle.deploy.contract.references import ImageRef
+from scmle.deploy.contract.references import Image
 from scmle.deploy.contract.references import NAME_PATTERN
 from scmle.deploy.contract.references import PRIVATE_KEY_MARKER
-from scmle.deploy.contract.references import require_digest
-from scmle.deploy.contract.references import require_positive
-from scmle.deploy.contract.references import SecretRef
-from scmle.deploy.contract.references import SecretSource
+from scmle.deploy.contract.references import require
+from scmle.deploy.contract.references import Secret
 from scmle.deploy.contract.references import simple
+from scmle.deploy.contract.references import Source
 from scmle.deploy.contract.references import VARIABLE_PATTERN
 from scmle.deploy.contract.references import VERSION_PATTERN
-from scmle.deploy.contract.runtime import conformance_problems
+from scmle.deploy.contract.runtime import audit
 from scmle.deploy.contract.runtime import diff
 from scmle.deploy.contract.runtime import divergences
 from scmle.deploy.contract.runtime import mounts
@@ -59,25 +59,25 @@ __all__ = [
     "VARIABLE_PATTERN",
     "VERSION_PATTERN",
     "Architecture",
-    "BundleRef",
+    "Bundle",
     "Deployment",
     "Environment",
-    "ImageRef",
+    "Image",
     "Probes",
     "Provider",
     "Quota",
     "Resources",
     "Runtime",
-    "SecretRef",
-    "SecretSource",
+    "Secret",
+    "Source",
+    "audit",
     "canonize",
-    "conformance_problems",
     "diff",
     "divergences",
+    "enforce",
     "harden",
     "mounts",
     "nonsecret",
-    "require_digest",
-    "require_positive",
+    "require",
     "simple",
 ]

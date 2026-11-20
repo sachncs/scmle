@@ -215,7 +215,7 @@ def test_the_journal_records_eight_threads_without_loss(tmp_path):
     total = THREADS * EACH
     names = [f"trial_{index:03d}" for index in range(1, total + 1)]
     assert record.counter == total
-    assert sorted(t.trial_id for t in record.trials) == names
+    assert sorted(t.identifier for t in record.trials) == names
     assert len(record.outcomes) == total
     written = lines(tmp_path / "run")
     assert sorted(event["artifacts"][0] for event in written) == [
@@ -243,7 +243,7 @@ def test_a_preview_journal_keeps_records_but_writes_nothing():
     record.forgo("x", "y")
     record.write("a.json", {})
     record.emit("z")
-    assert [t.trial_id for t in record.trials] == ["t1"]
+    assert [t.identifier for t in record.trials] == ["t1"]
     assert record.skipped == [{"work": "x", "reason": "y"}]
 
 

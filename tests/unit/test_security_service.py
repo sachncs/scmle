@@ -51,7 +51,7 @@ def make_gateway(clock, **options):
 
 
 def bearer(clock, **claims):
-    return tokens.sign_hs256(
+    return tokens.sign(
         support_identity.HS_SECRET,
         "hs-1",
         support_identity.claims_at(clock.now, **claims),
@@ -162,9 +162,7 @@ def test_the_rate_limit_answers_429_with_retry_after(reference):
     # Enforces website/src/pages/docs/threat-model.astro:21.
     clock = support_identity.Clock()
     ticks = support_identity.Clock(0.0)
-    gateway = make_gateway(
-        clock, limiter=access.RateLimiter(1.0, 2, clock=ticks)
-    )
+    gateway = make_gateway(clock, limiter=access.Limiter(1.0, 2, clock=ticks))
     adapter = server.Service(reference, gateway=gateway)
     adapter.start()
     try:
@@ -186,7 +184,7 @@ def test_guessing_credentials_is_slowed(reference):
     clock = support_identity.Clock()
     ticks = support_identity.Clock(0.0)
     gateway = make_gateway(
-        clock, failure_limiter=access.RateLimiter(1.0, 3, clock=ticks)
+        clock, failure_limiter=access.Limiter(1.0, 3, clock=ticks)
     )
     adapter = server.Service(reference, gateway=gateway)
     adapter.start()
@@ -242,7 +240,7 @@ def test_audit_records_activation_access_and_admin_in_a_valid_chain(
         actor="ops",
         reason="scheduled",
     )
-    loaded = deployment_ledger.DeploymentLedger.load(path)
+    loaded = deployment_ledger.Ledger.load(path)
     rows = [r["body"] for r in loaded.rows if r["kind"] == "audit"]
     assert [r["event"] for r in rows] == [
         "activation",
@@ -272,7 +270,7 @@ def test_an_edited_audit_row_breaks_the_chain(tmp_path):
     lines[1] = lines[1].replace('"one"', '"uno"')
     (tmp_path / "a.jsonl").write_text("\n".join(lines) + "\n")
     with pytest.raises(deployment_ledger.MisuseError):
-        deployment_ledger.DeploymentLedger.load(tmp_path / "a.jsonl")
+        deployment_ledger.Ledger.load(tmp_path / "a.jsonl")
 
 
 def test_a_failed_activation_is_audited(tmp_path):
@@ -320,7 +318,7 @@ def test_the_runtime_default_host_needs_authentication():
     plain = runtime.settings({})
     assert plain["host"] == "0.0.0.0" and plain["gateway"] is None  # nosec B104
     with pytest.raises(errors.ConfigError, match="without authentication"):
-        access.require_authentication_for(plain["host"], plain["gateway"])
+        access.insist(plain["host"], plain["gateway"])
     secured = runtime.settings(
         {
             "SCMLE_AUTH_HS256_SECRET": support_identity.HS_SECRET.decode(),
@@ -329,16 +327,16 @@ def test_the_runtime_default_host_needs_authentication():
             "SCMLE_TENANT": "acme",
         }
     )
-    access.require_authentication_for(secured["host"], secured["gateway"])
+    access.insist(secured["host"], secured["gateway"])
     assert secured["gateway"].tenant == "acme"
 
 
 def test_authentication_settings_need_an_issuer_and_audience():
     with pytest.raises(errors.ConfigError, match="ISSUER"):
-        access.gateway_from_environment(
+        access.assemble(
             {"SCMLE_AUTH_HS256_SECRET": support_identity.HS_SECRET.decode()}
         )
-    assert access.gateway_from_environment({}) is None
+    assert access.assemble({}) is None
 
 
 def test_the_shipped_compose_file_publishes_no_port_and_secures_the_apis():
@@ -372,7 +370,7 @@ def test_a_tampered_artifact_never_loads_in_production(reference, tmp_path):
     folder = tmp_path / "svc"
     packaging.scaffold(reference, folder, signing_key=KEY)
     environ = {"SCMLE_ENV": "production", "SCMLE_SIGNING_KEY": KEY}
-    assert verify.inspect(folder, environ).bundle_signed
+    assert verify.inspect(folder, environ).signed
     for name in (
         "model/pipeline.joblib",
         "requirements.lock",

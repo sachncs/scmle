@@ -256,7 +256,7 @@ def contenders(task: tasks.Task) -> tuple[str, records.Layout]:
     Returns:
         The scoring name and the constant, linear and non-linear estimators.
     """
-    if task.is_classification:
+    if task.classification:
         scoring = (
             "roc_auc" if task is tasks.Task.BINARY else ("balanced_accuracy")
         )
@@ -305,7 +305,7 @@ def crossval(
         for name, estimator in estimators.items():
             model = pipeline.Pipeline(
                 [
-                    ("prep", preprocessing.build_preprocessor(plan, options)),
+                    ("prep", preprocessing.build(plan, options)),
                     ("model", estimator),
                 ]
             )
@@ -357,9 +357,7 @@ def gauge(
     limit = DIFFICULTY_ROWS
     if allowance is not None:
         classes = (
-            int(frame[spec.data.target].nunique())
-            if task.is_classification
-            else 1
+            int(frame[spec.data.target].nunique()) if task.classification else 1
         )
         width = len(plan.features)
         limit = affordable(width, classes, allowance)
@@ -393,7 +391,7 @@ def gauge(
         "nonlinear_baseline": scores["nonlinear"],
         "nonlinearity_gain": gain,
         "headroom_over_constant": scores["nonlinear"] - scores["constant"],
-        "separability": scores["linear"] if task.is_classification else None,
+        "separability": scores["linear"] if task.classification else None,
         "seconds": time.monotonic() - started,
     }
 
@@ -473,7 +471,7 @@ def aim(target: pandas.Series, task: tasks.Task) -> records.Layout:
         ratio for classification, else the skew and outlier rate.
     """
     target_block: records.Layout = {"cardinality": int(target.nunique())}
-    if task.is_classification:
+    if task.classification:
         counts = target.value_counts()
         target_block |= {
             "entropy_bits": columns.entropy(target),
@@ -653,7 +651,7 @@ def imprint(
         "risk": {
             "leakage_hypotheses": leakage_flags,
             "order_drift_psi": ordering(frame, plan.numeric),
-            "rare_classes": task.is_classification
+            "rare_classes": task.classification
             and target_block["min_class_count"] < spec.validation.folds * 2,
         },
     }

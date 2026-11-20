@@ -17,7 +17,7 @@ from scmle.contracts import records
 PrivacyStatus = Literal["allowed", "redacted", "denied"]
 
 
-def require_text(value: str, field_name: str) -> str:
+def require(value: str, field_name: str) -> str:
     """Returns non-empty text for a required contract field.
 
     Args:
@@ -111,7 +111,7 @@ class Snapshot(Contract):
             The text with surrounding whitespace removed; blank text is
             rejected.
         """
-        return require_text(value, f"dataset_snapshot.{info.field_name}")
+        return require(value, f"dataset_snapshot.{info.field_name}")
 
 
 class Lineage(Contract):
@@ -131,7 +131,7 @@ class Lineage(Contract):
         Returns:
             The fingerprint with surrounding whitespace removed.
         """
-        return require_text(value, "feature_graph.fingerprint")
+        return require(value, "feature_graph.fingerprint")
 
 
 class Method(Contract):
@@ -151,7 +151,7 @@ class Method(Contract):
         Returns:
             The name with surrounding whitespace removed.
         """
-        return require_text(value, "method.name")
+        return require(value, "method.name")
 
     @pydantic.field_validator("parameters", mode="before")
     @classmethod
@@ -182,17 +182,18 @@ class Clearance(Contract, records.Spelled):
     Attributes:
         decision: Whether the content is allowed, redacted or denied.
         reason: The auditable reason for the decision.
-        redacted_fields: Names of the redacted fields, stored as `redacted`.
-        spelling: Field names to stored keys.
+        redacted: Names of the redacted fields.
+        former: Version-1 stored keys to the field names, for the
+            evidence record's migration.
     """
 
-    spelling: ClassVar[records.Migration] = records.Migration(
+    former: ClassVar[records.Migration] = records.Migration(
         renames={"redacted_fields": "redacted"}
     )
 
     decision: PrivacyStatus
     reason: str
-    redacted_fields: tuple[str, ...] = ()
+    redacted: tuple[str, ...] = ()
 
     @pydantic.field_validator("reason")
     @classmethod
@@ -205,9 +206,9 @@ class Clearance(Contract, records.Spelled):
         Returns:
             The reason with surrounding whitespace removed.
         """
-        return require_text(value, "privacy_decision.reason")
+        return require(value, "privacy_decision.reason")
 
-    @pydantic.field_validator("redacted_fields")
+    @pydantic.field_validator("redacted")
     @classmethod
     def trim(cls, value: tuple[str, ...]) -> tuple[str, ...]:
         """Rejects blank names in the redaction record.
@@ -219,7 +220,7 @@ class Clearance(Contract, records.Spelled):
             The names with surrounding whitespace removed.
         """
         return tuple(
-            require_text(field, "privacy_decision.redacted_fields")
+            require(field, "privacy_decision.redacted_fields")
             for field in value
         )
 
@@ -245,7 +246,7 @@ class Link(Contract):
         Returns:
             The text with surrounding whitespace removed.
         """
-        return require_text(value, f"evidence_link.{info.field_name}")
+        return require(value, f"evidence_link.{info.field_name}")
 
     @pydantic.field_validator("uri")
     @classmethod
@@ -279,7 +280,7 @@ class Link(Contract):
         Returns:
             The digest with surrounding whitespace removed, or None.
         """
-        return None if value is None else require_text(value, "link.digest")
+        return None if value is None else require(value, "link.digest")
 
 
 RENAMES = {
@@ -290,7 +291,7 @@ RENAMES = {
     "privacy_decision": "clearance",
     "evidence_links": "links",
 }
-"""Evidence field names to their stored single-word keys."""
+"""Version-1 evidence keys to their stored single-word keys (the fields)."""
 
 DIGESTS = {
     "digests": {
@@ -315,18 +316,18 @@ class Evidence(Contract, records.Spelled, records.Record):
         model_fingerprint: Content identity of the model being explained.
         bundle_digest: Digest of the packaged model bundle.
         input_fingerprint: Content identity of the explained input.
-        dataset_snapshot: Dataset identity and version used for context.
-        feature_graph: Feature graph version and fingerprint.
+        snapshot: Dataset identity and version used for context.
+        lineage: Feature graph version and fingerprint.
         method: Explanation method and resolved parameters.
         output: JSON-native explanation result.
         timestamp: Time the explanation was generated; normalized to UTC.
-        software_version: Version of the software that generated the record.
+        software: Version of the software that generated the record.
         uncertainty: JSON-native uncertainty evidence.
         stability: JSON-native stability evidence.
         limitations: Known limitations that must travel with the result.
-        causal_warning: Explicit causal-versus-associational warning.
-        privacy_decision: Disclosure and redaction decision.
-        evidence_links: Supporting artifact or report references.
+        caveat: Explicit causal-versus-associational warning.
+        clearance: Disclosure and redaction decision.
+        links: Supporting artifact or report references.
         schema_version: Version of the evidence record layout; at least one.
             Version 2 stores single-word keys and the three hashes under
             `digests` (`model`, `bundle`, `payload`).
@@ -334,13 +335,11 @@ class Evidence(Contract, records.Spelled, records.Record):
         migrations: Version steps of the stored evidence.
     """
 
-    spelling: ClassVar[records.Migration] = records.nest(
-        renames=RENAMES, groups=DIGESTS
-    )
+    spelling: ClassVar[records.Migration] = records.nest({}, groups=DIGESTS)
     migrations: ClassVar[tuple[records.Migration, ...]] = (
         records.nest(
             renames=RENAMES,
-            parts={"clearance": Clearance.spelling},
+            parts={"clearance": Clearance.former},
             groups=DIGESTS,
         ),
     )
@@ -348,24 +347,24 @@ class Evidence(Contract, records.Spelled, records.Record):
     model_fingerprint: str
     bundle_digest: str
     input_fingerprint: str
-    dataset_snapshot: Snapshot
-    feature_graph: Lineage
+    snapshot: Snapshot
+    lineage: Lineage
     method: Method
     output: Any
     timestamp: datetime.datetime
-    software_version: str
+    software: str
     uncertainty: dict[str, Any]
     stability: dict[str, Any]
     limitations: tuple[str, ...]
-    causal_warning: str
-    privacy_decision: Clearance
-    evidence_links: tuple[Link, ...]
+    caveat: str
+    clearance: Clearance
+    links: tuple[Link, ...]
 
     @pydantic.field_validator(
         "model_fingerprint",
         "bundle_digest",
         "input_fingerprint",
-        "software_version",
+        "software",
     )
     @classmethod
     def identify(cls, value: str, info: Any) -> str:
@@ -378,7 +377,7 @@ class Evidence(Contract, records.Spelled, records.Record):
         Returns:
             The text with surrounding whitespace removed.
         """
-        return require_text(value, info.field_name)
+        return require(value, info.field_name)
 
     @pydantic.field_validator(
         "output", "uncertainty", "stability", mode="before"
@@ -440,9 +439,9 @@ class Evidence(Contract, records.Spelled, records.Record):
             raise errors.InputError(
                 "limitations must contain at least one item"
             )
-        return tuple(require_text(item, "limitations") for item in value)
+        return tuple(require(item, "limitations") for item in value)
 
-    @pydantic.field_validator("causal_warning")
+    @pydantic.field_validator("caveat")
     @classmethod
     def validate_causal_warning(cls, value: str) -> str:
         """Requires an explicit causal interpretation warning.
@@ -453,9 +452,9 @@ class Evidence(Contract, records.Spelled, records.Record):
         Returns:
             The warning with surrounding whitespace removed.
         """
-        return require_text(value, "causal_warning")
+        return require(value, "causal_warning")
 
-    @pydantic.field_validator("evidence_links")
+    @pydantic.field_validator("links")
     @classmethod
     def linked(cls, value: tuple[Link, ...]) -> tuple[Link, ...]:
         """Requires at least one independently addressable evidence link.

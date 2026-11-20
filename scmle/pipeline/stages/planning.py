@@ -87,7 +87,7 @@ def devise(
     manifest = board.get(ingestion.Intake).manifest
     for model_name in plan.candidates:
         adapter = board.services.registry.get(model_name)
-        model_family = adapter.capability_family or adapter.family
+        model_family = adapter.boundary or adapter.family
         key = requisition(board, task, model_family)
         allowed_statuses = (
             {
@@ -172,7 +172,7 @@ def requisition(
     key = capabilities.Coordinate(
         modality=modality,
         task=task,
-        model_family=model_family,
+        family=model_family,
         evaluation=kinds.TABULAR_BETA_EVALUATIONS[task],
         uncertainty=capabilities.Uncertainty.NONE,
         fairness=fairness,

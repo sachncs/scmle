@@ -43,7 +43,7 @@ def summarize(
         when the ratio reaches `SEVERE_IMBALANCE`. Otherwise the summary
         holds mean, std and skew, and the risks are empty.
     """
-    if not task.is_classification:
+    if not task.classification:
         moments = target.astype(float).agg(["mean", "std", "skew"])
         stats = {str(k): float(v) for k, v in moments.to_dict().items()}
         return {"task": task.value, **stats}, []
@@ -237,7 +237,7 @@ class Profiler(inspection.Inspection):
     def profile(
         self,
         frame: pandas.DataFrame,
-        manifest: scmle.contracts.data.DatasetManifest,
+        manifest: scmle.contracts.data.Manifest,
         task: tasks.Task,
         read_seconds: float = 0.0,
         total_rows: int | None = None,
@@ -310,7 +310,7 @@ class Profiler(inspection.Inspection):
             text_encoding=data.text_encoding,
             embedding_model=data.embedding_model,
             ordinal_levels=len(data.ordinal_order) or None,
-            high_cardinality=tuple(
+            cardinal=tuple(
                 c
                 for c in features["categorical"]
                 if statistics[c]["n_unique"]
@@ -336,9 +336,7 @@ class Profiler(inspection.Inspection):
         Returns:
             Every finding, and a quality note for each informative one.
         """
-        found = missingness.assess(
-            frame, usable, target, task.is_classification
-        )
+        found = missingness.assess(frame, usable, target, task.classification)
         return found, [
             f"missingness of '{f.column}' is associated with the target "
             f"({f.test}, effect {f.effect:.2f}, p={f.p_value:.1e})"
@@ -367,7 +365,7 @@ class Profiler(inspection.Inspection):
     def portray(
         self,
         frame: pandas.DataFrame,
-        manifest: scmle.contracts.data.DatasetManifest,
+        manifest: scmle.contracts.data.Manifest,
         task: tasks.Task,
         read_seconds: float,
         total_rows: int | None,
@@ -434,12 +432,12 @@ class Profiler(inspection.Inspection):
         feature_plan = extend(base_plan, derived, stamps, gaps)
         return scmle.contracts.data.Portrait(
             manifest=manifest,
-            column_statistics=statistics,
-            quality_findings=tuple(quality),
+            statistics=statistics,
+            quality=tuple(quality),
             risk_findings=tuple(risks + target_risks),
-            target_summary=target_summary,
-            feature_plan=feature_plan,
-            dataset_statistics=dataset_statistics,
+            summary=target_summary,
+            plan=feature_plan,
+            overview=dataset_statistics,
             missingness=tuple(f.to_dict() for f in gaps),
             leakage={} if report is None else report.to_dict(),
         )
@@ -467,6 +465,6 @@ def extend(
         plan,
         numeric=plan.numeric + tuple(n.name for n in derived),
         derived=derived,
-        extra_inputs=tuple(c for c in stamps if derived) + plan.text,
+        extras=tuple(c for c in stamps if derived) + plan.text,
         informative_missing=tuple(f.column for f in gaps if f.informative),
     )

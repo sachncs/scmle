@@ -165,7 +165,7 @@ def gap(
     if times is None:
         return 0
     target = frame[data.target].iloc[dev_ids]
-    if task.is_classification:
+    if task.classification:
         target = pandas.Series(pandas.factorize(target)[0], index=target.index)
     values = pandas.to_numeric(target, errors="coerce").to_numpy(dtype=float)
     ordered = values[numpy.argsort(times, kind="stable")]
@@ -224,7 +224,7 @@ class Development:
         ]
         labels = (
             frame[data.target].iloc[ids].to_numpy()
-            if task.is_classification
+            if task.classification
             else None
         )
         known_entity = charter.purpose == contracts.KNOWN_ENTITY_FUTURE

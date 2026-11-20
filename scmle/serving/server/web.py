@@ -187,7 +187,7 @@ class Service(contract.Server, Watch):
             raise errors.InputError(
                 "request bounds and timeouts must be positive"
             )
-        access.require_authentication_for(host, gateway)
+        access.insist(host, gateway)
         super().__init__(bundle, on_null, on_unseen, warmup_records)
         self.gateway = gateway
         self.monitor = monitor
@@ -280,9 +280,7 @@ class Service(contract.Server, Watch):
             return
         snapshot = self.readiness.snapshot()
         if snapshot["ready"]:
-            gateway.audit.activation(
-                self.bundle.info.model_version, self.digest
-            )
+            gateway.audit.activation(self.bundle.info.version, self.digest)
         else:
             gateway.audit.record(
                 audit.ACTIVATION,
@@ -305,15 +303,12 @@ class Service(contract.Server, Watch):
             MismatchError: If the caller's expected schema digest differs
                 from the served schema's.
         """
-        if (
-            request.expected_schema_digest is not None
-            and request.expected_schema_digest != self.layout
-        ):
+        if request.schema is not None and request.schema != self.layout:
             raise serving.MismatchError(
                 "the model's input schema differs from the one the caller "
                 "expects",
                 {
-                    "expected": request.expected_schema_digest,
+                    "expected": request.schema,
                     "served": self.layout,
                 },
             )

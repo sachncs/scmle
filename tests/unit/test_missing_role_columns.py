@@ -30,7 +30,7 @@ def frame():
 )
 def test_a_missing_role_column_names_the_role(tmp_path, role, option):
     project = scmle.api.project.Project(
-        frame(), "y", output_dir=str(tmp_path), **{option: "nosuch"}
+        frame(), "y", directory=str(tmp_path), **{option: "nosuch"}
     )
     with pytest.raises(errors.DataError, match=f"{role} column 'nosuch'"):
         project.plan()

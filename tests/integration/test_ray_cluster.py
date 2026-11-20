@@ -101,23 +101,23 @@ def test_a_multi_node_run_reproduces_the_single_node_trials(
     if ray.is_initialized():
         ray.shutdown()
     local = support.make_project(
-        binary_frame, "y", time_budget=300, output_dir=tmp_path / "local"
+        binary_frame, "y", budget=300, directory=tmp_path / "local"
     ).run()
     spread = support.make_project(
         binary_frame,
         "y",
-        time_budget=300,
-        output_dir=tmp_path / "ray",
+        budget=300,
+        directory=tmp_path / "ray",
         executor="ray",
-        cluster_address=cluster.address,
+        address=cluster.address,
         workers=2,
     ).run()
 
     def scores(result):
         return {
-            (t.model_name, t.strategy): t.fold_scores
+            (t.model, t.strategy): t.folds
             for t in result.trials
-            if t.fold_scores
+            if t.folds
         }
 
     assert scores(local) == pytest.approx(scores(spread))
@@ -136,10 +136,10 @@ def test_a_trial_past_the_memory_limit_is_killed_on_a_ray_worker(
     project = support.make_project(
         binary_frame,
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
         executor="ray",
-        cluster_address=cluster.address,
+        address=cluster.address,
         workers=2,
         memory_limit_gb=1.0,
         enforcement="hard",
@@ -151,7 +151,7 @@ def test_a_trial_past_the_memory_limit_is_killed_on_a_ray_worker(
 
     result = project.run(plan)
 
-    hungry = [t for t in result.trials if t.model_name == "hungry"]
+    hungry = [t for t in result.trials if t.model == "hungry"]
     assert hungry and hungry[0].status == "failed"
     assert "memory limit" in hungry[0].error
     assert result.state == "COMPLETED" and result.selected_model == "dummy"

@@ -46,7 +46,7 @@ def cover(record: Mapping[str, Any], role: str) -> dict[str, Any]:
     }
 
 
-def sign_inputs(
+def sign(
     record: Mapping[str, Any], keys: Mapping[str, str | bytes]
 ) -> dict[str, Any]:
     """Returns a copy of ``record`` with both sections signed.

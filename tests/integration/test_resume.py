@@ -71,7 +71,7 @@ def test_cancelled_run_resumes_and_reuses_completed_trials(
     registry = scmle.models.registry.Catalog.stock()
     registry.register(CountedAdapter())
     registry.register(CancellerAdapter())
-    project = support.make_project(binary_frame, "y", output_dir=tmp_path)
+    project = support.make_project(binary_frame, "y", directory=tmp_path)
     project.orchestrator.registry = registry
     canceller.orchestrator = project.orchestrator
     plan = dataclasses.replace(
@@ -94,12 +94,12 @@ def test_cancelled_run_resumes_and_reuses_completed_trials(
     # model (ties go to the alphabetically first equal-cost model), its refit
     # on every row for the bundle (`shipped`), the 5 out-of-fold fits that
     # calibrate the conformal intervals and the 5 fits of the learning curve.
-    assert resumed.selected_model == "canceller"
+    assert resumed.model == "canceller"
     assert canceller.fits == 5 + 1 + 1 + 5 + 5, (
         "the cancelled trial must be reused"
     )
     assert counting.fits >= 5, "the unfinished trial must be computed"
-    assert [t.model_name for t in resumed.trials] == [
+    assert [t.model for t in resumed.trials] == [
         "dummy",
         "canceller",
         "counted",
@@ -117,7 +117,7 @@ def test_resume_of_tuned_run_recomputes_nothing(
 ):
     search = tasks.Search(top_models=1, configs_per_model=4)
     original = support.make_project(
-        binary_frame, "y", time_budget=300, output_dir=tmp_path, search=search
+        binary_frame, "y", budget=300, directory=tmp_path, search=search
     ).run()
     # A crash after the last trial, before the test set opens. Deleting a
     # completed run's evaluation.json is no crash: its test set was opened
@@ -126,8 +126,8 @@ def test_resume_of_tuned_run_recomputes_nothing(
         support.make_project(
             binary_frame,
             "y",
-            time_budget=300,
-            output_dir=tmp_path,
+            budget=300,
+            directory=tmp_path,
             search=search,
         )
     )
@@ -140,8 +140,8 @@ def test_resume_of_tuned_run_recomputes_nothing(
     )
     resumed = scmle.api.project.Project.resume(directory, data=binary_frame)
     assert calls == [], "all trials were checkpointed, none may be recomputed"
-    assert [(t.trial_id, t.status, t.params) for t in resumed.trials] == [
-        (t.trial_id, t.status, t.params) for t in original.trials
+    assert [(t.identifier, t.status, t.params) for t in resumed.trials] == [
+        (t.identifier, t.status, t.params) for t in original.trials
     ]
     assert (
         resumed.evaluation["selected"]["params"]
@@ -154,13 +154,13 @@ def test_resume_of_tuned_run_recomputes_nothing(
 
 def test_cannot_resume_completed_run_or_changed_config(binary_frame, tmp_path):
     # Enforces website/src/pages/docs/operations.astro:19.
-    result = support.make_project(binary_frame, "y", output_dir=tmp_path).run()
+    result = support.make_project(binary_frame, "y", directory=tmp_path).run()
     with pytest.raises(errors.ConfigError, match="already completed"):
-        scmle.api.project.Project.resume(result.run_dir, data=binary_frame)
-    (result.run_dir / "evaluation.json").unlink()
+        scmle.api.project.Project.resume(result.directory, data=binary_frame)
+    (result.directory / "evaluation.json").unlink()
     changed = support.make_project(binary_frame, "y", seed=1).orchestrator
     with pytest.raises(errors.ConfigError, match="configuration differs"):
-        changed.resume(result.run_dir)
+        changed.resume(result.directory)
     with pytest.raises(FileNotFoundError):
         scmle.api.project.Project.resume(tmp_path / "nope")
 
@@ -168,16 +168,16 @@ def test_cannot_resume_completed_run_or_changed_config(binary_frame, tmp_path):
 def test_tracking_database_records_runs_trials_and_lineage(
     binary_frame, tmp_path
 ):
-    first = support.make_project(binary_frame, "y", output_dir=tmp_path).run()
-    support.make_project(binary_frame, "y", output_dir=tmp_path, seed=3).run()
-    store = stores.SqliteExperimentStore(tmp_path / "experiments.sqlite")
+    first = support.make_project(binary_frame, "y", directory=tmp_path).run()
+    support.make_project(binary_frame, "y", directory=tmp_path, seed=3).run()
+    store = stores.Sqlite(tmp_path / "experiments.sqlite")
     runs = store.runs()
     assert len(runs) == 2 and {r["state"] for r in runs} == {"COMPLETED"}
     row = next(r for r in runs if r["run_id"] == first.run_id)
     assert row["dataset_id"] == first.profile.manifest.identifier
     assert row["data_hash"] == first.profile.manifest.digests["data"]
     assert row["split_fingerprint"] == first.evaluation["digests"]["split"]
-    assert row["selected_model"] == first.selected_model
+    assert row["selected_model"] == first.model
     assert json.loads(row["test_metrics"])["roc_auc"] == pytest.approx(
         first.evaluation["metrics"]["roc_auc"]
     )
@@ -197,7 +197,7 @@ def test_tracking_database_records_runs_trials_and_lineage(
     } <= set(lineage)
 
     for name, digest in lineage.items():
-        assert bundle.shasum(first.run_dir / name) == digest
+        assert bundle.shasum(first.directory / name) == digest
 
 
 def test_custom_tracker_is_honoured(binary_frame, tmp_path):
@@ -206,7 +206,7 @@ def test_custom_tracker_is_honoured(binary_frame, tmp_path):
             self.seen = []
 
         def transcribe(self, run_id, trial):
-            self.seen.append(trial.trial_id)
+            self.seen.append(trial.identifier)
 
     recorder = Recording()
     spec = support.make_project(binary_frame, "y").spec
@@ -214,7 +214,7 @@ def test_custom_tracker_is_honoured(binary_frame, tmp_path):
         spec, binary_frame, tracker=recorder
     )
     result = orchestrator.run(tmp_path)
-    assert recorder.seen == [t.trial_id for t in result.trials]
+    assert recorder.seen == [t.identifier for t in result.trials]
     assert not (tmp_path / "experiments.sqlite").exists()
 
 
@@ -230,7 +230,7 @@ def test_resume_refuses_checkpoints_computed_on_different_data(
     canceller.armed = True
     registry = scmle.models.registry.Catalog.stock()
     registry.register(CancellerAdapter())
-    project = support.make_project(binary_frame, "y", output_dir=tmp_path)
+    project = support.make_project(binary_frame, "y", directory=tmp_path)
     project.orchestrator.registry = registry
     canceller.orchestrator = project.orchestrator
     plan = dataclasses.replace(
@@ -253,10 +253,10 @@ def test_every_trial_records_its_evaluation_config_and_runtime(
     binary_frame, tmp_path
 ):
     result = support.make_project(
-        binary_frame, "y", output_dir=tmp_path, folds=4, seed=7
+        binary_frame, "y", directory=tmp_path, folds=4, seed=7
     ).run()
     for trial in result.trials:
-        assert trial.evaluation_config == {
+        assert trial.evaluation == {
             "metric": "roc_auc",
             "folds": 4,
             "seed": 7,
@@ -264,9 +264,9 @@ def test_every_trial_records_its_evaluation_config_and_runtime(
         }
         assert trial.runtime["python"].count(".") == 2
     record = json.loads(
-        (result.run_dir / "trials" / "trial_002.json").read_text()
+        (result.directory / "trials" / "trial_002.json").read_text()
     )
     assert record["evaluation"]["folds"] == 4
-    lightgbm = [t for t in result.trials if t.model_name == "lightgbm"]
+    lightgbm = [t for t in result.trials if t.model == "lightgbm"]
     for trial in lightgbm:
         assert "lightgbm" in trial.runtime["libraries"]

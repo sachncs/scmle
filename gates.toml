@@ -5,7 +5,7 @@
 # unregistered or stale entry.
 
 [ingest.cli.unit_verdict]
-site = "scmle.cli.intake:IngestCommand.execute"
+site = "scmle.cli.intake:Ingest.execute"
 error = "BlockedError"
 claim = "C5, C1"
 passes = "The ingest plan ran and the unit verdict is None, match or finer."

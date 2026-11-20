@@ -97,32 +97,26 @@ class Uplift(models.Model):
 
 T_LEARNER = Uplift(
     name="uplift_t_learner",
-    capabilities=models.Capabilities(
-        UPLIFT, handles_missing=True, cost=3, memory_factor=4.0
-    ),
+    capabilities=models.Capabilities(UPLIFT, missing=True, cost=3, factor=4.0),
     learner=estimators.Pair,
 )
 
 S_LEARNER = Uplift(
     name="uplift_s_learner",
-    capabilities=models.Capabilities(
-        UPLIFT, handles_missing=True, cost=3, memory_factor=3.0
-    ),
+    capabilities=models.Capabilities(UPLIFT, missing=True, cost=3, factor=3.0),
     learner=estimators.Pool,
 )
 
 X_LEARNER = Uplift(
     name="uplift_x_learner",
-    capabilities=models.Capabilities(
-        UPLIFT, handles_missing=True, cost=4, memory_factor=5.0
-    ),
+    capabilities=models.Capabilities(UPLIFT, missing=True, cost=4, factor=5.0),
     learner=estimators.Cross,
 )
 
 LINEAR = Uplift(
     name="uplift_linear_t_learner",
     family="linear",
-    capabilities=models.Capabilities(UPLIFT, needs_scaling=True, cost=1),
+    capabilities=models.Capabilities(UPLIFT, scaling=True, cost=1),
     learner=estimators.Pair,
     kind="linear",
 )

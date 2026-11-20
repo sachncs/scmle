@@ -63,8 +63,8 @@ def test_a_calibrated_score_passes_and_takes_the_bayes_path():
     assert decision.rule.path == "bayes"
     assert decision.rule.threshold == pytest.approx(5 / 105)
     assert decision.tier == "attested"
-    low, high = decision.cost_interval
-    assert low <= decision.expected_cost <= high
+    low, high = decision.interval
+    assert low <= decision.cost <= high
     assert decision.to_dict()["rule_hash"] == decision.rule.digest
 
 
@@ -124,8 +124,8 @@ def test_cluster_intervals_are_wider_than_independent_ones():
     y = (rng.random(2000) < p).astype(float)
     acts = (p > 0.2).astype(float)
     m = model()
-    flat = threshold.cost_interval(y, acts, m, None, 400, 0)
-    grouped = threshold.cost_interval(y, acts, m, clusters, 400, 0)
+    flat = threshold.bound(y, acts, m, None, 400, 0)
+    grouped = threshold.bound(y, acts, m, clusters, 400, 0)
     assert grouped[1] - grouped[0] > flat[1] - flat[0]
 
 
@@ -137,7 +137,7 @@ def test_a_useful_rule_is_called_useful_and_a_random_one_is_not():
         float
     )
     rule = netbenefit.lowerband(y, good, (0.1, 0.4), seed=1)
-    assert rule.claim == "useful" and rule.useful_range == (0.1, 0.4)
+    assert rule.claim == "useful" and rule.useful == (0.1, 0.4)
     assert rule.incumbent is None and rule.baselines == (
         "treat_none",
         "treat_all",
@@ -157,7 +157,7 @@ def test_the_band_matches_point_net_benefit_and_includes_the_incumbent():
     assert report.baselines[-1] == "incumbent"
     t = report.thresholds[3]
     assert report.rule[3] == pytest.approx(costs.net_benefit(y, a, t))
-    assert report.treat_all[3] == pytest.approx(costs.net_benefit_all(y, t))
+    assert report.everyone[3] == pytest.approx(costs.net_benefit_all(y, t))
     assert report.difference[2][3] == pytest.approx(
         costs.net_benefit(y, a, t) - costs.net_benefit(y, b, t)
     )
@@ -187,7 +187,7 @@ def test_clusters_widen_the_band():
 def test_the_final_table_is_evaluated_once_for_the_registered_rule():
     y = numpy.array([1.0, 0.0] * 100)
     a = y.copy()
-    guard = netbenefit.FinalNetBenefit("abc")
+    guard = netbenefit.Examiner("abc")
     with pytest.raises(netbenefit.RepeatError, match="differs"):
         guard.evaluate("other", y, a, (0.1, 0.3))
     first = guard.evaluate("abc", y, a, (0.1, 0.3), replicates=50)
@@ -195,7 +195,7 @@ def test_the_final_table_is_evaluated_once_for_the_registered_rule():
     with pytest.raises(netbenefit.RepeatError, match="already"):
         guard.evaluate("abc", y, a, (0.1, 0.3))
     with pytest.raises(ValueError):
-        netbenefit.FinalNetBenefit(" ")
+        netbenefit.Examiner(" ")
 
 
 @pytest.mark.parametrize(

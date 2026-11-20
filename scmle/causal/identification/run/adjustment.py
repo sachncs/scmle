@@ -246,7 +246,7 @@ class Backdoor(Estimator):
         return out
 
 
-class RandomizedEstimator(Estimator):
+class Experiment(Estimator):
     """Difference in means under a recorded assignment mechanism."""
 
     name = "randomized_diff"
@@ -262,7 +262,7 @@ class RandomizedEstimator(Estimator):
             The estimate with its standard error and interval.
         """
         spec = self.spec
-        r = aipw.difference_in_means(c, spec.treatment, spec.outcome, level)
+        r = aipw.contrast(c, spec.treatment, spec.outcome, level)
         return Est(r.estimate, r.se, r.low, r.high, r.n, df=r.df)
 
     def reckon(
@@ -278,7 +278,7 @@ class RandomizedEstimator(Estimator):
         Returns:
             The estimate with its standard error and interval.
         """
-        r = aipw.difference_in_means(
+        r = aipw.contrast(
             c, self.spec.treatment, outcome or self.spec.outcome, level
         )
         return Est(r.estimate, r.se, r.low, r.high, r.n, df=r.df)

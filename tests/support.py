@@ -40,7 +40,7 @@ def optin(task, rows=1_000, **models):
         experimental_models=sorted(
             name
             for name, adapter in adapters.items()
-            if adapter.auto_candidate
+            if adapter.candidate
             and adapter.capabilities.standalone
             and adapter.objection(task, rows) is None
         ),

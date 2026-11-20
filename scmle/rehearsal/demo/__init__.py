@@ -31,7 +31,7 @@ from scmle.rehearsal.demo.client import footprint
 from scmle.rehearsal.demo.client import halt
 from scmle.rehearsal.demo.client import launch
 from scmle.rehearsal.demo.client import measure
-from scmle.rehearsal.demo.client import post_json
+from scmle.rehearsal.demo.client import post
 from scmle.rehearsal.demo.client import push
 from scmle.rehearsal.demo.client import retrieve
 from scmle.rehearsal.demo.client import serialize
@@ -99,7 +99,7 @@ __all__ = [
     "measure",
     "mirror",
     "now",
-    "post_json",
+    "post",
     "prepare",
     "push",
     "retrieve",

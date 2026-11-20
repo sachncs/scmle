@@ -32,10 +32,10 @@ def kinds(run_dir):
 
 def test_a_run_opens_the_test_set_once(binary_frame, tmp_path, openings):
     result = support.make_project(
-        binary_frame, "y", time_budget=300, output_dir=tmp_path
+        binary_frame, "y", budget=300, directory=tmp_path
     ).run()
     assert len(openings) == 1
-    assert kinds(result.run_dir).count("test.opened") == 1
+    assert kinds(result.directory).count("test.opened") == 1
 
 
 def test_a_resumed_run_opens_the_test_set_once(
@@ -46,8 +46,8 @@ def test_a_resumed_run_opens_the_test_set_once(
     first = support.make_project(
         binary_frame,
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
         checkpoints=(reviewer,),
     )
     with pytest.raises(errors.BlockedError) as caught:
@@ -57,4 +57,4 @@ def test_a_resumed_run_opens_the_test_set_once(
     resumed = first.orchestrator.resume(caught.value.details["run_dir"])
     assert resumed.state == "COMPLETED"
     assert len(openings) == 1
-    assert kinds(resumed.run_dir).count("test.opened") == 1
+    assert kinds(resumed.directory).count("test.opened") == 1

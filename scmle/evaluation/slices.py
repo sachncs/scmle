@@ -92,11 +92,7 @@ class Slices(diagnostics.Diagnostic):
                 if score is None:
                     skipped += 1
                     continue
-                gap = (
-                    overall - score
-                    if metric.greater_is_better
-                    else score - overall
-                )
+                gap = overall - score if metric.maximize else score - overall
                 scored.append(
                     {
                         "feature": feature,
@@ -174,10 +170,7 @@ class Slices(diagnostics.Diagnostic):
         if rows.sum() < MIN_SUPPORT:
             return None
         target = inputs.target[rows]
-        if (
-            inputs.task.is_classification
-            and target.nunique() < MIN_TARGET_LEVELS
-        ):
+        if inputs.task.classification and target.nunique() < MIN_TARGET_LEVELS:
             return None
         try:
             return float(

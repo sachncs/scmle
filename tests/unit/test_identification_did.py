@@ -57,7 +57,7 @@ def test_a_hand_computed_three_period_panel():
     # pre-period t0 vs base t1: treated (1, 1) mean 1; control (1, 1) mean 1.
     k = out.events.index(-2)
     assert out.coefficients[k] == pytest.approx(0.0)
-    assert out.groups == {"2.0": 2} and out.n_never == 2
+    assert out.groups == {"2.0": 2} and out.untreated == 2
     # variance: treated deltas (4, 4) -> 0; control deltas (1, 0) -> 0.5/2.
     assert out.se == pytest.approx(numpy.sqrt(0.5 / 2))
 
@@ -82,7 +82,7 @@ def test_event_study_pre_coefficients_are_zero_under_parallel_trends():
     ]
     assert max(abs(c) for c in pre) < 0.25
     assert min(post) > 1.0
-    assert out.pretrend_p is not None and out.pretrend_p > 0.001
+    assert out.pretrend is not None and out.pretrend > 0.001
 
 
 def test_a_trend_violation_biases_the_estimate_and_sensitivity_covers_it():
@@ -106,7 +106,7 @@ def test_staggered_adoption_uses_only_never_treated_controls():
 
 def test_sensitivity_needs_two_pre_periods():
     out = did.estimate(panel(4, adopt=1, periods=4), "id", "t", "g", "y")
-    assert out.max_pre_change is None and out.breakdown() is None
+    assert out.drift is None and out.breakdown() is None
     with pytest.raises(ValueError, match="two pre-periods"):
         out.sensitivity(1.0)
 

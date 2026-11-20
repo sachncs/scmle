@@ -399,7 +399,7 @@ def refuse(
         "policy": policy.to_dict(),
     }
     path = folder / REFUSAL
-    durability.write_atomically(
+    durability.write(
         path,
         (
             json.dumps(record, default=str, indent=2, sort_keys=True) + "\n"
@@ -444,7 +444,7 @@ def bind(
         node for node_id, node in graph.nodes.items() if node_id != "evaluation"
     ]
     updated = lineage.Graph(nodes)
-    updated.add_node(
+    updated.add(
         lineage.Node(
             "evaluation",
             lineage.Kind.EVALUATION,
@@ -452,7 +452,7 @@ def bind(
             {"artifact": "evaluation.json"},
         )
     )
-    updated.add_node(
+    updated.add(
         lineage.Node(
             "parameter-estimation",
             lineage.Kind.PARAMETER_ESTIMATION,
@@ -496,7 +496,7 @@ def persist(
         ArtifactError: If the written report cannot be read back or its digest
             differs from the one written.
     """
-    artifact = result.run_dir / "parameter_estimation.json"
+    artifact = result.directory / "parameter_estimation.json"
     expected_digest = estimation.write(artifact)
     try:
         verified = parameter_estimation.Estimation.read(artifact)
@@ -504,7 +504,7 @@ def persist(
         raise errors.ArtifactError(
             "parameter estimation artifact cannot be read",
             {
-                "run_dir": str(result.run_dir),
+                "run_dir": str(result.directory),
                 "artifact": artifact.name,
             },
         ) from error
@@ -513,7 +513,7 @@ def persist(
             "parameter estimation artifact does not match the persisted "
             "estimate",
             {
-                "run_dir": str(result.run_dir),
+                "run_dir": str(result.directory),
                 "artifact": artifact.name,
             },
         )
@@ -525,8 +525,8 @@ def persist(
         **result.evaluation,
         "parameter_estimation": parameter_record,
     }
-    durability.write_atomically(
-        result.run_dir / "evaluation.json",
+    durability.write(
+        result.directory / "evaluation.json",
         (
             json.dumps(
                 evaluation,
@@ -537,7 +537,7 @@ def persist(
             + "\n"
         ).encode("utf-8"),
     )
-    bind(result.run_dir, artifact, verified)
+    bind(result.directory, artifact, verified)
     result.evaluation.clear()
     result.evaluation.update(evaluation)
     # The result must expose the exact digest-verified artifact that was

@@ -21,13 +21,13 @@ def result(tmp_path_factory):
     return support.make_project(
         world(400, 0),
         "y",
-        time_budget=300,
-        output_dir=tmp_path_factory.mktemp("cvplus"),
+        budget=300,
+        directory=tmp_path_factory.mktemp("cvplus"),
     ).run()
 
 
 def test_a_small_regression_run_stores_the_fold_models(result):
-    ensemble = result.bundle.cv_plus
+    ensemble = result.bundle.plus
     assert ensemble is not None
     assert len(ensemble.models) >= 2
     assert len(ensemble.residuals) == len(ensemble.folds)

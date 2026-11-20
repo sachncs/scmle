@@ -35,7 +35,7 @@ import scmle.preparation.uplift
 
 Featuriser = Callable[[data.Blueprint, data.Preprocessing], Any]
 """Builds the unfitted featuriser of a feature plan under its switches:
-`build_preprocessor` for a table, a data kind's `featurise` in a run."""
+`build` for a table, a data kind's `featurise` in a run."""
 
 SPARSE_THRESHOLD = 0.3
 # HistGradientBoosting bins a native categorical into at most `max_bins`
@@ -133,7 +133,7 @@ def overflow(special: tuple[str, ...]) -> tuple[str, Any, Overflow]:
     return "overflow", pipeline.Pipeline(steps), Overflow(special)
 
 
-def build_preprocessor(
+def build(
     plan: data.Blueprint,
     options: data.Preprocessing,
 ) -> compose.ColumnTransformer:
@@ -149,7 +149,7 @@ def build_preprocessor(
     parts: list[tuple[str, Any, Any]] = []
     special = isolate(plan, options)
     if special:
-        encoder = encode(options.high_cardinality)
+        encoder = encode(options.cardinality)
         parts.append(("high_cardinality", encoder, list(special)))
     for kind in columns.KINDS:
         selected = [c for c in plan.pick(kind.name) if c not in special]
@@ -174,7 +174,7 @@ def build_preprocessor(
                 compose.make_column_selector(pattern=f"^{selection.PREFIX}"),
             )
         )
-    if special and options.high_cardinality == "ordinal":
+    if special and options.cardinality == "ordinal":
         parts.append(overflow(special))
     return compose.ColumnTransformer(
         parts,
@@ -302,9 +302,9 @@ def isolate(
         The high-cardinality categorical columns, in plan order; empty with
         `onehot` encoding.
     """
-    if options.high_cardinality == "onehot":
+    if options.cardinality == "onehot":
         return ()
-    return tuple(c for c in plan.categorical if c in plan.high_cardinality)
+    return tuple(c for c in plan.categorical if c in plan.cardinal)
 
 
 def frontend(
@@ -317,13 +317,13 @@ def frontend(
     Args:
         plan: Feature columns by kind (and row-wise graph nodes).
         options: Preprocessing switches.
-        featurise: Builds the featuriser; `build_preprocessor` by default.
+        featurise: Builds the featuriser; `build` by default.
 
     Returns:
         The column transformer, or a pipeline of graph transformer followed
         by the column transformer when features are derived.
     """
-    preprocessor = (featurise or build_preprocessor)(plan, options)
+    preprocessor = (featurise or build)(plan, options)
     if not plan.derived:
         return preprocessor
     return pipeline.Pipeline(
@@ -334,9 +334,7 @@ def frontend(
     )
 
 
-def default_options(
-    plan: data.Blueprint, adapter: models.Model
-) -> data.Preprocessing:
+def default(plan: data.Blueprint, adapter: models.Model) -> data.Preprocessing:
     """Preprocessing switches implied by an adapter's capabilities.
 
     Scaling for models that benefit from it, no imputation for models that
@@ -353,18 +351,14 @@ def default_options(
         The preprocessing options for the adapter.
     """
     caps = adapter.capabilities
-    native = bool(
-        plan.high_cardinality
-        and caps.native_categorical
-        and adapter.nominals([0])
-    )
+    native = bool(plan.cardinal and caps.categorical and adapter.nominals([0]))
     return data.Preprocessing(
-        scale=caps.needs_scaling,
-        impute=not caps.handles_missing,
-        high_cardinality="ordinal" if native else "onehot",
-        sparse=caps.sparse_input and bool(plan.high_cardinality),
-        text_encoding=plan.text_encoding,
-        embedding_model=plan.embedding_model,
+        scale=caps.scaling,
+        impute=not caps.missing,
+        cardinality="ordinal" if native else "onehot",
+        sparse=caps.sparse and bool(plan.cardinal),
+        encoding=plan.text_encoding,
+        model=plan.embedding_model,
     )
 
 
@@ -399,7 +393,7 @@ def preprocess(
         options: Preprocessing switches.
         task: Resolved task type.
         seed: Random seed forwarded to the selector.
-        featurise: Builds the featuriser; `build_preprocessor` by default.
+        featurise: Builds the featuriser; `build` by default.
 
     Returns:
         The graph, construction, preprocessing and selection steps that the
@@ -410,13 +404,13 @@ def preprocess(
         steps.append(("graph", feature_graph.Transformer(plan.derived)))
     if options.construct:
         steps.append(("construct", selection.Constructor(tuple(plan.numeric))))
-    steps.append(("prep", (featurise or build_preprocessor)(plan, options)))
+    steps.append(("prep", (featurise or build)(plan, options)))
     if options.select:
         steps.append(
             (
                 "select",
-                selection.SparseSelector(
-                    classification=task.is_classification, random_state=seed
+                selection.Selector(
+                    classification=task.classification, random_state=seed
                 ),
             )
         )
@@ -437,24 +431,20 @@ def wrap(built: Any, plan: data.Blueprint, task: tasks.Task) -> Any:
         them.
     """
     if plan.event_column:
-        built = scmle.preparation.survival.EventAwareEstimator(
-            built, plan.event_column
-        )
+        built = scmle.preparation.survival.Estimator(built, plan.event_column)
     if task is tasks.Task.FORECAST:
         built = forecasters.Forecaster(
             built, plan.target_columns, plan.value_column or ""
         )
     elif plan.target_columns:
         kind = (
-            scmle.preparation.multitarget.MultiLabelEstimator
+            scmle.preparation.multitarget.Multilabel
             if task is tasks.Task.MULTILABEL
             else scmle.preparation.multitarget.Multioutput
         )
         built = kind(built, plan.target_columns)
     if plan.treatment_column:
-        built = scmle.preparation.uplift.TreatmentAwareEstimator(
-            built, plan.treatment_column
-        )
+        built = scmle.preparation.uplift.Estimator(built, plan.treatment_column)
     if plan.query_column:
         built = scmle.preparation.ranking.Ranker(built, plan.query_column)
     return built
@@ -477,9 +467,9 @@ def instantiate(
         task: Resolved task type.
         seed: Random seed forwarded to the estimator.
         params: Hyperparameter overrides for the estimator.
-        options: Preprocessing switches; by default `default_options`.
+        options: Preprocessing switches; by default `default`.
         featurise: Builds the featuriser of the plan, the data kind's
-            (`kinds.Kind.featurise`); `build_preprocessor` by default.
+            (`kinds.Kind.featurise`); `build` by default.
 
     Returns:
         An unfitted pipeline of preprocessing followed by the estimator.
@@ -505,9 +495,9 @@ def instantiate(
         return weigh(assembled, plan, seed)
     params = dict(params or {})
     if options is None:
-        options = default_options(plan, adapter)
+        options = default(plan, adapter)
     special = isolate(plan, options)
-    if options.high_cardinality == "ordinal" and special:
+    if options.cardinality == "ordinal" and special:
         params |= adapter.nominals(list(range(len(special))))
     steps = preprocess(plan, options, task, seed, featurise)
     estimator = adapter.build(task, seed, params)
@@ -524,7 +514,7 @@ def instantiate(
         )
         estimator = kind(
             cast("base.BaseEstimator", estimator),
-            adapter.monotonic_param or "",
+            adapter.param or "",
             monotonicity(plan, len(special)),
         )
     steps.append(("model", estimator))

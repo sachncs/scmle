@@ -31,7 +31,7 @@ import scmle.governance.loop
 SOURCE = "uncertainty_feed"
 
 
-class UncertaintyFeed:
+class Feed:
     """Feeds one loop from one classification bundle.
 
     Attributes:

@@ -6,7 +6,7 @@ the process or container), opens the store (confined to the namespace of
 ``SCMLE_TENANT`` when it is set), loads ``runs/<id>/spec.json``,
 refuses a spec whose digest differs from the one the runner started, and runs
 the workload named by ``SCMLE_WORKLOAD`` (default
-`scmle.runners.project:run_project`) under the training role.
+`scmle.runners.project:project`) under the training role.
 
 The exit status is a `base.Exit`: 0 when the workload returned, 75 for a
 transient error (a retry may pass), 143 when SIGTERM interrupted it (a
@@ -39,7 +39,7 @@ from scmle.runtime import retry
 from scmle.storage import objectstore
 from scmle.storage import tenancy
 
-DEFAULT_WORKLOAD = "scmle.runners.project:run_project"
+DEFAULT_WORKLOAD = "scmle.runners.project:project"
 
 
 def mount(
@@ -68,7 +68,7 @@ def mount(
     parts = urlsplit(uri)
     if parts.scheme == "file":
         # url2pathname turns /C:/dir into C:\\dir on Windows
-        store = objectstore.LocalObjectStore(url2pathname(parts.path))
+        store = objectstore.Disk(url2pathname(parts.path))
         return tenancy.confine(
             store, os.environ if environ is None else environ
         )
@@ -218,11 +218,11 @@ def main(environ: Mapping[str, str], store: Any = None) -> int:
             spec = respec(training, run_id)
             verify(spec, environ.get("SCMLE_SPEC_DIGEST"))
             context = local.Context(
-                roles.RoleStore(training, roles.TRAINING_ROLE),
+                roles.Store(training, roles.TRAINING_ROLE),
                 run_id,
                 attempt,
                 spec,
-                checkpoint.CheckpointStore(training, run_id),
+                checkpoint.Store(training, run_id),
                 alarm.check,
             )
             resolve(environ.get("SCMLE_WORKLOAD", DEFAULT_WORKLOAD))(context)

@@ -102,9 +102,9 @@ class Logistic(Multitarget):
     name = "multilabel_logistic"
     family = "linear"
     capabilities = models.Capabilities(
-        frozenset({tasks.Task.MULTILABEL}), needs_scaling=True, cost=2
+        frozenset({tasks.Task.MULTILABEL}), scaling=True, cost=2
     )
-    search_space = search.Space((search.Real("C", 1e-3, 100.0, log=True),))
+    space = search.Space((search.Real("C", 1e-3, 100.0, log=True),))
 
     def build(
         self,
@@ -135,10 +135,8 @@ class Ridge(Multitarget):
 
     name = "multioutput_ridge"
     family = "linear"
-    capabilities = models.Capabilities(
-        REGRESSION_LIKE, needs_scaling=True, cost=1
-    )
-    search_space = search.Space((search.Real("alpha", 1e-3, 100.0, log=True),))
+    capabilities = models.Capabilities(REGRESSION_LIKE, scaling=True, cost=1)
+    space = search.Space((search.Real("alpha", 1e-3, 100.0, log=True),))
 
     def build(
         self,
@@ -164,9 +162,7 @@ class Ridge(Multitarget):
 MULTI_BOOSTING = Multitarget(
     name="multi_hist_gradient_boosting",
     family="boosting",
-    capabilities=models.Capabilities(
-        MULTI, handles_missing=True, cost=3, memory_factor=3.0
-    ),
+    capabilities=models.Capabilities(MULTI, missing=True, cost=3, factor=3.0),
     classifier=ensemble.HistGradientBoostingClassifier,
     regressor=ensemble.HistGradientBoostingRegressor,
     search_space=search.Space(
@@ -183,7 +179,7 @@ class Forest(models.Model):
 
     name = "multi_random_forest"
     family = "tree"
-    capabilities = models.Capabilities(MULTI, cost=3, memory_factor=6.0)
+    capabilities = models.Capabilities(MULTI, cost=3, factor=6.0)
 
     def build(
         self,

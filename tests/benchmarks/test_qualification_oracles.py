@@ -114,7 +114,7 @@ def test_the_wilson_interval_agrees_with_scipy_on_every_frozen_case():
             seeds=(0, "x", 0),
         )
         oracles.assert_agrees(
-            record.recall_lower_bound(given["confidence"]),
+            record.bound(given["confidence"]),
             case["expected"]["low"],
             label=case["id"],
             rel_tol=REL,

@@ -59,7 +59,7 @@ def test_a_planted_effect_is_recovered_with_a_covering_interval(learner):
 
 def test_the_naive_difference_is_biased_and_aipw_is_not():
     frame = planted(4000, 3, confound=1.5)
-    naive = aipw.difference_in_means(frame, "t", "y")
+    naive = aipw.contrast(frame, "t", "y")
     assert naive.high < 2.0 or naive.low > 2.0
     nuis = aipw.prefit(
         planted(3000, 4, confound=1.5), ("a", "b", "c"), "t", "y"
@@ -80,7 +80,7 @@ def test_trimming_changes_the_estimand_and_can_refuse():
     )
     frame = planted(2000, 7, confound=2.5)
     trimmed = aipw.estimate(nuis, frame, "t", "y", trim=0.1)
-    assert trimmed.n < trimmed.n_input
+    assert trimmed.n < trimmed.received
     assert "estimand changed" in trimmed.population
     with pytest.raises(ValueError, match="minimum share"):
         aipw.estimate(nuis, frame, "t", "y", trim=0.45, min_share=0.9)
@@ -123,7 +123,7 @@ def test_difference_in_means_matches_welch():
     frame = pandas.DataFrame(
         {"t": [1, 1, 1, 0, 0, 0], "y": [5.0, 6.0, 7.0, 1.0, 2.0, 4.0]}
     )
-    out = aipw.difference_in_means(frame, "t", "y")
+    out = aipw.contrast(frame, "t", "y")
     assert out.estimate == pytest.approx(6.0 - 7.0 / 3)
     from scipy import stats
 

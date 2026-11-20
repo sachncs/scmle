@@ -24,7 +24,7 @@ class Interruptions(workspace.Workspace):
 
     __slots__ = ()
 
-    def run_process_death(
+    def kill(
         self,
     ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Writes a checkpoint, terminates a child and reads it back.
@@ -40,9 +40,7 @@ class Interruptions(workspace.Workspace):
         """
         scenario = reliability.Contingency.PROCESS_DEATH
         checkpoint = self.root / "process-death-checkpoint.json"
-        self.write_json(
-            checkpoint, {"run_id": "local-process-death", "step": 3}
-        )
+        self.write(checkpoint, {"run_id": "local-process-death", "step": 3})
         terminated, returncode = self.halt()
         restored = json.loads(checkpoint.read_text(encoding="utf-8"))
         digest = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
@@ -67,7 +65,7 @@ class Interruptions(workspace.Workspace):
             ),
         )
 
-    def run_stale_checkpoint(
+    def rebind(
         self,
     ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Checks that a checkpoint cannot be bound to a different source.
@@ -90,9 +88,7 @@ class Interruptions(workspace.Workspace):
             # handled: expected bind rejection recorded as rejected=True
             # evidence
             rejected = True
-        self.write_json(
-            self.root / "stale-checkpoint.json", checkpoint.to_dict()
-        )
+        self.write(self.root / "stale-checkpoint.json", checkpoint.to_dict())
         return (
             self.artifact(
                 scenario,
@@ -114,7 +110,7 @@ class Interruptions(workspace.Workspace):
             ),
         )
 
-    def run_worker_loss(
+    def lose(
         self,
     ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Terminates a child as a stand-in worker and writes one event output.
@@ -131,7 +127,7 @@ class Interruptions(workspace.Workspace):
         terminated, returncode = self.halt()
         output = self.root / "worker-output.json"
         writes = {"event-1"}
-        self.write_json(output, {"event_ids": sorted(writes)})
+        self.write(output, {"event_ids": sorted(writes)})
         return (
             self.artifact(
                 scenario,
@@ -153,7 +149,7 @@ class Interruptions(workspace.Workspace):
             ),
         )
 
-    def run_timeout(
+    def expire(
         self,
     ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Terminates a child that outlives a short wait and records it.
@@ -169,9 +165,7 @@ class Interruptions(workspace.Workspace):
         scenario = reliability.Contingency.TIMEOUT
         terminated, returncode = self.halt()
         terminal = self.root / "timeout-terminal.json"
-        self.write_json(
-            terminal, {"state": "cancelled", "returncode": returncode}
-        )
+        self.write(terminal, {"state": "cancelled", "returncode": returncode})
         return (
             self.artifact(
                 scenario,
@@ -193,7 +187,7 @@ class Interruptions(workspace.Workspace):
             ),
         )
 
-    def run_retry_exhaustion(
+    def exhaust(
         self,
     ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Simulates three failing attempts and records the terminal state.
@@ -221,9 +215,7 @@ class Interruptions(workspace.Workspace):
                 # attempts
                 continue
         terminal = self.root / "retry-terminal.json"
-        self.write_json(
-            terminal, {"state": "retry_exhausted", "attempts": attempts}
-        )
+        self.write(terminal, {"state": "retry_exhausted", "attempts": attempts})
         return (
             self.artifact(
                 scenario,

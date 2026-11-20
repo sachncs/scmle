@@ -40,7 +40,7 @@ def latch(path: str | pathlib.Path) -> threading.RLock:
         return lock
 
 
-def append_text(path: str | pathlib.Path, text: str) -> None:
+def append(path: str | pathlib.Path, text: str) -> None:
     """Appends text as one unit, never interleaved with another thread's.
 
     Args:
@@ -67,7 +67,7 @@ def sync(path: str | pathlib.Path) -> None:
         os.fsync(handle.fileno())
 
 
-def sync_directory(directory: str | pathlib.Path) -> None:
+def flush(directory: str | pathlib.Path) -> None:
     """Flushes a directory entry after an atomic replacement.
 
     ``fsync`` on the temporary file protects its contents. A second ``fsync``
@@ -121,7 +121,7 @@ def swap(source: str | pathlib.Path, target: str | pathlib.Path) -> None:
                 return
 
 
-def write_atomically(path: str | pathlib.Path, content: bytes) -> None:
+def write(path: str | pathlib.Path, content: bytes) -> None:
     """Writes bytes with flush, fsync, atomic replacement, and cleanup.
 
     The temporary file is created beside the destination so the replacement
@@ -143,7 +143,7 @@ def write_atomically(path: str | pathlib.Path, content: bytes) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         swap(temporary_name, target)
-        sync_directory(target.parent)
+        flush(target.parent)
     except BaseException:
         with contextlib.suppress(FileNotFoundError):
             pathlib.Path(temporary_name).unlink()

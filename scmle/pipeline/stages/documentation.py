@@ -80,7 +80,7 @@ class Documentation(releasing.Releasing):
                 feature_graph,
             )
             evidence[name] = record.model_dump(mode="json")
-            store.write_json(f"explanations/{name}.json", evidence[name])
+            store.write(f"explanations/{name}.json", evidence[name])
             store.write_text(
                 f"explanations/{name}.html",
                 explanation_report.Renderer().render(
@@ -186,7 +186,7 @@ class Documentation(releasing.Releasing):
         )
         record = {
             "schema_version": 1,
-            "run_id": store.run_id,
+            "run_id": store.run,
             "software_version": scmle.__version__,
             "config_hash": board.services.spec.config_hash(),
             "dataset": {
@@ -202,14 +202,14 @@ class Documentation(releasing.Releasing):
                 "manifest_sha256": scmle.artifacts.bundle.shasum(
                     model_manifest
                 ),
-                "model_name": bundle.info.model_name,
-                "model_version": bundle.info.model_version,
+                "model_name": bundle.info.model,
+                "model_version": bundle.info.version,
             },
             "environment": {
                 "python": bundle.info.python,
                 "platform": bundle.info.platform,
                 "libraries": bundle.info.libraries,
-                "lock": bundle.info.environment_lock(),
+                "lock": bundle.info.lock(),
             },
             "signature": {
                 "path": f"model/{scmle.artifacts.bundle.SIGNATURE_FILE}",
@@ -218,7 +218,7 @@ class Documentation(releasing.Releasing):
                 ).exists(),
             },
         }
-        store.write_json("provenance.json", record)
+        store.write("provenance.json", record)
         return record
 
     def inventory(
@@ -237,10 +237,10 @@ class Documentation(releasing.Releasing):
         """
         record = sbom.build(
             bundle.info.environment,
-            run_id=store.run_id,
+            run_id=store.run,
             software_version=scmle.__version__,
         )
-        store.write_json("sbom.json", record)
+        store.write("sbom.json", record)
         return record
 
     def persist(
@@ -267,5 +267,5 @@ class Documentation(releasing.Releasing):
             "The plan declares required fault evidence; it does not claim "
             "that the scenarios have executed."
         )
-        store.write_json("fault_injection_plan.json", record)
+        store.write("fault_injection_plan.json", record)
         return record

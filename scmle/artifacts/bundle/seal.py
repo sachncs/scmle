@@ -28,7 +28,7 @@ def sign(manifest_bytes: bytes, key: bytes) -> str:
     return hmac.new(key, manifest_bytes, hashlib.sha256).hexdigest()
 
 
-def verify_signature(
+def verify(
     root: pathlib.Path,
     signing_key: str | bytes | None,
     text: bytes | None = None,

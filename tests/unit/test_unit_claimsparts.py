@@ -50,11 +50,11 @@ def test_the_file_names_of_a_charter_run():
 
 
 def test_read_optional_returns_only_json_objects(tmp_path):
-    assert files.read_optional(tmp_path / "none.json") is None
-    assert files.read_optional(write(tmp_path / "a.json", [1])) is None
-    assert files.read_optional(write(tmp_path / "b.json", {"k": 1})) == {"k": 1}
+    assert files.read(tmp_path / "none.json") is None
+    assert files.read(write(tmp_path / "a.json", [1])) is None
+    assert files.read(write(tmp_path / "b.json", {"k": 1})) == {"k": 1}
     (tmp_path / "c.json").write_text("{", encoding="utf-8")
-    assert files.read_optional(tmp_path / "c.json") is None
+    assert files.read(tmp_path / "c.json") is None
 
 
 def test_migrate_moves_an_old_claim_row_to_the_current_keys():
@@ -109,13 +109,13 @@ def test_the_frozen_selection_must_come_once_before_the_open():
     document = {"digests": {"survivors": "s"}}
     entries = frozen({"survivors_sha256": "s"})
     names = [e["event"] for e in entries]
-    assert custody.frozen_selection_problem(entries, names, document) is None
+    assert custody.collate(entries, names, document) is None
     reversed_entries = entries[::-1]
-    assert custody.frozen_selection_problem(
+    assert custody.collate(
         reversed_entries, [e["event"] for e in reversed_entries], document
     ) == ("no single selection_frozen before the open")
     doubled = [entries[0], *entries]
-    assert custody.frozen_selection_problem(
+    assert custody.collate(
         doubled, [e["event"] for e in doubled], document
     ) == ("no single selection_frozen before the open")
 
@@ -123,15 +123,15 @@ def test_the_frozen_selection_must_come_once_before_the_open():
 def test_the_frozen_hashes_must_match_the_claims():
     entries = frozen({"survivors_sha256": "s", "family_sha256": "f"})
     names = ["selection_frozen", "open"]
-    assert custody.frozen_selection_problem(
-        entries, names, {"digests": {"survivors": "t"}}
-    ) == ("frozen survivor hash differs from the claims")
+    assert custody.collate(entries, names, {"digests": {"survivors": "t"}}) == (
+        "frozen survivor hash differs from the claims"
+    )
     document = {"digests": {"survivors": "s"}, "second": {"family_sha256": "g"}}
-    assert custody.frozen_selection_problem(entries, names, document) == (
+    assert custody.collate(entries, names, document) == (
         "frozen family hash differs from the claims"
     )
     document["second"]["family_sha256"] = "f"
-    assert custody.frozen_selection_problem(entries, names, document) is None
+    assert custody.collate(entries, names, document) is None
 
 
 def test_custody_is_skipped_without_a_log_and_fails_on_a_broken_chain(
@@ -142,7 +142,7 @@ def test_custody_is_skipped_without_a_log_and_fails_on_a_broken_chain(
     assert found.detail == "custody_log.jsonl is not in the run"
     write(tmp_path / files.CUSTODY_FILE, {"event": "open", "set": "C"})
     assert custody.custodial(tmp_path, {}, None).status == verdict.FAIL
-    assert custody.check_decision_files(tmp_path, None).status == verdict.FAIL
+    assert custody.audit(tmp_path, None).status == verdict.FAIL
     write(tmp_path / coverage_run.CLAIM_FILE, {"k": 1})
     assert custody.corroborate(tmp_path, None).status == verdict.FAIL
 
@@ -175,9 +175,9 @@ def test_tampered_names_each_unregistered_missing_or_changed_file(tmp_path):
 
 
 def test_decision_files_without_a_registration(tmp_path):
-    assert custody.check_decision_files(tmp_path, None) is None
+    assert custody.audit(tmp_path, None) is None
     write(tmp_path / reports.DECISION_FILES[0], {"a": 1})
-    found = custody.check_decision_files(tmp_path, None)
+    found = custody.audit(tmp_path, None)
     assert found == verdict.Finding(
         "decision files: hashes match the custody log",
         verdict.SKIPPED,
@@ -187,15 +187,15 @@ def test_decision_files_without_a_registration(tmp_path):
 
 def test_coverage_report_problems(tmp_path):
     path = tmp_path / coverage_run.REPORT_FILE
-    assert custody.coverage_report_problems(path, "h") == []
+    assert custody.examine(path, "h") == []
     write(path, {"claim_sha256": "h"})
-    assert custody.coverage_report_problems(path, "h") == []
-    assert custody.coverage_report_problems(path, None) == []
-    assert custody.coverage_report_problems(path, "g") == [
+    assert custody.examine(path, "h") == []
+    assert custody.examine(path, None) == []
+    assert custody.examine(path, "g") == [
         "coverage_report.json: names another claim"
     ]
     path.write_text("{", encoding="utf-8")
-    assert custody.coverage_report_problems(path, "h")[0].startswith(
+    assert custody.examine(path, "h")[0].startswith(
         "coverage_report.json: unreadable ("
     )
 
@@ -287,7 +287,7 @@ def test_check_registered_lists_every_disagreement(tmp_path):
             "attached.json": scmle.assurance.ledger.ledger.digest(attached)
         },
     }
-    assert registration.check_registered(tmp_path, document, sealed) == (
+    assert registration.check(tmp_path, document, sealed) == (
         verdict.Finding(
             "registered claims: files hash to the sealed ledger",
             verdict.PASS,
@@ -295,9 +295,7 @@ def test_check_registered_lists_every_disagreement(tmp_path):
         )
     )
     write(tmp_path / "attached.json", {"a": 2})
-    found = registration.check_registered(
-        tmp_path, {"registered_claims": {}}, sealed
-    )
+    found = registration.check(tmp_path, {"registered_claims": {}}, sealed)
     assert found.detail == (
         "claims file and confirmation row differ; "
         "attached.json: differs from the sealed hash; "
@@ -305,7 +303,7 @@ def test_check_registered_lists_every_disagreement(tmp_path):
     )
     (tmp_path / "attached.json").unlink()
     sealed.claims["h2"] = {"sha256": "y", "kind": "plain"}
-    found = registration.check_registered(tmp_path, document, sealed)
+    found = registration.check(tmp_path, document, sealed)
     assert found.detail == (
         "h2: registration hash differs; attached.json: missing"
     )
@@ -328,13 +326,11 @@ def test_misnamed_checks_the_baseline_registration(tmp_path):
 
 
 def test_the_ledger_head_must_be_named():
-    found = seal.check_ledger_head(
-        {"heads": {"ledger": "abcdef0123456789"}}, ledger()
-    )
+    found = seal.anchor({"heads": {"ledger": "abcdef0123456789"}}, ledger())
     assert found == verdict.Finding(
         "claims file names the ledger head", verdict.PASS, "head abcdef012345"
     )
-    assert seal.check_ledger_head({}, ledger()).status == verdict.FAIL
+    assert seal.anchor({}, ledger()).status == verdict.FAIL
 
 
 def test_authenticate_is_skipped_without_a_charter(tmp_path):
@@ -482,14 +478,9 @@ def test_stage_two_record_problems_names_each_inconsistency():
         "family_sha256": "e",
         "survivors_sha256": "s",
     }
-    assert (
-        seal.stage_two_record_problems(record, frozen_set, {"h1"}, ["h2"], "e")
-        == []
-    )
+    assert seal.screen(record, frozen_set, {"h1"}, ["h2"], "e") == []
     wrong = {"family": [], "family_sha256": "x", "survivors_sha256": "y"}
-    assert seal.stage_two_record_problems(
-        wrong, frozen_set, {"h9"}, ["h2"], "e"
-    ) == [
+    assert seal.screen(wrong, frozen_set, {"h9"}, ["h2"], "e") == [
         "a withdrawn id is not a survivor",
         "family is not survivors minus withdrawn",
         "family hash",

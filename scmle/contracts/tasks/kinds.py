@@ -19,7 +19,7 @@ class Task(enum.StrEnum):
     UPLIFT = "uplift"
 
     @property
-    def is_classification(self) -> bool:
+    def classification(self) -> bool:
         """Whether the task predicts discrete classes."""
         return self in (Task.BINARY, Task.MULTICLASS)
 

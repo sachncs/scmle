@@ -113,12 +113,12 @@ def test_the_rate_parts_give_numerators_and_denominators():
 
 
 def test_base_rates_count_positives_and_rows_by_text_label():
-    assert rates.base_rates([1, 0, 1, 1], [1, 1, 2, 2]) == {
+    assert rates.count([1, 0, 1, 1], [1, 1, 2, 2]) == {
         "1": (1.0, 2.0),
         "2": (2.0, 2.0),
     }
     with pytest.raises(errors.InputError, match="same length"):
-        rates.base_rates([1, 0], [1])
+        rates.count([1, 0], [1])
 
 
 def big(prevalence_a, prevalence_b, n=2000):
@@ -134,7 +134,7 @@ def big(prevalence_a, prevalence_b, n=2000):
 
 def test_compatible_criteria_are_reported_feasible():
     y, groups = big(0.5, 0.2)
-    out = rates.check_feasibility([constraint("equal_opportunity")], y, groups)
+    out = rates.check([constraint("equal_opportunity")], y, groups)
     assert out == {
         "base_rates": {"0": 0.5, "1": 0.2},
         "differ": True,
@@ -145,7 +145,7 @@ def test_compatible_criteria_are_reported_feasible():
 
 def test_incompatible_criteria_with_equal_base_rates_are_feasible():
     y, groups = big(0.3, 0.3)
-    out = rates.check_feasibility(
+    out = rates.check(
         [constraint("demographic_parity"), constraint("predictive_parity")],
         y,
         groups,
@@ -158,7 +158,7 @@ def test_incompatible_criteria_with_equal_base_rates_are_feasible():
 def test_incompatible_criteria_with_differing_base_rates_are_refused():
     y, groups = big(0.5, 0.2)
     with pytest.raises(rates.InfeasibleError) as caught:
-        rates.check_feasibility(
+        rates.check(
             [constraint("predictive_parity"), constraint("equalized_odds")],
             y,
             groups,
@@ -171,7 +171,7 @@ def test_incompatible_criteria_with_differing_base_rates_are_refused():
 
 def test_a_small_base_rate_difference_does_not_differ():
     y, groups = big(0.31, 0.3, n=200)
-    out = rates.check_feasibility([constraint("demographic_parity")], y, groups)
+    out = rates.check([constraint("demographic_parity")], y, groups)
     assert out["differ"] is False
 
 
@@ -182,9 +182,9 @@ def test_the_level_is_split_over_group_pairs():
         numpy.ones(56), numpy.zeros(44), numpy.ones(42), numpy.zeros(58)
     ]
     groups = numpy.r_[numpy.zeros(100), numpy.ones(100)]
-    two = rates.check_feasibility([], y, groups)
+    two = rates.check([], y, groups)
     assert two["differ"] is True
     third = numpy.r_[groups, numpy.full(100, 2)]
     y3 = numpy.r_[y, (rng.random(100) < 0.49).astype(float)]
-    three = rates.check_feasibility([], y3, third)
+    three = rates.check([], y3, third)
     assert three["differ"] is False

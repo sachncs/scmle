@@ -30,7 +30,7 @@ class Indicator(enum.StrEnum):
     COVERAGE = "coverage"
 
 
-def require_text(value: str, field_name: str) -> str:
+def require(value: str, field_name: str) -> str:
     """Returns trimmed non-empty text for a contract field.
 
     Args:
@@ -49,7 +49,7 @@ def require_text(value: str, field_name: str) -> str:
     return result
 
 
-def validate_timestamp(value: str, field_name: str) -> str:
+def validate(value: str, field_name: str) -> str:
     """Validates an aware ISO-8601 timestamp without changing its text.
 
     Args:
@@ -62,7 +62,7 @@ def validate_timestamp(value: str, field_name: str) -> str:
     Raises:
         ValueError: If the text is empty, not ISO-8601, or has no timezone.
     """
-    require_text(value, field_name)
+    require(value, field_name)
     try:
         parsed = datetime.datetime.fromisoformat(value)
     except ValueError as error:
@@ -93,9 +93,9 @@ class Sample:
                 not a `Indicator` value, the value is not finite, or a label
                 key or value is blank.
         """
-        require_text(self.name, "metric.name")
-        require_text(self.unit, "metric.unit")
-        validate_timestamp(self.timestamp, "metric.timestamp")
+        require(self.name, "metric.name")
+        require(self.unit, "metric.unit")
+        validate(self.timestamp, "metric.timestamp")
         kind: Any = self.kind  # may be a raw value at runtime
         if not isinstance(kind, Indicator):
             object.__setattr__(self, "kind", Indicator(kind))
@@ -171,15 +171,15 @@ class Inference:
         ),
     )
 
-    request_id: str
-    run_id: str
+    request: str
+    run: str
     model_fingerprint: str
     outcome: str
-    latency_ms: float
+    latency: float
     timestamp: str
-    input_fingerprint: str | None = None
-    error_category: str | None = None
-    redacted_fields: tuple[str, ...] = ()
+    fingerprint: str | None = None
+    category: str | None = None
+    fields: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         """Validates event identity, timestamp, latency and error category.
@@ -193,24 +193,24 @@ class Inference:
                 field name is empty.
         """
         for field_name, value in (
-            ("request_id", self.request_id),
-            ("run_id", self.run_id),
+            ("request_id", self.request),
+            ("run_id", self.run),
             ("model_fingerprint", self.model_fingerprint),
             ("outcome", self.outcome),
         ):
-            require_text(value, f"event.{field_name}")
-        validate_timestamp(self.timestamp, "event.timestamp")
-        if not math.isfinite(self.latency_ms) or self.latency_ms < 0:
+            require(value, f"event.{field_name}")
+        validate(self.timestamp, "event.timestamp")
+        if not math.isfinite(self.latency) or self.latency < 0:
             raise errors.InputError(
                 "event.latency_ms must be finite and non-negative"
             )
-        if self.outcome == "error" and not self.error_category:
+        if self.outcome == "error" and not self.category:
             raise errors.InputError("error events require error_category")
-        if self.outcome != "error" and self.error_category is not None:
+        if self.outcome != "error" and self.category is not None:
             raise errors.InputError(
                 "successful events must not carry error_category"
             )
-        if any(not field.strip() for field in self.redacted_fields):
+        if any(not field.strip() for field in self.fields):
             raise errors.InputError(
                 "redacted_fields must not contain empty values"
             )
@@ -218,16 +218,16 @@ class Inference:
     def to_dict(self) -> dict[str, Any]:
         """Returns redacted, JSON-compatible event metadata."""
         return {
-            "request": self.request_id,
-            "run": self.run_id,
+            "request": self.request,
+            "run": self.run,
             "outcome": self.outcome,
-            "latency": float(self.latency_ms),
+            "latency": float(self.latency),
             "timestamp": self.timestamp,
-            "error": self.error_category,
-            "redacted": list(self.redacted_fields),
+            "error": self.category,
+            "redacted": list(self.fields),
             "digests": {
                 "model": self.model_fingerprint,
-                "payload": self.input_fingerprint,
+                "payload": self.fingerprint,
             },
         }
 
@@ -254,10 +254,10 @@ class Requirements:
         ),
     )
 
-    retention_days: int
-    required_signals: tuple[Indicator, ...]
-    redacted_fields: tuple[str, ...]
-    alert_thresholds: Mapping[str, float]
+    retention: int
+    signals: tuple[Indicator, ...]
+    fields: tuple[str, ...]
+    thresholds: Mapping[str, float]
 
     def __post_init__(self) -> None:
         """Rejects policies that silently omit required operational signals.
@@ -268,26 +268,23 @@ class Requirements:
                 signals repeat, a redacted field name is empty, or an alert
                 threshold is unnamed, not finite or negative.
         """
-        if self.retention_days < 1:
+        if self.retention < 1:
             raise errors.InputError("retention_days must be at least 1")
-        if not self.required_signals:
+        if not self.signals:
             raise errors.InputError("required_signals must not be empty")
-        if any(
-            not isinstance(signal, Indicator)
-            for signal in self.required_signals
-        ):
+        if any(not isinstance(signal, Indicator) for signal in self.signals):
             raise errors.KindError(
                 "required_signals must contain Indicator values"
             )
-        if len(self.required_signals) != len(set(self.required_signals)):
+        if len(self.signals) != len(set(self.signals)):
             raise errors.InputError("required_signals must be unique")
-        if any(not field.strip() for field in self.redacted_fields):
+        if any(not field.strip() for field in self.fields):
             raise errors.InputError(
                 "redacted_fields must not contain empty values"
             )
         if any(
             not name.strip() or not math.isfinite(value) or value < 0
-            for name, value in self.alert_thresholds.items()
+            for name, value in self.thresholds.items()
         ):
             raise errors.InputError(
                 "alert thresholds must be named, finite, and non-negative"
@@ -296,10 +293,10 @@ class Requirements:
     def to_dict(self) -> dict[str, Any]:
         """Returns a deterministic policy record."""
         return {
-            "retention": self.retention_days,
-            "signals": sorted(signal.value for signal in self.required_signals),
-            "redacted": sorted(self.redacted_fields),
-            "thresholds": dict(sorted(self.alert_thresholds.items())),
+            "retention": self.retention,
+            "signals": sorted(signal.value for signal in self.signals),
+            "redacted": sorted(self.fields),
+            "thresholds": dict(sorted(self.thresholds.items())),
         }
 
 

@@ -300,7 +300,7 @@ class Threshold:
         """The hash identifying the frozen rule (not its actions)."""
         r = self.recalibrator
         label = f"{self.path}|{r.intercept!r}|{r.slope!r}" if r else self.path
-        return netbenefit.rule_hash(label, self.threshold)
+        return netbenefit.digest(label, self.threshold)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -314,10 +314,10 @@ class Thresholding:
         check: The calibration check on the raw probabilities.
         recheck: The check on cross-fitted recalibrated probabilities, or
             None when the raw probabilities passed.
-        expected_cost: Mean cost per row of the rule on the development rows.
-        cost_interval: Bootstrap interval of that cost (cluster bootstrap
+        cost: Mean cost per row of the rule on the development rows.
+        interval: Bootstrap interval of that cost (cluster bootstrap
             when clusters are given).
-        stable_range: First and last value of the longest run of grid points
+        stable: First and last value of the longest run of grid points
             of `t` inside the chartered range at which the rule's development
             net benefit beats treating all and treating none, or None.
     """
@@ -326,9 +326,9 @@ class Thresholding:
     tier: str
     check: Calibration
     recheck: Calibration | None
-    expected_cost: float
-    cost_interval: tuple[float, float]
-    stable_range: tuple[float, float] | None
+    cost: float
+    interval: tuple[float, float]
+    stable: tuple[float, float] | None
 
     KEYS: ClassVar[records.Migration] = records.Migration(
         renames={
@@ -358,18 +358,16 @@ class Thresholding:
                     if self.recheck is None
                     else dataclasses.asdict(self.recheck)
                 ),
-                "expected_cost": self.expected_cost,
-                "cost_interval": list(self.cost_interval),
+                "expected_cost": self.cost,
+                "cost_interval": list(self.interval),
                 "stable_range": (
-                    None
-                    if self.stable_range is None
-                    else list(self.stable_range)
+                    None if self.stable is None else list(self.stable)
                 ),
             }
         )
 
 
-def cost_interval(
+def bound(
     y: NDArray[numpy.float64],
     acts: NDArray[numpy.float64],
     model: costs.Tariff,
@@ -510,11 +508,9 @@ def operate(
         tier=tier,
         check=first,
         recheck=recheck,
-        expected_cost=costs.price(labels, acts, model),
-        cost_interval=cost_interval(
-            labels, acts, model, clusters, replicates, seed
-        ),
-        stable_range=span(risk, labels, rule, model),
+        cost=costs.price(labels, acts, model),
+        interval=bound(labels, acts, model, clusters, replicates, seed),
+        stable=span(risk, labels, rule, model),
     )
 
 

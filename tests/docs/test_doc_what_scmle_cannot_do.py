@@ -39,7 +39,7 @@ def test_the_command_line_only_records_replies_and_never_lifts_a_halt():
 
     Also enforces website/src/learn/what-scmle-cannot-do.html:42-43.
     """
-    commands = actions(cli.build_parser())
+    commands = actions(cli.build())
     loop = actions(commands["loop"])
     operate = actions(commands["operate"])
 

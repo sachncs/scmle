@@ -55,10 +55,10 @@ def main() -> None:
         make_dataset(),
         "demand",
         metric="rmse",
-        time_column="day",
-        group_column="store",
-        feature_graph=graph,
-        time_budget=60,
+        timestamp="day",
+        group="store",
+        graph=graph,
+        budget=60,
     )
     LOGGER.info(project.plan().summary())
     result = project.run()

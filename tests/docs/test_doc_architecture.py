@@ -212,7 +212,7 @@ def test_review_holds_the_state_lock_for_the_whole_retrain(tmp_path):
     The retrain runs inside `locked`; while it runs no other thread can take
     the state file's lock.
     """
-    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "r")
+    store = scmle.governance.registry.Registry(tmp_path / "r")
     manager = lifecycle.Maintainer(store, "churn", str(tmp_path / "w"))
     seen = []
 

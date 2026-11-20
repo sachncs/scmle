@@ -18,7 +18,7 @@ def finding(identifier="q.a", **changes):
     values = {
         "identifier": identifier,
         "rule": "rule.v1",
-        "severity": findings.FindingSeverity.ERROR,
+        "severity": findings.Severity.ERROR,
         "confidence": 0.9,
         "scope": {"columns": ["a"]},
         "evidence": {"message": "m"},
@@ -45,21 +45,21 @@ def manifest(**changes):
         "source": provenance.Origin(owner="ml-platform"),
     }
     values.update(changes)
-    return provenance.DatasetManifest(**values)
+    return provenance.Manifest(**values)
 
 
 def curation(**changes):
     values = {
         "manifest": manifest(),
         "source_rows": 12,
-        "profiled_rows": 10,
-        "read_seconds": 0.25,
+        "rows": 10,
+        "read": 0.25,
         "streamed": False,
-        "cleaning_notes": ("trimmed spaces",),
-        "quality_findings": (finding("q.a"),),
+        "notes": ("trimmed spaces",),
+        "quality": (finding("q.a"),),
         "risk_findings": (finding("r.b", blocking=False),),
-        "feature_columns": {"numeric": ("x", "y"), "categorical": ("c",)},
-        "dropped_columns": {"id": "identifier"},
+        "features": {"numeric": ("x", "y"), "categorical": ("c",)},
+        "dropped": {"id": "identifier"},
     }
     values.update(changes)
     return profiles.Curation(**values)
@@ -87,7 +87,7 @@ def test_an_observation_needs_a_note_with_text():
 
 def test_severities_and_dispositions_are_the_stable_strings():
     # Enforces website/src/pages/docs/modalities.astro:41.
-    assert [s.value for s in findings.FindingSeverity] == [
+    assert [s.value for s in findings.Severity] == [
         "info",
         "warning",
         "error",
@@ -98,7 +98,7 @@ def test_severities_and_dispositions_are_the_stable_strings():
 
 def test_a_finding_converts_raw_enum_values_and_round_trips():
     made = finding(severity="warning", disposition="waived")
-    assert made.severity is findings.FindingSeverity.WARNING
+    assert made.severity is findings.Severity.WARNING
     assert made.disposition is findings.Disposition.WAIVED
     record = made.to_dict()
     assert record == {
@@ -151,15 +151,15 @@ def test_glean_gives_an_observation_a_stable_identity():
     digest = hashlib.sha256(b"Column x is constant").hexdigest()[:16]
     assert made.identifier == f"quality.{digest}"
     assert made.rule == "pipeline-observation.v1"
-    assert made.severity is findings.FindingSeverity.WARNING
+    assert made.severity is findings.Severity.WARNING
     assert made.confidence == 1.0
     assert made.scope == {"category": "quality"}
     assert made.evidence == {"message": "Column x is constant"}
     assert made.owner == "pipeline"
     assert made.disposition is findings.Disposition.OPEN
     assert made.blocking is False
-    error = findings.Finding.glean("m", "risk", findings.FindingSeverity.ERROR)
-    assert error.severity is findings.FindingSeverity.ERROR
+    error = findings.Finding.glean("m", "risk", findings.Severity.ERROR)
+    assert error.severity is findings.Severity.ERROR
     with pytest.raises(errors.InputError, match="message must not be empty"):
         findings.Finding.glean(" ", "q")
     with pytest.raises(errors.InputError, match="category must not be empty"):
@@ -194,8 +194,8 @@ def test_a_blueprint_names_its_features_and_sources():
         categorical=("c",),
         derived=(node("d", "raw"),),
         series=(node("s", "a"),),
-        extra_inputs=("raw", "a"),
-        high_cardinality=("c",),
+        extras=("raw", "a"),
+        cardinal=("c",),
     )
     assert plan.features == ("a", "d", "c")
     assert plan.engineered == frozenset({"d", "s"})
@@ -213,11 +213,11 @@ def test_a_blueprint_names_its_features_and_sources():
 def portrait(**changes):
     values = {
         "manifest": manifest(),
-        "column_statistics": {"a": {"mean": 1.0}},
-        "quality_findings": ("q",),
+        "statistics": {"a": {"mean": 1.0}},
+        "quality": ("q",),
         "risk_findings": ("r",),
-        "target_summary": {"rate": 0.5},
-        "feature_plan": profiles.Blueprint(("a",), ()),
+        "summary": {"rate": 0.5},
+        "plan": profiles.Blueprint(("a",), ()),
     }
     values.update(changes)
     return profiles.Portrait(**values)
@@ -238,7 +238,7 @@ def test_a_portrait_reads_the_leakage_screen():
 
 
 def test_a_portrait_normalises_evidence_and_dumps_single_words():
-    made = portrait(quality_evidence=({"k": [1]},), missingness=({"c": "a"},))
+    made = portrait(evidence=({"k": [1]},), missingness=({"c": "a"},))
     record = made.to_dict()
     assert record["findings"] == {"quality": ["q"], "risk": ["r"]}
     assert record["plan"]["numeric"] == ["a"]
@@ -247,7 +247,7 @@ def test_a_portrait_normalises_evidence_and_dumps_single_words():
     assert record["columns"] == {"a": {"mean": 1.0}}
     assert record["statistics"] == {}
     with pytest.raises(TypeError):
-        portrait(quality_evidence=({"k": object()},))
+        portrait(evidence=({"k": object()},))
 
 
 # ---- profiles: curation and datasheet --------------------------------------
@@ -259,17 +259,17 @@ def test_blocking_findings_without_a_safe_disposition_hold_release():
     # Enforces website/src/pages/docs/extensions.astro:211.
     # Enforces website/src/pages/docs/modalities.astro:41.
     report = curation()
-    assert [f.identifier for f in report.unresolved_blocking_findings] == [
+    assert [f.identifier for f in report.blockers] == [
         "q.a"
     ]
-    assert report.release_ready is False
+    assert report.release is False
     for safe in ("resolved", "waived", "false_positive"):
-        cleared = curation(quality_findings=(finding("q.a", disposition=safe),))
-        assert cleared.release_ready is True
+        cleared = curation(quality=(finding("q.a", disposition=safe),))
+        assert cleared.release is True
     accepted = curation(
-        quality_findings=(finding("q.a", disposition="accepted"),)
+        quality=(finding("q.a", disposition="accepted"),)
     )
-    assert accepted.release_ready is False
+    assert accepted.release is False
 
 
 def test_a_curation_dumps_single_words():
@@ -287,15 +287,15 @@ def test_a_curation_dumps_single_words():
 
 def test_a_datasheet_is_distilled_from_curation():
     card = profiles.Datasheet.distill(curation())
-    assert card.dataset_id == "ds_1"
-    assert card.snapshot_id == "snap-1"
+    assert card.dataset == "ds_1"
+    assert card.snapshot == "snap-1"
     assert card.task == "binary_classification"
     assert card.target == "label"
-    assert card.intended_use == (
+    assert card.use == (
         "Training and evaluation for binary_classification using the "
         "declared target and feature decisions."
     )
-    assert len(card.out_of_scope) == 3
+    assert len(card.excluded) == 3
     assert card.composition == {
         "source_rows": 12,
         "profiled_rows": 10,
@@ -305,7 +305,7 @@ def test_a_datasheet_is_distilled_from_curation():
     assert card.limitations[2] == "trimmed spaces"
     assert len(card.limitations) == 3
     assert card.owner == "ml-platform"
-    assert card.review_status == "machine_generated_unreviewed"
+    assert card.status == "machine_generated_unreviewed"
     assert card.schema_version == 2
 
 
@@ -313,14 +313,14 @@ def test_a_datasheet_without_risks_or_owner_says_so():
     bare = curation(
         manifest=manifest(task="", source=provenance.Origin()),
         risk_findings=(),
-        cleaning_notes=(),
+        notes=(),
     )
     card = profiles.Datasheet.distill(bare)
     assert (
         card.limitations[-1] == "No risk finding was emitted by the profiler."
     )
     assert card.owner == "unassigned"
-    assert "the declared learning task" in card.intended_use
+    assert "the declared learning task" in card.use
 
 
 def test_a_datasheet_dumps_single_words():
@@ -364,6 +364,6 @@ def test_preprocessing_defaults_are_conservative():
     made = profiles.Preprocessing()
     assert made.impute is True
     assert made.scale is False
-    assert made.high_cardinality == "onehot"
+    assert made.cardinality == "onehot"
     assert made.missing == "median"
-    assert made.text_encoding == "tfidf"
+    assert made.encoding == "tfidf"

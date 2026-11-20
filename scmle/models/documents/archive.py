@@ -78,9 +78,9 @@ class Archive(Estimator):
                 stream.write("\n")
                 stream.flush()
                 os.fsync(stream.fileno())
-            durability.sync_directory(temporary_directory)
+            durability.flush(temporary_directory)
             pathlib.Path(temporary_directory).replace(target)
-            durability.sync_directory(target.parent)
+            durability.flush(target.parent)
         except Exception:
             if temporary_directory is not None:
                 shutil.rmtree(temporary_directory, ignore_errors=True)

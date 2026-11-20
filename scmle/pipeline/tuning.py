@@ -60,7 +60,7 @@ class Tuner(hyperband.Hyperband):
         Returns:
             Up to `search.top_models` distinct (model, strategy) pairs.
         """
-        sign = 1 if self.metric.greater_is_better else -1
+        sign = 1 if self.metric.maximize else -1
         adopted = {
             d.technique
             for d in self.board.journal.outcomes
@@ -73,16 +73,16 @@ class Tuner(hyperband.Hyperband):
             and not t.params
             and (
                 t.strategy == experiments.DEFAULT_STRATEGY
-                or f"{t.strategy}@{t.model_name}" in adopted
+                or f"{t.strategy}@{t.model}" in adopted
             )
         ]
-        ranked = sorted(ok, key=lambda t: -sign * t.score_mean)
+        ranked = sorted(ok, key=lambda t: -sign * t.score)
         registry = self.board.services.registry
         chosen: dict[str, str] = {}
         for trial in ranked:
-            tunable = registry.get(trial.model_name).search_space is not None
-            if tunable and trial.model_name not in chosen:
-                chosen[trial.model_name] = trial.strategy
+            tunable = registry.get(trial.model).space is not None
+            if tunable and trial.model not in chosen:
+                chosen[trial.model] = trial.strategy
         return list(chosen.items())[: self.search.top_models]
 
     def tune(self, screened: list[experiments.Trial]) -> None:
@@ -107,14 +107,14 @@ class Tuner(hyperband.Hyperband):
         """
         board, search = self.board, self.search
         space = products.require(
-            board.services.registry.get(name).search_space,
+            board.services.registry.get(name).space,
             f"{name}.search_space",
         )
         optimizer = optimizers.instantiate(
             search.optimizer,
             space,
             board.services.spec.validation.seed + index,
-            self.metric.greater_is_better,
+            self.metric.maximize,
         )
         if search.pruning == "hyperband":
             self.hyperband(name, strategy, optimizer)
@@ -168,13 +168,13 @@ class Tuner(hyperband.Hyperband):
         survivors = self.promote(first_rung) if multi_fold else None
         finished = {}
         if survivors:
-            winners = [t for t in first_rung if t.trial_id in survivors]
+            winners = [t for t in first_rung if t.identifier in survivors]
             finished = {
-                t.trial_id: t
+                t.identifier: t
                 for t in self.runner.dispatch(
                     [
                         trials.Job(
-                            t.trial_id, t.model_name, t.params, None, t.strategy
+                            t.identifier, t.model, t.params, None, t.strategy
                         )
                         for t in winners
                     ]
@@ -185,8 +185,8 @@ class Tuner(hyperband.Hyperband):
                 self.board.journal.transcribe(trial)
             elif survivors is None:
                 self.complete(trial, optimizer)
-            elif trial.trial_id in finished:
-                self.complete(finished[trial.trial_id], optimizer)
+            elif trial.identifier in finished:
+                self.complete(finished[trial.identifier], optimizer)
             else:
                 trial.status = experiments.Termination.PRUNED
                 trial.error = "pruned after the first rung"
@@ -204,6 +204,6 @@ class Tuner(hyperband.Hyperband):
         """
         ok = [t for t in first_rung if t.status is experiments.Termination.OK]
         keep = max(1, math.ceil(len(ok) * (1 - self.search.prune_fraction)))
-        sign = 1 if self.metric.greater_is_better else -1
-        ranked = sorted(ok, key=lambda t: -sign * t.score_mean)
-        return {t.trial_id for t in ranked[:keep]}
+        sign = 1 if self.metric.maximize else -1
+        ranked = sorted(ok, key=lambda t: -sign * t.score)
+        return {t.identifier for t in ranked[:keep]}

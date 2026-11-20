@@ -146,13 +146,13 @@ class Manifest:
         Raises:
             ValueError: If `scope` is not a known scope, or a set repeats a
                 row, or two sets share a row. The field checks of
-                `evidence.require_text`, `qualification.count`,
+                `evidence.require`, `qualification.count`,
                 `qualification.tupled` and `ids` raise on a malformed
                 field.
         """
-        evidence.require_text(self.strategy, "strategy")
-        evidence.require_text(self.digests.charter, "digests.charter")
-        evidence.require_text(self.digests.data, "digests.data")
+        evidence.require(self.strategy, "strategy")
+        evidence.require(self.digests.charter, "digests.charter")
+        evidence.require(self.digests.data, "digests.data")
         qualification.count(self.seed, "seed")
         qualification.count(self.embargo, "embargo")
         if self.scope not in SCOPES:

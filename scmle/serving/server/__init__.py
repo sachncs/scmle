@@ -11,7 +11,7 @@ logger), `batch` (`Batcher`), `web` (`Service`, its `Observer` and
 `Listener`) and `handler` (`Responder`, which answers each request).
 """
 
-# Callers patch `server.durability.write_atomically` to watch batch writes.
+# Callers patch `server.durability.write` to watch batch writes.
 from scmle import durability  # noqa: F401
 from scmle.serving.server.batch import Batcher
 from scmle.serving.server.contract import BATCH_CHUNK_ROWS

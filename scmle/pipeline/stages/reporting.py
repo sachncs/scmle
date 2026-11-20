@@ -133,9 +133,7 @@ class Reporting(relabelling.Relabelling):
         ).astype(float)
         logged = self.column(features, data.logged_action_column)
         propensity = self.column(features, data.propensity_column)
-        value = reports.policy_value(
-            layer, actions, outcome, logged, propensity
-        )
+        value = reports.value(layer, actions, outcome, logged, propensity)
         satisfaction = reports.fairness(
             layer,
             features,
@@ -143,10 +141,10 @@ class Reporting(relabelling.Relabelling):
             actions,
             float(charter.budget.confirmation.alpha_confirm),
         )
-        built = reports.rollout_design(
+        built = reports.plan(
             charter, float(numpy.mean(outcome)) if len(outcome) else 0.0
         )
-        report = reports.decision_report(
+        report = reports.report(
             charter,
             decision.threshold,
             decision.benefit,

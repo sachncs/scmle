@@ -496,7 +496,7 @@ class Thresholdout:
         """Writes the session to the journal, if there is one."""
         if self.journal is not None:
             text = json.dumps(self.record(), sort_keys=True) + "\n"
-            durability.write_atomically(self.journal, text.encode("utf-8"))
+            durability.write(self.journal, text.encode("utf-8"))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

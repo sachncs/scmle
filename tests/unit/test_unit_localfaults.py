@@ -25,7 +25,7 @@ def facts(artifacts):
     found = {}
     for item in artifacts:
         record = json.loads(item.content)
-        found[item.evidence_type] = record["details"]
+        found[item.kind] = record["details"]
     return found
 
 
@@ -47,14 +47,14 @@ def test_an_artifact_is_compact_sorted_json_marked_safe(tmp_path):
         b'{"details":{"a":"\\u00e9","b":1},"evidence_type":"kind",'
         b'"observation":"seen","scenario":"timeout"}'
     )
-    assert item.evidence_type == "kind"
+    assert item.kind == "kind"
     assert item.observation == "seen"
-    assert item.observed_outcome is reliability.Outcome.SAFE_OUTCOME_OBSERVED
+    assert item.outcome is reliability.Outcome.SAFE_OUTCOME_OBSERVED
 
 
 def test_write_json_writes_compact_sorted_json(tmp_path):
     made = workspace.Workspace(tmp_path)
-    made.write_json(tmp_path / "x.json", {"b": [1], "a": None})
+    made.write(tmp_path / "x.json", {"b": [1], "a": None})
     assert (tmp_path / "x.json").read_bytes() == b'{"a":null,"b":[1]}'
 
 
@@ -74,7 +74,7 @@ def test_unreachable_always_fails_like_a_connector():
 
 
 def test_process_death_keeps_the_checkpoint(runner):
-    found = facts(runner.run_process_death())
+    found = facts(runner.kill())
     assert list(found) == [
         "process_termination",
         "checkpoint_resume",
@@ -96,7 +96,7 @@ def test_process_death_keeps_the_checkpoint(runner):
 def test_a_stale_checkpoint_is_rejected(runner):
     # Enforces website/src/pages/docs/operations.astro:19.
     # Enforces website/src/pages/docs/recovery.astro:11.
-    found = facts(runner.run_stale_checkpoint())
+    found = facts(runner.rebind())
     assert found == {
         "checkpoint_identity": {"source": "source-old"},
         "stale_checkpoint_rejection": {"rejected": True},
@@ -106,7 +106,7 @@ def test_a_stale_checkpoint_is_rejected(runner):
 
 
 def test_worker_loss_writes_one_event(runner):
-    found = facts(runner.run_worker_loss())
+    found = facts(runner.lose())
     assert found["idempotent_retry"] == {"event_count": 1}
     assert found["event_deduplication"] == {"event_ids": ["event-1"]}
     assert found["worker_termination"]["terminated"] is True
@@ -116,7 +116,7 @@ def test_worker_loss_writes_one_event(runner):
 
 def test_a_timeout_is_cancelled_and_publishes_nothing(runner):
     # Enforces website/src/pages/docs/operations.astro:194.
-    found = facts(runner.run_timeout())
+    found = facts(runner.expire())
     assert found["timeout_injection"] == {"terminated": True}
     assert found["cancellation_record"] == {"state": "cancelled"}
     assert found["resource_error"] == {"public_result_exists": False}
@@ -126,7 +126,7 @@ def test_a_timeout_is_cancelled_and_publishes_nothing(runner):
 
 def test_retries_are_exhausted_after_three_attempts(runner):
     # Enforces website/src/pages/docs/operations.astro:194.
-    found = facts(runner.run_retry_exhaustion())
+    found = facts(runner.exhaust())
     assert found == {
         "retry_history": {"attempts": 3},
         "terminal_event": {"state": "retry_exhausted"},
@@ -160,7 +160,7 @@ def test_ration_refuses_only_an_allocation_over_the_budget():
 
 
 def test_a_full_disk_publishes_nothing(runner):
-    found = facts(runner.run_disk_full())
+    found = facts(runner.fill())
     assert found == {
         "disk_capacity_exhaustion": {"errno": errno.ENOSPC, "rejected": True},
         "artifact_integrity": {"public_artifact_exists": False},
@@ -169,7 +169,7 @@ def test_a_full_disk_publishes_nothing(runner):
 
 
 def test_a_corrupt_artifact_is_detected_and_quarantined(runner):
-    found = facts(runner.run_corrupt_artifact())
+    found = facts(runner.corrupt())
     assert found["corruption_injection"] == {"changed": True}
     assert found["digest_mismatch"] == {
         "expected": hashlib.sha256(b"valid-artifact").hexdigest(),
@@ -180,7 +180,7 @@ def test_a_corrupt_artifact_is_detected_and_quarantined(runner):
 
 
 def test_memory_exhaustion_stops_just_past_the_budget(runner):
-    found = facts(runner.run_memory_exhaustion())
+    found = facts(runner.starve())
     assert found["memory_pressure"] == {"rejected": True, "bytes": 1280}
     assert found["publication_absence"] == {"public_result_exists": False}
     assert found["resource_error"] == {"error": "MemoryError"}
@@ -188,7 +188,7 @@ def test_memory_exhaustion_stops_just_past_the_budget(runner):
 
 def test_a_partial_write_never_reaches_the_public_path(runner):
     # Enforces website/src/pages/docs/recovery.astro:11.
-    found = facts(runner.run_partial_write())
+    found = facts(runner.truncate())
     assert found == {
         "write_interruption": {"temporary_exists": True},
         "atomicity_check": {"public_exists": False},
@@ -198,7 +198,7 @@ def test_a_partial_write_never_reaches_the_public_path(runner):
 
 
 def test_a_dependency_mismatch_blocks_the_run(runner):
-    found = facts(runner.run_dependency_mismatch())
+    found = facts(runner.mismatch())
     assert found == {
         "environment_identity": {
             "required": "numpy==2.3.0",
@@ -215,7 +215,7 @@ def test_a_dependency_mismatch_blocks_the_run(runner):
 def test_a_tampered_signature_is_quarantined(runner):
     # Enforces website/src/pages/docs/operations.astro:194.
     # Enforces website/src/pages/docs/recovery.astro:11.
-    found = facts(runner.run_invalid_signature())
+    found = facts(runner.forge())
     assert found == {
         "signature_tampering": {"rejected": True},
         "verification_failure": {"verified": False},
@@ -227,7 +227,7 @@ def test_a_tampered_signature_is_quarantined(runner):
 
 def test_a_duplicate_event_is_committed_once(runner):
     # Enforces website/src/pages/docs/operations.astro:179.
-    found = facts(runner.run_duplicate_event())
+    found = facts(runner.duplicate())
     assert found["duplicate_event"]["first"] == ["event-1"]
     assert found["duplicate_event"]["second"] == ["event-1"]
     assert found["idempotency_key"] == {"accepted": ["event-1"]}
@@ -236,7 +236,7 @@ def test_a_duplicate_event_is_committed_once(runner):
 
 def test_an_incomplete_lineage_blocks_release(runner):
     # Enforces website/src/pages/docs/operations.astro:194.
-    found = facts(runner.run_incomplete_lineage())
+    found = facts(runner.orphan())
     assert found == {
         "lineage_gap": {"rejected": True},
         "release_block": {"release_ready": False},
@@ -246,7 +246,7 @@ def test_an_incomplete_lineage_blocks_release(runner):
 
 def test_a_rejected_approval_blocks_release(runner):
     # Enforces website/src/pages/docs/operations.astro:194.
-    found = facts(runner.run_rejected_approval())
+    found = facts(runner.reject())
     assert found == {
         "approval_rejection": {"rejected": True},
         "release_block": {"release_ready": False},
@@ -258,7 +258,7 @@ def test_a_changed_snapshot_is_rejected(runner):
     # Enforces website/src/pages/docs/operations.astro:179.
     # Enforces website/src/pages/docs/recovery.astro:11.
     # Enforces website/src/pages/docs/recovery.astro:29.
-    found = facts(runner.run_changed_snapshot())
+    found = facts(runner.mutate())
     assert found == {
         "snapshot_digest_change": {"snapshot_id": "snapshot-1"},
         "run_invalidation": {"rejected": True},
@@ -281,7 +281,7 @@ def test_execute_returns_exactly_the_planned_evidence(runner, scenario):
         for plan in reliability.drills()
         if plan.scenario is scenario
     )
-    names = [item.evidence_type for item in artifacts]
+    names = [item.kind for item in artifacts]
     assert sorted(names) == sorted(expected)
     assert len(names) == len(set(names))
     for item in artifacts:
@@ -311,7 +311,7 @@ def test_evidence_other_than_the_plan_is_refused(tmp_path):
         __slots__ = ()
 
         def run_timeout(self):
-            return super().run_timeout()[:2]
+            return super().expire()[:2]
 
     with pytest.raises(ValueError, match="scenario timeout returned evidence"):
         Short(tmp_path).execute(reliability.Contingency.TIMEOUT)
@@ -322,7 +322,7 @@ def test_repeated_evidence_is_refused(tmp_path):
         __slots__ = ()
 
         def run_timeout(self):
-            found = super().run_timeout()
+            found = super().expire()
             return (*found, found[0])
 
     with pytest.raises(ValueError, match="expected"):

@@ -73,7 +73,7 @@ def test_the_named_product_surfaces_are_all_calibrated() -> None:
         "evaluation/confidence.py:bound",
         "causal/identification/rd.py:estimate",
         "causal/identification/did.py:estimate",
-        "causal/identification/run/adjustment.py:RandomizedEstimator",
+        "causal/identification/run/adjustment.py:Experiment",
         "causal/identification/run/strata.py:stratify",
         "parameter_estimation/estimate.py:infer",
         "evaluation/coverage.py:stratify",

@@ -50,15 +50,15 @@ def run(tmp_path, charter, **kwargs):
     return support.make_project(
         panel(),
         "y",
-        time_budget=300,
-        output_dir=tmp_path / "out",
+        budget=300,
+        directory=tmp_path / "out",
         charter=charter,
         **kwargs,
     ).run()
 
 
 def read(result, name):
-    return json.loads((pathlib.Path(result.run_dir) / name).read_text())
+    return json.loads((pathlib.Path(result.directory) / name).read_text())
 
 
 def test_entities_are_on_both_sides_and_the_final_rows_come_last(tmp_path):
@@ -76,7 +76,7 @@ def test_entities_are_on_both_sides_and_the_final_rows_come_last(tmp_path):
     development = frame.iloc[validation["training"]]
     assert final.t.min() >= development.t.quantile(0.5)
     assert set(final.entity) <= set(development.entity)
-    events = (pathlib.Path(result.run_dir) / "events.jsonl").read_text()
+    events = (pathlib.Path(result.directory) / "events.jsonl").read_text()
     assert "unit.known_entity_future" in events
 
 
@@ -94,9 +94,9 @@ def test_a_known_entity_charter_needs_the_entity_and_time_columns(tmp_path):
     # Enforces website/src/pages/docs/qualification.astro:74.
     path = charter_file(tmp_path)
     with pytest.raises(errors.ConfigError, match="time_column"):
-        run(tmp_path, path, time_column=None)
+        run(tmp_path, path, timestamp=None)
     with pytest.raises(errors.ConfigError, match="group_column"):
-        run(tmp_path, path, group_column=None)
+        run(tmp_path, path, group=None)
 
 
 def test_a_known_entity_charter_refuses_an_entity_disjoint_validation(tmp_path):

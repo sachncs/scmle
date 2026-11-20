@@ -83,7 +83,7 @@ def test_reader_starts_empty_and_binds_the_retained_folder(tmp_path):
     assert state.keys == {"analyst": "k"}
     assert state.findings == []
     assert state.steps == {}
-    assert state.charter_hash == ""
+    assert state.charter == ""
     assert state.inputs == {}
 
 

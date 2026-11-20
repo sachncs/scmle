@@ -66,9 +66,9 @@ def test_too_few_kept_resamples_give_no_interval_and_no_decision(monkeypatch):
 def test_an_unreadable_coverage_report_is_named_not_misreported(tmp_path):
     report = tmp_path / "coverage_report.json"
     report.write_text("{not json", encoding="utf-8")
-    problems = claims_audit.coverage_report_problems(report, None)
+    problems = claims_audit.examine(report, None)
     assert len(problems) == 1 and "unreadable" in problems[0]
-    problems = claims_audit.coverage_report_problems(report, "a" * 64)
+    problems = claims_audit.examine(report, "a" * 64)
     assert "unreadable" in problems[0]
 
 
@@ -76,7 +76,7 @@ class Bundle:
     """The parts of a bundle `chronicle` reads."""
 
     schema = types.SimpleNamespace(task="regression")
-    info = types.SimpleNamespace(model_version="v1")
+    info = types.SimpleNamespace(version="v1")
 
     def prepare(self, data):
         return data
@@ -167,7 +167,7 @@ def test_champion_counts_every_dropped_resample(monkeypatch):
         return 0.5
 
     metric = types.SimpleNamespace(
-        name="rmse", greater_is_better=False, score=score
+        name="rmse", maximize=False, score=score
     )
     monkeypatch.setattr(metrics.CATALOG, "resolve", lambda name, task: metric)
     model = types.SimpleNamespace(
@@ -206,7 +206,7 @@ def test_a_failed_attestation_check_keeps_its_reason(monkeypatch, caplog):
     monkeypatch.setattr(release, "countersign", lambda outcome, *args: outcome)
     partition = types.SimpleNamespace(
         task=tasks.Task.REGRESSION,
-        metric=types.SimpleNamespace(name="rmse", greater_is_better=False),
+        metric=types.SimpleNamespace(name="rmse", maximize=False),
     )
     held = {
         profiling.Partition: partition,
@@ -220,7 +220,7 @@ def test_a_failed_attestation_check_keeps_its_reason(monkeypatch, caplog):
             )
         ),
     )
-    store = types.SimpleNamespace(write_json=lambda name, document: None)
+    store = types.SimpleNamespace(write=lambda name, document: None)
     evaluation = {"test_metrics": {}}
     with caplog.at_level("WARNING", logger=stages.__name__):
         stages.Packaging().release(context, store, evaluation)

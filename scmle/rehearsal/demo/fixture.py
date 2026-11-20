@@ -64,7 +64,7 @@ def train(name: str, data: pathlib.Path) -> scmle.artifacts.results.Run:
     return scmle.api.project.Project(
         frame,
         TARGET,
-        output_dir=str(tempfile.mkdtemp(prefix=name)),
+        directory=str(tempfile.mkdtemp(prefix=name)),
         **FAST_OPTIONS,
     ).run()
 
@@ -85,10 +85,10 @@ def sanction(
     return scmle.governance.registry.Sanction(
         model=record.model,
         version=record.version,
-        content_id=record.content_id,
+        content=record.content_id,
         reviewer=REVIEWER,
         decision=scmle.governance.registry.Verdict.APPROVED,
         reason=reason,
         evidence=(evidence,),
-        approved_at=now(),
+        approved=now(),
     ).sign(DEMO_SIGNING_KEY)

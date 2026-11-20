@@ -28,7 +28,7 @@ def distill(row_ids: list[Any]) -> dict[str, Any]:
     return {"rows": len(ordered), "digest": digest[:16]}
 
 
-def observed_access(
+def access(
     split: splitters.Split, trials: list[experiments.Trial]
 ) -> dict[str, Any]:
     """Checks what trials actually received against the split manifest.
@@ -57,7 +57,7 @@ def observed_access(
     test_ids = {str(i) for i in manifest.test}
     checked = mismatched = 0
     for trial in trials:
-        for index, seen in enumerate(trial.observed_access):
+        for index, seen in enumerate(trial.access):
             checked += 1
             if index >= len(expected) or (
                 seen["fit"] != expected[index][0]
@@ -145,7 +145,7 @@ def compose(
     Returns:
         A JSON-serializable dict with `partitions`, `operations` (cross
         validation, final refit, threshold optimization and final
-        evaluation), `observed` (the result of `observed_access`) and a
+        evaluation), `observed` (the result of `access`) and a
         `verified` section of booleans.
     """
     manifest = split.manifest
@@ -157,7 +157,7 @@ def compose(
         for fit, validate in manifest.folds
     )
     evaluated = [t for t in trials if t.status is experiments.Termination.OK]
-    observed = observed_access(split, evaluated)
+    observed = access(split, evaluated)
     return {
         "partitions": {
             "development_rows": len(development),

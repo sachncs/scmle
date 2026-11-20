@@ -87,7 +87,7 @@ def test_explicit_requests_must_match_data(classification_frame):
 
 def test_feature_plan_drops_constant_and_id_like(classification_frame):
     result = profile(classification_frame)[1]
-    plan = result.feature_plan
+    plan = result.plan
     assert plan.numeric == ("num",) and plan.categorical == ("cat",)
     assert plan.dropped["const"] == "constant"
     assert "id-like" in plan.dropped["uid"]
@@ -98,9 +98,9 @@ def test_roles_are_excluded_from_features(classification_frame):
         grp=numpy.arange(300) % 30, rid=range(300)
     )
     result = profile(frame, group_column="grp", id_columns=["rid"])[1]
-    dropped = result.feature_plan.dropped
+    dropped = result.plan.dropped
     assert "splitting" in dropped["grp"] and dropped["rid"] == "id column"
-    assert "grp" not in result.feature_plan.features
+    assert "grp" not in result.plan.features
 
 
 def test_missing_configured_column(classification_frame):
@@ -115,7 +115,7 @@ def test_leaky_feature_flagged(classification_frame):
     result = profile(leaky)[1]
     assert any("'leak'" in finding for finding in result.risk_findings)
     assert not any("'num'" in finding for finding in result.risk_findings)
-    assert result.column_statistics["leak"]["target_association"] >= 0.98
+    assert result.statistics["leak"]["target_association"] >= 0.98
     screen = result.leakage
     assert screen["suspects"] == ["leak"]
     assert screen["blocking"] == ["leak"]
@@ -203,7 +203,7 @@ def test_regression_target_summary():
     frame["y"] = frame.x * 2
     task, result = profile(frame)
     assert task is tasks.Task.REGRESSION
-    assert {"mean", "std", "skew"} <= set(result.target_summary)
+    assert {"mean", "std", "skew"} <= set(result.summary)
     assert any("'x'" in r for r in result.risk_findings)
 
 
@@ -227,10 +227,10 @@ def test_outcome_dependent_recording_is_reported_as_possible_leakage():
         for finding in result.risk_findings
     )
     assert (
-        result.column_statistics["discharge_code"]["missingness_association"]
+        result.statistics["discharge_code"]["missingness_association"]
         >= 0.9
     )
-    assert result.column_statistics["signal"]["missingness_association"] == 0.0
+    assert result.statistics["signal"]["missingness_association"] == 0.0
 
 
 def test_features_unavailable_at_prediction_time_are_excluded_with_a_reason(
@@ -238,9 +238,9 @@ def test_features_unavailable_at_prediction_time_are_excluded_with_a_reason(
 ):
     frame = classification_frame.assign(refund_issued=lambda f: f["y"] * 3.0)
     result = profile(frame, unavailable_at_prediction=["refund_issued"])[1]
-    reason = result.feature_plan.dropped["refund_issued"]
+    reason = result.plan.dropped["refund_issued"]
     assert "not available at prediction time" in reason
-    assert "refund_issued" not in result.feature_plan.features
+    assert "refund_issued" not in result.plan.features
 
 
 def test_target_cannot_be_declared_unavailable():
@@ -267,7 +267,7 @@ def test_datetime_columns_become_calendar_and_trend_features():
         frame, manifest, tasks.Task.BINARY
     )
 
-    plan = profile.feature_plan
+    plan = profile.plan
     names = {n.name for n in plan.derived}
     assert {
         "signed_up__year",
@@ -279,5 +279,5 @@ def test_datetime_columns_become_calendar_and_trend_features():
     assert not any(
         n.startswith("constant_day__") and "year" in n for n in names
     )
-    assert "signed_up" in plan.extra_inputs and "signed_up" not in plan.features
+    assert "signed_up" in plan.extras and "signed_up" not in plan.features
     assert set(names) <= set(plan.numeric)

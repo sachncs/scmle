@@ -127,11 +127,11 @@ def raster_adapter() -> modality_lifecycle.Imagery:
 def test_project_requires_explicit_experimental_opt_in(tmp_path: Path):
     """Experimental non-tabular paths never become an implicit default."""
     with pytest.raises(
-        scmle.api.non_tabular.UnsupportedNonTabularModelError,
+        scmle.api.non_tabular.UnsupportedError,
         match="experimental_opt_in=True",
     ):
         scmle.api.non_tabular.Modeler(
-            text_adapter(), "test-key", output_dir=tmp_path
+            text_adapter(), "test-key", directory=tmp_path
         )
 
 
@@ -142,7 +142,7 @@ def test_project_runs_and_reloads_verified_bounded_result(tmp_path: Path):
         adapter,
         "test-key",
         experimental_opt_in=True,
-        output_dir=tmp_path / "run",
+        directory=tmp_path / "run",
     )
 
     result = project.run()
@@ -168,14 +168,14 @@ def test_project_rejects_custom_adapter_subclasses(tmp_path: Path):
 
     adapter = CustomTextAdapter(text_adapter().dataset)
     with pytest.raises(
-        scmle.api.non_tabular.UnsupportedNonTabularModelError,
+        scmle.api.non_tabular.UnsupportedError,
         match="exact built-in Preparer types",
     ):
         scmle.api.non_tabular.Modeler(
             adapter,
             "test-key",
             experimental_opt_in=True,
-            output_dir=tmp_path,
+            directory=tmp_path,
         )
 
 
@@ -219,15 +219,15 @@ def test_capability_rejects_non_modelling_curation_adapter():
 def test_project_rejects_mismatched_observed_representation(tmp_path: Path):
     """Monitoring cannot silently compare incompatible feature contracts."""
     with pytest.raises(
-        scmle.api.non_tabular.UnsupportedNonTabularModelError,
+        scmle.api.non_tabular.UnsupportedError,
         match="same bounded capability",
     ):
         scmle.api.non_tabular.Modeler(
             text_adapter(),
             "test-key",
             experimental_opt_in=True,
-            output_dir=tmp_path,
-            observed_adapter=metadata_video_adapter(),
+            directory=tmp_path,
+            observed=metadata_video_adapter(),
         )
 
 

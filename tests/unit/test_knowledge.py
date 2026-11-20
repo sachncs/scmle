@@ -63,7 +63,7 @@ def test_fingerprint_has_a_defined_missing_rate_without_features():
         pandas.DataFrame({"feature": [1.0, 2.0, 3.0, 4.0], "y": [0, 1, 0, 1]})
     )
     empty_plan = dataclasses.replace(
-        profile.feature_plan, numeric=(), categorical=(), text=()
+        profile.plan, numeric=(), categorical=(), text=()
     )
     profile = dataclasses.replace(profile, feature_plan=empty_plan)
 

@@ -46,9 +46,9 @@ def folder(tmp_path_factory):
     """
     directory = tmp_path_factory.mktemp("artifacts")
     project = reliability.fast_project(
-        reliability.binary_data(200), "y", directory, time_budget=30
+        reliability.binary_data(200), "y", directory, budget=30
     )
-    return pathlib.Path(project.run().run_dir)
+    return pathlib.Path(project.run().directory)
 
 
 @pytest.fixture(scope="module")
@@ -219,8 +219,8 @@ def watched(tmp_path_factory):
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(stage, "measure", measuring)
         patch.setattr(stage, "ship", shipping)
-        project = reliability.fast_project(data, "y", directory, time_budget=30)
-        run = pathlib.Path(project.run().run_dir)
+        project = reliability.fast_project(data, "y", directory, budget=30)
+        run = pathlib.Path(project.run().directory)
     return run, calls
 
 

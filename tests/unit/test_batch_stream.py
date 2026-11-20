@@ -166,12 +166,12 @@ def test_streamed_output_matches_the_golden_scores(golden, bundle, tmp_path):
     target = tmp_path / "scored.csv"
     count = server.Batcher(bundle).score(source, target, chunk_rows=2)
     scored = pandas.read_csv(target)
-    expected = parity.read_json(GOLDEN / "expected.json")
+    expected = parity.read(GOLDEN / "expected.json")
     report = parity.compare(
         expected,
         scored["prediction"].tolist(),
         scored[["proba_0", "proba_1"]].to_numpy().tolist(),
-        golden.same_process,
+        golden.process,
     )
     assert report.passed, report.mismatches
     manifest = json.loads(

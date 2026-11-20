@@ -10,7 +10,7 @@ from scmle.governance import deployment_ledger
 from scmle.governance import registry
 
 
-class ReleaseRegistry(promotion.Promotion, rollback.Rollback):
+class Registry(promotion.Promotion, rollback.Rollback):
     """Release state, promotion, rollback and reconciliation for a registry."""
 
     def live(
@@ -36,7 +36,7 @@ class ReleaseRegistry(promotion.Promotion, rollback.Rollback):
         report = self.reconcile(model, environment, seen)
         recorded = self.environment(model, environment)
         if recorded is None or not report.consistent:
-            raise status.RuntimeDisagrees(
+            raise status.DisagreementError(
                 f"{model} is not confirmed deployed in {environment}",
                 {"findings": [f.to_dict() for f in report.findings]},
             )
@@ -116,8 +116,7 @@ class ReleaseRegistry(promotion.Promotion, rollback.Rollback):
         production = environment == status.PRODUCTION_ENVIRONMENT
         if (
             production
-            and known.get(recorded["version"])
-            is not status.ReleaseState.PRODUCTION
+            and known.get(recorded["version"]) is not status.State.PRODUCTION
         ):
             findings.append(
                 status.Finding(
@@ -129,7 +128,7 @@ class ReleaseRegistry(promotion.Promotion, rollback.Rollback):
         for number, state in known.items():
             if (
                 production
-                and state is status.ReleaseState.PRODUCTION
+                and state is status.State.PRODUCTION
                 and number != recorded["version"]
             ):
                 findings.append(

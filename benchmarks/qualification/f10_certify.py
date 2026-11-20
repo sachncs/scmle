@@ -523,7 +523,7 @@ def gate_coverage_randomized(replicates: int, base: int = 0) -> dict[str, Any]:
     covered = []
     for i in range(replicates):
         frame = f10_generators.randomized(stream(base, i), 800)
-        out = aipw.difference_in_means(frame, "t", "y", LEVEL)
+        out = aipw.contrast(frame, "t", "y", LEVEL)
         covered.append(out.low <= AIPW_TRUE_EFFECT <= out.high)
     result: dict[str, Any] = {"coverage": coverage_row(covered)}
     result["passed"] = verdict("coverage_randomized", result)
@@ -602,7 +602,7 @@ def gate_coverage_rd(replicates: int, base: int = 0) -> dict[str, Any]:
             f10_generators.discontinuity(stream(base, i), 1500), "x", "y", 0.0
         )
         covered.append(out.low <= 1.0 <= out.high)
-        z.append((out.bias_corrected - 1.0) / out.se)
+        z.append((out.corrected - 1.0) / out.se)
     result: dict[str, Any] = {"coverage": coverage_row(covered, z)}
     result["passed"] = verdict("coverage_rd", result)
     return result
@@ -764,7 +764,7 @@ def gate_battery_nco(replicates: int, base: int = 0) -> dict[str, Any]:
         nuisances = aipw.prefit(x, cols, "t", "nco")
         out = aipw.estimate(nuisances, c, "t", "nco", "ATE", LEVEL)
         test = battery.wald("nco", "negative_outcome", out.estimate, out.se)
-        return not battery.run_battery([test], ALPHA_FALSIFY).passed
+        return not battery.correct([test], ALPHA_FALSIFY).passed
 
     return alarm_gate(detect, [0.0, 0.1, 0.2, 0.3, 0.5, 0.8], replicates, base)
 
@@ -793,8 +793,8 @@ def gate_battery_pretrend(replicates: int, base: int = 0) -> dict[str, Any]:
         """
         frame = f10_generators.panel(rx, 150, 150, drift=delta)
         out = did.estimate(frame, "id", "t", "g", "y")
-        test = battery.Test("pretrend", "placebo", float(out.pretrend_p or 1.0))
-        return not battery.run_battery([test], ALPHA_FALSIFY).passed
+        test = battery.Test("pretrend", "placebo", float(out.pretrend or 1.0))
+        return not battery.correct([test], ALPHA_FALSIFY).passed
 
     return alarm_gate(
         detect, [0.0, 0.05, 0.1, 0.15, 0.2, 0.3], replicates, base
@@ -826,7 +826,7 @@ def gate_density_rd(replicates: int, base: int = 0) -> dict[str, Any]:
         out = rd.estimate(
             f10_generators.discontinuity(rx, 1500, sorting=delta), "x", "y", 0.0
         )
-        return out.density_p < ALPHA_FALSIFY
+        return out.density < ALPHA_FALSIFY
 
     return alarm_gate(detect, [0.0, 0.1, 0.2, 0.3, 0.5, 0.7], replicates, base)
 
@@ -868,7 +868,7 @@ def gate_battery_rd(replicates: int, base: int = 0) -> dict[str, Any]:
             battery.Test(f"balance:{k}", "negative_outcome", float(v["p"]))
             for k, v in out.balance.items()
         ]
-        return not battery.run_battery(tests, ALPHA_FALSIFY).passed
+        return not battery.correct(tests, ALPHA_FALSIFY).passed
 
     return alarm_gate(detect, [0.0, 0.05, 0.1, 0.2, 0.3, 0.5], replicates, base)
 
@@ -1224,7 +1224,7 @@ def current_digests() -> dict[str, dict[str, str]]:
     Returns:
         Mapping of gate name to its `method_hash` and `code_hash`.
     """
-    methods = certified.method_hashes()
+    methods = certified.checksum()
     harness = runner_objects()
     return {
         name: {

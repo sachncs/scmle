@@ -239,7 +239,7 @@ def test_surveying_curates_into_a_portrait():
         portrait = stage.curate(board, made.frame, development, made.profile)
         assert isinstance(portrait, surveying.Portrait)
         assert portrait.profile is made.profile
-        assert portrait.curation.profiled_rows == len(development)
+        assert portrait.curation.rows == len(development)
     finally:
         board.close()
 
@@ -310,13 +310,13 @@ def test_amend_applies_the_amended_portrait():
     made = profiling.Profiling().execute(board)
     try:
         plan = dataclasses.replace(
-            made.profile.feature_plan, numeric=("a",), dropped={"b": "gone"}
+            made.profile.plan, numeric=("a",), dropped={"b": "gone"}
         )
         written = admission.amend(board, plan)
         assert written == ["curation_report.json", "dataset_card.json"]
         portrait = board.get(surveying.Portrait)
-        assert portrait.profile.feature_plan is plan
-        assert portrait.curation.dropped_columns == {"b": "gone"}
-        assert made.profile.feature_plan is not plan
+        assert portrait.profile.plan is plan
+        assert portrait.curation.dropped == {"b": "gone"}
+        assert made.profile.plan is not plan
     finally:
         board.close()

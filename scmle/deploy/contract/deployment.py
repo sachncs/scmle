@@ -69,12 +69,10 @@ class Resources:
         """
         for side in ("requests", "limits"):
             quota = getattr(self, side)
-            references.require_positive(quota.cpu, f"resources.{side}.cpu")
-            references.require_positive(
-                quota.memory, f"resources.{side}.memory"
-            )
-        references.require_positive(self.scratch, "resources.scratch")
-        references.require_positive(self.concurrency, "resources.concurrency")
+            references.enforce(quota.cpu, f"resources.{side}.cpu")
+            references.enforce(quota.memory, f"resources.{side}.memory")
+        references.enforce(self.scratch, "resources.scratch")
+        references.enforce(self.concurrency, "resources.concurrency")
         if self.limits.cpu < self.requests.cpu:
             raise errors.ConfigError("limits.cpu must be at least requests.cpu")
         if self.limits.memory < self.requests.memory:
@@ -149,10 +147,10 @@ class Probes:
             raise errors.ConfigError(
                 "liveness and readiness must be different endpoints"
             )
-        references.require_positive(self.period, "health.period")
-        references.require_positive(self.timeout, "health.timeout")
-        references.require_positive(self.threshold, "health.threshold")
-        references.require_positive(self.grace, "health.grace")
+        references.enforce(self.period, "health.period")
+        references.enforce(self.timeout, "health.timeout")
+        references.enforce(self.threshold, "health.threshold")
+        references.enforce(self.grace, "health.grace")
         if self.timeout > self.period:
             raise errors.ConfigError("probe timeout exceeds the probe period")
 
@@ -296,12 +294,12 @@ class Deployment:
 
     version: str
     environment: references.Environment
-    image: references.ImageRef
-    bundle: references.BundleRef
+    image: references.Image
+    bundle: references.Bundle
     resources: Resources
     health: Probes = dataclasses.field(default_factory=Probes)
     config: Mapping[str, str] = dataclasses.field(default_factory=dict)
-    secrets: tuple[references.SecretRef, ...] = ()
+    secrets: tuple[references.Secret, ...] = ()
     port: int = 8000
 
     def __post_init__(self) -> None:
@@ -384,13 +382,13 @@ class Deployment:
         return cls(
             version=values["version"],
             environment=references.Environment(values["environment"]),
-            image=references.ImageRef.from_dict(values["image"]),
-            bundle=references.BundleRef.from_dict(values["bundle"]),
+            image=references.Image.from_dict(values["image"]),
+            bundle=references.Bundle.from_dict(values["bundle"]),
             resources=Resources.from_dict(values["resources"]),
             health=Probes.from_dict(values["health"]),
             config=dict(values["config"]),
             secrets=tuple(
-                references.SecretRef.from_dict(s) for s in values["secrets"]
+                references.Secret.from_dict(s) for s in values["secrets"]
             ),
             port=values["port"],
         )

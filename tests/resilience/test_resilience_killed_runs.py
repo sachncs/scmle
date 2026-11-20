@@ -119,7 +119,7 @@ def references(workspace):
 
 
 def check_resume(root, references, label, phase, index, gated):
-    store = objectstore.LocalObjectStore(root)
+    store = objectstore.Disk(root)
     failpoints.seed(store, gated)
     kind = "gate" if gated else "plain"
     child = run_child("kill", root, label, phase, index, kind)
@@ -175,7 +175,7 @@ def check_resume(root, references, label, phase, index, gated):
 def test_an_uninterrupted_child_matches_the_reference_byte_for_byte(
     root, references
 ):
-    store = objectstore.LocalObjectStore(root)
+    store = objectstore.Disk(root)
     failpoints.seed(store)
     child = run_child("kill", root, "output_write", "before", 99, "plain")
     assert child.returncode == 0, child.stderr[-2000:]

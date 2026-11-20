@@ -326,7 +326,7 @@ class Family(abc.ABC):
         present = int((~indicator).sum())
         if rate < MIN_MISSING_RATE or present < MIN_PRESENT_ROWS:
             return 0.0
-        if not task.is_classification:
+        if not task.classification:
             corr = indicator.astype(float).corr(
                 target.astype(float), method="spearman"
             )
@@ -461,7 +461,7 @@ class Quantitative(Family):
         ]
         if options.impute:
             steps.append(("impute", self.imputer(options.missing)))
-        if options.log_skewed:
+        if options.skewed:
             steps.append(("log", transformers.Logarithm()))
         if options.scale:
             steps.append(("scale", preprocessing.StandardScaler()))
@@ -497,7 +497,7 @@ class Quantitative(Family):
         if rows is None:
             return 0.0
         values, labels = rows
-        if not task.is_classification:
+        if not task.classification:
             corr = values.astype(float).corr(
                 labels.astype(float), method="spearman"
             )
@@ -599,8 +599,8 @@ class Text(Family):
             most `TEXT_TERMS` terms or embedding dimensions.
         """
         encoder: Any = (
-            embedding.Embedder(options.embedding_model, TEXT_TERMS)
-            if options.text_encoding == "embedding"
+            embedding.Embedder(options.model, TEXT_TERMS)
+            if options.encoding == "embedding"
             else transformers.Vectorizer(max_terms=TEXT_TERMS)
         )
         return pipeline.Pipeline(
@@ -760,7 +760,7 @@ class Categorical(Family):
             hold distinct values (near-unique keys).
         """
         rows = self.align(series, target)
-        if rows is None or not task.is_classification:
+        if rows is None or not task.classification:
             return 0.0
         values, labels = rows
         if values.nunique() > len(values) / 2:

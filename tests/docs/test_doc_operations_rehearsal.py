@@ -18,9 +18,7 @@ def test_rotation_rejects_the_old_key_and_leaves_no_temporary_file(
     bundle, features = trained
     directory = bundle.save(tmp_path / "m", signing_key="old-key")
     before = sorted(p.name for p in directory.rglob("*"))
-    scmle.artifacts.bundle.Bundle.rotate_signing_key(
-        directory, "old-key", "new-key"
-    )
+    scmle.artifacts.bundle.Bundle.rotate(directory, "old-key", "new-key")
     assert sorted(p.name for p in directory.rglob("*")) == before
     with pytest.raises(errors.ArtifactError, match="signature is invalid"):
         scmle.artifacts.bundle.Bundle.load(directory, signing_key="old-key")

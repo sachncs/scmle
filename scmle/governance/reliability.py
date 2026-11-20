@@ -23,27 +23,27 @@ class Emission:
     with the release-blocking reliability registry.
     """
 
-    evidence_type: str
+    kind: str
     content: bytes
-    observed_outcome: reliability.Outcome
+    outcome: reliability.Outcome
     observation: str
 
     def __post_init__(self) -> None:
         """Checks that the evidence can be persisted and reviewed.
 
         Raises:
-            TypeError: If `observed_outcome` is not an `Outcome`.
+            TypeError: If `outcome` is not an `Outcome`.
             ValueError: If the evidence type is blank or not a path-safe name,
                 the content is not non-empty bytes, or the observation is blank.
         """
-        if not self.evidence_type.strip():
+        if not self.kind.strip():
             raise errors.InputError("evidence_type must not be empty")
-        if "/" in self.evidence_type or "\\" in self.evidence_type:
+        if "/" in self.kind or "\\" in self.kind:
             raise errors.InputError("evidence_type must be a path-safe name")
         content: object = self.content  # may be any value from a caller
         if not isinstance(content, bytes) or not content:
             raise errors.InputError("content must be non-empty bytes")
-        if not isinstance(self.observed_outcome, reliability.Outcome):
+        if not isinstance(self.outcome, reliability.Outcome):
             raise errors.KindError("observed_outcome must be Outcome")
         if not self.observation.strip():
             raise errors.InputError("observation must not be empty")
@@ -55,21 +55,21 @@ class Harness:
     def __init__(
         self,
         registry: reliability.Registry,
-        artifact_root: str | pathlib.Path,
-        execution_id: str,
+        root: str | pathlib.Path,
+        execution: str,
         reviewer: str,
-        recorded_at: str,
+        recorded: str,
     ) -> None:
         """Initializes a harness with explicit evidence identity.
 
         Args:
             registry: The plan registry that receives the evidence.
-            artifact_root: Directory the evidence files are written to; it is
+            root: Directory the evidence files are written to; it is
                 created if missing.
-            execution_id: Identifier of this execution; it must be a path-safe
+            execution: Identifier of this execution; it must be a path-safe
                 name.
             reviewer: Who records the evidence.
-            recorded_at: When the evidence is recorded.
+            recorded: When the evidence is recorded.
 
         Raises:
             TypeError: If `registry` is not a `Registry`.
@@ -79,21 +79,21 @@ class Harness:
         if not isinstance(registry, reliability.Registry):
             raise errors.KindError("registry must be Registry")
         identity: tuple[tuple[str, object], ...] = (
-            ("execution_id", execution_id),
+            ("execution_id", execution),
             ("reviewer", reviewer),
-            ("recorded_at", recorded_at),
+            ("recorded_at", recorded),
         )
         for name, value in identity:
             if not isinstance(value, str) or not value.strip():
                 raise errors.InputError(f"{name} must not be empty")
-        if "/" in execution_id or "\\" in execution_id:
+        if "/" in execution or "\\" in execution:
             raise errors.InputError("execution_id must be a path-safe name")
         self.registry = registry
-        self.artifact_root = pathlib.Path(artifact_root).resolve()
-        self.artifact_root.mkdir(parents=True, exist_ok=True)
-        self.execution_id = execution_id
+        self.root = pathlib.Path(root).resolve()
+        self.root.mkdir(parents=True, exist_ok=True)
+        self.execution = execution
         self.reviewer = reviewer
-        self.recorded_at = recorded_at
+        self.recorded = recorded
 
     def run(
         self,
@@ -107,7 +107,7 @@ class Harness:
         the scenario ``INCONCLUSIVE`` (``FAILED`` if another artifact reports
         an unsafe outcome); evidence of an undeclared type is refused before
         anything is written. Neither becomes a passing release claim by
-        omission. Each artifact is written under `artifact_root` before the
+        omission. Each artifact is written under `root` before the
         registry records the evidence, so files remain if the registry then
         refuses it (for example an empty tuple, or an ``inconclusive``
         outcome on a complete set); a scenario the registry has no plan for
@@ -135,14 +135,14 @@ class Harness:
         except Exception as error:
             raise errors.ReliabilityError(
                 "fault executor failed before evidence was recorded",
-                {"scenario": scenario.value, "execution_id": self.execution_id},
+                {"scenario": scenario.value, "execution_id": self.execution},
             ) from error
         if not isinstance(artifacts, tuple) or not all(
             isinstance(item, Emission) for item in artifacts
         ):
             raise errors.KindError("executor must return Emission values")
         requirements = self.registry.plans[scenario].requirements
-        evidence_types = tuple(item.evidence_type for item in artifacts)
+        evidence_types = tuple(item.kind for item in artifacts)
         if len(evidence_types) != len(set(evidence_types)):
             raise errors.InputError(
                 "executor returned duplicate evidence types; "
@@ -158,18 +158,18 @@ class Harness:
             )
         evidence: list[reliability.Evidence] = []
         for artifact in artifacts:
-            path = self.artifact_root / (
-                f"{self.execution_id}-{scenario.value}-{artifact.evidence_type}.bin"
+            path = self.root / (
+                f"{self.execution}-{scenario.value}-{artifact.kind}.bin"
             )
-            self.write_atomically(path, artifact.content)
+            self.write(path, artifact.content)
             evidence.append(
                 reliability.Evidence(
-                    kind=artifact.evidence_type,
-                    execution=self.execution_id,
+                    kind=artifact.kind,
+                    execution=self.execution,
                     uri=path.as_uri(),
                     digests={"artifact": self.digest(path)},
-                    outcome=artifact.observed_outcome,
-                    recorded=self.recorded_at,
+                    outcome=artifact.outcome,
+                    recorded=self.recorded,
                     reviewer=self.reviewer,
                     observation=artifact.observation,
                 )
@@ -193,7 +193,7 @@ class Harness:
         return digest.hexdigest()
 
     @staticmethod
-    def write_atomically(path: pathlib.Path, content: bytes) -> None:
+    def write(path: pathlib.Path, content: bytes) -> None:
         """Writes an evidence artifact using flush, fsync, and replace.
 
         Args:
@@ -210,7 +210,7 @@ class Harness:
                 handle.flush()
                 os.fsync(handle.fileno())
             pathlib.Path(temporary_name).replace(path)
-            durability.sync_directory(path.parent)
+            durability.flush(path.parent)
         except Exception:
             with contextlib.suppress(FileNotFoundError):
                 pathlib.Path(temporary_name).unlink()

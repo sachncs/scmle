@@ -29,17 +29,17 @@ class Thresholds:
 
     Attributes:
         cuts: Cut on the score for each group label.
-        target_rate: The common rate the cuts were matched to.
-        net_benefit: Development net benefit of the rule at `t`.
-        development_gap: Largest development gap in the criterion.
+        target: The common rate the cuts were matched to.
+        benefit: Development net benefit of the rule at `t`.
+        gap: Largest development gap in the criterion.
         constrained: False when the unconstrained common cut already met the
             development bound.
     """
 
     cuts: dict[str, float]
-    target_rate: float | None
-    net_benefit: float
-    development_gap: float
+    target: float | None
+    benefit: float
+    gap: float
     constrained: bool
 
     def act(
@@ -61,7 +61,7 @@ class Thresholds:
         return (s >= cut).astype(float)
 
 
-def development_gap(
+def contrast(
     y: NDArray[numpy.float64],
     acts: NDArray[numpy.float64],
     labels: NDArray[Any],
@@ -146,11 +146,11 @@ def sweep(
         if cuts is None:
             continue
         acts = Thresholds(cuts, rate, 0.0, 0.0, constrained=True).act(s, labels)
-        achieved = development_gap(outcomes, acts, labels, criterion)
+        achieved = contrast(outcomes, acts, labels, criterion)
         if achieved > bound:
             continue
         value = costs.net_benefit(outcomes, acts, t)
-        if best is None or value > best.net_benefit:
+        if best is None or value > best.benefit:
             best = Thresholds(
                 cuts, float(rate), value, achieved, constrained=True
             )
@@ -206,7 +206,7 @@ def equalize(
     bound = margin * constraint.gap
     common = (s >= t).astype(float)
     names = sorted(str(g) for g in numpy.unique(labels))
-    gap = development_gap(outcomes, common, labels, constraint.criterion)
+    gap = contrast(outcomes, common, labels, constraint.criterion)
     if gap <= bound:
         return Thresholds(
             dict.fromkeys(names, t),
@@ -246,7 +246,7 @@ def frontier(
     Returns:
         One record per bound, in the order of `gaps`, with `max_gap` and
         `feasible`; a feasible point also carries its development
-        `net_benefit` and `development_gap`. The default `margin` of
+        `net_benefit` and `contrast`. The default `margin` of
         `equalize` is used. Errors other than infeasibility,
         including the refusal of predictive parity, propagate from
         `equalize`.
@@ -264,8 +264,8 @@ def frontier(
             {
                 "max_gap": gap,
                 "feasible": True,
-                "net_benefit": fitted.net_benefit,
-                "development_gap": fitted.development_gap,
+                "net_benefit": fitted.benefit,
+                "development_gap": fitted.gap,
             }
         )
     return rows

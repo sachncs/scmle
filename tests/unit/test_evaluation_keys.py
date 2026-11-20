@@ -217,19 +217,19 @@ def test_scope_writes_single_word_keys():
     scope = non_tabular.Scope(
         modality="image",
         representation="pixels",
-        decoder_policy="caller decodes",
+        policy="caller decodes",
         limitations=("small",),
     )
     written = scope.to_dict()
     assert written["decoder"] == "caller decodes"
-    assert written["family"] == scope.model_family
+    assert written["family"] == scope.family
     assert "decoder_policy" not in written
     assert "model_family" not in written
     assert non_tabular.Scope.KEYS.downgrade(written) == {
         "modality": "image",
         "representation": "pixels",
         "decoder_policy": "caller decodes",
-        "model_family": scope.model_family,
+        "model_family": scope.family,
         "status": "experimental",
         "limitations": ["small"],
     }
@@ -240,8 +240,8 @@ def manifest() -> provenance.Manifest:
         "logistic",
         "v1",
         "roc_auc",
-        model_params={"C": 1.0},
-        decision_threshold=0.4,
+        params={"C": 1.0},
+        threshold=0.4,
     )
 
 

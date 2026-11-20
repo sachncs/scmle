@@ -89,7 +89,7 @@ class Retraining(feeding.Feeding):
         Returns:
             The identifier of the open retrain escalation, or None.
         """
-        for item in self.loop.pending_escalations():
+        for item in self.loop.survey():
             if item.question.get("action") == policies.RETRAIN_QUESTION:
                 return item.id
         return None

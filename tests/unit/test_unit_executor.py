@@ -65,7 +65,7 @@ def flow(*items, **changes):
 
 @pytest.fixture
 def store(tmp_path):
-    return objectstore.LocalObjectStore(tmp_path / "state")
+    return objectstore.Disk(tmp_path / "state")
 
 
 @pytest.fixture
@@ -888,9 +888,9 @@ def test_a_bucket_keeps_a_runs_records_under_its_prefix(store, clock):
     assert bucket.restore(1, "b", None, {}) is None
     bucket.keep("run.json", {"state": "running"})
     assert executor.record("r1") == {"state": "running"}
-    before = sorted(meta.key for meta in store.list_objects("workflows/"))
+    before = sorted(meta.key for meta in store.catalog("workflows/"))
     bucket.finish()
-    assert sorted(m.key for m in store.list_objects("workflows/")) == before
+    assert sorted(m.key for m in store.catalog("workflows/")) == before
 
 
 def test_a_bucket_writes_through_the_runs_fenced_write(store, clock):

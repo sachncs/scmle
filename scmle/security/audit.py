@@ -39,7 +39,7 @@ class Log:
 
     def __init__(
         self,
-        ledger: deployment_ledger.DeploymentLedger,
+        ledger: deployment_ledger.Ledger,
         clock: Callable[[], float] = time.time,
     ) -> None:
         """Initializes the log.
@@ -75,9 +75,9 @@ class Log:
                 ledger's loader raises it).
         """
         if path is not None and pathlib.Path(path).exists():
-            ledger = deployment_ledger.DeploymentLedger.load(path)
+            ledger = deployment_ledger.Ledger.load(path)
         else:
-            ledger = deployment_ledger.DeploymentLedger.create(
+            ledger = deployment_ledger.Ledger.create(
                 path,
                 charter_hash=SERVICE_CHARTER,
                 policy={"purpose": "security audit"},
@@ -161,7 +161,7 @@ class Log:
             actor=None if principal is None else principal.subject,
             tenant=None if principal is None else principal.tenant,
             key_id=None if principal is None else principal.key_id,
-            token_id=None if principal is None else principal.token_id,
+            token_id=None if principal is None else principal.token,
             route=route,
             outcome=outcome,
             status=status,

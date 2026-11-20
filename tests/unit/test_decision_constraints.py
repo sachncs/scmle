@@ -37,13 +37,13 @@ def test_equal_rates_are_satisfied_and_unequal_rates_are_not():
     y = (rng.random(20000) < 0.4).astype(float)
     fair = (rng.random(20000) < 0.2 + 0.5 * y).astype(float)
     ok = constraints.satisfy(y, fair, groups, constraint(gap=0.08))
-    assert ok.status == constraints.SATISFIED and ok.upper_bound <= 0.08
+    assert ok.status == constraints.SATISFIED and ok.upper <= 0.08
     unfair = (rng.random(20000) < 0.2 + 0.5 * y - 0.15 * groups * y).astype(
         float
     )
     bad = constraints.satisfy(y, unfair, groups, constraint(gap=0.08))
     assert bad.status == constraints.NOT_SATISFIED
-    assert bad.point_gap == pytest.approx(0.15 / 0.7 * 0.7, abs=0.05)
+    assert bad.estimate == pytest.approx(0.15 / 0.7 * 0.7, abs=0.05)
 
 
 def test_a_point_estimate_below_the_bound_is_not_satisfaction():
@@ -52,7 +52,7 @@ def test_a_point_estimate_below_the_bound_is_not_satisfaction():
     y = (rng.random(400) < 0.5).astype(float)
     acts = (rng.random(400) < 0.3 + 0.4 * y).astype(float)
     result = constraints.satisfy(y, acts, groups, constraint(gap=0.1))
-    assert result.point_gap < 0.1 < result.upper_bound
+    assert result.estimate < 0.1 < result.upper
     assert result.status == constraints.NOT_SATISFIED
 
 
@@ -63,26 +63,19 @@ def test_small_groups_are_not_assessable_never_passing():
     acts = y.copy()
     result = constraints.satisfy(y, acts, groups, constraint(minimum=30))
     assert result.status == constraints.NOT_ASSESSABLE
-    assert result.small_groups == ("1",)
-    assert result.point_gap is None
+    assert result.small == ("1",)
+    assert result.estimate is None
 
 
 def test_each_criterion_reads_its_own_rate():
     y = numpy.array([1.0, 1.0, 0.0, 0.0] * 50)
     groups = numpy.array([0, 1] * 100)
     acts = numpy.array([1.0, 0.0, 1.0, 0.0] * 50)
-    assert (
-        constraints.development_gap(y, acts, groups, "demographic_parity")
-        == 1.0
-    )
-    assert (
-        constraints.development_gap(y, acts, groups, "equal_opportunity") == 1.0
-    )
-    assert constraints.development_gap(y, acts, groups, "equalized_odds") == 1.0
+    assert constraints.contrast(y, acts, groups, "demographic_parity") == 1.0
+    assert constraints.contrast(y, acts, groups, "equal_opportunity") == 1.0
+    assert constraints.contrast(y, acts, groups, "equalized_odds") == 1.0
     # group 1 selects nobody, so its precision is read as zero; group 0 has 0.5
-    assert (
-        constraints.development_gap(y, acts, groups, "predictive_parity") == 0.5
-    )
+    assert constraints.contrast(y, acts, groups, "predictive_parity") == 0.5
 
 
 def test_group_thresholds_close_a_gap_and_the_price_is_reported():
@@ -90,11 +83,9 @@ def test_group_thresholds_close_a_gap_and_the_price_is_reported():
     score, y, groups = binormal(30000, 2)
     t = 0.3
     free = (score >= t).astype(float)
-    assert (
-        constraints.development_gap(y, free, groups, "equal_opportunity") > 0.1
-    )
+    assert constraints.contrast(y, free, groups, "equal_opportunity") > 0.1
     fitted = constraints.equalize(score, y, groups, constraint(gap=0.06), t)
-    assert fitted.constrained and fitted.development_gap <= 0.03
+    assert fitted.constrained and fitted.gap <= 0.03
     acts = fitted.act(score, groups)
     result = constraints.satisfy(y, acts, groups, constraint(gap=0.06))
     assert result.status == constraints.SATISFIED
@@ -135,11 +126,11 @@ def test_incompatible_criteria_are_refused_only_when_base_rates_differ():
     )
     ignored, y, groups = binormal(20000, 6, rates=(0.2, 0.5))
     with pytest.raises(constraints.InfeasibleError, match="cannot both hold"):
-        constraints.check_feasibility(pair, y, groups)
+        constraints.check(pair, y, groups)
     ignored, y_equal, groups_equal = binormal(20000, 7, rates=(0.3, 0.3))
-    report = constraints.check_feasibility(pair, y_equal, groups_equal)
+    report = constraints.check(pair, y_equal, groups_equal)
     assert report["differ"] is False and report["conflicts"]
-    single = constraints.check_feasibility(pair[:1], y, groups)
+    single = constraints.check(pair[:1], y, groups)
     assert single["conflicts"] == []
 
 
@@ -182,7 +173,7 @@ def test_clustered_rows_are_not_declared_satisfied_more_often_than_alpha():
         rows += constraints.satisfy(y, acts, groups, rule).status == (
             constraints.SATISFIED
         )
-        cluster_aware += constraints.cluster_satisfaction_test(
+        cluster_aware += constraints.resample(
             y, acts, groups, cluster, rule, draws=400, seed=seed
         ).status == (constraints.SATISFIED)
     assert cluster_aware / worlds <= 0.07
@@ -191,17 +182,17 @@ def test_clustered_rows_are_not_declared_satisfied_more_often_than_alpha():
 
 def test_a_clearly_fair_clustered_rule_is_satisfied():
     y, acts, groups, cluster = clustered_world(1, gap=0.0, spread=0.02)
-    result = constraints.cluster_satisfaction_test(
+    result = constraints.resample(
         y, acts, groups, cluster, constraint("demographic_parity", gap=0.2)
     )
     assert result.status == constraints.SATISFIED
-    assert result.point_gap is not None and result.upper_bound is not None
-    assert result.upper_bound >= result.point_gap
+    assert result.estimate is not None and result.upper is not None
+    assert result.upper >= result.estimate
 
 
 def test_cluster_aware_small_groups_and_bad_inputs():
     y, acts, groups, cluster = clustered_world(2)
-    small = constraints.cluster_satisfaction_test(
+    small = constraints.resample(
         y,
         acts,
         groups,
@@ -210,15 +201,15 @@ def test_cluster_aware_small_groups_and_bad_inputs():
     )
     assert small.status == constraints.NOT_ASSESSABLE
     with pytest.raises(ValueError):
-        constraints.cluster_satisfaction_test(
+        constraints.resample(
             y, acts, groups, cluster[:-1], constraint("demographic_parity")
         )
     with pytest.raises(ValueError):
-        constraints.cluster_satisfaction_test(
+        constraints.resample(
             y, acts, groups, cluster, constraint("demographic_parity"), alpha=2
         )
     with pytest.raises(ValueError):
-        constraints.cluster_satisfaction_test(
+        constraints.resample(
             y, acts, groups, cluster, constraint("demographic_parity"), draws=0
         )
 
@@ -232,10 +223,10 @@ def test_the_cluster_test_is_reproducible_and_reads_every_criterion():
         "predictive_parity",
     ):
         rule = constraint(criterion, gap=0.5, minimum=30)
-        first = constraints.cluster_satisfaction_test(
+        first = constraints.resample(
             y, acts, groups, cluster, rule, draws=200, seed=4
         )
-        again = constraints.cluster_satisfaction_test(
+        again = constraints.resample(
             y, acts, groups, cluster, rule, draws=200, seed=4
         )
         assert first == again
@@ -244,4 +235,4 @@ def test_the_cluster_test_is_reproducible_and_reads_every_criterion():
 
 def test_base_rates_refuse_groups_and_outcomes_of_different_length():
     with pytest.raises(ValueError, match="same length"):
-        constraints.base_rates(numpy.array([1, 0, 1]), numpy.array(["a", "b"]))
+        constraints.count(numpy.array([1, 0, 1]), numpy.array(["a", "b"]))

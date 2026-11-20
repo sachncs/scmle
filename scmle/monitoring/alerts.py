@@ -254,7 +254,7 @@ class Jsonl(Sink):
                 stream.write(json.dumps(record, sort_keys=True) + "\n")
                 stream.flush()
                 os.fsync(stream.fileno())
-            durability.sync_directory(self.path.parent)
+            durability.flush(self.path.parent)
         return Delivery(
             alert.identifier,
             alert.route,
@@ -505,7 +505,7 @@ class Dispatcher:
                 stream.write(json.dumps(record, sort_keys=True) + "\n")
                 stream.flush()
                 os.fsync(stream.fileno())
-            durability.sync_directory(self.journal.parent)
+            durability.flush(self.journal.parent)
 
 
 __all__ = [

@@ -26,7 +26,7 @@ class Oversight:
         self.path = path
         self.rows: list[dict[str, Any]] = []
         self.header: dict[str, Any] = {}
-        self.system_keys: frozenset[str] = frozenset()
+        self.keys: frozenset[str] = frozenset()
         self.escalations: dict[str, dict[str, Any]] = {}
         self.closed: dict[str, str] = {}
         self.attestations: dict[str, dict[str, Any]] = {}
@@ -37,8 +37,8 @@ class Oversight:
         self.halted = False
         self.experiments: dict[str, dict[str, Any]] = {}
         self.envelopes: dict[str, dict[str, Any]] = {}
-        self.envelope_uses: dict[str, dict[str, int]] = {}
-        self.envelope_revoked: dict[str, dict[str, Any]] = {}
+        self.uses: dict[str, dict[str, int]] = {}
+        self.revoked: dict[str, dict[str, Any]] = {}
         self.intents: dict[str, dict[str, Any]] = {}
         self.consumed: dict[str, dict[str, Any]] = {}
         self.rejected: dict[str, dict[str, Any]] = {}
@@ -55,7 +55,7 @@ class Oversight:
             body: The row content; not interpreted.
         """
 
-    def apply_open(self, body: Mapping[str, Any]) -> None:
+    def apply(self, body: Mapping[str, Any]) -> None:
         """Reads the header and builds the e-LOND sequence.
 
         Args:
@@ -70,7 +70,7 @@ class Oversight:
         if body["policy_hash"] != ledger.digest(body["policy"]):
             raise kinds.MisuseError("policy does not match its hash")
         self.header = dict(body)
-        self.system_keys = frozenset(body["system_keys"])
+        self.keys = frozenset(body["system_keys"])
         self.promotion = sequential_tests.Sequence(body["alpha_promo"])
 
     def elond(self) -> sequential_tests.Sequence:
@@ -183,7 +183,7 @@ class Oversight:
             raise kinds.MisuseError(
                 "attestation is bound to a different question"
             )
-        if reply.key_id in self.system_keys:
+        if reply.key_id in self.keys:
             raise kinds.MisuseError(
                 "attestation is signed with a key the system holds"
             )
@@ -266,12 +266,12 @@ class Automation(Oversight):
             raise kinds.MisuseError(
                 f"envelope {grant.identifier!r} was already granted"
             )
-        if grant.key_id in self.system_keys:
+        if grant.key_id in self.keys:
             raise kinds.MisuseError(
                 "envelope is signed with a key the system holds"
             )
         self.envelopes[grant.identifier] = grant.to_dict()
-        self.envelope_uses[grant.identifier] = {}
+        self.uses[grant.identifier] = {}
 
     def consume(self, body: Mapping[str, Any]) -> None:
         """Counts one use, refusing what the envelope does not allow.
@@ -290,7 +290,7 @@ class Automation(Oversight):
         grant = self.envelopes.get(identity)
         if grant is None:
             raise kinds.MisuseError(f"envelope {identity!r} is unknown")
-        if identity in self.envelope_revoked:
+        if identity in self.revoked:
             raise kinds.MisuseError(f"envelope {identity!r} was revoked")
         limit = grant["limits"].get(action)
         if limit is None:
@@ -299,13 +299,13 @@ class Automation(Oversight):
             )
         if body["scope"] != grant["scope"]:
             raise kinds.MisuseError("use is outside the envelope's scope")
-        used = self.envelope_uses[identity].get(action, 0)
+        used = self.uses[identity].get(action, 0)
         if used >= limit:
             raise kinds.MisuseError(
                 f"envelope {identity!r} has spent its {limit} use(s) of "
                 f"{action!r}"
             )
-        self.envelope_uses[identity][action] = used + 1
+        self.uses[identity][action] = used + 1
 
     def revoke(self, body: Mapping[str, Any]) -> None:
         """Removes an envelope's authority, once.
@@ -320,9 +320,9 @@ class Automation(Oversight):
         identity = str(body["envelope_id"])
         if identity not in self.envelopes:
             raise kinds.MisuseError(f"envelope {identity!r} is unknown")
-        if identity in self.envelope_revoked:
+        if identity in self.revoked:
             raise kinds.MisuseError(f"envelope {identity!r} is revoked")
-        self.envelope_revoked[identity] = dict(body)
+        self.revoked[identity] = dict(body)
 
     def journal(self, body: Mapping[str, Any]) -> None:
         """Keeps the controller's journal: each input digest is applied once.

@@ -57,13 +57,13 @@ UNSUPPORTED_NAMES = frozenset(
     }
 )
 FAMILIES = {
-    capabilities.ModelFamily.TRANSFORMER.value,
-    capabilities.ModelFamily.TEXT_TRANSFORMER.value,
-    capabilities.ModelFamily.VISION_TRANSFORMER.value,
-    capabilities.ModelFamily.AUDIO_TRANSFORMER.value,
-    capabilities.ModelFamily.VIDEO_TRANSFORMER.value,
-    capabilities.ModelFamily.MULTIMODAL_TRANSFORMER.value,
-    capabilities.ModelFamily.JEPA.value,
+    capabilities.Family.TRANSFORMER.value,
+    capabilities.Family.TEXT_TRANSFORMER.value,
+    capabilities.Family.VISION_TRANSFORMER.value,
+    capabilities.Family.AUDIO_TRANSFORMER.value,
+    capabilities.Family.VIDEO_TRANSFORMER.value,
+    capabilities.Family.MULTIMODAL_TRANSFORMER.value,
+    capabilities.Family.JEPA.value,
 }
 
 
@@ -151,7 +151,7 @@ def test_every_supported_capability_is_tabular_library_inference():
 def test_no_pretrained_or_multimodal_family_is_supported():
     found = roster.enrol().catalogue()
     for capability in found:
-        if capability.key.model_family in FAMILIES:
+        if capability.key.family in FAMILIES:
             assert capability.status is capabilities.Status.EXPERIMENTAL
 
 
@@ -179,7 +179,7 @@ def test_an_extension_adapter_never_inherits_supported():
     key = capabilities.Coordinate(
         modality=capabilities.Modality.IMAGE,
         task=tasks.Task.BINARY,
-        model_family="acme_cnn",
+        family="acme_cnn",
         evaluation=capabilities.Evaluation.STANDARD,
         uncertainty=capabilities.Uncertainty.NONE,
         fairness=capabilities.Fairness.NONE,

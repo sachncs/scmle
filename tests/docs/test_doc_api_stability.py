@@ -15,25 +15,25 @@ SNAPSHOT = (
     pathlib.Path(__file__).resolve().parents[1] / "fixtures" / "public_api.json"
 )
 CONTRACT = (
-    "BundleRef",
+    "Bundle",
     "Deployment",
-    "ImageRef",
+    "Image",
     "Probes",
     "Provider",
     "Resources",
     "Runtime",
-    "SecretRef",
-    "conformance_problems",
+    "Secret",
+    "audit",
 )
 SECURITY = {
     "scmle.security.tokens": (
         "Key",
         "Keystore",
         "Principal",
-        "RevocationList",
+        "Revocations",
         "Verifier",
     ),
-    "scmle.security.access": ("DeniedError", "Gateway", "RateLimiter"),
+    "scmle.security.access": ("DeniedError", "Gateway", "Limiter"),
     "scmle.security.audit": ("Log",),
 }
 GOVERNED = (
@@ -96,14 +96,14 @@ def test_a_portrait_has_an_empty_leakage_field_and_writes_its_key():
     Also enforces website/src/pages/docs/api-stability.astro:62.
     """
     portrait = data.Portrait(
-        manifest=data.DatasetManifest(
+        manifest=data.Manifest(
             "ds", {"schema": "schema", "data": "data"}, 3, 1, "y"
         ),
-        column_statistics={},
-        quality_findings=(),
+        statistics={},
+        quality=(),
         risk_findings=(),
-        target_summary={},
-        feature_plan=data.Blueprint(("x",), ()),
+        summary={},
+        plan=data.Blueprint(("x",), ()),
     )
     assert portrait.leakage == {}
     assert portrait.blockers == ()

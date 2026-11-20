@@ -40,7 +40,7 @@ def main():
         {"age": rng.integers(18, 80, 300), "income": rng.normal(50, 15, 300)}
     )
     data["approved"] = (0.04 * data.age - 0.05 * data.income > 0).astype(int)
-    result = Project(data, "approved", time_budget=30).run()
+    result = Project(data, "approved", budget=30).run()
     result.save("runs/run-42/model", signing_key=release_key)
 
     bundle = Bundle.load(

@@ -385,7 +385,7 @@ class Processor:
         rows_out = 0
         failed: str | None = None
         problem: str | None = None
-        listing = self.retrying(lambda: self.store.list_objects(self.prefix))
+        listing = self.retrying(lambda: self.store.catalog(self.prefix))
         for meta in listing:
             known = checkpoint.processed.get(meta.key)
             if known is not None:
@@ -434,7 +434,7 @@ class Processor:
         )
 
     def process(
-        self, meta: objectstore.ObjectMeta, checkpoint: Checkpoint
+        self, meta: objectstore.Metadata, checkpoint: Checkpoint
     ) -> tuple[int, int, str]:
         """Processes one object and commits it to the checkpoint.
 

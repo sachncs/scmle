@@ -18,7 +18,7 @@ class Rollback(rollout.Rollout):
         self,
         model: str,
         environment: str,
-        plane: control.ControlPlane,
+        plane: control.Platform,
         signing_key: str | bytes | None = None,
     ) -> status.Outcome:
         """Restores the previous known-good revision.
@@ -47,7 +47,7 @@ class Rollback(rollout.Rollout):
             )
         target = current["known_good"][-1]
         try:
-            plane.set_traffic({target["revision"]: status.FULL_ROLLOUT})
+            plane.route({target["revision"]: status.FULL_ROLLOUT})
             control.confirm(
                 plane,
                 control.expecting(
@@ -57,7 +57,7 @@ class Rollback(rollout.Rollout):
             )
             self.rewind(model, environment, current, target, signing_key)
         except (
-            control.RuntimeUnconfirmed,
+            control.UnconfirmedError,
             control.Unsupported,
             errors.ScmleError,
         ) as error:
@@ -138,16 +138,16 @@ class Rollback(rollout.Rollout):
                 self.move(
                     entry,
                     current["version"],
-                    status.ReleaseState.RETIRED,
+                    status.State.RETIRED,
                     "rolled back",
-                    status.ReleaseState.PRODUCTION,
+                    status.State.PRODUCTION,
                 )
                 self.move(
                     entry,
                     target["version"],
-                    status.ReleaseState.PRODUCTION,
+                    status.State.PRODUCTION,
                     "rollback confirmed by the runtime",
-                    status.ReleaseState.RETIRED,
+                    status.State.RETIRED,
                 )
             entry["environments"][environment] = {
                 "version": target["version"],

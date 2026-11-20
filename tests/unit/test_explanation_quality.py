@@ -59,15 +59,15 @@ def test_linear_contribution_report_rejects_incomplete_contract(factory):
 
 
 def test_fidelity_scores_reconstruction_against_mean_baseline():
-    assert quality.fidelity_score((0.0, 1.0, 2.0), (0.0, 1.0, 2.0)) == 1.0
-    assert quality.fidelity_score((0.0, 1.0, 2.0), (1.0, 1.0, 1.0)) == 0.0
+    assert quality.score((0.0, 1.0, 2.0), (0.0, 1.0, 2.0)) == 1.0
+    assert quality.score((0.0, 1.0, 2.0), (1.0, 1.0, 1.0)) == 0.0
 
 
 def test_quality_evaluation_fails_closed_for_missing_required_measure():
     result = quality.evaluate(
         "permutation_importance",
         sample_count=2,
-        thresholds=quality.Thresholds(stability_minimum=0.8),
+        thresholds=quality.Thresholds(stability=0.8),
     )
 
     assert result.passed is False
@@ -78,9 +78,7 @@ def test_quality_evaluation_passes_declared_measures():
     result = quality.evaluate(
         "permutation_importance",
         sample_count=2,
-        thresholds=quality.Thresholds(
-            stability_minimum=0.8, fidelity_minimum=0.9
-        ),
+        thresholds=quality.Thresholds(stability=0.8, minimum=0.9),
         stability=0.95,
         fidelity=0.92,
     )
@@ -97,8 +95,8 @@ def test_independent_ground_truth_evaluation_is_explicit_and_deterministic():
     ground_truth = quality.Truth(
         method="annotated_feature_reference",
         reference="tests/fixtures/explanation-reference-v1.json",
-        expected_features=("signal", "age"),
-        minimum_overlap=1.0,
+        features=("signal", "age"),
+        overlap=1.0,
         limitations=("The reference covers this synthetic fixture only.",),
     )
 
@@ -109,7 +107,7 @@ def test_independent_ground_truth_evaluation_is_explicit_and_deterministic():
     )
 
     assert result.passed is True
-    assert result.overlap_score == 1.0
+    assert result.score == 1.0
     assert result.to_dict()["status"] == "available"
     assert result.to_dict()["reference"] == (
         "tests/fixtures/explanation-reference-v1.json"
@@ -121,7 +119,7 @@ def test_independent_ground_truth_evaluation_fails_on_mismatched_ranking():
     ground_truth = quality.Truth(
         method="annotated_feature_reference",
         reference="fixture://reference",
-        expected_features=("signal", "age"),
+        features=("signal", "age"),
     )
 
     result = quality.truth(
@@ -131,7 +129,7 @@ def test_independent_ground_truth_evaluation_fails_on_mismatched_ranking():
     )
 
     assert result.passed is False
-    assert result.overlap_score == 0.5
+    assert result.score == 0.5
     assert result.findings == (
         "independent explanation reference overlap is below threshold",
     )
@@ -142,7 +140,7 @@ def test_independent_ground_truth_suite_fails_closed_for_partial_references():
     ground_truth = quality.Truth(
         method="synthetic_oracle",
         reference="fixture://reference",
-        expected_features=("signal",),
+        features=("signal",),
     )
 
     result = quality.referee(
@@ -159,7 +157,7 @@ def test_independent_ground_truth_suite_fails_closed_for_partial_references():
     "factory",
     [
         quality.Thresholds,
-        lambda: quality.fidelity_score((1.0,), (1.0, 2.0)),
+        lambda: quality.score((1.0,), (1.0, 2.0)),
         lambda: quality.topk((report("signal"),)),
     ],
 )

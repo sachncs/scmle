@@ -15,7 +15,7 @@ from scmle.governance.loop import terms
 class Desk(memory.Memory):
     """Opening, answering and timing out the questions a person must decide."""
 
-    def pending_escalations(self) -> list[terms.Escalation]:
+    def survey(self) -> list[terms.Escalation]:
         """Lists the escalations with no reply and no timeout, oldest first.
 
         Returns:
@@ -74,8 +74,8 @@ class Desk(memory.Memory):
                 "proposed_default": proposed_default or self.policy.fallback,
             },
         )
-        self.escalation_batch[identity] = self.batch
-        return next(e for e in self.pending_escalations() if e.id == identity)
+        self.escalation[identity] = self.batch
+        return next(e for e in self.survey() if e.id == identity)
 
     def suspend(self, reason: str, detail: Mapping[str, Any]) -> None:
         """Writes a halt row and an incident row, then calls the incident hook.
@@ -99,12 +99,12 @@ class Desk(memory.Memory):
                 "detail": terms.jsonify(dict(detail)),
             },
         )
-        self.halt_reason = reason
-        self.record_incident(reason)
+        self.reason = reason
+        self.record(reason)
         if self.hooks.open_incident is not None:
             self.hooks.open_incident(reason)
 
-    def record_incident(self, reason: str) -> None:
+    def record(self, reason: str) -> None:
         """Writes an `incident` ledger row with status ``open``.
 
         It records that a person must look; it is not the SLO incident
@@ -149,7 +149,7 @@ class Desk(memory.Memory):
                 or it is expired or dated in the future. A malformed date
                 raises the ledger's `MisuseError` instead.
         """
-        pending = {e.id: e for e in self.pending_escalations()}
+        pending = {e.id: e for e in self.survey()}
         target = pending.get(escalation_id)
         if target is None:
             raise terms.RefusalError(
@@ -163,34 +163,30 @@ class Desk(memory.Memory):
             )
         if attestation.scope != target.question["scope"]:
             raise terms.RefusalError("the reply names a different scope")
-        if attestation.key_id in self.ledger.system_keys:
+        if attestation.key_id in self.ledger.keys:
             raise terms.RefusalError(
                 "the reply is signed with a key the system holds"
             )
-        verifier = (
-            key
-            if key is not None
-            else self.verification_keys.get(attestation.key_id)
-        )
+        verifier = key if key is not None else self.keys.get(attestation.key_id)
         if verifier is None:
             raise terms.RefusalError(
                 "no verification key for the reply's key id"
             )
-        if deployment_ledger.thumbprint(verifier) in self.ledger.system_keys:
+        if deployment_ledger.thumbprint(verifier) in self.ledger.keys:
             raise terms.RefusalError(
                 "the verification key is one the system holds"
             )
         if not attestation.verify(verifier):
             raise terms.RefusalError("the reply's signature does not verify")
         today = self.today()
-        issued = deployment_ledger.parse_date(attestation.date, "date")
-        expires = deployment_ledger.parse_date(attestation.expires, "expires")
+        issued = deployment_ledger.parse(attestation.date, "date")
+        expires = deployment_ledger.parse(attestation.expires, "expires")
         if not issued <= today <= expires:
             raise terms.RefusalError(
                 "the reply is expired or dated in the future"
             )
         self.ledger.commit(deployment_ledger.ATTESTATION, attestation.to_dict())
-        self.save_state()
+        self.save()
         allowed = attestation.decision in never_list.ALLOWING
         return terms.Consequence(
             qualification.Tier.ATTESTED
@@ -228,7 +224,7 @@ class Desk(memory.Memory):
                 action, detail, self.policy.scope, do, proposed_default
             )
         finally:
-            self.save_state()
+            self.save()
 
     def expire(self) -> terms.Escalation | None:
         """Closes escalations unanswered for ``timeout`` batches.
@@ -243,7 +239,7 @@ class Desk(memory.Memory):
         """
         for row in list(self.ledger.pending()):
             identity = str(row["id"])
-            opened = self.escalation_batch.setdefault(identity, self.batch)
+            opened = self.escalation.setdefault(identity, self.batch)
             if self.batch - opened >= self.policy.timeout:
                 self.ledger.commit(
                     deployment_ledger.ESCALATION,

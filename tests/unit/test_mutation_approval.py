@@ -44,7 +44,7 @@ def test_a_hand_transition_is_audited_with_its_reason(tmp_path):
     store = support_runtime.make_registry(tmp_path)
     gate = approval.Approval(store)
 
-    gate.transition(MODEL, 3, status.ReleaseState.CHALLENGER, "compare")
+    gate.transition(MODEL, 3, status.State.CHALLENGER, "compare")
 
     assert audits(store)[-1] == {
         "action": "release_state",

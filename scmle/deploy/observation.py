@@ -59,7 +59,7 @@ class Observation:
         image_digest: Digest of the image the primary revision runs.
         ready: Whether the platform reports the service healthy and settled.
         traffic: Revisions and their shares; the shares sum to 100.
-        observed_at: UTC time of the read.
+        observed: UTC time of the read.
         revisions: Image digest of every revision the response named.
         KEYS: Version-1 keys to the written ones (`digests.image`,
             `observed`); `downgrade` restores version 1.
@@ -76,7 +76,7 @@ class Observation:
     image_digest: str
     ready: bool
     traffic: tuple[Traffic, ...]
-    observed_at: str
+    observed: str
     revisions: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
@@ -89,7 +89,7 @@ class Observation:
         """
         if REVISION_PATTERN.fullmatch(self.revision) is None:
             raise errors.ConfigError(f"bad revision {self.revision!r}")
-        contract.require_digest(self.image_digest, "observation.image_digest")
+        contract.require(self.image_digest, "observation.image_digest")
         if sum(item.percent for item in self.traffic) != FULL_TRAFFIC:
             raise errors.ConfigError("traffic shares must sum to 100")
 
@@ -135,6 +135,6 @@ class Observation:
                 "ready": self.ready,
                 "traffic": [dataclasses.asdict(t) for t in self.traffic],
                 "revisions": [list(item) for item in self.revisions],
-                "observed_at": self.observed_at,
+                "observed_at": self.observed,
             }
         )

@@ -28,14 +28,14 @@ class Features(Strategy):
     """Base for strategies that change the numeric preprocessing.
 
     Attributes:
-        log_skewed: Log-transform right-skewed numeric features.
+        skewed: Log-transform right-skewed numeric features.
         interactions: Add pairwise numeric interactions.
         construct: Append differences and ratios of the best numeric pairs.
         select: Keep only columns an L1-penalised linear model uses.
         missing: Missing-value strategy for numeric features.
     """
 
-    log_skewed: ClassVar[bool] = False
+    skewed: ClassVar[bool] = False
     interactions: ClassVar[bool] = False
     construct: ClassVar[bool] = False
     select: ClassVar[bool] = False
@@ -65,8 +65,8 @@ class Features(Strategy):
             The unfitted candidate estimator, preprocessing included.
         """
         options = dataclasses.replace(
-            preprocessing.default_options(plan, adapter),
-            log_skewed=self.log_skewed,
+            preprocessing.default(plan, adapter),
+            skewed=self.skewed,
             interactions=self.interactions,
             construct=self.construct,
             select=self.select,
@@ -85,7 +85,7 @@ class Logarithm(Features):
 
     name = "log_skewed"
     description = "log1p of right-skewed non-negative numeric features"
-    log_skewed = True
+    skewed = True
 
     def applicability(
         self,
@@ -108,10 +108,10 @@ class Logarithm(Features):
             return reason
         if adapter.family in ("tree", "boosting"):
             return "monotone transforms do not change tree splits"
-        stats = profile.column_statistics
+        stats = profile.statistics
         skewed = [
             name
-            for name in profile.feature_plan.numeric
+            for name in profile.plan.numeric
             if name in stats
             and stats[name].get("skew", 0.0) > SKEW_THRESHOLD
             and stats[name].get("min", -1.0) >= 0
@@ -158,9 +158,9 @@ class Rarity(Strategy):
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
-        if task.is_classification:
+        if task.classification:
             return "regression only (classification uses class weighting)"
-        skew = abs(profile.target_summary.get("skew", 0.0))
+        skew = abs(profile.summary.get("skew", 0.0))
         if skew < TARGET_SKEW_THRESHOLD:
             return f"target is not long-tailed (|skew| {skew:.2f})"
         if not validation.has_fit_parameter(
@@ -195,7 +195,7 @@ class Rarity(Strategy):
         inner = preprocessing.instantiate(
             plan, adapter, task, seed, params, featurise=featurise
         )
-        return resampling.DensityWeightedRegressor(inner)
+        return resampling.Density(inner)
 
 
 class Encoding(Strategy):
@@ -228,7 +228,7 @@ class Encoding(Strategy):
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
-        if not profile.feature_plan.high_cardinality:
+        if not profile.plan.cardinal:
             return "no high-cardinality categorical feature"
         return None
 
@@ -256,8 +256,8 @@ class Encoding(Strategy):
             The unfitted candidate estimator, preprocessing included.
         """
         options = dataclasses.replace(
-            preprocessing.default_options(plan, adapter),
-            high_cardinality="target",
+            preprocessing.default(plan, adapter),
+            cardinality="target",
             sparse=False,
         )
         pipeline: models.Estimator = preprocessing.instantiate(
@@ -294,7 +294,7 @@ class Interactions(Features):
             return reason
         if adapter.family != "linear":
             return "non-linear models learn interactions themselves"
-        count = len(profile.feature_plan.numeric)
+        count = len(profile.plan.numeric)
         if not MIN_INTERACTION_FEATURES <= count <= MAX_INTERACTION_FEATURES:
             return f"{count} numeric features is outside [2, 12]"
         return None
@@ -326,7 +326,7 @@ class Construction(Features):
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
-        if len(profile.feature_plan.numeric) < MIN_INTERACTION_FEATURES:
+        if len(profile.plan.numeric) < MIN_INTERACTION_FEATURES:
             return "fewer than two numeric features to combine"
         return None
 
@@ -357,7 +357,7 @@ class Selection(Features):
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
-        plan = profile.feature_plan
+        plan = profile.plan
         if plan.monotonic:
             return "feature selection would shift the monotonic constraints"
         if len(plan.numeric) + len(plan.categorical) < MIN_SELECTION_FEATURES:
@@ -387,12 +387,12 @@ class Imputation(Features):
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
-        if adapter.capabilities.handles_missing:
+        if adapter.capabilities.missing:
             return "the model handles missing values natively"
-        stats = profile.column_statistics
+        stats = profile.statistics
         gaps = [
             name
-            for name in profile.feature_plan.numeric
+            for name in profile.plan.numeric
             if stats.get(name, {}).get("missing_rate", 0.0) >= MIN_MISSING_RATE
         ]
         if not gaps:
@@ -429,7 +429,7 @@ class Indicators(Imputation):
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
-        plan = profile.feature_plan
+        plan = profile.plan
         problem = preprocessing.misalignment(
             plan, select=False, missing=self.missing
         )
@@ -469,7 +469,7 @@ class IterativeImputation(Imputation):
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
-        width = len(profile.feature_plan.numeric)
+        width = len(profile.plan.numeric)
         if width > MAX_ITERATIVE_FEATURES:
             return f"{width} numeric features is too many to impute iteratively"
         return None
@@ -512,7 +512,7 @@ class Transformation(Strategy):
             return reason
         if task is not tasks.Task.REGRESSION:
             return "target transforms are a regression technique"
-        skew = abs(profile.target_summary.get("skew", 0.0))
+        skew = abs(profile.summary.get("skew", 0.0))
         if skew < TARGET_SKEW_THRESHOLD:
             return f"target is not long-tailed (|skew| {skew:.2f})"
         return None

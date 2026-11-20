@@ -153,7 +153,7 @@ class Admission(identification.Identification):
             view.features,
             view.target,
             kind=charter.estimand.kind,
-            classification=task.is_classification,
+            classification=task.classification,
             seed=charter.seed,
             structure=structure,
             group_column=spec.data.group_column,
@@ -168,7 +168,7 @@ class Admission(identification.Identification):
         )
         written = register(board, found)
         quarantined = found.quarantined
-        plan = board.get(surveying.Portrait).profile.feature_plan
+        plan = board.get(surveying.Portrait).profile.plan
         if quarantined:
             kept = [f for f in plan.features if f not in quarantined]
             if not kept:
@@ -205,7 +205,7 @@ class Admission(identification.Identification):
         outcome = explore.vectorize(
             view.target, classification=True, classes=classes
         )
-        plan = board.get(surveying.Portrait).profile.feature_plan
+        plan = board.get(surveying.Portrait).profile.plan
         numeric = [
             c
             for c in plan.numeric
@@ -239,9 +239,7 @@ def prune(
         categorical=tuple(c for c in plan.categorical if c not in gone),
         text=tuple(c for c in plan.text if c not in gone),
         monotonic={k: v for k, v in plan.monotonic.items() if k not in gone},
-        high_cardinality=tuple(
-            c for c in plan.high_cardinality if c not in gone
-        ),
+        cardinal=tuple(c for c in plan.cardinal if c not in gone),
         dropped={
             **plan.dropped,
             **{
@@ -333,7 +331,7 @@ def amend(
         The curation report and dataset card when they were rewritten.
     """
     portrait = board.get(surveying.Portrait)
-    profile = dataclasses.replace(portrait.profile, feature_plan=plan)
+    profile = dataclasses.replace(portrait.profile, plan=plan)
     board.journal.write("dataset_profile.json", profile.to_dict())
     curation = portrait.curation
     if curation is None:
@@ -341,12 +339,12 @@ def amend(
         return []
     amended = dataclasses.replace(
         curation,
-        feature_columns={
+        features={
             "numeric": plan.numeric,
             "categorical": plan.categorical,
             "text": plan.text,
         },
-        dropped_columns=plan.dropped,
+        dropped=plan.dropped,
     )
     surveying.Portrait(profile, amended).apply(board)
     board.journal.write("curation_report.json", amended.to_dict())

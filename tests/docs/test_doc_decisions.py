@@ -24,7 +24,7 @@ def test_no_success_criteria_blocks_the_release_and_invents_none():
     """
     partition = types.SimpleNamespace(
         task=tasks.Task.BINARY,
-        metric=types.SimpleNamespace(name="roc_auc", greater_is_better=True),
+        metric=types.SimpleNamespace(name="roc_auc", maximize=True),
     )
     context = types.SimpleNamespace(
         get={profiling.Partition: partition}.__getitem__,

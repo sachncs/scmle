@@ -43,7 +43,7 @@ def test_the_api_finds_the_groups_and_saves_a_bundle_that_predicts(tmp_path):
     }
     assert model.schema.task == clustering.TASK
     assert model.schema.numeric == ("x", "y")
-    assert model.info.model_name == "kmeans"
+    assert model.info.model == "kmeans"
     assert model.info.metric == "silhouette"
     assert model.classes is None
     numpy.testing.assert_array_equal(model.predict(frame), result.labels)
@@ -188,6 +188,6 @@ def test_python_dash_m_scmle_is_the_console_script():
     )
 
     assert shown.returncode == cli.EXIT_OK
-    assert shown.stdout == cli.build_parser().format_help()
+    assert shown.stdout == cli.build().format_help()
     assert wrong.returncode == cli.EXIT_USAGE
     assert wrong.stderr.startswith("usage: scmle ")

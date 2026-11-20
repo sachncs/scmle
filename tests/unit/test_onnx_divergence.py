@@ -47,7 +47,7 @@ def test_held_out_rows_with_infinities_reach_the_graph_as_missing(tmp_path):
     bundle = test_onnx_export.make_bundle(
         "logistic_regression", tasks.Task.BINARY
     )[0]
-    path = bundle.export_onnx(tmp_path / "m.onnx", unverified=True)
+    path = bundle.export(tmp_path / "m.onnx", unverified=True)
     rows = held_out()
     rows.loc[::20, "num"] = numpy.inf
     rows.loc[1::20, "num"] = -numpy.inf
@@ -63,9 +63,9 @@ def test_held_out_rows_with_infinities_reach_the_graph_as_missing(tmp_path):
     "task", [tasks.Task.BINARY, tasks.Task.REGRESSION], ids=lambda t: t.value
 )
 def test_an_export_that_drifted_from_the_model_is_blocked(task, tmp_path):
-    name = "logistic_regression" if task.is_classification else "ridge"
+    name = "logistic_regression" if task.classification else "ridge"
     bundle = test_onnx_export.make_bundle(name, task)[0]
-    path = bundle.export_onnx(tmp_path / "m.onnx", unverified=True)
+    path = bundle.export(tmp_path / "m.onnx", unverified=True)
     model = bundle.pipeline.steps[-1][1]
     while not hasattr(model, "coef_"):
         model = model.estimator_
@@ -80,7 +80,7 @@ def test_a_larger_tolerance_is_the_override(tmp_path):
     bundle = test_onnx_export.make_bundle(
         "logistic_regression", tasks.Task.BINARY
     )[0]
-    path = bundle.export_onnx(tmp_path / "m.onnx", unverified=True)
+    path = bundle.export(tmp_path / "m.onnx", unverified=True)
     bundle.pipeline.steps[-1][1].coef_ = (
         bundle.pipeline.steps[-1][1].coef_ * 1.01
     )
@@ -95,7 +95,7 @@ def test_fewer_held_out_rows_than_the_minimum_are_blocked(tmp_path):
     bundle = test_onnx_export.make_bundle(
         "logistic_regression", tasks.Task.BINARY
     )[0]
-    path = bundle.export_onnx(tmp_path / "m.onnx", unverified=True)
+    path = bundle.export(tmp_path / "m.onnx", unverified=True)
 
     with pytest.raises(errors.BlockedError, match=f"{onnx_export.ROWS} rows"):
         onnx_export.verify(bundle, path, held_out(onnx_export.ROWS - 1))
@@ -108,7 +108,7 @@ def test_labels_that_disagree_away_from_the_boundary_are_blocked(
     bundle = test_onnx_export.make_bundle(
         "logistic_regression", tasks.Task.BINARY
     )[0]
-    path = bundle.export_onnx(tmp_path / "m.onnx", unverified=True)
+    path = bundle.export(tmp_path / "m.onnx", unverified=True)
     flipped = {"no": "yes", "yes": "no"}
     monkeypatch.setattr(
         onnx_export,
@@ -134,7 +134,7 @@ def test_a_function_the_graph_cannot_express_is_refused_by_name(tmp_path):
     )
 
     with pytest.raises(errors.ArtifactError, match="log1p"):
-        bundle.export_onnx(tmp_path / "m.onnx", check=held_out())
+        bundle.export(tmp_path / "m.onnx", check=held_out())
 
 
 def test_too_few_held_out_rows_are_refused_before_the_converter_loads(
@@ -148,7 +148,7 @@ def test_too_few_held_out_rows_are_refused_before_the_converter_loads(
 
     for rows in (None, held_out(onnx_export.ROWS - 1)):
         with pytest.raises(errors.BlockedError, match="at least"):
-            bundle.export_onnx(tmp_path / "m.onnx", check=rows)
+            bundle.export(tmp_path / "m.onnx", check=rows)
 
     assert loads == []
     assert not (tmp_path / "m.onnx").exists()

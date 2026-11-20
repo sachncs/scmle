@@ -15,10 +15,10 @@ def test_a_cox_adapter_builds_a_penalised_model():
     assert built.penalty == 3.0
     assert adapter.build(tasks.Task.SURVIVAL, 9).penalty == 1.0
     assert adapter.name == "cox_ph"
-    assert adapter.capabilities.needs_scaling is True
+    assert adapter.capabilities.scaling is True
     assert adapter.capabilities.cost == 2
-    assert adapter.search_space.names() == ("penalty",)
-    assert isinstance(adapter.search_space.parameters[0], search.Real)
+    assert adapter.space.names() == ("penalty",)
+    assert isinstance(adapter.space.parameters[0], search.Real)
 
 
 def test_a_hazard_adapter_builds_seeded_discrete_time_boosting():
@@ -28,9 +28,9 @@ def test_a_hazard_adapter_builds_seeded_discrete_time_boosting():
     assert built.random_state == 4
     assert built.learning_rate == 0.05
     assert adapter.name == "discrete_time_boosting"
-    assert adapter.capabilities.handles_missing is False
+    assert adapter.capabilities.missing is False
     assert adapter.capabilities.cost == 4
-    assert adapter.capabilities.memory_factor == 4.0
+    assert adapter.capabilities.factor == 4.0
     assert (adapters.Cox, adapters.Hazard) == adapters.SURVIVAL_ADAPTERS
     assert {tasks.Task.SURVIVAL} == adapters.SURVIVAL
 

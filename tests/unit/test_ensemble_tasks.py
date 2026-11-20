@@ -51,7 +51,7 @@ class Search(ensemble_search.Stacker):
                 transcribe=lambda outcome: None,
             ),
         )
-        self.metric = types.SimpleNamespace(greater_is_better=True, name="m")
+        self.metric = types.SimpleNamespace(maximize=True, name="m")
         self.runner = types.SimpleNamespace(run=self.run)
 
     def run(self, trial_id, combiner, params):

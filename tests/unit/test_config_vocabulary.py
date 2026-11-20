@@ -149,9 +149,7 @@ def test_the_renamed_paths_cover_every_section():
 
 def parse(*argv):
     """Parses a `plan` command line."""
-    return cli.build_parser().parse_args(
-        ["plan", "d.csv", "--target", "y", *argv]
-    )
+    return cli.build().parse_args(["plan", "d.csv", "--target", "y", *argv])
 
 
 NEW_FLAGS = [

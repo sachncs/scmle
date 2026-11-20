@@ -38,15 +38,13 @@ def charter(**kwargs):
 
 
 def test_without_a_randomized_log_the_value_is_not_assessable():
-    found = reports.policy_value(
-        layer(), numpy.ones(5), numpy.ones(5), None, None
-    )
+    found = reports.value(layer(), numpy.ones(5), numpy.ones(5), None, None)
     assert found["status"] == reports.NOT_ASSESSABLE
     assert "never estimated" in found["reason"]
 
 
 def test_bad_propensities_are_refused_not_clipped():
-    found = reports.policy_value(
+    found = reports.value(
         layer(),
         numpy.ones(4),
         numpy.ones(4),
@@ -62,9 +60,7 @@ def test_a_randomized_log_gives_a_value_near_the_truth():
     logged = (rng.random(n) < 0.5).astype(float)
     outcome = (rng.random(n) < 0.3 + 0.2 * logged).astype(float)
     acts = numpy.ones(n)  # treat everyone: true value 0.5
-    found = reports.policy_value(
-        layer(), acts, outcome, logged, numpy.full(n, 0.5)
-    )
+    found = reports.value(layer(), acts, outcome, logged, numpy.full(n, 0.5))
     assert found["status"] == "issued"
     low, high = found["interval"]
     assert low < 0.5 < high
@@ -93,7 +89,7 @@ def test_fairness_reports_each_constraint_and_missing_columns():
 
 
 def test_the_rollout_design_has_a_hashed_log_and_no_assignments():
-    built = reports.rollout_design(charter(plan=plan()), 0.4)
+    built = reports.plan(charter(plan=plan()), 0.4)
     record, log = built
     assert record["ran"] is False and record["fixed_horizon_rows"] > 0
     assert record["expected_sample_number"] is not None
@@ -103,6 +99,6 @@ def test_the_rollout_design_has_a_hashed_log_and_no_assignments():
 
 
 def test_no_rollout_plan_means_no_design_and_no_room_means_no_size():
-    assert reports.rollout_design(charter(), 0.4) is None
-    record, ignored = reports.rollout_design(charter(plan=plan()), 0.99)
+    assert reports.plan(charter(), 0.4) is None
+    record, ignored = reports.plan(charter(plan=plan()), 0.99)
     assert record["fixed_horizon_rows"] is None

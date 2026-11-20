@@ -72,7 +72,7 @@ def findings(
         quality_findings.append(
             flaw(
                 "quality.graph-mixed-temporal-state",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"source": graph.uri},
                 {"temporal": temporal},
                 "Supply event times for every edge or explicitly use a "
@@ -84,7 +84,7 @@ def findings(
         quality_findings.append(
             flaw(
                 "quality.graph-duplicate-edges",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"source": graph.uri},
                 {"duplicate_edge_count": (profile.edge.duplicates)},
                 "Declare whether parallel edges are valid or deduplicate them.",
@@ -95,7 +95,7 @@ def findings(
         quality_findings.append(
             flaw(
                 "quality.graph-isolated-nodes",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"source": graph.uri},
                 {"isolated_node_count": profile.node.isolated},
                 "Confirm isolated nodes are valid for the intended task.",
@@ -106,7 +106,7 @@ def findings(
         quality_findings.append(
             flaw(
                 "quality.graph-no-declared-features",
-                data.FindingSeverity.INFO,
+                data.Severity.INFO,
                 {"source": graph.uri},
                 {"node_count": profile.node.nodes},
                 "Declare node features or select a topology-only model "
@@ -118,7 +118,7 @@ def findings(
         risk_findings.append(
             flaw(
                 "risk.graph-mixed-label-state",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"source": graph.uri},
                 {"label_counts": labels},
                 "Declare whether unlabeled nodes are valid for the "

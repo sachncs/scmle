@@ -11,7 +11,7 @@ class Approval(records.Records):
     """Hand transitions, approvals and why a version may not be released."""
 
     def transition(
-        self, model: str, version: int, target: status.ReleaseState, reason: str
+        self, model: str, version: int, target: status.State, reason: str
     ) -> None:
         """Moves a version to ``challenger`` or ``retired``.
 
@@ -84,7 +84,7 @@ class Approval(records.Records):
             raise errors.ArtifactError(str(error)) from error
         with self.store.lock:
             current = self.lookup(model, version)
-            if status.ReleaseState.APPROVED not in status.ALLOWED[current]:
+            if status.State.APPROVED not in status.ALLOWED[current]:
                 raise errors.ArtifactError(
                     f"{model} v{version} is {current.value}"
                 )
@@ -93,7 +93,7 @@ class Approval(records.Records):
             self.move(
                 entry,
                 version,
-                status.ReleaseState.APPROVED,
+                status.State.APPROVED,
                 "approved",
                 current,
             )
@@ -127,7 +127,7 @@ class Approval(records.Records):
         record = self.store.resolve(model, version)
         reasons = []
         current = self.lookup(model, version)
-        if current is not status.ReleaseState.APPROVED:
+        if current is not status.State.APPROVED:
             reasons.append(
                 f"{model} v{version} is {current.value}, not approved"
             )

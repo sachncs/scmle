@@ -216,7 +216,7 @@ class Directory:
         }
         body["digest"] = digest(body)
         text = json.dumps(body, indent=2, sort_keys=True)
-        durability.write_atomically(self.path(index, name), text.encode())
+        durability.write(self.path(index, name), text.encode())
         return body
 
     def read(self) -> list[records.Layout]:
@@ -302,7 +302,7 @@ class Directory:
         }
         body["digest"] = digest(body)
         text = json.dumps(body, indent=2, sort_keys=True)
-        durability.write_atomically(self.directory / MARKER, text.encode())
+        durability.write(self.directory / MARKER, text.encode())
 
     def complete(self) -> bool:
         """Whether the run wrote its completion marker."""
@@ -319,7 +319,7 @@ class Directory:
         for path in sorted((self.directory / "trials").glob("trial_*.json")):
             stored = json.loads(path.read_text(encoding="utf-8"))
             trial = experiments.Trial.load(stored)
-            found[trial.trial_id] = trial
+            found[trial.identifier] = trial
         return found
 
     def recoverable(self) -> list[str]:

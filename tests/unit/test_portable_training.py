@@ -17,11 +17,11 @@ from tests import support_runners
 
 TRAIN = "scmle-training"
 SERVE = "scmle-serving"
-RATE = base.CostRate(per_cpu_hour=3.6)
+RATE = base.Rate(per_cpu_hour=3.6)
 
 
 def make_store(tmp_path):
-    return objectstore.LocalObjectStore(tmp_path / "durable")
+    return objectstore.Disk(tmp_path / "durable")
 
 
 @pytest.fixture
@@ -31,7 +31,7 @@ def store(tmp_path):
 
 def spec_for(run_id="run-1", **changes):
     values = {
-        "run_id": run_id,
+        "identifier": run_id,
         "name": "churn",
         "project": {"data": "data/t.csv", "target": "y"},
         "identity": TRAIN,
@@ -47,16 +47,16 @@ def local_runner(store, clock, workload=None, **options):
     return local.Runner(
         store,
         workload,
-        serving_identity=SERVE,
+        identity=SERVE,
         clock=base.Clock(clock.now, clock.sleep),
-        poll_seconds=1.0,
+        interval=1.0,
         **options,
     )
 
 
 def reference_result(tmp_path):
     clock = support_runners.FakeClock()
-    store = objectstore.LocalObjectStore(tmp_path / "reference")
+    store = objectstore.Disk(tmp_path / "reference")
     local_runner(store, clock).run(spec_for("reference"))
     return json.loads(store.get("runs/reference/result.json")[0])
 
@@ -136,7 +136,7 @@ def test_a_run_that_ends_without_a_result_is_a_failure(store):
 def test_the_cost_budget_stops_a_runaway_job(store):
     clock = support_runners.FakeClock()
     slow = support_runners.toy_workload(clock, steps=1000)
-    budget = base.CostBudget(0.2, RATE)
+    budget = base.Budget(0.2, RATE)
     manifest = local_runner(store, clock, slow).run(
         spec_for("runaway", budget=budget)
     )
@@ -159,7 +159,7 @@ def test_the_budget_accumulates_across_attempts(store):
         clock,
         interruptions=lambda attempt, step: step % 2 == 0 and attempt < 3,
     )
-    manifest = runner.run(spec_for("spend", budget=base.CostBudget(0.3, RATE)))
+    manifest = runner.run(spec_for("spend", budget=base.Budget(0.3, RATE)))
     assert manifest.state == "budget_stopped"
     assert [a.state for a in manifest.attempts] == [
         "interrupted",
@@ -173,7 +173,7 @@ def test_the_budget_accumulates_across_attempts(store):
 def test_a_timeout_is_final(store):
     clock = support_runners.FakeClock()
     manifest = local_runner(store, clock).run(
-        spec_for("slow", timeout_seconds=100.0)
+        spec_for("slow", timeout=100.0)
     )
     assert manifest.state == "timed_out" and len(manifest.attempts) == 1
 
@@ -205,7 +205,7 @@ def test_a_crashed_supervisor_continues_the_numbering(store):
         )
     )
     runner.save(manifest)
-    checkpoints = checkpoint.CheckpointStore(store, "resumed")
+    checkpoints = checkpoint.Store(store, "resumed")
     checkpoints.save(2, {"w": 2.25})
     done = runner.run(spec)
     assert done.state == "succeeded" and done.attempts[-1].attempt == 2
@@ -224,32 +224,32 @@ def test_training_cannot_run_as_serving_or_touch_released_bundles(store):
 
     manifest = local_runner(store, clock, activating).run(spec_for("act"))
     assert manifest.state == "failed"
-    assert "RoleDeniedError" in manifest.attempts[0].reason
+    assert "DeniedError" in manifest.attempts[0].reason
     assert not store.exists("bundles/model/v2")
 
 
 def test_role_tables_are_separate():
     # Enforces docs/TENANT_ISOLATION.md:56.
     # Enforces website/src/pages/docs/tenant-isolation.astro:34.
-    roles.check_separation(roles.TRAINING_ROLE, roles.SERVING_ROLE)
+    roles.separate(roles.TRAINING_ROLE, roles.SERVING_ROLE)
     both = roles.Role("serving", roles.SERVING_ROLE.reads, ("runs/",))
     with pytest.raises(errors.ConfigError):
-        roles.check_separation(roles.TRAINING_ROLE, both)
+        roles.separate(roles.TRAINING_ROLE, both)
     with pytest.raises(errors.ConfigError):
-        roles.check_separation(
+        roles.separate(
             roles.Role("training", (), ("bundles/",)), roles.SERVING_ROLE
         )
     with pytest.raises(errors.ConfigError):
-        roles.check_separation(
+        roles.separate(
             roles.TRAINING_ROLE, roles.Role("training", (), ("audit/",))
         )
-    wrapped = roles.RoleStore(
-        objectstore.LocalObjectStore("/tmp/unused-role-store"),
+    wrapped = roles.Store(
+        objectstore.Disk("/tmp/unused-role-store"),
         roles.SERVING_ROLE,
     )
-    with pytest.raises(roles.RoleDeniedError):
+    with pytest.raises(roles.DeniedError):
         wrapped.put("runs/x/manifest.json", b"")
-    with pytest.raises(roles.RoleDeniedError):
+    with pytest.raises(roles.DeniedError):
         wrapped.get("data/train.csv")
 
 
@@ -267,11 +267,11 @@ def test_specialised_compute_needs_a_declared_reason_and_specs_are_validated():
         with pytest.raises(errors.ConfigError):
             spec_for(**bad)
     with pytest.raises(errors.ConfigError):
-        base.CostBudget(0, RATE)
+        base.Budget(0, RATE)
 
 
 def test_checkpoints_skip_a_damaged_newest_one(store):
-    checkpoints = checkpoint.CheckpointStore(store, "c")
+    checkpoints = checkpoint.Store(store, "c")
     checkpoints.save(1, {"w": 1})
     checkpoints.save(2, {"w": 2})
     store.put(
@@ -281,7 +281,7 @@ def test_checkpoints_skip_a_damaged_newest_one(store):
     latest = checkpoints.latest()
     assert latest.step == 2 and latest.state == {"w": 2}
     assert len(checkpoints.skipped) == 2
-    assert checkpoint.CheckpointStore(store, "empty").latest() is None
+    assert checkpoint.Store(store, "empty").latest() is None
     with pytest.raises(checkpoint.CheckpointError):
         checkpoints.save(5, {"bad": object()})
     with pytest.raises(checkpoint.CheckpointError):
@@ -344,7 +344,7 @@ def test_a_checkpoint_load_tells_absent_damaged_and_outage_apart(
 ):
     # ERR-10: absent, corrupt and backend-down all returned None, so an
     # outage looked like "no checkpoint" and the work restarted from zero.
-    held = checkpoint.CheckpointStore(store, "run-x")
+    held = checkpoint.Store(store, "run-x")
     absent = held.load(3)
     assert absent.condition is checkpoint.Condition.ABSENT
     assert absent.checkpoint is None
@@ -361,20 +361,20 @@ def test_a_checkpoint_load_tells_absent_damaged_and_outage_apart(
     assert any("malformed" in r.getMessage() for r in caplog.records)
 
     def down(key):
-        raise objectstore.TransientStoreError("backend unavailable")
+        raise objectstore.TransientError("backend unavailable")
 
     monkeypatch.setattr(store, "get", down)
-    with pytest.raises(objectstore.TransientStoreError):
+    with pytest.raises(objectstore.TransientError):
         held.load(3)
 
 
 def test_a_resume_past_damaged_checkpoints_leaves_a_record(store):
     # ERR-10: a restart from zero (or an older step) past damaged
     # checkpoints is recorded in durable storage, not only logged.
-    checkpoints = checkpoint.CheckpointStore(store, "d")
+    checkpoints = checkpoint.Store(store, "d")
     store.put(checkpoints.key(1), b"not json")
     context = local.Context(
-        roles.RoleStore(store, roles.TRAINING_ROLE),
+        roles.Store(store, roles.TRAINING_ROLE),
         "d",
         2,
         spec_for("d"),
@@ -386,10 +386,10 @@ def test_a_resume_past_damaged_checkpoints_leaves_a_record(store):
     assert record["attempt"] == 2 and record["resumed_from"] is None
     assert record["damaged"][0]["key"] == checkpoints.key(1)
     assert "malformed" in record["damaged"][0]["reason"]
-    clean = checkpoint.CheckpointStore(store, "e")
+    clean = checkpoint.Store(store, "e")
     clean.save(1, {"w": 1})
     local.Context(
-        roles.RoleStore(store, roles.TRAINING_ROLE),
+        roles.Store(store, roles.TRAINING_ROLE),
         "e",
         1,
         spec_for("e"),

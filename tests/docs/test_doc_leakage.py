@@ -42,7 +42,7 @@ def test_every_entry_point_defaults_to_the_warn_policy():
     Also enforces website/src/learn/leakage.html:68-69.
     """
     signature = inspect.signature(project.Project)
-    parser = cli.build_parser()
+    parser = cli.build()
     run = parser.parse_args(["run", "data.csv", "--target", "y"])
 
     assert signature.parameters["leakage_policy"].default == "warn"

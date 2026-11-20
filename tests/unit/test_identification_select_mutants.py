@@ -107,8 +107,8 @@ def test_a_verdict_is_recorded_under_exact_keys():
         "adjustment_checked_by_dag": True,
     }
     bare = select.Verdict("rd", True)
-    assert bare.missing_assumptions == ()
-    assert bare.missing_design == ()
+    assert bare.assumptions == ()
+    assert bare.design == ()
     assert bare.reasons == ()
     assert bare.checked is False
 
@@ -174,11 +174,11 @@ def test_missing_pieces_are_listed_in_the_declared_order_with_no_reason():
         assumptions=("exclusion", "monotonicity"),
     )
     verdict = select.select(spec).verdict("iv")
-    assert verdict.missing_assumptions == (
+    assert verdict.assumptions == (
         "instrument_relevance",
         "independence",
     )
-    assert verdict.missing_design == ("instrument",)
+    assert verdict.design == ("instrument",)
     assert verdict.reasons == ()
     assert verdict.checked is False
     assert verdict.eligible is False
@@ -193,7 +193,7 @@ def test_a_design_field_that_is_declared_is_not_missing():
         time="week",
     )
     verdict = select.select(spec).verdict("did")
-    assert verdict.missing_design == ("adoption",)
+    assert verdict.design == ("adoption",)
     full = block(
         estimand="ATT_DID",
         strategies=("did",),
@@ -221,7 +221,7 @@ def test_the_adjustment_check_is_skipped_while_anything_else_is_missing():
     bad = graph(("age", "t"), ("age", "y"), ("t", "y"), ("u", "t"), ("u", "y"))
     spec = block(assumptions=(COVARIATES, "positivity"), dag="dag.json")
     verdict = select.select(spec, bad).verdict("backdoor_aipw")
-    assert verdict.missing_assumptions == ("no_interference",)
+    assert verdict.assumptions == ("no_interference",)
     assert verdict.reasons == ()
     assert verdict.checked is False
     # an estimand mismatch stops the check too
@@ -316,7 +316,7 @@ def test_a_chartered_order_is_kept_and_the_first_eligible_leads():
         assumptions=(*ASSUMPTIONS, "randomized_assignment"),
     )
     plan = select.select(spec)
-    assert plan.chartered_order is True
+    assert plan.chartered is True
     assert plan.order == ("did", "randomized_diff", "backdoor_aipw")
     assert plan.primary == "randomized_diff"
     assert plan.multiverse == ("backdoor_aipw",)

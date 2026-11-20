@@ -50,7 +50,7 @@ class Resources(workspace.Workspace):
 
     __slots__ = ()
 
-    def run_disk_full(
+    def fill(
         self,
     ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Simulates a full disk without filling one.
@@ -99,7 +99,7 @@ class Resources(workspace.Workspace):
             ),
         )
 
-    def run_corrupt_artifact(
+    def corrupt(
         self,
     ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Corrupts a written artifact, detects it by digest and quarantines it.
@@ -116,7 +116,7 @@ class Resources(workspace.Workspace):
         scenario = reliability.Contingency.CORRUPT_ARTIFACT
         artifact_path = self.root / "artifact.bin"
         quarantine_path = self.root / "quarantine-artifact.bin"
-        scmle.governance.reliability.Harness.write_atomically(
+        scmle.governance.reliability.Harness.write(
             artifact_path, b"valid-artifact"
         )
         expected = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
@@ -146,7 +146,7 @@ class Resources(workspace.Workspace):
             ),
         )
 
-    def run_memory_exhaustion(
+    def starve(
         self,
     ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Simulates memory exhaustion with a tiny allocation budget.
@@ -196,7 +196,7 @@ class Resources(workspace.Workspace):
             ),
         )
 
-    def run_partial_write(
+    def truncate(
         self,
     ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Writes a temporary file and never replaces the public path.
@@ -243,7 +243,7 @@ class Resources(workspace.Workspace):
             ),
         )
 
-    def run_dependency_mismatch(
+    def mismatch(
         self,
     ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Compares two fixed dependency identities and records the mismatch.

@@ -58,7 +58,7 @@ class Recourse:
         predict: Callable[[pandas.DataFrame], numpy.ndarray],
         background: pandas.DataFrame,
         actionable: Sequence[str],
-        max_changes: int = 3,
+        sparsity: int = 3,
     ) -> None:
         """Binds the search to a model and to the values it may try.
 
@@ -68,13 +68,13 @@ class Recourse:
             predict: Prediction per row (reported in the result).
             background: Typical rows; their values are the candidates.
             actionable: Columns the search may change.
-            max_changes: Most columns it may change.
+            sparsity: Most columns it may change.
         """
         self.progress = progress
         self.reached = reached
         self.predict = predict
         self.actionable = list(actionable)
-        self.max_changes = max_changes
+        self.sparsity = sparsity
         self.values = {c: self.propose(background[c]) for c in actionable}
         self.scales = {c: self.measure(background[c]) for c in actionable}
 
@@ -196,7 +196,7 @@ class Recourse:
         current = dict(row)
         changed: dict[str, Any] = {}
         while not self.reached(pandas.DataFrame([current]))[0]:
-            if len(changed) >= self.max_changes:
+            if len(changed) >= self.sparsity:
                 break
             batch, moves = self.candidates(current, set(changed))
             if batch.empty:

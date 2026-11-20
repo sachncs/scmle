@@ -187,20 +187,20 @@ def test_an_incomplete_screen_is_in_summary_report_log_and_plan(tmp_path):
     result = support.make_project(
         wide(columns=WIDE, leaky=True),
         "y",
-        output_dir=tmp_path,
-        time_budget=RUN_BUDGET,
+        directory=tmp_path,
+        budget=RUN_BUDGET,
     ).run()
     warning = result.profile.admonition
     assert warning.startswith("leakage screen NOT RUN for 40 columns")
     summary = result.summary()
     assert "PROVISIONAL: leakage screen incomplete" in summary
     assert summary.endswith("WARNING " + warning)
-    page = (result.run_dir / "report.html").read_text()
+    page = (result.directory / "report.html").read_text()
     assert page.index("WARNING leakage screen NOT RUN") < page.index(
         "<h2>Leaderboard"
     )
     log = json.loads(
-        (result.run_dir / "diagnostics" / "decision_log.json").read_text()
+        (result.directory / "diagnostics" / "decision_log.json").read_text()
     )
     assert any(
         d["technique"] == "leakage_screen" and warning in d["reason"]
@@ -218,9 +218,9 @@ def test_block_refuses_an_unchecked_screen_and_warn_proceeds(tmp_path):
         support.make_project(
             wide(columns=WIDE, leaky=True),
             "y",
-            output_dir=tmp_path,
-            time_budget=RUN_BUDGET,
-            leakage_policy="block",
+            directory=tmp_path,
+            budget=RUN_BUDGET,
+            leakage="block",
         ).run()
     assert raised.value.details["leakage"]["unchecked"]
     assert "'warn'" in str(raised.value)
@@ -229,8 +229,8 @@ def test_block_refuses_an_unchecked_screen_and_warn_proceeds(tmp_path):
     ok = support.make_project(
         wide(classes=2),
         "y",
-        output_dir=tmp_path,
-        time_budget=LARGE_BUDGET,
-        leakage_policy="block",
+        directory=tmp_path,
+        budget=LARGE_BUDGET,
+        leakage="block",
     ).run()
     assert "NOT RUN" not in ok.summary()

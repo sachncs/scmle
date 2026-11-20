@@ -594,7 +594,7 @@ def test_defects_lists_quality_findings_in_order():
     assert findings[2].evidence == {"max_samples": 2, "profiled_count": 2}
     empty = survey.defects(0, survey.EMPTY_PROFILE, [], 1)
     assert [f.identifier for f in empty] == ["quality.image-empty-dataset"]
-    assert empty[0].severity == data.FindingSeverity.CRITICAL
+    assert empty[0].severity == data.Severity.CRITICAL
     assert empty[0].blocking
 
 

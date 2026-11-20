@@ -25,7 +25,7 @@ CSV = "id,amount,region\n1,10.5,north\n2,20.0,south\n3,5.25,north\n"
 
 @pytest.fixture
 def store(tmp_path):
-    return objectstore.LocalObjectStore(tmp_path / "root")
+    return objectstore.Disk(tmp_path / "root")
 
 
 def pick(store, key="o.csv", hours=0.0):
@@ -265,7 +265,7 @@ def seed(store):
 
 
 def outputs(store):
-    return {m.key: store.get(m.key)[0] for m in store.list_objects("output/")}
+    return {m.key: store.get(m.key)[0] for m in store.catalog("output/")}
 
 
 def test_incremental_runs_process_each_object_once_and_deduplicate(store):
@@ -300,8 +300,8 @@ def test_a_repeated_upload_is_skipped_and_a_changed_input_is_refused(store):
 
 
 def test_the_result_is_deterministic(tmp_path):
-    first = objectstore.LocalObjectStore(tmp_path / "one")
-    second = objectstore.LocalObjectStore(tmp_path / "two")
+    first = objectstore.Disk(tmp_path / "one")
+    second = objectstore.Disk(tmp_path / "two")
     for target in (first, second):
         seed(target)
         processor(target).run()
@@ -338,7 +338,7 @@ def test_a_crash_between_output_and_checkpoint_recovers_without_duplicates(
     assert resumed.processed == ("input/b.csv",)
     final = processing.Checkpoint.decode(store.get("state/checkpoint.json")[0])
     assert set(final.processed) == {"input/a.csv", "input/b.csv"}
-    reference = objectstore.LocalObjectStore(tmp_path / "reference")
+    reference = objectstore.Disk(tmp_path / "reference")
     seed(reference)
     processor(reference).run()
     assert outputs(store) == outputs(reference)
@@ -395,7 +395,7 @@ def test_exhausted_or_permanent_failures_stop_at_the_object_and_keep_progress(
     def always_busy(frame):
         raise retry.TransientError("down")
 
-    other = objectstore.LocalObjectStore(tmp_path / "reference")
+    other = objectstore.Disk(tmp_path / "reference")
     seed(other)
     run = processing.Processor(
         other,
@@ -435,7 +435,7 @@ def test_the_gate_runs_before_processing_and_quarantine_is_respected(
     run = processor(store, gate=gate).run()
     assert run.rows_out == 3
     strict = quality.Gate([quality.Range("amount", 0, 1)], store)
-    other = objectstore.LocalObjectStore(tmp_path / "reference")
+    other = objectstore.Disk(tmp_path / "reference")
     other.put("input/a.csv", CSV.encode())
     failed = processing.Processor(
         other,
@@ -493,9 +493,7 @@ def test_max_objects_bounds_a_run_and_the_next_continues(store):
 def test_processing_needs_key_columns():
     contract = snapshot.Contract("x", "1", {"id": "int"})
     with pytest.raises(errors.ConfigError):
-        processing.Processor(
-            objectstore.LocalObjectStore("/tmp/unused"), contract, upper
-        )
+        processing.Processor(objectstore.Disk("/tmp/unused"), contract, upper)
 
 
 def test_the_frame_dtype_kinds_are_reader_independent():

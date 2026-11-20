@@ -19,15 +19,13 @@ def make_frame(rows, seed):
 
 def run(frame, directory):
     return support.make_project(
-        frame, "y", time_budget=300, output_dir=directory
+        frame, "y", budget=300, directory=directory
     ).run()
 
 
 def test_runs_store_fingerprints_and_winning_strategies(tmp_path):
     result = run(make_frame(400, 0), tmp_path)
-    history = stores.SqliteExperimentStore(
-        tmp_path / "experiments.sqlite"
-    ).history()
+    history = stores.Sqlite(tmp_path / "experiments.sqlite").history()
     assert len(history) == 1
     record = history[0]
     assert (
@@ -43,11 +41,9 @@ def test_plan_prioritizes_models_that_won_on_similar_datasets(tmp_path):
         run(make_frame(400, seed), tmp_path)
     winners = {
         r.selected_model
-        for r in stores.SqliteExperimentStore(
-            tmp_path / "experiments.sqlite"
-        ).history()
+        for r in stores.Sqlite(tmp_path / "experiments.sqlite").history()
     }
-    project = support.make_project(make_frame(420, 9), "y", output_dir=tmp_path)
+    project = support.make_project(make_frame(420, 9), "y", directory=tmp_path)
     plan = project.plan()
     decision = next(d for d in plan.decisions if d.technique == "meta_learning")
     assert decision.action == "include"
@@ -61,7 +57,7 @@ def test_plan_prioritizes_models_that_won_on_similar_datasets(tmp_path):
 def test_same_dataset_history_is_never_used(tmp_path):
     frame = make_frame(400, 0)
     run(frame, tmp_path)
-    plan = support.make_project(frame, "y", output_dir=tmp_path).plan()
+    plan = support.make_project(frame, "y", directory=tmp_path).plan()
     decision = next(d for d in plan.decisions if d.technique == "meta_learning")
     assert (
         decision.action == "defer"
@@ -71,7 +67,7 @@ def test_same_dataset_history_is_never_used(tmp_path):
 
 def test_planning_without_a_database_creates_nothing(tmp_path):
     plan = support.make_project(
-        make_frame(300, 4), "y", output_dir=tmp_path / "runs"
+        make_frame(300, 4), "y", directory=tmp_path / "runs"
     ).plan()
     assert not (tmp_path / "runs").exists()
     assert any(
@@ -93,7 +89,7 @@ def test_old_databases_are_migrated(tmp_path):
     )
     connection.commit()
     connection.close()
-    store = stores.SqliteExperimentStore(path)
+    store = stores.Sqlite(path)
     store.commence("r", "h", "d", "2026-10-15T00:00:00+00:00")
     store.revise(
         "r", fingerprint={"a": 1.0}, task="regression", selected_strategy="x"

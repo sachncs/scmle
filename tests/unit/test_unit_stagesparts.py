@@ -460,7 +460,7 @@ def plan():
         ("c", "d"),
         text=("t",),
         monotonic={"a": 1, "b": -1},
-        high_cardinality=("d",),
+        cardinal=("d",),
         dropped={"old": "constant"},
     )
 
@@ -471,7 +471,7 @@ def test_prune_removes_quarantined_fields_and_records_why():
     assert pruned.categorical == ("c",)
     assert pruned.text == ("t",)
     assert pruned.monotonic == {"b": -1}
-    assert pruned.high_cardinality == ()
+    assert pruned.cardinal == ()
     assert pruned.dropped == {
         "old": "constant",
         "a": "quarantined by admissibility: leaks",
@@ -526,14 +526,14 @@ def test_select_adds_the_rows_set_aside_as_unseen(monkeypatch):
 
 def test_attested_loads_nothing_unless_named():
     assert (
-        admission.attested(types.SimpleNamespace(leakage_attestations=None))
+        admission.attested(types.SimpleNamespace(attestations=None))
         == ()
     )
 
 
 def test_attested_explains_an_invalid_file(tmp_path):
     (tmp_path / "a.json").write_text("{", encoding="utf-8")
-    spec = types.SimpleNamespace(leakage_attestations=str(tmp_path / "a.json"))
+    spec = types.SimpleNamespace(attestations=str(tmp_path / "a.json"))
     with pytest.raises(
         errors.ConfigError, match="invalid leakage attestations"
     ):
@@ -545,7 +545,7 @@ class Profile:
     feature_plan: object
 
     def to_dict(self):
-        return {"plan": self.feature_plan.numeric}
+        return {"plan": self.plan.numeric}
 
 
 def test_amend_replaces_the_profile_without_a_curation():
@@ -621,6 +621,6 @@ def test_reporting_reads_a_declared_column_as_floats():
 
 
 def test_graft_leaves_a_profile_without_a_graph_alone():
-    profile = types.SimpleNamespace(feature_plan=plan())
+    profile = types.SimpleNamespace(plan=plan())
     spec = types.SimpleNamespace(feature_graph=types.SimpleNamespace(nodes=()))
     assert surveying.graft(spec, profile) is profile

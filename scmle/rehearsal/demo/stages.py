@@ -89,9 +89,7 @@ def package(
         A dict with the paths `service` and `golden_service`.
     """
     started = time.monotonic()
-    registry = scmle.governance.registry.ModelRegistryStore(
-        workdir / "registry"
-    )
+    registry = scmle.governance.registry.Registry(workdir / "registry")
     records = []
     for label, result in (("v1 good", good), ("v2 bad release", bad)):
         exported = result.bundle.save(
@@ -102,7 +100,7 @@ def package(
                 fixture.MODEL,
                 exported,
                 metrics=result.evaluation["metrics"],
-                run_id=result.run_id,
+                run_id=result.identifier,
                 signing_key=fixture.DEMO_SIGNING_KEY,
             )
         )
@@ -129,7 +127,7 @@ def package(
         ok=(service / "provenance.json").exists(),
         versions=[record.version for record in records],
         champion=registry.resolve(fixture.MODEL).version,
-        bundle_digest=provenance.bundle_digest(service / "model"),
+        bundle_digest=provenance.digest(service / "model"),
         files=sorted(p.name for p in service.iterdir()),
     )
     return {"service": service, "golden_service": golden_service}
@@ -159,7 +157,7 @@ def compare(
         model_directory, signing_key=fixture.DEMO_SIGNING_KEY
     )
     rows = frame.head(60).to_dict("records")
-    status, body = client.post_json(f"{base}/predict", {"records": rows})
+    status, body = client.post(f"{base}/predict", {"records": rows})
     online_match = (
         status == http.HTTPStatus.OK
         and body["predictions"] == direct.predict(frame.head(60)).tolist()
@@ -237,7 +235,7 @@ def tamper(service: pathlib.Path, workdir: pathlib.Path) -> dict[str, Any]:
                     break
                 time.sleep(0.2)
             live_status = client.retrieve(f"{base}/livez")[0]
-            predict_status = client.post_json(
+            predict_status = client.post(
                 f"{base}/predict", {"records": [{"age": 1.0}]}
             )[0]
             outcomes[label] = {
@@ -291,9 +289,7 @@ def drill(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
         predictions as the original, whether the audit log has the rollback
         check, and the bad release's metrics on the fresh data.
     """
-    registry = scmle.governance.registry.ModelRegistryStore(
-        workdir / "registry"
-    )
+    registry = scmle.governance.registry.Registry(workdir / "registry")
     manager = lifecycle.Maintainer(
         registry, fixture.MODEL, str(workdir / "work")
     )
@@ -328,7 +324,7 @@ def drill(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
     adapter = server.Service(restored)
     adapter.start()
     try:
-        status, body = client.post_json(
+        status, body = client.post(
             f"{adapter.address}/predict",
             {"records": features.head(40).to_dict("records")},
         )
@@ -380,9 +376,9 @@ def mirror(
     if fetched.exists():
         shutil.rmtree(fetched)
     client.download(store_url, "models/churn/v1", etags, fetched)
-    same = provenance.bundle_digest(
-        fetched / "model"
-    ) == provenance.bundle_digest(service / "model")
+    same = provenance.digest(fetched / "model") == provenance.digest(
+        service / "model"
+    )
     transcript.record(
         "object store round trip",
         started,

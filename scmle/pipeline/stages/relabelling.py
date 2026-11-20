@@ -56,8 +56,8 @@ class Relabelling(remedy.Remedy):
         task = partition.task
         metric = partition.metric
         template = strategies.lookup(selected.strategy).build(
-            partition.profile.feature_plan,
-            board.services.registry.get(selected.model_name),
+            partition.profile.plan,
+            board.services.registry.get(selected.model),
             task,
             board.services.spec.validation.seed,
             selected.params,

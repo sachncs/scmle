@@ -124,7 +124,7 @@ def test_the_declared_fault_plan_is_exactly_the_reviewed_table():
 def test_plan_enum_fields_are_type_checked_under_their_own_names():
     good = {
         "scenario": reliability.Contingency.PROCESS_DEATH,
-        "outcome": (reliability.SafeOutcome.RESUME_DURABLE_CHECKPOINT),
+        "outcome": (reliability.Expectation.RESUME_DURABLE_CHECKPOINT),
         "recoverability": reliability.Recoverability.AUTOMATIC,
         "requirements": ("a",),
         "blocking": True,

@@ -160,7 +160,7 @@ def advertise(
         key=capabilities.Coordinate(
             modality=capabilities.Modality.TABULAR,
             task=task,
-            model_family=model_family,
+            family=model_family,
             evaluation=TABULAR_BETA_EVALUATIONS[task],
             uncertainty=capabilities.Uncertainty.NONE,
             fairness=fairness,
@@ -168,16 +168,16 @@ def advertise(
             inference=capabilities.Inference.LIBRARY,
         ),
         status=capabilities.Status.SUPPORTED,
-        required_extras=(
+        extras=(
             ("deeplearning",) if model_family == "deep_learning" else ("core",)
         ),
-        resources=capabilities.Resources(memory_gb=1.0),
-        failure_modes=(
+        resources=capabilities.Resources(memory=1.0),
+        modes=(
             "malformed or schema-incompatible input",
             "model-family dependency unavailable",
             "resource limits exceeded",
         ),
-        evidence_links=("tests/integration/test_capability_gate.py",),
+        links=("tests/integration/test_capability_gate.py",),
         limitations=(
             "tabular modality only",
             "library inference only",
@@ -213,7 +213,7 @@ def experimental_tabular_capability(
         key=capabilities.Coordinate(
             modality=capabilities.Modality.TABULAR,
             task=task,
-            model_family=model_family,
+            family=model_family,
             evaluation=capabilities.Evaluation.STANDARD,
             uncertainty=capabilities.Uncertainty.NONE,
             fairness=fairness,
@@ -221,20 +221,20 @@ def experimental_tabular_capability(
             inference=capabilities.Inference.LIBRARY,
         ),
         status=capabilities.Status.EXPERIMENTAL,
-        required_extras=("deeplearning",),
+        extras=("deeplearning",),
         resources=capabilities.Resources(
-            memory_gb=4.0,
-            max_rows=100_000,
+            memory=4.0,
+            rows=100_000,
         ),
-        failure_modes=failure_modes,
-        evidence_links=evidence_links,
+        modes=failure_modes,
+        links=evidence_links,
         limitations=limitations,
     )
 
 
 EXPERIMENTAL = (
     (
-        capabilities.ModelFamily.TRANSFORMER.value,
+        capabilities.Family.TRANSFORMER.value,
         (
             ("torch runtime or tabular transformer adapter is unavailable"),
             "numeric feature-token training or evaluation fails",
@@ -252,7 +252,7 @@ EXPERIMENTAL = (
         ),
     ),
     (
-        capabilities.ModelFamily.JEPA.value,
+        capabilities.Family.JEPA.value,
         (
             "torch runtime or tabular JEPA adapter is unavailable",
             (
@@ -311,7 +311,7 @@ class Kind(Protocol):
         self,
         spec: tasks.Config,
         frame: pandas.DataFrame,
-        manifest: scmle.contracts.data.DatasetManifest,
+        manifest: scmle.contracts.data.Manifest,
         task: tasks.Task,
         seconds: float = 0.0,
         total: int | None = None,
@@ -465,7 +465,7 @@ class Tabular:
         self,
         spec: tasks.Config,
         frame: pandas.DataFrame,
-        manifest: scmle.contracts.data.DatasetManifest,
+        manifest: scmle.contracts.data.Manifest,
         task: tasks.Task,
         seconds: float = 0.0,
         total: int | None = None,
@@ -514,9 +514,9 @@ class Tabular:
 
         Returns:
             The unfitted column transformer
-            (`preprocessing.build_preprocessor`).
+            (`preprocessing.build`).
         """
-        return preprocessing.build_preprocessor(plan, options)
+        return preprocessing.build(plan, options)
 
     def decode(self, labels: tuple[Any, ...] | None) -> tuple[Any, ...] | None:
         """Ordinal ranks decode to the recorded labels; else the classes.

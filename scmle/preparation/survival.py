@@ -10,7 +10,7 @@ from sklearn import base
 from sklearn import pipeline
 
 
-class EventAwareEstimator(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Estimator(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Fits a survival pipeline using the event column of the features frame.
 
     The preprocessing steps never see the event indicator (they select their

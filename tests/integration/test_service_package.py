@@ -100,7 +100,7 @@ def test_the_folder_holds_everything_needed_to_run_and_rebuild(boosted):
     ):
         assert (folder / name).exists()
     pins = (folder / "requirements.txt").read_text()
-    assert f"scmle=={bundle.info.scmle_version}" in pins
+    assert f"scmle=={bundle.info.scmle}" in pins
     assert f"scikit-learn=={bundle.info.sklearn}" in pins
     dockerfile = (folder / "Dockerfile").read_text()
     assert "python:" in dockerfile
@@ -115,7 +115,7 @@ def test_onnx_refuses_the_boosted_model_and_points_to_the_service(boosted):
     bundle, frame, root = boosted
 
     with pytest.raises(errors.ArtifactError, match="scaffold"):
-        bundle.export_onnx(root / "m.onnx", check=frame)
+        bundle.export(root / "m.onnx", check=frame)
 
 
 def test_the_generated_server_scores_rows_like_the_bundle(boosted):

@@ -27,7 +27,7 @@ def staged(tmp_path):
     other = bundle_of(
         "logistic_regression", test_lifecycle_extras.traffic(seed=1)
     )
-    store = registry.ModelRegistryStore(tmp_path / "registry")
+    store = registry.Registry(tmp_path / "registry")
     manager = lifecycle.Maintainer(store, "m", str(tmp_path / "work"))
     first = store.register("m", good.save(tmp_path / "e1"), trusted=True)
     store.promote(
@@ -42,7 +42,7 @@ def staged(tmp_path):
 
 
 def ledger_for():
-    return deployment_ledger.DeploymentLedger.create(
+    return deployment_ledger.Ledger.create(
         None, charter_hash="c" * 64, policy={"p": 1}, alpha_promo="1/20"
     )
 
@@ -226,7 +226,7 @@ def broken_champion(tmp_path):
     broken = bundle_of(
         "logistic_regression", test_lifecycle_extras.traffic(seed=0, flip=True)
     )
-    store = registry.ModelRegistryStore(tmp_path / "registry")
+    store = registry.Registry(tmp_path / "registry")
     manager = lifecycle.Maintainer(store, "m", str(tmp_path / "work"))
     for index, model in enumerate((good, broken), start=1):
         record = store.register(

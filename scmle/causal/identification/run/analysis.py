@@ -15,7 +15,7 @@ from scmle.causal.identification import select
 from scmle.causal.identification import tier
 import scmle.causal.identification.certified
 from scmle.causal.identification.run.adjustment import Backdoor
-from scmle.causal.identification.run.adjustment import RandomizedEstimator
+from scmle.causal.identification.run.adjustment import Experiment
 from scmle.causal.identification.run.documents import arbitrate
 from scmle.causal.identification.run.documents import assemble
 from scmle.causal.identification.run.documents import Outcome
@@ -23,12 +23,12 @@ from scmle.causal.identification.run.documents import prerequisites
 from scmle.causal.identification.run.documents import refuse
 from scmle.causal.identification.run.estimator import Est
 from scmle.causal.identification.run.estimator import Estimator
+from scmle.causal.identification.run.exogeneity import Discontinuity
 from scmle.causal.identification.run.exogeneity import Instrument
-from scmle.causal.identification.run.exogeneity import RdEstimator
-from scmle.causal.identification.run.panel import DiD
+from scmle.causal.identification.run.panel import Differences
 from scmle.causal.identification.run.panel import Synth
+from scmle.causal.identification.run.strata import estimate
 from scmle.causal.identification.run.strata import replication
-from scmle.causal.identification.run.strata import subgroup_results
 from scmle.contracts import qualification
 
 INTERVAL_GATES = {
@@ -66,10 +66,10 @@ SENSITIVITY_GATES = {
 
 ADAPTERS: dict[str, type[Estimator]] = {
     "backdoor_aipw": Backdoor,
-    "randomized_diff": RandomizedEstimator,
-    "did": DiD,
+    "randomized_diff": Experiment,
+    "did": Differences,
     "iv": Instrument,
-    "rd": RdEstimator,
+    "rd": Discontinuity,
     "synth": Synth,
 }
 
@@ -105,7 +105,7 @@ def fragility(
         The sensitivity document of the strategy, or a note that a single
         treated unit has only the placebo permutation.
     """
-    if adapter.single_unit:
+    if adapter.unit:
         return {
             "holds": None,
             "note": "single treated unit: inference is the placebo permutation",
@@ -152,8 +152,8 @@ class Trial:
         adapter: The strategy's estimator, prepared on `X`.
         primary: The primary estimate on `C`.
         level: Confidence level of the primary interval.
-        alpha_primary: The primary level, `1 - level`.
-        alpha_falsify: Familywise level of the falsification battery.
+        alpha: The primary level, `1 - level`.
+        falsify: Familywise level of the falsification battery.
     """
 
     plan: select.Plan
@@ -162,8 +162,8 @@ class Trial:
     adapter: Estimator
     primary: Est
     level: float
-    alpha_primary: float
-    alpha_falsify: float
+    alpha: float
+    falsify: float
 
 
 def design(
@@ -228,11 +228,11 @@ def falsify(
     except ValueError as error:
         # handled: returned as failed finding/problem/refusal with error text
         notes.append(f"controls could not run: {error}")
-    report_battery = battery.run_battery(tests, trial.alpha_falsify)
+    report_battery = battery.correct(tests, trial.falsify)
     rep: dict[str, Any]
-    if trial.spec.strata and not adapter.single_unit:
+    if trial.spec.strata and not adapter.unit:
         rep = replication(
-            adapter, c, trial.level, trial.primary.estimate, trial.alpha_falsify
+            adapter, c, trial.level, trial.primary.estimate, trial.falsify
         )
     else:
         rep = {"by_column": {}, "passed": None}
@@ -270,21 +270,21 @@ def grade(
         identified=True,
         needed=needed,
         attestors=dict(attestors or {}),
-        estimated_on_c=not adapter.single_unit,
-        design_passed=True,
-        design_gates=DESIGN_GATES.get(strategy, ()),
-        interval_gate=INTERVAL_GATES[strategy],
-        battery_ran=report_battery.ran,
-        battery_passed=report_battery.passed,
-        negative_control_declared=bool(spec.controls),
-        battery_gate=BATTERY_GATES[strategy],
-        replication_passed=rep["passed"],
-        sensitivity_holds=sens.get("holds"),
-        sensitivity_gate=SENSITIVITY_GATES.get(strategy),
-        single_unit=adapter.single_unit,
-        weak_instrument=adapter.weak,
+        confirmatory=not adapter.unit,
+        sound=True,
+        gates=DESIGN_GATES.get(strategy, ()),
+        interval=INTERVAL_GATES[strategy],
+        ran=report_battery.ran,
+        passed=report_battery.passed,
+        negative=bool(spec.controls),
+        gate=BATTERY_GATES[strategy],
+        replicated=rep["passed"],
+        holds=sens.get("holds"),
+        sensitivity=SENSITIVITY_GATES.get(strategy),
+        unit=adapter.unit,
+        instrument=adapter.weak,
         certified=certified,
-        adjustment_checked=checked,
+        checked=checked,
     )
     return tier.decide(facts), needed, checked
 
@@ -318,8 +318,8 @@ def chronicle(
         "strategy": trial.strategy,
         "estimand": trial.spec.estimand,
         "level": trial.level,
-        "alpha_primary": trial.alpha_primary,
-        "alpha_falsify": trial.alpha_falsify,
+        "alpha_primary": trial.alpha,
+        "alpha_falsify": trial.falsify,
         "estimate": {
             "point": primary.estimate,
             "se": primary.se,
@@ -368,7 +368,7 @@ def confirm(
     adapter, spec, level = trial.adapter, trial.spec, trial.level
     report_battery, rep, notes = falsify(trial, c)
     sens = fragility(adapter, c, level)
-    subgroup_found = subgroup_results(adapter, spec, c, level, named)
+    subgroup_found = estimate(adapter, spec, c, level, named)
     decision, needed, checked = grade(
         trial, report_battery, rep, sens, attestors, certified
     )
@@ -481,7 +481,7 @@ NOT_ESTIMATED = (
 )
 
 
-def design_only(
+def diagnose(
     spec: causal.Question,
     x: pandas.DataFrame,
     error_budget: budget.Alpha,

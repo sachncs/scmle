@@ -36,23 +36,23 @@ def test_parallel_run_matches_sequential_run(binary_frame, tmp_path):
         return support.make_project(
             binary_frame,
             "y",
-            time_budget=300,
+            budget=300,
             workers=workers,
             search=search,
-            output_dir=tmp_path / f"w{workers}",
+            directory=tmp_path / f"w{workers}",
         ).run()
 
     sequential, parallel = run(1), run(2)
-    assert [t.trial_id for t in sequential.trials] == [
-        t.trial_id for t in parallel.trials
+    assert [t.identifier for t in sequential.trials] == [
+        t.identifier for t in parallel.trials
     ]
     assert [t.params for t in sequential.trials] == [
         t.params for t in parallel.trials
     ]
     for a, b in zip(sequential.trials, parallel.trials, strict=True):
         assert a.status == b.status
-        assert a.score_mean == pytest.approx(b.score_mean, nan_ok=True)
-    assert sequential.selected_model == parallel.selected_model
+        assert a.score == pytest.approx(b.score, nan_ok=True)
+    assert sequential.model == parallel.model
     assert (
         sequential.evaluation["selected"]["params"]
         == parallel.evaluation["selected"]["params"]

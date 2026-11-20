@@ -32,7 +32,7 @@ class Bagging(models.Model):
 
     family = "bagging"
     base: models.Model
-    search_space = search.Space(
+    space = search.Space(
         (
             search.Integer("n_estimators", 10, 60),
             search.Real("max_samples", 0.5, 1.0),
@@ -53,9 +53,9 @@ class Bagging(models.Model):
         inner = cls.base.capabilities
         cls.capabilities = dataclasses.replace(
             inner,
-            sparse_input=False,
+            sparse=False,
             cost=min(inner.cost + 1, MAX_COST),
-            memory_factor=inner.memory_factor * MEMORY_MULTIPLIER,
+            factor=inner.factor * MEMORY_MULTIPLIER,
         )
 
     def build(
@@ -80,7 +80,7 @@ class Bagging(models.Model):
         member = self.base.build(task, seed, given)
         bagger = (
             ensemble.BaggingClassifier
-            if task.is_classification
+            if task.classification
             else ensemble.BaggingRegressor
         )
         bagged: models.Estimator = bagger(

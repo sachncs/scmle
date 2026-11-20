@@ -60,15 +60,15 @@ def test_the_curator_checks_its_inputs(tmp_path):
         curator.Curator(adapter(), "")
     with pytest.raises(errors.KindError, match="manifest must be Passport"):
         curator.Curator(adapter(), KEY, manifest=passport())
-    made = curator.Curator(adapter(), KEY, output_dir=str(tmp_path))
-    assert made.output_dir == tmp_path
+    made = curator.Curator(adapter(), KEY, directory=str(tmp_path))
+    assert made.directory == tmp_path
     assert made.manifest is None
 
 
 def test_a_run_writes_signed_curation_evidence(tmp_path):
     # Enforces website/src/pages/docs/extensions.astro:154.
     source = adapter()
-    result = curator.Curator(source, KEY, output_dir=tmp_path).run()
+    result = curator.Curator(source, KEY, directory=tmp_path).run()
     path = tmp_path / "modality_curation.json"
     assert result.path == str(path)
     assert result.modality == "document"
@@ -81,24 +81,24 @@ def test_a_run_writes_signed_curation_evidence(tmp_path):
 
 
 def test_a_second_run_reuses_the_matching_artifact(tmp_path):
-    first = curator.Curator(adapter(), KEY, output_dir=tmp_path).run()
-    again = curator.Curator(adapter(), KEY, output_dir=tmp_path).run()
+    first = curator.Curator(adapter(), KEY, directory=tmp_path).run()
+    again = curator.Curator(adapter(), KEY, directory=tmp_path).run()
     assert again.digest == first.digest
     assert again.to_dict() == first.to_dict()
 
 
 def test_an_artifact_of_other_data_is_not_replaced(tmp_path):
-    curator.Curator(adapter(6), KEY, output_dir=tmp_path).run()
+    curator.Curator(adapter(6), KEY, directory=tmp_path).run()
     before = (tmp_path / "modality_curation.json").read_bytes()
     with pytest.raises(errors.InputError, match="does not match current"):
-        curator.Curator(adapter(8), KEY, output_dir=tmp_path).run()
+        curator.Curator(adapter(8), KEY, directory=tmp_path).run()
     assert (tmp_path / "modality_curation.json").read_bytes() == before
 
 
 def test_an_output_path_that_is_a_file_is_refused(tmp_path):
     (tmp_path / "file").write_text("x")
     with pytest.raises(errors.InputError, match="must be a directory"):
-        curator.Curator(adapter(), KEY, output_dir=tmp_path / "file").run()
+        curator.Curator(adapter(), KEY, directory=tmp_path / "file").run()
 
 
 def test_examine_refuses_a_report_that_is_not_a_curation():

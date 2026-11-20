@@ -1,6 +1,6 @@
 """Keys and revocations fetched over the network.
 
-`tokens.Keystore.from_file` and `RevocationList.from_file` read files. This
+`tokens.Keystore.read` and `Revocations.read` read files. This
 module adds the pull side, with the standard library only:
 
 * `discover` reads an OpenID Connect discovery document and checks that its
@@ -130,12 +130,12 @@ class Keystore(tokens.Keystore):
     Attributes:
         uri: Where the JWKS document is served.
         ttl: Seconds a fetched set is used before it is refetched.
-        min_refresh: Least seconds between fetches caused by an unknown `kid`.
-        max_stale: Seconds a set may be served after its refresh began to fail.
+        cooldown: Least seconds between fetches caused by an unknown `kid`.
+        staleness: Seconds a set may be served after its refresh began to fail.
         clock: Epoch seconds.
-        allow_http: Whether plain http is permitted.
+        http: Whether plain http is permitted.
         fetcher: The JSON fetcher.
-        fetched_at: Clock reading of the last successful fetch.
+        fetched: Clock reading of the last successful fetch.
     """
 
     def __init__(
@@ -143,10 +143,10 @@ class Keystore(tokens.Keystore):
         jwks_uri: str,
         *,
         ttl: float = DEFAULT_TTL,
-        min_refresh: float = DEFAULT_MIN_REFRESH,
-        max_stale: float = DEFAULT_MAX_STALE,
+        cooldown: float = DEFAULT_MIN_REFRESH,
+        staleness: float = DEFAULT_MAX_STALE,
         clock: Callable[[], float] = time.time,
-        allow_http: bool = False,
+        http: bool = False,
         fetch: Callable[..., Any] = retrieve,
     ) -> None:
         """Fetches the key set once; it must succeed.
@@ -154,12 +154,12 @@ class Keystore(tokens.Keystore):
         Args:
             jwks_uri: Where the JWKS document is served.
             ttl: Seconds a fetched set is used before it is refetched.
-            min_refresh: Least seconds between fetches caused by an unknown
+            cooldown: Least seconds between fetches caused by an unknown
                 `kid`.
-            max_stale: Seconds a set may be served after its refresh began to
+            staleness: Seconds a set may be served after its refresh began to
                 fail; beyond that no key is trusted.
             clock: Epoch seconds (injectable for tests).
-            allow_http: Permit plain http (tests only).
+            http: Permit plain http (tests only).
             fetch: The JSON fetcher (injectable).
 
         Raises:
@@ -168,16 +168,16 @@ class Keystore(tokens.Keystore):
         """
         self.uri = jwks_uri
         self.ttl = ttl
-        self.min_refresh = min_refresh
-        self.max_stale = max_stale
+        self.cooldown = cooldown
+        self.staleness = staleness
         self.clock = clock
-        self.allow_http = allow_http
+        self.http = http
         self.fetcher = fetch
-        self.fetched_at = 0.0
-        self.refresh_started = False
+        self.fetched = 0.0
+        self.started = False
         loaded = self.load()
         super().__init__(list(loaded.keys.values()))
-        self.fetched_at = self.clock()
+        self.fetched = self.clock()
 
     def load(self) -> tokens.Keystore:
         """Fetches and parses the JWKS document.
@@ -190,7 +190,7 @@ class Keystore(tokens.Keystore):
                 JWKS.
         """
         return tokens.Keystore.jwks(
-            self.fetcher(self.uri, allow_http=self.allow_http)
+            self.fetcher(self.uri, allow_http=self.http)
         )
 
     def refresh(self) -> bool:
@@ -211,16 +211,16 @@ class Keystore(tokens.Keystore):
             )
             return False
         self.keys = loaded.keys
-        self.fetched_at = self.clock()
+        self.fetched = self.clock()
         return True
 
     def get(self, kid: str) -> tokens.Key:
         """Looks up the key with this id, refreshing the set when it is due.
 
         The set is refetched when it is `ttl` seconds old or more, and for
-        an unknown `kid` when it is `min_refresh` seconds old or more. If the
+        an unknown `kid` when it is `cooldown` seconds old or more. If the
         refetch fails the old set is still used until it is `ttl` plus
-        `max_stale` seconds old.
+        `staleness` seconds old.
 
         Args:
             kid: The key id.
@@ -232,18 +232,18 @@ class Keystore(tokens.Keystore):
             TokenError: `unknown_key` for a key the set does not hold, or
                 `keys_unavailable` once the set is too stale to trust.
         """
-        age = self.clock() - self.fetched_at
+        age = self.clock() - self.fetched
         if age >= self.ttl:
             self.refresh()
-            age = self.clock() - self.fetched_at
-            if age >= self.ttl + self.max_stale:
+            age = self.clock() - self.fetched
+            if age >= self.ttl + self.staleness:
                 raise tokens.TokenError(KEYS_UNAVAILABLE)
-        elif kid not in self.keys and age >= self.min_refresh:
+        elif kid not in self.keys and age >= self.cooldown:
             self.refresh()
         return super().get(kid)
 
 
-def revoked(document: Any) -> tokens.RevocationList:
+def revoked(document: Any) -> tokens.Revocations:
     """Builds a revocation list from a fetched document.
 
     Args:
@@ -258,7 +258,7 @@ def revoked(document: Any) -> tokens.RevocationList:
     """
     if not isinstance(document, dict):
         raise errors.ConfigError("the revocation list is not an object")
-    return tokens.RevocationList(
+    return tokens.Revocations(
         document.get("tokens", ()),
         document.get("subjects", ()),
         document.get("key_ids", ()),
@@ -271,12 +271,12 @@ class Revocations:
     Attributes:
         url: Where the revocation document is served.
         ttl: Seconds a fetched list is used.
-        max_stale: Seconds a list may be served after its refresh began to fail.
+        staleness: Seconds a list may be served after its refresh began to fail.
         clock: Epoch seconds.
-        allow_http: Whether plain http is permitted.
+        http: Whether plain http is permitted.
         fetcher: The JSON fetcher.
         current: The list in force, or None before the first fetch.
-        fetched_at: Clock reading of the last successful fetch.
+        fetched: Clock reading of the last successful fetch.
     """
 
     def __init__(
@@ -284,9 +284,9 @@ class Revocations:
         url: str,
         *,
         ttl: float = 30.0,
-        max_stale: float = DEFAULT_MAX_STALE,
+        staleness: float = DEFAULT_MAX_STALE,
         clock: Callable[[], float] = time.time,
-        allow_http: bool = False,
+        http: bool = False,
         fetch: Callable[..., Any] = retrieve,
     ) -> None:
         """Creates the puller; the first call fetches.
@@ -295,22 +295,22 @@ class Revocations:
             url: Where `{"tokens": [], "subjects": [], "key_ids": []}` is
                 served.
             ttl: Seconds a fetched list is used.
-            max_stale: Seconds a list may be served after its refresh began
+            staleness: Seconds a list may be served after its refresh began
                 to fail.
             clock: Epoch seconds.
-            allow_http: Permit plain http (tests only).
+            http: Permit plain http (tests only).
             fetch: The JSON fetcher.
         """
         self.url = url
         self.ttl = ttl
-        self.max_stale = max_stale
+        self.staleness = staleness
         self.clock = clock
-        self.allow_http = allow_http
+        self.http = http
         self.fetcher = fetch
-        self.current: tokens.RevocationList | None = None
-        self.fetched_at = 0.0
+        self.current: tokens.Revocations | None = None
+        self.fetched = 0.0
 
-    def __call__(self) -> tokens.RevocationList:
+    def __call__(self) -> tokens.Revocations:
         """Returns the list in force, refreshing it when due.
 
         Returns:
@@ -325,23 +325,23 @@ class Revocations:
                 (including on the first call).
         """
         now = self.clock()
-        if self.current is not None and now - self.fetched_at < self.ttl:
+        if self.current is not None and now - self.fetched < self.ttl:
             return self.current
         try:
-            fresh = revoked(self.fetcher(self.url, allow_http=self.allow_http))
+            fresh = revoked(self.fetcher(self.url, allow_http=self.http))
         except errors.ConfigError as error:
             if (
                 self.current is not None
-                and now - self.fetched_at < self.ttl + self.max_stale
+                and now - self.fetched < self.ttl + self.staleness
             ):
                 LOGGER.warning(
                     "WARNING revocation list %s did not refresh; the cached "
                     "list is used until it is %ss stale: %s",
                     self.url,
-                    self.max_stale,
+                    self.staleness,
                     error,
                 )
                 return self.current
             raise
-        self.current, self.fetched_at = fresh, now
+        self.current, self.fetched = fresh, now
         return fresh

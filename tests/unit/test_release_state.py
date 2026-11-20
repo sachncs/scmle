@@ -25,12 +25,10 @@ PRODUCTION = "production"
 
 def world(tmp_path, split=True, **options):
     store = support_runtime.make_registry(tmp_path / "registry")
-    ledger = deployment_ledger.DeploymentLedger.create(
+    ledger = deployment_ledger.Ledger.create(
         None, charter_hash="c" * 8, policy={}, alpha_promo="1/20"
     )
-    release = release_state.ReleaseRegistry(
-        store, ledger, support_runtime.NO_WAIT
-    )
+    release = release_state.Registry(store, ledger, support_runtime.NO_WAIT)
     for number in (1, 2, 3):
         release.approve(
             MODEL,
@@ -91,45 +89,39 @@ def test_an_observation_refuses_a_tag_and_a_broken_split():
 
 def test_every_registered_version_starts_as_a_candidate(tmp_path):
     store = support_runtime.make_registry(tmp_path / "registry")
-    release = release_state.ReleaseRegistry(store)
+    release = release_state.Registry(store)
     assert set(release.states(MODEL).values()) == {
-        release_state.ReleaseState.CANDIDATE
+        release_state.State.CANDIDATE
     }
 
 
 def test_states_are_distinct_and_the_hand_moves_are_limited(tmp_path):
     store = support_runtime.make_registry(tmp_path / "registry")
-    release = release_state.ReleaseRegistry(store)
-    assert len({s.value for s in release_state.ReleaseState}) == 5
-    release.transition(
-        MODEL, 1, release_state.ReleaseState.CHALLENGER, "compare"
-    )
-    assert release.lookup(MODEL, 1) is release_state.ReleaseState.CHALLENGER
+    release = release_state.Registry(store)
+    assert len({s.value for s in release_state.State}) == 5
+    release.transition(MODEL, 1, release_state.State.CHALLENGER, "compare")
+    assert release.lookup(MODEL, 1) is release_state.State.CHALLENGER
     for forbidden in (
-        release_state.ReleaseState.PRODUCTION,
-        release_state.ReleaseState.APPROVED,
+        release_state.State.PRODUCTION,
+        release_state.State.APPROVED,
     ):
         with pytest.raises(errors.ArtifactError, match="cannot be set by hand"):
             release.transition(MODEL, 2, forbidden, "shortcut")
-    release.transition(
-        MODEL, 1, release_state.ReleaseState.RETIRED, "withdrawn"
-    )
+    release.transition(MODEL, 1, release_state.State.RETIRED, "withdrawn")
     with pytest.raises(errors.ArtifactError, match="not allowed"):
-        release.transition(
-            MODEL, 1, release_state.ReleaseState.CHALLENGER, "again"
-        )
+        release.transition(MODEL, 1, release_state.State.CHALLENGER, "again")
 
 
 def test_approval_needs_a_signed_bundle_and_a_valid_independent_review(
     tmp_path,
 ):
     store = support_runtime.make_registry(tmp_path / "registry")
-    release = release_state.ReleaseRegistry(store)
+    release = release_state.Registry(store)
     bad = {
         "rejected": support_runtime.sanction(1, decision="rejected"),
         "not independent": support_runtime.sanction(1, independent=False),
         "another bundle": support_release.approval(
-            version=1, content_id="8" * 64
+            version=1, content="8" * 64
         ),
         "unsigned approval": support_runtime.sanction(1).__class__(
             **{
@@ -142,19 +134,17 @@ def test_approval_needs_a_signed_bundle_and_a_valid_independent_review(
     for name, approval in bad.items():
         with pytest.raises(errors.ArtifactError):
             release.approve(MODEL, 1, approval, support_release.KEY)
-        assert (
-            release.lookup(MODEL, 1) is release_state.ReleaseState.CANDIDATE
-        ), name
+        assert release.lookup(MODEL, 1) is release_state.State.CANDIDATE, name
     with pytest.raises(errors.ArtifactError):
         release.approve(MODEL, 1, support_runtime.sanction(1), "wrong-key")
     release.approve(MODEL, 1, support_runtime.sanction(1), support_release.KEY)
-    assert release.lookup(MODEL, 1) is release_state.ReleaseState.APPROVED
+    assert release.lookup(MODEL, 1) is release_state.State.APPROVED
 
 
 def test_an_unsigned_bundle_cannot_be_approved(tmp_path):
     store = support_runtime.make_registry(tmp_path / "registry", signed=False)
     with pytest.raises(errors.ArtifactError, match="unsigned"):
-        release_state.ReleaseRegistry(store).approve(
+        release_state.Registry(store).approve(
             MODEL, 1, support_runtime.sanction(1), support_release.KEY
         )
 
@@ -169,9 +159,9 @@ def test_a_confirmed_promotion_changes_state_alias_and_ledger(tmp_path, split):
     assert first.done and first.restored is None
     second = promote(release, plane, 2, support_runtime.NEW)
     assert second.done and second.version == 2
-    assert release.lookup(MODEL, 2) is release_state.ReleaseState.PRODUCTION
-    assert release.lookup(MODEL, 1) is release_state.ReleaseState.RETIRED
-    assert release.lookup(MODEL, 3) is release_state.ReleaseState.APPROVED
+    assert release.lookup(MODEL, 2) is release_state.State.PRODUCTION
+    assert release.lookup(MODEL, 1) is release_state.State.RETIRED
+    assert release.lookup(MODEL, 3) is release_state.State.APPROVED
     assert release.store.aliases(MODEL)[registry.CHAMPION] == 2
     recorded = release.environment(MODEL, PRODUCTION)
     assert (
@@ -194,7 +184,7 @@ def test_a_staging_release_does_not_make_a_version_production(tmp_path, split):
         release, plane, 1, support_runtime.OLD, environment="staging"
     )
     assert outcome.done
-    assert release.lookup(MODEL, 1) is release_state.ReleaseState.APPROVED
+    assert release.lookup(MODEL, 1) is release_state.State.APPROVED
     assert registry.CHAMPION not in release.store.aliases(MODEL)
     assert release.environment(MODEL, "staging")["version"] == 1
     assert release.reconcile(MODEL, "staging", plane.observe()).consistent
@@ -227,15 +217,13 @@ def test_a_staged_rollout_passes_through_each_share_only_where_traffic_splits(
     else:
         assert outcome.done
         assert [p for p, ignored in seen_shares] == [10, 50, 100]
-        assert release.lookup(MODEL, 2) is release_state.ReleaseState.PRODUCTION
+        assert release.lookup(MODEL, 2) is release_state.State.PRODUCTION
 
 
 def test_each_unconfirmed_or_refused_promotion_changes_nothing(tmp_path):
     release, plane, ignored = world(tmp_path)
     assert promote(release, plane, 1, support_runtime.OLD).done
-    release.transition(
-        MODEL, 3, release_state.ReleaseState.RETIRED, "withdrawn"
-    )
+    release.transition(MODEL, 3, release_state.State.RETIRED, "withdrawn")
     before = snapshot(release)
     # not approved (retired), then a bad digest request
     refused = promote(release, plane, 3, support_runtime.NEW)
@@ -265,7 +253,7 @@ def test_a_platform_that_never_confirms_leaves_the_registry_unchanged(
     assert after["registry"] == before["registry"]
     assert after["state"] == before["state"]
     assert after["aliases"] == before["aliases"]
-    assert release.lookup(MODEL, 2) is release_state.ReleaseState.APPROVED
+    assert release.lookup(MODEL, 2) is release_state.State.APPROVED
     assert release.ledger.rows[-1]["body"]["event"] == "rejected"
     assert release.environment(MODEL, PRODUCTION)["version"] == 1
 
@@ -356,8 +344,8 @@ def test_rollback_restores_the_previous_known_good_revision(tmp_path, split):
     outcome = release.rollback(MODEL, PRODUCTION, plane, support_release.KEY)
     assert outcome.done and outcome.version == 1
     assert outcome.revision == first["revision"]
-    assert release.lookup(MODEL, 1) is release_state.ReleaseState.PRODUCTION
-    assert release.lookup(MODEL, 2) is release_state.ReleaseState.RETIRED
+    assert release.lookup(MODEL, 1) is release_state.State.PRODUCTION
+    assert release.lookup(MODEL, 2) is release_state.State.RETIRED
     assert release.store.aliases(MODEL)[registry.CHAMPION] == 1
     seen = plane.observe()
     assert seen.image_digest == support_runtime.OLD
@@ -441,7 +429,7 @@ def test_reconcile_detects_a_seeded_revision_and_digest_disagreement(released):
     )
     found = kinds(release, other)
     assert {"revision_mismatch", "digest_mismatch", "traffic_split"} <= found
-    with pytest.raises(release_state.RuntimeDisagrees) as raised:
+    with pytest.raises(release_state.DisagreementError) as raised:
         release.live(MODEL, PRODUCTION, other)
     assert raised.value.details["findings"]
 
@@ -472,7 +460,7 @@ def test_an_alias_moved_around_the_runtime_is_never_deployed(released):
     )
     assert release.store.aliases(MODEL)[registry.CHAMPION] == 3
     assert "alias_not_deployed" in kinds(release, seen)
-    with pytest.raises(release_state.RuntimeDisagrees):
+    with pytest.raises(release_state.DisagreementError):
         release.live(MODEL, PRODUCTION, seen)
 
 
@@ -502,7 +490,7 @@ def test_reconcile_detects_a_ledger_that_disagrees_or_is_empty(released):
         },
     )
     assert "ledger_disagrees" in kinds(release, seen)
-    fresh = deployment_ledger.DeploymentLedger.create(
+    fresh = deployment_ledger.Ledger.create(
         None, charter_hash="c" * 8, policy={}, alpha_promo="1/20"
     )
     release.ledger = fresh
@@ -513,7 +501,7 @@ def test_the_runtime_running_something_unrecorded_is_a_finding(tmp_path):
     release, plane, ignored = world(tmp_path, split=False)
     report = release.reconcile(MODEL, PRODUCTION, plane.observe())
     assert [f.kind for f in report.findings] == ["no_registry_record"]
-    with pytest.raises(release_state.RuntimeDisagrees):
+    with pytest.raises(release_state.DisagreementError):
         release.live(MODEL, PRODUCTION, plane.observe())
 
 
@@ -568,7 +556,7 @@ def test_confirm_waits_and_then_gives_up():
     policy = control.Polling(attempts=3, delay=2, sleep=waits.append)
     plane = support_runtime.MemoryPlane(never_settles=True)
     revision = plane.deploy(support_runtime.NEW)
-    with pytest.raises(control.RuntimeUnconfirmed):
+    with pytest.raises(control.UnconfirmedError):
         control.confirm(
             plane, control.expecting(revision, support_runtime.NEW, 100), policy
         )
@@ -580,5 +568,5 @@ def test_confirm_waits_and_then_gives_up():
 def test_a_plane_that_cannot_split_traffic_refuses_a_split():
     plane = support_runtime.MemoryPlane(split=False)
     with pytest.raises(control.Unsupported):
-        plane.set_traffic({"serve-1": 50, "serve-2": 50})
+        plane.route({"serve-1": 50, "serve-2": 50})
     assert plane.deploy(support_runtime.NEW) == "serve-2"

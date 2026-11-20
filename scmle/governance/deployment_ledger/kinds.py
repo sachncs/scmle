@@ -109,7 +109,7 @@ def thumbprint(key: str | bytes) -> str:
     return hashlib.sha256(b"scmle-key-fingerprint:" + raw).hexdigest()[:16]
 
 
-def parse_date(value: str, name: str) -> datetime.date:
+def parse(value: str, name: str) -> datetime.date:
     """Parses an ISO 8601 calendar date, normally ``YYYY-MM-DD``.
 
     Args:

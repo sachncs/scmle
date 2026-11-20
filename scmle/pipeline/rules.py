@@ -64,8 +64,8 @@ def shape(context: Situation) -> tuple[int, int, int]:
         profile counts none).
     """
     rows = context.profile.manifest.rows
-    columns = len(context.profile.feature_plan.features)
-    classes = int(context.profile.target_summary.get("n_classes", 0) or 0)
+    columns = len(context.profile.plan.features)
+    classes = int(context.profile.summary.get("n_classes", 0) or 0)
     return rows, columns, classes
 
 
@@ -156,12 +156,12 @@ class Memory(Refiner):
             The candidates whose estimated training memory is within the limit.
         """
         rows = context.profile.manifest.rows
-        width = max(len(context.profile.feature_plan.features), 1)
+        width = max(len(context.profile.plan.features), 1)
         limit = context.spec.resources.memory_limit_gb
         base_gb = rows * width * 8 / 1024**3
         kept = []
         for adapter in candidates:
-            estimate = base_gb * adapter.capabilities.memory_factor
+            estimate = base_gb * adapter.capabilities.factor
             if estimate > limit:
                 decisions.append(
                     experiments.Decision(
@@ -245,7 +245,7 @@ class Budget(Refiner):
                     experiments.Edict.INCLUDE,
                     f"{', '.join(a.name for a in late)} would outlast the "
                     f"{window(context):.1f} s trial window on "
-                    f"{len(context.profile.feature_plan.features)} columns; "
+                    f"{len(context.profile.plan.features)} columns; "
                     "the cheaper learners run first",
                 )
             )
@@ -278,7 +278,7 @@ class Streaming(Refiner):
         if context.spec.data.training != "stream":
             kept = []
             for adapter in candidates:
-                if adapter.capabilities.stream_only:
+                if adapter.capabilities.streaming:
                     decisions.append(
                         experiments.Decision(
                             adapter.name,
@@ -367,13 +367,13 @@ class Cardinality(Refiner):
             otherwise the same candidates reordered as baselines, native
             categorical models, then the rest.
         """
-        wide = context.profile.feature_plan.high_cardinality
+        wide = context.profile.plan.cardinal
         if not wide:
             return candidates
         native = [
             a
             for a in candidates
-            if a.capabilities.native_categorical
+            if a.capabilities.categorical
             and a.nominals([0])
             and a.family != "baseline"
             and not (context.spec.brief and outlasts(context, a))

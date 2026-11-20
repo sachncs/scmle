@@ -54,7 +54,7 @@ def test_network_keeps_the_given_declaration() -> None:
         name="custom", architecture="mlp", capability_family="transformer"
     )
     assert (network.name, network.architecture) == ("custom", "mlp")
-    assert network.capability_family == "transformer"
+    assert network.boundary == "transformer"
     assert network.contract is networks.Network.contract
 
 

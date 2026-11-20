@@ -216,8 +216,8 @@ class Check:
                 decision, set or tier has the wrong type, or the confirmed
                 tier is not on the confirmation set.
         """
-        evidence.require_text(self.identifier, "identifier")
-        evidence.require_text(self.null, "null")
+        evidence.require(self.identifier, "identifier")
+        evidence.require(self.null, "null")
         finite(self.statistic, "statistic")
         finite(self.effect, "effect")
         count(self.n, "n")
@@ -336,14 +336,14 @@ class Claim:
                 is not a finite number, the tier has the wrong type, or a
                 confirmed claim has no adjusted p-value.
         """
-        evidence.require_text(self.identifier, "identifier")
-        evidence.require_text(self.statement, "statement")
+        evidence.require(self.identifier, "identifier")
+        evidence.require(self.statement, "statement")
         tupled(self.checks, "checks")
         tupled(self.assumptions, "assumptions")
         if not self.checks:
             raise errors.InputError("checks must not be empty")
         for check in self.checks:
-            evidence.require_text(check, "checks")
+            evidence.require(check, "checks")
         if self.adjusted_p_value is not None:
             probability(self.adjusted_p_value, "adjusted_p_value")
         finite(self.effect, "effect")
@@ -442,8 +442,8 @@ class Certificate:
                 planted count, the alarms exceed the clean rows, or the
                 seed path is not a tuple.
         """
-        evidence.require_text(self.detector, "detector")
-        evidence.require_text(self.defect, "defect")
+        evidence.require(self.detector, "detector")
+        evidence.require(self.defect, "defect")
         count(self.planted, "planted", minimum=1)
         count(self.detected, "detected")
         if self.detected > self.planted:
@@ -460,13 +460,11 @@ class Certificate:
         return self.detected / self.planted
 
     @property
-    def false_alarm_rate(self) -> float:
+    def fallout(self) -> float:
         """Share of clean rows that were flagged."""
         return self.alarms / self.clean
 
-    def recall_lower_bound(
-        self, confidence: float = DEFAULT_CONFIDENCE
-    ) -> float:
+    def bound(self, confidence: float = DEFAULT_CONFIDENCE) -> float:
         """Returns the lower end of the two-sided Wilson interval for recall.
 
         Args:

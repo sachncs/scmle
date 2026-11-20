@@ -250,10 +250,10 @@ def test_a_version_one_review_still_verifies():
     assert loaded.digests["artifacts"] == {"wheel": "sha256:w"}
     assert loaded.claims[0].criterion == "metric.auc"
     assert loaded.to_dict() == fixture["record"]
-    assert loaded.verify_signature(fixture["key"])
+    assert loaded.verify(fixture["key"])
     assert loaded.accepted("abc1234", ("metric",), fixture["key"])
     changed = dataclasses.replace(loaded, reviewer="someone@example.com")
-    assert not changed.verify_signature(fixture["key"])
+    assert not changed.verify(fixture["key"])
 
 
 def test_a_review_signed_now_is_version_two():
@@ -265,7 +265,7 @@ def test_a_review_signed_now_is_version_two():
     written = fresh.to_dict()
     assert written[records.KEY] == 2 and written["claims"][0]["uri"]
     again = review.Signoff.from_dict(written)
-    assert again == fresh and again.verify_signature(fixture["key"])
+    assert again == fresh and again.verify(fixture["key"])
 
 
 @hypothesis.given(release=TEXT, notes=TEXT)
@@ -295,7 +295,7 @@ def copy_ledger(tmp_path):
 def test_a_version_one_ledger_verifies_and_its_replies_still_verify(tmp_path):
     fixture = stored("deployment_ledger")
     directory = copy_ledger(tmp_path)
-    loaded = deployment_ledger.DeploymentLedger.load(
+    loaded = deployment_ledger.Ledger.load(
         directory / deployment_ledger.FILE_NAME
     )
     reply = deployment_ledger.Attestation.from_dict(
@@ -319,7 +319,7 @@ def test_a_tampered_version_one_ledger_row_is_refused(tmp_path):
     text = path.read_text("utf-8")
     path.write_text(text.replace('"P. Owner"', '"Q. Owner"', 1), "utf-8")
     with pytest.raises(deployment_ledger.MisuseError):
-        deployment_ledger.DeploymentLedger.load(path)
+        deployment_ledger.Ledger.load(path)
 
 
 def test_a_version_one_ledger_resumes_with_its_amended_policy(tmp_path):
@@ -341,7 +341,7 @@ def test_a_version_one_ledger_resumes_with_its_amended_policy(tmp_path):
 def test_a_new_amendment_on_a_version_one_ledger_carries_its_version(tmp_path):
     directory = copy_ledger(tmp_path)
     loop = scmle.governance.loop.Loop.resume(directory)
-    loop.amend_policy(target=0.4, promotion={"delta": 0.05})
+    loop.amend(target=0.4, promotion={"delta": 0.05})
     body = loop.ledger.rows[-1]["body"]["policy_amendment"]
     assert body[records.KEY] == 2
     again = scmle.governance.loop.Loop.resume(directory)
@@ -461,7 +461,7 @@ def test_a_version_one_baseline_loads():
 
 def test_a_version_one_run_manifest_loads():
     record = stored("run_manifest")["record"]
-    manifest = ledger.RunManifest.from_dict(record)
+    manifest = ledger.Manifest.from_dict(record)
     assert manifest.identifier == "run-1" and manifest.cost == 0.1
     assert manifest.digests == {
         "spec": record["spec_digest"],
@@ -470,23 +470,23 @@ def test_a_version_one_run_manifest_loads():
     }
     written = manifest.to_dict()
     assert written["format"] == ledger.MANIFEST_FORMAT == 2
-    assert ledger.RunManifest.from_dict(written) == manifest
+    assert ledger.Manifest.from_dict(written) == manifest
     content = {k: v for k, v in written.items() if k != "format"}
-    restored = revert(ledger.RunManifest.migrations, content)
+    restored = revert(ledger.Manifest.migrations, content)
     assert {**restored, "format": 1} == record
 
 
 def test_a_run_manifest_newer_than_the_build_is_refused():
     record = stored("run_manifest")["record"]
     with pytest.raises(ValueError, match="newer"):
-        ledger.RunManifest.from_dict({**record, "format": 3})
+        ledger.Manifest.from_dict({**record, "format": 3})
 
 
 @hypothesis.given(runner=TEXT, name=TEXT)
 def test_the_manifest_and_baseline_migrations_round_trip(runner, name):
     layout = {**stored("run_manifest")["record"], "runner": runner}
     del layout["format"]
-    steps = ledger.RunManifest.migrations
+    steps = ledger.Manifest.migrations
     assert revert(steps, lift(steps, layout)) == layout
     profile = {**stored("baseline")["record"], "output_name": name}
     steps = reference.Baseline.migrations
@@ -507,7 +507,7 @@ def test_every_r5_kind_registers_one_invertible_step():
         review.Signoff,
         incidents.Incident,
         reference.Baseline,
-        ledger.RunManifest,
+        ledger.Manifest,
     )
     for kind in kinds:
         # the baseline gained a second step: each reference writes `missing`

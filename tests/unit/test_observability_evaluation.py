@@ -10,10 +10,10 @@ import scmle.monitoring.observability
 def make_policy() -> observability.Requirements:
     """Build a policy with one required signal and one upper bound."""
     return observability.Requirements(
-        retention_days=30,
-        required_signals=(observability.Indicator.LATENCY,),
-        redacted_fields=("email",),
-        alert_thresholds={"latency_p95_ms": 250.0},
+        retention=30,
+        signals=(observability.Indicator.LATENCY,),
+        fields=("email",),
+        thresholds={"latency_p95_ms": 250.0},
     )
 
 
@@ -47,13 +47,13 @@ def test_evaluation_passes_fresh_metrics_under_threshold():
 def test_evaluation_fails_closed_for_missing_stale_future_and_breached_metrics():
     # Enforces website/src/pages/docs/operations.astro:61.
     policy = observability.Requirements(
-        retention_days=1,
-        required_signals=(
+        retention=1,
+        signals=(
             observability.Indicator.LATENCY,
             observability.Indicator.ERROR,
         ),
-        redacted_fields=(),
-        alert_thresholds={"latency_p95_ms": 250.0},
+        fields=(),
+        thresholds={"latency_p95_ms": 250.0},
     )
     metrics = [
         make_metric(value=300.0),
@@ -82,10 +82,10 @@ def test_evaluation_fails_closed_for_missing_stale_future_and_breached_metrics()
 
 def test_prediction_log_enforces_sidecar_retention_atomically(tmp_path):
     policy = observability.Requirements(
-        retention_days=1,
-        required_signals=(observability.Indicator.LATENCY,),
-        redacted_fields=(),
-        alert_thresholds={},
+        retention=1,
+        signals=(observability.Indicator.LATENCY,),
+        fields=(),
+        thresholds={},
     )
     log = events.Journal(tmp_path / "predictions.jsonl", policy=policy)
     log.sidecar.write_text(

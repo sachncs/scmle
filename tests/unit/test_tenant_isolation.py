@@ -23,7 +23,7 @@ links = pytest.mark.skipif(
 
 @pytest.fixture
 def shared(tmp_path):
-    return objectstore.LocalObjectStore(tmp_path / "root")
+    return objectstore.Disk(tmp_path / "root")
 
 
 @pytest.fixture
@@ -35,9 +35,9 @@ def pair(shared):
 
 
 def test_the_conformance_suite_passes_inside_a_tenancy(shared):
-    report = conformance.run_conformance(tenancy.Tenancy(shared, "acme"))
+    report = conformance.certify(tenancy.Tenancy(shared, "acme"))
     assert [r.name for r in report.results if not r.passed] == []
-    assert shared.list_objects() == []
+    assert shared.catalog() == []
 
 
 def test_keys_are_namespaced_and_metadata_is_relative(shared, pair):
@@ -47,7 +47,7 @@ def test_keys_are_namespaced_and_metadata_is_relative(shared, pair):
     assert shared.get("tenants/acme/bundles/v1.json")[0] == b"acme"
     assert acme.get("bundles/v1.json")[1].key == "bundles/v1.json"
     assert acme.uri("a") == shared.location + "/tenants/acme/a"
-    assert [m.key for m in acme.list_objects()] == ["bundles/v1.json"]
+    assert [m.key for m in acme.catalog()] == ["bundles/v1.json"]
 
 
 @pytest.mark.parametrize(
@@ -73,7 +73,7 @@ def test_a_crafted_key_is_refused_for_every_operation(pair, key):
         lambda: acme.put(key, b"x"),
         lambda: acme.put(key, b"x", if_absent=True),
         lambda: acme.delete(key),
-        lambda: acme.list_objects(key + "/"),
+        lambda: acme.catalog(key + "/"),
     )
     for operation in operations:
         with pytest.raises(objectstore.StoreError):
@@ -90,7 +90,7 @@ def test_a_key_naming_the_namespace_root_is_a_tenant_error(pair, key):
         lambda: acme.get(key),
         lambda: acme.put(key, b"x"),
         lambda: acme.delete(key),
-        lambda: acme.list_objects("tenants/"),
+        lambda: acme.catalog("tenants/"),
     ):
         with pytest.raises(tenancy.TenantError):
             operation()
@@ -99,7 +99,7 @@ def test_a_key_naming_the_namespace_root_is_a_tenant_error(pair, key):
 
 def test_one_tenant_sees_nothing_of_another(pair):
     acme, globex = pair
-    assert acme.list_objects() == []
+    assert acme.catalog() == []
     with pytest.raises(objectstore.AbsentError):
         acme.get("secret.json")
     assert not acme.exists("secret.json")
@@ -110,7 +110,7 @@ def test_one_tenant_sees_nothing_of_another(pair):
 
 def test_a_prefix_never_matches_a_longer_tenant_name(shared):
     tenancy.Tenancy(shared, "acme2").put("x", b"2")
-    assert tenancy.Tenancy(shared, "acme").list_objects() == []
+    assert tenancy.Tenancy(shared, "acme").catalog() == []
 
 
 @pytest.mark.parametrize(
@@ -141,7 +141,7 @@ def test_a_symlinked_directory_into_another_tenant_is_refused(shared, pair):
     ):
         with pytest.raises(objectstore.EscapeError):
             operation()
-    assert acme.list_objects() == []
+    assert acme.catalog() == []
     assert globex.get("secret.json")[0] == b"globex"
 
 
@@ -156,7 +156,7 @@ def test_a_symlinked_file_into_another_tenant_is_refused(shared, pair):
         acme.get("copy.json")
     with pytest.raises(objectstore.EscapeError):
         acme.put("copy.json", b"x")
-    assert acme.list_objects() == []
+    assert acme.catalog() == []
     assert globex.get("secret.json")[0] == b"globex"
 
 
@@ -168,21 +168,21 @@ def test_a_symlinked_tenant_directory_is_refused(shared, pair):
     )
     with pytest.raises(objectstore.EscapeError):
         acme.get("secret.json")
-    assert acme.list_objects() == []
+    assert acme.catalog() == []
 
 
-class Leaky(objectstore.LocalObjectStore):
+class Leaky(objectstore.Disk):
     """A backend that ignores the prefix of a listing."""
 
-    def list_objects(self, prefix=""):
-        return super().list_objects("")
+    def catalog(self, prefix=""):
+        return super().catalog("")
 
 
 def test_a_backend_that_ignores_the_prefix_cannot_leak(tmp_path):
     inner = Leaky(tmp_path / "leaky")
     tenancy.Tenancy(inner, "globex").put("secret.json", b"globex")
     with pytest.raises(tenancy.TenantError):
-        tenancy.Tenancy(inner, "acme").list_objects()
+        tenancy.Tenancy(inner, "acme").catalog()
 
 
 def test_adopt_moves_legacy_objects_and_resumes(shared):
@@ -193,11 +193,11 @@ def test_adopt_moves_legacy_objects_and_resumes(shared):
     # An interrupted earlier run copied one object but did not remove it.
     shared.put("tenants/acme/bundles/v1.json", b"one")
     assert acme.adopt() == ["bundles/v1.json", "runs/r1.json"]
-    assert [m.key for m in acme.list_objects()] == [
+    assert [m.key for m in acme.catalog()] == [
         "bundles/v1.json",
         "runs/r1.json",
     ]
-    assert [m.key for m in shared.list_objects()] == [
+    assert [m.key for m in shared.catalog()] == [
         "tenants/acme/bundles/v1.json",
         "tenants/acme/runs/r1.json",
         "tenants/globex/keep.json",
@@ -227,7 +227,7 @@ def test_the_store_adopt_command_moves_and_resumes(shared, capsys):
         "bundles/v1.json",
         "runs/r1.json",
     ]
-    assert [m.key for m in shared.list_objects()] == [
+    assert [m.key for m in shared.catalog()] == [
         "tenants/acme/bundles/v1.json",
         "tenants/acme/runs/r1.json",
     ]
@@ -248,22 +248,22 @@ def test_confine_follows_the_environment(shared):
 
 def trial():
     return experiments.Trial(
-        trial_id="t1",
-        model_name="m",
+        identifier="t1",
+        model="m",
         status=experiments.Termination.OK,
         metric="r2",
-        score_mean=0.5,
-        score_std=0.1,
-        fit_seconds=1.0,
+        score=0.5,
+        deviation=0.1,
+        fit=1.0,
         params={},
-        fold_scores=[0.5],
+        folds=[0.5],
     )
 
 
 def test_experiment_stores_of_two_tenants_never_share_a_run(tmp_path):
     path = tmp_path / "tracking.db"
-    acme = stores.SqliteExperimentStore(path, tenant="acme")
-    globex = stores.SqliteExperimentStore(path, tenant="globex")
+    acme = stores.Sqlite(path, tenant="acme")
+    globex = stores.Sqlite(path, tenant="globex")
     assert acme.path == tmp_path / "tenants" / "acme" / "tracking.db"
     acme.commence("r1", "h-acme", "dir", "2026-01-01T00:00:00Z")
     acme.transcribe("r1", trial())
@@ -273,14 +273,14 @@ def test_experiment_stores_of_two_tenants_never_share_a_run(tmp_path):
     assert acme.runs()[0]["state"] == "CREATED"
     assert globex.trials("r1") == []
     assert len(acme.trials("r1")) == 1
-    legacy = stores.SqliteExperimentStore(path)
+    legacy = stores.Sqlite(path)
     assert legacy.path == path and legacy.tenant is None
     assert legacy.runs() == []
 
 
 def test_an_experiment_store_refuses_a_crafted_tenant(tmp_path):
     with pytest.raises(tenancy.TenantError):
-        stores.SqliteExperimentStore(tmp_path / "t.db", tenant="../acme")
+        stores.Sqlite(tmp_path / "t.db", tenant="../acme")
 
 
 @links
@@ -290,7 +290,7 @@ def test_an_experiment_store_refuses_a_symlinked_tenant(tmp_path):
         tmp_path / "tenants" / "globex", target_is_directory=True
     )
     with pytest.raises(objectstore.EscapeError):
-        stores.SqliteExperimentStore(tmp_path / "t.db", tenant="acme")
+        stores.Sqlite(tmp_path / "t.db", tenant="acme")
 
 
 def bound(kid, tenant):
@@ -307,7 +307,7 @@ def verifier(clock, *entries):
 
 
 def token(clock, kid="hs-1", **claims):
-    return tokens.sign_hs256(
+    return tokens.sign(
         support_identity.HS_SECRET,
         kid,
         support_identity.claims_at(clock.now, **claims),
@@ -418,8 +418,8 @@ def environment(tmp_path, tenant, *entries):
 def test_the_environment_refuses_a_key_of_another_tenant(tmp_path):
     entries = (bound("hs-1", "acme"), bound("hs-2", "globex"))
     with pytest.raises(errors.ConfigError, match=r"\['hs-2'\]"):
-        access.gateway_from_environment(environment(tmp_path, "acme", *entries))
-    gate = access.gateway_from_environment(
+        access.assemble(environment(tmp_path, "acme", *entries))
+    gate = access.assemble(
         environment(tmp_path, "acme", entries[0], support_identity.hs_jwk("x"))
     )
     assert gate is not None and gate.tenant == "acme"
@@ -427,6 +427,6 @@ def test_the_environment_refuses_a_key_of_another_tenant(tmp_path):
 
 def test_the_environment_refuses_an_invalid_tenant_name(tmp_path):
     with pytest.raises(errors.ConfigError):
-        access.gateway_from_environment(
+        access.assemble(
             environment(tmp_path, "Acme", support_identity.hs_jwk("hs-1"))
         )

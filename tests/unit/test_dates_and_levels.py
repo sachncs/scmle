@@ -112,19 +112,19 @@ def portray(frame, cutoff=None, budget=600):
 
 
 def test_a_date_text_column_becomes_calendar_features():
-    plan = portray(campaign()).feature_plan
+    plan = portray(campaign()).plan
     assert "Dt_Customer" not in plan.categorical
     names = {node.name for node in plan.derived}
     # The ordinal day number carries the order the categorical codes lost.
     assert "Dt_Customer__timestamp" in names
     assert {"Dt_Customer__year", "Dt_Customer__month"} <= names
     assert "Dt_Customer__dayofweek" in names
-    assert "Dt_Customer" in plan.extra_inputs
+    assert "Dt_Customer" in plan.extras
 
 
 def test_the_calendar_features_fit_from_the_raw_text():
     frame = campaign()
-    plan = portray(frame).feature_plan
+    plan = portray(frame).plan
     model = preprocessing.instantiate(
         plan, classical.HIST_GRADIENT_BOOSTING, tasks.Task.BINARY, 0
     )
@@ -172,9 +172,7 @@ def wide(levels=400, rows=4000, seed=0):
     return frame, pandas.Series((signal > 0).astype(int))
 
 
-PLAN = data.Blueprint(
-    numeric=("x",), categorical=("code",), high_cardinality=("code",)
-)
+PLAN = data.Blueprint(numeric=("x",), categorical=("code",), cardinal=("code",))
 
 
 def test_levels_past_the_native_limit_are_target_encoded_after_the_rest():

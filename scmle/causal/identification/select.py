@@ -105,8 +105,8 @@ class Verdict:
     Attributes:
         strategy: Registry name.
         eligible: Whether every requirement holds.
-        missing_assumptions: Required assumptions not attested.
-        missing_design: Required design fields not declared.
+        assumptions: Required assumptions not attested.
+        design: Required design fields not declared.
         reasons: Other reasons (estimand mismatch, DAG failure, ...).
         checked: For back-door adjustment, whether a DAG verified the
             adjustment set; False caps the tier at `attested`.
@@ -114,8 +114,8 @@ class Verdict:
 
     strategy: str
     eligible: bool
-    missing_assumptions: tuple[str, ...] = ()
-    missing_design: tuple[str, ...] = ()
+    assumptions: tuple[str, ...] = ()
+    design: tuple[str, ...] = ()
     reasons: tuple[str, ...] = ()
     checked: bool = False
 
@@ -141,8 +141,8 @@ class Verdict:
             {
                 "strategy": self.strategy,
                 "eligible": self.eligible,
-                "missing_assumptions": list(self.missing_assumptions),
-                "missing_design": list(self.missing_design),
+                "missing_assumptions": list(self.assumptions),
+                "missing_design": list(self.design),
                 "reasons": list(self.reasons),
                 "adjustment_checked_by_dag": self.checked,
             }
@@ -159,7 +159,7 @@ class Plan:
         multiverse: Other eligible strategies, in order.
         verdicts: One verdict per considered strategy.
         order: The priority order that was used.
-        chartered_order: Whether the order came from the charter.
+        chartered: Whether the order came from the charter.
     """
 
     status: str
@@ -167,7 +167,7 @@ class Plan:
     multiverse: tuple[str, ...]
     verdicts: tuple[Verdict, ...]
     order: tuple[str, ...]
-    chartered_order: bool
+    chartered: bool
 
     def verdict(self, name: str) -> Verdict:
         """Looks up the verdict of one strategy.
@@ -206,7 +206,7 @@ class Plan:
             "primary": self.primary,
             "multiverse": list(self.multiverse),
             "order": list(self.order),
-            "order_chartered": self.chartered_order,
+            "order_chartered": self.chartered,
             "strategies": [v.to_dict() for v in self.verdicts],
         }
         if self.status == NOT_IDENTIFIED:
@@ -334,7 +334,7 @@ def select(
         multiverse=eligible[1:],
         verdicts=tuple(verdicts),
         order=tuple(order),
-        chartered_order=chartered,
+        chartered=chartered,
     )
 
 
@@ -354,8 +354,8 @@ def refusal(plan: Plan, spec: causal.Question) -> Mapping[str, Any]:
     missing = {
         v.strategy: Verdict.KEYS.upgrade(
             {
-                "missing_assumptions": list(v.missing_assumptions),
-                "missing_design": list(v.missing_design),
+                "missing_assumptions": list(v.assumptions),
+                "missing_design": list(v.design),
                 "reasons": list(v.reasons),
             }
         )

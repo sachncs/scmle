@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
     project = scmle.api.project.Project(
-        "customers.parquet", target="churn", metric="roc_auc", time_budget=60
+        "customers.parquet", target="churn", metric="roc_auc", budget=60
     )
     logging.info(project.plan().summary())  # nothing is trained or written
     result = project.run()
@@ -63,7 +63,7 @@ project = scmle.api.project.Project(
         threshold_objective="cost", false_positive_cost=1, false_negative_cost=8
     ),
     selection=tasks.Selection(max_model_mb=50, max_p95_latency_ms=20),
-    leakage_policy="block",  # opt-in stop; the default "warn" labels the score
+    leakage="block",  # opt-in stop; the default "warn" labels the score
 )
 ```
 
@@ -76,10 +76,10 @@ import scmle.api.project
 
 data = pandas.read_parquet("customers.parquet")
 scmle.api.project.Project(
-    data, "churn", group_column="customer_id"
+    data, "churn", group="customer_id"
 )  # no customer in both
 scmle.api.project.Project(
-    data, "churn", time_column="event_time"
+    data, "churn", timestamp="event_time"
 )  # train on the past
 ```
 
@@ -132,7 +132,7 @@ graph = tasks.Derivation(
     ]
 )
 project = scmle.api.project.Project(
-    data, "y", time_column="day", group_column="unit", feature_graph=graph
+    data, "y", timestamp="day", group="unit", graph=graph
 )
 ```
 
@@ -145,7 +145,7 @@ rows the serving adapters have scored so far, so a single new record still
 gets its lags. The graph is part
 of the configuration hash and is stored, with its fingerprint, in the bundle.
 Declare columns known only after the outcome with
-`unavailable_at_prediction=[...]`, and add `embargo_rows=` for temporal
+`unavailable=[...]`, and add `rows=` for temporal
 validation gaps.
 
 ## 5. Approval gates, audit trail and replay
@@ -186,7 +186,7 @@ import scmle.api.project
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     finished = sorted(pathlib.Path("runs").glob("run_*"))[0]  # step 1's run
-    verdict = scmle.api.project.Project.verify_replay(finished)
+    verdict = scmle.api.project.Project.verify(finished)
     logging.info(verdict.level)  # exact | comparable | different
 ```
 
@@ -204,7 +204,7 @@ from scmle.contracts import errors
 
 if __name__ == "__main__":
     project = scmle.api.project.Project(
-        "customers.parquet", "churn", time_budget=120
+        "customers.parquet", "churn", budget=120
     )
     threading.Timer(10, project.cancel).start()  # the interruption
     try:
@@ -266,7 +266,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     data = pandas.read_parquet("customers.parquet")
     result = scmle.api.project.Project(
-        data[:400], "churn", time_budget=60
+        data[:400], "churn", budget=60
     ).run()
     fresh_labeled_rows = data[400:]  # outcomes that arrived later
 
@@ -381,11 +381,11 @@ selection = tasks.Selection(uncertainty="bayesian", rope=0.005)
 project = scmle.api.project.Project(
     data,
     "churn",
-    time_column="event_time",
+    timestamp="event_time",
     validation="rolling",
-    horizon_rows=30,
-    window_rows=300,
-    feature_delays={"monthly_spend": 4},
+    span=30,
+    window=300,
+    delays={"monthly_spend": 4},
 )
 
 scmle.evaluation.metrics.register(
@@ -397,24 +397,24 @@ project = scmle.api.project.Project(data, "churn", metric="business_cost")
 project = scmle.api.project.Project(
     data,
     "churn",
-    sensitive_columns=["age"],
-    monotonic_constraints={"tenure": -1},
-    weight_column="monthly_spend",  # rows count by weight when training
+    sensitive=["age"],
+    constraints={"tenure": -1},
+    weight="monthly_spend",  # rows count by weight when training
 )
 
 # Rows without a label: set aside, or self-train when it measurably helps.
 project = scmle.api.project.Project(data, "churn", unlabeled="pseudo_label")
 # result.bundle.prioritize(pool, count=20) -> rows to label next
 
-# Time to an event with censored rows (target = time, event_column = 0/1).
+# Time to an event with censored rows (target = time, event = 0/1).
 project = scmle.api.project.Project(
-    data, "tenure", task="survival", event_column="churn"
+    data, "tenure", task="survival", event="churn"
 )
 # result.bundle.predict_survival(rows, times=[3, 6, 12]) -> P(no event yet)
 
 # Ordered labels: predictions come back as your labels, in order.
 project = scmle.api.project.Project(
-    data, "plan", task="ordinal", ordinal_order=["basic", "plus", "pro"]
+    data, "plan", task="ordinal", order=["basic", "plus", "pro"]
 )
 ```
 
@@ -433,7 +433,7 @@ if __name__ == "__main__":
     data = pandas.read_parquet("customers.parquet")
     features = data.drop(columns="churn")
     result = scmle.api.project.Project(
-        data[:300], "churn", time_budget=120
+        data[:300], "churn", budget=120
     ).run()
     result.save("artifacts/early", signing_key="tutorial-signing-key")
 
@@ -480,7 +480,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     data = pandas.read_parquet("customers.parquet").drop(columns="churn")
     result = scmle.api.project.Project(
-        data, "monthly_spend", time_budget=120
+        data, "monthly_spend", budget=120
     ).run()
     rows = data.drop(columns="monthly_spend").head(5)
     logging.info(result.bundle.predict_interval(rows, coverage=0.9))

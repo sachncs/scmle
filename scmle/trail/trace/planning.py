@@ -22,8 +22,8 @@ class Planning(reader.Reader):
         facts: dict[str, Any] = {}
         if isinstance(wrapper, dict) and "charter" in wrapper:
             charter = wrapper["charter"]
-            self.charter_hash = records.digest(charter)
-            if self.charter_hash != wrapper.get("charter_hash"):
+            self.charter = records.digest(charter)
+            if self.charter != wrapper.get("charter_hash"):
                 self.problem(
                     finding.TAMPERED,
                     name,
@@ -31,7 +31,7 @@ class Planning(reader.Reader):
                 )
             estimand = charter["estimand"]
             facts = {
-                "charter_hash": self.charter_hash,
+                "charter_hash": self.charter,
                 "question": charter["question"],
                 "target": estimand["target"],
                 "unit": charter["unit"],
@@ -89,7 +89,7 @@ class Planning(reader.Reader):
         cost = self.json(files[2], name)
         facts: dict[str, Any] = {}
         if isinstance(draft, dict):
-            if draft.get("charter_hash") != self.charter_hash:
+            if draft.get("charter_hash") != self.charter:
                 self.problem(
                     finding.IDENTITY,
                     name,
@@ -136,7 +136,7 @@ class Planning(reader.Reader):
         )
         if problem:
             self.problem(finding.UNSIGNED, name, problem)
-        if self.inputs.get("charter_hash") != self.charter_hash:
+        if self.inputs.get("charter_hash") != self.charter:
             self.problem(
                 finding.IDENTITY, name, "inputs.json names another charter hash"
             )

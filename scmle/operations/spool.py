@@ -102,7 +102,7 @@ class Spool:
             json.dumps(s.to_dict(), sort_keys=True) + "\n" for s in samples
         )
         if text:
-            durability.append_text(self.path, text)
+            durability.append(self.path, text)
         return len(samples)
 
     def flush(self) -> Flush:
@@ -145,5 +145,5 @@ class Spool:
             lines = lines[len(batch) :]
             sent += len(batch)
             text = "".join(line + "\n" for line in lines)
-            durability.write_atomically(self.path, text.encode("utf-8"))
+            durability.write(self.path, text.encode("utf-8"))
         return Flush(sent, len(lines), error)

@@ -81,7 +81,7 @@ def test_a_low_effective_sample_size_is_refused_and_clipping_is_labelled():
     assert strict.status == ope.REFUSED
     assert any("effective sample size" in r for r in strict.reasons)
     clipped = ope.evaluate(log, "ipw", clip=3.0, ess_floor=0.01)
-    assert clipped.clipped and clipped.clipped_share > 0
+    assert clipped.clipped and clipped.truncation > 0
     assert any("clipped" in r for r in clipped.reasons)
 
 

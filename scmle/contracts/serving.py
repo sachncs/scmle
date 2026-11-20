@@ -40,10 +40,10 @@ class Inquiry:
 
     records: list[dict[str, Any]]
     schema_version: str = SCHEMA_VERSION
-    expected_schema_digest: str | None = None
+    schema: str | None = None
 
 
-def schema_digest(schema: Mapping[str, Any]) -> str:
+def digest(schema: Mapping[str, Any]) -> str:
     """Returns the `sha256:` digest of a bundle's input schema.
 
     Args:

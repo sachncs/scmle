@@ -56,15 +56,15 @@ class Estimate:
         high: Upper interval limit.
         level: Confidence level.
         groups: Adoption period to unit count.
-        n_never: Never-treated units.
+        untreated: Never-treated units.
         events: Event times, in increasing order.
         coefficients: Event-study coefficient per event time.
         ses: Standard error per event time.
         covariance: Covariance matrix of the coefficients.
-        pretrend_p: Wald p-value of the pre-period coefficients, if any.
-        max_pre_change: `J`, largest consecutive pre-period change, or None
+        pretrend: Wald p-value of the pre-period coefficients, if any.
+        drift: `J`, largest consecutive pre-period change, or None
             when fewer than two pre-periods exist.
-        mean_horizon: Group-size-weighted mean of `e + 1` over the post
+        horizon: Group-size-weighted mean of `e + 1` over the post
             cells (bias multiplier).
     """
 
@@ -74,14 +74,14 @@ class Estimate:
     high: float
     level: float
     groups: dict[str, int]
-    n_never: int
+    untreated: int
     events: tuple[int, ...]
     coefficients: tuple[float, ...]
     ses: tuple[float, ...]
     covariance: tuple[tuple[float, ...], ...]
-    pretrend_p: float | None
-    max_pre_change: float | None
-    mean_horizon: float
+    pretrend: float | None
+    drift: float | None
+    horizon: float
 
     def sensitivity(self, m: float) -> tuple[float, float]:
         """Widens the interval by the relative-magnitudes bound at `m`.
@@ -97,11 +97,11 @@ class Estimate:
         Raises:
             ValueError: If fewer than two pre-periods exist.
         """
-        if self.max_pre_change is None:
+        if self.drift is None:
             raise errors.InputError(
                 "sensitivity needs at least two pre-periods"
             )
-        bias = m * self.max_pre_change * self.mean_horizon
+        bias = m * self.drift * self.horizon
         return self.low - bias, self.high + bias
 
     def breakdown(self) -> float | None:
@@ -114,12 +114,12 @@ class Estimate:
             nearer interval limit divided by ``max_pre_change *
             mean_horizon``.
         """
-        if self.max_pre_change is None:
+        if self.drift is None:
             return None
         gap = min(abs(self.low), abs(self.high))
         if self.low <= 0 <= self.high:
             return 0.0
-        scale = self.max_pre_change * self.mean_horizon
+        scale = self.drift * self.horizon
         return float("inf") if scale == 0 else gap / scale
 
     KEYS: ClassVar[records.Migration] = records.Migration(
@@ -495,7 +495,7 @@ def estimate(
         high=theta + z * se,
         level=level,
         groups={str(g): sizes[g] for g in groups},
-        n_never=n_never,
+        untreated=n_never,
         events=tuple(int(e) for e in events),
         coefficients=tuple(coefficients),
         ses=tuple(
@@ -503,7 +503,7 @@ def estimate(
             for k in range(len(events))
         ),
         covariance=tuple(tuple(float(v) for v in row) for row in covariance),
-        pretrend_p=pretrend_p,
-        max_pre_change=max_change,
-        mean_horizon=horizon,
+        pretrend=pretrend_p,
+        drift=max_change,
+        horizon=horizon,
     )

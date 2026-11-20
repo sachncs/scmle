@@ -3,7 +3,7 @@
 The rates each fairness criterion compares (`CRITERION_RATES`), their counts
 per group (`tabulate`), the Wilson interval of one rate and Newcombe's hybrid
 interval of a difference, and the refusal of incompatible criteria at the
-measured base rates (`check_feasibility`).
+measured base rates (`check`).
 """
 
 from collections.abc import Sequence
@@ -165,9 +165,7 @@ CRITERION_RATES = {
 }
 
 
-def base_rates(
-    y: ArrayLike, groups: ArrayLike
-) -> dict[str, tuple[float, float]]:
+def count(y: ArrayLike, groups: ArrayLike) -> dict[str, tuple[float, float]]:
     """Counts the positive outcomes and rows of each group.
 
     Args:
@@ -194,7 +192,7 @@ def base_rates(
     }
 
 
-def check_feasibility(
+def check(
     constraints: Sequence[decision.Constraint],
     y: ArrayLike,
     groups: ArrayLike,
@@ -213,7 +211,7 @@ def check_feasibility(
             pairs.
 
     Returns:
-        A mapping with `base_rates` (the share of positives per group, by
+        A mapping with `count` (the share of positives per group, by
         group label as text), `differ` (whether any pair of groups has base
         rates whose interval for the difference excludes zero), `conflicts`
         (the incompatible pairs of declared criteria, as lists) and
@@ -224,7 +222,7 @@ def check_feasibility(
             declared criteria are incompatible and the groups' base rates
             differ (their interval for the difference excludes zero).
     """
-    rates = base_rates(y, groups)
+    rates = count(y, groups)
     names = sorted(rates)
     differ = False
     pairs = list(itertools.combinations(names, 2))

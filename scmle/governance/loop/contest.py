@@ -43,7 +43,7 @@ class Contest(risk.Risk):
             "batches": 0,
         }
         self.queue.append(name)
-        self.save_state()
+        self.save()
         return len(self.queue)
 
     def surveil(self, previous: str) -> None:
@@ -54,13 +54,13 @@ class Contest(risk.Risk):
                 passed to `mature`.
         """
         policy = self.policy
-        self.rollback_watch = {
+        self.watch = {
             "previous": previous,
             "process": sequential_tests.Comparison(
                 policy.rollback["delta"], policy.rollback["alpha"], policy.scale
             ),
         }
-        self.save_state()
+        self.save()
 
     def challenge(
         self,
@@ -90,11 +90,8 @@ class Contest(risk.Risk):
             holder: Any
             if name in self.active:
                 holder = self.active[name]
-            elif (
-                self.rollback_watch is not None
-                and name == self.rollback_watch["previous"]
-            ):
-                holder = self.rollback_watch
+            elif self.watch is not None and name == self.watch["previous"]:
+                holder = self.watch
             else:
                 continue
             paired = numpy.array([i in other for i in ids])
@@ -148,7 +145,7 @@ class Contest(risk.Risk):
             or None if there is none, no proposal was made or an identical
             question is already pending.
         """
-        watch = self.rollback_watch
+        watch = self.watch
         if watch is None or not watch["process"].crossed:
             return None
         self.ledger.commit(
@@ -162,9 +159,9 @@ class Contest(risk.Risk):
         )
         if not math.isinf(self.tau):
             self.tau = min(1.0, self.tau + self.policy.step)
-        self.rollback_watch = None
-        self.consecutive_rollbacks += 1
-        if self.consecutive_rollbacks >= terms.ESCALATING_ROLLBACKS:
+        self.watch = None
+        self.rollbacks += 1
+        if self.rollbacks >= terms.ESCALATING_ROLLBACKS:
             return self.escalate(
                 "two_consecutive_rollbacks", {"batch": self.batch - 1}
             )
@@ -213,7 +210,7 @@ class Contest(risk.Risk):
             self.queue.pop(0)
             del self.active[name]
             if step.rejected:
-                self.consecutive_rollbacks = 0
+                self.rollbacks = 0
                 self.ledger.commit(
                     deployment_ledger.PROMOTION_PROPOSAL,
                     {

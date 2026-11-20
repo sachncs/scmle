@@ -149,11 +149,11 @@ def train(kind: str, directory: pathlib.Path) -> dict[str, Any]:
     started = time.monotonic()
     data, target = generate(kind)
     result = reliability.fast_project(
-        data, target, directory / "run", seed=SEED, time_budget=BUDGET
+        data, target, directory / "run", seed=SEED, budget=BUDGET
     ).run()
     result.save(directory / "bundle", signing_key=SIGNING_KEY)
     return {
-        "selected": result.selected_model,
+        "selected": result.model,
         "metrics": {
             name: float(value)
             for name, value in result.evaluation["metrics"].items()

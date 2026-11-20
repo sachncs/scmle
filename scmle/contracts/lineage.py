@@ -36,7 +36,7 @@ class Kind(enum.StrEnum):
     INFERENCE = "inference"
 
 
-def require_text(value: str, name: str) -> str:
+def require(value: str, name: str) -> str:
     """Returns a trimmed non-empty contract string.
 
     Args:
@@ -85,8 +85,8 @@ class Node:
             ValueError: If the id or digest is blank, the kind is not a valid
                 node kind, or an attribute name is empty.
         """
-        require_text(self.identifier, "identifier")
-        require_text(self.digest, "digest")
+        require(self.identifier, "identifier")
+        require(self.digest, "digest")
         kind: Any = self.kind  # may be a raw value at runtime
         if not isinstance(kind, Kind):
             object.__setattr__(self, "kind", Kind(kind))
@@ -153,9 +153,9 @@ class Edge:
             ValueError: If an endpoint or the relationship is blank, or the edge
                 connects a node to itself.
         """
-        require_text(self.source, "source")
-        require_text(self.target, "target")
-        require_text(self.relationship, "relationship")
+        require(self.source, "source")
+        require(self.target, "target")
+        require(self.relationship, "relationship")
         if self.source == self.target:
             raise errors.InputError("evidence edges must not be self-loops")
 
@@ -203,9 +203,9 @@ class Graph:
         self.nodes: dict[str, Node] = {}
         self.edges: list[Edge] = []
         for node in nodes:
-            self.add_node(node)
+            self.add(node)
 
-    def add_node(self, node: Node) -> None:
+    def add(self, node: Node) -> None:
         """Registers one node without silently replacing an identity.
 
         Args:
@@ -283,7 +283,7 @@ class Graph:
             for node_id, targets in sorted(result.items())
         }
 
-    def topological_order(self) -> tuple[str, ...]:
+    def order(self) -> tuple[str, ...]:
         """Returns a deterministic topological node order.
 
         Returns:
@@ -470,7 +470,7 @@ class Graph:
             )
         graph.validate()
         expected_order = tuple(record.get("topological_order", ()))
-        if expected_order and expected_order != graph.topological_order():
+        if expected_order and expected_order != graph.order():
             raise errors.InputError(
                 "evidence graph topological order is invalid"
             )
@@ -482,5 +482,5 @@ __all__ = [
     "Graph",
     "Kind",
     "Node",
-    "require_text",
+    "require",
 ]

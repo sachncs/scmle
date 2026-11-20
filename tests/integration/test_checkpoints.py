@@ -17,8 +17,8 @@ def project(frame, tmp_path, *gates):
     return support.make_project(
         frame,
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
         checkpoints=tuple(gates),
     )
 
@@ -31,7 +31,7 @@ def kinds(run_dir):
 def test_auto_approval_runs_and_audits_both_gates(binary_frame, tmp_path):
     approve = policies.Callback(lambda review: True)
     result = project(binary_frame, tmp_path, approve).run()
-    events = kinds(result.run_dir)
+    events = kinds(result.directory)
     approvals = [e for e in events if e["kind"] == "policy.approved"]
     assert [a["data"]["gate"] for a in approvals] == ["PLANNING", "SELECTING"]
     assert all(a["data"]["reviewer"] == "callback" for a in approvals)
@@ -113,7 +113,7 @@ def test_a_blocked_run_can_be_resumed_once_approved(binary_frame, tmp_path):
     gate["open"] = True
     resumed = first.orchestrator.resume(caught.value.details["run_dir"])
     assert resumed.state == "COMPLETED"
-    names = [e["kind"] for e in kinds(resumed.run_dir)]
+    names = [e["kind"] for e in kinds(resumed.directory)]
     assert "policy.rejected" in names and names.count("test.opened") == 1
 
 
@@ -121,7 +121,7 @@ def test_checkpoints_do_not_change_results(binary_frame, tmp_path):
     plain = project(binary_frame, tmp_path / "a").run()
     approve = policies.Callback(lambda review: True)
     gated = project(binary_frame, tmp_path / "b", approve).run()
-    assert gated.selected_model == plain.selected_model
+    assert gated.model == plain.model
     assert gated.evaluation["selected"]["score"] == pytest.approx(
         plain.evaluation["selected"]["score"]
     )

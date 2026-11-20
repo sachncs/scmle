@@ -14,7 +14,7 @@
 | `sampling` | imbalanced-learn | SMOTE, Borderline-SMOTE, ADASYN strategies |
 | `polars` | Polars | Polars frames and lazyframes as input (Arrow tables need only pyarrow) |
 | `spreadsheets` | openpyxl | `.xlsx` and `.xlsm` input; first worksheet is read |
-| `tracking` | MLflow | `MlflowExperimentStore` |
+| `tracking` | MLflow | `Mlflow` |
 | `distributed` | Ray | `Resources(executor="ray")`; no free-threaded (3.14t) wheel yet |
 | `catboost` | CatBoost | no free-threaded (3.14t) wheel yet; kept out of `boosting` for that reason |
 | `deeplearning` | PyTorch, Keras 3 (PyTorch backend) | model families run in a separate worker process; CPU wheel on Linux via `uv` |

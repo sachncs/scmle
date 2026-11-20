@@ -16,7 +16,7 @@ from scmle.data.modalities.document.sample import Sample
 
 def flaw(
     finding_id: str,
-    severity: data.FindingSeverity,
+    severity: data.Severity,
     scope: dict[str, Any],
     evidence: dict[str, Any],
     remediation: str,
@@ -70,7 +70,7 @@ def legibility(
         findings.append(
             flaw(
                 "quality.document-ocr-confidence-missing",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {
                     "document_ids": [
                         sample.identifier
@@ -107,7 +107,7 @@ def traceability(samples: Sequence[Sample]) -> list[data.Finding]:
         findings.append(
             flaw(
                 "quality.document-source-traceability-incomplete",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {
                     "document_ids": [
                         sample.identifier for sample in partially_traceable
@@ -228,7 +228,7 @@ class Review:
             findings.append(
                 flaw(
                     "quality.duplicate-document-content",
-                    data.FindingSeverity.WARNING,
+                    data.Severity.WARNING,
                     {"groups": [list(group) for group in duplicate_groups]},
                     {"group_count": len(duplicate_groups)},
                     "Confirm duplicates are intentional or deduplicate "
@@ -244,7 +244,7 @@ class Review:
             findings.append(
                 flaw(
                     "quality.profile-truncated",
-                    data.FindingSeverity.INFO,
+                    data.Severity.INFO,
                     {"document_ids": list(truncated_ids)},
                     {
                         "max_characters": max_characters,
@@ -265,7 +265,7 @@ class Review:
             findings.append(
                 flaw(
                     "quality.unknown-language",
-                    data.FindingSeverity.WARNING,
+                    data.Severity.WARNING,
                     {"document_ids": list(unknown_ids)},
                     {"count": len(unknown_ids)},
                     "Confirm language coverage and configure an appropriate "
@@ -307,7 +307,7 @@ class Review:
             findings.append(
                 flaw(
                     "risk.document-sensitive-content",
-                    data.FindingSeverity.ERROR,
+                    data.Severity.ERROR,
                     {"document_ids": sorted(sensitive_document_ids)},
                     {"match_counts": dict(sorted(sensitive_counts.items()))},
                     "Redact or explicitly govern detected sensitive content "
@@ -328,7 +328,7 @@ class Review:
                 findings.append(
                     flaw(
                         "risk.conflicting-duplicate-labels",
-                        data.FindingSeverity.ERROR,
+                        data.Severity.ERROR,
                         {"document_ids": list(group)},
                         {"labels": sorted(labels)},
                         "Resolve the label conflict or explicitly exclude "
@@ -343,7 +343,7 @@ class Review:
             findings.append(
                 flaw(
                     "risk.mixed-label-state",
-                    data.FindingSeverity.WARNING,
+                    data.Severity.WARNING,
                     {"dataset": self.digest},
                     {"label_counts": dict(label_counts)},
                     "Declare whether unlabeled samples are valid for the "

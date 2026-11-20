@@ -77,8 +77,8 @@ def run(tmp_path, **kwargs):
     return support.make_project(
         frame(),
         "y",
-        time_budget=300,
-        output_dir=tmp_path / "out",
+        budget=300,
+        directory=tmp_path / "out",
         charter=charter_file(
             tmp_path, kwargs.pop("plan", True), kwargs.pop("uncertainty", None)
         ),
@@ -87,7 +87,7 @@ def run(tmp_path, **kwargs):
 
 
 def read(result, name):
-    return json.loads((pathlib.Path(result.run_dir) / name).read_text())
+    return json.loads((pathlib.Path(result.directory) / name).read_text())
 
 
 def test_the_decision_files_are_written_with_a_randomized_log(tmp_path):
@@ -98,9 +98,9 @@ def test_the_decision_files_are_written_with_a_randomized_log(tmp_path):
     # Enforces website/src/pages/docs/artifacts.astro:35.
     # Enforces website/src/pages/docs/cli.astro:35.
     result = run(
-        tmp_path, logged_action_column="treat", propensity_column="prop"
+        tmp_path, action="treat", propensity="prop"
     )
-    folder = pathlib.Path(result.run_dir)
+    folder = pathlib.Path(result.directory)
 
     value = read(result, "policy_value.json")
     assert value["status"] == "issued" and value["rows"] > 0
@@ -122,7 +122,7 @@ def test_without_a_log_the_value_is_not_assessable_and_no_plan_no_design(
     # Enforces docs/ARTIFACTS.md:74 and docs/ARTIFACTS.md:77.
     # Enforces website/src/pages/docs/artifacts.astro:35.
     result = run(tmp_path, plan=False)
-    folder = pathlib.Path(result.run_dir)
+    folder = pathlib.Path(result.directory)
 
     assert read(result, "policy_value.json")["status"] == "not_assessable"
     assert not (folder / "rollout_design.json").exists()
@@ -136,9 +136,9 @@ def test_the_four_decision_files_are_registered_and_verified(tmp_path):
     from scmle.artifacts import claims_audit
 
     result = run(
-        tmp_path, logged_action_column="treat", propensity_column="prop"
+        tmp_path, action="treat", propensity="prop"
     )
-    folder = pathlib.Path(result.run_dir)
+    folder = pathlib.Path(result.directory)
 
     assert read(result, "decision_threshold.json")["threshold"] is not None
     assert read(result, "net_benefit.json")["rule_hash"]

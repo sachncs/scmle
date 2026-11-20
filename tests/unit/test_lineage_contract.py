@@ -50,7 +50,7 @@ def test_graph_is_deterministic_and_content_addressed():
         second.connect(edge)
 
     assert first.reachable("source", "bundle")
-    assert first.topological_order() == (
+    assert first.order() == (
         "source",
         "snapshot",
         "curation",
@@ -73,7 +73,7 @@ def test_graph_rejects_conflicts_dangling_edges_and_cycles():
     """Evidence cannot become ambiguous or cyclic through registration."""
     result = graph()
     with pytest.raises(ValueError, match="conflicting evidence node"):
-        result.add_node(node("source", lineage.Kind.SNAPSHOT))
+        result.add(node("source", lineage.Kind.SNAPSHOT))
     with pytest.raises(ValueError, match="unknown node"):
         result.connect(lineage.Edge("bundle", "missing", "points"))
     with pytest.raises(ValueError, match="acyclic"):

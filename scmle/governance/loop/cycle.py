@@ -76,7 +76,7 @@ class Loop(intake.Intake, alarms.Alarms, guard.Gatekeeper):
             fingerprints.append(deployment_ledger.thumbprint(environment))
         keys = dict(verification_keys or {})
         if path.exists():
-            ledger = deployment_ledger.DeploymentLedger.load(path)
+            ledger = deployment_ledger.Ledger.load(path)
             header = ledger.header
             if header["charter_hash"] != charter.charter_hash:
                 raise deployment_ledger.MisuseError(
@@ -87,7 +87,7 @@ class Loop(intake.Intake, alarms.Alarms, guard.Gatekeeper):
                     "ledger was opened with a different policy"
                 )
         else:
-            ledger = deployment_ledger.DeploymentLedger.create(
+            ledger = deployment_ledger.Ledger.create(
                 path,
                 charter_hash=charter.charter_hash,
                 policy=terms.jsonify(policy.to_dict()),
@@ -95,12 +95,12 @@ class Loop(intake.Intake, alarms.Alarms, guard.Gatekeeper):
                 system_keys=sorted(set(fingerprints)),
             )
         guard = never_list.Guard(
-            ledger, today, keys, single_use=single_use_attestations
+            ledger, today, keys, use=single_use_attestations
         )
         actions = hooks or terms.Hooks()
         loop = cls(directory, ledger, policy, guard, actions, keys, today)
         loop.restore()
-        loop.save_state()
+        loop.save()
         return loop
 
     @classmethod
@@ -137,7 +137,7 @@ class Loop(intake.Intake, alarms.Alarms, guard.Gatekeeper):
             The open loop.
         """
         path = Path(deploy_dir) / deployment_ledger.FILE_NAME
-        ledger = deployment_ledger.DeploymentLedger.load(path)
+        ledger = deployment_ledger.Ledger.load(path)
         policy = terms.Preregistration.from_dict(terms.amend(ledger))
         charter = types.SimpleNamespace(
             charter_hash=ledger.header["charter_hash"]
@@ -168,7 +168,7 @@ class Loop(intake.Intake, alarms.Alarms, guard.Gatekeeper):
             escalation and mechanism are described by `Outcome`.
         """
         if not self.recheck():
-            self.save_state()
+            self.save()
             return terms.Outcome(
                 terms.HALTED,
                 (("halt", terms.HALT_LEDGER),),
@@ -179,13 +179,13 @@ class Loop(intake.Intake, alarms.Alarms, guard.Gatekeeper):
         now = self.batch - 1
         keep: list[dict[str, Any]] = []
         used = False
-        for record in self.pending_batches:
+        for record in self.batches:
             window = self.policy.maturity
             if labels.is_matured(record["index"], now, window):
                 used |= self.feed(record)
             else:
                 keep.append(record)
-        self.pending_batches = keep
+        self.batches = keep
         newest = self.decide()
         newest = self.expire() or newest
         events = tuple(
@@ -196,8 +196,8 @@ class Loop(intake.Intake, alarms.Alarms, guard.Gatekeeper):
             for row in self.ledger.rows[first_row:]
             if row["kind"] != deployment_ledger.OBSERVE_SUMMARY
         )
-        self.write_label_mechanism()
-        self.save_state()
+        self.declare()
+        self.save()
         status = (
             terms.HALTED
             if self.halted

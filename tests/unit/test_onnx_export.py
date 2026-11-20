@@ -63,7 +63,7 @@ def make_bundle(name, task, features=None):
 def test_classifiers_match_the_pipeline_within_tolerance(name, tmp_path):
     bundle, features = make_bundle(name, tasks.Task.BINARY)
 
-    path = bundle.export_onnx(tmp_path / "m.onnx", check=features)
+    path = bundle.export(tmp_path / "m.onnx", check=features)
     report = onnx_export.verify(bundle, path, features)
 
     assert report["max_difference"] <= onnx_export.DEFAULT_TOLERANCE
@@ -78,7 +78,7 @@ def test_hist_gradient_boosting_exports_when_the_converter_supports_it(
     refusal = None
     path = None
     try:
-        path = bundle.export_onnx(tmp_path / "m.onnx", check=features)
+        path = bundle.export(tmp_path / "m.onnx", check=features)
     except errors.ArtifactError as error:
         refusal = error
     if refusal is not None:
@@ -90,7 +90,7 @@ def test_hist_gradient_boosting_exports_when_the_converter_supports_it(
 def test_a_regressor_matches_on_scaled_values(tmp_path):
     bundle, features = make_bundle("random_forest", tasks.Task.REGRESSION)
 
-    path = bundle.export_onnx(tmp_path / "m.onnx", check=features)
+    path = bundle.export(tmp_path / "m.onnx", check=features)
 
     assert path.exists()
     assert onnx_export.verify(bundle, path, features)["max_difference"] < 1e-3
@@ -98,7 +98,7 @@ def test_a_regressor_matches_on_scaled_values(tmp_path):
 
 def test_the_exported_classifier_agrees_in_class_order(tmp_path):
     bundle, features = make_bundle("logistic_regression", tasks.Task.BINARY)
-    path = bundle.export_onnx(tmp_path / "m.onnx", check=features)
+    path = bundle.export(tmp_path / "m.onnx", check=features)
 
     result = onnx_export.verify(bundle, path, features)
 
@@ -111,7 +111,7 @@ def test_models_the_converter_cannot_express_are_refused_by_name(tmp_path):
     bundle.pipeline = tasks  # Not an estimator at all.
 
     with pytest.raises(errors.ArtifactError, match="not supported"):
-        bundle.export_onnx(tmp_path / "m.onnx", check=features)
+        bundle.export(tmp_path / "m.onnx", check=features)
 
 
 def test_an_attached_calibrator_blocks_the_export(tmp_path):
@@ -119,7 +119,7 @@ def test_an_attached_calibrator_blocks_the_export(tmp_path):
     bundle.calibrate(features, bundle.predict(features), method="sigmoid")
 
     with pytest.raises(errors.ArtifactError, match="calibrator"):
-        bundle.export_onnx(tmp_path / "m.onnx", check=features)
+        bundle.export(tmp_path / "m.onnx", check=features)
 
 
 def test_survival_models_are_refused(tmp_path):
@@ -127,12 +127,12 @@ def test_survival_models_are_refused(tmp_path):
     bundle.schema = dataclasses.replace(bundle.schema, task="survival")
 
     with pytest.raises(errors.ArtifactError, match="survival"):
-        bundle.export_onnx(tmp_path / "m.onnx", check=features)
+        bundle.export(tmp_path / "m.onnx", check=features)
 
 
 def test_a_failed_parity_check_names_the_difference(tmp_path):
     bundle, features = make_bundle("logistic_regression", tasks.Task.BINARY)
-    path = bundle.export_onnx(tmp_path / "m.onnx", unverified=True)
+    path = bundle.export(tmp_path / "m.onnx", unverified=True)
 
     with pytest.raises(errors.BlockedError, match="differs"):
         onnx_export.verify(bundle, path, features, tolerance=0.0)
@@ -142,7 +142,7 @@ def test_an_export_without_held_out_rows_is_blocked_by_default(tmp_path):
     bundle = make_bundle("logistic_regression", tasks.Task.BINARY)[0]
 
     with pytest.raises(errors.BlockedError, match="at least"):
-        bundle.export_onnx(tmp_path / "m.onnx")
+        bundle.export(tmp_path / "m.onnx")
 
     assert not (tmp_path / "m.onnx").exists()
 
@@ -151,7 +151,7 @@ def test_a_diverging_export_is_blocked_and_its_graph_removed(tmp_path):
     bundle, features = make_bundle("logistic_regression", tasks.Task.BINARY)
 
     with pytest.raises(errors.BlockedError, match="differs"):
-        bundle.export_onnx(tmp_path / "m.onnx", check=features, tolerance=0.0)
+        bundle.export(tmp_path / "m.onnx", check=features, tolerance=0.0)
 
     assert not (tmp_path / "m.onnx").exists()
 
@@ -159,8 +159,8 @@ def test_a_diverging_export_is_blocked_and_its_graph_removed(tmp_path):
 def test_the_manifest_records_the_check_or_its_skipping(tmp_path):
     bundle, features = make_bundle("logistic_regression", tasks.Task.BINARY)
 
-    checked = bundle.export_onnx(tmp_path / "a.onnx", check=features)
-    skipped = bundle.export_onnx(tmp_path / "b.onnx", unverified=True)
+    checked = bundle.export(tmp_path / "a.onnx", check=features)
+    skipped = bundle.export(tmp_path / "b.onnx", unverified=True)
 
     def read(path):
         manifest = path.with_name(path.name + onnx_export.MANIFEST)
@@ -177,7 +177,7 @@ def test_rows_and_unverified_together_are_a_config_error(tmp_path):
     bundle, features = make_bundle("logistic_regression", tasks.Task.BINARY)
 
     with pytest.raises(errors.ConfigError, match="not both"):
-        bundle.export_onnx(tmp_path / "m.onnx", check=features, unverified=True)
+        bundle.export(tmp_path / "m.onnx", check=features, unverified=True)
 
 
 needs_boosters = pytest.mark.skipif(
@@ -194,7 +194,7 @@ needs_boosters = pytest.mark.skipif(
 def test_boosted_models_export_and_decode_their_string_labels(name, tmp_path):
     bundle, features = make_bundle(name, tasks.Task.BINARY)
 
-    path = bundle.export_onnx(tmp_path / "m.onnx", check=features)
+    path = bundle.export(tmp_path / "m.onnx", check=features)
 
     result = onnx_export.verify(bundle, path, features)
     assert result["label_agreement"] >= 0.99
@@ -205,7 +205,7 @@ def test_boosted_models_export_and_decode_their_string_labels(name, tmp_path):
 def test_boosted_regressors_export(name, tmp_path):
     bundle, features = make_bundle(name, tasks.Task.REGRESSION)
 
-    path = bundle.export_onnx(tmp_path / "m.onnx", check=features)
+    path = bundle.export(tmp_path / "m.onnx", check=features)
 
     assert path.stat().st_size > 0
 
@@ -215,7 +215,7 @@ def test_a_refusal_points_to_the_service_package(tmp_path):
     bundle.pipeline = object()
 
     with pytest.raises(errors.ArtifactError, match="scaffold"):
-        bundle.export_onnx(tmp_path / "m.onnx", check=features)
+        bundle.export(tmp_path / "m.onnx", check=features)
 
 
 def test_nan_outputs_do_not_pass_the_parity_check(monkeypatch, tmp_path):

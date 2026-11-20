@@ -54,10 +54,10 @@ def test_smoke_builds_every_check_with_seed_zero() -> None:
         name="recorder",
         capabilities=models.Capabilities(
             frozenset({tasks.Task.REGRESSION}),
-            handles_missing=True,
-            sparse_input=True,
+            missing=True,
+            sparse=True,
         ),
-        conformance_params=None,
+        params=None,
         build=recorder.build,
     )
     features, target = conformance.toy(tasks.Task.REGRESSION)
@@ -69,7 +69,7 @@ def test_searchable_builds_with_seed_zero() -> None:
     recorder = Recorder()
     adapter = types.SimpleNamespace(
         name="recorder",
-        search_space=search.Space(
+        space=search.Space(
             (search.Choice("strategy", ("mean", "median")),)
         ),
         build=recorder.build,

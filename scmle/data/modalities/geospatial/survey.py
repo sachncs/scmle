@@ -73,7 +73,7 @@ def findings(
         quality_findings.append(
             flaw(
                 "quality.geospatial-mixed-temporal-state",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"source": survey.source},
                 {"temporal": profile["temporal"]},
                 "Supply observation times for every feature or explicitly "
@@ -85,7 +85,7 @@ def findings(
         quality_findings.append(
             flaw(
                 "quality.geospatial-missing-crs",
-                data.FindingSeverity.ERROR,
+                data.Severity.ERROR,
                 {"source": survey.source},
                 {"feature_count": len(survey.features)},
                 "Declare the source CRS before spatial transforms or "
@@ -97,7 +97,7 @@ def findings(
         quality_findings.append(
             flaw(
                 "quality.geospatial-mixed-geometry",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"source": survey.source},
                 {"geometry_types": list(profile["geometries"])},
                 "Choose a geometry normalization or task-specific "
@@ -109,7 +109,7 @@ def findings(
         risk_findings.append(
             flaw(
                 "risk.geospatial-mixed-label-state",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"source": survey.source},
                 {"label_counts": labels},
                 "Declare whether unlabeled features are valid for the "

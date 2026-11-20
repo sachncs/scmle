@@ -67,9 +67,9 @@ class Attribute:
     def __post_init__(self) -> None:
         """Validates the record.
 
-        A blank `name` raises `ValueError` (from `evidence.require_text`).
+        A blank `name` raises `ValueError` (from `evidence.require`).
         """
-        evidence.require_text(self.name, "name")
+        evidence.require(self.name, "name")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the record.
@@ -118,7 +118,7 @@ class Pass:
             ValueError: If `field` is blank, `kind` is not in `PASS_KINDS`,
                 or `size` is not an integer of at least 1.
         """
-        evidence.require_text(self.field, "field")
+        evidence.require(self.field, "field")
         if self.kind not in PASS_KINDS:
             raise errors.InputError(f"kind must be one of {PASS_KINDS}")
         qualification.count(self.size, "size", minimum=1)
@@ -179,7 +179,7 @@ class Entity:
         names = [f.name for f in self.fields]
         if len(set(names)) != len(names):
             raise errors.InputError("duplicate entity field")
-        evidence.require_text(self.column, "column")
+        evidence.require(self.column, "column")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the block.
@@ -233,9 +233,9 @@ class Total:
         """Validates the record.
 
         A blank `column` or a `total` that is not finite raises `ValueError`
-        (from `evidence.require_text` and `qualification.finite`).
+        (from `evidence.require` and `qualification.finite`).
         """
-        evidence.require_text(self.column, "column")
+        evidence.require(self.column, "column")
         qualification.finite(self.total, "total")
 
     def to_dict(self) -> dict[str, Any]:
@@ -295,7 +295,7 @@ class Totals:
                 lower-case hex digits, or none of `rows`, `sums` and
                 `checksum` is declared.
         """
-        evidence.require_text(self.view, "view")
+        evidence.require(self.view, "view")
         qualification.tupled(self.sums, "sums")
         if self.rows is not None:
             qualification.count(self.rows, "rows")

@@ -156,7 +156,7 @@ def test_a_forest_adapter_ignores_params_and_follows_the_task():
     assert built.estimator.random_state == 2
     other = adapters.Forest().build(tasks.Task.FORECAST, 2)
     assert isinstance(other.estimator, ensemble.RandomForestRegressor)
-    assert adapters.Forest.capabilities.memory_factor == 6.0
+    assert adapters.Forest.capabilities.factor == 6.0
 
 
 def test_the_adapters_are_registered_in_order():
@@ -167,8 +167,8 @@ def test_the_adapters_are_registered_in_order():
         adapters.Forest,
     ]
     assert adapters.MULTITARGET_ADAPTERS[2] is adapters.MULTI_BOOSTING
-    assert adapters.MULTI_BOOSTING.capabilities.handles_missing is True
-    assert adapters.MULTI_BOOSTING.search_space.names() == (
+    assert adapters.MULTI_BOOSTING.capabilities.missing is True
+    assert adapters.MULTI_BOOSTING.space.names() == (
         "learning_rate",
         "max_leaf_nodes",
     )

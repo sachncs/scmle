@@ -71,7 +71,7 @@ class Strangeness:
             return None
         plan = data.Blueprint(numeric, categorical)
         options = data.Preprocessing(scale=True)
-        encoder = preprocessing.build_preprocessor(plan, options)
+        encoder = preprocessing.build(plan, options)
         model = pipeline.Pipeline(
             [
                 ("encode", encoder),

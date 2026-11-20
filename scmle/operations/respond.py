@@ -140,7 +140,7 @@ class Desk:
             },
             sort_keys=True,
         )
-        durability.append_text(self.archive, line + "\n")
+        durability.append(self.archive, line + "\n")
         return hashlib.sha256(line.encode()).hexdigest()
 
     def retained(self, since: float = 0.0) -> list[dict[str, Any]]:
@@ -177,7 +177,7 @@ class Desk:
         rows = self.retained()
         keep = [row for row in rows if row["at"] >= older_than]
         text = "".join(json.dumps(r, sort_keys=True) + "\n" for r in keep)
-        durability.write_atomically(self.archive, text.encode())
+        durability.write(self.archive, text.encode())
         return len(rows) - len(keep)
 
     def handle(

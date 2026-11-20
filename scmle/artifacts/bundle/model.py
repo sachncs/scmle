@@ -86,11 +86,11 @@ def describe(
     categorical = tuple(c for c in plan.categorical if c not in computed)
     extra = tuple(
         c
-        for c in plan.extra_inputs
+        for c in plan.extras
         if c not in computed and c not in numeric + categorical
     )
     series_columns = tuple(
-        c for c in (*plan.features, *plan.extra_inputs) if c in series_names
+        c for c in (*plan.features, *plan.extras) if c in series_names
     )
     known = {
         column: sorted(map(str, dev_features[column].dropna().unique()))[
@@ -164,9 +164,9 @@ def stamp(
         model_name,
         model_version,
         metric,
-        model_params=model_params or {},
+        params=model_params or {},
         strategy=strategy,
-        decision_threshold=decision_threshold,
+        threshold=decision_threshold,
         environment=environment.inventory(),
         platform=platform.platform(),
         seed=seed,

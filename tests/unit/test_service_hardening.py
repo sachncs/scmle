@@ -175,7 +175,7 @@ def test_the_sbom_lists_libraries_the_model_and_the_base_image(signed_service):
         for item in document["components"]
         if item["type"] == "machine-learning-model"
     )
-    digest = provenance.bundle_digest(signed_service / "model")
+    digest = provenance.digest(signed_service / "model")
     assert model["hashes"][0]["content"] == digest.removeprefix("sha256:")
     names = {item["name"] for item in document["components"]}
     assert "numpy" in names and "pytest" not in names
@@ -201,16 +201,16 @@ def test_the_service_sbom_is_deterministic_for_one_timestamp():
 
 def test_source_date_epoch_fixes_the_sbom_time(monkeypatch):
     monkeypatch.setenv("SOURCE_DATE_EPOCH", "86400")
-    assert sbom.source_timestamp().startswith("1970-01-02T00:00:00")
+    assert sbom.timestamp().startswith("1970-01-02T00:00:00")
     monkeypatch.delenv("SOURCE_DATE_EPOCH")
-    assert datetime.datetime.fromisoformat(sbom.source_timestamp())
+    assert datetime.datetime.fromisoformat(sbom.timestamp())
 
 
 def test_the_provenance_verifies_and_names_the_bundle(signed_service):
     document = attest.parse(signed_service / "provenance.json")
     body, verified = attest.authenticate(document, KEY)
     assert verified is True
-    digest = provenance.bundle_digest(signed_service / "model")
+    digest = provenance.digest(signed_service / "model")
     assert body["subject"][0]["digest"]["sha256"] == digest.removeprefix(
         "sha256:"
     )
@@ -228,11 +228,9 @@ def test_the_provenance_verifies_and_names_the_bundle(signed_service):
 
 def test_production_verification_accepts_a_signed_service(signed_service):
     verified = verify.inspect(signed_service, production())
-    assert verified.bundle_signed and verified.provenance_verified
+    assert verified.signed and verified.verified
     assert verified.production and not verified.trusted
-    assert verified.bundle_digest == provenance.bundle_digest(
-        signed_service / "model"
-    )
+    assert verified.digest == provenance.digest(signed_service / "model")
 
 
 def test_trusted_is_refused_in_production_everywhere(
@@ -292,7 +290,7 @@ def test_an_unsigned_bundle_never_verifies_in_production(
     accepted = verify.inspect(
         unsigned, {"SCMLE_ENV": "staging", "SCMLE_TRUSTED": "1"}
     )
-    assert accepted.trusted and not accepted.bundle_signed
+    assert accepted.trusted and not accepted.signed
 
 
 def test_a_wrong_key_is_refused(signed_service):

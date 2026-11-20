@@ -45,9 +45,9 @@ class Rebalancing(Strategy):
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
-        if not task.is_classification:
+        if not task.classification:
             return "rebalancing is a classification technique"
-        ratio = profile.target_summary.get("imbalance_ratio", 1.0)
+        ratio = profile.summary.get("imbalance_ratio", 1.0)
         if ratio < MIN_IMBALANCE_RATIO:
             return (
                 f"classes are balanced enough ({ratio:.1f}:1 < "
@@ -122,7 +122,7 @@ class Resampling(Rebalancing):
         resampler_class: Resampler applied inside `fit`.
     """
 
-    resampler_class: ClassVar[type[resampling.Resampler]]
+    resampler: ClassVar[type[resampling.Resampler]]
 
     def build(
         self,
@@ -150,9 +150,7 @@ class Resampling(Rebalancing):
         inner = preprocessing.instantiate(
             plan, adapter, task, seed, params, featurise=featurise
         )
-        return resampling.ResamplingClassifier(
-            inner, self.resampler_class(), seed
-        )
+        return resampling.ResamplingClassifier(inner, self.resampler(), seed)
 
 
 class Oversampling(Resampling):
@@ -160,7 +158,7 @@ class Oversampling(Resampling):
 
     name = "random_oversample"
     description = "random oversampling inside the training fold"
-    resampler_class = resampling.RandomOverSampler
+    resampler = resampling.Oversampler
 
 
 class Undersampling(Resampling):
@@ -168,7 +166,7 @@ class Undersampling(Resampling):
 
     name = "random_undersample"
     description = "random undersampling inside the training fold"
-    resampler_class = resampling.RandomUnderSampler
+    resampler = resampling.Undersampler
 
 
 class Recalibration(Strategy):
@@ -196,7 +194,7 @@ class Recalibration(Strategy):
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
-        if not task.is_classification:
+        if not task.classification:
             return "calibration applies to classification"
         if not adapter.capabilities.probabilities:
             return f"{adapter.name} does not provide probabilities"
@@ -249,7 +247,7 @@ class Jitter(Resampling):
 
     name = "jitter_augment"
     description = "EXPERIMENTAL jittered minority augmentation inside the fold"
-    resampler_class = resampling.Jittered
+    resampler = resampling.Jittered
 
 
 class Copula(Resampling):
@@ -261,7 +259,7 @@ class Copula(Resampling):
 
     name = "copula_augment"
     description = "EXPERIMENTAL Gaussian-copula synthetic minority rows"
-    resampler_class = synthesis.CopulaOverSampler
+    resampler = synthesis.CopulaOverSampler
 
 
 class Smote(Rebalancing):
@@ -271,8 +269,8 @@ class Smote(Rebalancing):
         sampler_name: Class name in `imblearn.over_sampling`.
     """
 
-    sampler_name: ClassVar[str] = "SMOTE"
-    min_features: ClassVar[int] = 2
+    sampler: ClassVar[str] = "SMOTE"
+    minimum: ClassVar[int] = 2
 
     def applicability(
         self,
@@ -295,9 +293,9 @@ class Smote(Rebalancing):
             return reason
         if importlib.util.find_spec("imblearn") is None:
             return "needs the 'sampling' extra (imbalanced-learn)"
-        if profile.feature_plan.categorical:
+        if profile.plan.categorical:
             return "interpolating one-hot categories is not meaningful"
-        if len(profile.feature_plan.numeric) < self.min_features:
+        if len(profile.plan.numeric) < self.minimum:
             return "needs at least two numeric features"
         return None
 
@@ -325,8 +323,8 @@ class Smote(Rebalancing):
             The unfitted candidate estimator, preprocessing included.
         """
         over_sampling = importlib.import_module("imblearn.over_sampling")
-        sampler = getattr(over_sampling, self.sampler_name)(random_state=seed)
-        options = data.Preprocessing(scale=adapter.capabilities.needs_scaling)
+        sampler = getattr(over_sampling, self.sampler)(random_state=seed)
+        options = data.Preprocessing(scale=adapter.capabilities.scaling)
         return resampling.PreprocessedResamplingClassifier(
             preprocessing.frontend(plan, options, featurise),
             sampler,
@@ -339,7 +337,7 @@ class Borderline(Smote):
 
     name = "borderline_smote"
     description = "Borderline-SMOTE oversampling inside the training fold"
-    sampler_name = "BorderlineSMOTE"
+    sampler = "BorderlineSMOTE"
 
 
 class PlainSmote(Smote):
@@ -347,7 +345,7 @@ class PlainSmote(Smote):
 
     name = "smote"
     description = "SMOTE oversampling inside the training fold"
-    sampler_name = "SMOTE"
+    sampler = "SMOTE"
 
 
 class Adasyn(Smote):
@@ -355,4 +353,4 @@ class Adasyn(Smote):
 
     name = "adasyn"
     description = "ADASYN oversampling inside the training fold"
-    sampler_name = "ADASYN"
+    sampler = "ADASYN"

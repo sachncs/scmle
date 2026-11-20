@@ -116,7 +116,7 @@ def authenticate(environ: Mapping[str, str], prefixes: tuple[str, ...]) -> bool:
     if not secret:
         return False
     now = time.time()
-    token = tokens.sign_hs256(
+    token = tokens.sign(
         secret.encode(),
         "env",
         {
@@ -151,7 +151,7 @@ def retrieve(url: str, timeout: float = 10.0) -> tuple[int, dict[str, Any]]:
         return error.code, json.loads(error.read())
 
 
-def post_json(
+def post(
     url: str, payload: dict[str, Any], timeout: float = 30.0
 ) -> tuple[int, dict[str, Any]]:
     """POSTs JSON; HTTP errors return their status and body.
@@ -276,7 +276,7 @@ def download(
         destination: Folder to write the files to; created as needed.
     """
     for name, etag in expected.items():
-        data = mocks.get_object(base, f"{prefix}/{name}", expected=etag)
+        data = mocks.download(base, f"{prefix}/{name}", expected=etag)
         target = destination / name
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
@@ -353,7 +353,7 @@ def measure(
     timings = []
     for attempt in range(count):
         started = time.perf_counter()
-        status = post_json(f"{base}/predict", {"records": rows})[0]
+        status = post(f"{base}/predict", {"records": rows})[0]
         if status != http.HTTPStatus.OK:
             raise errors.ScmleError(
                 f"measurement request {attempt} failed: {status}"

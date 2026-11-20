@@ -18,9 +18,9 @@ def run(tmp_path, **kwargs):
     return support.make_project(
         drifting_frame(),
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
-        time_column="t",
+        budget=300,
+        directory=tmp_path,
+        timestamp="t",
         **kwargs,
     ).run()
 

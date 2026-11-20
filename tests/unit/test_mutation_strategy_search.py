@@ -54,7 +54,7 @@ class Context:
         self.governor = SimpleNamespace(
             skip=lambda first: pending.pop(0) if pending else None
         )
-        self.metric = SimpleNamespace(name="accuracy", greater_is_better=better)
+        self.metric = SimpleNamespace(name="accuracy", maximize=better)
         self.task = tasks.Task.BINARY
         self.profile = SimpleNamespace(rows=10)
         self.entries: list[tuple[str, str, str]] = []
@@ -187,7 +187,7 @@ def test_an_inapplicable_strategy_is_rejected_and_not_run(seen) -> None:
         (job.trial, job.model, dict(job.params), job.strategy)
         for job in runner.jobs
     ] == [("s1-0", "c", {}, "w"), ("s1-1", "c", {}, "y")]
-    assert [t.trial_id for t in context.transcribed] == ["s1-0", "s1-1"]
+    assert [t.identifier for t in context.transcribed] == ["s1-0", "s1-1"]
     assert context.entries == [
         ("x@c", experiments.Edict.REJECT, "not applicable: no minority class"),
         (

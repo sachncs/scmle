@@ -48,8 +48,8 @@ def test_a_clear_effect_gets_the_smallest_attainable_p_value():
     frame, pre = panel(1)
     out = synth.estimate(frame, "u", "t", "y", 0, pre)
     assert out.effect == pytest.approx(3.0, abs=0.4)
-    assert out.p_value == pytest.approx(out.min_p)
-    assert out.min_p == pytest.approx(1 / 25)
+    assert out.p_value == pytest.approx(out.floor)
+    assert out.floor == pytest.approx(1 / 25)
     assert out.pre_rmspe < 0.3
 
 

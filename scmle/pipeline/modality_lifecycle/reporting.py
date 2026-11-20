@@ -79,7 +79,7 @@ def rehydrate(
         stage_evidence.append(
             modalities.Proof(
                 stage=modalities.Phase(stage),
-                evidence_links=tuple(evidence_links),
+                links=tuple(evidence_links),
                 evidence=evidence,
                 notes=tuple(notes),
             )

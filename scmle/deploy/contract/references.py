@@ -29,7 +29,7 @@ class Architecture(enum.StrEnum):
     ARM64 = "arm64"
 
 
-class SecretSource(enum.StrEnum):
+class Source(enum.StrEnum):
     """Where a secret is read from at run time."""
 
     ENVIRONMENT = "env"
@@ -45,7 +45,7 @@ class Environment(enum.StrEnum):
     PRODUCTION = "production"
 
 
-def require_digest(value: object, field_name: str) -> str:
+def require(value: object, field_name: str) -> str:
     """Returns `value` if it is a `sha256:<64 hex>` digest.
 
     Args:
@@ -85,7 +85,7 @@ def simple(value: object, field_name: str) -> str:
     return value
 
 
-def require_positive(value: object, field_name: str) -> float:
+def enforce(value: object, field_name: str) -> float:
     """Returns `value` if it is a positive finite number.
 
     Args:
@@ -110,7 +110,7 @@ def require_positive(value: object, field_name: str) -> float:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ImageRef:
+class Image:
     """A container image pinned by digest, with the platforms it covers.
 
     Attributes:
@@ -139,7 +139,7 @@ class ImageRef:
                 `ValueError`.
         """
         simple(self.repository, "image.repository")
-        require_digest(self.digest, "image.digest")
+        require(self.digest, "image.digest")
         converted = tuple(Architecture(item) for item in self.architectures)
         object.__setattr__(self, "architectures", converted)
         if not converted or len(set(converted)) != len(converted):
@@ -185,7 +185,7 @@ class ImageRef:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class BundleRef:
+class Bundle:
     """A model bundle pinned by the digest of its manifest.
 
     Attributes:
@@ -213,7 +213,7 @@ class BundleRef:
         simple(self.model, "bundle.model")
         if VERSION_PATTERN.fullmatch(str(self.version)) is None:
             raise errors.ConfigError("bundle.version is not valid")
-        require_digest(self.digest, "bundle.digest")
+        require(self.digest, "bundle.digest")
         if not isinstance(self.signed, bool):
             raise errors.ConfigError("bundle.signed must be a boolean")
 
@@ -244,7 +244,7 @@ class BundleRef:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SecretRef:
+class Secret:
     """Names a secret and where to read it; never holds the value.
 
     `name` is the environment variable the service sees. `locator` is an
@@ -261,7 +261,7 @@ class SecretRef:
     __module__ = "scmle.deploy.contract"  # the path pinned signatures name
 
     name: str
-    source: SecretSource
+    source: Source
     locator: str
     required: bool = True
 
@@ -278,7 +278,7 @@ class SecretRef:
             raise errors.ConfigError(
                 f"secret name must be an upper-case variable: {self.name!r}"
             )
-        object.__setattr__(self, "source", SecretSource(self.source))
+        object.__setattr__(self, "source", Source(self.source))
         text: object = self.locator  # may be any value from a record
         if (
             not isinstance(text, str)
@@ -292,17 +292,17 @@ class SecretRef:
                 f"secret {self.name} locator must be a plain reference"
             )
         if (
-            self.source is SecretSource.ENVIRONMENT
+            self.source is Source.ENVIRONMENT
             and VARIABLE_PATTERN.fullmatch(text) is None
         ):
             raise errors.ConfigError(
                 f"secret {self.name} env locator must be a variable name"
             )
-        if self.source is SecretSource.FILE and not text.startswith("/"):
+        if self.source is Source.FILE and not text.startswith("/"):
             raise errors.ConfigError(
                 f"secret {self.name} file locator must be an absolute path"
             )
-        if self.source is SecretSource.STORE:
+        if self.source is Source.STORE:
             simple(text, f"secret {self.name} locator")
 
     def to_dict(self) -> dict[str, Any]:
@@ -332,7 +332,7 @@ class SecretRef:
         """
         return cls(
             name=record["name"],
-            source=SecretSource(record["source"]),
+            source=Source(record["source"]),
             locator=record["locator"],
             required=record.get("required", True),
         )

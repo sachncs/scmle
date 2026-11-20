@@ -136,8 +136,8 @@ class Estimate:
         value: The estimate, or None when refused.
         interval: Two-sided normal interval from the influence function, or
             None when refused.
-        ess_ratio: Kish effective sample size over `n`.
-        clipped_share: Share of rows whose weight was clipped.
+        ess: Kish effective sample size over `n`.
+        truncation: Share of rows whose weight was clipped.
         reasons: Why the value was refused or labelled.
         tier: `confirmed`, `attested` or `unverified`.
         clipped: Whether a weight clip was declared (also True when the
@@ -148,8 +148,8 @@ class Estimate:
     estimator: str
     value: float | None
     interval: tuple[float, float] | None
-    ess_ratio: float
-    clipped_share: float
+    ess: float
+    truncation: float
     reasons: tuple[str, ...]
     tier: str
     clipped: bool
@@ -448,7 +448,7 @@ def contrast(
         main,
         value=centre,
         interval=interval,
-        ess_ratio=min(main.ess_ratio, base.ess_ratio),
+        ess=min(main.ess, base.ess),
     )
 
 

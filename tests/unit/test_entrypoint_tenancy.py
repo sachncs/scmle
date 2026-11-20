@@ -31,7 +31,7 @@ def job(run: str) -> base.Job:
         The job.
     """
     return base.Job(
-        run_id=run,
+        identifier=run,
         name="churn",
         project={"data": "data/t.csv", "target": "y"},
         identity="scmle-training",
@@ -48,7 +48,7 @@ def store(depot: objectstore.Depot, spec: base.Job) -> None:
         spec: The job.
     """
     body = json.dumps(spec.to_dict(), sort_keys=True).encode("utf-8")
-    depot.put(f"runs/{spec.run_id}/spec.json", body)
+    depot.put(f"runs/{spec.identifier}/spec.json", body)
 
 
 def finish(context: object) -> None:
@@ -83,16 +83,14 @@ def test_mount_confines_to_the_tenant_of_the_given_environment(
     assert isinstance(confined, tenancy.Tenancy)
     assert confined.tenant == TENANT
     shared = entrypoint.mount(tmp_path.as_uri(), {})
-    assert isinstance(shared, objectstore.LocalObjectStore)
+    assert isinstance(shared, objectstore.Disk)
 
 
 def test_mount_follows_the_given_environment_not_the_process(
     tmp_path, monkeypatch
 ):
     monkeypatch.setenv(tenancy.VARIABLE, "other")
-    assert isinstance(
-        entrypoint.mount(tmp_path.as_uri(), {}), objectstore.LocalObjectStore
-    )
+    assert isinstance(entrypoint.mount(tmp_path.as_uri(), {}), objectstore.Disk)
 
 
 def test_mount_refuses_an_invalid_tenant(tmp_path):
@@ -104,12 +102,12 @@ def test_a_tenant_job_reads_the_spec_its_confined_runner_registered(
     tmp_path, monkeypatch
 ):
     monkeypatch.delenv(tenancy.VARIABLE, raising=False)
-    shared = objectstore.LocalObjectStore(tmp_path)
+    shared = objectstore.Disk(tmp_path)
     runner = tenancy.confine(shared, {tenancy.VARIABLE: TENANT})
     spec = job("tenant-run")
     store(runner, spec)
     environ = {
-        "SCMLE_RUN_ID": spec.run_id,
+        "SCMLE_RUN_ID": spec.identifier,
         "SCMLE_STORE_URI": tmp_path.as_uri(),
         "SCMLE_SPEC_DIGEST": spec.digest(),
         tenancy.VARIABLE: TENANT,
@@ -125,11 +123,11 @@ def test_a_tenant_job_does_not_read_a_spec_outside_its_namespace(
     tmp_path, monkeypatch
 ):
     monkeypatch.delenv(tenancy.VARIABLE, raising=False)
-    shared = objectstore.LocalObjectStore(tmp_path)
+    shared = objectstore.Disk(tmp_path)
     spec = job("shared-run")
     store(shared, spec)
     environ = {
-        "SCMLE_RUN_ID": spec.run_id,
+        "SCMLE_RUN_ID": spec.identifier,
         "SCMLE_STORE_URI": tmp_path.as_uri(),
         "SCMLE_SPEC_DIGEST": spec.digest(),
     }

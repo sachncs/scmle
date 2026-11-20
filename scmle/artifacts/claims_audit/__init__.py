@@ -50,11 +50,11 @@ from typing import Any
 from scmle.artifacts.claims_audit.attestation import assess
 from scmle.artifacts.claims_audit.attestation import vet
 from scmle.artifacts.claims_audit.attestation import vouch
-from scmle.artifacts.claims_audit.custody import check_decision_files
+from scmle.artifacts.claims_audit.custody import audit
+from scmle.artifacts.claims_audit.custody import collate
 from scmle.artifacts.claims_audit.custody import corroborate
-from scmle.artifacts.claims_audit.custody import coverage_report_problems
 from scmle.artifacts.claims_audit.custody import custodial
-from scmle.artifacts.claims_audit.custody import frozen_selection_problem
+from scmle.artifacts.claims_audit.custody import examine
 from scmle.artifacts.claims_audit.custody import openings
 from scmle.artifacts.claims_audit.custody import tampered
 from scmle.artifacts.claims_audit.files import BASELINE_FILE
@@ -63,21 +63,21 @@ from scmle.artifacts.claims_audit.files import CHARTER_FILE
 from scmle.artifacts.claims_audit.files import CONTROL_FILE
 from scmle.artifacts.claims_audit.files import CUSTODY_FILE
 from scmle.artifacts.claims_audit.files import migrate
-from scmle.artifacts.claims_audit.files import read_optional
+from scmle.artifacts.claims_audit.files import read
 from scmle.artifacts.claims_audit.files import recall
 from scmle.artifacts.claims_audit.files import rehydrate
-from scmle.artifacts.claims_audit.registration import check_registered
+from scmle.artifacts.claims_audit.registration import check
 from scmle.artifacts.claims_audit.registration import misnamed
 from scmle.artifacts.claims_audit.registration import orphaned
 from scmle.artifacts.claims_audit.registration import reconcile
 from scmle.artifacts.claims_audit.registration import reconfirm
 from scmle.artifacts.claims_audit.registration import witness
+from scmle.artifacts.claims_audit.seal import anchor
 from scmle.artifacts.claims_audit.seal import authenticate
-from scmle.artifacts.claims_audit.seal import check_ledger_head
 from scmle.artifacts.claims_audit.seal import compare
 from scmle.artifacts.claims_audit.seal import crosscheck
 from scmle.artifacts.claims_audit.seal import rederive
-from scmle.artifacts.claims_audit.seal import stage_two_record_problems
+from scmle.artifacts.claims_audit.seal import screen
 from scmle.artifacts.claims_audit.seal import tally
 from scmle.artifacts.claims_audit.seal import upheld
 from scmle.artifacts.claims_audit.verdict import FAIL
@@ -102,31 +102,31 @@ __all__ = [
     "TOLERANCE",
     "Finding",
     "Verification",
+    "anchor",
     "assess",
+    "audit",
     "authenticate",
-    "check_decision_files",
-    "check_ledger_head",
-    "check_registered",
+    "check",
+    "collate",
     "compare",
     "corroborate",
-    "coverage_report_problems",
     "crosscheck",
     "custodial",
     "enrolled",
-    "frozen_selection_problem",
+    "examine",
     "inspect",
     "inventory",
     "locate",
     "misnamed",
     "openings",
     "orphaned",
-    "read_optional",
+    "read",
     "recall",
     "reconcile",
     "reconfirm",
     "rederive",
     "rehydrate",
-    "stage_two_record_problems",
+    "screen",
     "tally",
     "tampered",
     "upheld",
@@ -209,11 +209,11 @@ def enrolled(
         tier: str | None = None
         detail: str | None = None
         if item["kind"] == "baseline":
-            report = read_optional(folder / BASELINE_FILE)
+            report = read(folder / BASELINE_FILE)
             tier = ((report or {}).get("claim") or {}).get("tier")
             detail = (report or {}).get("status")
         elif item["kind"] == "causal_primary":
-            report = read_optional(folder / CAUSAL_FILE)
+            report = read(folder / CAUSAL_FILE)
             tier = (report or {}).get("tier")
             detail = (report or {}).get("status")
         rows.append(
@@ -334,17 +334,17 @@ def verify(
         # handled: returned as failed finding/problem/refusal with error text
         findings.append(Finding("claims file reads", FAIL, str(error)))
         return Verification(str(folder), tuple(findings))
-    findings.append(check_ledger_head(document, ledger))
+    findings.append(anchor(document, ledger))
     findings.extend(authenticate(folder, ledger, signing_key))
     findings.append(crosscheck(document, ledger))
     findings.append(rederive(document))
     findings.append(tally(document, ledger))
     findings.append(custodial(folder, document, signing_key))
     if ledger.claims:
-        findings.append(check_registered(folder, document, ledger))
+        findings.append(check(folder, document, ledger))
     findings.append(witness(folder, ledger))
     findings.append(vouch(folder, signing_key))
-    decided = check_decision_files(folder, signing_key)
+    decided = audit(folder, signing_key)
     if decided is not None:
         findings.append(decided)
     measured = corroborate(folder, signing_key)

@@ -96,10 +96,10 @@ def test_the_gate_tables_are_pinned():
 def test_the_adapter_registry_maps_each_strategy_to_its_class():
     assert {
         "backdoor_aipw": adjustment.Backdoor,
-        "randomized_diff": adjustment.RandomizedEstimator,
-        "did": panel.DiD,
+        "randomized_diff": adjustment.Experiment,
+        "did": panel.Differences,
         "iv": exogeneity.Instrument,
-        "rd": exogeneity.RdEstimator,
+        "rd": exogeneity.Discontinuity,
         "synth": panel.Synth,
     } == analysis.ADAPTERS
     assert set(analysis.ADAPTERS) == set(select.STRATEGIES)
@@ -120,7 +120,7 @@ def test_a_single_unit_fragility_is_the_placebo_note():
         "holds": None,
         "note": "no sensitivity analysis for this strategy",
     }
-    adapter.single_unit = True
+    adapter.unit = True
     assert analysis.fragility(adapter, None, 0.9) == {
         "holds": None,
         "note": "single treated unit: inference is the placebo permutation",
@@ -162,7 +162,7 @@ def test_a_design_returns_the_prepared_adapter(stubbed):
     )
     assert isinstance(adapter, Stub)
     assert (adapter.x, adapter.seed, adapter.learner) == ("X", 3, "boosted")
-    assert adapter.alpha_falsify == 0.02
+    assert adapter.falsify == 0.02
     assert adapter.design == {"stub": True}
 
 
@@ -218,7 +218,7 @@ def test_a_falsification_replicates_over_declared_strata():
     rows = pandas.DataFrame({"region": ["a"] * 50 + ["b"] * 50})
     ignored, rep, ignored = analysis.falsify(found, rows)
     assert rep["passed"] is True
-    found.adapter.single_unit = True
+    found.adapter.unit = True
     ignored, rep, ignored = analysis.falsify(found, rows)
     assert rep == {"by_column": {}, "passed": None}
 
@@ -228,7 +228,7 @@ def test_a_grade_is_the_tier_decision_of_the_facts(monkeypatch):
     monkeypatch.setattr(tier, "decide", lambda facts: seen.append(facts) or "D")
     found = trial(block(controls=(causal.Control("outcome", "nco"),)))
     found.adapter.weak = True
-    report = battery.run_battery([], 0.01)
+    report = battery.correct([], 0.01)
     decision, needed, checked = analysis.grade(
         found, report, {"passed": False}, {"holds": True}, {"p": "A"}, ("g",)
     )
@@ -238,18 +238,18 @@ def test_a_grade_is_the_tier_decision_of_the_facts(monkeypatch):
     facts = seen[0]
     assert facts.identified is True
     assert facts.attestors == {"p": "A"}
-    assert facts.estimated_on_c is True
-    assert facts.design_gates == ("overlap",)
-    assert facts.interval_gate == "coverage_aipw"
-    assert facts.battery_ran is False
-    assert facts.negative_control_declared is True
-    assert facts.battery_gate == "battery_nco"
-    assert facts.replication_passed is False
-    assert facts.sensitivity_holds is True
-    assert facts.sensitivity_gate == "sensitivity_bound"
-    assert facts.weak_instrument is True
+    assert facts.confirmatory is True
+    assert facts.gates == ("overlap",)
+    assert facts.interval == "coverage_aipw"
+    assert facts.ran is False
+    assert facts.negative is True
+    assert facts.gate == "battery_nco"
+    assert facts.replicated is False
+    assert facts.holds is True
+    assert facts.sensitivity == "sensitivity_bound"
+    assert facts.instrument is True
     assert facts.certified == ("g",)
-    assert facts.adjustment_checked is False
+    assert facts.checked is False
 
 
 def test_a_chronicle_reports_the_estimate_and_verdict():
@@ -343,7 +343,7 @@ def test_an_identification_estimates_at_the_primary_level(stubbed):
 
 def test_a_design_only_run_never_estimates():
     assert analysis.NOT_ESTIMATED.startswith("no estimate was computed")
-    out = analysis.design_only(
+    out = analysis.diagnose(
         block(), observational(800, 1), BUDGET, dag_checks={"d": 2}
     )
     report = out.documents["identification_report.json"]
@@ -369,10 +369,10 @@ def test_a_design_only_run_never_estimates():
 def test_a_design_only_run_refuses_unidentified_or_failed_designs(
     stubbed, monkeypatch
 ):
-    refused = analysis.design_only(
+    refused = analysis.diagnose(
         block(assumptions=("positivity",)), None, BUDGET
     )
     assert refused.documents["causal_claims.json"]["status"] == "not_identified"
     monkeypatch.setattr(Stub, "refuse_with", "no")
-    failed = analysis.design_only(block(), "X", BUDGET)
+    failed = analysis.diagnose(block(), "X", BUDGET)
     assert failed.documents["identification_report.json"]["reason"] == "no"

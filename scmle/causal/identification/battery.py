@@ -129,7 +129,7 @@ class Battery:
         }
 
 
-def run_battery(tests: list[Test], alpha: float) -> Battery:
+def correct(tests: list[Test], alpha: float) -> Battery:
     """Applies Holm's step-down over all tests at familywise level `alpha`.
 
     Args:
@@ -160,19 +160,19 @@ class Replication:
 
     Attributes:
         strata: Stratum to `(estimate, se)`.
-        pooled_sign: Sign of the pooled estimate.
-        same_sign: Whether every stratum has that sign.
+        sign: Sign of the pooled estimate.
+        agreeing: Whether every stratum has that sign.
         q: Cochran's Q.
-        p_heterogeneity: Its chi-square p-value.
+        heterogeneity: Its chi-square p-value.
         alpha: Level of the heterogeneity test.
         passed: Same sign everywhere, no heterogeneity, enough strata.
     """
 
     strata: dict[str, tuple[float, float]]
-    pooled_sign: int
-    same_sign: bool
+    sign: int
+    agreeing: bool
     q: float
-    p_heterogeneity: float
+    heterogeneity: float
     alpha: float
     passed: bool
 

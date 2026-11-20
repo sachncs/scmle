@@ -84,11 +84,11 @@ def test_end_to_end_with_string_labels(multiclass_frame, tmp_path):
         multiclass_frame,
         "y",
         task="classification",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
     )
     result = project.run()
-    names = {t.model_name for t in result.trials if t.status == "ok"}
+    names = {t.model for t in result.trials if t.status == "ok"}
     assert {"lightgbm", "xgboost"} <= names
     assert set(result.predict(multiclass_frame.drop(columns="y"))) <= {
         "lo",
@@ -146,15 +146,15 @@ def test_catboost_handles_string_labels_natively(multiclass_frame, tmp_path):
         multiclass_frame,
         "y",
         task="classification",
-        time_budget=600,
-        output_dir=tmp_path,
+        budget=600,
+        directory=tmp_path,
         strategies=only,
     )
     plan = project.plan()
     assert "catboost" in plan.candidates
     result = project.run()
     assert {"catboost"} <= {
-        t.model_name for t in result.trials if t.status == "ok"
+        t.model for t in result.trials if t.status == "ok"
     }
     assert set(result.predict(multiclass_frame.drop(columns="y"))) <= {
         "lo",
@@ -179,9 +179,7 @@ def test_flat_prediction_wrapper_flattens_column_vectors():
     target = pandas.Series((features.a > 0).astype(int))
     plain = ColumnVectorTree().fit(features, target)
     assert plain.predict(features).ndim == 2
-    wrapped = wrappers.FlatPredictionClassifier(ColumnVectorTree()).fit(
-        features, target
-    )
+    wrapped = wrappers.Flattener(ColumnVectorTree()).fit(features, target)
     assert wrapped.predict(features).shape == (80,)
     assert wrapped.predict_proba(features).shape == (80, 2)
     assert list(wrapped.classes_) == [0, 1]

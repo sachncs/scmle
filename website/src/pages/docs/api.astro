@@ -12,7 +12,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   <h2>The lifecycle objects</h2>
   <pre><code class="language-python">{`from sklearn import datasets
 
-from scmle.api.predict import load_model, predict
+from scmle.api.predict import load, predict
 from scmle.api.project import Project
 
 KEY = "load-this-from-your-secret-manager"
@@ -23,7 +23,7 @@ if __name__ == "__main__":  # training starts helper processes
     new_rows = df.drop(columns="outcome").head(5)
 
     project = Project(
-        data=df, target="outcome", task="regression", time_budget=60
+        data=df, target="outcome", task="regression", budget=60
     )
     plan = project.plan()
     result = project.run()
@@ -31,7 +31,7 @@ if __name__ == "__main__":  # training starts helper processes
 
     bundle = result.bundle
     bundle.save("artifacts/outcome-model", signing_key=KEY)
-    loaded = load_model("artifacts/outcome-model", signing_key=KEY)
+    loaded = load("artifacts/outcome-model", signing_key=KEY)
     print(loaded.predict(new_rows))
     print(predict("artifacts/outcome-model", new_rows, signing_key=KEY))`}</code></pre>
   <ul>
@@ -57,7 +57,7 @@ project = Project(
 
   <h2>Run a non-tabular lifecycle explicitly</h2>
   <p><code>ModalityProject</code> is the public entry point for typed experimental adapters. It accepts the built-in document, image, audio, video, graph, geospatial-vector, and raster families, or a caller-defined <code>Bespoke</code>, through the same fifteen-stage lifecycle. The adapter owns decoding and representation policy; the project owns signed packaging, evidence persistence, inference parity, monitoring, documentation, and recovery checks. <code>Predictor</code>, <code>ModalityHttpServing</code>, and <code>Decoder</code> are also exported for verified library inference and explicit reference serving.</p>
-  <pre><code class="language-python">from scmle.api.project import ModalityProject
+  <pre><code class="language-python">from scmle.api.project import Modality
 from scmle.data.modalities.document import Dataset, Sample
 from scmle.pipeline.modality_lifecycle import Plaintext
 
@@ -71,10 +71,10 @@ adapter = Plaintext(Dataset((
     Sample("g", "orange crop", label="fruit"),
     Sample("h", "lake vessel", label="water"),
 )))
-project = ModalityProject(
+project = Modality(
     adapter,
-    signing_key="load-this-from-your-secret-manager",
-    output_dir="runs/text-baseline",
+    key="load-this-from-your-secret-manager",
+    directory="runs/text-baseline",
 )
 report = project.run()
 print(report.documentation["status"])  # experimental</code></pre>
@@ -98,9 +98,9 @@ adapter = Plaintext(Dataset((
 )))
 project = Modeler(
     adapter,
-    signing_key="load-this-from-your-secret-manager",
+    key="load-this-from-your-secret-manager",
     experimental_opt_in=True,
-    output_dir="runs/text-bounded-baseline",
+    directory="runs/text-bounded-baseline",
 )
 result = project.run()
 assert result.health()["support_status"] == "experimental"
@@ -110,7 +110,7 @@ print(result.predict(adapter.samples[:2]))`}</code></pre>
 
   <h2>Bring a new dataset family</h2>
   <p>Use <code>Bespoke</code> when your dataset does not fit a built-in identity. It gives the family a stable serialized name and keeps the declaration <code>extension-only</code> even when all fifteen local stages have evidence. For raw records that are not ready for modelling, <code>Extension</code> supplies only source identity, sample ownership, and a caller-owned curation callback; it does not force unused split or feature methods. Read the <a href={`${base}/docs/extensions/`}>extension contract guide</a> for the raw-fixture, curation, adapter, and promotion requirements.</p>
-  <pre><code class="language-python" data-snippet="synopsis">{`from scmle.api.project import ModalityProject
+  <pre><code class="language-python" data-snippet="synopsis">{`from scmle.api.project import Modality
 from scmle.contracts import modalities
 from scmle.pipeline import modality_lifecycle
 
@@ -118,9 +118,9 @@ class PointCloudAdapter(modality_lifecycle.Preparer):
     modality = modalities.Bespoke("acme/point-cloud")
     # Implement the complete adapter contract for your raw source.
 
-report = ModalityProject(
+report = Modality(
     PointCloudAdapter(...),
-    signing_key="load-this-from-your-secret-manager",
+    key="load-this-from-your-secret-manager",
 ).run()
 assert report.documentation["status"] == "extension-only"`}</code></pre>
   <p>For raw or unlabeled data, start with <code>Curator</code>. It produces signed curation and dataset-card evidence without forcing a modelling stage; use <code>ModalityProject</code> only when the curation decision supports a supervised lifecycle.</p>

@@ -33,7 +33,7 @@ VERSION_ONE = FIXTURES / "contracts"
 KEY = "fixture-signing-key"
 STANDALONE = {
     "interface": artifacts.Interface,
-    "dataset_manifest": data.DatasetManifest,
+    "dataset_manifest": data.Manifest,
     "passport": data.Passport,
     "experiment_plan": experiments.Plan,
     "performance_run": performance.Run,
@@ -89,7 +89,7 @@ def test_a_record_newer_than_the_build_is_refused(name):
         data.Ancestry,
         data.Confidentiality,
         data.Finding,
-        data.DatasetManifest,
+        data.Manifest,
         data.Passport,
         evidence.Record,
         experiments.Plan,
@@ -149,7 +149,7 @@ def test_a_claim_round_trips_through_both_versions(
 def test_a_manifest_round_trips_through_both_versions(
     identifier, rows, columns, schema, content, owner, pii
 ):
-    manifest = data.DatasetManifest(
+    manifest = data.Manifest(
         identifier=identifier,
         digests={"schema": schema, "data": content},
         rows=rows,
@@ -162,8 +162,8 @@ def test_a_manifest_round_trips_through_both_versions(
     old = manifest.anchor()
     assert old["schema_hash"] == schema and old["data_hash"] == content
     assert old["privacy"]["contains_pii"] is pii
-    assert data.DatasetManifest.from_dict(old) == manifest
-    assert data.DatasetManifest.from_dict(manifest.to_dict()) == manifest
+    assert data.Manifest.from_dict(old) == manifest
+    assert data.Manifest.from_dict(manifest.to_dict()) == manifest
 
 
 @hypothesis.given(
@@ -237,7 +237,7 @@ def test_the_serving_schema_digest_is_anchored_at_version_one():
     old = stored("interface")
     schema = artifacts.Interface.from_dict(old)
     assert schema.digests == {"graph": "f" * 64}
-    assert serving.schema_digest(schema.anchor()) == serving.schema_digest(old)
+    assert serving.digest(schema.anchor()) == serving.digest(old)
 
 
 def test_the_passport_checksum_is_anchored_at_version_one():

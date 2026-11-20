@@ -112,28 +112,28 @@ def test_project_result_can_be_loaded_from_a_verified_artifact(
 ) -> None:
     """A new project instance can expose its digest-verified durable result."""
     project = Estimation(
-        make_frame(), make_estimand(), make_policy(), output_dir=tmp_path
+        make_frame(), make_estimand(), make_policy(), directory=tmp_path
     )
     result = project.run()
     restored = Estimation(
-        make_frame(), make_estimand(), make_policy(), output_dir=tmp_path
+        make_frame(), make_estimand(), make_policy(), directory=tmp_path
     ).recall()
 
     assert result.digest() == restored.digest()
-    assert project.artifact_path.name == "sequential_estimation.json"
+    assert project.artifact.name == "sequential_estimation.json"
 
 
 def test_replay_detects_policy_changes(tmp_path) -> None:
     """Replay verification reports a changed policy instead of hiding it."""
     policy = make_policy()
     project = Estimation(
-        make_frame(), make_estimand(), policy, output_dir=tmp_path
+        make_frame(), make_estimand(), policy, directory=tmp_path
     )
     project.run()
     changed = dataclasses.replace(policy, weight=10.0)
     replay = Estimation(
-        make_frame(), make_estimand(), changed, output_dir=project.output_dir
-    ).verify_replay()
+        make_frame(), make_estimand(), changed, directory=project.directory
+    ).verify()
 
     assert replay.level == "different"
     assert "policy" in " ".join(replay.reasons)

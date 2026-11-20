@@ -201,8 +201,8 @@ def launch(
     project = scmle.api.project.Project(
         frame,
         target,
-        time_budget=BUDGET,
-        **{"output_dir": folder, **FAST, **options},
+        budget=BUDGET,
+        **{"directory": folder, **FAST, **options},
     )
     if adjust is not None:
         project.spec = adjust(project.spec)
@@ -328,12 +328,12 @@ def churn(kind: str) -> Task:
     left = pandas.to_numeric(frame.pop("class")).astype(int)
     if kind == "survival":
         frame["event"] = left
-        options = {"task": "survival", "event_column": "event"}
+        options = {"task": "survival", "event": "event"}
         return frame, "account_length", options
     frame["churned"] = left
     frame["treated"] = pandas.to_numeric(frame.pop("international_plan"))
     frame["treated"] = frame["treated"].astype(int)
-    return frame, "churned", {"task": "uplift", "treatment_column": "treated"}
+    return frame, "churned", {"task": "uplift", "treatment": "treated"}
 
 
 def listings() -> Task:
@@ -347,7 +347,7 @@ def listings() -> Task:
     """
     frame = sales().drop(columns="date")
     frame["query"] = frame.pop("zipcode").astype(str)
-    return frame, "view", {"task": "ranking", "query_column": "query"}
+    return frame, "view", {"task": "ranking", "query": "query"}
 
 
 def clean(kind: str, part: str = "simulated") -> Task:
@@ -377,8 +377,8 @@ def clean(kind: str, part: str = "simulated") -> Task:
         options = {
             "task": "forecast",
             "horizon": 4,
-            "time_column": "date",
-            "seasonal_period": 7,
+            "timestamp": "date",
+            "period": 7,
         }
         return daily, "price", options
     if part != "real" or kind not in TABLES:
@@ -636,9 +636,9 @@ def ingesting(
             "busy",
             task="binary_classification",
             charter=signed,
-            ingest_plan=recipe(path, lab.folder, unit),
-            id_columns=["zipcode", "moment"],
-            output_dir=lab.folder / "runs",
+            ingest=recipe(path, lab.folder, unit),
+            identifiers=["zipcode", "moment"],
+            directory=lab.folder / "runs",
             **options,
         )
 
@@ -671,7 +671,7 @@ def command(unit: str, part: str = "simulated") -> Any:
                 "zipcodes",
             )
         parser = argparse.ArgumentParser()
-        step = cli.IngestCommand()
+        step = cli.Ingest()
         step.configure(parser)
         arguments = parser.parse_args(
             [
@@ -1199,7 +1199,7 @@ def rerun(again: bool) -> Any:
     frame, target, options = clean("binary", "real")
     lab = bypass.Lab(Path(tempfile.mkdtemp(prefix="faults-")))
     path = bypass.charter(lab)
-    options = {**options, "output_dir": lab.folder / "runs"}
+    options = {**options, "directory": lab.folder / "runs"}
     with bypass.environ(SCMLE_SIGNING_KEY=bypass.KEY):
         result = launch(frame, target, charter=path, **options)
         if again:
@@ -1223,7 +1223,7 @@ def monotonic(column: str, part: str = "simulated") -> Any:
         frame, target, options = refusal.simulate("binary", ROWS, SEED, "mixed")
     else:
         frame, target, options = clean("binary", part)
-    return launch(frame, target, monotonic_constraints={column: 1}, **options)
+    return launch(frame, target, constraints={column: 1}, **options)
 
 
 def featureless(part: str = "simulated") -> Any:
@@ -1297,8 +1297,8 @@ def overrun(spent: bool, part: str = "simulated") -> Any:
     project = scmle.api.project.Project(
         frame,
         target,
-        time_budget=BUDGET,
-        output_dir=tempfile.mkdtemp(prefix="faults-"),
+        budget=BUDGET,
+        directory=tempfile.mkdtemp(prefix="faults-"),
         **{**FAST, **options},
     )
     project.orchestrator.stages = tuple(
@@ -1385,7 +1385,7 @@ def scarce(rare: int | None) -> Any:
         frame = frame.drop(index=frame.index[minority][rare:])
         frame = frame.reset_index(drop=True)
     return launch(
-        frame, target, validation="stratified", test_fraction=0.5, **options
+        frame, target, validation="stratified", holdout=0.5, **options
     )
 
 
@@ -1433,7 +1433,7 @@ def grouped(classes: bool, part: str = "simulated") -> Any:
     elif not classes:
         minority = frame[target] == frame[target].value_counts().idxmin()
         frame.loc[minority, "entity"] = 0
-    return launch(frame, target, group_column="entity", **options)
+    return launch(frame, target, group="entity", **options)
 
 
 def strategy(name: str, part: str = "simulated") -> Any:
@@ -1566,8 +1566,8 @@ def revisit(fault: str) -> Any:
     project = scmle.api.project.Project(
         frame,
         target,
-        time_budget=BUDGET,
-        output_dir=folder,
+        budget=BUDGET,
+        directory=folder,
         checkpoints=(reviewer(approve=approve),),
         **{**FAST, **options},
     )
@@ -1613,7 +1613,7 @@ def rolling(horizon: int, part: str = "simulated") -> str | None:
     else:
         frame, target, options = clean("forecast", part)
     run = launch(
-        frame, target, validation="rolling", horizon_rows=horizon, **options
+        frame, target, validation="rolling", span=horizon, **options
     )
     saved = configured(run)["validation"]["rolling"]["horizon"]
     return f"config.json: validation.rolling.horizon {saved}"
@@ -1648,7 +1648,7 @@ def chronology(fault: str, entities: str = "known") -> Any:
         frame.loc[3, "t"] = pandas.NaT
     if fault == "tied":
         frame["t"] = pandas.Timestamp("2024-01-01")
-    fields: dict[str, Any] = {"time_column": "t", "entities": entities}
+    fields: dict[str, Any] = {"timestamp": "t", "entities": entities}
     if fault == "few":
         fields["group_column"] = "g"
     split = splitters.Chronology(spec(**fields), tasks.Task.BINARY)
@@ -1684,9 +1684,9 @@ def dated(fault: str, entities: str = "known") -> Any:
     if fault == "few":
         kept = sorted(frame["zipcode"].unique())[:3]
         frame = frame[frame["zipcode"].isin(kept)].reset_index(drop=True)
-        options = {"group_column": "zipcode", "entities": entities}
+        options = {"group": "zipcode", "entities": entities}
     run = launch(
-        frame, "price", task="regression", time_column="date", **options
+        frame, "price", task="regression", timestamp="date", **options
     )
     if fault == "few" and entities == "known":
         saved = configured(run)["validation"]["entities"]
@@ -1999,7 +1999,7 @@ def multiclass(
         The saved constraints, the record of the relaxed setting.
     """
     frame, target, options = clean("multiclass", part)
-    run = launch(frame, target, monotonic_constraints=constraints, **options)
+    run = launch(frame, target, constraints=constraints, **options)
     saved = configured(run)["data"]["monotonic"]
     return f"config.json: data.monotonic {saved}"
 
@@ -2109,7 +2109,7 @@ def quarantined(attest: bool) -> str | None:
             json.dumps({"format_version": 1, "attestations": [item.to_dict()]}),
             encoding="utf-8",
         )
-        options = {**options, "leakage_attestations": filed}
+        options = {**options, "attestations": filed}
     with bypass.environ(SCMLE_SIGNING_KEY=bypass.KEY):
         run = launch(copied, target, charter=path, **options)
     for written in sorted(Path(run.directory).rglob("*.json")):
@@ -2153,7 +2153,7 @@ def exported(fault: str, part: str = "simulated") -> Any:
     """Exports a logistic model of a binary table as an ONNX graph.
 
     The model is fitted on the rows not held out and saved as a bundle;
-    the simulated part exports it through `Bundle.export_onnx`, the real
+    the simulated part exports it through `Bundle.export`, the real
     part through the `scmle export-onnx` command on the saved bundle.
 
     Args:
@@ -2201,7 +2201,7 @@ def exported(fault: str, part: str = "simulated") -> Any:
     graph = folder / "model.onnx"
     check = held if fault == "checked" else None
     if part == "simulated":
-        written: Any = bundle.export_onnx(
+        written: Any = bundle.export(
             graph, check=check, unverified=fault == "unverified"
         )
     else:
@@ -2269,7 +2269,7 @@ def bind(
 INJECTIONS: dict[str, Injection] = {
     "export.onnx.divergence": Injection(
         "site",
-        "Bundle.export_onnx with no held-out rows (verification is the "
+        "Bundle.export with no held-out rows (verification is the "
         "default)",
         bind(exported, "unchecked"),
         bind(exported, "checked"),

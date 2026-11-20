@@ -54,9 +54,9 @@ def run(frame, tmp_path, graph=GRAPH, models=None, **kwargs):
     project = support.make_project(
         frame,
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
-        feature_graph=graph,
+        budget=300,
+        directory=tmp_path,
+        graph=graph,
         **kwargs,
     )
     if models is None:
@@ -96,9 +96,9 @@ def test_derived_features_are_used_and_inference_needs_only_raw_columns(
         graph=tasks.Derivation(),
         models=linear,
     )
-    plan = result.profile.feature_plan
+    plan = result.profile.plan
     assert {"cross", "month"} <= set(plan.numeric)
-    assert "when" in plan.extra_inputs
+    assert "when" in plan.extras
     assert set(result.bundle.features) == {"x1", "x2", "when"}
     assert "cross" not in result.bundle.features  # computed, not supplied
     with_graph = result.evaluation["metrics"]["roc_auc"]
@@ -121,7 +121,7 @@ def test_bundle_with_a_graph_roundtrips_and_records_its_fingerprint(tmp_path):
         loaded.predict_proba(raw), result.predict_proba(raw)
     )
     assert loaded.schema.digests["graph"] == GRAPH.fingerprint()
-    events = (result.run_dir / "events.jsonl").read_text().splitlines()
+    events = (result.directory / "events.jsonl").read_text().splitlines()
     graph_events = [
         json.loads(e)
         for e in events
@@ -140,7 +140,7 @@ def test_fitted_nodes_are_learned_from_the_rows_the_model_was_fitted_on(
     frame = graph_frame()
     result = run(frame, tmp_path)
     manifest = json.loads(
-        (result.run_dir / "validation_manifest.json").read_text()
+        (result.directory / "validation_manifest.json").read_text()
     )
     shipped = result.evaluation["shipped"]
     rows = list(manifest["training"])
@@ -170,8 +170,8 @@ def test_a_different_graph_is_a_different_configuration(tmp_path):
         run(frame, tmp_path / "a"),
         run(frame, tmp_path / "b", graph=other),
     )
-    first = json.loads((one.run_dir / "config.json").read_text())
-    second = json.loads((two.run_dir / "config.json").read_text())
+    first = json.loads((one.directory / "config.json").read_text())
+    second = json.loads((two.directory / "config.json").read_text())
     assert first["derivation"] != second["derivation"]
 
 
@@ -234,11 +234,11 @@ def run_series(frame, tmp_path, **kwargs):
     return support.make_project(
         frame,
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
-        time_column="day",
-        group_column="unit",
-        feature_graph=SERIES,
+        budget=300,
+        directory=tmp_path,
+        timestamp="day",
+        group="unit",
+        graph=SERIES,
         validation="group",
         **kwargs,
     ).run()
@@ -249,7 +249,7 @@ def test_time_series_features_are_generated_within_groups_and_scored_with_histor
 ):
     frame = series_frame()
     result = run_series(frame, tmp_path)
-    plan = result.profile.feature_plan
+    plan = result.profile.plan
     assert {"load_prev", "load_change", "load_avg3"} <= set(plan.numeric)
     assert [n.name for n in plan.series] == [
         "load_prev",
@@ -276,7 +276,7 @@ def test_search_is_invariant_to_future_target_rewrites_with_a_graph(tmp_path):
     frame = series_frame()
     first = run_series(frame, tmp_path / "a")
     manifest = json.loads(
-        (first.run_dir / "validation_manifest.json").read_text()
+        (first.directory / "validation_manifest.json").read_text()
     )
     altered = frame.copy()
     rng = numpy.random.default_rng(5)
@@ -288,7 +288,7 @@ def test_search_is_invariant_to_future_target_rewrites_with_a_graph(tmp_path):
     second = run_series(altered, tmp_path / "b")
     assert [t.params for t in first.trials] == [t.params for t in second.trials]
     for a, b in zip(first.trials, second.trials, strict=True):
-        assert a.fold_scores == pytest.approx(b.fold_scores)
+        assert a.folds == pytest.approx(b.folds)
 
 
 def test_a_single_new_record_gets_lag_and_rolling_values_from_stored_history(

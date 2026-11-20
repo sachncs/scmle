@@ -49,8 +49,8 @@ class Estimation:
         data: The input as given.
         estimand: The sustained-treatment causal declaration.
         policy: The numerical, support, and truncation policy.
-        output_dir: Directory containing the report artifact.
-        artifact_path: Path of the report artifact.
+        directory: Directory containing the report artifact.
+        artifact: Path of the report artifact.
         result: The latest result run or loaded, or None.
     """
 
@@ -60,7 +60,7 @@ class Estimation:
         estimand: sequential.Estimand,
         policy: sequential.Config,
         *,
-        output_dir: str | pathlib.Path = "runs",
+        directory: str | pathlib.Path = "runs",
     ) -> None:
         """Defines a sequential estimation project.
 
@@ -68,7 +68,7 @@ class Estimation:
             data: In-memory tabular data or a supported tabular file path.
             estimand: Explicit sustained-treatment causal declaration.
             policy: Explicit numerical, support, and truncation policy.
-            output_dir: Directory containing the deterministic report artifact.
+            directory: Directory containing the deterministic report artifact.
 
         Raises:
             TypeError: If the input, estimand, or policy is unsupported.
@@ -85,14 +85,14 @@ class Estimation:
         self.data = data
         self.estimand = estimand
         self.policy = policy
-        self.output_dir = pathlib.Path(output_dir)
-        self.artifact_path = self.output_dir / SEQUENTIAL_ESTIMATION_ARTIFACT
+        self.directory = pathlib.Path(directory)
+        self.artifact = self.directory / SEQUENTIAL_ESTIMATION_ARTIFACT
         self.result: sequential.Estimation | None = None
 
     def run(self) -> sequential.Estimation:
         """Estimates, atomically persists, and reads back the verified result.
 
-        The report is written to `artifact_path`, replacing any earlier one.
+        The report is written to `artifact`, replacing any earlier one.
 
         Returns:
             The result as read back from the persisted report.
@@ -103,8 +103,8 @@ class Estimation:
         """
         frame = tabulate(self.data)
         estimate = sequential.Estimator(self.estimand, self.policy).fit(frame)
-        expected_digest = estimate.write(self.artifact_path)
-        verified = sequential.Estimation.read(self.artifact_path)
+        expected_digest = estimate.write(self.artifact)
+        verified = sequential.Estimation.read(self.artifact)
         if verified.digest() != expected_digest:
             raise errors.InputError(
                 "persisted sequential report failed verification"
@@ -121,10 +121,10 @@ class Estimation:
         Returns:
             The persisted result, which is also kept as `result`.
         """
-        self.result = sequential.Estimation.read(self.artifact_path)
+        self.result = sequential.Estimation.read(self.artifact)
         return self.result
 
-    def verify_replay(
+    def verify(
         self, data: pandas.DataFrame | str | pathlib.Path | None = None
     ) -> reproducibility.Comparison:
         """Replays the project and verifies input, policy, and result identity.
@@ -161,14 +161,14 @@ class Estimation:
             return reproducibility.Comparison(
                 level=reproducibility.DIFFERENT,
                 reasons=reasons,
-                max_abs_difference=float("nan"),
-                trials_compared=1,
+                discrepancy=float("nan"),
+                compared=1,
                 notes=[],
             )
         return reproducibility.Comparison(
             level=reproducibility.EXACT,
             reasons=[],
-            max_abs_difference=0.0,
-            trials_compared=1,
+            discrepancy=0.0,
+            compared=1,
             notes=["input identity, policy, and digest-bound result verified"],
         )

@@ -118,7 +118,7 @@ class Resources:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CostRate:
+class Rate:
     """Declared prices, per hour, for the cost estimate.
 
     Attributes:
@@ -155,7 +155,7 @@ class CostRate:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CostBudget:
+class Budget:
     """A ceiling on the estimated cost of a whole run.
 
     Attributes:
@@ -168,7 +168,7 @@ class CostBudget:
     __module__ = "scmle.runners.base"
 
     max_cost: float
-    rate: CostRate
+    rate: Rate
 
     def __post_init__(self) -> None:
         """Validates the ceiling.
@@ -185,12 +185,12 @@ class Job:
     """One training run, independent of where it runs.
 
     Attributes:
-        run_id: Durable id (letters, digits, `-`, `_`); the idempotency key.
+        identifier: Durable id (letters, digits, `-`, `_`); the idempotency key.
         name: Human-readable job name.
         project: The project specification (JSON-ready), opaque to runners.
         identity: The training identity (role ARN or service account).
         resources: What the job asks for.
-        timeout_seconds: Wall-clock limit of one attempt.
+        timeout: Wall-clock limit of one attempt.
         retries: Attempts and backoff.
         budget: Cost ceiling for the whole run, if any.
         environment: Non-secret environment for the job.
@@ -203,14 +203,14 @@ class Job:
         groups={"digests": {"project_digest": "project"}},
     )
 
-    run_id: str
+    identifier: str
     name: str
     project: Mapping[str, Any]
     identity: str
     resources: Resources = dataclasses.field(default_factory=Resources)
-    timeout_seconds: float = 3600.0
+    timeout: float = 3600.0
     retries: retry.Retries = dataclasses.field(default_factory=retry.Retries)
-    budget: CostBudget | None = None
+    budget: Budget | None = None
     environment: Mapping[str, str] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -222,14 +222,14 @@ class Job:
                 secret-looking.
         """
         if (
-            not self.run_id
-            or len(self.run_id) > MAX_RUN_ID_LENGTH
-            or set(self.run_id) - set(RUN_ID_PATTERN)
+            not self.identifier
+            or len(self.identifier) > MAX_RUN_ID_LENGTH
+            or set(self.identifier) - set(RUN_ID_PATTERN)
         ):
             raise errors.ConfigError(
                 "run_id must be 1-64 characters of letters, digits, - and _"
             )
-        if self.timeout_seconds <= 0 or not self.identity:
+        if self.timeout <= 0 or not self.identity:
             raise errors.ConfigError("a timeout and an identity are required")
         for name, value in self.environment.items():
             if any(word in name.upper() for word in SECRET_WORDS):
@@ -241,7 +241,7 @@ class Job:
                 raise errors.ConfigError(f"environment {name} holds a key")
 
     @property
-    def project_digest(self) -> str:
+    def fingerprint(self) -> str:
         """The SHA-256 of the canonical project specification."""
         text = json.dumps(self.project, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(text.encode()).hexdigest()
@@ -274,13 +274,13 @@ class Job:
             The spec's fields with their version-1 keys.
         """
         return {
-            "run_id": self.run_id,
+            "run_id": self.identifier,
             "name": self.name,
             "project": dict(self.project),
-            "project_digest": self.project_digest,
+            "project_digest": self.fingerprint,
             "identity": self.identity,
             "resources": dataclasses.asdict(self.resources),
-            "timeout_seconds": self.timeout_seconds,
+            "timeout_seconds": self.timeout,
             "retries": dict(retries),
             "budget": None
             if self.budget is None
@@ -310,16 +310,16 @@ class Job:
             fields = cls.KEYS.downgrade(dict(record))
             budget = fields["budget"]
             return cls(
-                run_id=fields["run_id"],
+                identifier=fields["run_id"],
                 name=fields["name"],
                 project=fields["project"],
                 identity=fields["identity"],
                 resources=Resources(**fields["resources"]),
-                timeout_seconds=fields["timeout_seconds"],
+                timeout=fields["timeout_seconds"],
                 retries=retry.Retries.read(fields["retries"]),
                 budget=None
                 if budget is None
-                else CostBudget(budget["max_cost"], CostRate(**budget["rate"])),
+                else Budget(budget["max_cost"], Rate(**budget["rate"])),
                 environment=fields["environment"],
             )
         except (KeyError, TypeError, AttributeError) as error:
@@ -536,6 +536,6 @@ class Meter:
         """
         if self.exceeded(seconds):
             return Progress.BUDGET_STOPPED
-        if seconds > self.spec.timeout_seconds:
+        if seconds > self.spec.timeout:
             return Progress.TIMED_OUT
         return None

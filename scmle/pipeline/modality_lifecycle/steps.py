@@ -514,7 +514,7 @@ class Packaging(state.Stage):
                 newline="\n",
             )
             durability.sync(manifest_path)
-            durability.sync_directory(temporary)
+            durability.flush(temporary)
         except Exception:
             shutil.rmtree(temporary, ignore_errors=True)
             raise
@@ -550,7 +550,7 @@ class Packaging(state.Stage):
                 (temporary / "manifest.json").read_text(encoding="utf-8")
             )
             temporary.replace(target)
-            durability.sync_directory(target.parent)
+            durability.flush(target.parent)
         except Exception:
             shutil.rmtree(temporary, ignore_errors=True)
             raise

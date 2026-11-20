@@ -173,7 +173,7 @@ class Identification(qualification.Qualification):
             return Estimand(claims["status"], claims["tier"], estimated=True)
         frame = view.features.copy()
         frame[board.services.spec.data.target] = view.target
-        outcome = scmle.causal.identification.run.design_only(
+        outcome = scmle.causal.identification.run.diagnose(
             block,
             frame,
             charter.budget,

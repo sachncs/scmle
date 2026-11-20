@@ -54,7 +54,7 @@ def seen() -> observation.Observation:
         image_digest=DIGEST,
         ready=True,
         traffic=(observation.Traffic("serve:12", 100),),
-        observed_at=NOW,
+        observed=NOW,
     )
 
 
@@ -62,33 +62,33 @@ def approval() -> registry.Sanction:
     return registry.Sanction(
         model="churn",
         version=3,
-        content_id="9" * 64,
+        content="9" * 64,
         reviewer="reviewer-1",
         decision=registry.Verdict.APPROVED,
         reason="evidence reviewed",
         evidence=("ticket-17",),
-        approved_at=NOW,
+        approved=NOW,
     )
 
 
 def card() -> model_card.Card:
     return model_card.Card(
-        model_name="m",
-        model_version="v1",
-        model_fingerprint="sha256:x",
+        model="m",
+        version="v1",
+        fingerprint="sha256:x",
         task="binary_classification",
         metric="roc_auc",
-        dataset_id="ds_1",
-        snapshot_id="snap_1",
-        intended_use="inference",
-        out_of_scope=("elsewhere",),
+        dataset="ds_1",
+        snapshot="snap_1",
+        use="inference",
+        excluded=("elsewhere",),
         limitations=("review",),
-        feature_names=("amount",),
+        features=("amount",),
         evaluation={},
         resources={},
-        evidence_artifacts=("evaluation.json",),
-        support_status="beta",
-        generated_at=NOW,
+        artifacts=("evaluation.json",),
+        support="beta",
+        generated=NOW,
     )
 
 
@@ -143,7 +143,7 @@ def delivery() -> notify.Delivery:
 
 def job() -> base.Job:
     return base.Job(
-        run_id="run-1",
+        identifier="run-1",
         name="train",
         project={"task": "binary", "target": "y"},
         identity="role",

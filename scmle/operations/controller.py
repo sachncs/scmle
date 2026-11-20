@@ -150,7 +150,7 @@ class Intake:
             body: The row content.
         """
         self.loop.ledger.commit(deployment_ledger.CONTROLLER, dict(body))
-        self.loop.save_state()
+        self.loop.save()
 
     def mark(self, label: str) -> None:
         """Reports progress to the crash-test seam.
@@ -374,7 +374,7 @@ class Intake:
         """
         self.loop.suspend(reason, {"file": name})
         self.loop.escalate(reason, {"file": name})
-        self.loop.save_state()
+        self.loop.save()
 
     def fresh(
         self, inbox: pathlib.Path, folder: str
@@ -443,7 +443,7 @@ class Controller(Intake):
         self.envelopes = envelope.Guard(
             self.loop.ledger, today, verification_keys
         )
-        self.envelopes.on_write = self.loop.save_state
+        self.envelopes.observer = self.loop.save
 
     # ------------------------------------------------------------ authority
 
@@ -577,7 +577,7 @@ class Controller(Intake):
                 "controller_labels_not_arriving",
                 {"ticks": self.policy.unlabelled},
             )
-        self.loop.save_state()
+        self.loop.save()
 
     def result(
         self,
@@ -605,7 +605,7 @@ class Controller(Intake):
             matured,
             rejected,
             events,
-            tuple(e.id for e in self.loop.pending_escalations()),
+            tuple(e.id for e in self.loop.survey()),
         )
 
     def status(self) -> dict[str, Any]:
@@ -622,9 +622,7 @@ class Controller(Intake):
             "batch": self.loop.batch,
             "applied": len(ledger.consumed),
             "rejected": len(ledger.rejected),
-            "pending_escalations": [
-                e.id for e in self.loop.pending_escalations()
-            ],
+            "pending_escalations": [e.id for e in self.loop.survey()],
             "envelopes": {
                 identity: self.envelopes.remaining(identity)
                 for identity in ledger.envelopes

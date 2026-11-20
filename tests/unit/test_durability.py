@@ -9,7 +9,7 @@ from scmle import durability
 
 def test_sync_directory_flushes_a_real_directory(tmp_path: pathlib.Path):
     """A directory handle can flush an atomic replacement on Unix."""
-    durability.sync_directory(tmp_path)
+    durability.flush(tmp_path)
 
 
 def test_write_atomically_replaces_complete_content(tmp_path: pathlib.Path):
@@ -17,7 +17,7 @@ def test_write_atomically_replaces_complete_content(tmp_path: pathlib.Path):
     destination = tmp_path / "evidence.json"
     destination.write_bytes(b"old")
 
-    durability.write_atomically(destination, b"new evidence")
+    durability.write(destination, b"new evidence")
 
     assert destination.read_bytes() == b"new evidence"
     assert tuple(tmp_path.glob(".*.tmp")) == ()
@@ -36,7 +36,7 @@ def test_write_atomically_preserves_previous_content_on_write_failure(
     monkeypatch.setattr(durability.os, "replace", fail_replace)
 
     with pytest.raises(OSError, match="simulated replacement failure"):
-        durability.write_atomically(destination, b"new evidence")
+        durability.write(destination, b"new evidence")
 
     assert destination.read_bytes() == b"previous evidence"
     assert tuple(tmp_path.glob(".*.tmp")) == ()
@@ -68,7 +68,7 @@ def test_windows_retries_a_transiently_denied_replacement(
     monkeypatch.setattr(durability.os, "replace", flaky)
     monkeypatch.setattr(durability.time, "sleep", lambda seconds: None)
 
-    durability.write_atomically(destination, b"new")
+    durability.write(destination, b"new")
 
     assert destination.read_bytes() == b"new"
     assert flaky.calls == 4
@@ -87,7 +87,7 @@ def test_windows_gives_up_after_a_bounded_number_of_attempts(
     monkeypatch.setattr(durability.time, "sleep", lambda seconds: None)
 
     with pytest.raises(PermissionError):
-        durability.write_atomically(destination, b"new")
+        durability.write(destination, b"new")
 
     assert flaky.calls == durability.REPLACE_ATTEMPTS
     assert destination.read_bytes() == b"old"
@@ -104,7 +104,7 @@ def test_other_platforms_do_not_retry_a_denied_replacement(
     monkeypatch.setattr(durability.os, "replace", flaky)
 
     with pytest.raises(PermissionError):
-        durability.write_atomically(destination, b"new")
+        durability.write(destination, b"new")
 
     assert flaky.calls == 1
 
@@ -120,7 +120,7 @@ def test_replacement_waits_for_a_reader_holding_the_path_lock(
     finished = threading.Event()
 
     def write() -> None:
-        durability.write_atomically(destination, b"new")
+        durability.write(destination, b"new")
         finished.set()
 
     with durability.latch(destination):

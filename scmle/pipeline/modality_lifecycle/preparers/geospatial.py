@@ -137,7 +137,7 @@ class Geospatial(curators.Preparer):
                 quality_findings.append(
                     curation.flaw(
                         "quality.geospatial-boundary-leakage",
-                        data.FindingSeverity.WARNING,
+                        data.Severity.WARNING,
                         {
                             "dataset": self.digest,
                             "block_size": self.side,

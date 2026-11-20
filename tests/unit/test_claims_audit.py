@@ -416,7 +416,7 @@ def test_an_empty_key_is_an_input_error_not_a_failed_step(tmp_path):
     with pytest.raises(errors.InputError, match="must not be empty"):
         claims_audit.custodial(tmp_path, {}, "")
     with pytest.raises(errors.InputError, match="must not be empty"):
-        claims_audit.check_decision_files(tmp_path, "")
+        claims_audit.audit(tmp_path, "")
     with pytest.raises(errors.InputError, match="must not be empty"):
         claims_audit.corroborate(tmp_path, "")
 

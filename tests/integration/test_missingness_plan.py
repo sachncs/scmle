@@ -27,13 +27,13 @@ def run(informative, tmp_path):
     result = support.make_project(
         frame(informative),
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
         strategies=tasks.Strategies(names=["missing_indicators"]),
         models=tasks.Candidates(exclude_families=["deep_learning"]),
     ).run()
     log = json.loads(
-        (result.run_dir / "diagnostics/decision_log.json").read_text()
+        (result.directory / "diagnostics/decision_log.json").read_text()
     )
     return result, [
         o
@@ -47,7 +47,7 @@ def test_informative_gaps_are_reported_and_the_flags_are_not_ruled_out(
 ):
     result, outcomes = run(True, tmp_path)
 
-    assert result.profile.feature_plan.informative_missing == ("gappy",)
+    assert result.profile.plan.informative_missing == ("gappy",)
     assert any(
         "missingness of 'gappy'" in finding
         for finding in result.profile.quality_findings
@@ -58,7 +58,7 @@ def test_informative_gaps_are_reported_and_the_flags_are_not_ruled_out(
 def test_random_gaps_do_not_earn_missing_value_flags(tmp_path):
     result, outcomes = run(False, tmp_path)
 
-    assert result.profile.feature_plan.informative_missing == ()
+    assert result.profile.plan.informative_missing == ()
     assert outcomes and all(
         o["action"] == "reject" and "associated with the target" in o["reason"]
         for o in outcomes

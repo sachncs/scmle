@@ -59,20 +59,20 @@ class Workspace:
             sort_keys=True,
         ).encode("utf-8")
         return scmle.governance.reliability.Emission(
-            evidence_type=evidence_type,
+            kind=evidence_type,
             content=content,
-            observed_outcome=reliability.Outcome.SAFE_OUTCOME_OBSERVED,
+            outcome=reliability.Outcome.SAFE_OUTCOME_OBSERVED,
             observation=observation,
         )
 
-    def write_json(self, path: pathlib.Path, record: dict[str, Any]) -> None:
+    def write(self, path: pathlib.Path, record: dict[str, Any]) -> None:
         """Writes JSON with the evidence harness's atomic, synced write.
 
         Args:
             path: The destination file.
             record: The content, written as compact sorted JSON.
         """
-        scmle.governance.reliability.Harness.write_atomically(
+        scmle.governance.reliability.Harness.write(
             path,
             json.dumps(
                 record,

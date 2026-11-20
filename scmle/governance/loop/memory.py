@@ -21,16 +21,16 @@ class Memory:
     def __init__(
         self,
         directory: Path,
-        ledger: deployment_ledger.DeploymentLedger,
+        ledger: deployment_ledger.Ledger,
         policy: terms.Preregistration,
         guard: never_list.Guard,
         hooks: terms.Hooks,
-        verification_keys: Mapping[str, str | bytes],
+        keys: Mapping[str, str | bytes],
         today: Callable[[], datetime.date],
     ) -> None:
         """Builds a loop from parts that `Loop.open` assembles.
 
-        Hooks the guard's ``on_write`` callback to `save_state` and creates
+        Hooks the guard's ``on_write`` callback to `save` and creates
         the monitors. It does not load the saved state; `Loop.open` does.
 
         Args:
@@ -39,7 +39,7 @@ class Memory:
             policy: The pre-registered policy.
             guard: The never-list guard.
             hooks: Optional callbacks.
-            verification_keys: Map from key id to the key that verifies a
+            keys: Map from key id to the key that verifies a
                 person's attestation.
             today: Clock, replaceable in tests.
         """
@@ -48,24 +48,24 @@ class Memory:
         self.policy = policy
         self.guard = guard
         self.hooks = hooks
-        self.verification_keys = dict(verification_keys)
+        self.keys = dict(keys)
         self.today = today
         self.batch = 0
         self.tau = math.inf if policy.tau is None else policy.tau
-        self.pending_batches: list[dict[str, Any]] = []
-        self.escalation_batch: dict[str, int] = {}
-        self.consecutive_rollbacks = 0
+        self.batches: list[dict[str, Any]] = []
+        self.escalation: dict[str, int] = {}
+        self.rollbacks = 0
         self.stopped: dict[str, float] = {}
         self.queue: list[str] = []
         self.active: dict[str, dict[str, Any]] = {}
-        self.rollback_watch: dict[str, Any] | None = None
+        self.watch: dict[str, Any] | None = None
         self.mechanism = labels.Mechanism.COMPLETE
-        self.halt_reason: str | None = None
-        self.halted_by_state = False
+        self.reason: str | None = None
+        self.frozen = False
         self.naive_flag = False
         self.calibrated = False
         self.feedback: dict[str, Any] | None = None
-        self.guard.on_write = self.save_state
+        self.guard.observer = self.save
         self.arm()
 
     def arm(self) -> None:
@@ -86,7 +86,7 @@ class Memory:
         self.selective = sequential_tests.Tripwire(
             policy.target, 0.0, policy.delta, policy.scale
         )
-        self.coverage_test: sequential_tests.Mixture | None = (
+        self.test: sequential_tests.Mixture | None = (
             None
             if policy.coverage is None
             else sequential_tests.Mixture(
@@ -95,7 +95,7 @@ class Memory:
                 policy.alarm,
             )
         )
-        self.novelty_test = sequential_tests.Mixture(
+        self.novelty = sequential_tests.Mixture(
             min(max(policy.novelty, 1e-6), 1 - 1e-6),
             sequential_tests.GREATER,
             policy.alarm,
@@ -106,7 +106,7 @@ class Memory:
         """The state file."""
         return self.directory / terms.STATE_FILE
 
-    def save_state(self) -> None:
+    def save(self) -> None:
         """Writes the running state with the ledger head it belongs to."""
         challengers = {
             name: {
@@ -121,33 +121,31 @@ class Memory:
             "batch": self.batch,
             "tau": None if math.isinf(self.tau) else self.tau,
             "mechanism": self.mechanism.value,
-            "halt_reason": self.halt_reason,
+            "halt_reason": self.reason,
             "naive_flag": self.naive_flag,
             "calibrated": self.calibrated,
             "feedback": self.feedback,
-            "consecutive_rollbacks": self.consecutive_rollbacks,
-            "escalation_batch": self.escalation_batch,
+            "consecutive_rollbacks": self.rollbacks,
+            "escalation_batch": self.escalation,
             "queue": self.queue,
             "stopped": self.stopped,
             "alarm": self.alarm.to_dict(),
             "naive_alarm": self.naive_alarm.to_dict(),
             "selective": self.selective.to_dict(),
             "coverage_test": (
-                None
-                if self.coverage_test is None
-                else self.coverage_test.to_dict()
+                None if self.test is None else self.test.to_dict()
             ),
-            "novelty_test": self.novelty_test.to_dict(),
+            "novelty_test": self.novelty.to_dict(),
             "active": challengers,
             "rollback_watch": (
                 None
-                if self.rollback_watch is None
+                if self.watch is None
                 else {
-                    "previous": self.rollback_watch["previous"],
-                    "process": self.rollback_watch["process"].to_dict(),
+                    "previous": self.watch["previous"],
+                    "process": self.watch["process"].to_dict(),
                 }
             ),
-            "pending_batches": self.pending_batches,
+            "pending_batches": self.batches,
         }
         temporary = self.statefile.with_suffix(".tmp")
         temporary.write_text(
@@ -160,22 +158,22 @@ class Memory:
     def restore(self) -> None:
         """Reads the state file; halts if it does not match the ledger."""
         if not self.statefile.exists():
-            self.halted_by_state = self.ledger.halted
+            self.frozen = self.ledger.halted
             return
         state = json.loads(self.statefile.read_text(encoding="utf-8"))
         if state["ledger_head"] != self.ledger.head:
-            self.halted_by_state = True
-            self.halt_reason = terms.HALT_STATE
+            self.frozen = True
+            self.reason = terms.HALT_STATE
             return
         self.batch = state["batch"]
         self.tau = math.inf if state["tau"] is None else state["tau"]
         self.mechanism = labels.Mechanism(state["mechanism"])
-        self.halt_reason = state["halt_reason"]
+        self.reason = state["halt_reason"]
         self.naive_flag = state["naive_flag"]
         self.calibrated = state["calibrated"]
         self.feedback = state.get("feedback")
-        self.consecutive_rollbacks = state["consecutive_rollbacks"]
-        self.escalation_batch = dict(state["escalation_batch"])
+        self.rollbacks = state["consecutive_rollbacks"]
+        self.escalation = dict(state["escalation_batch"])
         self.queue = list(state["queue"])
         self.stopped = dict(state["stopped"])
         self.alarm = sequential_tests.Tripwire.from_dict(state["alarm"])
@@ -184,12 +182,10 @@ class Memory:
         )
         self.selective = sequential_tests.Tripwire.from_dict(state["selective"])
         if state["coverage_test"] is not None:
-            self.coverage_test = sequential_tests.Mixture.from_dict(
+            self.test = sequential_tests.Mixture.from_dict(
                 state["coverage_test"]
             )
-        self.novelty_test = sequential_tests.Mixture.from_dict(
-            state["novelty_test"]
-        )
+        self.novelty = sequential_tests.Mixture.from_dict(state["novelty_test"])
         self.active = {
             name: {
                 "process": sequential_tests.Comparison.from_dict(
@@ -201,19 +197,19 @@ class Memory:
         }
         watch = state["rollback_watch"]
         if watch is not None:
-            self.rollback_watch = {
+            self.watch = {
                 "previous": watch["previous"],
                 "process": sequential_tests.Comparison.from_dict(
                     watch["process"]
                 ),
             }
-        self.pending_batches = state["pending_batches"]
-        self.halted_by_state = self.ledger.halted
+        self.batches = state["pending_batches"]
+        self.frozen = self.ledger.halted
 
     @property
     def halted(self) -> bool:
         """Whether every case is escalated."""
-        return self.ledger.halted or self.halted_by_state
+        return self.ledger.halted or self.frozen
 
     def recheck(self) -> bool:
         """Re-checks the ledger file; enters a halt (in memory) if it fails.
@@ -226,7 +222,7 @@ class Memory:
             self.ledger.verify()
         except deployment_ledger.MisuseError:
             # handled: loop halted with reason; returns False
-            self.halted_by_state = True
-            self.halt_reason = terms.HALT_LEDGER
+            self.frozen = True
+            self.reason = terms.HALT_LEDGER
             return False
         return True

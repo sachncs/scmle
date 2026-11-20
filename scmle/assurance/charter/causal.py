@@ -127,7 +127,7 @@ class Control:
             raise errors.InputError(
                 f"kind must be one of {NEGATIVE_CONTROL_KINDS}"
             )
-        evidence.require_text(self.variable, "variable")
+        evidence.require(self.variable, "variable")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the record.
@@ -179,12 +179,12 @@ class Subgroup:
             ValueError: If `column` or any value is blank, `values` is not
                 a tuple, is empty, or contains a duplicate.
         """
-        evidence.require_text(self.column, "column")
+        evidence.require(self.column, "column")
         qualification.tupled(self.values, "values")
         if not self.values:
             raise errors.InputError("a subgroup needs at least one value")
         for value in self.values:
-            evidence.require_text(value, "value")
+            evidence.require(value, "value")
         if len(set(self.values)) != len(self.values):
             raise errors.InputError("duplicate subgroup value")
 
@@ -237,8 +237,8 @@ class Attestor:
                 a tuple, is empty, holds a word `vet` rejects,
                 or contains a duplicate.
         """
-        evidence.require_text(self.name, "name")
-        evidence.require_text(self.role, "role")
+        evidence.require(self.name, "name")
+        evidence.require(self.role, "role")
         qualification.tupled(self.assumptions, "assumptions")
         if not self.assumptions:
             raise errors.InputError("an attestor needs at least one assumption")
@@ -421,8 +421,8 @@ class Question:
                 is not finite; `trim` is not finite or outside [0, 0.5);
                 or `retained` is not finite or outside (0, 1].
         """
-        evidence.require_text(self.treatment, "treatment")
-        evidence.require_text(self.outcome, "outcome")
+        evidence.require(self.treatment, "treatment")
+        evidence.require(self.outcome, "outcome")
         if self.estimand not in CAUSAL_ESTIMANDS:
             raise errors.InputError(
                 f"estimand must be one of {CAUSAL_ESTIMANDS}"
@@ -482,7 +482,7 @@ class Question:
         if self.attestors and not self.attestations:
             raise errors.InputError("attestors need an attestations file")
         if self.attestations is not None:
-            evidence.require_text(self.attestations, "attestations")
+            evidence.require(self.attestations, "attestations")
             if not self.attestors:
                 raise errors.InputError("an attestations file needs attestors")
         for attestor in self.attestors:

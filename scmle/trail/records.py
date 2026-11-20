@@ -86,7 +86,7 @@ def digest(value: Any) -> str:
     return hashlib.sha256(signing.canonicalise(value)).hexdigest()
 
 
-def read_json(path: Path) -> Any:
+def read(path: Path) -> Any:
     """Reads a JSON file.
 
     Args:
@@ -99,7 +99,7 @@ def read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def read_lines(path: Path) -> list[dict[str, Any]]:
+def scan(path: Path) -> list[dict[str, Any]]:
     """Reads a JSON-lines file.
 
     Args:
@@ -115,7 +115,7 @@ def read_lines(path: Path) -> list[dict[str, Any]]:
     ]
 
 
-def write_json(path: Path, value: Any) -> None:
+def write(path: Path, value: Any) -> None:
     """Writes sorted, indented JSON with a trailing newline.
 
     Args:
@@ -199,5 +199,5 @@ def resolve(directory: Path, spec: str, derived: Mapping[str, Any]) -> Any:
     if name in derived:
         document = derived[name]
     else:
-        document = read_json(directory / RETAINED / name)
+        document = read(directory / RETAINED / name)
     return lookup(document, dotted) if dotted else document

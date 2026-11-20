@@ -12,7 +12,7 @@ from tests.unit import test_governed_data
 
 @pytest.fixture
 def store(tmp_path):
-    return objectstore.LocalObjectStore(tmp_path / "root")
+    return objectstore.Disk(tmp_path / "root")
 
 
 def test_metadata_carries_a_hash_of_the_bytes_read(store):
@@ -60,7 +60,7 @@ def test_a_dataset_rule_holds_the_snapshot_until_released(store, rule):
             bad, record, test_governed_data.CONTRACT, quality.Stage.TRAIN
         )
     assert raised.value.quarantined
-    assert store.list_objects(f"quarantine/{record.identifier}")
+    assert store.catalog(f"quarantine/{record.identifier}")
     permissive = quality.Gate([quality.Rows(1)], store)
     with pytest.raises(quality.GateError, match="is quarantined"):
         permissive.run(

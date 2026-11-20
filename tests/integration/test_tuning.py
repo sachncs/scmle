@@ -17,8 +17,8 @@ def run(frame, tmp_path, search=SEARCH, **kwargs):
     project = support.make_project(
         frame,
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
         search=search,
         **kwargs,
     )
@@ -31,24 +31,24 @@ def test_tuning_adds_pruned_and_completed_trials(binary_frame, tmp_path):
     pruned = [t for t in tuned if t.status == "pruned"]
     completed = [t for t in tuned if t.status == "ok"]
     assert len(pruned) == 3 and len(completed) == 3
-    assert len({t.model_name for t in tuned}) == 1
-    assert all(len(t.fold_scores) == 1 for t in pruned)
-    assert all(len(t.fold_scores) > 1 for t in completed)
-    trial_ids = [t.trial_id for t in result.trials]
+    assert len({t.model for t in tuned}) == 1
+    assert all(len(t.folds) == 1 for t in pruned)
+    assert all(len(t.folds) > 1 for t in completed)
+    trial_ids = [t.identifier for t in result.trials]
     assert len(trial_ids) == len(set(trial_ids))
-    assert (result.run_dir / "trials" / f"{tuned[0].trial_id}.json").exists()
+    assert (result.directory / "trials" / f"{tuned[0].identifier}.json").exists()
 
 
 def test_selection_can_pick_a_tuned_configuration(regression_frame, tmp_path):
     result = run(regression_frame, tmp_path, task="regression")
     best_default = min(
-        t.score_mean
+        t.score
         for t in result.trials
-        if t.status == "ok" and not t.params and t.model_name != "dummy"
+        if t.status == "ok" and not t.params and t.model != "dummy"
     )
     assert result.evaluation["selected"]["score"] <= best_default + 1e-12
     selected = result.evaluation["selected"]["params"]
-    assert result.bundle.info.model_params == selected
+    assert result.bundle.info.params == selected
 
 
 def test_params_survive_in_leaderboard_and_bundle(binary_frame, tmp_path):
@@ -62,7 +62,7 @@ def test_params_survive_in_leaderboard_and_bundle(binary_frame, tmp_path):
     loaded = scmle.artifacts.bundle.Bundle.load(
         result.save(tmp_path / "exported"), trusted=True
     )
-    assert loaded.info.model_params == result.bundle.info.model_params
+    assert loaded.info.params == result.bundle.info.params
     features = binary_frame.drop(columns="y")
     numpy.testing.assert_allclose(
         result.predict_proba(features), loaded.predict_proba(features)
@@ -88,7 +88,7 @@ def test_plan_documents_the_search(binary_frame):
 
 def test_search_stops_when_budget_is_exhausted(binary_frame, tmp_path):
     result = support.make_project(
-        binary_frame, "y", time_budget=12, output_dir=tmp_path, search=SEARCH
+        binary_frame, "y", budget=12, directory=tmp_path, search=SEARCH
     ).run()
     assert result.state == "COMPLETED"
     assert sum(1 for t in result.trials if t.params) <= 6

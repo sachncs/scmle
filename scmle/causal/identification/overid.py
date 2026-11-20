@@ -98,7 +98,7 @@ def prepare(
     )
 
 
-def not_testable(name: str, count: int) -> dict[str, Any]:
+def abstain(name: str, count: int) -> dict[str, Any]:
     """Builds the result when there is nothing to test.
 
     Args:
@@ -106,7 +106,7 @@ def not_testable(name: str, count: int) -> dict[str, Any]:
         count: Number of instruments.
 
     Returns:
-        A record with status `not_testable`, no statistic or p-value, zero
+        A record with status `abstain`, no statistic or p-value, zero
         degrees of freedom, the instrument count and a note that a single
         instrument is just identified.
     """
@@ -187,13 +187,13 @@ def sargan(
 
     Returns:
         A result record; with fewer than two instruments the status is
-        `not_testable`, otherwise `described` with the statistic and its
+        `abstain`, otherwise `described` with the statistic and its
         p-value on `k - 1` degrees of freedom.
     """
     outcome, regressor, z = prepare(y, d, instruments, controls)
     count = z.shape[1]
     if count < MIN_INSTRUMENTS:
-        return not_testable("sargan", count)
+        return abstain("sargan", count)
     rows = len(outcome)
     residual = outcome - estimate(outcome, regressor, z) * regressor
     fit = z @ numpy.linalg.lstsq(z, residual, rcond=None)[0]
@@ -221,13 +221,13 @@ def hansen_j(
 
     Returns:
         A result record; with fewer than two instruments the status is
-        `not_testable`, otherwise `described` with the statistic and its
+        `abstain`, otherwise `described` with the statistic and its
         p-value on one fewer degrees of freedom than instruments.
     """
     outcome, regressor, z = prepare(y, d, instruments, controls)
     count = z.shape[1]
     if count < MIN_INSTRUMENTS:
-        return not_testable("hansen_j", count)
+        return abstain("hansen_j", count)
     rows = len(outcome)
     first = outcome - estimate(outcome, regressor, z) * regressor
     moments = z * first[:, None]

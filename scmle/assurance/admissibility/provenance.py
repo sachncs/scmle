@@ -229,7 +229,7 @@ class Attestation:
         ):
             if not isinstance(getattr(self, name), str):
                 raise errors.InputError(f"{name} must be text")
-            evidence.require_text(getattr(self, name), name)
+            evidence.require(getattr(self, name), name)
         issued = parse(self.date, "date")
         if parse(self.expires, "expires") < issued:
             raise errors.InputError("expires must not precede date")
@@ -442,11 +442,11 @@ class Pedigree:
                 the wrong type, or the as-of rule, its source, the
                 attestation and the reconstruction are inconsistent.
         """
-        evidence.require_text(self.name, "name")
-        evidence.require_text(self.writer, "writer")
+        evidence.require(self.name, "name")
+        evidence.require(self.writer, "writer")
         qualification.tupled(self.definitions, "definitions")
         for note in self.definitions:
-            evidence.require_text(note, "definitions")
+            evidence.require(note, "definitions")
         for value, kind in (
             (self.origin, Origin),
             (self.stamp, Stamp),

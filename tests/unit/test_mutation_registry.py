@@ -38,7 +38,7 @@ def test_serialized_text_must_hold_an_object() -> None:
         errors.KindError,
         match=r"^serialized plan must contain a JSON object$",
     ):
-        reliability.Registry.from_json("[]")
+        reliability.Registry.parse("[]")
 
 
 def test_only_a_contingency_can_be_logged() -> None:

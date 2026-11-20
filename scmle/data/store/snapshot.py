@@ -263,7 +263,7 @@ class Log:
         self.records.append(record)
         if self.path is not None:
             line = json.dumps(record.to_dict(), sort_keys=True) + "\n"
-            durability.append_text(self.path, line)
+            durability.append(self.path, line)
 
     def trace(self, snapshot_id: str) -> list[Record]:
         """Follows a snapshot back through the snapshots it derives from.

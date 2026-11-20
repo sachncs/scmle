@@ -87,10 +87,10 @@ class Explanation:
         """
         if not isinstance(self.mechanism, Mechanism):
             raise errors.InputError("mechanism must be a Mechanism")
-        evidence.require_text(self.detail, "detail")
+        evidence.require(self.detail, "detail")
         qualification.finite(self.amount, "amount")
         if self.attestor is not None:
-            evidence.require_text(self.attestor, "attestor")
+            evidence.require(self.attestor, "attestor")
 
     def to_dict(self) -> dict[str, Any]:
         """Converts the explanation to a JSON-ready record.
@@ -153,8 +153,8 @@ class Item:
                 `source` is not finite, `source` is zero, or
                 `explanations` is not a tuple.
         """
-        evidence.require_text(self.name, "name")
-        evidence.require_text(self.origin, "source_name")
+        evidence.require(self.name, "name")
+        evidence.require(self.origin, "source_name")
         qualification.finite(self.extract, "extract")
         if qualification.finite(self.source, "source") == 0.0:
             raise errors.InputError(

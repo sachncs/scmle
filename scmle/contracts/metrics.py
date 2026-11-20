@@ -19,14 +19,14 @@ class Metric:
 
     Attributes:
         name: Public metric name.
-        scorer_name: scikit-learn scorer (sign-adjusted so larger is better).
-        greater_is_better: Whether larger natural values are better.
+        scoring: scikit-learn scorer (sign-adjusted so larger is better).
+        maximize: Whether larger natural values are better.
         tasks: Tasks the metric is defined for.
     """
 
     name: str
-    scorer_name: str
-    greater_is_better: bool
+    scoring: str
+    maximize: bool
     tasks: frozenset[tasks.Task]
 
     def naturalise(self, scorer_value: float) -> float:
@@ -39,7 +39,7 @@ class Metric:
         Returns:
             The value in the metric's own units and direction.
         """
-        return scorer_value if self.greater_is_better else -scorer_value
+        return scorer_value if self.maximize else -scorer_value
 
     def weightable(self) -> bool:
         """Returns whether the metric can be scored with `sample_weight`.
@@ -54,7 +54,7 @@ class Metric:
         self,
         positive: Any = None,  # noqa: ARG002 -- shared scorer signature
     ) -> Any:
-        """Returns the scikit-learn scorer named by `scorer_name`.
+        """Returns the scikit-learn scorer named by `scoring`.
 
         Args:
             positive: Positive class label; ignored here, used by subclasses
@@ -63,7 +63,7 @@ class Metric:
         Returns:
             The stock scorer from `sklearn.metrics.get_scorer`.
         """
-        return metrics.get_scorer(self.scorer_name)
+        return metrics.get_scorer(self.scoring)
 
     def score(
         self,
@@ -103,12 +103,12 @@ class PositiveLabelMetric(Metric):
     positive class instead.
 
     Attributes:
-        score_function: Function `(y_true, y_pred_or_score, pos_label=...)`.
-        response_methods: Estimator methods supplying the prediction.
+        function: Function `(y_true, y_pred_or_score, pos_label=...)`.
+        methods: Estimator methods supplying the prediction.
     """
 
-    score_function: Callable[..., float] = metrics.f1_score
-    response_methods: tuple[str, ...] = ("predict",)
+    function: Callable[..., float] = metrics.f1_score
+    methods: tuple[str, ...] = ("predict",)
 
     def scorer(self, positive: Any = None) -> Any:
         """Builds a scorer bound to `positive` (stock scorer if unknown).
@@ -123,9 +123,9 @@ class PositiveLabelMetric(Metric):
         if positive is None:
             return super().scorer(None)
         return metrics.make_scorer(
-            self.score_function,
-            greater_is_better=self.greater_is_better,
-            response_method=cast("Any", self.response_methods),
+            self.function,
+            greater_is_better=self.maximize,
+            response_method=cast("Any", self.methods),
             pos_label=positive,
         )
 
@@ -138,13 +138,13 @@ class Formula(Metric):
     a module-level function that those processes can import.
 
     Attributes:
-        score_function: Function `(y_true, y_pred) -> float`.
-        response_method: What the estimator supplies to the function:
+        function: Function `(y_true, y_pred) -> float`.
+        method: What the estimator supplies to the function:
             `predict`, `predict_proba` or `decision_function`.
     """
 
-    score_function: Callable[..., float] = metrics.accuracy_score
-    response_method: str = "predict"
+    function: Callable[..., float] = metrics.accuracy_score
+    method: str = "predict"
 
     def weightable(self) -> bool:
         """Returns whether the user function takes `sample_weight`.
@@ -152,9 +152,7 @@ class Formula(Metric):
         Returns:
             True if the user function has a ``sample_weight`` parameter.
         """
-        return (
-            "sample_weight" in inspect.signature(self.score_function).parameters
-        )
+        return "sample_weight" in inspect.signature(self.function).parameters
 
     def scorer(
         self,
@@ -169,7 +167,7 @@ class Formula(Metric):
             A scorer wrapping the user function.
         """
         return metrics.make_scorer(
-            self.score_function,
-            greater_is_better=self.greater_is_better,
-            response_method=self.response_method,
+            self.function,
+            greater_is_better=self.maximize,
+            response_method=self.method,
         )

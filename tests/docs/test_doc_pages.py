@@ -117,7 +117,7 @@ def test_the_core_leaves_a_new_family_semantics_to_its_adapter():
 
 def test_status_limits_renames_and_new_refusals_are_where_the_page_says():
     # Enforces website/src/pages/docs/migrations.astro:15.
-    families = capabilities.Registry.seed().list_model_families()
+    families = capabilities.Registry.seed().inventory()
     assert families
     for family in families:
         assert isinstance(family.status, capabilities.Status)
@@ -181,7 +181,7 @@ def test_a_release_decision_names_its_differences_or_blocks():
             notes=" ",
         )
     blocked = signoff(review.Verdict.BLOCKED).sign("release-key")
-    assert blocked.verify_signature("release-key")
+    assert blocked.verify("release-key")
     assert not blocked.accepted("abc1234", kinds, "release-key")
 
 
@@ -255,7 +255,7 @@ def test_a_valid_signature_proves_neither_custody_rotation_nor_review():
     assert "operator" not in retired.to_dict()
     # A validly signed review that is not approved is not a release.
     blocked = signoff(review.Verdict.BLOCKED).sign("release-key")
-    assert blocked.verify_signature("release-key")
+    assert blocked.verify("release-key")
     assert not blocked.accepted("abc1234", list(review.Kind), "release-key")
 
 

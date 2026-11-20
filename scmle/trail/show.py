@@ -65,7 +65,7 @@ def render(directory: str | Path) -> str:
         its digest. A folder without ``trail.json`` raises
         `FileNotFoundError`.
     """
-    document = records.read_json(Path(directory) / records.TRAIL_FILE)
+    document = records.read(Path(directory) / records.TRAIL_FILE)
     lines = [
         f"Trail for {document['model']} v{document['version']}",
         f"charter {document['charter_hash']}",

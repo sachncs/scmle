@@ -153,7 +153,7 @@ def authenticate(
         ArtifactError: If the bundle is unauthenticated, signed but no key is
             set to check it, lacks its model file, or a checksum differs.
     """
-    authentic = seal.verify_signature(root, signing_key, snapshot.text)
+    authentic = seal.verify(root, signing_key, snapshot.text)
     if not authentic and not trusted:
         raise errors.ArtifactError(
             "refusing to load an unauthenticated bundle: it is pickle-"
@@ -393,9 +393,7 @@ class Archive(core.Core):
             joblib.dump(self.novelty, novelty_path)
             files[layout.NOVELTY_FILE] = layout.shasum(novelty_path)
 
-    def write_interval_members(
-        self, root: pathlib.Path, files: dict[str, str]
-    ) -> None:
+    def annex(self, root: pathlib.Path, files: dict[str, str]) -> None:
         """Writes the quantile, CV+, coverage, shift-weight and history members.
 
         A stale history file is deleted when the bundle has no history.
@@ -409,21 +407,21 @@ class Archive(core.Core):
             quantile_path = root / layout.QUANTILE_FILE
             joblib.dump(self.quantile, quantile_path)
             files[layout.QUANTILE_FILE] = layout.shasum(quantile_path)
-        if self.cv_plus is not None:
+        if self.plus is not None:
             cv_plus_path = root / layout.CV_PLUS_FILE
-            joblib.dump(self.cv_plus, cv_plus_path)
+            joblib.dump(self.plus, cv_plus_path)
             files[layout.CV_PLUS_FILE] = layout.shasum(cv_plus_path)
-        if self.coverage_report is not None:
+        if self.report is not None:
             coverage_path = root / layout.COVERAGE_FILE
             coverage_path.write_text(
-                json.dumps(self.coverage_report, sort_keys=True),
+                json.dumps(self.report, sort_keys=True),
                 encoding="utf-8",
                 newline="\n",
             )
             files[layout.COVERAGE_FILE] = layout.shasum(coverage_path)
-        if self.shift_weights is not None:
+        if self.weights is not None:
             shift_path = root / layout.SHIFT_WEIGHTS_FILE
-            joblib.dump(self.shift_weights, shift_path)
+            joblib.dump(self.weights, shift_path)
             files[layout.SHIFT_WEIGHTS_FILE] = layout.shasum(shift_path)
         if self.history is not None:
             history_path = root / layout.HISTORY_FILE
@@ -463,7 +461,7 @@ class Archive(core.Core):
             layout.SCHEMA_FILE: layout.shasum(schema_path),
         }
         self.persist(root, files)
-        self.write_interval_members(root, files)
+        self.annex(root, files)
         info = dataclasses.replace(
             self.info, format=layout.BUNDLE_FORMAT, files=files
         )
@@ -490,7 +488,7 @@ class Archive(core.Core):
         return root
 
     @classmethod
-    def rotate_signing_key(
+    def rotate(
         cls,
         directory: str | pathlib.Path,
         current_key: str | bytes,
@@ -535,7 +533,7 @@ class Archive(core.Core):
             raise errors.ArtifactError(
                 "cannot rotate an incomplete model bundle"
             ) from error
-        if not seal.verify_signature(root, old, manifest_text):
+        if not seal.verify(root, old, manifest_text):
             raise errors.ArtifactError(
                 "cannot rotate an unauthenticated model bundle"
             )
@@ -555,7 +553,7 @@ class Archive(core.Core):
                 handle.flush()
                 os.fsync(handle.fileno())
             pathlib.Path(temporary_name).replace(signature_path)
-            durability.sync_directory(signature_path.parent)
+            durability.flush(signature_path.parent)
         except Exception:
             with contextlib.suppress(FileNotFoundError):
                 pathlib.Path(temporary_name).unlink()
@@ -614,7 +612,7 @@ class Archive(core.Core):
                 + "; ".join(problems),
                 {
                     "mismatches": problems,
-                    "environment_lock": info.environment_lock(),
+                    "environment_lock": info.lock(),
                 },
             )
         reference, history, calibrator, calibrated, detector = hydrate(
@@ -634,7 +632,7 @@ class Archive(core.Core):
             detector,
             intervals,
         )
-        loaded.cv_plus = cv_plus_models
-        loaded.shift_weights = stored_weights
-        loaded.coverage_report = stored_coverage
+        loaded.plus = cv_plus_models
+        loaded.weights = stored_weights
+        loaded.report = stored_coverage
         return loaded

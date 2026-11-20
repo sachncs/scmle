@@ -268,7 +268,7 @@ class Replay(Chain):
                 already used by a claim or a hypothesis.
         """
         self.guard()
-        claim_id = scmle.contracts.evidence.require_text(
+        claim_id = scmle.contracts.evidence.require(
             str(body["claim_id"]), "claim_id"
         )
         if claim_id in self.claims or claim_id in self.hypotheses:
@@ -277,13 +277,11 @@ class Replay(Chain):
             )
         self.claims[claim_id] = {
             "claim_id": claim_id,
-            "kind": scmle.contracts.evidence.require_text(
-                str(body["kind"]), "kind"
-            ),
-            "statement": scmle.contracts.evidence.require_text(
+            "kind": scmle.contracts.evidence.require(str(body["kind"]), "kind"),
+            "statement": scmle.contracts.evidence.require(
                 str(body["statement"]), "statement"
             ),
-            "sha256": scmle.contracts.evidence.require_text(
+            "sha256": scmle.contracts.evidence.require(
                 str(body["sha256"]), "sha256"
             ),
         }

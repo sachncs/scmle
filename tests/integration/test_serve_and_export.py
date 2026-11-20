@@ -33,7 +33,7 @@ def saved(tmp_path_factory):
     frame["y"] = (frame.a + frame.b > 0).astype(int)
     root = tmp_path_factory.mktemp("served")
     result = support.make_project(
-        frame, "y", time_budget=300, output_dir=root / "runs"
+        frame, "y", budget=300, directory=root / "runs"
     ).run()
     result.bundle.save(root / "bundle")
     frame.drop(columns="y").to_csv(root / "rows.csv", index=False)
@@ -232,7 +232,7 @@ def test_health_reports_the_model_version_and_checksum(saved):
     finally:
         adapter.stop()
 
-    assert health["model_version"] == model.info.model_version
+    assert health["model_version"] == model.info.version
     assert (
         health["model_sha256"]
         == model.info.files[scmle.artifacts.bundle.MODEL_FILE]
@@ -262,7 +262,7 @@ def test_an_unsigned_bundle_is_not_served_unless_trusted(saved):
 
     with pytest.raises(errors.ArtifactError, match="unauthenticated"):
         cli.Serve().execute(
-            cli.build_parser().parse_args(["serve", str(root / "bundle")])
+            cli.build().parse_args(["serve", str(root / "bundle")])
         )
 
 

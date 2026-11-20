@@ -17,7 +17,7 @@ so no key can name another tenant's object:
   a backend that ignored the prefix cannot leak another tenant's listing.
 
 Symbolic links inside a local root are refused by
-`objectstore.LocalObjectStore.locate`, which closes the remaining route from
+`objectstore.Disk.locate`, which closes the remaining route from
 one tenant's directory into another's.
 
 Stores written before namespacing keep their objects at the root. `adopt`
@@ -142,7 +142,7 @@ class Tenancy(objectstore.Depot):
             )
         return self.prefix + key
 
-    def strip(self, meta: objectstore.ObjectMeta) -> objectstore.ObjectMeta:
+    def strip(self, meta: objectstore.Metadata) -> objectstore.Metadata:
         """Maps metadata from underneath back to this tenant's key.
 
         Args:
@@ -165,7 +165,7 @@ class Tenancy(objectstore.Depot):
         *,
         if_absent: bool = False,
         if_version: str | None = None,
-    ) -> objectstore.ObjectMeta:
+    ) -> objectstore.Metadata:
         """See `Depot.put`; the key is confined to the namespace.
 
         Args:
@@ -184,7 +184,7 @@ class Tenancy(objectstore.Depot):
             )
         )
 
-    def get(self, key: str) -> tuple[bytes, objectstore.ObjectMeta]:
+    def get(self, key: str) -> tuple[bytes, objectstore.Metadata]:
         """See `Depot.get`; the key is confined to the namespace.
 
         Args:
@@ -196,7 +196,7 @@ class Tenancy(objectstore.Depot):
         data, meta = self.inner.get(self.place(key))
         return data, self.strip(meta)
 
-    def head(self, key: str) -> objectstore.ObjectMeta:
+    def head(self, key: str) -> objectstore.Metadata:
         """See `Depot.head`; the key is confined to the namespace.
 
         Args:
@@ -207,8 +207,8 @@ class Tenancy(objectstore.Depot):
         """
         return self.strip(self.inner.head(self.place(key)))
 
-    def list_objects(self, prefix: str = "") -> list[objectstore.ObjectMeta]:
-        """See `Depot.list_objects`; only this tenant's objects are listed.
+    def catalog(self, prefix: str = "") -> list[objectstore.Metadata]:
+        """See `Depot.catalog`; only this tenant's objects are listed.
 
         Args:
             prefix: Key prefix within the namespace; empty for every object.
@@ -218,7 +218,7 @@ class Tenancy(objectstore.Depot):
         """
         if prefix:
             self.place(prefix.removesuffix("/"))
-        found = self.inner.list_objects(self.prefix + prefix)
+        found = self.inner.catalog(self.prefix + prefix)
         return [self.strip(meta) for meta in found]
 
     def delete(self, key: str, *, if_version: str | None = None) -> None:
@@ -247,7 +247,7 @@ class Tenancy(objectstore.Depot):
                 destination, or the original changed during the move.
         """
         moved = []
-        for meta in self.inner.list_objects():
+        for meta in self.inner.catalog():
             if meta.key.split("/", 1)[0].lower() == ROOT:
                 continue
             data, current = self.inner.get(meta.key)

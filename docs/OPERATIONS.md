@@ -111,12 +111,12 @@ tuned to a result:
 | telemetry_spool | 30 s | 0 samples | destination back to spool drained (duplicates possible) |
 | job_state | 60 s | 0 completed steps | killed run continued, lease wait included |
 
-`faults.run_all()` runs eleven faults against the real local service (the
+`faults.rehearse()` runs eleven faults against the real local service (the
 generated `serve.py` as a subprocess), the local object-store and metrics
 emulators, a real ledger writer and a real workflow executor, and records for
 each component the measured RTO and RPO and how they were measured. In
 `bad_release` the revisions are local processes behind a control plane that
-implements the `ControlPlane` interface, so the release registry's promote,
+implements the `Platform` interface, so the release registry's promote,
 confirm, restore and rollback logic runs for real against them.
 
 Not run: the rollback to a managed revision on a hosted platform, a zone or

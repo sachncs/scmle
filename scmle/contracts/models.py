@@ -69,44 +69,44 @@ class Capabilities:
 
     Attributes:
         tasks: Supported task types.
-        sparse_input: Accepts sparse matrices.
+        sparse: Accepts sparse matrices.
         probabilities: Provides `predict_proba` for classification.
-        native_categorical: The pipeline can hand it high-cardinality
+        categorical: The pipeline can hand it high-cardinality
             columns as integer codes marked categorical (the adapter
             implements `nominals`).
-        handles_missing: Handles missing values natively.
+        missing: Handles missing values natively.
         early_stopping: Supports early stopping.
-        needs_scaling: Benefits from standardized inputs.
+        scaling: Benefits from standardized inputs.
         serializable: Can be persisted in a bundle.
         incremental: Can keep learning from batches (`partial_fit`), so it
             can train on data larger than memory.
-        stream_only: Built for streamed training; planned only when
+        streaming: Built for streamed training; planned only when
             `data.training` is `stream`.
         gpu: Can train on a GPU.
         standalone: Can be a screening candidate on its own (False for
             meta-models assembled from other candidates).
-        max_rows: Largest dataset it is practical on, if any.
+        scale: Largest dataset it is practical on, if any.
         cost: Relative training cost from 1 (cheap) to 5 (expensive).
-        memory_factor: Peak training memory as a multiple of the size of the
+        factor: Peak training memory as a multiple of the size of the
             numeric training matrix (rows x features x 8 bytes); the planner
             rejects models whose estimate exceeds the memory limit.
     """
 
     tasks: frozenset[tasks.Task]
-    sparse_input: bool = False
+    sparse: bool = False
     probabilities: bool = True
-    native_categorical: bool = False
-    handles_missing: bool = False
+    categorical: bool = False
+    missing: bool = False
     early_stopping: bool = False
-    needs_scaling: bool = False
+    scaling: bool = False
     serializable: bool = True
     incremental: bool = False
-    stream_only: bool = False
+    streaming: bool = False
     gpu: bool = False
     standalone: bool = True
-    max_rows: int | None = None
+    scale: int | None = None
     cost: int = 1
-    memory_factor: float = 1.0
+    factor: float = 1.0
 
 
 class Model(abc.ABC):
@@ -121,30 +121,30 @@ class Model(abc.ABC):
     Attributes:
         name: Unique registry name.
         family: Coarse family used for reporting (linear, tree, ...).
-        capability_family: Optional release-boundary identity. When absent,
+        boundary: Optional release-boundary identity. When absent,
             the coarse family is used for capability resolution.
-        auto_candidate: Whether the adapter enters automatic model search.
+        candidate: Whether the adapter enters automatic model search.
             Experimental adapters can be selected through an explicit project
             opt-in without silently changing the beta candidate set.
         capabilities: Declared capabilities.
         requires: Importable modules needed at build time.
-        search_space: Tunable hyperparameters, or None if not tunable.
-        conformance_params: Build parameters the conformance suite should use
+        space: Tunable hyperparameters, or None if not tunable.
+        params: Build parameters the conformance suite should use
             for adapters that cannot build without them (meta-models).
-        monotonic_param: Name of the estimator parameter that takes one
+        param: Name of the estimator parameter that takes one
             monotonic sign per input column, or None when the model cannot
             enforce monotonic constraints.
     """
 
     name: str
     family: str
-    capability_family: str | None = None
-    auto_candidate: bool = True
+    boundary: str | None = None
+    candidate: bool = True
     capabilities: Capabilities
     requires: tuple[str, ...] = ()
-    search_space: search.Space | None = None
-    conformance_params: Mapping[str, Any] | None = None
-    monotonic_param: str | None = None
+    space: search.Space | None = None
+    params: Mapping[str, Any] | None = None
+    param: str | None = None
 
     @abc.abstractmethod
     def build(
@@ -252,10 +252,10 @@ class Model(abc.ABC):
             return f"missing dependency: {', '.join(self.requires)}"
         if (
             row_count is not None
-            and caps.max_rows is not None
-            and row_count > caps.max_rows
+            and caps.scale is not None
+            and row_count > caps.scale
         ):
-            return f"dataset too large ({row_count} > {caps.max_rows} rows)"
+            return f"dataset too large ({row_count} > {caps.scale} rows)"
         return None
 
 

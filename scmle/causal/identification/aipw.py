@@ -363,7 +363,7 @@ class Estimate:
         high: Upper interval limit.
         level: Confidence level.
         n: Rows scored (after trimming).
-        n_input: Rows offered.
+        received: Rows offered.
         overlap: The overlap report on the scored rows.
         population: Words naming the estimand actually estimated.
         nuisance_digest: Digest of the frozen models.
@@ -376,7 +376,7 @@ class Estimate:
     high: float
     level: float
     n: int
-    n_input: int
+    received: int
     overlap: dict[str, Any]
     population: str
     nuisance_digest: str
@@ -509,7 +509,7 @@ def estimate(
         high=theta + z * se,
         level=level,
         n=n,
-        n_input=len(frame),
+        received=len(frame),
         overlap=propensities(e, t, matrix),
         population=population,
         nuisance_digest=nuisances.digest,
@@ -547,7 +547,7 @@ class Difference:
         return dataclasses.asdict(self)
 
 
-def difference_in_means(
+def contrast(
     frame: pandas.DataFrame, treatment: str, outcome: str, level: float = 0.95
 ) -> Difference:
     """Computes the treated minus control mean with the Neyman variance.

@@ -16,7 +16,7 @@ TODAY = datetime.date(2026, 11, 10)
 
 
 def book():
-    return deployment_ledger.DeploymentLedger.create(
+    return deployment_ledger.Ledger.create(
         None,
         charter_hash="c" * 64,
         policy={},
@@ -41,7 +41,7 @@ def signed(key=KEY, **changes):
 
 
 def guard(keys=None, today=TODAY):
-    return envelope.Guard(book(), today=lambda: today, verification_keys=keys)
+    return envelope.Guard(book(), today=lambda: today, keys=keys)
 
 
 # ---- envelope --------------------------------------------------------------
@@ -60,7 +60,7 @@ def test_a_refusal_names_the_action_and_reason():
 def test_a_grant_is_spent_once_and_recorded_first():
     keeper = guard()
     calls = []
-    keeper.on_write = lambda: calls.append(1)
+    keeper.observer = lambda: calls.append(1)
     keeper.grant(signed())
     assert keeper.remaining("e1") == {"train_challenger": 1}
     used = keeper.authorize(envelope.Action.TRAIN_CHALLENGER, "v1:s", {"b": 7})
@@ -129,7 +129,7 @@ def test_verification_keys_check_the_grant_and_every_use():
     with pytest.raises(envelope.RefusedError, match="does not verify"):
         keeper.grant(signed(key="stranger"))
     keeper.grant(signed())
-    keeper.verification_keys = {}
+    keeper.keys = {}
     assert keeper.invalidity(keeper.ledger.envelopes["e1"]) == (
         "its signature does not verify"
     )
@@ -182,7 +182,7 @@ def manifest(
 
 
 def trial(seen, status=experiments.Termination.OK):
-    return types.SimpleNamespace(observed_access=seen, status=status)
+    return types.SimpleNamespace(access=seen, status=status)
 
 
 def faithful(split):
@@ -194,7 +194,7 @@ def faithful(split):
 
 def test_observed_access_matching_the_manifest_is_clean():
     split = types.SimpleNamespace(manifest=manifest())
-    out = ledger.observed_access(split, [trial(faithful(split))])
+    out = ledger.access(split, [trial(faithful(split))])
     assert out == {
         "folds_checked": 2,
         "folds_mismatched": 0,
@@ -206,7 +206,7 @@ def test_observed_access_counts_mismatches_and_extra_folds():
     split = types.SimpleNamespace(manifest=manifest())
     seen = faithful(split)
     wrong = [seen[1], seen[0], seen[0]]
-    out = ledger.observed_access(split, [trial(wrong)])
+    out = ledger.access(split, [trial(wrong)])
     assert out == {
         "folds_checked": 3,
         "folds_mismatched": 3,
@@ -216,7 +216,7 @@ def test_observed_access_counts_mismatches_and_extra_folds():
 
 def test_overlapping_partitions_count_as_test_rows_seen():
     split = types.SimpleNamespace(manifest=manifest(test=(12,)))
-    out = ledger.observed_access(split, [])
+    out = ledger.access(split, [])
     assert out["test_rows_seen"] is True
     assert out["folds_checked"] == 0
 

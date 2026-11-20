@@ -10,21 +10,21 @@ from scmle.rehearsal.faults import release
 from scmle.rehearsal.faults import service
 
 SCENARIOS: dict[str, Callable[[], recovery.Outcome]] = {
-    "process_kill": crashes.process_kill,
+    "process_kill": crashes.process,
     "unhealthy_container_rolling_restart": service.restart,
     "invalid_credentials": service.invalid_credentials,
-    "lost_object_store_access": outages.object_store_loss,
+    "lost_object_store_access": outages.disconnect,
     "dependency_outage": outages.blackout,
-    "corrupted_bundle": service.corrupted_bundle,
+    "corrupted_bundle": service.bundle,
     "incompatible_schema": service.incompatible_schema,
-    "bad_release": release.bad_release,
-    "job_interruption": crashes.job_interruption,
+    "bad_release": release.release,
+    "job_interruption": crashes.resume,
     "audit_log_continuity": crashes.resilience,
     "secret_rotation_recovery": service.rekey,
 }
 
 
-def run_all(only: list[str] | None = None) -> dict[str, Any]:
+def rehearse(only: list[str] | None = None) -> dict[str, Any]:
     """Runs the local scenarios of the fault catalogue and builds the report.
 
     Args:

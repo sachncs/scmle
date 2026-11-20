@@ -55,11 +55,11 @@ class Network(models.Model):
         tasks.STANDARD_TASKS,
         probabilities=True,
         early_stopping=True,
-        needs_scaling=True,
+        scaling=True,
         gpu=True,
-        max_rows=500_000,
+        scale=500_000,
         cost=4,
-        memory_factor=4.0,
+        factor=4.0,
     )
 
     def __init__(
@@ -137,7 +137,7 @@ class Network(models.Model):
             "random_state": seed,
             **(params or {}),
         }
-        if task.is_classification:
+        if task.classification:
             return estimators.TorchClassifier(**settings)
         return estimators.TorchRegressor(**settings)
 
@@ -198,7 +198,7 @@ FT_TRANSFORMER = Network(
     contract=contracts.TABULAR_TRANSFORMER_CONTRACT,
     auto_candidate=False,
     capabilities=dataclasses.replace(
-        Network.capabilities, max_rows=100_000, cost=5, memory_factor=8.0
+        Network.capabilities, scale=100_000, cost=5, factor=8.0
     ),
     search_space=search.Space(
         (
@@ -234,17 +234,17 @@ class Jepa(Network):
 
     name = "torch_jepa"
     family = "deep_learning"
-    capability_family = "jepa"
+    boundary = "jepa"
     contract = contracts.TABULAR_JEPA_CONTRACT
-    auto_candidate = False
+    candidate = False
     requires: tuple[str, ...] = ("torch",)
     capabilities = dataclasses.replace(
         Network.capabilities,
-        max_rows=100_000,
+        scale=100_000,
         cost=5,
-        memory_factor=8.0,
+        factor=8.0,
     )
-    search_space = search.Space(
+    space = search.Space(
         (
             search.Choice("hidden_size", (32, 64, 128)),
             search.Choice("embedding_size", (16, 32, 64)),
@@ -335,7 +335,7 @@ class Jepa(Network):
         head_params.update({"hidden_sizes": (32,), "random_state": seed})
         head = (
             estimators.TorchClassifier(**head_params)
-            if task.is_classification
+            if task.classification
             else estimators.TorchRegressor(**head_params)
         )
         return pipeline.Pipeline(
@@ -373,7 +373,7 @@ class Jepa(Network):
             An unfitted pipeline: the feature front end followed by the JEPA
             representation and prediction head.
         """
-        options = preprocessing.default_options(plan, self)
+        options = preprocessing.default(plan, self)
         front_end = preprocessing.frontend(plan, options)
         representation_pipeline = self.build(task, seed, params)
         return pipeline.Pipeline(
@@ -386,7 +386,7 @@ class Keras(Network):
 
     name = "keras_mlp"
     requires = ("torch", "keras")
-    search_space = search.Space(
+    space = search.Space(
         (
             search.Choice(
                 "hidden_sizes", ((64,), (128,), (128, 64), (256, 128))
@@ -422,7 +422,7 @@ class Keras(Network):
                 f"{self.name}: install the 'deeplearning' extra (torch, keras)"
             )
         settings: dict[str, Any] = {"random_state": seed, **(params or {})}
-        if task.is_classification:
+        if task.classification:
             return estimators.KerasClassifier(**settings)
         return estimators.KerasRegressor(**settings)
 
@@ -442,9 +442,9 @@ class Tabpfn(models.Model):
         tasks.STANDARD_TASKS,
         probabilities=True,
         gpu=True,
-        max_rows=foundation.MAX_ROWS,
+        scale=foundation.MAX_ROWS,
         cost=5,
-        memory_factor=6.0,
+        factor=6.0,
     )
 
     def objection(
@@ -509,7 +509,7 @@ class Tabpfn(models.Model):
                 f"{self.name}: install the 'tabpfn' extra (tabpfn)"
             )
         settings: dict[str, Any] = {"random_state": seed, **(params or {})}
-        if task.is_classification:
+        if task.classification:
             return estimators.TabPfnClassifier(**settings)
         return estimators.TabPfnRegressor(**settings)
 

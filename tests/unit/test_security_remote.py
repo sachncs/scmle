@@ -107,9 +107,7 @@ def test_a_verifier_accepts_a_token_signed_by_a_fetched_key():
     documents = Documents()
     with serve(documents) as base:
         provider(base, documents)
-        keys = remote.Keystore(
-            f"{base}/jwks.json", clock=clock, allow_http=True
-        )
+        keys = remote.Keystore(f"{base}/jwks.json", clock=clock, http=True)
         check = tokens.Verifier(
             keys,
             support_identity.ISSUER,
@@ -128,7 +126,7 @@ def test_the_key_set_is_cached_until_the_ttl_and_then_refreshed():
     with serve(documents) as base:
         provider(base, documents)
         keys = remote.Keystore(
-            f"{base}/jwks.json", ttl=60, clock=clock, allow_http=True
+            f"{base}/jwks.json", ttl=60, clock=clock, http=True
         )
         keys.get("rs-k1")
         keys.get("rs-k1")
@@ -146,9 +144,9 @@ def test_rotation_is_picked_up_for_an_unknown_kid_but_not_every_call():
         keys = remote.Keystore(
             f"{base}/jwks.json",
             ttl=3600,
-            min_refresh=10,
+            cooldown=10,
             clock=clock,
-            allow_http=True,
+            http=True,
         )
         provider(base, documents, keys=("k1", "k2"))
         with pytest.raises(tokens.TokenError):
@@ -169,9 +167,9 @@ def test_a_key_set_that_cannot_be_fetched_fails_closed_after_max_stale(caplog):
         keys = remote.Keystore(
             f"{base}/jwks.json",
             ttl=60,
-            max_stale=300,
+            staleness=300,
             clock=clock,
-            allow_http=True,
+            http=True,
         )
         documents.broken = True
         clock.now += 100  # past the ttl, inside max_stale: the cache serves
@@ -188,7 +186,7 @@ def test_a_key_set_that_cannot_be_fetched_fails_closed_after_max_stale(caplog):
 def test_the_first_fetch_must_succeed():
     documents = Documents()
     with serve(documents) as base, pytest.raises(errors.ConfigError):
-        remote.Keystore(f"{base}/jwks.json", allow_http=True)
+        remote.Keystore(f"{base}/jwks.json", http=True)
 
 
 def revoke(documents, **fields):
@@ -209,11 +207,9 @@ def test_two_replicas_see_a_revocation_within_the_ttl():
         revoke(documents)
         replicas = []
         for ignored in range(2):
-            keys = remote.Keystore(
-                f"{base}/jwks.json", clock=clock, allow_http=True
-            )
+            keys = remote.Keystore(f"{base}/jwks.json", clock=clock, http=True)
             lists = remote.Revocations(
-                f"{base}/revoked.json", ttl=30, clock=clock, allow_http=True
+                f"{base}/revoked.json", ttl=30, clock=clock, http=True
             )
             replicas.append(
                 tokens.Verifier(
@@ -245,15 +241,13 @@ def test_a_revocation_source_that_stays_down_stops_accepting_tokens():
     with serve(documents) as base:
         provider(base, documents)
         revoke(documents)
-        keys = remote.Keystore(
-            f"{base}/jwks.json", clock=clock, allow_http=True
-        )
+        keys = remote.Keystore(f"{base}/jwks.json", clock=clock, http=True)
         lists = remote.Revocations(
             f"{base}/revoked.json",
             ttl=30,
-            max_stale=120,
+            staleness=120,
             clock=clock,
-            allow_http=True,
+            http=True,
         )
         check = tokens.Verifier(
             keys,
@@ -287,6 +281,4 @@ def test_a_malformed_revocation_document_is_refused():
     with serve(documents) as base:
         documents.routes["/revoked.json"] = ["not", "an", "object"]
         with pytest.raises(errors.ConfigError):
-            remote.Revocations(
-                f"{base}/revoked.json", clock=clock, allow_http=True
-            )()
+            remote.Revocations(f"{base}/revoked.json", clock=clock, http=True)()

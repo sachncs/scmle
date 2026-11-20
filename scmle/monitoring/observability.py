@@ -90,12 +90,12 @@ def evaluate(
         exceeds its threshold.
     """
     observed_timestamp = parse(observed_at, "observed_at")
-    cutoff = observed_timestamp - datetime.timedelta(days=policy.retention_days)
+    cutoff = observed_timestamp - datetime.timedelta(days=policy.retention)
     observed_signals = {metric.kind for metric in metrics}
     missing = tuple(
         sorted(
             signal.value
-            for signal in policy.required_signals
+            for signal in policy.signals
             if signal not in observed_signals
         )
     )
@@ -108,7 +108,7 @@ def evaluate(
             expired.append(metric.name)
         if timestamp > observed_timestamp:
             future.append(metric.name)
-        threshold = policy.alert_thresholds.get(metric.name)
+        threshold = policy.thresholds.get(metric.name)
         if threshold is not None and metric.value > threshold:
             breaches.append(
                 {

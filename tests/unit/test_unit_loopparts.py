@@ -100,9 +100,9 @@ def test_opening_arms_monitors_and_saves_state(tmp_path):
     assert state["ledger_head"] == loop.ledger.head
     assert state["tau"] == 0.5
     assert state["batch"] == 0
-    assert loop.coverage_test is None
+    assert loop.test is None
     assert loop.halted is False
-    assert loop.guard.on_write == loop.save_state
+    assert loop.guard.observer == loop.save
 
 
 def test_an_infinite_tau_is_saved_as_none(tmp_path):
@@ -116,19 +116,19 @@ def test_restore_reads_back_the_saved_state(tmp_path):
     loop.tau = 0.25
     loop.batch = 3
     loop.queue = ["x"]
-    loop.save_state()
+    loop.save()
     again = open_loop(tmp_path, make_policy(coverage=0.9))
     assert (again.tau, again.batch, again.queue) == (0.25, 3, ["x"])
-    assert again.coverage_test is not None
-    assert again.halted_by_state is False
+    assert again.test is not None
+    assert again.frozen is False
 
 
 def test_a_state_behind_the_ledger_halts(tmp_path):
     loop = open_loop(tmp_path)
     loop.ledger.commit(deployment_ledger.ALARM, {"batch": 0})
     again = open_loop(tmp_path)
-    assert again.halted_by_state is True
-    assert again.halt_reason == terms.HALT_STATE
+    assert again.frozen is True
+    assert again.reason == terms.HALT_STATE
     assert again.halted is True
 
 
@@ -138,7 +138,7 @@ def test_recheck_halts_in_memory_when_the_ledger_was_edited(tmp_path):
     path = loop.ledger.path
     path.write_text(path.read_text().replace('"r', '"R', 1))
     assert loop.recheck() is False
-    assert loop.halt_reason == terms.HALT_LEDGER
+    assert loop.reason == terms.HALT_LEDGER
     assert loop.halted is True
 
 
@@ -159,7 +159,7 @@ def test_escalate_writes_once_per_question(tmp_path):
     )
     assert other.question["action"] == "edit_ledger_or_register_late"
     assert other.proposed_default == "keep"
-    assert [e.id for e in loop.pending_escalations()] == [first.id, other.id]
+    assert [e.id for e in loop.survey()] == [first.id, other.id]
 
 
 def test_suspend_halts_once_and_calls_the_incident_hook(tmp_path):
@@ -172,7 +172,7 @@ def test_suspend_halts_once_and_calls_the_incident_hook(tmp_path):
         "reason": "why",
         "batch": 0,
     }
-    assert loop.halt_reason == "why"
+    assert loop.reason == "why"
     assert reasons == ["why"]
     size = len(loop.ledger.rows)
     loop.suspend("again", {})
@@ -188,7 +188,7 @@ def test_reply_records_an_approval_as_attested(tmp_path):
     assert out.decision is deployment_ledger.Reply.APPROVE
     assert out.safe_default_applies is False
     assert kinds_of(loop)[-1] == "attestation"
-    assert loop.pending_escalations() == []
+    assert loop.survey() == []
 
 
 def test_a_rejecting_reply_keeps_the_safe_default(tmp_path):
@@ -251,14 +251,14 @@ def test_expire_closes_escalations_after_the_timeout(tmp_path):
 def test_perform_runs_only_with_an_attestation(tmp_path):
     loop = open_loop(tmp_path)
     calls = []
-    with pytest.raises(never_list.AttestationRequired):
+    with pytest.raises(never_list.UnattestedError):
         loop.perform(
             never_list.Forbidden.REOPEN_SEALED,
             {"s": 1},
             lambda: calls.append(1),
         )
     assert calls == []
-    pending = loop.pending_escalations()[-1]
+    pending = loop.survey()[-1]
     loop.reply(pending.id, reply_to(pending))
     out = loop.perform(
         never_list.Forbidden.REOPEN_SEALED, {"s": 1}, lambda: "done"
@@ -311,7 +311,7 @@ def test_performativity_needs_a_bypass_slice(tmp_path):
 
 def test_label_mechanism_file_states_feedback_is_unverified(tmp_path):
     loop = open_loop(tmp_path)
-    loop.write_label_mechanism()
+    loop.declare()
     record = json.loads(
         (loop.directory / terms.LABEL_MECHANISM_FILE).read_text()
     )
@@ -321,7 +321,7 @@ def test_label_mechanism_file_states_feedback_is_unverified(tmp_path):
     assert record["bypass_rate"] == 0.0
     assert record["outcome_window"] == 0
     declared = open_loop(tmp_path / "b", make_policy(bypass=0.1))
-    declared.write_label_mechanism()
+    declared.declare()
     again = json.loads(
         (declared.directory / terms.LABEL_MECHANISM_FILE).read_text()
     )
@@ -362,13 +362,13 @@ def test_propose_does_nothing_without_a_crossed_watch(tmp_path):
     loop = open_loop(tmp_path)
     assert loop.propose() is None
     loop.surveil("old")
-    assert loop.rollback_watch["previous"] == "old"
+    assert loop.watch["previous"] == "old"
     assert loop.propose() is None
 
 
 def test_a_crossed_watch_proposes_a_rollback_and_raises_tau(tmp_path):
     loop = open_loop(tmp_path, make_policy(tau=0.98, step=0.05))
-    loop.rollback_watch = {"previous": "old", "process": crossed()}
+    loop.watch = {"previous": "old", "process": crossed()}
     loop.batch = 3
     assert loop.propose() is None
     assert loop.tau == 1.0
@@ -378,10 +378,10 @@ def test_a_crossed_watch_proposes_a_rollback_and_raises_tau(tmp_path):
         "batch": 2,
         "tau_before": 0.98,
     }
-    loop.rollback_watch = {"previous": "old", "process": crossed()}
+    loop.watch = {"previous": "old", "process": crossed()}
     second = loop.propose()
     assert second.question["action"] == "two_consecutive_rollbacks"
-    assert loop.consecutive_rollbacks == 2
+    assert loop.rollbacks == 2
 
 
 def test_drain_stops_at_a_challenger_without_evidence_or_budget(tmp_path):
@@ -405,7 +405,7 @@ def test_drain_promotes_a_challenger_with_enough_evidence(tmp_path):
     assert loop.drain() is None
     assert kinds_of(loop)[-1] == "promotion_proposal"
     assert loop.ledger.rows[-1]["body"]["name"] == "c1"
-    assert loop.consecutive_rollbacks == 0
+    assert loop.rollbacks == 0
 
 
 # ---- alarms ----------------------------------------------------------------
@@ -418,7 +418,7 @@ def test_a_naive_alarm_on_unverified_labels_halts(tmp_path):
     newest = loop.alert(3, verified=False)
     assert newest.question["action"] == "l1_alarm_unverified_label_mechanism"
     assert loop.naive_flag is False
-    assert loop.halt_reason == terms.HALT_UNVERIFIED
+    assert loop.reason == terms.HALT_UNVERIFIED
     assert loop.ledger.halted is True
     alarm_row = next(r for r in loop.ledger.rows if r["kind"] == "alarm")
     assert alarm_row["body"]["rule"] == "L1_naive"
@@ -451,7 +451,7 @@ def test_a_selective_alarm_halts_and_escalates(tmp_path):
     loop.selective = types.SimpleNamespace(test=crossed())
     newest = loop.alert(1, verified=True)
     assert newest.question["action"] == "halt_selective_risk"
-    assert loop.halt_reason == terms.HALT_SELECTIVE
+    assert loop.reason == terms.HALT_SELECTIVE
     assert isinstance(loop.selective, sequential_tests.Tripwire)
 
 
@@ -465,17 +465,17 @@ def test_nothing_crossed_raises_no_alarm(tmp_path):
 
 def test_screen_escalates_coverage_and_novelty(tmp_path):
     loop = open_loop(tmp_path, make_policy(coverage=0.9))
-    loop.coverage_test = crossed()
-    loop.novelty_test = crossed()
+    loop.test = crossed()
+    loop.novelty = crossed()
     newest = loop.screen(5)
     assert newest.question["action"] == "out_of_support_rate_above_bound"
-    actions = [e.question["action"] for e in loop.pending_escalations()]
+    actions = [e.question["action"] for e in loop.survey()]
     assert actions == [
         "coverage_below_nominal",
         "out_of_support_rate_above_bound",
     ]
-    assert isinstance(loop.coverage_test, sequential_tests.Mixture)
-    assert isinstance(loop.novelty_test, sequential_tests.Mixture)
+    assert isinstance(loop.test, sequential_tests.Mixture)
+    assert isinstance(loop.novelty, sequential_tests.Mixture)
 
 
 # ---- intake ----------------------------------------------------------------
@@ -501,12 +501,12 @@ def test_observe_routes_logs_and_advances_the_batch(tmp_path):
     assert body["answered"] == 3
     assert body["tau"] == 0.5
     assert body["halted"] is False
-    assert loop.pending_batches[0]["ids"] == ["c0", "c1", "c2"]
+    assert loop.batches[0]["ids"] == ["c0", "c1", "c2"]
     generated = loop.observe(
         pandas.DataFrame({"x": [1, 2]}), [0, 0], ["a", "b"]
     )
     assert generated.batch == 1
-    assert loop.pending_batches[1]["ids"] == ["b1-0", "b1-1"]
+    assert loop.batches[1]["ids"] == ["b1-0", "b1-1"]
 
 
 def test_a_halted_loop_escalates_every_case(tmp_path):
@@ -531,7 +531,7 @@ def test_mature_matches_known_ids_only(tmp_path):
         challengers={"k": {"c0": 0.0, "zz": 1.0}},
     )
     assert matched == 2
-    record = loop.pending_batches[0]
+    record = loop.batches[0]
     assert record["labels"] == {"c0": 0.1, "c1": 0.2}
     assert record["covered"] == {"c0": 1.0}
     assert record["challenger_losses"] == {"k": {"c0": 0.0}}
@@ -540,7 +540,7 @@ def test_mature_matches_known_ids_only(tmp_path):
 def test_feed_needs_enough_matured_labels(tmp_path):
     loop = open_loop(tmp_path)
     loop.observe(frame(4), [0] * 4, ["go"] * 4)
-    record = loop.pending_batches[0]
+    record = loop.batches[0]
     loop.mature({"c0": 0.1, "c1": 0.1})
     assert loop.feed(record) is False
     loop.mature({"c2": 0.1})
@@ -557,12 +557,12 @@ def test_amend_policy_refuses_unknown_fields(tmp_path):
     with pytest.raises(
         errors.InputError, match=r"unknown policy fields: \['x'\]"
     ):
-        loop.amend_policy(x=1)
+        loop.amend(x=1)
 
 
 def test_tightening_a_threshold_needs_no_attestation(tmp_path):
     loop = open_loop(tmp_path)
-    updated = loop.amend_policy(target=0.5, promotion={"delta": 0.1})
+    updated = loop.amend(target=0.5, promotion={"delta": 0.1})
     assert updated.target == 0.5
     assert updated.promotion == {"alpha": "1/20", "delta": 0.1}
     body = loop.ledger.rows[-1]["body"]["policy_amendment"]
@@ -573,23 +573,23 @@ def test_tightening_a_threshold_needs_no_attestation(tmp_path):
 
 def test_loosening_or_changing_the_charter_needs_an_attestation(tmp_path):
     loop = open_loop(tmp_path)
-    with pytest.raises(never_list.AttestationRequired):
-        loop.amend_policy(target=0.7)
+    with pytest.raises(never_list.UnattestedError):
+        loop.amend(target=0.7)
     assert loop.policy.target == 0.6
-    question = loop.pending_escalations()[-1].question
+    question = loop.survey()[-1].question
     assert question["action"] == "relax_threshold"
     assert question["detail"] == {"field": "target", "from": 0.6, "to": 0.7}
-    with pytest.raises(never_list.AttestationRequired):
-        loop.amend_policy(fallback="approve")
-    assert loop.pending_escalations()[-1].question["action"] == "change_charter"
+    with pytest.raises(never_list.UnattestedError):
+        loop.amend(fallback="approve")
+    assert loop.survey()[-1].question["action"] == "change_charter"
 
 
 def test_turning_on_the_coverage_test_is_amended_or_gated(tmp_path):
     loop = open_loop(tmp_path)
-    with pytest.raises(never_list.AttestationRequired):
-        loop.amend_policy(coverage=0.9)
+    with pytest.raises(never_list.UnattestedError):
+        loop.amend(coverage=0.9)
     assert loop.policy.coverage is None
-    question = loop.pending_escalations()[-1].question
+    question = loop.survey()[-1].question
     assert question["action"] == "change_charter"
     assert question["detail"] == {"field": "coverage", "from": None, "to": 0.9}
 
@@ -624,10 +624,10 @@ def test_each_never_list_action_needs_its_attestation(
         calls.append(1)
 
     call = (detail, do) if method in ACTION_FIRST else (do, detail)
-    with pytest.raises(never_list.AttestationRequired):
+    with pytest.raises(never_list.UnattestedError):
         getattr(loop, method)(*call)
     assert calls == []
-    assert loop.pending_escalations()[-1].question["action"] == action
+    assert loop.survey()[-1].question["action"] == action
 
 
 def test_move_champion_through_an_attached_guard_skips_the_attestation(
@@ -643,11 +643,11 @@ def test_move_champion_through_an_attached_guard_skips_the_attestation(
         attach=lambda g, s: moved.append(("attach", s)),
     )
     loop.intercept(registry)
-    assert loop.move_champion(registry, "m", 2, approval=None) == "ok"
+    assert loop.move(registry, "m", 2, approval=None) == "ok"
     assert moved == [("attach", SCOPE), ("m", 2)]
     registry.guard = None
-    with pytest.raises(never_list.AttestationRequired):
-        loop.move_champion(registry, "m", 3, approval=None)
+    with pytest.raises(never_list.UnattestedError):
+        loop.move(registry, "m", 3, approval=None)
 
 
 # ---- cycle -----------------------------------------------------------------
@@ -677,7 +677,7 @@ def test_step_without_labels_reports_insufficient_labels(tmp_path):
     assert out.status == terms.INSUFFICIENT_LABELS
     assert out.escalation is None
     assert out.events == ()
-    assert loop.pending_batches == []
+    assert loop.batches == []
 
 
 def test_step_with_enough_labels_is_ok(tmp_path):

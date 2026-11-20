@@ -153,8 +153,8 @@ def test_a_pytorch_model_family_trains_packages_and_predicts(
     project = support.make_project(
         binary_frame,
         "y",
-        time_budget=600,
-        output_dir=tmp_path,
+        budget=600,
+        directory=tmp_path,
         enforcement="hard",
         models=tasks.Candidates(),
     )
@@ -168,7 +168,7 @@ def test_a_pytorch_model_family_trains_packages_and_predicts(
     assert result.selected_model == "torch_residual"
     features = binary_frame.drop(columns="y").head(20)
     result.save(tmp_path / "net")
-    reloaded = scmle.api.predict.load_model(tmp_path / "net", trusted=True)
+    reloaded = scmle.api.predict.load(tmp_path / "net", trusted=True)
     numpy.testing.assert_array_equal(
         reloaded.predict(features), result.predict(features)
     )
@@ -181,8 +181,8 @@ def test_serving_limits_are_checked_for_a_pytorch_candidate(
     project = support.make_project(
         binary_frame,
         "y",
-        time_budget=600,
-        output_dir=tmp_path,
+        budget=600,
+        directory=tmp_path,
         enforcement="hard",
         models=tasks.Candidates(),
         selection=tasks.Selection(max_model_mb=50.0),
@@ -192,7 +192,7 @@ def test_serving_limits_are_checked_for_a_pytorch_candidate(
     result = project.run(only_torch)
 
     assert result.selected_model == "torch_mlp"
-    log = (result.run_dir / "diagnostics" / "decision_log.json").read_text()
+    log = (result.directory / "diagnostics" / "decision_log.json").read_text()
     assert "within serving limits" in log
 
 

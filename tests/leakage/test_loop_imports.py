@@ -5,7 +5,7 @@ Modules of the loop (`scmle.governance.loop`, `escalation`, `never_list`,
 `labels`) may not import the custody package, the vault, the splitters module
 or the orchestrator, directly or through any scmle module they import. A
 sealed set therefore reaches them only as a callable handed over by a person's
-attested request (`Loop.reopen_sealed`), never through an import.
+attested request (`Loop.reopen`), never through an import.
 """
 
 import pytest

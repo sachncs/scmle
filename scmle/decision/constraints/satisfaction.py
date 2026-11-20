@@ -1,7 +1,7 @@
 """The satisfaction test of a fairness constraint on the final table.
 
 `satisfy` takes rows as independent and bounds every gap with Newcombe's
-interval; `cluster_satisfaction_test` resamples whole clusters of rows.
+interval; `resample` resamples whole clusters of rows.
 Either is a claim tested once: the upper bound of the gap must be at most
 `max_gap`, and a group too small for a rate's denominator makes the test
 `not_assessable`.
@@ -36,20 +36,20 @@ class Satisfaction:
     Attributes:
         status: `satisfied`, `not_satisfied` or `not_assessable`.
         criterion: The criterion tested.
-        max_gap: The declared bound.
-        point_gap: Largest observed gap (None when not assessable).
-        upper_bound: Upper bound of the gap, or None.
-        small_groups: Groups whose denominators were too small.
+        gap: The declared bound.
+        estimate: Largest observed gap (None when not assessable).
+        upper: Upper bound of the gap, or None.
+        small: Groups whose denominators were too small.
         alpha: Total level. The row-wise test splits it over group pairs
             and rates; the cluster test uses it for the bootstrap bound.
     """
 
     status: str
     criterion: str
-    max_gap: float
-    point_gap: float | None
-    upper_bound: float | None
-    small_groups: tuple[str, ...]
+    gap: float
+    estimate: float | None
+    upper: float | None
+    small: tuple[str, ...]
     alpha: float
 
     KEYS: ClassVar[records.Migration] = records.Migration(
@@ -268,7 +268,7 @@ def bound(
     return point, max(point, float(numpy.quantile(resampled, 1.0 - alpha)))
 
 
-def cluster_satisfaction_test(
+def resample(
     y: ArrayLike,
     acts: ArrayLike,
     groups: ArrayLike,

@@ -166,7 +166,7 @@ def make_certificate(**overrides):
 def test_certificate_rates_and_round_trip():
     certificate = make_certificate()
     assert certificate.recall == pytest.approx(0.8)
-    assert certificate.false_alarm_rate == pytest.approx(0.02)
+    assert certificate.fallout == pytest.approx(0.02)
     restored = qualification.Certificate.from_dict(
         json.loads(json.dumps(certificate.to_dict()))
     )
@@ -176,20 +176,20 @@ def test_certificate_rates_and_round_trip():
 def test_certificate_wilson_lower_bound_matches_a_known_value():
     # Wilson 95% interval for 8 successes in 10 trials: (0.4902, 0.9433).
     certificate = make_certificate(planted=10, detected=8)
-    assert certificate.recall_lower_bound(0.95) == pytest.approx(
+    assert certificate.bound(0.95) == pytest.approx(
         0.4902, abs=1e-3
     )
 
 
 def test_certificate_lower_bound_is_below_the_point_estimate():
     certificate = make_certificate()
-    assert certificate.recall_lower_bound() < certificate.recall
+    assert certificate.bound() < certificate.recall
 
 
 def test_certificate_edge_cases():
     perfect = make_certificate(planted=50, detected=50, alarms=0)
-    assert perfect.recall_lower_bound() < 1.0
-    assert perfect.false_alarm_rate == 0.0
+    assert perfect.bound() < 1.0
+    assert perfect.fallout == 0.0
 
 
 def test_certificate_rejects_impossible_counts():
@@ -205,4 +205,4 @@ def test_certificate_rejects_impossible_counts():
 
 def test_lower_bound_rejects_bad_confidence():
     with pytest.raises(ValueError, match="confidence"):
-        make_certificate().recall_lower_bound(1.0)
+        make_certificate().bound(1.0)

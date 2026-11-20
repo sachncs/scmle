@@ -130,7 +130,7 @@ class Monotonicity(Refiner):
             )
         kept = []
         for adapter in candidates:
-            if adapter.monotonic_param or adapter.family == "baseline":
+            if adapter.param or adapter.family == "baseline":
                 kept.append(adapter)
             else:
                 decisions.append(
@@ -140,7 +140,7 @@ class Monotonicity(Refiner):
                         "cannot enforce monotonic constraints",
                     )
                 )
-        if not any(a.monotonic_param for a in kept):
+        if not any(a.param for a in kept):
             raise errors.BlockedError(
                 "no available model can enforce the monotonic constraints; "
                 "install the 'boosting' extra or relax the constraints"
@@ -337,7 +337,7 @@ class Tuning(Refiner):
             The candidates, unchanged.
         """
         search = context.spec.budgeted()
-        tunable = [a.name for a in candidates if a.search_space is not None]
+        tunable = [a.name for a in candidates if a.space is not None]
         if search.top_models == 0 or not tunable:
             decisions.append(
                 experiments.Decision(
@@ -488,7 +488,7 @@ class Planner:
                 a.name,
                 experiments.Edict.INCLUDE,
                 (
-                    f"{'experimental-only ' if not a.auto_candidate else ''}"
+                    f"{'experimental-only ' if not a.candidate else ''}"
                     f"{a.family} candidate (cost {a.capabilities.cost})"
                 ),
             )

@@ -104,7 +104,7 @@ def test_a_detector_that_flags_everything_is_not_certified():
     )
     outcome = result.outcomes[0]
     assert outcome.certificate.recall == 1.0
-    assert outcome.certificate.false_alarm_rate == 1.0
+    assert outcome.certificate.fallout == 1.0
     assert outcome.passed is False
 
 

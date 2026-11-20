@@ -492,7 +492,7 @@ class Catalog:
             )
             + "\n"
         ).encode("utf-8")
-        durability.write_atomically(path, encoded)
+        durability.write(path, encoded)
 
     @classmethod
     def read(cls, path: str | pathlib.Path) -> Self:

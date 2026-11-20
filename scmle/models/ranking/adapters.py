@@ -19,7 +19,7 @@ class Pointwise(models.Model):
     name = "pointwise_ranker"
     family = "boosting"
     capabilities = models.Capabilities(
-        RANKING, handles_missing=True, cost=3, memory_factor=3.0
+        RANKING, missing=True, cost=3, factor=3.0
     )
 
     def build(
@@ -44,7 +44,7 @@ class Pointwise(models.Model):
             )
         )
 
-    search_space = search.Space(
+    space = search.Space(
         (
             search.Real("learning_rate", 0.02, 0.3, log=True),
             search.Integer("max_leaf_nodes", 8, 64),
@@ -62,9 +62,9 @@ class Ranker(models.Model):
     library = ""
     family = "boosting"
     capabilities = models.Capabilities(
-        RANKING, handles_missing=True, cost=3, memory_factor=3.0
+        RANKING, missing=True, cost=3, factor=3.0
     )
-    search_space = search.Space(
+    space = search.Space(
         (
             search.Real("learning_rate", 0.02, 0.3, log=True),
             search.Integer("max_leaves", 8, 64),
@@ -134,10 +134,8 @@ class Linear(models.Model):
 
     name = "pairwise_linear_ranker"
     family = "linear"
-    capabilities = models.Capabilities(RANKING, needs_scaling=True, cost=2)
-    search_space = search.Space(
-        (search.Real("penalty", 1e-3, 100.0, log=True),)
-    )
+    capabilities = models.Capabilities(RANKING, scaling=True, cost=2)
+    space = search.Space((search.Real("penalty", 1e-3, 100.0, log=True),))
 
     def build(
         self,

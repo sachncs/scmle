@@ -118,7 +118,7 @@ def build(
     }
 
 
-def source_timestamp() -> str:
+def timestamp() -> str:
     """Returns the build time as `SOURCE_DATE_EPOCH` or the current time.
 
     The environment variable is used only when it holds digits; any other
@@ -176,7 +176,7 @@ def catalogue(
         distributions,
         run_id=bundle_digest,
         software_version=software_version,
-        observed_at=observed_at or source_timestamp(),
+        observed_at=observed_at or timestamp(),
     )
     model_ref = f"model:{model_name}@{bundle_digest}"
     image_ref = f"image:{base_image}"

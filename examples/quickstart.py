@@ -35,7 +35,7 @@ def main() -> None:
     LOGGER.setLevel(logging.INFO)
     data = make_dataset()
     project = scmle.api.project.Project(
-        data, "churn", metric="roc_auc", time_budget=120
+        data, "churn", metric="roc_auc", budget=120
     )
     LOGGER.info(project.plan().summary())
     result = project.run()

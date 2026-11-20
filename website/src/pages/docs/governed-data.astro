@@ -3,7 +3,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import DocTable from "../../components/DocTable.astro";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const backends = [
-  ["Directory", "<code>LocalObjectStore(root)</code>", "none"],
+  ["Directory", "<code>Disk(root)</code>", "none"],
 ];
 const policies = [
   ["<code>fail</code>", "<code>GateError</code> with the report; nothing continues."],

@@ -244,9 +244,9 @@ def test_the_survey_profiles_the_rows_and_names_the_duplicate_groups(
         spec, frame, manifest, tasks.Task.BINARY
     )
     assert isinstance(portrait, scmle.contracts.data.Portrait)
-    assert portrait.feature_plan.text == (document.TEXT,)
-    assert rows.KEY not in portrait.column_statistics
-    notes = " ".join(portrait.quality_findings)
+    assert portrait.plan.text == (document.TEXT,)
+    assert rows.KEY not in portrait.statistics
+    notes = " ".join(portrait.quality)
     assert "document: 2 of 42 rows in 1 cohorts" in notes
     assert "1 documents hold sensitive values" in notes
 
@@ -304,27 +304,27 @@ def test_a_document_run_trains_tests_explains_and_packages(
     run = project.Project(
         str(root),
         "label",
-        time_budget=120,
+        budget=120,
         modality="document",
         models=support.optin(tasks.Task.BINARY),
         enforcement="cooperative",
-        output_dir=tmp_path / "runs",
+        directory=tmp_path / "runs",
     ).run()
     assert run.state == "COMPLETED"
     manifest = json.loads(
-        (run.run_dir / "validation_manifest.json").read_text(encoding="utf-8")
+        (run.directory / "validation_manifest.json").read_text(encoding="utf-8")
     )
     assert manifest["strategy"] == "group"
     profile = json.loads(
-        (run.run_dir / "dataset_profile.json").read_text(encoding="utf-8")
+        (run.directory / "dataset_profile.json").read_text(encoding="utf-8")
     )
     assert json.dumps(profile).count(rows.KEY) == 0
     assert len(set(run.plan.candidates)) > 2
     evaluation = json.loads(
-        (run.run_dir / "evaluation.json").read_text(encoding="utf-8")
+        (run.directory / "evaluation.json").read_text(encoding="utf-8")
     )
     assert evaluation["task"] == "binary_classification"
-    assert (run.run_dir / "explanations").is_dir()
+    assert (run.directory / "explanations").is_dir()
 
 
 def test_a_numeric_document_label_is_a_regression(tmp_path, monkeypatch):
@@ -340,11 +340,11 @@ def test_a_numeric_document_label_is_a_regression(tmp_path, monkeypatch):
     run = project.Project(
         str(path),
         "score",
-        time_budget=120,
+        budget=120,
         modality="document",
         models=support.optin(tasks.Task.REGRESSION),
         enforcement="cooperative",
-        output_dir=tmp_path / "runs",
+        directory=tmp_path / "runs",
     ).run()
     assert run.state == "COMPLETED"
     assert run.plan.task == "regression"
@@ -364,5 +364,5 @@ def test_a_short_corpus_keeps_its_text_column_as_text(tmp_path):
     portrait = document.DOCUMENT.survey(
         spec, frame, manifest, tasks.Task.BINARY
     )
-    assert portrait.feature_plan.text == (document.TEXT,)
-    assert document.TEXT not in portrait.feature_plan.dropped
+    assert portrait.plan.text == (document.TEXT,)
+    assert document.TEXT not in portrait.plan.dropped

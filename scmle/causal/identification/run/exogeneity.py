@@ -64,7 +64,7 @@ class Instrument(Estimator):
         fit = self.fit(self.x, 0.95)
         self.weak = fit.weak
         self.design = {
-            "first_stage_F_on_x": fit.f_stat,
+            "first_stage_F_on_x": fit.fstat,
             "threshold": iv.F_THRESHOLD,
             "weak_on_x": fit.weak,
             "overidentification": (
@@ -87,7 +87,7 @@ class Instrument(Estimator):
         """
         fit = self.fit(c, level)
         self.weak = self.weak or fit.weak
-        self.design["first_stage_F_on_c"] = fit.f_stat
+        self.design["first_stage_F_on_c"] = fit.fstat
         return Est(
             fit.estimate,
             fit.se,
@@ -142,7 +142,7 @@ class Instrument(Estimator):
         return tests
 
 
-class RdEstimator(Estimator):
+class Discontinuity(Estimator):
     """Sharp regression discontinuity with a bandwidth frozen on `X`."""
 
     name = "rd"
@@ -187,12 +187,12 @@ class RdEstimator(Estimator):
         self.bandwidth = fit.bandwidth
         self.design = {
             "bandwidth": fit.bandwidth,
-            "density_p_on_x": fit.density_p,
-            "alpha_density": self.alpha_falsify,
+            "density_p_on_x": fit.density,
+            "alpha_density": self.falsify,
             "n_left_in_bandwidth": fit.n_left,
             "n_right_in_bandwidth": fit.n_right,
         }
-        if fit.density_p < self.alpha_falsify:
+        if fit.density < self.falsify:
             self.refusal = (
                 "the density check rejects at the cutoff on X: possible "
                 "manipulation of the running variable"
@@ -245,7 +245,7 @@ class RdEstimator(Estimator):
         """
         fit = self.fit(c, level)
         return Est(
-            fit.bias_corrected,
+            fit.corrected,
             fit.se,
             fit.low,
             fit.high,
@@ -268,7 +268,7 @@ class RdEstimator(Estimator):
         """
         fit = self.fit(c, level, outcome)
         return Est(
-            fit.bias_corrected,
+            fit.corrected,
             fit.se,
             fit.low,
             fit.high,

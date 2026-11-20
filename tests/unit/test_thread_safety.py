@@ -233,10 +233,10 @@ def small_project(data, output_dir):
     return support.make_project(
         data,
         "y",
-        output_dir=output_dir,
+        directory=output_dir,
         seed=7,
         search=tasks.Search(top_models=1, configs_per_model=2),
-        time_budget=300,
+        budget=300,
     )
 
 
@@ -249,7 +249,7 @@ def sequential_results(tmp_path_factory):
         result = small_project(frame(seed=index), root / str(index)).run()
         out.append(
             (
-                result.selected_model,
+                result.model,
                 result.evaluation["metrics"],
                 result.predict(frame(60, seed=99)),
             )
@@ -263,10 +263,10 @@ def test_parallel_projects_match_sequential_runs(tmp_path, sequential_results):
     def work(index):
         result = small_project(frame(seed=index), shared).run()
         return (
-            result.selected_model,
+            result.model,
             result.evaluation["metrics"],
             result.predict(frame(60, seed=99)),
-            result.run_dir,
+            result.directory,
         )
 
     outcomes, failures = run_together(2, work)
@@ -334,7 +334,7 @@ def test_concurrent_load_model_and_predict(trained, tmp_path):
     want = trained.predict(data)
 
     def work(index):
-        model = scmle.api.predict.load_model(directory, trusted=True)
+        model = scmle.api.predict.load(directory, trusted=True)
         return model.predict(data), scmle.api.predict.predict(
             directory, data, trusted=True
         )
@@ -374,7 +374,7 @@ def test_concurrent_store_open_migrates_once(tmp_path):
     legacy_database(path)
 
     def work(index):
-        return stores.SqliteExperimentStore(path)
+        return stores.Sqlite(path)
 
     opened, failures = run_together(THREADS, work)
 
@@ -383,7 +383,7 @@ def test_concurrent_store_open_migrates_once(tmp_path):
 
 
 def test_concurrent_store_writes_are_all_recorded(tmp_path):
-    store = stores.SqliteExperimentStore(tmp_path / "tracking.sqlite")
+    store = stores.Sqlite(tmp_path / "tracking.sqlite")
     per_thread = 20
 
     def work(index):
@@ -393,11 +393,11 @@ def test_concurrent_store_writes_are_all_recorded(tmp_path):
             store.transcribe(
                 run_id,
                 experiments.Trial(
-                    trial_id=f"t{number}",
-                    model_name="m",
+                    identifier=f"t{number}",
+                    model="m",
                     status=experiments.Termination.OK,
                     metric="accuracy",
-                    score_mean=0.5,
+                    score=0.5,
                 ),
             )
             store.revise(run_id, state="RUNNING")
@@ -428,7 +428,7 @@ def two_bundles(trained, tmp_path_factory):
 def test_concurrent_registry_register_assigns_distinct_versions(
     two_bundles, tmp_path
 ):
-    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
+    store = scmle.governance.registry.Registry(tmp_path / "registry")
 
     def work(index):
         return store.register(
@@ -448,7 +448,7 @@ def test_concurrent_registry_register_assigns_distinct_versions(
 
 
 def test_concurrent_registry_same_bundle_registers_once(two_bundles, tmp_path):
-    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
+    store = scmle.governance.registry.Registry(tmp_path / "registry")
 
     def work(index):
         return store.register("churn", two_bundles[0], trusted=True)
@@ -461,7 +461,7 @@ def test_concurrent_registry_same_bundle_registers_once(two_bundles, tmp_path):
 
 
 def test_concurrent_alias_moves_do_not_corrupt_the_index(two_bundles, tmp_path):
-    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
+    store = scmle.governance.registry.Registry(tmp_path / "registry")
     for index in range(len(two_bundles)):
         store.register("churn", two_bundles[index], trusted=True)
 
@@ -479,7 +479,7 @@ def test_concurrent_alias_moves_do_not_corrupt_the_index(two_bundles, tmp_path):
 
 
 def test_concurrent_lifecycle_state_writes(tmp_path):
-    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
+    store = scmle.governance.registry.Registry(tmp_path / "registry")
     manager = lifecycle.Maintainer(store, "churn", str(tmp_path / "w"))
 
     def work(index):
@@ -704,8 +704,8 @@ def test_bundle_remember_does_not_lose_rows():
 
     bundle.history = None
     bundle.assemble = Builder
-    bundle.read_frame = lambda data: data
-    bundle.history_lock = threading.RLock()
+    bundle.read = lambda data: data
+    bundle.lock = threading.RLock()
 
     def work(index):
         for number in range(30):

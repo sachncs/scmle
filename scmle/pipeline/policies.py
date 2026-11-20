@@ -131,7 +131,7 @@ def describe(gate: state.Progress, board: engine.Board) -> Review:
     )
     return Review(
         gate,
-        f"selected {selected.model_name}/{selected.strategy} "
-        f"(cv {selected.score_mean:.4f}); the test set is still locked",
+        f"selected {selected.model}/{selected.strategy} "
+        f"(cv {selected.score:.4f}); the test set is still locked",
         selected.to_dict(),
     )

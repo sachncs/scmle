@@ -33,7 +33,7 @@ def capability(resources: capabilities.Resources):
         key=capabilities.Coordinate(
             modality=capabilities.Modality.TABULAR,
             task=tasks.Task.BINARY,
-            model_family="baseline",
+            family="baseline",
             evaluation=capabilities.Evaluation.STANDARD,
             uncertainty=capabilities.Uncertainty.NONE,
             fairness=capabilities.Fairness.NONE,
@@ -41,12 +41,10 @@ def capability(resources: capabilities.Resources):
             inference=capabilities.Inference.LIBRARY,
         ),
         status=capabilities.Status.SUPPORTED,
-        required_extras=("core",),
+        extras=("core",),
         resources=resources,
-        failure_modes=("resource observation unavailable",),
-        evidence_links=(
-            "tests/integration/test_capability_resource_observation.py",
-        ),
+        modes=("resource observation unavailable",),
+        links=("tests/integration/test_capability_resource_observation.py",),
     )
 
 
@@ -58,10 +56,10 @@ def observation(
 ) -> resource_observation.Observation:
     """Build a fixed observation for tests without probing the host."""
     environment = capabilities.Environment(
-        available_extras=frozenset({"core"}),
-        cpu_cores=cpu_cores,
-        memory_gb=memory_gb,
-        disk_gb=disk_gb,
+        extras=frozenset({"core"}),
+        cores=cpu_cores,
+        memory=memory_gb,
+        disk=disk_gb,
     )
     return resource_observation.Observation(
         environment,
@@ -132,9 +130,9 @@ def test_bound_observation_is_used_by_the_capability_gate(monkeypatch):
     """A context-bound observation is applied by the existing gate call."""
     record = capability(
         capabilities.Resources(
-            cpu_cores=2,
-            memory_gb=4.0,
-            disk_gb=1.0,
+            cores=2,
+            memory=4.0,
+            disk=1.0,
         )
     )
     registry = capabilities.Registry((record,))
@@ -168,9 +166,9 @@ def test_unknown_declared_facts_fail_closed_and_are_persisted(
     """The planning gate rejects unknown facts after saving its evidence."""
     record = capability(
         capabilities.Resources(
-            cpu_cores=2,
-            memory_gb=4.0,
-            disk_gb=1.0,
+            cores=2,
+            memory=4.0,
+            disk=1.0,
         )
     )
     registry = capabilities.Registry((record,))

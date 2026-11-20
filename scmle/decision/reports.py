@@ -70,7 +70,7 @@ the net benefit (`everyone`, `useful`) and satisfaction (`gap`, `estimate`,
 REGISTRATION_EVENT = "decision_files"
 
 
-def file_digest(path: Path) -> str | None:
+def digest(path: Path) -> str | None:
     """Hash of a JSON file's canonical content, None if absent.
 
     The same SHA-256 of the canonical JSON as the claim ledger's `digest`;
@@ -103,10 +103,10 @@ def hashsums(folder: str | Path) -> dict[str, str | None]:
         A mapping from decision file name to its content digest, or None
         for a file that does not exist.
     """
-    return {name: file_digest(Path(folder) / name) for name in DECISION_FILES}
+    return {name: digest(Path(folder) / name) for name in DECISION_FILES}
 
 
-def policy_value(
+def value(
     layer: scmle.assurance.charter.decision.Layer,
     actions: numpy.ndarray,
     outcome: numpy.ndarray,
@@ -215,7 +215,7 @@ def fairness(
     return out
 
 
-def rollout_design(
+def plan(
     charter: contracts.Charter, base_rate: float
 ) -> tuple[dict[str, Any], rollout.Journal] | None:
     """The rollout plan's design record and its one-row decision log.
@@ -248,7 +248,7 @@ def rollout_design(
         "assignment or decision; the first level shown is illustrative",
     }
     if base_rate > 0.0 and base_rate + plan.delta < 1.0:
-        record["fixed_horizon_rows"] = design.fixed_horizon_rows(
+        record["fixed_horizon_rows"] = design.size(
             base_rate,
             plan.delta,
             alpha=float(plan.promotion),
@@ -272,7 +272,7 @@ def rollout_design(
     return record, log
 
 
-def decision_report(
+def report(
     charter: contracts.Charter,
     decision: Mapping[str, Any] | None,
     net_benefit: Mapping[str, Any] | None,

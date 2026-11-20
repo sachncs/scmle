@@ -163,7 +163,7 @@ class Cataloging(command.Command):
         return command.EXIT_OK
 
 
-class IngestCommand(command.Command):
+class Ingest(command.Command):
     """Profiles a SQLite source: catalog, keys, unit verdict and joins."""
 
     name = "ingest"

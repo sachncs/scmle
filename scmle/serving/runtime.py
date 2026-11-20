@@ -159,7 +159,7 @@ def settings(environ: Mapping[str, str]) -> dict[str, Any]:
         ),
         "on_null": environ.get("SCMLE_ON_NULL", "impute"),
         "on_unseen": environ.get("SCMLE_ON_UNSEEN", "report"),
-        "gateway": access.gateway_from_environment(environ),
+        "gateway": access.assemble(environ),
         "drain": (number(environ, "SCMLE_DRAIN_SECONDS", 0.0) or None),
     }
 
@@ -264,9 +264,9 @@ def prime(folder: pathlib.Path, environ: Mapping[str, str]) -> server.Loader:
         verified = verify.inspect(folder, environ)
         readiness.complete(
             guard.Phase.VERIFYING,
-            f"bundle {verified.bundle_digest}; "
-            f"signed={verified.bundle_signed}; "
-            f"provenance={verified.provenance_verified}",
+            f"bundle {verified.digest}; "
+            f"signed={verified.signed}; "
+            f"provenance={verified.verified}",
         )
         readiness.begin(guard.Phase.LOADING)
         model = bundle.Bundle.load(

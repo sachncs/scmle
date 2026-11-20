@@ -196,7 +196,7 @@ class Dag:
         for name, values in (("nodes", self.nodes), ("latent", self.latent)):
             qualification.tupled(values, name)
             for item in values:
-                evidence.require_text(item, name)
+                evidence.require(item, name)
             if list(values) != sorted(set(values)):
                 raise errors.InputError(f"{name} must be sorted and unique")
         qualification.tupled(self.edges, "edges")
@@ -213,8 +213,8 @@ class Dag:
         kids = successors(self.edges)
         if any(node in reach([node], kids) for node in self.nodes):
             raise errors.InputError("the graph has a cycle")
-        evidence.require_text(self.source, "source")
-        evidence.require_text(self.prompt, "prompt")
+        evidence.require(self.source, "source")
+        evidence.require(self.prompt, "prompt")
 
     @classmethod
     def build(

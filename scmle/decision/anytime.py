@@ -196,7 +196,7 @@ def grow(
     return result
 
 
-def log_wealth_paths(
+def accumulate(
     values: ArrayLike, stream: Stream, size: int = GRID_SIZE
 ) -> NDArray[numpy.float64]:
     """Computes log e-process paths for raw values, `(T,)` or `(R, T)`.
@@ -345,7 +345,7 @@ def fractional(level: float) -> float:
     return value
 
 
-def pseudo_outcomes(
+def transform(
     arm: ArrayLike,
     outcome: ArrayLike,
     assignment_prob: float,
@@ -486,8 +486,8 @@ def recentre(
         `outcome`.
     """
     y = numpy.asarray(outcome, dtype=float)
-    z = sign * pseudo_outcomes(arm, y, assignment_prob, centers(y))
-    return log_wealth_paths(z, deviations(assignment_prob, null, direction))
+    z = sign * transform(arm, y, assignment_prob, centers(y))
+    return accumulate(z, deviations(assignment_prob, null, direction))
 
 
 def contrasts(
@@ -539,7 +539,7 @@ def clamped(
     return Stream(-b, b, null, direction)
 
 
-def confidence_bound(
+def bound(
     values: ArrayLike,
     stream: Stream,
     alpha: float,
@@ -579,7 +579,7 @@ def confidence_bound(
         moved = dataclasses.replace(stream, null=null)
         if array.size == 0:
             return False
-        return float(log_wealth_paths(array, moved, size)[-1]) >= target
+        return float(accumulate(array, moved, size)[-1]) >= target
 
     span = inside[1] - inside[0]
     eps = 1e-9 * span

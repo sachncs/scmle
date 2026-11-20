@@ -49,7 +49,7 @@ def probe(data: bytes) -> None:
         raise RuntimeError("accepted a record that is not an object")
     if request.schema_version not in serving.SUPPORTED_VERSIONS:
         raise RuntimeError(f"accepted version {request.schema_version!r}")
-    digest = request.expected_schema_digest
+    digest = request.schema
     if digest is not None and not isinstance(digest, str):
         raise RuntimeError("accepted a digest that is not text")
 

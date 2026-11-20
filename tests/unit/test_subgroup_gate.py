@@ -27,28 +27,23 @@ def certificate(path, **entry):
 
 def test_without_a_certificate_the_family_is_descriptive(tmp_path):
     # Enforces website/src/pages/docs/qualification.astro:123.
-    gate = certified.subgroup_gate(run.stratify, tmp_path / "none.json")
+    gate = certified.gate(run.stratify, tmp_path / "none.json")
     assert gate.status == certified.DESCRIPTIVE
     assert "no subgroup certificate" in gate.reason
 
 
 def test_a_passing_current_certificate_makes_the_family_gating(tmp_path):
     # Enforces docs/ARTIFACTS.md:47.
-    gate = certified.subgroup_gate(
-        run.stratify, certificate(tmp_path / "c.json")
-    )
-    assert gate.status == certified.GATING and gate.min_rows == 200
+    gate = certified.gate(run.stratify, certificate(tmp_path / "c.json"))
+    assert gate.status == certified.GATING and gate.rows == 200
 
 
 def test_a_failed_or_stale_certificate_is_descriptive(tmp_path):
     # Enforces website/src/pages/docs/causal-decision.astro:41.
     missed = certificate(tmp_path / "m.json", passed=False)
     stale = certificate(tmp_path / "s.json", method_hash="0" * 64)
-    assert (
-        certified.subgroup_gate(run.stratify, missed).status
-        == certified.DESCRIPTIVE
-    )
-    gate = certified.subgroup_gate(run.stratify, stale)
+    assert certified.gate(run.stratify, missed).status == certified.DESCRIPTIVE
+    gate = certified.gate(run.stratify, stale)
     assert gate.status == certified.DESCRIPTIVE and "stale" in gate.reason
 
 

@@ -98,7 +98,7 @@ class Registry(catalog.Catalog):
         ):
             raise errors.KindError("environment must be Environment")
         if environment is None:
-            environment = self.runtime_environment
+            environment = self.environment
         statuses = (
             frozenset({axes.Status.SUPPORTED})
             if allowed_statuses is None
@@ -126,7 +126,7 @@ class Registry(catalog.Catalog):
             )
         if environment is not None:
             diagnostics.extend(self.audit(capability, environment, row_count))
-        elif row_count is not None or capability.resources.max_rows is not None:
+        elif row_count is not None or capability.resources.rows is not None:
             diagnostics.extend(self.audit(capability, None, row_count))
         return tuple(diagnostics)
 
@@ -144,7 +144,7 @@ class Registry(catalog.Catalog):
             catalogued, an entry for an unsupported modality or a disallowed
             family status.
         """
-        family = self.find(key.model_family)
+        family = self.find(key.family)
         family_status = None if family is None else family.status.value
         family_diagnostics = [
             declarations.Reason(
@@ -234,8 +234,7 @@ class Registry(catalog.Catalog):
         return {
             "schema_version": CAPABILITY_SCHEMA_VERSION,
             "model_families": [
-                declaration.to_dict()
-                for declaration in self.list_model_families()
+                declaration.to_dict() for declaration in self.inventory()
             ],
             "capabilities": [
                 capability.to_dict() for capability in self.catalogue()

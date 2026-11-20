@@ -31,9 +31,9 @@ def run(tmp_path, frame, **kwargs):
         frame,
         "grade",
         task="ranking",
-        query_column="query",
-        time_budget=300,
-        output_dir=tmp_path,
+        query="query",
+        budget=300,
+        directory=tmp_path,
         **kwargs,
     ).run()
 
@@ -46,7 +46,7 @@ def result(tmp_path_factory):
 def test_no_query_appears_in_both_development_and_locked_rows(result):
     frame = corpus()
     manifest = json.loads(
-        (result.run_dir / "validation_manifest.json").read_text()
+        (result.directory / "validation_manifest.json").read_text()
     )
 
     development = set(frame["query"].iloc[manifest["training"]])
@@ -58,8 +58,8 @@ def test_no_query_appears_in_both_development_and_locked_rows(result):
 
 def test_the_selected_ranker_beats_a_constant_ordering(result):
     assert result.evaluation["metrics"]["ndcg"] > 0.6
-    baseline = next(t for t in result.trials if t.model_name == "dummy")
-    assert result.evaluation["selected"]["score"] > baseline.score_mean
+    baseline = next(t for t in result.trials if t.model == "dummy")
+    assert result.evaluation["selected"]["score"] > baseline.score
 
 
 def test_the_bundle_orders_rows_within_each_query(result):
@@ -86,13 +86,13 @@ def test_non_integer_relevance_is_refused(tmp_path):
 def test_ranking_needs_a_query_column_and_others_forbid_one(tmp_path):
     with pytest.raises(ValueError, match="query_column"):
         support.make_project(
-            corpus(10, 5), "grade", task="ranking", output_dir=tmp_path
+            corpus(10, 5), "grade", task="ranking", directory=tmp_path
         )
     with pytest.raises(ValueError, match="query_column"):
         support.make_project(
             corpus(10, 5),
             "grade",
             task="regression",
-            query_column="query",
-            output_dir=tmp_path,
+            query="query",
+            directory=tmp_path,
         )

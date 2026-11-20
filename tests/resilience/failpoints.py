@@ -104,7 +104,7 @@ def files_of(store, prefixes=RESULT_PREFIXES):
     """Key to bytes of every object under the result prefixes."""
     found = {}
     for prefix in prefixes:
-        for meta in store.list_objects(prefix):
+        for meta in store.catalog(prefix):
             found[meta.key] = store.get(meta.key)[0]
     return found
 
@@ -154,7 +154,7 @@ class Reference:
 
 
 def reference_run(root, gated=False):
-    store = objectstore.LocalObjectStore(root)
+    store = objectstore.Disk(root)
     seed(store, gated)
     result = processor(store, gated).run()
     return Reference(files_of(store), store.get(STATE_KEY)[0], result)
@@ -259,9 +259,9 @@ class FailpointStore(objectstore.Depot):
     def head(self, key):
         return self.around("head", key, lambda: self.inner.head(key))
 
-    def list_objects(self, prefix=""):
+    def catalog(self, prefix=""):
         return self.around(
-            "list", prefix, lambda: self.inner.list_objects(prefix)
+            "list", prefix, lambda: self.inner.catalog(prefix)
         )
 
     def delete(self, key, *, if_version=None):

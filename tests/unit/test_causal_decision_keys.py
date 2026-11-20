@@ -48,7 +48,7 @@ CASES = {
         {"pooled_sign", "same_sign", "p_heterogeneity"},
     ),
     "gate": (
-        filled(certified.SubgroupGate),
+        filled(certified.Gate),
         {"rows"},
         {"min_rows"},
     ),

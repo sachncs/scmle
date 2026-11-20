@@ -100,13 +100,13 @@ def test_read_claims_refuses_unreadable_and_foreign_documents(tmp_path):
 
 def test_read_optional_returns_only_json_objects(tmp_path):
     path = tmp_path / "x.json"
-    assert claims_audit.read_optional(path) is None
+    assert claims_audit.read(path) is None
     path.write_text("[1]", encoding="utf-8")
-    assert claims_audit.read_optional(path) is None
+    assert claims_audit.read(path) is None
     path.write_text("{bad", encoding="utf-8")
-    assert claims_audit.read_optional(path) is None
+    assert claims_audit.read(path) is None
     path.write_text('{"a": 1}', encoding="utf-8")
-    assert claims_audit.read_optional(path) == {"a": 1}
+    assert claims_audit.read(path) == {"a": 1}
 
 
 def test_column_of_names_the_feature_or_none(run):
@@ -317,13 +317,13 @@ def test_registered_claims_without_reports_fall_back_to_unverified(tmp_path):
 def test_ledger_head_findings_are_exact(run):
     ledger = claims_audit.rehydrate(run)
     document = claims_audit.recall(run)
-    assert claims_audit.check_ledger_head(document, ledger) == finding(
+    assert claims_audit.anchor(document, ledger) == finding(
         "claims file names the ledger head",
         "pass",
         f"head {ledger.head[:12]}",
     )
     document["heads"]["ledger"] = "0" * 64
-    assert claims_audit.check_ledger_head(document, ledger) == finding(
+    assert claims_audit.anchor(document, ledger) == finding(
         "claims file names the ledger head",
         "fail",
         "confirmed_claims.json names a different ledger head",
@@ -552,16 +552,9 @@ def test_replay_tolerates_tiny_absolute_differences_only():
 def test_stage_two_record_problems_are_named_in_order():
     survivors = types.SimpleNamespace(sha256="s", hypotheses=("h1", "h2"))
     good = {"family": [], "family_sha256": "d", "survivors_sha256": "s"}
-    assert (
-        claims_audit.stage_two_record_problems(
-            good, survivors, {"h1", "h2"}, [], "d"
-        )
-        == []
-    )
+    assert claims_audit.screen(good, survivors, {"h1", "h2"}, [], "d") == []
     bad = {"family": ["h1"], "family_sha256": "x", "survivors_sha256": "y"}
-    assert claims_audit.stage_two_record_problems(
-        bad, survivors, {"h1", "h9"}, [], "d"
-    ) == [
+    assert claims_audit.screen(bad, survivors, {"h1", "h9"}, [], "d") == [
         "a withdrawn id is not a survivor",
         "family is not survivors minus withdrawn",
         "family hash",
@@ -656,17 +649,11 @@ def test_frozen_selection_problems_are_named():
     opened = {"event": "open"}
     document = {"digests": {"survivors": "s"}}
     names = ["selection_frozen", "open"]
-    assert (
-        claims_audit.frozen_selection_problem([frozen, opened], names, document)
-        is None
-    )
+    assert claims_audit.collate([frozen, opened], names, document) is None
     missing = "no single selection_frozen before the open"
+    assert claims_audit.collate([opened], ["open"], document) == missing
     assert (
-        claims_audit.frozen_selection_problem([opened], ["open"], document)
-        == missing
-    )
-    assert (
-        claims_audit.frozen_selection_problem(
+        claims_audit.collate(
             [frozen, frozen, opened],
             ["selection_frozen", "selection_frozen", "open"],
             document,
@@ -674,38 +661,29 @@ def test_frozen_selection_problems_are_named():
         == missing
     )
     assert (
-        claims_audit.frozen_selection_problem(
+        claims_audit.collate(
             [opened, frozen], ["open", "selection_frozen"], document
         )
         == missing
     )
     assert (
-        claims_audit.frozen_selection_problem(
+        claims_audit.collate(
             [frozen, opened], names, {"digests": {"survivors": "other"}}
         )
         == "frozen survivor hash differs from the claims"
     )
     bare = {"event": "selection_frozen"}
-    assert (
-        claims_audit.frozen_selection_problem([bare, opened], names, {}) is None
-    )
+    assert claims_audit.collate([bare, opened], names, {}) is None
     with_family = dict(document, second={"family_sha256": "f"})
     assert (
-        claims_audit.frozen_selection_problem(
-            [frozen, opened], names, with_family
-        )
+        claims_audit.collate([frozen, opened], names, with_family)
         == "frozen family hash differs from the claims"
     )
     matching = {
         "event": "selection_frozen",
         "detail": {"survivors_sha256": "s", "family_sha256": "f"},
     }
-    assert (
-        claims_audit.frozen_selection_problem(
-            [matching, opened], names, with_family
-        )
-        is None
-    )
+    assert claims_audit.collate([matching, opened], names, with_family) is None
 
 
 def write_custody(folder, events, key=KEY):
@@ -757,7 +735,7 @@ def test_custody_pass_counts_entries_and_a_wrong_key_fails(tmp_path):
         sealed.Journal(tmp_path / claims_audit.CUSTODY_FILE, "wrong-key")
     bad = claims_audit.custodial(tmp_path, document, "wrong-key")
     assert bad == finding(CUSTODY, "fail", str(caught.value))
-    decision = claims_audit.check_decision_files(tmp_path, "wrong-key")
+    decision = claims_audit.audit(tmp_path, "wrong-key")
     assert decision == finding(DECISION, "fail", str(caught.value))
     coverage = tmp_path / coverage_run.CLAIM_FILE
     coverage.write_text("{}", encoding="utf-8")
@@ -768,11 +746,11 @@ def test_custody_pass_counts_entries_and_a_wrong_key_fails(tmp_path):
 
 
 def test_decision_files_without_a_registration_are_an_older_run(tmp_path):
-    assert claims_audit.check_decision_files(tmp_path, KEY) is None
+    assert claims_audit.audit(tmp_path, KEY) is None
     write_custody(tmp_path, [("C", "sealed", {})])
-    assert claims_audit.check_decision_files(tmp_path, KEY) is None
+    assert claims_audit.audit(tmp_path, KEY) is None
     (tmp_path / reports.DECISION_FILES[0]).write_text("{}", encoding="utf-8")
-    assert claims_audit.check_decision_files(tmp_path, KEY) == finding(
+    assert claims_audit.audit(tmp_path, KEY) == finding(
         DECISION,
         "skipped",
         "the run registered no decision file hashes (older run)",
@@ -795,12 +773,12 @@ def test_decision_files_registration_counts_and_joins_problems(tmp_path):
             )
         ],
     )
-    assert claims_audit.check_decision_files(folder, KEY) == finding(
+    assert claims_audit.audit(folder, KEY) == finding(
         DECISION, "pass", "3 file(s) hash to the registration"
     )
     (folder / names[0]).write_text("{}", encoding="utf-8")
     (folder / names[1]).unlink()
-    failed = claims_audit.check_decision_files(folder, KEY)
+    failed = claims_audit.audit(folder, KEY)
     assert failed == finding(
         DECISION,
         "fail",
@@ -816,14 +794,14 @@ def test_decision_files_registration_counts_and_joins_problems(tmp_path):
             )
         ],
     )
-    assert claims_audit.check_decision_files(folder, KEY) == finding(
+    assert claims_audit.audit(folder, KEY) == finding(
         DECISION, "fail", "the decision files were registered twice"
     )
 
 
 def test_a_decision_registration_without_files_registers_nothing(tmp_path):
     write_custody(tmp_path, [("final_test", reports.REGISTRATION_EVENT, {})])
-    assert claims_audit.check_decision_files(tmp_path, KEY) == finding(
+    assert claims_audit.audit(tmp_path, KEY) == finding(
         DECISION, "pass", "0 file(s) hash to the registration"
     )
 
@@ -948,7 +926,7 @@ def test_attestations_are_skipped_without_both_files(run, tmp_path):
 def test_verify_reports_the_chain_step_exactly(run, tmp_path):
     result = claims_audit.verify(run, KEY)
     ledger = claims_audit.rehydrate(run)
-    assert result.run_dir == str(run)
+    assert result.directory == str(run)
     assert result.findings[0] == finding(
         CHAIN, "pass", f"{len(ledger.rows)} rows, head {ledger.head[:12]}"
     )
@@ -1036,13 +1014,13 @@ def test_registered_claim_step_is_exact(tmp_path):
     registered_claim_run(tmp_path)
     ledger = claims_audit.rehydrate(tmp_path)
     document = claims_audit.recall(tmp_path)
-    assert claims_audit.check_registered(tmp_path, document, ledger) == (
+    assert claims_audit.check(tmp_path, document, ledger) == (
         finding(name, "pass", "2 claim(s), 2 file(s) bound")
     )
     bare = tmp_path / "bare"
     bare.mkdir()
     registered_claim_run(bare, baseline_report=False, causal_report=False)
-    plain = claims_audit.check_registered(
+    plain = claims_audit.check(
         bare,
         claims_audit.recall(bare),
         claims_audit.rehydrate(bare),
@@ -1059,11 +1037,11 @@ def test_registered_claim_step_names_each_problem(tmp_path):
         claims={"x": {"kind": "other", "sha256": "s"}},
     )
     document = {"registered_claims": {}, "attachments": {}}
-    assert claims_audit.check_registered(tmp_path, document, ledger) == (
+    assert claims_audit.check(tmp_path, document, ledger) == (
         finding(name, "fail", "x: registration hash differs")
     )
     skewed = {"registered_claims": {"y": 1}, "attachments": {"f": "h"}}
-    assert claims_audit.check_registered(tmp_path, skewed, ledger) == finding(
+    assert claims_audit.check(tmp_path, skewed, ledger) == finding(
         name,
         "fail",
         "claims file and confirmation row differ; "
@@ -1078,7 +1056,7 @@ def test_registered_claim_step_names_each_problem(tmp_path):
         claims={"x": {"kind": "other", "sha256": "s"}},
     )
     both = {"registered_claims": {"x": {"sha256": "other"}}, "attachments": {}}
-    assert claims_audit.check_registered(tmp_path, both, stated).detail == (
+    assert claims_audit.check(tmp_path, both, stated).detail == (
         "x: registration hash differs; a.json: missing; "
         "attachment hashes differ from the claims file"
     )
@@ -1161,4 +1139,4 @@ def test_verify_passes_its_key_to_every_log_reading_step(run):
 
 def test_verify_names_its_directory_when_the_claims_cannot_be_read(run):
     (run / confirm.CLAIMS_FILE).unlink()
-    assert claims_audit.verify(run, KEY).run_dir == str(run)
+    assert claims_audit.verify(run, KEY).directory == str(run)

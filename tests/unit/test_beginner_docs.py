@@ -132,7 +132,7 @@ def test_there_are_runnable_commands_to_check():
     ids=lambda value: value if isinstance(value, str) else None,
 )
 def test_every_scmle_command_in_the_docs_parses(name, command, arguments):
-    parser = cli.build_parser()
+    parser = cli.build()
     stderr = io.StringIO()
     with contextlib.redirect_stderr(stderr):
         try:

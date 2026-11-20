@@ -52,15 +52,13 @@ def test_assignment_is_reproducible_and_close_to_the_probability():
 
 
 def test_the_fixed_horizon_size_uses_the_closed_form_and_the_design_effect():
-    base = design.fixed_horizon_rows(0.10, 0.02, alpha=0.05, power=0.8)
+    base = design.size(0.10, 0.02, alpha=0.05, power=0.8)
     assert base == 2 * 3841 or abs(base - 7682) < 400
-    assert design.fixed_horizon_rows(
+    assert design.size(
         0.10, 0.02, alpha=0.05, power=0.8, design_effect=2.0
     ) == pytest.approx(2 * base, abs=2)
     with pytest.raises(ValueError):
-        design.fixed_horizon_rows(
-            0.1, 0.02, alpha=0.05, power=0.8, design_effect=0.5
-        )
+        design.size(0.1, 0.02, alpha=0.05, power=0.8, design_effect=0.5)
 
 
 def test_the_exact_binomial_check_and_the_anytime_check_agree_on_a_bad_split():
@@ -88,7 +86,7 @@ def test_a_clear_win_is_promoted_with_a_bound_above_the_minimum_effect():
     decision = run.observe(arm, primary, guards)
     assert decision.status == rollout.PROMOTE
     assert decision.tier == "confirmed"
-    assert decision.lower_bound > plan.delta
+    assert decision.lower > plan.delta
     assert decision.units < 40000
     again = run.observe(arm, primary, guards)
     assert again.units == decision.units and again.status == rollout.PROMOTE
@@ -192,7 +190,7 @@ def test_a_worse_champion_is_rolled_back_and_a_fine_one_is_kept():
     losing = (rng.random(30000) < 0.20 - 0.05 * arm).astype(float)
     monitor = rollout.Watchdog(0.01, 0.01)
     assert monitor.observe(arm, losing) == rollout.ROLLBACK
-    assert monitor.done_at < 30000
+    assert monitor.stopped < 30000
     assert monitor.observe(arm, losing) == rollout.ROLLBACK
     fine = (rng.random(30000) < 0.20 + 0.0 * arm).astype(float)
     assert rollout.Watchdog(0.01, 0.01).observe(arm, fine) == rollout.HOLD

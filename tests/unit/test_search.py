@@ -49,11 +49,11 @@ def test_parameters_are_immutable_and_comparable():
 def test_adapters_apply_sampled_params():
     registry = scmle.models.registry.Catalog.stock()
     forest = registry.get("random_forest")
-    sampled = forest.search_space.sample(random.Random(0))
+    sampled = forest.space.sample(random.Random(0))
     estimator = forest.build(tasks.Task.BINARY, 0, sampled)
     for key, value in sampled.items():
         assert estimator.get_params()[key] == value
-    assert registry.get("dummy").search_space is None
+    assert registry.get("dummy").space is None
 
 
 def test_every_tunable_builtin_samples_valid_configurations():
@@ -62,10 +62,7 @@ def test_every_tunable_builtin_samples_valid_configurations():
         if not adapter.is_available():
             continue  # Optional library not installed in this environment.
         conformance.comply(adapter)
-        assert (
-            adapter.search_space is None
-            or len(adapter.search_space.names()) > 0
-        )
+        assert adapter.space is None or len(adapter.space.names()) > 0
 
 
 def test_conformance_rejects_ignored_search_parameter():

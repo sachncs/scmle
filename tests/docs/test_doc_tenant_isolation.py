@@ -44,7 +44,7 @@ def gateway(clock, log=None, **options):
 
 
 def bearer(clock, **claims):
-    return tokens.sign_hs256(
+    return tokens.sign(
         support_identity.HS_SECRET,
         "hs-1",
         support_identity.claims_at(clock.now, **claims),
@@ -178,7 +178,7 @@ def test_refusals_use_three_fixed_messages(reference):
     """
     clock = support_identity.Clock()
     ticks = support_identity.Clock(0.0)
-    gate = gateway(clock, limiter=access.RateLimiter(1.0, 1, clock=ticks))
+    gate = gateway(clock, limiter=access.Limiter(1.0, 1, clock=ticks))
     adapter = server.Service(reference, gateway=gate)
     adapter.start()
     try:
@@ -233,7 +233,7 @@ def test_audit_rows_carry_the_request_id_and_never_a_body(reference, tmp_path):
     text = path.read_text()
     assert str(MARKER) not in text and repr(MARKER)[:10] not in text
     assert token not in text and "Bearer" not in text
-    loaded = deployment_ledger.DeploymentLedger.load(path)
+    loaded = deployment_ledger.Ledger.load(path)
     rows = [r["body"] for r in loaded.rows if r["kind"] == "audit"]
     access_rows = [r for r in rows if r["event"] == "access"]
     assert [r["outcome"] for r in access_rows] == ["allowed", "denied"]
@@ -264,9 +264,9 @@ def test_the_chain_catches_edits_gaps_and_reordering_but_not_a_cut_tail(
     for changed in (gap, swapped):
         path.write_text("\n".join(changed) + "\n")
         with pytest.raises(deployment_ledger.MisuseError):
-            deployment_ledger.DeploymentLedger.load(path)
+            deployment_ledger.Ledger.load(path)
     path.write_text("\n".join(lines[:-1]) + "\n")
-    cut = deployment_ledger.DeploymentLedger.load(path)
+    cut = deployment_ledger.Ledger.load(path)
     assert len(cut.rows) == len(lines) - 1
 
 
@@ -280,7 +280,7 @@ def test_the_revocation_file_named_by_the_environment_is_read_per_request(
     """
     revoked = tmp_path / "revoked.json"
     revoked.write_text(json.dumps({"tokens": [], "subjects": []}))
-    gate = access.gateway_from_environment(
+    gate = access.assemble(
         {
             "SCMLE_AUTH_HS256_SECRET": support_identity.HS_SECRET.decode(),
             "SCMLE_AUTH_ISSUER": support_identity.ISSUER,
@@ -289,9 +289,7 @@ def test_the_revocation_file_named_by_the_environment_is_read_per_request(
         }
     )
     claims = support_identity.claims_at(time.time())
-    header = "Bearer " + tokens.sign_hs256(
-        support_identity.HS_SECRET, "env", claims
-    )
+    header = "Bearer " + tokens.sign(support_identity.HS_SECRET, "env", claims)
 
     def status():
         try:
@@ -316,10 +314,10 @@ def test_serving_and_training_roles_keep_to_their_prefixes(tmp_path):
 
     Also enforces website/src/pages/docs/tenant-isolation.astro:34.
     """
-    inner = objectstore.LocalObjectStore(str(tmp_path / "store"))
+    inner = objectstore.Disk(str(tmp_path / "store"))
     inner.put("bundles/model/v1/manifest.json", b"{}")
-    serving_store = roles.RoleStore(inner, roles.SERVING_ROLE)
-    training_store = roles.RoleStore(inner, roles.TRAINING_ROLE)
+    serving_store = roles.Store(inner, roles.SERVING_ROLE)
+    training_store = roles.Store(inner, roles.TRAINING_ROLE)
     assert serving_store.get("bundles/model/v1/manifest.json")[0] == b"{}"
     serving_store.put("audit/trail.jsonl", b"row")
     for key in (
@@ -327,13 +325,13 @@ def test_serving_and_training_roles_keep_to_their_prefixes(tmp_path):
         "artifacts/r1/checkpoint.bin",
         "bundles/model/v2/manifest.json",
     ):
-        with pytest.raises(roles.RoleDeniedError):
+        with pytest.raises(roles.DeniedError):
             serving_store.put(key, b"x")
     training_store.put("runs/r1/manifest.json", b"{}")
     training_store.put("artifacts/r1/checkpoint.bin", b"x")
-    with pytest.raises(roles.RoleDeniedError):
+    with pytest.raises(roles.DeniedError):
         training_store.get("bundles/model/v1/manifest.json")
-    with pytest.raises(roles.RoleDeniedError):
+    with pytest.raises(roles.DeniedError):
         training_store.put("bundles/model/v2/manifest.json", b"x")
     assert not inner.exists("bundles/model/v2/manifest.json")
 
@@ -345,14 +343,14 @@ def test_each_tenant_reaches_only_its_own_prefix(tmp_path):
     tenant selects; no key, listing or link reaches another tenant's prefix.
     """
     clock = support_identity.Clock()
-    shared = objectstore.LocalObjectStore(str(tmp_path / "store"))
+    shared = objectstore.Disk(str(tmp_path / "store"))
     tenancy.Tenancy(shared, "globex").put("bundles/m/v1.json", b"globex")
     gate = gateway(clock)
     principal = gate.check(
         "GET", "/health", "Bearer " + bearer(clock), "127.0.0.1", "r"
     )
     store = gate.confine(shared, principal)
-    assert store.list_objects() == []
+    assert store.catalog() == []
     for key in (
         "../globex/bundles/m/v1.json",
         "tenants/globex/bundles/m/v1.json",
@@ -368,23 +366,23 @@ def test_each_tenant_reaches_only_its_own_prefix(tmp_path):
 
 def test_keys_are_relative_and_the_prefix_is_added_underneath(tmp_path):
     """Enforces docs/TENANT_ISOLATION.md:40-43."""
-    shared = objectstore.LocalObjectStore(tmp_path / "root")
+    shared = objectstore.Disk(tmp_path / "root")
     acme = tenancy.Tenancy(shared, "acme")
     meta = acme.put("bundles/v1.json", b"acme")
     assert meta.key == "bundles/v1.json"
     assert shared.get("tenants/acme/bundles/v1.json")[0] == b"acme"
-    assert [m.key for m in acme.list_objects()] == ["bundles/v1.json"]
+    assert [m.key for m in acme.catalog()] == ["bundles/v1.json"]
     # A key naming another namespace is never taken as the prefix.
     with pytest.raises(objectstore.StoreError):
         acme.put("tenants/globex/x.json", b"x")
     assert not shared.exists("tenants/globex/x.json")
 
 
-class Leaky(objectstore.LocalObjectStore):
+class Leaky(objectstore.Disk):
     """A backend whose listing ignores the prefix it is given."""
 
-    def list_objects(self, prefix=""):
-        return super().list_objects("")
+    def catalog(self, prefix=""):
+        return super().catalog("")
 
 
 @pytest.mark.parametrize(
@@ -400,7 +398,7 @@ class Leaky(objectstore.LocalObjectStore):
 )
 def test_a_crafted_key_and_a_listing_outside_are_refused(tmp_path, key):
     """Enforces docs/TENANT_ISOLATION.md:43-45."""
-    shared = objectstore.LocalObjectStore(tmp_path / "root")
+    shared = objectstore.Disk(tmp_path / "root")
     acme = tenancy.Tenancy(shared, "acme")
     tenancy.Tenancy(shared, "globex").put("secret.json", b"globex")
     for operation in (
@@ -413,12 +411,12 @@ def test_a_crafted_key_and_a_listing_outside_are_refused(tmp_path, key):
     leaky = Leaky(tmp_path / "leaky")
     tenancy.Tenancy(leaky, "globex").put("secret.json", b"globex")
     with pytest.raises(tenancy.TenantError):
-        tenancy.Tenancy(leaky, "acme").list_objects()
+        tenancy.Tenancy(leaky, "acme").catalog()
 
 
 def test_tenant_names_are_lowercase_dns_labels(tmp_path):
     """Enforces docs/TENANT_ISOLATION.md:46-47."""
-    shared = objectstore.LocalObjectStore(tmp_path / "root")
+    shared = objectstore.Disk(tmp_path / "root")
     tenancy.Tenancy(shared, "acme")
     for name in ("Acme", "ACME", "ac_me", "-acme", "acme-", "a" * 64):
         with pytest.raises(tenancy.TenantError):
@@ -431,7 +429,7 @@ def test_tenant_names_are_lowercase_dns_labels(tmp_path):
 )
 def test_a_local_store_refuses_any_path_through_a_symbolic_link(tmp_path):
     """Enforces docs/TENANT_ISOLATION.md:55."""
-    store = objectstore.LocalObjectStore(tmp_path / "root")
+    store = objectstore.Disk(tmp_path / "root")
     store.put("real/file.json", b"x")
     root = tmp_path / "root"
     (root / "door").symlink_to(root / "real", target_is_directory=True)

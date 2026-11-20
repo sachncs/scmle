@@ -34,7 +34,7 @@ def main() -> None:
     """Trains once, then assesses a healthy and a drifted batch."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     result = scmle.api.project.Project(
-        make_dataset(800), "fault", metric="roc_auc", time_budget=60
+        make_dataset(800), "fault", metric="roc_auc", budget=60
     ).run()
     watcher = monitor.Watcher(result.bundle)
 

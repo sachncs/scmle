@@ -588,7 +588,7 @@ def manifested(
     target: str,
     uri: str | pathlib.Path = "",
     modality: str = "tabular",
-) -> data.DatasetManifest:
+) -> data.Manifest:
     """Builds the immutable identity of a dataset.
 
     Args:
@@ -615,7 +615,7 @@ def manifested(
     object_hashes = {"tabular-frame": content_hash}
     if raw_hash:
         object_hashes["raw-source"] = raw_hash
-    return data.DatasetManifest(
+    return data.Manifest(
         identifier=f"ds_{content_hash[:8]}",
         digests={"schema": schema_hash(frame), "data": content_hash},
         rows=len(frame),

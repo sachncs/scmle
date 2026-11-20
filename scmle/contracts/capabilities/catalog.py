@@ -15,30 +15,30 @@ class Catalog:
 
     Attributes:
         records: Registered capabilities keyed by their complete coordinate.
-        model_families: Registered family declarations keyed by family name.
-        runtime_environment: The bound runtime environment, or None until
+        families: Registered family declarations keyed by family name.
+        environment: The bound runtime environment, or None until
             :meth:`bind` is called.
     """
 
     def __init__(
         self,
         capabilities: Iterable[declarations.Capability] = (),
-        model_families: Iterable[declarations.Declaration] = (),
+        families: Iterable[declarations.Declaration] = (),
     ) -> None:
         """Creates a registry from complete capability declarations.
 
         Args:
             capabilities: The capabilities to register.
-            model_families: The model-family declarations to register.
+            families: The model-family declarations to register.
         """
         self.records: dict[
             declarations.Coordinate, declarations.Capability
         ] = {}
-        self.model_families: dict[str, declarations.Declaration] = {}
-        self.runtime_environment: declarations.Environment | None = None
+        self.families: dict[str, declarations.Declaration] = {}
+        self.environment: declarations.Environment | None = None
         for capability in capabilities:
             self.register(capability)
-        for declaration in model_families:
+        for declaration in families:
             self.enroll(declaration)
 
     def register(self, capability: declarations.Capability) -> None:
@@ -74,11 +74,11 @@ class Catalog:
         """
         if not isinstance(declaration, declarations.Declaration):
             raise errors.KindError("declaration must be ModelFamilyDeclaration")
-        if declaration.model_family in self.model_families:
+        if declaration.family in self.families:
             raise errors.ConfigError(
-                f"model family already registered: {declaration.model_family}"
+                f"model family already registered: {declaration.family}"
             )
-        self.model_families[declaration.model_family] = declaration
+        self.families[declaration.family] = declaration
 
     def find(
         self,
@@ -97,7 +97,7 @@ class Catalog:
         """
         if not isinstance(model_family, str):
             raise errors.KindError("model_family must be a string")
-        return self.model_families.get(model_family)
+        return self.families.get(model_family)
 
     def bind(self, environment: declarations.Environment) -> None:
         """Binds observed facts used when a caller omits an environment.
@@ -110,7 +110,7 @@ class Catalog:
         """
         if not isinstance(environment, declarations.Environment):
             raise errors.KindError("environment must be Environment")
-        self.runtime_environment = environment
+        self.environment = environment
 
     def catalogue(self) -> tuple[declarations.Capability, ...]:
         """Returns declarations in deterministic key order."""
@@ -122,11 +122,9 @@ class Catalog:
             )
         )
 
-    def list_model_families(self) -> tuple[declarations.Declaration, ...]:
+    def inventory(self) -> tuple[declarations.Declaration, ...]:
         """Returns model-family declarations in deterministic order."""
-        return tuple(
-            self.model_families[name] for name in sorted(self.model_families)
-        )
+        return tuple(self.families[name] for name in sorted(self.families))
 
     def audit(
         self,
@@ -158,12 +156,11 @@ class Catalog:
         ):
             raise errors.KindError("environment must be Environment")
         if environment is None:
-            environment = self.runtime_environment
+            environment = self.environment
         diagnostics: list[declarations.Reason] = []
         if environment is not None:
             missing_extras = sorted(
-                set(capability.required_extras)
-                - set(environment.available_extras)
+                set(capability.extras) - set(environment.extras)
             )
             if missing_extras:
                 diagnostics.append(
@@ -173,11 +170,11 @@ class Catalog:
                             "required optional dependency extra is unavailable"
                         ),
                         expected=missing_extras,
-                        observed=sorted(environment.available_extras),
+                        observed=sorted(environment.extras),
                     )
                 )
             diagnostics.extend(self.quantify(capability, environment))
-        if capability.resources.max_rows is not None:
+        if capability.resources.rows is not None:
             if row_count is None:
                 diagnostics.append(
                     declarations.Reason(
@@ -185,17 +182,17 @@ class Catalog:
                         message=(
                             "row count is required for this capability limit"
                         ),
-                        expected=capability.resources.max_rows,
+                        expected=capability.resources.rows,
                     )
                 )
-            elif row_count > capability.resources.max_rows:
+            elif row_count > capability.resources.rows:
                 diagnostics.append(
                     declarations.Reason(
                         code="row_limit_exceeded",
                         message=(
                             "requested dataset exceeds capability row limit"
                         ),
-                        expected=capability.resources.max_rows,
+                        expected=capability.resources.rows,
                         observed=row_count,
                     )
                 )
@@ -218,9 +215,9 @@ class Catalog:
         requirements = capability.resources
         diagnostics: list[declarations.Reason] = []
         numeric_values = (
-            ("cpu_cores", requirements.cpu_cores, environment.cpu_cores),
-            ("memory_gb", requirements.memory_gb, environment.memory_gb),
-            ("disk_gb", requirements.disk_gb, environment.disk_gb),
+            ("cpu_cores", requirements.cores, environment.cores),
+            ("memory_gb", requirements.memory, environment.memory),
+            ("disk_gb", requirements.disk, environment.disk),
         )
         for name, expected, observed in numeric_values:
             if observed is None:
@@ -243,14 +240,14 @@ class Catalog:
         boolean_values = (
             (
                 "gpu_available",
-                requirements.gpu_required,
-                environment.gpu_available,
+                requirements.required,
+                environment.available,
                 "GPU",
             ),
             (
                 "network_available",
-                requirements.network_required,
-                environment.network_available,
+                requirements.network,
+                environment.online,
                 "network",
             ),
         )

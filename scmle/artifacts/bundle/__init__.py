@@ -52,7 +52,7 @@ from scmle.artifacts.bundle.provenance import truncate
 from scmle.artifacts.bundle.seal import sign
 from scmle.artifacts.bundle.seal import SIGNATURE_ALGORITHM
 from scmle.artifacts.bundle.seal import SIGNATURE_FILE
-from scmle.artifacts.bundle.seal import verify_signature
+from scmle.artifacts.bundle.seal import verify
 
 __all__ = [
     "BINARY_CLASSES",
@@ -94,5 +94,5 @@ __all__ = [
     "truncate",
     "unpack",
     "unpickle",
-    "verify_signature",
+    "verify",
 ]

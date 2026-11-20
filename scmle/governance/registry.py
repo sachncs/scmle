@@ -58,12 +58,12 @@ class Sanction:
 
     model: str
     version: int
-    content_id: str
+    content: str
     reviewer: str
     decision: Verdict
     reason: str
     evidence: tuple[str, ...]
-    approved_at: str
+    approved: str
     independent: bool = True
     signature: str | None = None
 
@@ -81,10 +81,10 @@ class Sanction:
         """
         for name in (
             "model",
-            "content_id",
+            "content",
             "reviewer",
             "reason",
-            "approved_at",
+            "approved",
         ):
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
@@ -115,12 +115,12 @@ class Sanction:
         return {
             "model": self.model,
             "version": self.version,
-            "content_id": self.content_id,
+            "content_id": self.content,
             "reviewer": self.reviewer,
             "decision": self.decision.value,
             "reason": self.reason,
             "evidence": list(self.evidence),
-            "approved_at": self.approved_at,
+            "approved_at": self.approved,
             "independent": self.independent,
         }
 
@@ -181,7 +181,7 @@ class Sanction:
                 rejected it, the review was not independent, or the signature
                 is not valid.
         """
-        if (self.model, self.version, self.content_id) != (
+        if (self.model, self.version, self.content) != (
             model,
             version,
             content_id,
@@ -227,7 +227,7 @@ class Sanction:
             KeyError: If a required field is missing.
             ValueError: If a field is invalid.
         """
-        values = cls.KEYS.downgrade(dict(record))
+        values = cls.KEYS.upgrade(dict(record))
         values["evidence"] = tuple(values.get("evidence", ()))
         return cls(**values)
 
@@ -294,7 +294,7 @@ class Store:
         self.root.mkdir(parents=True, exist_ok=True)
         self.lock = durability.latch(self.root)
 
-    def read_index(self) -> dict[str, Any]:
+    def read(self) -> dict[str, Any]:
         """Loads the registry index (empty when new).
 
         Returns:
@@ -306,13 +306,13 @@ class Store:
         index: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
         return index
 
-    def write_index(self, index: dict[str, Any]) -> None:
+    def write(self, index: dict[str, Any]) -> None:
         """Writes the index atomically (temp file + rename).
 
         Args:
             index: The complete registry index.
         """
-        durability.write_atomically(
+        durability.write(
             self.root / INDEX_FILE, json.dumps(index, indent=2).encode("utf-8")
         )
 
@@ -328,7 +328,7 @@ class Store:
             "action": action,
             **details,
         }
-        durability.append_text(
+        durability.append(
             self.root / AUDIT_FILE, json.dumps(record, default=str) + "\n"
         )
 
@@ -370,9 +370,7 @@ class Store:
         bundle.Bundle.load(
             bundle_directory, trusted=trusted, signing_key=signing_key
         )
-        signed = bundle.verify_signature(
-            pathlib.Path(bundle_directory), signing_key
-        )
+        signed = bundle.verify(pathlib.Path(bundle_directory), signing_key)
         content_id = identify(bundle_directory)
         with self.lock:
             return self.enroll(
@@ -414,7 +412,7 @@ class Store:
             The record of the new version, or of the existing one with the same
             content.
         """
-        index = self.read_index()
+        index = self.read()
         entry = index["models"].setdefault(
             model, {"versions": {}, "aliases": {}}
         )
@@ -436,7 +434,7 @@ class Store:
             signed,
         )
         entry["versions"][str(version)] = dataclasses.asdict(record)
-        self.write_index(index)
+        self.write(index)
         self.audit("register", model=model, version=version, run_id=run_id)
         return record
 
@@ -452,7 +450,7 @@ class Store:
         Raises:
             ArtifactError: If the model is not registered.
         """
-        entry = self.read_index()["models"].get(model)
+        entry = self.read()["models"].get(model)
         if entry is None:
             raise errors.ArtifactError(f"unknown model '{model}'")
         return [
@@ -469,7 +467,7 @@ class Store:
         Returns:
             A mapping from alias to version; empty if the model has none.
         """
-        entry = self.read_index()["models"].get(model, {"aliases": {}})
+        entry = self.read()["models"].get(model, {"aliases": {}})
         return {alias: int(v) for alias, v in entry["aliases"].items()}
 
     def resolve(self, model: str, ref: str | int = CHAMPION) -> Release:
@@ -527,7 +525,7 @@ class Store:
         )
 
 
-class ModelRegistryStore(Store):
+class Registry(Store):
     """Versioned model storage with promotion by alias."""
 
     def __init__(
@@ -634,7 +632,7 @@ class ModelRegistryStore(Store):
                 has no approval, or the approval is not valid for the bundle.
         """
         if index is None:
-            index = self.read_index()
+            index = self.read()
         entry: dict[str, Any] | None = index["models"].get(model)
         if entry is None or str(version) not in entry["versions"]:
             raise errors.ArtifactError(f"{model} v{version} is not registered")
@@ -680,13 +678,13 @@ class ModelRegistryStore(Store):
             ArtifactError: If the version is not registered, a champion move
                 has no approval, or the approval is not valid for the bundle.
         """
-        index = self.read_index()
+        index = self.read()
         entry = self.vet(model, version, alias, approval, signing_key, index)
         previous = entry["aliases"].get(alias)
         entry["aliases"][alias] = version
         if alias == CHAMPION and previous is not None and previous != version:
             entry["aliases"][PREVIOUS] = previous
-        self.write_index(index)
+        self.write(index)
         self.audit(
             "promote",
             model=model,

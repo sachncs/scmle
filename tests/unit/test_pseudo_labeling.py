@@ -60,7 +60,7 @@ def test_judging_reports_the_gain_over_the_plain_fit():
     )
 
     assert outcome is not None
-    assert outcome.folds == 1 and outcome.pseudo_rows >= 20
+    assert outcome.folds == 1 and outcome.pseudo >= 20
     assert outcome.accepted == (outcome.gain > 0)
 
 

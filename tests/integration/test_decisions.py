@@ -13,8 +13,8 @@ def run(frame, tmp_path, decision=None, strategies=None, **kwargs):
     project = support.make_project(
         frame,
         "y",
-        time_budget=600,
-        output_dir=tmp_path,
+        budget=600,
+        directory=tmp_path,
         search=NO_SEARCH,
         strategies=strategies or tasks.Strategies(top_models=0),
         decision=decision,
@@ -30,7 +30,7 @@ def test_threshold_is_optimized_on_validation_and_frozen_into_the_bundle(
     result = run(imbalanced_frame, tmp_path, decision, metric="roc_auc")
     chosen = result.evaluation["decision"]
     assert chosen["objective"] == "f1" and 0.01 <= chosen["threshold"] <= 0.99
-    assert result.bundle.info.decision_threshold == chosen["threshold"]
+    assert result.bundle.info.threshold == chosen["threshold"]
     features = imbalanced_frame.drop(columns="y")
     probability = result.predict_proba(features)[:, 1]
     expected = (probability >= chosen["threshold"]).astype(int)
@@ -46,7 +46,7 @@ def test_threshold_choice_never_uses_the_test_rows(imbalanced_frame, tmp_path):
     reloaded = scmle.artifacts.bundle.Bundle.load(
         result.save(tmp_path / "bundle"), trusted=True
     )
-    assert reloaded.info.decision_threshold == chosen["threshold"]
+    assert reloaded.info.threshold == chosen["threshold"]
 
 
 def test_cost_objective_responds_to_costs(imbalanced_frame, tmp_path):
@@ -78,7 +78,7 @@ def test_disabled_and_non_binary_leave_decisions_alone(
         multiclass_frame, tmp_path / "b", decision, task="classification"
     )
     assert multi.evaluation["decision"] is None
-    assert multi.bundle.info.decision_threshold is None
+    assert multi.bundle.info.threshold is None
 
 
 def test_string_labels_with_thresholds(binary_frame, tmp_path):
@@ -100,9 +100,9 @@ def test_calibration_is_tried_for_uncalibrated_models_and_judged(
     )
     calibrated = [t for t in result.trials if t.strategy == "calibrated"]
     assert calibrated and all(
-        t.model_name != "logistic_regression" for t in calibrated
+        t.model != "logistic_regression" for t in calibrated
     )
-    log = (result.run_dir / "diagnostics" / "decision_log.json").read_text()
+    log = (result.directory / "diagnostics" / "decision_log.json").read_text()
     assert "calibrated@" in log
 
 
@@ -112,7 +112,7 @@ def test_calibration_improves_log_loss_for_forests(imbalanced_frame, tmp_path):
         imbalanced_frame, tmp_path, strategies=strategies, metric="log_loss"
     )
     pairs = {
-        (t.model_name, t.strategy): t.score_mean
+        (t.model, t.strategy): t.score
         for t in result.trials
         if t.status == "ok" and not t.params
     }

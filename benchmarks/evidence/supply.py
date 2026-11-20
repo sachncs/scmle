@@ -307,8 +307,8 @@ def run(
             scmle.api.project.Project(
                 frame,
                 "y",
-                output_dir=folder,
-                time_budget=budget,
+                directory=folder,
+                budget=budget,
                 search=tasks.Search(top_models=0),
                 strategies=tasks.Strategies(top_models=0),
                 ensemble=tasks.Stacking(size=0),

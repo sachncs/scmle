@@ -121,14 +121,13 @@ def test_profiling_yields_a_consistent_plan_or_a_clear_refusal(frame):
         profile = profiler.Profiler(spec).profile(frame, manifest, task)
     except errors.ScmleError:
         return
-    plan = profile.feature_plan
+    plan = profile.plan
     assert "y" not in plan.features
     assert set(plan.features) <= set(frame.columns)
     assert not set(plan.features) & set(plan.dropped)
     assert set(plan.features) | set(plan.dropped) == set(frame.columns) - {"y"}
     assert all(
-        0.0 <= s["missing_rate"] <= 1.0
-        for s in profile.column_statistics.values()
+        0.0 <= s["missing_rate"] <= 1.0 for s in profile.statistics.values()
     )
 
 
@@ -139,9 +138,7 @@ def test_pipelines_fit_and_predict_on_arbitrary_clean_frames(frame, seed):
     manifest = tabular.manifested(frame, "y")
     try:
         task = scmle.data.validation.target.Resolver(spec).resolve(frame["y"])
-        plan = (
-            profiler.Profiler(spec).profile(frame, manifest, task).feature_plan
-        )
+        plan = profiler.Profiler(spec).profile(frame, manifest, task).plan
     except errors.ScmleError:
         return
     features = frame.drop(columns="y")
@@ -267,8 +264,8 @@ def test_temporal_splits_never_train_on_the_future(rows, seed):
 def test_resamplers_balance_classes_using_only_existing_rows(counts, seed):
     labels = pandas.Series(numpy.repeat(numpy.arange(len(counts)), counts))
     features = pandas.DataFrame({"row": numpy.arange(len(labels))})
-    over = resampling.RandomOverSampler().resample(features, labels, seed)
-    under = resampling.RandomUnderSampler().resample(features, labels, seed)
+    over = resampling.Oversampler().resample(features, labels, seed)
+    under = resampling.Undersampler().resample(features, labels, seed)
     assert set(over[1].value_counts()) == {max(counts)}
     assert set(under[1].value_counts()) == {min(counts)}
     for sampled, target in (over, under):

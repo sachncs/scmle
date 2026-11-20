@@ -28,12 +28,12 @@ def sanction(record: Mapping[str, Any]) -> registry.Sanction:
     return registry.Sanction(
         model=record["model"],
         version=record["version"],
-        content_id=record["content_id"],
+        content=record["content_id"],
         reviewer=record["reviewer"],
         decision=record["decision"],
         reason=record["reason"],
         evidence=tuple(record["evidence"]),
-        approved_at=record["approved_at"],
+        approved=record["approved_at"],
         independent=record["independent"],
         signature=record.get("signature"),
     )
@@ -71,13 +71,13 @@ class Release(reader.Reader):
                 bundle_signed=entry["signed"],
                 run_id=entry["run_id"],
             )
-            if entry["content_id"] != self.content_id:
+            if entry["content_id"] != self.content:
                 self.problem(
                     finding.IDENTITY,
                     name,
                     "the registered bundle is not the bundle the run wrote",
                 )
-            if entry["run_id"] != self.run_id:
+            if entry["run_id"] != self.run:
                 self.problem(
                     finding.IDENTITY, name, "the registry names another run"
                 )
@@ -165,7 +165,7 @@ class Release(reader.Reader):
                 finding.UNSIGNED, step, "the approval signature does not verify"
             )
         try:
-            held.validate(str(model), int(version), self.content_id, key)
+            held.validate(str(model), int(version), self.content, key)
         except (ValueError, TypeError) as error:
             # handled: recorded as trace problem
             self.problem(finding.UNAPPROVED, step, str(error))
@@ -185,7 +185,7 @@ class Release(reader.Reader):
         ledger = None
         if path is not None:
             try:
-                ledger = deployment_ledger.DeploymentLedger.load(path)
+                ledger = deployment_ledger.Ledger.load(path)
             except errors.ScmleError as error:
                 # handled: recorded as trace problem
                 self.problem(
@@ -193,14 +193,14 @@ class Release(reader.Reader):
                 )
         if ledger is not None:
             header = ledger.header
-            if header["charter_hash"] != self.charter_hash:
+            if header["charter_hash"] != self.charter:
                 self.problem(
                     finding.IDENTITY,
                     name,
                     "the ledger belongs to another charter",
                 )
             scope = str(header["policy"].get("scope", ""))
-            if not scope.startswith(self.content_id):
+            if not scope.startswith(self.content):
                 self.problem(
                     finding.IDENTITY,
                     name,

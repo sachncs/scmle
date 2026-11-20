@@ -70,7 +70,7 @@ def test_an_instrument_prepare_records_the_first_stage_on_x():
     adapter.prepare()
     fit = iv.estimate(x, "d", "y", "z", ("w",), 0.95)
     assert adapter.design == {
-        "first_stage_F_on_x": fit.f_stat,
+        "first_stage_F_on_x": fit.fstat,
         "threshold": iv.F_THRESHOLD,
         "weak_on_x": fit.weak,
         "overidentification": "not applicable: one instrument, just identified",
@@ -104,7 +104,7 @@ def test_an_instrument_estimate_equals_the_engine_and_keeps_weakness():
         "ar_kind": fit.ar_kind,
         "estimand": "LATE",
     }
-    assert adapter.design["first_stage_F_on_c"] == fit.f_stat
+    assert adapter.design["first_stage_F_on_c"] == fit.fstat
     assert adapter.weak is False
     adapter.weak = True
     adapter.estimate(c, 0.9)
@@ -163,17 +163,17 @@ def rd_block(**changes):
 
 
 def test_a_discontinuity_starts_with_no_bandwidth_and_lists_pretreatment():
-    adapter = exogeneity.RdEstimator(
+    adapter = exogeneity.Discontinuity(
         rd_block(), rd_world(50, 0), 0, "linear", 0.01
     )
-    assert exogeneity.RdEstimator.name == "rd"
+    assert exogeneity.Discontinuity.name == "rd"
     assert adapter.bandwidth == 0.0
     assert adapter.pretreatment() == ("pre",)
 
 
 def test_a_discontinuity_without_running_variable_or_cutoff_raises():
     for spec in (rd_block(running_variable=None), rd_block(cutoff=None)):
-        adapter = exogeneity.RdEstimator(
+        adapter = exogeneity.Discontinuity(
             spec, rd_world(50, 0), 0, "linear", 0.01
         )
         with pytest.raises(errors.InputError, match="rd needs a running"):
@@ -184,13 +184,13 @@ def test_a_discontinuity_without_running_variable_or_cutoff_raises():
 
 def test_a_discontinuity_prepare_freezes_the_bandwidth_from_x():
     x = rd_world(3000, 1)
-    adapter = exogeneity.RdEstimator(rd_block(), x, 0, "linear", 0.01)
+    adapter = exogeneity.Discontinuity(rd_block(), x, 0, "linear", 0.01)
     adapter.prepare()
     fit = rd.estimate(x, "x", "y", 0.0, covariates=("pre",))
     assert adapter.bandwidth == fit.bandwidth
     assert adapter.design == {
         "bandwidth": fit.bandwidth,
-        "density_p_on_x": fit.density_p,
+        "density_p_on_x": fit.density,
         "alpha_density": 0.01,
         "n_left_in_bandwidth": fit.n_left,
         "n_right_in_bandwidth": fit.n_right,
@@ -201,7 +201,7 @@ def test_a_discontinuity_prepare_freezes_the_bandwidth_from_x():
 def test_a_manipulated_running_variable_is_refused():
     x = rd_world(3000, 2)
     x.loc[x.x.between(-0.2, 0) & (numpy.arange(3000) % 2 == 0), "x"] *= -1
-    adapter = exogeneity.RdEstimator(rd_block(), x, 0, "linear", 0.01)
+    adapter = exogeneity.Discontinuity(rd_block(), x, 0, "linear", 0.01)
     adapter.prepare()
     assert adapter.design["density_p_on_x"] < 0.01
     assert adapter.refusal == (
@@ -212,7 +212,7 @@ def test_a_manipulated_running_variable_is_refused():
 
 def prepared_rd():
     x, c = rd_world(3000, 3), rd_world(3000, 4)
-    adapter = exogeneity.RdEstimator(rd_block(), x, 0, "linear", 0.01)
+    adapter = exogeneity.Discontinuity(rd_block(), x, 0, "linear", 0.01)
     adapter.prepare()
     return adapter, c
 
@@ -222,7 +222,7 @@ def test_a_discontinuity_estimate_is_bias_corrected_at_the_frozen_bandwidth():
     est = adapter.estimate(c, 0.9)
     fit = rd.estimate(c, "x", "y", 0.0, 0.9, adapter.bandwidth)
     assert (est.estimate, est.se, est.low, est.high, est.n) == (
-        fit.bias_corrected,
+        fit.corrected,
         fit.se,
         fit.low,
         fit.high,
@@ -235,7 +235,7 @@ def test_a_discontinuity_estimate_is_bias_corrected_at_the_frozen_bandwidth():
     other = adapter.reckon(c, 0.9, "pre")
     pre = rd.estimate(c, "x", "pre", 0.0, 0.9, adapter.bandwidth)
     assert (other.estimate, other.se, other.n) == (
-        pre.bias_corrected,
+        pre.corrected,
         pre.se,
         pre.n_left + pre.n_right,
     )

@@ -27,17 +27,17 @@ def long_tailed(rows=800, seed=0):
 def profile_with(skew):
     return data.Portrait(
         manifest=None,
-        column_statistics={},
-        quality_findings=(),
+        statistics={},
+        quality=(),
         risk_findings=(),
-        target_summary={"task": "regression", "skew": skew},
-        feature_plan=data.Blueprint(("x",), ()),
+        summary={"task": "regression", "skew": skew},
+        plan=data.Blueprint(("x",), ()),
     )
 
 
 def test_weights_favour_sparse_regions_of_the_target_range():
     target = long_tailed()[1]
-    model = resampling.DensityWeightedRegressor(estimator=None)
+    model = resampling.Density(estimator=None)
     weights = model.weights(target.to_numpy())
     assert weights.mean() == pytest.approx(1.0)
     tail = target.to_numpy() > numpy.quantile(target, 0.97)

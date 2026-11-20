@@ -36,7 +36,7 @@ from scmle.pipeline.stages import profiling
 __all__ = [
     "Curator",
     "LeakagePolicy",
-    "ModalityProject",
+    "Modality",
     "Project",
     "ValidationStrategy",
 ]
@@ -76,18 +76,18 @@ class Definition:
             `ranking`, `multilabel`, `multioutput`, `forecast` and
             `uplift`.
         metric: Primary metric; defaults per task.
-        time_budget: Wall-clock budget in seconds.
+        budget: Wall-clock budget in seconds.
         modality: Dataset family; a file needs a registered `kinds.Kind`.
         workers: Concurrent trial processes (1 = sequential).
         enforcement: `hard` supervises every trial in its own process and
             kills it past the time or memory limit; `cooperative` only stops
             new trials from starting (and allows in-process hooks).
         executor: `process` (default) or `ray`.
-        cluster_address: Ray cluster to join (a local runtime if None).
+        address: Ray cluster to join (a local runtime if None).
         memory_limit_gb: Hard memory cap per trial.
-        id_columns: Identifier columns excluded from features.
-        group_column: Entity column that must not straddle splits.
-        time_column: Column ordering rows in time.
+        identifiers: Identifier columns excluded from features.
+        group: Entity column that must not straddle splits.
+        timestamp: Column ordering rows in time.
         cutoff: The prediction time, ISO 8601 text such as `2020-01-01`:
             a date column with values after it was not known when the
             prediction is made, and the leakage screen blocks it.
@@ -97,61 +97,61 @@ class Definition:
             a feature declared `outcome`.
         time_as_feature: Also let the model use the time column as a feature
             (off by default; models must extrapolate in time).
-        excluded_columns: Other columns to ignore.
-        unavailable_at_prediction: Columns known only after the outcome
+        excluded: Other columns to ignore.
+        unavailable: Columns known only after the outcome
             (excluded; the feature-availability contract).
-        feature_delays: Columns whose value is known only that many rows
+        delays: Columns whose value is known only that many rows
             after the row it describes; the model sees the value from that
-            many rows earlier (needs `time_column`).
-        sensitive_columns: Columns describing groups of people; the fairness
+            many rows earlier (needs `timestamp`).
+        sensitive: Columns describing groups of people; the fairness
             report compares outcomes across them.
-        weight_column: Numeric column of per-row training weights (never a
+        weight: Numeric column of per-row training weights (never a
             feature; not needed at prediction time; test metrics are also
             reported weighted).
-        event_column: For `task="survival"`, the 0/1 column saying whether
+        event: For `task="survival"`, the 0/1 column saying whether
             the event was observed (1) or the row was censored (0); the
             target is the time to the event or to censoring.
-        query_column: For `task="ranking"`, the column identifying each
+        query: For `task="ranking"`, the column identifying each
             row's query; the target is the relevance grade.
         memory_budget_gb: Largest in-memory size of the dataset; a bigger
             Parquet / CSV file is streamed (see `Dataset`).
         training: `sample` or `stream` for a streamed file.
-        treatment_column: For `task="uplift"`, the 0/1 column saying whether
+        treatment: For `task="uplift"`, the 0/1 column saying whether
             a row was treated; the target is the outcome.
         horizon: For `task="forecast"`, how many steps ahead to predict
-            (needs `time_column`; `target` is the series value).
-        seasonal_period: Rows per season of a forecast series.
-        forecast_lags: Lags of the value used as features (default 1, 2, 3
+            (needs `timestamp`; `target` is the series value).
+        period: Rows per season of a forecast series.
+        lags: Lags of the value used as features (default 1, 2, 3
             and 7).
-        forecast_windows: Rolling-window sizes (default 3 and 7).
-        forecast_calendar: Date parts of the time column to add.
-        text_encoding: `tfidf` (default) or `embedding` for free-text
+        windows: Rolling-window sizes (default 3 and 7).
+        calendar: Date parts of the time column to add.
+        encoding: `tfidf` (default) or `embedding` for free-text
             columns (needs the `embeddings` extra; falls back to TF-IDF with
             a warning when unavailable).
-        embedding_model: Sentence-embedding model for `embedding`.
-        ordinal_order: For `task="ordinal"`, the target's labels from lowest
+        model: Sentence-embedding model for `embedding`.
+        order: For `task="ordinal"`, the target's labels from lowest
             to highest.
         unlabeled: What to do with rows whose target is missing: `block`
             (default), `ignore`, or `pseudo_label` (classification; used
             only if it wins in cross-validation).
         reference: Path of a recent sample of the population the model will
             serve; the development rows are compared with it.
-        pseudo_label_confidence: Smallest probability trusted as a label.
-        monotonic_constraints: Numeric feature to +1 / -1: predictions must
+        confidence: Smallest probability trusted as a label.
+        constraints: Numeric feature to +1 / -1: predictions must
             never fall / rise as the feature grows (binary classification
             and regression).
-        embargo_rows: Rows dropped between training and validation windows
+        rows: Rows dropped between training and validation windows
             in temporal validation.
-        horizon_rows: Rolling validation: rows in each validation window.
-        window_rows: Rolling validation: rows in each training window (all
+        span: Rolling validation: rows in each validation window.
+        window: Rolling validation: rows in each training window (all
             earlier rows when omitted).
-        entities: Temporal and rolling validation with `group_column`:
+        entities: Temporal and rolling validation with `group`:
             `known` (default) forecasts the entities trained on, so an
             entity's past trains and its future is held out; `unseen`
             predicts new entities and keeps each on one side of every split.
         validation: Split strategy or `auto`.
         folds: Cross-validation folds.
-        test_fraction: Share of rows locked away for the final test.
+        holdout: Share of rows locked away for the final test.
         seed: Random seed.
         search: Hyperparameter search settings; defaults to a small pruned
             random search. Use `Search(top_models=0)` to disable tuning.
@@ -159,7 +159,7 @@ class Definition:
             `Strategies(top_models=0)` to disable.
         models: Model names and families to exclude.
         ensemble: Stacking settings; `Stacking(size=0)` disables.
-        feature_graph: Declarative derived features (row-wise, fitted and
+        graph: Declarative derived features (row-wise, fitted and
             time-series operations), versioned with the configuration.
         selection: Serving constraints (max model size, p95 latency).
         decision: Threshold optimization for binary tasks (objective f1,
@@ -170,113 +170,113 @@ class Definition:
             reach on the locked rows (checked after the one test release).
         estimand: Explicit population quantity for a separate parameter
             estimation evidence track. It does not affect model selection.
-        estimation_policy: Explicit likelihood, covariance, missingness, and
+        policy: Explicit likelihood, covariance, missingness, and
             uncertainty policy for parameter estimation.
-        leakage_policy: `warn` or `block` on leakage hypotheses.
+        leakage: `warn` or `block` on leakage hypotheses.
         charter: Path of an analysis charter (`scmle charter init`). When
             given, the development rows are split into exploration rows and
             a sealed confirmation set the exploration steps cannot read; the
             charter is checked before any profiling.
-        leakage_attestations: JSON file of per-column attestations that a
+        attestations: JSON file of per-column attestations that a
             strong predictor flagged by the leakage screen is legitimate.
             Used only with `charter`; each counts only for that charter and
             while valid, and is recorded in the ledger at tier `attested`.
-        baseline_column: Used with `charter` on a binary task whose charter
+        baseline: Used with `charter` on a binary task whose charter
             has a cost model: the 0/1 decisions of the current process. It
             is never a feature. A rule is frozen on the exploration rows and
             the claim that it beats the current process over the cost range
             is registered in the ledger and tested once on the confirmation
             set (`baseline_report.json`).
-        baseline_subject: `frozen_rule` (default) or `selected_model`; the
+        subject: `frozen_rule` (default) or `selected_model`; the
             latter defers the opening of the confirmation set until the
             model selection is frozen and tests the selected model against
             the current process instead of the logistic rule.
-        framing_draft: The `framing_draft.json` written by `scmle frame` for
+        draft: The `framing_draft.json` written by `scmle frame` for
             the charter; a claim that depends on an LLM-filled field of an
             unsigned charter stays `unverified`.
-        propensity_column: With `logged_action_column`, the recorded
+        propensity: With `action`, the recorded
             probability of action 1; never a feature. It enables the
             off-policy value of the frozen rule (`policy_value.json`).
-        logged_action_column: With a charter decision block, the 0/1 action
+        action: With a charter decision block, the 0/1 action
             the current process logged; never a feature.
-        ingest_plan: Path of an ingest plan (JSON); needs a charter with an
+        ingest: Path of an ingest plan (JSON); needs a charter with an
             `ingest` block. Features are synthesized through the as-of views
             of the ingest plan's database before the data are split.
         checkpoints: Approval gates after planning and selection (the latter
             fires before the test set is opened).
-        output_dir: Parent directory for run directories.
+        directory: Parent directory for run directories.
     """
 
     data: Any
     target: str | list[str]
     task: tasks.TaskRequest = "auto"
     metric: str | None = None
-    time_budget: int = 1800
+    budget: int = 1800
     marker: dataclasses.KW_ONLY
     modality: tasks.DatasetModality = "tabular"
     workers: int = 1
     enforcement: Literal["hard", "cooperative"] = "hard"
     executor: Literal["process", "ray"] = "process"
-    cluster_address: str | None = None
+    address: str | None = None
     memory_limit_gb: float = 8.0
-    id_columns: list[str] | None = None
-    group_column: str | None = None
-    time_column: str | None = None
+    identifiers: list[str] | None = None
+    group: str | None = None
+    timestamp: str | None = None
     cutoff: str | None = None
     known: dict[str, Literal["prediction", "outcome"]] | None = None
     time_as_feature: bool = False
-    excluded_columns: list[str] | None = None
-    unavailable_at_prediction: list[str] | None = None
-    feature_delays: dict[str, int] | None = None
-    sensitive_columns: list[str] | None = None
-    weight_column: str | None = None
-    event_column: str | None = None
-    query_column: str | None = None
+    excluded: list[str] | None = None
+    unavailable: list[str] | None = None
+    delays: dict[str, int] | None = None
+    sensitive: list[str] | None = None
+    weight: str | None = None
+    event: str | None = None
+    query: str | None = None
     memory_budget_gb: float | None = None
     training: Literal["sample", "stream"] = "sample"
-    treatment_column: str | None = None
+    treatment: str | None = None
     horizon: int | None = None
-    seasonal_period: int | None = None
-    forecast_lags: list[int] | None = None
-    forecast_windows: list[int] | None = None
-    forecast_calendar: list[str] | None = None
-    text_encoding: Literal["tfidf", "embedding"] = "tfidf"
-    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
-    ordinal_order: list[str | int] | None = None
+    period: int | None = None
+    lags: list[int] | None = None
+    windows: list[int] | None = None
+    calendar: list[str] | None = None
+    encoding: Literal["tfidf", "embedding"] = "tfidf"
+    model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    order: list[str | int] | None = None
     unlabeled: Literal["block", "ignore", "pseudo_label"] = "block"
     reference: str | None = None
-    pseudo_label_confidence: float = 0.9
-    monotonic_constraints: dict[str, int] | None = None
-    embargo_rows: int = 0
-    horizon_rows: int | None = None
-    window_rows: int | None = None
+    confidence: float = 0.9
+    constraints: dict[str, int] | None = None
+    rows: int = 0
+    span: int | None = None
+    window: int | None = None
     entities: Literal["known", "unseen"] = "known"
     validation: ValidationStrategy = "auto"
     folds: int = 5
-    test_fraction: float = 0.2
+    holdout: float = 0.2
     seed: int = 42
     search: tasks.Search | None = None
     strategies: tasks.Strategies | None = None
     models: tasks.Candidates | None = None
     ensemble: tasks.Stacking | None = None
-    feature_graph: tasks.Derivation | None = None
+    graph: tasks.Derivation | None = None
     selection: tasks.Selection | None = None
     decision: tasks.Threshold | None = None
     fairness: tasks.Parity | None = None
     problem: tasks.Problem | None = None
     estimand: parameter_estimation.Estimand | None = None
-    estimation_policy: parameter_estimation.Config | None = None
-    leakage_policy: LeakagePolicy = "warn"
+    policy: parameter_estimation.Config | None = None
+    leakage: LeakagePolicy = "warn"
     charter: str | pathlib.Path | None = None
-    leakage_attestations: str | pathlib.Path | None = None
-    baseline_column: str | None = None
-    baseline_subject: Literal["frozen_rule", "selected_model"] = "frozen_rule"
-    framing_draft: str | pathlib.Path | None = None
-    propensity_column: str | None = None
-    logged_action_column: str | None = None
-    ingest_plan: str | pathlib.Path | None = None
+    attestations: str | pathlib.Path | None = None
+    baseline: str | None = None
+    subject: Literal["frozen_rule", "selected_model"] = "frozen_rule"
+    draft: str | pathlib.Path | None = None
+    propensity: str | None = None
+    action: str | None = None
+    ingest: str | pathlib.Path | None = None
     checkpoints: tuple[policies.Reviewer, ...] = ()
-    output_dir: str | pathlib.Path = "runs"
+    directory: str | pathlib.Path = "runs"
 
 
 def describe(
@@ -300,45 +300,43 @@ def describe(
         targets=[]
         if isinstance(definition.target, str)
         else list(definition.target),
-        id_columns=definition.id_columns or [],
-        group_column=definition.group_column,
-        time_column=definition.time_column,
+        id_columns=definition.identifiers or [],
+        group_column=definition.group,
+        time_column=definition.timestamp,
         cutoff=definition.cutoff,
         known=definition.known or {},
         time_as_feature=definition.time_as_feature,
-        excluded_columns=definition.excluded_columns or [],
-        unavailable_at_prediction=definition.unavailable_at_prediction or [],
-        feature_delays=definition.feature_delays or {},
-        sensitive_columns=definition.sensitive_columns or [],
-        weight_column=definition.weight_column,
-        event_column=definition.event_column,
-        query_column=definition.query_column,
+        excluded_columns=definition.excluded or [],
+        unavailable_at_prediction=definition.unavailable or [],
+        feature_delays=definition.delays or {},
+        sensitive_columns=definition.sensitive or [],
+        weight_column=definition.weight,
+        event_column=definition.event,
+        query_column=definition.query,
         memory_budget_gb=definition.memory_budget_gb,
         training=definition.training,
-        treatment_column=definition.treatment_column,
+        treatment_column=definition.treatment,
         horizon=definition.horizon,
-        seasonal_period=definition.seasonal_period,
-        forecast_lags=definition.forecast_lags or [],
-        forecast_windows=definition.forecast_windows or [],
-        forecast_calendar=definition.forecast_calendar or [],
-        text_encoding=definition.text_encoding,
-        embedding_model=definition.embedding_model,
-        ordinal_order=definition.ordinal_order or [],
+        seasonal_period=definition.period,
+        forecast_lags=definition.lags or [],
+        forecast_windows=definition.windows or [],
+        forecast_calendar=definition.calendar or [],
+        text_encoding=definition.encoding,
+        embedding_model=definition.model,
+        ordinal_order=definition.order or [],
         unlabeled=definition.unlabeled,
         reference_uri=definition.reference,
-        pseudo_label_confidence=definition.pseudo_label_confidence,
-        monotonic_constraints=definition.monotonic_constraints or {},
-        baseline_column=definition.baseline_column,
-        baseline_subject=definition.baseline_subject,
-        propensity_column=definition.propensity_column,
-        logged_action_column=definition.logged_action_column,
+        pseudo_label_confidence=definition.confidence,
+        monotonic_constraints=definition.constraints or {},
+        baseline_column=definition.baseline,
+        baseline_subject=definition.subject,
+        propensity_column=definition.propensity,
+        logged_action_column=definition.action,
         ingest_plan=None
-        if definition.ingest_plan is None
-        else str(definition.ingest_plan),
+        if definition.ingest is None
+        else str(definition.ingest),
         framing_draft=(
-            None
-            if definition.framing_draft is None
-            else str(definition.framing_draft)
+            None if definition.draft is None else str(definition.draft)
         ),
     )
 
@@ -361,39 +359,39 @@ def configure(
         metric=definition.metric,
         validation=tasks.Validation(
             strategy=definition.validation,
-            embargo_rows=definition.embargo_rows,
-            horizon_rows=definition.horizon_rows,
-            window_rows=definition.window_rows,
+            embargo_rows=definition.rows,
+            horizon_rows=definition.span,
+            window_rows=definition.window,
             entities=definition.entities,
             folds=definition.folds,
-            test_fraction=definition.test_fraction,
+            test_fraction=definition.holdout,
             seed=definition.seed,
         ),
         resources=tasks.Resources(
-            time_budget_seconds=definition.time_budget,
+            time_budget_seconds=definition.budget,
             workers=definition.workers,
             enforcement=definition.enforcement,
             executor=definition.executor,
-            cluster_address=definition.cluster_address,
+            cluster_address=definition.address,
             memory_limit_gb=definition.memory_limit_gb,
         ),
         search=definition.search or tasks.Search(),
         strategies=definition.strategies or tasks.Strategies(),
         models=definition.models or tasks.Candidates(),
         ensemble=definition.ensemble or tasks.Stacking(),
-        feature_graph=definition.feature_graph or tasks.Derivation(),
+        feature_graph=definition.graph or tasks.Derivation(),
         selection=definition.selection or tasks.Selection(),
         decision=definition.decision or tasks.Threshold(),
         fairness=definition.fairness or tasks.Parity(),
         problem=definition.problem or tasks.Problem(),
-        leakage_policy=definition.leakage_policy,
+        leakage_policy=definition.leakage,
         charter_path=None
         if definition.charter is None
         else str(definition.charter),
         leakage_attestations=(
             None
-            if definition.leakage_attestations is None
-            else str(definition.leakage_attestations)
+            if definition.attestations is None
+            else str(definition.attestations)
         ),
     )
 
@@ -423,8 +421,8 @@ class Project(Definition):
             else None
         )
         self.spec = configure(self, frame)
-        self.output_dir = pathlib.Path(self.output_dir)
-        if (self.estimand is None) != (self.estimation_policy is None):
+        self.directory = pathlib.Path(self.directory)
+        if (self.estimand is None) != (self.policy is None):
             raise errors.ConfigError(
                 "parameter estimation requires both an explicit estimand "
                 "and an estimation policy"
@@ -432,7 +430,7 @@ class Project(Definition):
         self.orchestrator = scmle.pipeline.orchestrator.Orchestrator(
             self.spec, frame, checkpoints=self.checkpoints
         )
-        self.orchestrator.tracking = self.output_dir / "experiments.sqlite"
+        self.orchestrator.tracking = self.directory / "experiments.sqlite"
         self.profile: scmle.contracts.data.Portrait | None = None
 
     def plan(self) -> experiments.Plan:
@@ -481,24 +479,24 @@ class Project(Definition):
 
         Raises:
             ConfigError: If the declared estimate is refused for its
-                configuration (see `estimate_parameters`).
+                configuration (see `estimate`).
             DataError: If it is refused for the data.
         """
         estimation = None
-        if self.estimand is not None and self.estimation_policy is not None:
+        if self.estimand is not None and self.policy is not None:
             try:
-                estimation = self.estimate_parameters()
+                estimation = self.estimate()
             except REFUSALS as error:
                 refuse(
-                    self.output_dir,
+                    self.directory,
                     self.estimand,
-                    self.estimation_policy,
+                    self.policy,
                     error,
                 )
                 raise
-        declaration = declare(self.estimand, self.estimation_policy)
+        declaration = declare(self.estimand, self.policy)
         result = self.orchestrator.run(
-            self.output_dir,
+            self.directory,
             plan,
             parameter_estimation_declaration=declaration,
         )
@@ -506,7 +504,7 @@ class Project(Definition):
             persist(result, estimation)
         return result
 
-    def estimate_parameters(
+    def estimate(
         self, artifact_directory: str | pathlib.Path | None = None
     ) -> parameter_estimation.Estimation:
         """Estimates declared parameters without changing model selection.
@@ -529,7 +527,7 @@ class Project(Definition):
                 `estimate`, and missing columns or
                 values raise `DataError` from there.
         """
-        if self.estimand is None or self.estimation_policy is None:
+        if self.estimand is None or self.policy is None:
             raise errors.ConfigError(
                 "parameter estimation is disabled: declare both estimand "
                 "and estimation_policy explicitly"
@@ -538,7 +536,7 @@ class Project(Definition):
             return estimate(
                 self.orchestrator,
                 self.estimand,
-                self.estimation_policy,
+                self.policy,
                 artifact_directory,
             )
         except REFUSALS as error:
@@ -546,7 +544,7 @@ class Project(Definition):
                 refuse(
                     artifact_directory,
                     self.estimand,
-                    self.estimation_policy,
+                    self.policy,
                     error,
                 )
             raise
@@ -596,7 +594,7 @@ class Project(Definition):
         return result
 
     @classmethod
-    def verify_replay(
+    def verify(
         cls,
         run_directory: str | pathlib.Path,
         data: pandas.DataFrame | None = None,
@@ -633,7 +631,7 @@ class Project(Definition):
             persist(rerun, estimation)
         return reproducibility.judge(
             reproducibility.reread(original),
-            reproducibility.reread(rerun.run_dir),
+            reproducibility.reread(rerun.directory),
         )
 
     def cancel(self) -> None:
@@ -641,7 +639,7 @@ class Project(Definition):
         self.orchestrator.cancel()
 
 
-class ModalityProject:
+class Modality:
     """Runs a typed non-tabular dataset through the shared lifecycle.
 
     ``Project`` remains the supported tabular beta surface. This project
@@ -672,40 +670,40 @@ class ModalityProject:
     def __init__(
         self,
         adapter: modality_lifecycle.Preparer,
-        signing_key: str | bytes,
+        key: str | bytes,
         *,
-        output_dir: str | pathlib.Path = "runs",
+        directory: str | pathlib.Path = "runs",
         seed: int = 42,
-        observed_adapter: modality_lifecycle.Preparer | None = None,
-        performance_budget: performance.Budget | None = None,
-        performance_baseline: performance.Baseline | None = None,
+        observed: modality_lifecycle.Preparer | None = None,
+        budget: performance.Budget | None = None,
+        baseline: performance.Baseline | None = None,
         manifest: scmle.contracts.data.Passport | None = None,
-        require_independent_ground_truth: bool = False,
+        independent: bool = False,
         cancellation: modality_lifecycle.Cancellation | None = None,
-        checkpoint_path: str | pathlib.Path | None = None,
+        checkpoint: str | pathlib.Path | None = None,
         resume: bool = False,
     ) -> None:
         """Defines an experimental lifecycle run.
 
         Args:
             adapter: Typed adapter that owns modality validation and features.
-            signing_key: Non-empty key used to authenticate the package.
-            output_dir: Directory for the package (in its `model` subdirectory,
+            key: Non-empty key used to authenticate the package.
+            directory: Directory for the package (in its `model` subdirectory,
                 which must not already exist) and the lifecycle report
                 (`modality_lifecycle.json`).
             seed: Deterministic split and model seed.
-            observed_adapter: Optional shifted dataset for monitoring.
-            performance_budget: Optional declared performance budget.
-            performance_baseline: Optional comparable-run baseline.
+            observed: Optional shifted dataset for monitoring.
+            budget: Optional declared performance budget.
+            baseline: Optional comparable-run baseline.
             manifest: Optional identity and governance contract.
-            require_independent_ground_truth: Require a complete independent
+            independent: Require a complete independent
                 explanation reference suite before packaging.
             cancellation: Optional thread-safe signal for cooperative
                 cancellation at lifecycle checkpoints.
-            checkpoint_path: Optional signed checkpoint file for durable
+            checkpoint: Optional signed checkpoint file for durable
                 modality recovery. It must differ from the report path the
-                project uses (`modality_lifecycle.json` in `output_dir`).
-            resume: Resume from ``checkpoint_path`` after verifying its
+                project uses (`modality_lifecycle.json` in `directory`).
+            resume: Resume from ``checkpoint`` after verifying its
                 signature, identity, and deterministic replay of the completed
                 work.
 
@@ -717,27 +715,27 @@ class ModalityProject:
         """
         if not isinstance(adapter, modality_lifecycle.Preparer):
             raise errors.KindError("adapter must be a Preparer")
-        vet(signing_key, seed, require_independent_ground_truth, resume)
+        vet(key, seed, independent, resume)
         if cancellation is not None and not isinstance(
             cancellation, modality_lifecycle.Cancellation
         ):
             raise errors.KindError("cancellation must be a Cancellation")
-        if observed_adapter is not None and not isinstance(
-            observed_adapter, modality_lifecycle.Preparer
+        if observed is not None and not isinstance(
+            observed, modality_lifecycle.Preparer
         ):
             raise errors.KindError("observed_adapter must be a Preparer")
         self.adapter = adapter
-        self.signing_key = signing_key
-        self.output_dir = pathlib.Path(output_dir)
+        self.key = key
+        self.directory = pathlib.Path(directory)
         self.seed = seed
-        self.observed_adapter = observed_adapter
-        self.performance_budget = performance_budget
-        self.performance_baseline = performance_baseline
+        self.observed = observed
+        self.budget = budget
+        self.baseline = baseline
         self.manifest = manifest
-        self.require_independent_ground_truth = require_independent_ground_truth
-        self.checkpoint_path = (
-            pathlib.Path(checkpoint_path)
-            if checkpoint_path is not None
+        self.independent = independent
+        self.checkpoint = (
+            pathlib.Path(checkpoint)
+            if checkpoint is not None
             else None
         )
         self.resume = resume
@@ -755,24 +753,24 @@ class ModalityProject:
             The lifecycle report, also kept as `report`.
 
         Raises:
-            ValueError: If `output_dir` exists and is not a directory.
+            ValueError: If `directory` exists and is not a directory.
         """
-        if self.output_dir.exists() and not self.output_dir.is_dir():
+        if self.directory.exists() and not self.directory.is_dir():
             raise errors.InputError("output_dir must be a directory")
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.directory.mkdir(parents=True, exist_ok=True)
         self.report = self.lifecycle.run(
             self.adapter,
-            self.output_dir / "model",
-            self.signing_key,
+            self.directory / "model",
+            self.key,
             seed=self.seed,
-            observed_adapter=self.observed_adapter,
-            report_path=self.output_dir / "modality_lifecycle.json",
-            performance_budget=self.performance_budget,
-            performance_baseline=self.performance_baseline,
+            observed_adapter=self.observed,
+            report_path=self.directory / "modality_lifecycle.json",
+            performance_budget=self.budget,
+            performance_baseline=self.baseline,
             manifest=self.manifest,
-            require_independent_ground_truth=self.require_independent_ground_truth,
+            require_independent_ground_truth=self.independent,
             cancellation_check=self.cancellation.is_cancelled,
-            checkpoint_path=self.checkpoint_path,
+            checkpoint_path=self.checkpoint,
             resume=self.resume,
         )
         return self.report

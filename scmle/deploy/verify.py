@@ -29,18 +29,18 @@ class Verified:
     """What was established about a service folder before loading.
 
     Attributes:
-        bundle_digest: Digest of the bundle manifest.
-        bundle_signed: Whether the bundle's signature verified.
-        provenance_verified: Whether a provenance statement was present and its
+        digest: Digest of the bundle manifest.
+        signed: Whether the bundle's signature verified.
+        verified: Whether a provenance statement was present and its
             signature verified.
         trusted: Whether the unsigned bundle is loaded on the strength of
             `SCMLE_TRUSTED=1` (never true for a signed bundle).
         production: Whether the environment declares itself production.
     """
 
-    bundle_digest: str
-    bundle_signed: bool
-    provenance_verified: bool
+    digest: str
+    signed: bool
+    verified: bool
     trusted: bool
     production: bool
 
@@ -133,8 +133,8 @@ def inspect(folder: str | pathlib.Path, environ: Mapping[str, str]) -> Verified:
     model_directory = root / "model"
     key = signing.lookup(environ)
     refuse(key, production, environ.get(ALLOW_PUBLISHED_KEY) == "1")
-    digest = provenance.bundle_digest(model_directory)
-    signed = bundle.verify_signature(model_directory, key)
+    digest = provenance.digest(model_directory)
+    signed = bundle.verify(model_directory, key)
     if not signed and (production or not trusted):
         raise errors.ArtifactError(
             "refusing to load an unauthenticated bundle: it is pickle-based "

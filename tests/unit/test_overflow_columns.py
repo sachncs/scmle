@@ -8,10 +8,8 @@ import pandas
 from scmle.contracts import data
 from scmle.preparation import preprocessing
 
-PLAN = data.Blueprint(
-    numeric=(), categorical=("code",), high_cardinality=("code",)
-)
-OPTIONS = data.Preprocessing(high_cardinality="ordinal")
+PLAN = data.Blueprint(numeric=(), categorical=("code",), cardinal=("code",))
+OPTIONS = data.Preprocessing(cardinality="ordinal")
 
 
 def unique(rows=2000, seed=0):
@@ -24,7 +22,7 @@ def test_the_overflow_encoding_is_cross_fitted():
     # Every level is seen once, so a plain target mean would be the row's
     # own label; the cross-fitted encoding of a training row never sees it.
     codes, target = unique()
-    prep = preprocessing.build_preprocessor(PLAN, OPTIONS)
+    prep = preprocessing.build(PLAN, OPTIONS)
     matrix = prep.fit_transform(codes, target)
     names = list(prep.get_feature_names_out())
     assert names == ["code", "code__target"]
@@ -49,6 +47,6 @@ def test_the_wide_columns_are_chosen_on_the_fitted_rows():
 
 def test_a_fitted_overflow_survives_a_pickle():
     codes, target = unique(rows=600)
-    prep = preprocessing.build_preprocessor(PLAN, OPTIONS).fit(codes, target)
+    prep = preprocessing.build(PLAN, OPTIONS).fit(codes, target)
     again = pickle.loads(pickle.dumps(prep))
     assert numpy.array_equal(again.transform(codes), prep.transform(codes))

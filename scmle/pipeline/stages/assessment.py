@@ -111,7 +111,7 @@ class Assessment(summary.Summary):
         selected = products.require(
             board.get(selecting.Choice).selected, "selected"
         )
-        return f"final one-time test evaluation of {selected.model_name}"
+        return f"final one-time test evaluation of {selected.model}"
 
     def execute(self, board: engine.Board) -> Exam:
         """Refits on all development data and evaluates on the test set.
@@ -207,13 +207,13 @@ class Assessment(summary.Summary):
         Returns:
             The refit made during selection if there is one, else a new fit.
         """
-        pipeline = board.get(selecting.Choice).refits.get(selected.trial_id)
+        pipeline = board.get(selecting.Choice).refits.get(selected.identifier)
         partition = board.get(profiling.Partition)
         if pipeline is None:
             split = partition.split
             pipeline = strategies.lookup(selected.strategy).build(
-                partition.profile.feature_plan,
-                board.services.registry.get(selected.model_name),
+                partition.profile.plan,
+                board.services.registry.get(selected.model),
                 task,
                 board.services.spec.validation.seed,
                 selected.params,
@@ -270,8 +270,8 @@ class Assessment(summary.Summary):
         features, target = pool(split, rows)
         task = partition.task
         fitted = strategies.lookup(selected.strategy).build(
-            partition.profile.feature_plan,
-            board.services.registry.get(selected.model_name),
+            partition.profile.plan,
+            board.services.registry.get(selected.model),
             task,
             board.services.spec.validation.seed,
             selected.params,

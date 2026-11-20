@@ -21,12 +21,12 @@ def make_spec(**changes):
     values = {
         "version": "1.2.0",
         "environment": "staging",
-        "image": contract.ImageRef("registry.example/scmle-svc", IMAGE),
-        "bundle": contract.BundleRef("churn", "v3", BUNDLE, True),
+        "image": contract.Image("registry.example/scmle-svc", IMAGE),
+        "bundle": contract.Bundle("churn", "v3", BUNDLE, True),
         "resources": resources(0.5, 1.0, 256, 512),
         "config": {"PORT": "8000", "SCMLE_ENV": "staging"},
         "secrets": (
-            contract.SecretRef("SCMLE_SIGNING_KEY", "env", "SIGNING_KEY_SRC"),
+            contract.Secret("SCMLE_SIGNING_KEY", "env", "SIGNING_KEY_SRC"),
         ),
     }
     values.update(changes)
@@ -46,17 +46,17 @@ class FakeAdapter(contract.Provider):
         )
         self.last = None
 
-    def supported_architectures(self):
+    def support(self):
         return self.architectures
 
     def apply(self, spec):
         values = {
-            "spec_digest": spec.digest(),
-            "image_digest": spec.image.digest,
-            "bundle_digest": spec.bundle.digest,
-            "model_version": spec.bundle.version,
+            "spec": spec.digest(),
+            "image": spec.image.digest,
+            "digest": spec.bundle.digest,
+            "version": spec.bundle.version,
             "ready": True,
-            "secret_names": tuple(s.name for s in spec.secrets),
+            "secrets": tuple(s.name for s in spec.secrets),
         }
         values.update(self.drift)
         self.last = contract.Runtime(**values)
@@ -96,25 +96,25 @@ def test_config_order_does_not_change_the_digest():
 )
 def test_an_image_must_be_pinned_by_a_real_digest(digest):
     with pytest.raises(errors.ConfigError, match="digest"):
-        contract.ImageRef("registry.example/x", digest)
+        contract.Image("registry.example/x", digest)
 
 
 def test_architectures_must_be_known_and_unique():
     with pytest.raises(ValueError):
-        contract.ImageRef("registry.example/x", IMAGE, ("sparc",))
+        contract.Image("registry.example/x", IMAGE, ("sparc",))
     with pytest.raises(errors.ConfigError, match="unique"):
-        contract.ImageRef("registry.example/x", IMAGE, ("amd64", "amd64"))
+        contract.Image("registry.example/x", IMAGE, ("amd64", "amd64"))
 
 
 def test_secrets_are_references_not_values():
     with pytest.raises(errors.ConfigError, match="plain reference"):
-        contract.SecretRef("TOKEN", "store", "abc=def")
+        contract.Secret("TOKEN", "store", "abc=def")
     with pytest.raises(errors.ConfigError, match="plain reference"):
-        contract.SecretRef("TOKEN", "store", "-----BEGIN PRIVATE KEY-----")
+        contract.Secret("TOKEN", "store", "-----BEGIN PRIVATE KEY-----")
     with pytest.raises(errors.ConfigError, match="absolute"):
-        contract.SecretRef("TOKEN", "file", "relative/path")
+        contract.Secret("TOKEN", "file", "relative/path")
     with pytest.raises(errors.ConfigError, match="variable name"):
-        contract.SecretRef("TOKEN", "env", "lower")
+        contract.Secret("TOKEN", "env", "lower")
 
 
 def test_a_secret_looking_config_key_is_refused():
@@ -128,7 +128,7 @@ def test_a_name_cannot_be_both_config_and_secret():
     with pytest.raises(errors.ConfigError, match="both"):
         make_spec(
             config={"OTHER": "2"},
-            secrets=(contract.SecretRef("OTHER", "env", "OTHER_SRC"),),
+            secrets=(contract.Secret("OTHER", "env", "OTHER_SRC"),),
         )
 
 
@@ -140,7 +140,7 @@ def test_production_refuses_trusted_loading_and_unsigned_bundles():
     with pytest.raises(errors.ConfigError, match="signed"):
         make_spec(
             environment="production",
-            bundle=contract.BundleRef("churn", "v3", BUNDLE, False),
+            bundle=contract.Bundle("churn", "v3", BUNDLE, False),
         )
     assert make_spec(environment="staging", config={"SCMLE_TRUSTED": "1"})
 
@@ -180,7 +180,7 @@ def test_a_conforming_adapter_deploys():
     spec = make_spec()
     adapter = FakeAdapter()
     report = adapter.deploy(spec)
-    assert contract.conformance_problems(spec, report) == []
+    assert contract.audit(spec, report) == []
     assert adapter.observe() is report
 
 

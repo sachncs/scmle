@@ -173,7 +173,7 @@ def test_check_results_round_trip_and_refuse_unknown_fields():
 
 def test_http_fetch_refuses_a_relative_url():
     with pytest.raises(errors.ConfigError):
-        livetests.http_fetch("staging.example.test")
+        livetests.fetch("staging.example.test")
 
 
 # ---- the gate ----------------------------------------------------------
@@ -190,7 +190,7 @@ def test_a_complete_staging_release_is_admitted_and_certified_with_a_record():
         support_release.COMMIT,
         support_release.CONTAINER,
     )
-    assert record.digests["model"] == candidate.model_digest
+    assert record.digests["model"] == candidate.reported
     assert record.digests["config"] == support_release.CONFIG
     assert record.approver == "release-manager"
     assert set(dict(record.evidence)) == set(livetests.CHECK_NAMES)
@@ -200,8 +200,8 @@ def test_a_complete_staging_release_is_admitted_and_certified_with_a_record():
 def test_a_record_round_trips_and_detects_tampering(tmp_path):
     record = support_release.staging_record()
     path = tmp_path / "staging.json"
-    scmle.deploy.record.write_record(path, record)
-    again = scmle.deploy.record.read_record(path)
+    scmle.deploy.record.write(path, record)
+    again = scmle.deploy.record.read(path)
     assert again == record and again.verify(support_release.KEY)
     assert not again.verify("another-key")
     forged = dataclasses.replace(again, approver="someone-else")
@@ -248,7 +248,7 @@ MODEL_FAILURES = {
         "independent review",
     ),
     "other bundle": (
-        {"approval": support_release.approval(content_id="8" * 64)},
+        {"approval": support_release.approval(content="8" * 64)},
         "does not match bundle identity",
     ),
     "other version": (
@@ -284,7 +284,7 @@ SCAN_FAILURES = {
     "no scan": ({"scan": None}, "no scan result"),
     "failed scan": (
         {
-            "scan": gate.ImageScan(
+            "scan": gate.Scan(
                 support_release.CONTAINER, False, support_release.SCAN_REPORT
             )
         },
@@ -292,7 +292,7 @@ SCAN_FAILURES = {
     ),
     "scan of another image": (
         {
-            "scan": gate.ImageScan(
+            "scan": gate.Scan(
                 support_release.OTHER_CONTAINER,
                 True,
                 support_release.SCAN_REPORT,
@@ -409,7 +409,7 @@ def test_the_platform_must_show_the_candidate_running():
 
 def test_production_needs_a_matching_signed_staging_record():
     staged = support_release.staging_record()
-    good = support_release.candidate("production", staging_record=staged)
+    good = support_release.candidate("production", record=staged)
     assert gate.certify(good, support_release.KEY, support_release.NOW).allowed
     refused(
         support_release.candidate("production"),
@@ -417,7 +417,7 @@ def test_production_needs_a_matching_signed_staging_record():
     )
     forged = dataclasses.replace(staged, approver="intruder")
     refused(
-        support_release.candidate("production", staging_record=forged),
+        support_release.candidate("production", record=forged),
         "signature is not valid",
     )
     for field, value, expected in (
@@ -438,21 +438,21 @@ def test_production_needs_a_matching_signed_staging_record():
             support_release.KEY
         )
         refused(
-            support_release.candidate("production", staging_record=other),
+            support_release.candidate("production", record=other),
             expected,
         )
     thin = dataclasses.replace(staged, evidence=staged.evidence[:2]).signed(
         support_release.KEY
     )
     refused(
-        support_release.candidate("production", staging_record=thin),
+        support_release.candidate("production", record=thin),
         "staging evidence is missing",
     )
     again = dataclasses.replace(staged, environment="production").signed(
         support_release.KEY
     )
     refused(
-        support_release.candidate("production", staging_record=again),
+        support_release.candidate("production", record=again),
         "not for staging",
     )
 
@@ -462,7 +462,7 @@ def test_a_staging_record_signed_with_another_key_is_refused():
         "some-other-key"
     )
     refused(
-        support_release.candidate("production", staging_record=other),
+        support_release.candidate("production", record=other),
         "signature is not valid",
     )
 

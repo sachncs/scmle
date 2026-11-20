@@ -40,7 +40,7 @@ class Edict(enum.StrEnum):
 def texts(values: Iterable[Any], name: str) -> tuple[str, ...]:
     """Converts values to text and requires each to be non-blank.
 
-    A blank value raises `ValueError` (from `evidence.require_text`).
+    A blank value raises `ValueError` (from `evidence.require`).
 
     Args:
         values: The items; each is converted with `str`.
@@ -49,7 +49,7 @@ def texts(values: Iterable[Any], name: str) -> tuple[str, ...]:
     Returns:
         The stripped strings, in the order of `values`.
     """
-    return tuple(evidence.require_text(str(v), name) for v in values)
+    return tuple(evidence.require(str(v), name) for v in values)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -70,10 +70,10 @@ class Event:
         """Validates the record.
 
         A blank `event` or `strategy` raises `ValueError` (from
-        `evidence.require_text`).
+        `evidence.require`).
         """
-        evidence.require_text(self.event, "event")
-        evidence.require_text(self.strategy, "strategy")
+        evidence.require(self.event, "event")
+        evidence.require(self.strategy, "strategy")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the record.
@@ -149,10 +149,10 @@ class Estimand:
         """
         if self.kind not in ESTIMAND_KINDS:
             raise errors.InputError(f"kind must be one of {ESTIMAND_KINDS}")
-        evidence.require_text(self.population, "population")
-        evidence.require_text(self.target, "target")
-        evidence.require_text(self.moment, "moment")
-        evidence.require_text(self.summary, "summary")
+        evidence.require(self.population, "population")
+        evidence.require(self.target, "target")
+        evidence.require(self.moment, "moment")
+        evidence.require(self.summary, "summary")
         qualification.tupled(self.intercurrent, "intercurrent")
         if not self.intercurrent:
             raise errors.InputError(
@@ -250,8 +250,8 @@ class Trigger:
             ValueError: If `check` or `trigger` is blank, or `action` is
                 not an `Edict`.
         """
-        evidence.require_text(self.check, "check")
-        evidence.require_text(self.trigger, "trigger")
+        evidence.require(self.check, "check")
+        evidence.require(self.trigger, "trigger")
         if not isinstance(self.action, Edict):
             raise errors.InputError("action must be an Edict")
 
@@ -379,7 +379,7 @@ class Choice:
                 empty or has a repeat, or `default` is not one of the
                 options.
         """
-        evidence.require_text(self.name, "name")
+        evidence.require(self.name, "name")
         qualification.tupled(self.options, "options")
         if not self.options or len(set(self.options)) != len(self.options):
             raise errors.InputError("options must be non-empty and distinct")

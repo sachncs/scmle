@@ -52,17 +52,17 @@ def run(tmp_path_factory):
     frame["y"] = (frame.a + rng.normal(scale=0.5, size=240) > 0).astype(int)
     root = tmp_path_factory.mktemp("stages")
     result = scmle.api.project.Project(
-        frame, "y", time_budget=30, output_dir=root
+        frame, "y", budget=30, directory=root
     ).run()
     return result, frame
 
 
 def read(result, relative):
-    return json.loads((result.run_dir / relative).read_text("utf-8"))
+    return json.loads((result.directory / relative).read_text("utf-8"))
 
 
 def kinds(result):
-    lines = (result.run_dir / "events.jsonl").read_text("utf-8").splitlines()
+    lines = (result.directory / "events.jsonl").read_text("utf-8").splitlines()
     return [json.loads(line)["kind"] for line in lines]
 
 
@@ -125,7 +125,7 @@ def test_each_stage_names_what_it_needs_and_makes():
 
 def test_every_stage_left_a_record_in_order(run):
     result = run[0]
-    records = sorted((result.run_dir / "stages").glob("*.json"))
+    records = sorted((result.directory / "stages").glob("*.json"))
     assert [p.name for p in records] == [
         "00-ingeststage.json",
         "01-reservation.json",
@@ -188,7 +188,7 @@ def test_the_reserve_comes_before_profiling_and_selection_before_test(run):
 
 def test_the_reserve_event_reports_the_seconds_held(run):
     result = run[0]
-    lines = (result.run_dir / "events.jsonl").read_text("utf-8").splitlines()
+    lines = (result.directory / "events.jsonl").read_text("utf-8").splitlines()
     reserved = next(
         json.loads(line)
         for line in lines
@@ -203,8 +203,8 @@ def test_the_reserve_event_reports_the_seconds_held(run):
 
 def test_each_trial_is_written_once(run):
     result = run[0]
-    written = sorted(p.stem for p in (result.run_dir / "trials").glob("*.json"))
-    assert written == sorted(t.trial_id for t in result.trials)
+    written = sorted(p.stem for p in (result.directory / "trials").glob("*.json"))
+    assert written == sorted(t.identifier for t in result.trials)
     assert len(set(written)) == len(written)
 
 
@@ -212,8 +212,8 @@ def test_the_selected_trial_is_evaluated_on_the_test_rows(run):
     result = run[0]
     evaluation = read(result, "evaluation.json")
     chosen = evaluation["selected"]
-    assert chosen["model"] == result.selected_model
-    assert chosen["trial"] in {t.trial_id for t in result.trials}
+    assert chosen["model"] == result.model
+    assert chosen["trial"] in {t.identifier for t in result.trials}
     assert set(evaluation["metrics"]) == {
         "roc_auc",
         "pr_auc",
@@ -234,9 +234,9 @@ def test_the_package_serves_the_selected_model(run):
     assert set(numpy.asarray(predictions).tolist()) <= {0, 1}
     probabilities = numpy.asarray(result.predict_proba(rows))
     numpy.testing.assert_allclose(probabilities.sum(axis=1), 1.0)
-    assert (result.run_dir / "model" / "model_manifest.json").exists()
+    assert (result.directory / "model" / "model_manifest.json").exists()
     assert (
-        (result.run_dir / "report.html")
+        (result.directory / "report.html")
         .read_text("utf-8")
         .startswith("<!doctype html>")
     )
@@ -288,9 +288,9 @@ def test_the_cost_helpers_size_this_run(run):
     chosen = next(
         t
         for t in result.trials
-        if t.trial_id == read(result, "evaluation.json")["selected"]["trial"]
+        if t.identifier == read(result, "evaluation.json")["selected"]["trial"]
     )
     assert cost.foldcost(chosen) == pytest.approx(
-        cost.FIT_MARGIN * chosen.fit_seconds / max(len(chosen.fold_scores), 1)
+        cost.FIT_MARGIN * chosen.fit / max(len(chosen.folds), 1)
     )
     assert len(scoring.pin(chosen, None)) == 64

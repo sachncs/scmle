@@ -76,8 +76,8 @@ class Imbalance(Advisor):
             when the target is binary with an imbalance ratio of at least
             `SEVERE_IMBALANCE`; otherwise empty.
         """
-        ratio = float(profile.target_summary.get("imbalance_ratio", 0.0))
-        binary = profile.target_summary.get("task") == str(tasks.Task.BINARY)
+        ratio = float(profile.summary.get("imbalance_ratio", 0.0))
+        binary = profile.summary.get("task") == str(tasks.Task.BINARY)
         if not binary or ratio < SEVERE_IMBALANCE:
             return []
         advice = [
@@ -121,11 +121,9 @@ class Missingness(Advisor):
             missing; otherwise empty.
         """
         overall = float(
-            profile.dataset_statistics.get("missingness", {}).get(
-                "overall_rate", 0.0
-            )
+            profile.overview.get("missingness", {}).get("overall_rate", 0.0)
         )
-        heavy = [f for f in profile.quality_findings if "% missing" in f]
+        heavy = [f for f in profile.quality if "% missing" in f]
         if overall < MISSING_SHARE and not heavy:
             return []
         return [
@@ -197,9 +195,7 @@ class Duplication(Advisor):
             `DUPLICATE_SHARE` and no group column is set; otherwise empty.
         """
         share = float(
-            profile.dataset_statistics.get("quality", {}).get(
-                "duplicate_share", 0.0
-            )
+            profile.overview.get("quality", {}).get("duplicate_share", 0.0)
         )
         if share < DUPLICATE_SHARE or spec.data.group_column:
             return []
@@ -233,7 +229,7 @@ class Scarcity(Advisor):
             One recommendation when there are fewer than `SMALL_DATA_ROWS` rows;
             otherwise empty (also when the row count is unknown).
         """
-        rows = int(profile.dataset_statistics.get("shape", {}).get("rows", 0))
+        rows = int(profile.overview.get("shape", {}).get("rows", 0))
         if rows == 0 or rows >= SMALL_DATA_ROWS:
             return []
         return [

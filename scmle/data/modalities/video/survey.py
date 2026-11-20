@@ -37,7 +37,7 @@ def synchronization(samples: Sequence[Sample]) -> list[data.Finding]:
         quality_findings.append(
             flaw(
                 "quality.video-audio-sync-out-of-tolerance",
-                data.FindingSeverity.ERROR,
+                data.Severity.ERROR,
                 {"sources": out_of_tolerance},
                 {"count": len(out_of_tolerance)},
                 "Align audio and video or exclude synchronization-"
@@ -49,7 +49,7 @@ def synchronization(samples: Sequence[Sample]) -> list[data.Finding]:
         quality_findings.append(
             flaw(
                 "quality.video-audio-sync-unknown",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"sources": unknown_synchronization},
                 {"count": len(unknown_synchronization)},
                 "Supply measured audio duration, offset, and tolerance "
@@ -83,7 +83,7 @@ def drift(
         quality_findings.append(
             flaw(
                 "quality.video-encoding-drift",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"sources": [profile.source for profile in profiles]},
                 {"formats": formats, "codecs": codecs},
                 "Choose an explicit decoder and normalization policy "
@@ -95,7 +95,7 @@ def drift(
         quality_findings.append(
             flaw(
                 "quality.video-dimension-drift",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"sources": [profile.source for profile in profiles]},
                 {"dimensions": [list(value) for value in dimensions]},
                 "Record frame resizing or bucketing as a versioned "
@@ -156,7 +156,7 @@ def risks(
         risk_findings.append(
             flaw(
                 "risk.video-mixed-label-state",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"dataset": content_hash},
                 {"label_counts": labels},
                 "Declare whether unlabeled clips are valid for the "
@@ -168,7 +168,7 @@ def risks(
         risk_findings.append(
             flaw(
                 "risk.video-conflicting-duplicate-labels",
-                data.FindingSeverity.ERROR,
+                data.Severity.ERROR,
                 {"dataset": content_hash},
                 {"groups": list(conflicts)},
                 "Resolve the label conflict or explicitly exclude the "
@@ -244,7 +244,7 @@ class Survey:
             quality_findings.append(
                 flaw(
                     "quality.video-mixed-temporal-state",
-                    data.FindingSeverity.WARNING,
+                    data.Severity.WARNING,
                     {"dataset": self.digest},
                     temporal_evidence,
                     "Supply observation times for every clip before using "

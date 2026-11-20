@@ -42,7 +42,7 @@ def test_violations_are_counted_ledgered_and_escalate_without_retraining(
     tmp_path,
 ):
     loop = open_loop(tmp_path, make_policy(coverage=0.9, retrain=False))
-    feed = uncertainty_feed.UncertaintyFeed(loop, StubBundle(), 0.9)
+    feed = uncertainty_feed.Feed(loop, StubBundle(), 0.9)
 
     violations = run(feed, 30, "z")
 
@@ -53,7 +53,7 @@ def test_violations_are_counted_ledgered_and_escalate_without_retraining(
         if r["body"].get("source") == uncertainty_feed.SOURCE
     ]
     assert rows[0]["violations"] == 40 and rows[0]["gates_retrain"] is False
-    actions = {e.question["action"] for e in loop.pending_escalations()}
+    actions = {e.question["action"] for e in loop.survey()}
     assert "coverage_below_nominal" in actions
     kinds = {r["kind"] for r in loop.ledger.rows}
     assert "retrain" not in kinds
@@ -62,11 +62,11 @@ def test_violations_are_counted_ledgered_and_escalate_without_retraining(
 
 def test_covered_cases_raise_no_coverage_escalation(tmp_path):
     loop = open_loop(tmp_path, make_policy(coverage=0.9, retrain=False))
-    feed = uncertainty_feed.UncertaintyFeed(loop, StubBundle(), 0.9)
+    feed = uncertainty_feed.Feed(loop, StubBundle(), 0.9)
 
     assert run(feed, 30, "a") == 0
 
-    actions = {e.question["action"] for e in loop.pending_escalations()}
+    actions = {e.question["action"] for e in loop.survey()}
     assert "coverage_below_nominal" not in actions
 
 
@@ -78,23 +78,23 @@ def test_set_size_and_novelty_go_to_the_loop(tmp_path):
             {"out_of_distribution": [True] * len(f)}, index=f.index
         )
     )
-    feed = uncertainty_feed.UncertaintyFeed(loop, bundle, 0.9)
+    feed = uncertainty_feed.Feed(loop, bundle, 0.9)
     ids = [f"x{i}" for i in range(10)]
 
     feed.observe(served(10, 1.0), numpy.zeros(10), ["approve"] * 10, ids)
 
     row = [r for r in loop.ledger.rows if r["kind"] == "observe_summary"][-1]
     assert row["body"]["cases"] == 10
-    assert loop.pending_batches[-1]["novel"] == [True] * 10
+    assert loop.batches[-1]["novel"] == [True] * 10
     assert set(feed.sets["x0"]) == {"a", "b"}
 
 
 def test_labels_of_unserved_cases_and_bad_nominals_are_refused(tmp_path):
     loop = open_loop(tmp_path, make_policy(retrain=False))
-    feed = uncertainty_feed.UncertaintyFeed(loop, StubBundle(), 0.9)
+    feed = uncertainty_feed.Feed(loop, StubBundle(), 0.9)
     with pytest.raises(errors.ScmleError, match="did not serve"):
         feed.mature({"ghost": "a"}, {})
     with pytest.raises(ValueError):
-        uncertainty_feed.UncertaintyFeed(loop, StubBundle(), 1.0)
+        uncertainty_feed.Feed(loop, StubBundle(), 1.0)
     with pytest.raises(ValueError):
         feed.observe(served(3), numpy.zeros(3), ["approve"] * 3, ["a"])

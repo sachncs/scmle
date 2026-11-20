@@ -32,17 +32,15 @@ def test_ordinal_levels_join_the_given_parameters() -> None:
 def test_the_options_carry_the_plan_embedding_model() -> None:
     plan = data.Blueprint(("x",), (), embedding_model="local/encoder")
     adapter = scmle.models.registry.Catalog.stock().get("ridge")
-    options = preprocessing.default_options(plan, adapter)
-    assert options.embedding_model == "local/encoder"
+    options = preprocessing.default(plan, adapter)
+    assert options.model == "local/encoder"
 
 
 def test_derived_features_run_before_the_column_transformer() -> None:
     node = tasks.Node(name="z", op="square", inputs=["x"])
     plan = data.Blueprint(("x",), (), derived=(node,))
     adapter = scmle.models.registry.Catalog.stock().get("ridge")
-    front = preprocessing.frontend(
-        plan, preprocessing.default_options(plan, adapter)
-    )
+    front = preprocessing.frontend(plan, preprocessing.default(plan, adapter))
     assert isinstance(front, pipeline.Pipeline)
     assert [step[0] for step in front.steps] == ["graph", "prep"]
     assert isinstance(front.steps[0][1], feature_graph.Transformer)

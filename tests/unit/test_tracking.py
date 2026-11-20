@@ -26,7 +26,7 @@ def make_trial(
 
 @pytest.fixture
 def store(tmp_path):
-    return stores.SqliteExperimentStore(tmp_path / "db" / "experiments.sqlite")
+    return stores.Sqlite(tmp_path / "db" / "experiments.sqlite")
 
 
 def test_run_lifecycle_and_lineage(store):
@@ -99,7 +99,7 @@ def test_every_operation_closes_its_connection(tmp_path):
 
     with warnings.catch_warnings():
         warnings.simplefilter("error", ResourceWarning)
-        store = stores.SqliteExperimentStore(tmp_path / "leak.sqlite")
+        store = stores.Sqlite(tmp_path / "leak.sqlite")
         store.commence("r", "h", "d", "2026-10-15T00:00:00+00:00")
         store.revise("r", state="TRAINING", fingerprint={"a": 1.0})
         store.transcribe("r", make_trial())
@@ -110,7 +110,7 @@ def test_every_operation_closes_its_connection(tmp_path):
 
 
 def test_a_failed_update_rolls_back_and_still_closes(tmp_path):
-    store = stores.SqliteExperimentStore(tmp_path / "rollback.sqlite")
+    store = stores.Sqlite(tmp_path / "rollback.sqlite")
     store.commence("r", "h", "d", "2026-10-15T00:00:00+00:00")
     with pytest.raises(ValueError):
         store.revise("r", bogus=1)
@@ -125,7 +125,7 @@ def test_store_connections_wait_for_a_busy_database(tmp_path):
     """
     from scmle.storage import stores
 
-    store = stores.SqliteExperimentStore(tmp_path / "tracking.sqlite")
+    store = stores.Sqlite(tmp_path / "tracking.sqlite")
     connection = store.connect()
     try:
         waited_ms = connection.execute("PRAGMA busy_timeout").fetchone()[0]

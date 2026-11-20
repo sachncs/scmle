@@ -159,7 +159,7 @@ def test_media_kinds_declare_experimental_capabilities_beside_the_tabular_ones()
             item.status is capabilities.Status.EXPERIMENTAL for item in declared
         )
         assert {item.key for item in declared} <= set(registry.records)
-    assert image.IMAGE.declare()[0].required_extras == ("multimodal",)
+    assert image.IMAGE.declare()[0].extras == ("multimodal",)
 
 
 def test_media_cost_adds_the_per_file_bound_to_the_profiling_bound():

@@ -108,7 +108,7 @@ def test_numeric_statistics_include_skew():
 
 def test_numeric_transformer_composes_optional_steps():
     full = columns.Quantitative().transformer(
-        data.Preprocessing(scale=True, log_skewed=True, interactions=True)
+        data.Preprocessing(scale=True, skewed=True, interactions=True)
     )
     assert list(full.named_steps) == [
         "cast",

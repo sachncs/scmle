@@ -70,11 +70,11 @@ def test_the_base_estimator_stores_settings_and_has_empty_hooks():
     assert estimator.Estimator.name == ""
     assert (adapter.spec, adapter.x, adapter.seed) == (spec, frame, 3)
     assert adapter.learner == "linear"
-    assert adapter.alpha_falsify == 0.01
+    assert adapter.falsify == 0.01
     assert adapter.design == {}
     assert adapter.refusal is None
     assert adapter.weak is False
-    assert adapter.single_unit is False
+    assert adapter.unit is False
     assert adapter.notes == []
     assert adapter.prepare() is None
     assert adapter.controls(frame, 0.9) == []

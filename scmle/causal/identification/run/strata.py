@@ -222,17 +222,17 @@ def certify(found: dict[str, Any], named: tuple[str, ...] | None) -> None:
             from the shipped certificate (None when it is absent, so every
             estimated subgroup then counts as certified size).
     """
-    gate = scmle.causal.identification.certified.subgroup_gate(stratify)
+    gate = scmle.causal.identification.certified.gate(stratify)
     if named is not None:
         listed = scmle.causal.identification.certified.SUBGROUP_GATE in named
-        gate = scmle.causal.identification.certified.SubgroupGate(
+        gate = scmle.causal.identification.certified.Gate(
             scmle.causal.identification.certified.GATING
             if listed
             else scmle.causal.identification.certified.DESCRIPTIVE,
             "named among the certified gates"
             if listed
             else "the caller named the certified gates and this is not one",
-            gate.min_rows,
+            gate.rows,
         )
     found["gate"] = gate.to_dict()
     gating = gate.status == scmle.causal.identification.certified.GATING
@@ -241,7 +241,7 @@ def certify(found: dict[str, Any], named: tuple[str, ...] | None) -> None:
         row["certified_size"] = bool(
             gating
             and size is not None
-            and (gate.min_rows is None or size >= gate.min_rows)
+            and (gate.rows is None or size >= gate.rows)
         )
     found["statement_gate"] = (
         "gating: the family-wise error and the power at the certified size "
@@ -254,7 +254,7 @@ def certify(found: dict[str, Any], named: tuple[str, ...] | None) -> None:
     )
 
 
-def subgroup_results(
+def estimate(
     adapter: Estimator,
     spec: causal.Question,
     c: pandas.DataFrame,
@@ -280,7 +280,7 @@ def subgroup_results(
     weak_before_subgroups = adapter.weak
     found = (
         stratify(adapter, c, level, spec.subgroups)
-        if spec.subgroups and not adapter.single_unit
+        if spec.subgroups and not adapter.unit
         else None
     )
     adapter.weak = weak_before_subgroups

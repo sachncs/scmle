@@ -42,9 +42,9 @@ class Thresholds:
     """Declared release thresholds for explanation quality measures.
 
     Attributes:
-        stability_minimum: Smallest acceptable stability score in [0, 1], or
+        stability: Smallest acceptable stability score in [0, 1], or
             None when stability is not required.
-        fidelity_minimum: Smallest acceptable fidelity score in [0, 1], or
+        minimum: Smallest acceptable fidelity score in [0, 1], or
             None when fidelity is not required.
         migrations: The written layout's version steps, oldest first;
             version 2 writes the two minimums as `stability` and `fidelity`.
@@ -59,8 +59,8 @@ class Thresholds:
         ),
     )
 
-    stability_minimum: float | None = None
-    fidelity_minimum: float | None = None
+    stability: float | None = None
+    minimum: float | None = None
 
     def __post_init__(self) -> None:
         """Validates every declared threshold.
@@ -72,14 +72,14 @@ class Thresholds:
             ValueError: If neither threshold is declared, or a declared
                 threshold is not finite or lies outside [0, 1].
         """
-        if self.stability_minimum is None and self.fidelity_minimum is None:
+        if self.stability is None and self.minimum is None:
             raise errors.InputError(
                 "at least one explanation threshold is required"
             )
-        if self.stability_minimum is not None:
-            validate(self.stability_minimum, "stability_minimum")
-        if self.fidelity_minimum is not None:
-            validate(self.fidelity_minimum, "fidelity_minimum")
+        if self.stability is not None:
+            validate(self.stability, "stability_minimum")
+        if self.minimum is not None:
+            validate(self.minimum, "fidelity_minimum")
 
     def to_dict(self) -> dict[str, float | None]:
         """Returns JSON-compatible threshold declarations.
@@ -89,8 +89,8 @@ class Thresholds:
             or None.
         """
         return {
-            "stability": self.stability_minimum,
-            "fidelity": self.fidelity_minimum,
+            "stability": self.stability,
+            "fidelity": self.minimum,
         }
 
 
@@ -100,10 +100,10 @@ class Evaluation:
 
     Attributes:
         method: Name of the explanation method that was checked.
-        sample_count: Number of samples the checks covered.
-        stability_score: Measured stability in [0, 1], or None if not
+        samples: Number of samples the checks covered.
+        stability: Measured stability in [0, 1], or None if not
             measured.
-        fidelity_score: Measured fidelity in [0, 1], or None if not
+        score: Measured fidelity in [0, 1], or None if not
             measured.
         thresholds: The declared thresholds the scores were compared with.
         passed: Whether every declared threshold was met.
@@ -125,9 +125,9 @@ class Evaluation:
     )
 
     method: str
-    sample_count: int
-    stability_score: float | None
-    fidelity_score: float | None
+    samples: int
+    stability: float | None
+    score: float | None
     thresholds: Thresholds
     passed: bool
     findings: tuple[str, ...]
@@ -136,19 +136,19 @@ class Evaluation:
         """Validates the evaluation record before it is persisted.
 
         Raises:
-            ValueError: If `method` is blank, `sample_count` is below 1, or
+            ValueError: If `method` is blank, `samples` is below 1, or
                 a present score is not finite or lies outside [0, 1].
             TypeError: If a present score is not numeric or `findings` is
                 not a tuple.
         """
         if not self.method.strip():
             raise errors.InputError("method must not be empty")
-        if self.sample_count < 1:
+        if self.samples < 1:
             raise errors.InputError("sample_count must be at least 1")
-        if self.stability_score is not None:
-            validate(self.stability_score, "stability_score")
-        if self.fidelity_score is not None:
-            validate(self.fidelity_score, "fidelity_score")
+        if self.stability is not None:
+            validate(self.stability, "stability_score")
+        if self.score is not None:
+            validate(self.score, "fidelity_score")
         if not isinstance(self.findings, tuple):
             raise errors.KindError("findings must be a tuple")
 
@@ -161,9 +161,9 @@ class Evaluation:
         """
         return {
             "method": self.method,
-            "samples": self.sample_count,
-            "stability": self.stability_score,
-            "fidelity": self.fidelity_score,
+            "samples": self.samples,
+            "stability": self.stability,
+            "fidelity": self.score,
             "thresholds": self.thresholds.to_dict(),
             "passed": self.passed,
             "findings": list(self.findings),
@@ -181,9 +181,9 @@ class Truth:
     Attributes:
         method: Name of the explanation method the reference applies to.
         reference: Description of where the reference ranking comes from.
-        expected_features: Feature names that the explanation is expected to
+        features: Feature names that the explanation is expected to
             rank at the top; unique and non-empty.
-        minimum_overlap: Smallest acceptable fraction of the expected
+        overlap: Smallest acceptable fraction of the expected
             features found in the observed top ranking, in [0, 1].
         limitations: Stated limits of the reference.
         migrations: The written layout's version steps, oldest first;
@@ -201,35 +201,35 @@ class Truth:
 
     method: str
     reference: str
-    expected_features: tuple[str, ...]
-    minimum_overlap: float = 1.0
+    features: tuple[str, ...]
+    overlap: float = 1.0
     limitations: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         """Validates the independent reference declaration.
 
-        A `minimum_overlap` that is not a number is rejected by
+        A `overlap` that is not a number is rejected by
         `validate` with a `TypeError`.
 
         Raises:
             ValueError: If `method`, `reference`, or any expected feature or
                 limitation is blank, if no expected features are given or
-                they repeat, or if `minimum_overlap` is not finite or lies
+                they repeat, or if `overlap` is not finite or lies
                 outside [0, 1].
         """
         if not self.method.strip():
             raise errors.InputError("method must not be empty")
         if not self.reference.strip():
             raise errors.InputError("reference must not be empty")
-        if not self.expected_features:
+        if not self.features:
             raise errors.InputError("expected_features must not be empty")
-        if len(set(self.expected_features)) != len(self.expected_features):
+        if len(set(self.features)) != len(self.features):
             raise errors.InputError("expected_features must be unique")
-        if any(not feature.strip() for feature in self.expected_features):
+        if any(not feature.strip() for feature in self.features):
             raise errors.InputError(
                 "expected_features must not contain empty values"
             )
-        validate(self.minimum_overlap, "minimum_overlap")
+        validate(self.overlap, "minimum_overlap")
         if any(not limitation.strip() for limitation in self.limitations):
             raise errors.InputError("limitations must not contain empty values")
 
@@ -243,8 +243,8 @@ class Truth:
         return {
             "method": self.method,
             "reference": self.reference,
-            "expected": list(self.expected_features),
-            "overlap": self.minimum_overlap,
+            "expected": list(self.features),
+            "overlap": self.overlap,
             "limitations": list(self.limitations),
         }
 
@@ -254,16 +254,16 @@ class Comparison:
     """Reviewable comparison between an explanation and its reference.
 
     Attributes:
-        sample_id: Identity of the explained sample.
+        sample: Identity of the explained sample.
         method: Name of the explanation method.
         reference: Description of the reference ranking's source.
-        expected_features: Feature names expected at the top.
-        observed_features: Top features the explanation actually ranked, as
+        features: Feature names expected at the top.
+        observed: Top features the explanation actually ranked, as
             many as there are expected features.
-        overlap_score: Fraction of the expected features that were observed,
+        score: Fraction of the expected features that were observed,
             in [0, 1].
-        minimum_overlap: Smallest overlap that passes, in [0, 1].
-        passed: Whether `overlap_score` reached `minimum_overlap`.
+        overlap: Smallest overlap that passes, in [0, 1].
+        passed: Whether `score` reached `overlap`.
         findings: Human-readable statements explaining the outcome.
         limitations: Stated limits of the reference.
         migrations: The written layout's version steps, oldest first;
@@ -283,13 +283,13 @@ class Comparison:
         ),
     )
 
-    sample_id: str
+    sample: str
     method: str
     reference: str
-    expected_features: tuple[str, ...]
-    observed_features: tuple[str, ...]
-    overlap_score: float
-    minimum_overlap: float
+    features: tuple[str, ...]
+    observed: tuple[str, ...]
+    score: float
+    overlap: float
     passed: bool
     findings: tuple[str, ...]
     limitations: tuple[str, ...]
@@ -301,18 +301,18 @@ class Comparison:
         a `TypeError`.
 
         Raises:
-            ValueError: If `sample_id`, `method` or `reference` is blank, or
+            ValueError: If `sample`, `method` or `reference` is blank, or
                 a score is not finite or lies outside [0, 1].
             TypeError: If `findings` is not a tuple.
         """
-        if not self.sample_id.strip():
+        if not self.sample.strip():
             raise errors.InputError("sample_id must not be empty")
         if not self.method.strip():
             raise errors.InputError("method must not be empty")
         if not self.reference.strip():
             raise errors.InputError("reference must not be empty")
-        validate(self.overlap_score, "overlap_score")
-        validate(self.minimum_overlap, "minimum_overlap")
+        validate(self.score, "overlap_score")
+        validate(self.overlap, "minimum_overlap")
         if not isinstance(self.findings, tuple):
             raise errors.KindError("findings must be a tuple")
 
@@ -325,13 +325,13 @@ class Comparison:
         """
         return {
             "status": "available",
-            "sample": self.sample_id,
+            "sample": self.sample,
             "method": self.method,
             "reference": self.reference,
-            "expected": list(self.expected_features),
-            "observed": list(self.observed_features),
-            "agreement": self.overlap_score,
-            "overlap": self.minimum_overlap,
+            "expected": list(self.features),
+            "observed": list(self.observed),
+            "agreement": self.score,
+            "overlap": self.overlap,
             "passed": self.passed,
             "findings": list(self.findings),
             "limitations": list(self.limitations),
@@ -343,9 +343,9 @@ class Suite:
     """Bounded suite result for independent explanation references.
 
     Attributes:
-        sample_count: Number of samples in the held-out suite.
-        reference_count: Number of samples that have a reference; between 0
-            and `sample_count`.
+        samples: Number of samples in the held-out suite.
+        references: Number of samples that have a reference; between 0
+            and `samples`.
         evaluations: One comparison per referenced sample.
         passed: Whether every sample has a reference and every comparison
             passed.
@@ -362,8 +362,8 @@ class Suite:
         ),
     )
 
-    sample_count: int
-    reference_count: int
+    samples: int
+    references: int
     evaluations: tuple[Comparison, ...]
     passed: bool
     findings: tuple[str, ...]
@@ -372,18 +372,18 @@ class Suite:
         """Validates suite cardinality and evaluation consistency.
 
         Raises:
-            ValueError: If `sample_count` is below 1, `reference_count` is
-                negative or exceeds `sample_count`, or it differs from the
+            ValueError: If `samples` is below 1, `references` is
+                negative or exceeds `samples`, or it differs from the
                 number of evaluations.
             TypeError: If `findings` is not a tuple.
         """
-        if self.sample_count < 1:
+        if self.samples < 1:
             raise errors.InputError("sample_count must be at least 1")
-        if self.reference_count < 0 or self.reference_count > self.sample_count:
+        if self.references < 0 or self.references > self.samples:
             raise errors.InputError(
                 "reference_count must be within sample_count"
             )
-        if self.reference_count != len(self.evaluations):
+        if self.references != len(self.evaluations):
             raise errors.InputError("reference_count must match evaluations")
         if not isinstance(self.findings, tuple):
             raise errors.KindError("findings must be a tuple")
@@ -395,9 +395,9 @@ class Suite:
         It is "not_available" when no sample has a reference, "partial" when
         only some do, and "available" when all do.
         """
-        if self.reference_count == 0:
+        if self.references == 0:
             return "not_available"
-        if self.reference_count < self.sample_count:
+        if self.references < self.samples:
             return "partial"
         return "available"
 
@@ -409,13 +409,11 @@ class Suite:
             score (None when there are no evaluations), the pass flag, the
             findings and the per-sample evaluations as mappings.
         """
-        overlaps = tuple(
-            evaluation.overlap_score for evaluation in self.evaluations
-        )
+        overlaps = tuple(evaluation.score for evaluation in self.evaluations)
         return {
             "status": self.status,
-            "samples": self.sample_count,
-            "references": self.reference_count,
+            "samples": self.samples,
+            "references": self.references,
             "minimum_overlap_score": min(overlaps) if overlaps else None,
             "mean_overlap_score": (
                 sum(overlaps) / len(overlaps) if overlaps else None
@@ -496,23 +494,23 @@ def truth(
     if not isinstance(ground_truth, Truth):
         raise errors.KindError("ground_truth must be Truth")
     ranking = rank(report)
-    observed = ranking[: len(ground_truth.expected_features)]
-    expected = set(ground_truth.expected_features)
+    observed = ranking[: len(ground_truth.features)]
+    expected = set(ground_truth.features)
     overlap = len(expected & set(observed)) / len(expected)
-    passed = overlap >= ground_truth.minimum_overlap
+    passed = overlap >= ground_truth.overlap
     findings = (
         ("independent explanation reference passed",)
         if passed
         else ("independent explanation reference overlap is below threshold",)
     )
     return Comparison(
-        sample_id=sample_id,
+        sample=sample_id,
         method=ground_truth.method,
         reference=ground_truth.reference,
-        expected_features=ground_truth.expected_features,
-        observed_features=observed,
-        overlap_score=overlap,
-        minimum_overlap=ground_truth.minimum_overlap,
+        features=ground_truth.features,
+        observed=observed,
+        score=overlap,
+        overlap=ground_truth.overlap,
         passed=passed,
         findings=findings,
         limitations=ground_truth.limitations,
@@ -566,8 +564,8 @@ def referee(
         findings = ("one or more independent explanation references failed",)
         passed = False
     return Suite(
-        sample_count=sample_count,
-        reference_count=len(evaluations),
+        samples=sample_count,
+        references=len(evaluations),
         evaluations=evaluations,
         passed=passed,
         findings=findings,
@@ -679,9 +677,7 @@ def topk(
     return sum(overlaps) / len(overlaps)
 
 
-def fidelity_score(
-    reference: Sequence[float], reconstruction: Sequence[float]
-) -> float:
+def score(reference: Sequence[float], reconstruction: Sequence[float]) -> float:
     """Returns normalized reconstruction fidelity against reference outputs.
 
     The score is ``1 - RMSE / baseline_RMSE``, where the baseline predicts the
@@ -765,27 +761,27 @@ def evaluate(
         validate(fidelity, "fidelity")
     findings: list[str] = []
     passed = True
-    if thresholds.stability_minimum is not None:
+    if thresholds.stability is not None:
         if stability is None:
             passed = False
             findings.append("stability evidence is missing")
-        elif stability < thresholds.stability_minimum:
+        elif stability < thresholds.stability:
             passed = False
             findings.append("stability is below its declared threshold")
-    if thresholds.fidelity_minimum is not None:
+    if thresholds.minimum is not None:
         if fidelity is None:
             passed = False
             findings.append("fidelity evidence is missing")
-        elif fidelity < thresholds.fidelity_minimum:
+        elif fidelity < thresholds.minimum:
             passed = False
             findings.append("fidelity is below its declared threshold")
     if passed:
         findings.append("all declared explanation thresholds passed")
     return Evaluation(
         method=method,
-        sample_count=sample_count,
-        stability_score=stability,
-        fidelity_score=fidelity,
+        samples=sample_count,
+        stability=stability,
+        score=fidelity,
         thresholds=thresholds,
         passed=passed,
         findings=tuple(findings),

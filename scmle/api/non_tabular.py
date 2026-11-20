@@ -34,7 +34,7 @@ NON_TABULAR_MODEL_DIRECTORY = "model"
 NON_TABULAR_MODEL_FAMILY = "regularized_linear_classifier"
 
 
-class UnsupportedNonTabularModelError(errors.ConfigError):
+class UnsupportedError(errors.ConfigError):
     """Raised when a non-tabular model path cannot cross its gate."""
 
     category = "non_tabular_model"
@@ -47,8 +47,8 @@ class Scope:
     Attributes:
         modality: The modality name.
         representation: How samples are turned into model inputs.
-        decoder_policy: Who decodes the samples and how.
-        model_family: The model family fitted on the representation.
+        policy: Who decodes the samples and how.
+        family: The model family fitted on the representation.
         status: Always `experimental`.
         limitations: Non-empty statements of what the path does not claim.
         KEYS: Version-1 keys to the written ones (`decoder`, `family`);
@@ -61,8 +61,8 @@ class Scope:
 
     modality: str
     representation: str
-    decoder_policy: str
-    model_family: str = NON_TABULAR_MODEL_FAMILY
+    policy: str
+    family: str = NON_TABULAR_MODEL_FAMILY
     status: Literal["experimental"] = "experimental"
     limitations: tuple[str, ...] = ()
 
@@ -77,8 +77,8 @@ class Scope:
         for name in (
             "modality",
             "representation",
-            "decoder_policy",
-            "model_family",
+            "policy",
+            "family",
         ):
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
@@ -108,8 +108,8 @@ class Scope:
             {
                 "modality": self.modality,
                 "representation": self.representation,
-                "decoder_policy": self.decoder_policy,
-                "model_family": self.model_family,
+                "decoder_policy": self.policy,
+                "model_family": self.family,
                 "status": self.status,
                 "limitations": list(self.limitations),
             }
@@ -189,13 +189,13 @@ class Predictor:
             **self.predictor.health(),
             "support_status": self.capability.status,
             "representation": self.capability.representation,
-            "decoder_policy": self.capability.decoder_policy,
-            "model_family": self.capability.model_family,
+            "decoder_policy": self.capability.policy,
+            "model_family": self.capability.family,
             "limitations": list(self.capability.limitations),
         }
 
 
-def video_scope(adapter: modality_lifecycle.Footage) -> Scope:
+def qualify(adapter: modality_lifecycle.Footage) -> Scope:
     """Returns the capability of a video adapter.
 
     Args:
@@ -217,7 +217,7 @@ def video_scope(adapter: modality_lifecycle.Footage) -> Scope:
     return Scope(
         modality="video",
         representation=representation,
-        decoder_policy=decoder_policy,
+        policy=decoder_policy,
         limitations=(
             (
                 "Metadata-only video does not claim visual modelling; a "
@@ -253,7 +253,7 @@ def delimit(adapter: modality_lifecycle.Imagery) -> Scope:
     return Scope(
         modality="raster",
         representation=representation,
-        decoder_policy=decoder_policy,
+        policy=decoder_policy,
         limitations=(
             (
                 "Metadata-only rasters do not claim pixel modelling; a "
@@ -272,7 +272,7 @@ SCOPES: dict[type, Scope] = {
     modality_lifecycle.Image: Scope(
         modality="image",
         representation="decoded_resized_rgb_pixels",
-        decoder_policy="built-in bounded RGB decoder",
+        policy="built-in bounded RGB decoder",
         limitations=(
             (
                 "This is a pixel baseline, not object detection, semantic "
@@ -284,7 +284,7 @@ SCOPES: dict[type, Scope] = {
     modality_lifecycle.Audio: Scope(
         modality="audio",
         representation="bounded_decoded_wav_signal_statistics",
-        decoder_policy="built-in WAV decoder; other codecs are rejected",
+        policy="built-in WAV decoder; other codecs are rejected",
         limitations=(
             (
                 "This representation does not provide transcript, "
@@ -296,7 +296,7 @@ SCOPES: dict[type, Scope] = {
     modality_lifecycle.Graph: Scope(
         modality="graph",
         representation="declared_inductive_node_features",
-        decoder_policy="caller-declared graph nodes and features",
+        policy="caller-declared graph nodes and features",
         limitations=(
             (
                 "Edges are retained for evidence but are not model "
@@ -308,7 +308,7 @@ SCOPES: dict[type, Scope] = {
     modality_lifecycle.Geospatial: Scope(
         modality="geospatial",
         representation="declared_crs_geometry_features",
-        decoder_policy="caller-declared geometries and CRS",
+        policy="caller-declared geometries and CRS",
         limitations=(
             (
                 "This is a bounded geometry baseline, not a geospatial "
@@ -342,7 +342,7 @@ def invariant(
         return Scope(
             modality=modalities.serialise(adapter.modality),
             representation="bounded_character_and_token_counts",
-            decoder_policy="caller-decoded text or document samples",
+            policy="caller-decoded text or document samples",
             limitations=(
                 (
                     "This is a lexical baseline, not OCR, layout, table, or "
@@ -381,13 +381,13 @@ def entitle(
         raise errors.KindError("adapter must be a Preparer")
     adapter_type = type(adapter)
     if adapter_type is modality_lifecycle.Footage:
-        return video_scope(cast("modality_lifecycle.Footage", adapter))
+        return qualify(cast("modality_lifecycle.Footage", adapter))
     if adapter_type is modality_lifecycle.Imagery:
         return delimit(cast("modality_lifecycle.Imagery", adapter))
     scope = invariant(adapter)
     if scope is not None:
         return scope
-    raise UnsupportedNonTabularModelError(
+    raise UnsupportedError(
         "adapter type is not allowlisted for bounded non-tabular modelling; "
         "exact built-in Preparer types are required",
         {
@@ -419,7 +419,7 @@ def conform(
     """
     observed_capability = entitle(observed_adapter)
     if observed_capability != capability:
-        raise UnsupportedNonTabularModelError(
+        raise UnsupportedError(
             "observed adapter must use the same bounded capability",
             {
                 "reference": capability.to_dict(),
@@ -430,7 +430,7 @@ def conform(
         adapter.decoder
         is not cast("modality_lifecycle.Footage", observed_adapter).decoder
     ):
-        raise UnsupportedNonTabularModelError(
+        raise UnsupportedError(
             "reference and observed video adapters must share the "
             "same frame decoder object",
             {"modality": capability.modality},
@@ -439,7 +439,7 @@ def conform(
         adapter.decoder
         is not cast("modality_lifecycle.Imagery", observed_adapter).decoder
     ):
-        raise UnsupportedNonTabularModelError(
+        raise UnsupportedError(
             "reference and observed raster adapters must share the "
             "same decoder object",
             {"modality": capability.modality},
@@ -490,7 +490,7 @@ def consent(experimental_opt_in: bool, capability: Scope) -> None:
     if not isinstance(experimental_opt_in, bool):
         raise errors.KindError("experimental_opt_in must be bool")
     if not experimental_opt_in:
-        raise UnsupportedNonTabularModelError(
+        raise UnsupportedError(
             "non-tabular modelling is experimental; set "
             "experimental_opt_in=True explicitly",
             {"modality": capability.modality, "status": capability.status},
@@ -509,17 +509,17 @@ class Modeler:
     Attributes:
         capability: The bounded capability of the adapter.
         adapter: The adapter holding the training samples.
-        signing_key: HMAC key that signs the package and the report.
-        output_dir: Directory for the report and the package.
+        key: HMAC key that signs the package and the report.
+        directory: Directory for the report and the package.
         seed: Random seed.
-        observed_adapter: Adapter holding later observed samples, if any.
-        performance_budget: Performance limits to enforce, if any.
-        performance_baseline: Performance baseline to compare with, if any.
+        observed: Adapter holding later observed samples, if any.
+        budget: Performance limits to enforce, if any.
+        baseline: Performance baseline to compare with, if any.
         manifest: The modality manifest, if any.
-        require_independent_ground_truth: Whether independent ground truth is
+        independent: Whether independent ground truth is
             required.
         cancellation: Cancellation signal checked by the lifecycle.
-        checkpoint_path: Where progress is checkpointed, if anywhere.
+        checkpoint: Where progress is checkpointed, if anywhere.
         resume: Whether to resume from the checkpoint.
         lifecycle: The lifecycle that runs the model.
         result: The latest result run or loaded, or None.
@@ -528,40 +528,40 @@ class Modeler:
     def __init__(
         self,
         adapter: modality_lifecycle.Preparer,
-        signing_key: str | bytes,
+        key: str | bytes,
         *,
         experimental_opt_in: bool = False,
-        output_dir: str | Path = "runs",
+        directory: str | Path = "runs",
         seed: int = 42,
-        observed_adapter: modality_lifecycle.Preparer | None = None,
-        performance_budget: performance.Budget | None = None,
-        performance_baseline: performance.Baseline | None = None,
+        observed: modality_lifecycle.Preparer | None = None,
+        budget: performance.Budget | None = None,
+        baseline: performance.Baseline | None = None,
         manifest: data.Passport | None = None,
-        require_independent_ground_truth: bool = False,
+        independent: bool = False,
         cancellation: modality_lifecycle.Cancellation | None = None,
-        checkpoint_path: str | Path | None = None,
+        checkpoint: str | Path | None = None,
         resume: bool = False,
     ) -> None:
         """Defines a bounded non-tabular model run.
 
         Args:
             adapter: Exact built-in adapter holding the training samples.
-            signing_key: Non-empty HMAC key that signs the package and report.
+            key: Non-empty HMAC key that signs the package and report.
             experimental_opt_in: Must be True to acknowledge the experimental
                 status.
-            output_dir: Directory for the report and the package; its `model`
+            directory: Directory for the report and the package; its `model`
                 subdirectory must not already exist when the lifecycle runs.
             seed: Random seed (an integer, not a bool).
-            observed_adapter: Adapter of later observed samples; it must have
+            observed: Adapter of later observed samples; it must have
                 the same capability and, for video and raster adapters, share
                 the decoder object of `adapter`.
-            performance_budget: Performance limits to enforce.
-            performance_baseline: Performance baseline to compare with.
+            budget: Performance limits to enforce.
+            baseline: Performance baseline to compare with.
             manifest: The modality manifest.
-            require_independent_ground_truth: Whether independent ground truth
+            independent: Whether independent ground truth
                 is required.
             cancellation: Cancellation signal; a new one if omitted.
-            checkpoint_path: Where to checkpoint progress.
+            checkpoint: Where to checkpoint progress.
             resume: Whether to resume from the checkpoint.
 
         Raises:
@@ -574,26 +574,24 @@ class Modeler:
         """
         self.capability = entitle(adapter)
         consent(experimental_opt_in, self.capability)
-        vet(signing_key, seed, require_independent_ground_truth, resume)
-        if observed_adapter is not None:
-            conform(adapter, observed_adapter, self.capability)
+        vet(key, seed, independent, resume)
+        if observed is not None:
+            conform(adapter, observed, self.capability)
         if cancellation is not None and not isinstance(
             cancellation, modality_lifecycle.Cancellation
         ):
             raise errors.KindError("cancellation must be a Cancellation")
         self.adapter = adapter
-        self.signing_key = signing_key
-        self.output_dir = Path(output_dir)
+        self.key = key
+        self.directory = Path(directory)
         self.seed = seed
-        self.observed_adapter = observed_adapter
-        self.performance_budget = performance_budget
-        self.performance_baseline = performance_baseline
+        self.observed = observed
+        self.budget = budget
+        self.baseline = baseline
         self.manifest = manifest
-        self.require_independent_ground_truth = require_independent_ground_truth
+        self.independent = independent
         self.cancellation = cancellation or modality_lifecycle.Cancellation()
-        self.checkpoint_path = (
-            Path(checkpoint_path) if checkpoint_path is not None else None
-        )
+        self.checkpoint = Path(checkpoint) if checkpoint is not None else None
         self.resume = resume
         self.lifecycle = modality_lifecycle.Lifecycle()
         self.result: Predictor | None = None
@@ -601,17 +599,17 @@ class Modeler:
     @property
     def report(self) -> Path:
         """The signed lifecycle report location."""
-        return self.output_dir / NON_TABULAR_MODEL_REPORT
+        return self.directory / NON_TABULAR_MODEL_REPORT
 
     @property
     def package(self) -> Path:
         """The signed model package location."""
-        return self.output_dir / NON_TABULAR_MODEL_DIRECTORY
+        return self.directory / NON_TABULAR_MODEL_DIRECTORY
 
     def run(self) -> Predictor:
         """Runs, verifies, and returns the complete bounded lifecycle.
 
-        The lifecycle writes the signed report and package under `output_dir`.
+        The lifecycle writes the signed report and package under `directory`.
         Its failures, including cancellation, propagate unchanged.
 
         Returns:
@@ -619,28 +617,26 @@ class Modeler:
             package.
 
         Raises:
-            ValueError: If `output_dir` exists and is not a directory. Loading
+            ValueError: If `directory` exists and is not a directory. Loading
                 the result back raises it too when the report does not match
                 the project.
         """
-        if self.output_dir.exists() and not self.output_dir.is_dir():
+        if self.directory.exists() and not self.directory.is_dir():
             raise errors.InputError("output_dir must be a directory")
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.directory.mkdir(parents=True, exist_ok=True)
         self.lifecycle.run(
             self.adapter,
             self.package,
-            self.signing_key,
+            self.key,
             seed=self.seed,
-            observed_adapter=self.observed_adapter,
+            observed_adapter=self.observed,
             report_path=self.report,
-            performance_budget=self.performance_budget,
-            performance_baseline=self.performance_baseline,
+            performance_budget=self.budget,
+            performance_baseline=self.baseline,
             manifest=self.manifest,
-            require_independent_ground_truth=(
-                self.require_independent_ground_truth
-            ),
+            require_independent_ground_truth=(self.independent),
             cancellation_check=self.cancellation.is_cancelled,
-            checkpoint_path=self.checkpoint_path,
+            checkpoint_path=self.checkpoint,
             resume=self.resume,
         )
         return self.recall()
@@ -655,7 +651,7 @@ class Modeler:
             ValueError: If the report's modality or dataset does not match the
                 project.
         """
-        report = modality_lifecycle.Record.load(self.report, self.signing_key)
+        report = modality_lifecycle.Record.load(self.report, self.key)
         if report.modality != self.capability.modality:
             raise errors.InputError(
                 "lifecycle report modality does not match project"
@@ -667,7 +663,7 @@ class Modeler:
         predictor = modality_lifecycle.Predictor.load(
             self.adapter,
             report.package.path,
-            self.signing_key,
+            self.key,
             lifecycle_report_path=self.report,
         )
         self.result = Predictor(
@@ -689,6 +685,6 @@ __all__ = [
     "Modeler",
     "Predictor",
     "Scope",
-    "UnsupportedNonTabularModelError",
+    "UnsupportedError",
     "entitle",
 ]

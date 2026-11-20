@@ -51,7 +51,7 @@ def test_the_record_holds_every_field_under_its_name() -> None:
         "metric": "roc_auc",
         "dataset": "ds_1",
         "snapshot": "snap_1",
-        "use": card.intended_use,
+        "use": card.use,
         "excluded": list(model_card.EXCLUSIONS),
         "limitations": list(card.limitations),
         "features": ["amount"],
@@ -60,7 +60,7 @@ def test_the_record_holds_every_field_under_its_name() -> None:
         "artifacts": list(model_card.ARTIFACTS),
         "support": "tabular_beta_library_inference",
         "review": "machine_generated_unreviewed",
-        "generated": card.generated_at,
+        "generated": card.generated,
     }
 
 

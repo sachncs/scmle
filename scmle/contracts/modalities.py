@@ -155,13 +155,13 @@ class Status(enum.StrEnum):
 class Proof:
     """Evidence record for one modality lifecycle stage.
 
-    An empty ``evidence_links`` value is allowed while a declaration is being
+    An empty ``links`` value is allowed while a declaration is being
     assembled. It makes the incomplete state explicit and lets the registry
     reject it instead of silently treating the stage as proven.
 
     Attributes:
         stage: Lifecycle stage covered by the record.
-        evidence_links: Test, report, or artifact references proving the
+        links: Test, report, or artifact references proving the
             stage.
         evidence: JSON-native structured output produced by the stage.
         notes: Human-readable boundaries or observations for the stage.
@@ -174,7 +174,7 @@ class Proof:
     )
 
     stage: Phase
-    evidence_links: tuple[str, ...] = ()
+    links: tuple[str, ...] = ()
     evidence: Mapping[str, object] = dataclasses.field(default_factory=dict)
     notes: tuple[str, ...] = ()
 
@@ -189,7 +189,7 @@ class Proof:
         """
         if not isinstance(self.stage, Phase):
             raise errors.KindError("stage must be Phase")
-        object.__setattr__(self, "evidence_links", tuple(self.evidence_links))
+        object.__setattr__(self, "links", tuple(self.links))
         if not isinstance(self.evidence, Mapping):
             raise errors.KindError("evidence must be a mapping")
         try:
@@ -207,7 +207,7 @@ class Proof:
         object.__setattr__(self, "evidence", normalized)
         object.__setattr__(self, "notes", tuple(self.notes))
         for field_name, values in (
-            ("evidence_links", self.evidence_links),
+            ("evidence_links", self.links),
             ("notes", self.notes),
         ):
             if any(not value.strip() for value in values):
@@ -218,13 +218,13 @@ class Proof:
     @property
     def evidenced(self) -> bool:
         """Whether at least one supporting reference is present."""
-        return bool(self.evidence_links)
+        return bool(self.links)
 
     def to_dict(self) -> dict[str, object]:
         """Returns a stable JSON-compatible stage record."""
         return {
             "stage": self.stage.value,
-            "links": list(self.evidence_links),
+            "links": list(self.links),
             "evidence": dict(self.evidence),
             "notes": list(self.notes),
         }
@@ -255,10 +255,10 @@ class Declaration:
     Attributes:
         modality: Dataset modality covered by the declaration.
         status: Support level assigned after review.
-        stage_evidence: Evidence records for lifecycle stages.
-        required_extras: Package extras needed to use the modality.
+        evidence: Evidence records for lifecycle stages.
+        extras: Package extras needed to use the modality.
         resources: Minimum runtime and environment assumptions.
-        failure_modes: Known failures that must be handled or reported.
+        modes: Known failures that must be handled or reported.
         limitations: User-visible boundaries of the declaration.
         migrations: Version steps of the stored declaration. Version 2
             writes single-word keys (`evidence`, `extras`, `failures`,
@@ -283,12 +283,12 @@ class Declaration:
 
     modality: ModalityIdentity
     status: Status
-    stage_evidence: tuple[Proof, ...]
-    required_extras: tuple[str, ...] = ()
+    evidence: tuple[Proof, ...]
+    extras: tuple[str, ...] = ()
     resources: capabilities.Resources = dataclasses.field(
         default_factory=capabilities.Resources
     )
-    failure_modes: tuple[str, ...] = ()
+    modes: tuple[str, ...] = ()
     limitations: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -309,25 +309,25 @@ class Declaration:
             raise errors.KindError("status must be Status")
         if not isinstance(self.resources, capabilities.Resources):
             raise errors.KindError("resources must be capabilities.Resources")
-        object.__setattr__(self, "stage_evidence", tuple(self.stage_evidence))
-        object.__setattr__(self, "required_extras", tuple(self.required_extras))
-        object.__setattr__(self, "failure_modes", tuple(self.failure_modes))
+        object.__setattr__(self, "evidence", tuple(self.evidence))
+        object.__setattr__(self, "extras", tuple(self.extras))
+        object.__setattr__(self, "modes", tuple(self.modes))
         object.__setattr__(self, "limitations", tuple(self.limitations))
-        if any(not isinstance(record, Proof) for record in self.stage_evidence):
+        if any(not isinstance(record, Proof) for record in self.evidence):
             raise errors.KindError("stage_evidence must contain Proof records")
-        stages = [record.stage for record in self.stage_evidence]
+        stages = [record.stage for record in self.evidence]
         if len(stages) != len(set(stages)):
             raise errors.InputError(
                 "stage_evidence must not contain duplicate stages"
             )
         blanks(
             (
-                ("required_extras", self.required_extras),
-                ("failure_modes", self.failure_modes),
+                ("required_extras", self.extras),
+                ("failure_modes", self.modes),
                 ("limitations", self.limitations),
             )
         )
-        if not self.failure_modes:
+        if not self.modes:
             raise errors.InputError(
                 "failure_modes must declare at least one value"
             )
@@ -338,17 +338,17 @@ class Declaration:
             raise errors.InputError(
                 "extension modalities must use extension-only status"
             )
-        if self.status is Status.SUPPORTED and self.missing_stages:
-            missing = ", ".join(stage.value for stage in self.missing_stages)
+        if self.status is Status.SUPPORTED and self.stages:
+            missing = ", ".join(stage.value for stage in self.stages)
             raise errors.InputError(
                 "supported modalities require evidenced lifecycle stages: "
                 f"{missing}"
             )
 
     @property
-    def missing_stages(self) -> tuple[Phase, ...]:
+    def stages(self) -> tuple[Phase, ...]:
         """The required lifecycle stages that are missing or lack evidence."""
-        evidence = {record.stage: record for record in self.stage_evidence}
+        evidence = {record.stage: record for record in self.evidence}
         return tuple(
             stage
             for stage in REQUIRED_LIFECYCLE_STAGES
@@ -358,11 +358,11 @@ class Declaration:
     @property
     def complete(self) -> bool:
         """Whether every required lifecycle stage has evidence."""
-        return not self.missing_stages
+        return not self.stages
 
     def to_dict(self) -> dict[str, object]:
         """Returns a stable JSON-compatible declaration."""
-        stage_records = {record.stage: record for record in self.stage_evidence}
+        stage_records = {record.stage: record for record in self.evidence}
         return {
             "modality": serialise(self.modality),
             "status": self.status.value,
@@ -371,12 +371,12 @@ class Declaration:
                 for stage in REQUIRED_LIFECYCLE_STAGES
                 if stage in stage_records
             ],
-            "extras": list(self.required_extras),
+            "extras": list(self.extras),
             "resources": self.resources.to_dict(),
-            "failures": list(self.failure_modes),
+            "failures": list(self.modes),
             "limitations": list(self.limitations),
             "complete": self.complete,
-            "missing": [stage.value for stage in self.missing_stages],
+            "missing": [stage.value for stage in self.stages],
         }
 
 
@@ -473,7 +473,7 @@ class Registry:
         if declaration is None:
             self.refuse(modality, "no declaration exists")
         if not declaration.complete:
-            missing = [stage.value for stage in declaration.missing_stages]
+            missing = [stage.value for stage in declaration.stages]
             self.refuse(
                 modality,
                 "declaration is incomplete",

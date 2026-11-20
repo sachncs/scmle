@@ -43,7 +43,7 @@ class Attempt:
 
 
 @dataclasses.dataclass(slots=True)
-class RunManifest:
+class Manifest:
     """The durable record of a run.
 
     Attributes:
@@ -109,7 +109,7 @@ class RunManifest:
         return record
 
     @classmethod
-    def from_dict(cls, record: Mapping[str, Any]) -> "RunManifest":
+    def from_dict(cls, record: Mapping[str, Any]) -> "Manifest":
         """Rebuilds a manifest from its stored form.
 
         Args:
@@ -128,7 +128,7 @@ class RunManifest:
         return cls(**fields)
 
     @classmethod
-    def begin(cls, spec: job.Job, runner: str) -> "RunManifest":
+    def begin(cls, spec: job.Job, runner: str) -> "Manifest":
         """Starts the manifest of a new run.
 
         Args:
@@ -139,11 +139,11 @@ class RunManifest:
             A manifest with no attempts, started now.
         """
         return cls(
-            identifier=spec.run_id,
+            identifier=spec.identifier,
             runner=runner,
             digests={
                 "spec": spec.digest(),
-                "project": spec.project_digest,
+                "project": spec.fingerprint,
                 "result": "",
             },
             identity=spec.identity,
@@ -169,7 +169,7 @@ class RunManifest:
             result: The key where the workload leaves its result.
             own: The key of this manifest, left out of the evidence.
         """
-        checkpoints = checkpoint.CheckpointStore(store, self.identifier)
+        checkpoints = checkpoint.Store(store, self.identifier)
         self.checkpoints = []
         for step in checkpoints.steps():
             reading = checkpoints.load(step)
@@ -192,7 +192,7 @@ class RunManifest:
                 self.digests["result"] = meta.sha256
         self.evidence = [
             {"key": meta.key, "sha256": meta.sha256, "size": meta.size}
-            for meta in store.list_objects(f"runs/{self.identifier}/")
+            for meta in store.catalog(f"runs/{self.identifier}/")
             if meta.key != own
         ]
         self.state = state.value

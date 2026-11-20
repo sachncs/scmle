@@ -35,12 +35,8 @@ def case_threshold():
         ),
         "small": escalation.select(small["score"], small["loss"], 0.05, 0.1),
         "p": [escalation.binomial_p_value(e, 50, 0.1) for e in (0, 3, 10)],
-        "curve": escalation.risk_coverage(
-            data["score"], data["loss"], points=11
-        ),
-        "curve_w": escalation.risk_coverage(
-            data["score"], data["loss"], weights, 11
-        ),
+        "curve": escalation.sweep(data["score"], data["loss"], points=11),
+        "curve_w": escalation.sweep(data["score"], data["loss"], weights, 11),
     }
 
 

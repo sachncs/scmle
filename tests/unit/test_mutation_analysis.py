@@ -49,7 +49,7 @@ def fixed(monkeypatch):
 
 
 def test_a_design_only_claim_is_identified():
-    out = analysis.design_only(block(), "X", BUDGET)
+    out = analysis.diagnose(block(), "X", BUDGET)
 
     assert out.documents["causal_claims.json"]["status"] == "identified"
     assert out.decision.status == "identified"

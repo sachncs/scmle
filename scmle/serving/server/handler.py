@@ -246,7 +246,7 @@ class Responder(Exchange):
                 200,
                 {
                     "status": "ok",
-                    "model_version": info.model_version,
+                    "model_version": info.version,
                     "model_sha256": info.files.get(
                         scmle.artifacts.bundle.MODEL_FILE, ""
                     ),

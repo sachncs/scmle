@@ -88,7 +88,7 @@ def test_candidates_with_another_number_of_folds_are_ignored():
 def test_runs_report_the_interval(binary_frame, tmp_path):
     import support
 
-    result = support.make_project(binary_frame, "y", output_dir=tmp_path).run()
+    result = support.make_project(binary_frame, "y", directory=tmp_path).run()
     record = result.evaluation["confidence"]
     assert record["available"] and record["folds"] == 5
     assert record["interval"][0] <= result.evaluation["selected"]["score"]

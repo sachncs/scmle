@@ -53,8 +53,8 @@ def make_trial(name, scores, train, strategy="default"):
         name,
         experiments.Termination.OK,
         "m",
-        fold_scores=scores,
-        train_scores=train,
+        folds=scores,
+        training=train,
         strategy=strategy,
     )
 

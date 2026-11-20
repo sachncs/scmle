@@ -70,7 +70,7 @@ def assign(
     return numpy.array(out)
 
 
-def fixed_horizon_rows(
+def size(
     p_control: float,
     delta: float,
     *,

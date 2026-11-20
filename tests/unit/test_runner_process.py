@@ -25,17 +25,17 @@ SERVE = "arn:serve"
 
 @pytest.fixture
 def store(tmp_path):
-    return objectstore.LocalObjectStore(tmp_path / "store")
+    return objectstore.Disk(tmp_path / "store")
 
 
 def job(run_id, workload_project=None, **changes):
     values = {
-        "run_id": run_id,
+        "identifier": run_id,
         "name": "count",
         "project": workload_project or {},
         "identity": TRAIN,
         "retries": retry.Retries(3, 0.01, 1.0, 0.01),
-        "timeout_seconds": 60.0,
+        "timeout": 60.0,
     }
     values.update(changes)
     return base.Job(**values)
@@ -44,10 +44,10 @@ def job(run_id, workload_project=None, **changes):
 def process(store, workload, **options):
     return local.Process(
         store,
-        serving_identity=SERVE,
+        identity=SERVE,
         workload=f"tests.support_jobs:{workload}",
         directory=ROOT,
-        poll_seconds=0.02,
+        interval=0.02,
         **options,
     )
 
@@ -72,9 +72,7 @@ def test_exit_statuses_map_to_attempt_states():
 
 
 def test_a_job_spec_reads_back_from_either_layout():
-    spec = job(
-        "read-1", {"steps": 2}, budget=base.CostBudget(5.0, base.CostRate(1.0))
-    )
+    spec = job("read-1", {"steps": 2}, budget=base.Budget(5.0, base.Rate(1.0)))
     assert base.Job.read(spec.to_dict()) == spec
     assert base.Job.read(spec.anchor()) == spec
     with pytest.raises(errors.ConfigError, match="malformed job spec"):
@@ -92,7 +90,7 @@ def test_a_process_run_checkpoints_and_leaves_its_result(store):
         "attempt": 1,
         "resumed": 0,
     }
-    assert checkpoint.CheckpointStore(store, "count-1").latest().step == 3
+    assert checkpoint.Store(store, "count-1").latest().step == 3
     assert store.get("runs/count-1/logs/1.txt")[0] == b""
 
 
@@ -120,7 +118,7 @@ def test_a_preempted_process_resumes_from_its_checkpoint(store):
     done = []
     thread = threading.Thread(target=lambda: done.append(runner.run(spec)))
     thread.start()
-    checkpoints = checkpoint.CheckpointStore(store, "preempt-1")
+    checkpoints = checkpoint.Store(store, "preempt-1")
     deadline = time.monotonic() + 30
     while checkpoints.latest() is None and time.monotonic() < deadline:
         time.sleep(0.01)
@@ -144,7 +142,7 @@ def test_a_timeout_stops_the_process_and_is_final(store, deaf):
     if deaf and sys.platform == "win32":
         pytest.skip("SIGTERM is POSIX only")
     runner = process(store, "stubborn", grace=0.5)
-    spec = job(f"stop-{int(deaf)}", {"deaf": deaf}, timeout_seconds=1.5)
+    spec = job(f"stop-{int(deaf)}", {"deaf": deaf}, timeout=1.5)
     manifest = runner.run(spec)
     assert manifest.state == "timed_out"
     assert states(manifest) == ["cancelled"]
@@ -155,20 +153,20 @@ def test_a_timeout_stops_the_process_and_is_final(store, deaf):
 
 
 def test_the_process_runner_needs_a_store_the_job_can_open(tmp_path):
-    memory = objectstore.RetryingStore(
-        objectstore.LocalObjectStore(tmp_path / "s"), retry.Retries()
+    memory = objectstore.Retrier(
+        objectstore.Disk(tmp_path / "s"), retry.Retries()
     )
     with pytest.raises(errors.ConfigError, match="needs a LocalObjectStore"):
-        local.Process(memory, serving_identity=SERVE)
+        local.Process(memory, identity=SERVE)
     with pytest.raises(errors.ConfigError, match="module:function"):
         local.Process(
-            objectstore.LocalObjectStore(tmp_path / "s"),
-            serving_identity=SERVE,
+            objectstore.Disk(tmp_path / "s"),
+            identity=SERVE,
             workload="nocolon",
         )
     runner = local.Container(
-        objectstore.LocalObjectStore(tmp_path / "s"),
-        serving_identity=SERVE,
+        objectstore.Disk(tmp_path / "s"),
+        identity=SERVE,
         image="scmle:1",
         client=str(tmp_path / "no-docker"),
     )
@@ -177,10 +175,10 @@ def test_the_process_runner_needs_a_store_the_job_can_open(tmp_path):
 
 
 def test_the_container_command_is_hardened_and_carries_no_values(tmp_path):
-    store = objectstore.LocalObjectStore(tmp_path / "s")
+    store = objectstore.Disk(tmp_path / "s")
     runner = local.Container(
         store,
-        serving_identity=SERVE,
+        identity=SERVE,
         image="scmle@sha256:" + "a" * 64,
         user="1000:1000",
     )
@@ -244,7 +242,7 @@ def test_the_container_command_is_hardened_and_carries_no_values(tmp_path):
         "SCMLE_ATTEMPT": "2",
         "SCMLE_STORE_URI": "file:///store",
         "SCMLE_SPEC_DIGEST": spec.digest(),
-        "SCMLE_WORKLOAD": "scmle.runners.project:run_project",
+        "SCMLE_WORKLOAD": "scmle.runners.project:project",
     }
 
 
@@ -291,7 +289,7 @@ def test_the_command_line_runs_a_spec_in_a_process(
     ]
     assert local.main(arguments) == 0
     assert capsys.readouterr().out == "cli-1: succeeded\n"
-    store = objectstore.LocalObjectStore(tmp_path / "store")
+    store = objectstore.Disk(tmp_path / "store")
     assert store.get("data/train.csv")[0] == b"a,y\n1,0\n"
     assert local.main([*arguments[:-2], "--put", "nokey"]) == 1
     assert "--put needs KEY=PATH" in capsys.readouterr().err
@@ -299,7 +297,7 @@ def test_the_command_line_runs_a_spec_in_a_process(
 
 
 def test_a_tenant_runner_runs_its_job_in_the_tenant_namespace(tmp_path):
-    shared = objectstore.LocalObjectStore(tmp_path / "store")
+    shared = objectstore.Disk(tmp_path / "store")
     confined = tenancy.Tenancy(shared, "acme")
     runner = process(confined, "count")
     assert runner.root == shared.root
@@ -309,7 +307,7 @@ def test_a_tenant_runner_runs_its_job_in_the_tenant_namespace(tmp_path):
         json.loads(confined.get("runs/tenant-1/result.json")[0])["steps"] == 2
     )
     assert shared.head("tenants/acme/runs/tenant-1/result.json") is not None
-    assert shared.list_objects("runs/") == []
+    assert shared.catalog("runs/") == []
 
 
 def test_the_job_environment_names_the_runner_tenant_over_the_spec(store):
@@ -320,11 +318,11 @@ def test_the_job_environment_names_the_runner_tenant_over_the_spec(store):
 
 
 def test_a_tenancy_over_a_store_the_job_cannot_open_is_refused(tmp_path):
-    remote = objectstore.RetryingStore(
-        objectstore.LocalObjectStore(tmp_path / "s"), retry.Retries()
+    remote = objectstore.Retrier(
+        objectstore.Disk(tmp_path / "s"), retry.Retries()
     )
     with pytest.raises(errors.ConfigError, match="needs a LocalObjectStore"):
-        local.Process(tenancy.Tenancy(remote, "acme"), serving_identity=SERVE)
+        local.Process(tenancy.Tenancy(remote, "acme"), identity=SERVE)
 
 
 def test_the_command_line_confines_the_store_to_its_tenant(
@@ -352,7 +350,7 @@ def test_the_command_line_confines_the_store_to_its_tenant(
     ]
     assert local.main(arguments) == 0
     assert capsys.readouterr().out == "cli-tenant-1: succeeded\n"
-    shared = objectstore.LocalObjectStore(tmp_path / "store")
+    shared = objectstore.Disk(tmp_path / "store")
     assert shared.get("tenants/acme/data/train.csv")[0] == b"a,y\n1,0\n"
     assert shared.head("tenants/acme/runs/cli-tenant-1/result.json")
-    assert shared.list_objects("data/") == []
+    assert shared.catalog("data/") == []

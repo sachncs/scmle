@@ -21,7 +21,7 @@ def verifier(clock, *keys, revocations=None, **options):
 
 
 def hs_token(clock, kid="hs-1", header=None, **claims):
-    return tokens.sign_hs256(
+    return tokens.sign(
         support_identity.HS_SECRET,
         kid,
         support_identity.claims_at(clock.now, **claims),
@@ -40,7 +40,7 @@ def test_a_valid_hs256_token_gives_a_principal():
     principal = check.verify(hs_token(clock))
     assert principal.subject == "alice" and principal.tenant == "acme"
     assert principal.scopes == {"model:read", "model:predict"}
-    assert principal.key_id == "hs-1" and principal.token_id == "tok-1"
+    assert principal.key_id == "hs-1" and principal.token == "tok-1"
 
 
 def test_a_valid_rs256_token_gives_a_principal():
@@ -55,7 +55,7 @@ def test_a_valid_rs256_token_gives_a_principal():
 def test_scopes_may_arrive_as_a_list():
     clock = support_identity.Clock()
     check = verifier(clock, support_identity.hs_jwk("hs-1"))
-    token = tokens.sign_hs256(
+    token = tokens.sign(
         support_identity.HS_SECRET,
         "hs-1",
         support_identity.claims_at(clock.now, scope=None, scp=["model:read"]),
@@ -98,7 +98,7 @@ def test_the_none_algorithm_and_confusion_attacks_are_refused():
     )
     assert refused(check, unsigned) == tokens.BAD_ALGORITHM
     # An HS256 token naming the RSA key's kid: the key's algorithm must win.
-    confused = tokens.sign_hs256(support_identity.HS_SECRET, "rs-1", claims)
+    confused = tokens.sign(support_identity.HS_SECRET, "rs-1", claims)
     assert refused(check, confused) == tokens.BAD_ALGORITHM
     # A token without a kid cannot choose a key.
     anonymous = support_identity.compact(
@@ -156,8 +156,8 @@ def test_wrong_issuer_audience_and_missing_claims_are_refused():
 def test_revoked_tokens_subjects_and_keys_are_refused():
     # Enforces website/src/pages/docs/threat-model.astro:20.
     clock = support_identity.Clock()
-    revocations = tokens.RevocationList(
-        tokens=["tok-bad"], subjects=["mallory"], key_ids=["hs-old"]
+    revocations = tokens.Revocations(
+        tokens=["tok-bad"], subjects=["mallory"], keys=["hs-old"]
     )
     check = verifier(
         clock,
@@ -183,7 +183,7 @@ def test_the_revocation_file_is_read_on_every_check_and_fails_closed(tmp_path):
     check = verifier(
         clock,
         support_identity.hs_jwk("hs-1"),
-        revocations=lambda: tokens.RevocationList.from_file(path),
+        revocations=lambda: tokens.Revocations.read(path),
     )
     assert check.verify(hs_token(clock))
     path.write_text(json.dumps({"tokens": ["tok-1"]}))
@@ -260,14 +260,14 @@ def test_a_key_set_loads_from_a_jwks_file(tmp_path):
             }
         )
     )
-    assert set(tokens.Keystore.from_file(path).keys) == {"rs-1", "hs-1"}
+    assert set(tokens.Keystore.read(path).keys) == {"rs-1", "hs-1"}
     with pytest.raises(errors.ConfigError):
-        tokens.Keystore.from_file(tmp_path / "missing.json")
+        tokens.Keystore.read(tmp_path / "missing.json")
 
 
 def test_a_short_hs256_secret_cannot_mint():
     with pytest.raises(errors.ConfigError):
-        tokens.sign_hs256(b"short", "k", {})
+        tokens.sign(b"short", "k", {})
 
 
 def test_a_non_numeric_validity_bound_is_a_config_error():
@@ -282,4 +282,4 @@ def test_a_key_set_file_that_is_not_an_object_is_a_config_error(
     path = tmp_path / "jwks.json"
     path.write_text(document)
     with pytest.raises(errors.ConfigError):
-        tokens.Keystore.from_file(path)
+        tokens.Keystore.read(path)

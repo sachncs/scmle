@@ -594,7 +594,7 @@ def flaws(preparer: Imagery, profile: Survey) -> tuple[data.Finding, ...]:
         quality_findings.append(
             curation.flaw(
                 "quality.raster-shape-or-crs-drift",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"dataset": preparer.digest},
                 {
                     "dimensions": profile["dimensions"],
@@ -610,7 +610,7 @@ def flaws(preparer: Imagery, profile: Survey) -> tuple[data.Finding, ...]:
         quality_findings.append(
             curation.flaw(
                 "quality.raster-nodata-unknown",
-                data.FindingSeverity.WARNING,
+                data.Severity.WARNING,
                 {"dataset": preparer.digest},
                 {"statuses": nodata_profile["statuses"]},
                 "Declare or measure nodata handling before interpreting "

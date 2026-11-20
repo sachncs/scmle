@@ -427,9 +427,7 @@ class Environment(Link):
                 )
         kept = dict((records.read(PROVENANCE) or {}).get("environment", {}))
         if "lock" in kept:
-            rendered = provenance.Manifest.read(
-                records.manifest
-            ).environment_lock()
+            rendered = provenance.Manifest.read(records.manifest).lock()
             if kept["lock"] != rendered:
                 problems.append(
                     f"the lock in {PROVENANCE} differs from the pins"
@@ -555,7 +553,7 @@ def inspect(
         elif checksum(path) != digest:
             problems.append(f"{name} does not match its manifest digest")
     try:
-        signed = seal.verify_signature(bundle, key)
+        signed = seal.verify(bundle, key)
     except errors.ArtifactError as error:
         problems.append(str(error))
         signed = False

@@ -4,7 +4,7 @@
     routing = loop.observe(batch, predictions, decisions)
     loop.mature(losses)                    # outcomes arrive, with delay
     result = loop.step()                   # alarms, proposals, escalations
-    pending = loop.pending_escalations()
+    pending = loop.survey()
     loop.reply(pending[0].id, attestation)  # a person's signed reply
 
 What the loop does by itself, and how each rule behaves:

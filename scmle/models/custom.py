@@ -75,9 +75,9 @@ def rebuild(spec: Registration) -> models.Model:
         "capabilities": models.Capabilities(
             supported,
             probabilities=probabilities,
-            needs_scaling=spec.scaling,
-            handles_missing=spec.missing,
-            sparse_input=spec.sparse,
+            scaling=spec.scaling,
+            missing=spec.missing,
+            sparse=spec.sparse,
             cost=spec.cost,
         ),
         "spec": spec,

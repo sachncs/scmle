@@ -37,8 +37,8 @@ def test_an_empty_plane_has_nothing_deployed():
 def test_the_plane_moves_all_traffic_to_one_revision_only(allocation):
     plane = release.Processes(harness.Fleet())
     with pytest.raises(control.Unsupported, match="only all traffic"):
-        plane.set_traffic(allocation)
-    plane.set_traffic({"local-7": 100})
+        plane.route(allocation)
+    plane.route({"local-7": 100})
     assert plane.primary == "local-7"
 
 
@@ -54,7 +54,7 @@ def test_a_plane_deploys_and_observes_real_revisions(tmp_path):
     fleet = harness.Fleet()
     plane = release.Processes(fleet)
     try:
-        folder = harness.export_service(tmp_path / "img", harness.specify())
+        folder = harness.export(tmp_path / "img", harness.specify())
         digest = plane.enroll(folder)
         assert digest.startswith("sha256:")
         assert plane.images == {digest: folder}
@@ -74,7 +74,7 @@ def test_a_plane_deploys_and_observes_real_revisions(tmp_path):
 
 
 def test_a_bad_release_is_detected_and_rolled_back():
-    result = release.bad_release()
+    result = release.release()
     assert result.checks, result
     assert all(result.checks.values()), result.checks
     assert result.fault == "bad_release"

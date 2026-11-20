@@ -126,11 +126,9 @@ def test_charter_is_a_plain_dict_when_unsigned(tmp_path):
 
 def test_run_and_plan_accept_a_charter_option():
     for command in ("run", "plan"):
-        args = cli.build_parser().parse_args(
+        args = cli.build().parse_args(
             [command, "data.csv", "--target", "y", "--charter", "c.json"]
         )
         assert args.charter == "c.json"
-    default = cli.build_parser().parse_args(
-        ["run", "data.csv", "--target", "y"]
-    )
+    default = cli.build().parse_args(["run", "data.csv", "--target", "y"])
     assert default.charter is None

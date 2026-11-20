@@ -25,7 +25,7 @@ def test_check_separation_refuses_each_overlap_on_its_own():
 
     Also enforces website/src/pages/docs/portable-training.astro:29.
     """
-    roles.check_separation(roles.TRAINING_ROLE, roles.SERVING_ROLE)
+    roles.separate(roles.TRAINING_ROLE, roles.SERVING_ROLE)
     cases = (
         (
             roles.Role("training", (), ("evidence/",)),
@@ -45,7 +45,7 @@ def test_check_separation_refuses_each_overlap_on_its_own():
     )
     for training, serving, message in cases:
         with pytest.raises(errors.ConfigError, match=message):
-            roles.check_separation(training, serving)
+            roles.separate(training, serving)
 
 
 def runners(kind=base.Runner):
@@ -67,10 +67,10 @@ def test_workloads_get_a_training_store_and_no_runner_runs_as_serving(
     tmp_path,
 ):
     """Enforces website/src/pages/docs/portable-training.astro:29."""
-    store = objectstore.LocalObjectStore(tmp_path / "store")
-    training = roles.RoleStore(store, roles.TRAINING_ROLE)
+    store = objectstore.Disk(tmp_path / "store")
+    training = roles.Store(store, roles.TRAINING_ROLE)
     training.put("runs/r/result.json", b"{}")
-    with pytest.raises(roles.RoleDeniedError):
+    with pytest.raises(roles.DeniedError):
         training.put("bundles/model/v2", b"x")
     assert not store.exists("bundles/model/v2")
     found = runners()
@@ -79,15 +79,15 @@ def test_workloads_get_a_training_store_and_no_runner_runs_as_serving(
     # the serving identity before anything is stored.
     assert all("run" not in vars(kind) for kind in found)
     spec = base.Job(
-        run_id="bad",
+        identifier="bad",
         name="churn",
         project={"data": "data/t.csv", "target": "y"},
         identity=SERVE,
         resources=base.Resources(cpu=1.0, memory_mb=1024),
     )
     for runner in (
-        local.Runner(store, lambda context: None, serving_identity=SERVE),
-        local.Process(store, serving_identity=SERVE, directory=tmp_path),
+        local.Runner(store, lambda context: None, identity=SERVE),
+        local.Process(store, identity=SERVE, directory=tmp_path),
     ):
         with pytest.raises(errors.ConfigError, match="serving identity"):
             runner.run(spec)
@@ -98,17 +98,17 @@ def test_the_entrypoint_opens_the_tenant_store_checks_the_digest_and_runs(
     tmp_path,
 ):
     """Enforces website/src/pages/docs/portable-training.astro:33."""
-    shared = objectstore.LocalObjectStore(tmp_path / "store")
+    shared = objectstore.Disk(tmp_path / "store")
     confined = tenancy.Tenancy(shared, "acme")
     clock = support_runners.FakeClock()
     runner = local.Runner(
         confined,
         lambda context: None,
-        serving_identity=SERVE,
+        identity=SERVE,
         clock=base.Clock(clock.now, clock.sleep),
     )
     spec = base.Job(
-        run_id="entry",
+        identifier="entry",
         name="churn",
         project={"data": "data/t.csv", "target": "y"},
         identity="scmle-training",

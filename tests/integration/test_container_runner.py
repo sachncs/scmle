@@ -49,7 +49,7 @@ def frame():
 
 def spec(run_id, **changes):
     values = {
-        "run_id": run_id,
+        "identifier": run_id,
         "name": "churn",
         "project": {
             "data": "data/train.csv",
@@ -59,7 +59,7 @@ def spec(run_id, **changes):
         "identity": "arn:train",
         "resources": base.Resources(cpu=1, memory_mb=2048),
         "retries": retry.Retries(2, 0.1, 1.0, 0.1),
-        "timeout_seconds": 600.0,
+        "timeout": 600.0,
     }
     values.update(changes)
     return base.Job(**values)
@@ -67,7 +67,7 @@ def spec(run_id, **changes):
 
 @pytest.fixture
 def store(tmp_path):
-    depot = objectstore.LocalObjectStore(tmp_path / "store")
+    depot = objectstore.Disk(tmp_path / "store")
     depot.put("data/train.csv", frame().to_csv(index=False).encode())
     return depot
 
@@ -84,7 +84,7 @@ def test_the_image_runs_scmle_as_a_non_root_user():
 
 def test_a_project_runs_inside_the_image(store):
     runner = local.Container(
-        store, serving_identity="arn:serve", image=IMAGE, poll_seconds=0.5
+        store, identity="arn:serve", image=IMAGE, interval=0.5
     )
     manifest = runner.run(spec("image-1"))
     log = store.get("runs/image-1/logs/1.txt")[0].decode()
@@ -106,12 +106,12 @@ def test_a_stopped_container_is_cancelled_and_removed(store):
     project = {"data": "data/train.csv", "target": "y", "options": options}
     runner = local.Container(
         store,
-        serving_identity="arn:serve",
+        identity="arn:serve",
         image=IMAGE,
-        poll_seconds=0.5,
+        interval=0.5,
         grace=5,
     )
-    manifest = runner.run(spec("image-2", project=project, timeout_seconds=8.0))
+    manifest = runner.run(spec("image-2", project=project, timeout=8.0))
     assert manifest.state == "timed_out"
     assert [attempt.state for attempt in manifest.attempts] == ["cancelled"]
     assert (

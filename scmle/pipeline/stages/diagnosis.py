@@ -46,8 +46,8 @@ def recipe(
     partition = board.get(profiling.Partition)
     return functools.partial(
         strategies.lookup(selected.strategy).build,
-        partition.profile.feature_plan,
-        board.services.registry.get(selected.model_name),
+        partition.profile.plan,
+        board.services.registry.get(selected.model),
         partition.task,
         board.services.spec.validation.seed,
         featurise=board.get(ingestion.Intake).kind.featurise,
@@ -149,7 +149,7 @@ class Diagnosis(calibration.Calibration):
                     partition.task,
                 )
             ),
-            metric.greater_is_better,
+            metric.maximize,
             lambda: bool(cost.halt(board, selected, "learning curve")),
         )
         return None if curve is None else curve.to_dict()
@@ -187,7 +187,7 @@ class Diagnosis(calibration.Calibration):
             lambda: build(selected.params),
             split.features,
             split.target,
-            task.is_classification,
+            task.classification,
             replicates,
             board.services.spec.validation.seed,
             lambda: bool(cost.halt(board, selected, "bias-variance estimate")),
@@ -277,18 +277,18 @@ class Diagnosis(calibration.Calibration):
         if cost.halt(board, selected, "nested validation"):
             return {"skipped": "time budget spent"}
         task = partition.task
-        adapter = board.services.registry.get(selected.model_name)
+        adapter = board.services.registry.get(selected.model)
         build = recipe(board, selected)
         metric = partition.metric
         positive = scmle.evaluation.metrics.positive_label(split.target, task)
         result = nested.nest(
             build,
-            adapter.search_space,
+            adapter.space,
             split.features,
             split.target,
             [(f[0], f[1]) for f in split.manifest.folds],
             metric.scorer(positive),
-            task.is_classification,
+            task.classification,
             board.services.spec.validation.seed,
             should_stop=lambda: bool(
                 cost.halt(board, selected, "nested validation")
@@ -296,7 +296,7 @@ class Diagnosis(calibration.Calibration):
         )
         if result is None:
             return {"skipped": "time budget spent or too few rows"}
-        sign = 1.0 if metric.greater_is_better else -1.0
+        sign = 1.0 if metric.maximize else -1.0
         record = result.to_dict()
         record["mean_natural"] = sign * result.mean
         record["optimism_natural"] = sign * result.optimism

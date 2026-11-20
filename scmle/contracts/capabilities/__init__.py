@@ -12,9 +12,9 @@ declarations and their resource checks and `registry` the registry.
 from scmle.contracts.capabilities.axes import Evaluation
 from scmle.contracts.capabilities.axes import Explainability
 from scmle.contracts.capabilities.axes import Fairness
+from scmle.contracts.capabilities.axes import Family
 from scmle.contracts.capabilities.axes import Inference
 from scmle.contracts.capabilities.axes import Modality
-from scmle.contracts.capabilities.axes import ModelFamily
 from scmle.contracts.capabilities.axes import Status
 from scmle.contracts.capabilities.axes import Uncertainty
 from scmle.contracts.capabilities.declarations import Capability
@@ -40,9 +40,9 @@ __all__ = [
     "Evaluation",
     "Explainability",
     "Fairness",
+    "Family",
     "Inference",
     "Modality",
-    "ModelFamily",
     "Reason",
     "Registry",
     "Resources",

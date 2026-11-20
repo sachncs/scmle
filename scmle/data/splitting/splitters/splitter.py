@@ -79,7 +79,7 @@ def scheme(spec: tasks.Config, task: tasks.Task) -> str:
         return "group"
     if task in TASK_STRATEGIES:
         return TASK_STRATEGIES[task]
-    return "stratified" if task.is_classification else "random"
+    return "stratified" if task.classification else "random"
 
 
 class Splitter:

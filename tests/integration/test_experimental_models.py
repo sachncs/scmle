@@ -84,12 +84,12 @@ def test_transformer_and_jepa_are_explicit_opt_in_candidates(monkeypatch):
     context = project.start()
     context.services.capabilities.bind(
         capabilities.Environment(
-            available_extras=frozenset({"core", "deeplearning"}),
-            cpu_cores=1,
-            memory_gb=8.0,
-            disk_gb=1.0,
-            gpu_available=False,
-            network_available=False,
+            extras=frozenset({"core", "deeplearning"}),
+            cores=1,
+            memory=8.0,
+            disk=1.0,
+            available=False,
+            online=False,
         )
     )
     stages.Ingest().execute(context)
@@ -116,7 +116,7 @@ def test_jepa_has_a_complete_experimental_tabular_capability():
     key = capabilities.Coordinate(
         modality=capabilities.Modality.TABULAR,
         task=tasks.Task.BINARY,
-        model_family=capabilities.ModelFamily.JEPA.value,
+        family=capabilities.Family.JEPA.value,
         evaluation=capabilities.Evaluation.STANDARD,
         uncertainty=capabilities.Uncertainty.NONE,
         fairness=capabilities.Fairness.NONE,
@@ -128,7 +128,7 @@ def test_jepa_has_a_complete_experimental_tabular_capability():
 
     assert declaration is not None
     assert declaration.status is capabilities.Status.EXPERIMENTAL
-    assert declaration.required_extras == ("deeplearning",)
+    assert declaration.extras == ("deeplearning",)
     assert "multimodal JEPA" in " ".join(declaration.limitations)
 
 
@@ -186,8 +186,8 @@ def test_explicit_deep_model_project_packages_and_predicts(
     project = scmle.api.project.Project(
         binary_frame,
         "y",
-        time_budget=600,
-        output_dir=tmp_path,
+        budget=600,
+        directory=tmp_path,
         enforcement="cooperative",
         search=tasks.Search(top_models=0),
         strategies=tasks.Strategies(top_models=0),
@@ -202,9 +202,9 @@ def test_explicit_deep_model_project_packages_and_predicts(
     result = project.run(plan)
     features = binary_frame.drop(columns="y").head(12)
     saved = result.save(tmp_path / f"{model_name}-bundle")
-    loaded = scmle.api.predict.load_model(saved, trusted=True)
+    loaded = scmle.api.predict.load(saved, trusted=True)
 
-    assert result.selected_model == model_name
+    assert result.model == model_name
     assert len(result.predict(features)) == 12
     numpy.testing.assert_array_equal(
         loaded.predict(features),

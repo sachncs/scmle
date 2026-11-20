@@ -40,7 +40,7 @@ def test_resources_must_be_positive_and_a_gpu_needs_a_reason():
 
 
 def test_a_cost_rate_prices_cpu_memory_and_gpu_by_the_hour():
-    rate = job.CostRate(per_cpu_hour=2.0, per_gb_hour=1.0, per_gpu_hour=10.0)
+    rate = job.Rate(per_cpu_hour=2.0, per_gb_hour=1.0, per_gpu_hour=10.0)
     resources = job.Resources(cpu=2, memory_mb=2048, gpu=1, gpu_reason="x")
     assert rate.cost(resources, 3600) == 16.0
     assert rate.cost(resources, 1800) == 8.0
@@ -49,15 +49,15 @@ def test_a_cost_rate_prices_cpu_memory_and_gpu_by_the_hour():
 
 def test_a_cost_budget_must_be_positive():
     with pytest.raises(errors.ConfigError, match="max_cost must be positive"):
-        job.CostBudget(0, job.CostRate())
-    assert job.CostBudget(0.01, job.CostRate()).max_cost == 0.01
+        job.Budget(0, job.Rate())
+    assert job.Budget(0.01, job.Rate()).max_cost == 0.01
 
 
 def test_the_run_id_must_be_short_and_safe():
-    assert spec(run_id="a" * 64).run_id == "a" * 64
+    assert spec(identifier="a" * 64).run_id == "a" * 64
     for bad in ("", "a" * 65, "a/b", "a b", "ä"):
         with pytest.raises(errors.ConfigError, match="run_id must be 1-64"):
-            spec(run_id=bad)
+            spec(identifier=bad)
 
 
 def test_a_job_needs_a_timeout_and_an_identity():
@@ -77,7 +77,7 @@ def test_the_environment_may_not_hold_secrets():
 
 def test_the_project_digest_is_of_the_canonical_json():
     text = json.dumps({"a": 2, "b": 1}, separators=(",", ":"))
-    assert spec().project_digest == hashlib.sha256(text.encode()).hexdigest()
+    assert spec().fingerprint == hashlib.sha256(text.encode()).hexdigest()
 
 
 def test_the_digest_is_anchored_at_the_version_one_layout():
@@ -86,14 +86,14 @@ def test_the_digest_is_anchored_at_the_version_one_layout():
     assert anchor["run_id"] == "run-1"
     assert anchor["timeout_seconds"] == 3600.0
     assert anchor["budget"] is None
-    assert anchor["project_digest"] == made.project_digest
+    assert anchor["project_digest"] == made.fingerprint
     assert (
         made.digest()
         == hashlib.sha256(
             json.dumps(anchor, sort_keys=True).encode()
         ).hexdigest()
     )
-    budgeted = spec(budget=job.CostBudget(5.0, job.CostRate(per_cpu_hour=1.0)))
+    budgeted = spec(budget=job.Budget(5.0, job.Rate(per_cpu_hour=1.0)))
     assert budgeted.anchor()["budget"] == {
         "max_cost": 5.0,
         "rate": {"per_cpu_hour": 1.0, "per_gb_hour": 0.0, "per_gpu_hour": 0.0},
@@ -105,7 +105,7 @@ def test_the_stored_form_uses_the_current_keys():
     stored = spec().to_dict()
     assert stored["identifier"] == "run-1"
     assert stored["timeout"] == 3600.0
-    assert stored["digests"]["project"] == spec().project_digest
+    assert stored["digests"]["project"] == spec().fingerprint
     assert "run_id" not in stored
 
 
@@ -129,8 +129,8 @@ def test_terminal_and_final_states():
 
 
 def test_the_meter_adds_attempt_costs_and_stops_at_the_ceiling():
-    budget = job.CostBudget(2.0, job.CostRate(per_cpu_hour=3600.0))
-    meter = job.Meter(spec(budget=budget, timeout_seconds=10), spent=1.0)
+    budget = job.Budget(2.0, job.Rate(per_cpu_hour=3600.0))
+    meter = job.Meter(spec(budget=budget, timeout=10), spent=1.0)
     assert meter.estimate(0.5) == 1.5
     assert meter.exceeded(1.0) is False
     assert meter.exceeded(1.01) is True
@@ -140,7 +140,7 @@ def test_the_meter_adds_attempt_costs_and_stops_at_the_ceiling():
 
 
 def test_the_meter_without_a_budget_only_times_out():
-    meter = job.Meter(spec(timeout_seconds=10), spent=3.0)
+    meter = job.Meter(spec(timeout=10), spent=3.0)
     assert meter.estimate(1e9) == 3.0
     assert meter.exceeded(1e9) is False
     assert meter.verdict(10) is None
@@ -175,9 +175,9 @@ class Scripted(runner.Runner):
         self.clock_source = Clock()
         super().__init__(
             store,
-            serving_identity="server",
+            identity="server",
             clock=job.Clock(self.clock_source.now, self.clock_source.sleep),
-            poll_seconds=1.0,
+            interval=1.0,
         )
         self.statuses = list(statuses)
         self.submitted = []
@@ -201,7 +201,7 @@ class Scripted(runner.Runner):
 
 @pytest.fixture
 def store(tmp_path):
-    return objectstore.LocalObjectStore(tmp_path / "store")
+    return objectstore.Disk(tmp_path / "store")
 
 
 def quick(**fields):
@@ -286,7 +286,7 @@ def test_a_clashing_spec_or_the_serving_identity_is_refused(store):
 
 
 def test_a_budget_stop_is_recorded_with_its_cost(store):
-    budget = job.CostBudget(1.0, job.CostRate(per_cpu_hour=3600.0))
+    budget = job.Budget(1.0, job.Rate(per_cpu_hour=3600.0))
     made = Scripted(
         store,
         [job.Status(job.State.RUNNING)] * 3 + [job.Status(job.State.CANCELLED)],
@@ -362,7 +362,7 @@ def test_summarize_reports_the_run():
     result = types.SimpleNamespace(
         run_id="r",
         state="complete",
-        selected_model="ridge",
+        model="ridge",
         evaluation={
             "metric": "rmse",
             "selected": {"score": 1.5},
@@ -370,9 +370,9 @@ def test_summarize_reports_the_run():
         },
         trials=[
             types.SimpleNamespace(
-                model_name="ridge", status=types.SimpleNamespace(value="ok")
+                model="ridge", status=types.SimpleNamespace(value="ok")
             ),
-            types.SimpleNamespace(model_name="dummy", status="failed"),
+            types.SimpleNamespace(model="dummy", status="failed"),
         ],
         summary=lambda: "done",
     )
@@ -397,7 +397,7 @@ def test_a_project_without_data_or_target_is_refused():
         spec=types.SimpleNamespace(project={"data": "x"})
     )
     with pytest.raises(errors.ConfigError, match="'data' and 'target'"):
-        project.run_project(context)
+        project.project(context)
 
 
 class RayError(Exception):

@@ -216,7 +216,7 @@ def stratified():
 def test_a_certification_by_name_marks_the_family_gating():
     found = stratified()
     strata.certify(found, ("subgroup_holm",))
-    rows = certified.subgroup_gate(strata.stratify).min_rows
+    rows = certified.gate(strata.stratify).rows
     assert found["gate"] == {
         "status": "gating",
         "reason": "named among the certified gates",
@@ -245,32 +245,30 @@ def test_a_certification_without_the_name_is_descriptive():
 def test_a_certification_from_the_shipped_store_follows_that_store():
     found = stratified()
     strata.certify(found, None)
-    gate = certified.subgroup_gate(strata.stratify)
+    gate = certified.gate(strata.stratify)
     assert found["gate"] == gate.to_dict()
     gating = gate.status == "gating"
     assert found["statement_gate"].startswith(
         "gating:" if gating else "descriptive:"
     )
     assert found["hypotheses"][0]["certified_size"] is (
-        gating and (gate.min_rows is None or gate.min_rows <= 60)
+        gating and (gate.rows is None or gate.rows <= 60)
     )
 
 
 def test_subgroup_results_are_none_without_subgroups_or_with_one_unit():
     found = adapter()
-    assert (
-        strata.subgroup_results(found, block(), frame(a=60), 0.95, ()) is None
-    )
+    assert strata.estimate(found, block(), frame(a=60), 0.95, ()) is None
     spec = block(subgroups=(causal.Subgroup("region", ("a",)),))
     single = adapter(spec)
-    single.single_unit = True
-    assert strata.subgroup_results(single, spec, frame(a=60), 0.95, ()) is None
+    single.unit = True
+    assert strata.estimate(single, spec, frame(a=60), 0.95, ()) is None
 
 
 def test_subgroup_results_restore_weakness_and_are_labelled():
     spec = block(subgroups=(causal.Subgroup("region", ("a",)),))
     found = adapter(spec)
-    out = strata.subgroup_results(found, spec, frame(a=60), 0.95, ())
+    out = strata.estimate(found, spec, frame(a=60), 0.95, ())
     assert found.weak is False
     assert out["gate"]["status"] == "descriptive"
     assert out["family_size"] == 1

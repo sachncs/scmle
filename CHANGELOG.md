@@ -179,6 +179,41 @@ marked `Breaking:` and listed first in their group.
   runs `python -m scmle.serving.runtime`; folders generated earlier pin the
   scmle version that built them. Logger names follow the module path, so a log
   filter on an old path must change.
+* **Single-word names in the remaining packages (phase 6, lane `rest`).**
+  Classes, functions, methods and attributes of `scmle.api`,
+  `scmle.artifacts`, `scmle.causal`, `scmle.cli`, `scmle.contracts`,
+  `scmle.decision`, `scmle.deploy`, `scmle.governance`, `scmle.runners`,
+  `scmle.security`, `scmle.storage`, `scmle.trail` and the other packages
+  outside lanes 3.1 to 3.3 take single-word names; the full old-to-new list
+  is in [`docs/RENAMES.md`](docs/RENAMES.md) under "Name renames". Stored
+  record keys and artifact file names do not change, so files written
+  earlier still read. The pinned surface changes, among it
+  `scmle.api.project.ModalityProject` (`Modality`),
+  `scmle.api.predict.load_model` (`load`),
+  `scmle.api.non_tabular.UnsupportedNonTabularModelError`
+  (`UnsupportedError`), `Bundle.export_onnx` (`export`), the `Project`
+  keywords (`output_dir` is `directory`, `time_column` is `timestamp`,
+  `id_columns` is `identifiers`, `test_fraction` is `holdout`, ...), the
+  deploy contract references (`BundleRef`, `ImageRef`, `SecretRef`,
+  `SecretSource` are `Bundle`, `Image`, `Secret`, `Source`), the runner,
+  object store, token and gateway classes (`RunManifest`, `CheckpointStore`,
+  `RoleStore`, `LocalObjectStore`, `RetryingStore`, `RevocationList`,
+  `RateLimiter` are `Manifest`, `Store`, `Store`, `Disk`, `Retrier`,
+  `Revocations`, `Limiter`) and the keywords of their constructors
+  (`serving_identity` and `poll_seconds` of the runners are `identity` and
+  `interval`). The migration table is in
+  [`docs/API_STABILITY.md`](docs/API_STABILITY.md). Replace the old name
+  with the new one to migrate; no alias is kept.
+* **Bundle format 7.** The single-word names of phase 6 (lane `rest`)
+  rename classes a bundle pickles when its pipeline uses them:
+  `scmle.preparation.wrappers.FlatPredictionClassifier` (`Flattener`) and
+  `FitParamsClassifier` (`Forwarder`), the resamplers
+  `RandomOverSampler`, `RandomUnderSampler`, `GeneratorOverSampler` and
+  `DensityWeightedRegressor` (`Oversampler`, `Undersampler`, `Generator`,
+  `Density`), `SparseSelector` (`Selector`) and the multi-label, survival
+  and uplift wrappers (`Multilabel`, `Estimator`). `BUNDLE_FORMAT` goes
+  from 6 to 7 and `Bundle.load` refuses a format 6 bundle with the existing
+  message: retrain and save it again.
 * **Single-word names in `scmle.pipeline`, `scmle.runtime`,
   `scmle.workflow`, `scmle.operations` and `scmle.monitoring` (phase 6).**
   Classes, functions, methods and attributes of these packages take

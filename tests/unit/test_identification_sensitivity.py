@@ -31,7 +31,7 @@ def test_evalue_of_the_interval_uses_the_limit_nearest_the_null():
 
 
 def test_smd_conversion():
-    assert sensitivity.smd_to_rr(0.5) == pytest.approx(math.exp(0.455))
+    assert sensitivity.convert(0.5) == pytest.approx(math.exp(0.455))
 
 
 def test_robustness_values_reproduce_the_sensemakr_readme_example():

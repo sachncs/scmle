@@ -216,7 +216,7 @@ class Explanation(core.Core):
         frame = pandas.DataFrame([row] if isinstance(row, dict) else row)
         if len(frame) != 1:
             raise errors.ArtifactError("give exactly one row")
-        reference = self.read_frame(background)
+        reference = self.read(background)
         fixed = {c: frame.iloc[0][c] for c in frame.columns}
         goal: Label | Range
         if self.schema.classes is not None:

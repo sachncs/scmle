@@ -113,7 +113,7 @@ def test_ml_difficulty_cost_follows_the_fitted_model():
 def test_ml_difficulty_subsamples_to_fit_its_allowance():
     frame = xor()
     spec, profile = portrait(frame)
-    plan = profile.feature_plan
+    plan = profile.plan
     allowance = fingerprint.cost(500, len(plan.features), 2)
     result = fingerprint.gauge(frame, spec, tasks.Task.BINARY, plan, allowance)
     assert result["available"] and result["rows"] == 500
@@ -125,7 +125,7 @@ def test_ml_difficulty_skips_with_a_reason_when_nothing_fits():
     frame = xor()
     spec, profile = portrait(frame)
     result = fingerprint.gauge(
-        frame, spec, tasks.Task.BINARY, profile.feature_plan, 0.01
+        frame, spec, tasks.Task.BINARY, profile.plan, 0.01
     )
     assert result["available"] is False and result["skipped"] is True
     assert "allowance" in result["reason"]
@@ -134,14 +134,14 @@ def test_ml_difficulty_skips_with_a_reason_when_nothing_fits():
 def test_the_profiler_gives_ml_difficulty_its_share_of_the_budget():
     frame = xor()
     small = portrait(frame, budget=2)[1]
-    stats = small.dataset_statistics["ml_difficulty"]
+    stats = small.overview["ml_difficulty"]
     assert stats["available"] is False and stats["skipped"] is True
     assert any(
         note.startswith("ml_difficulty skipped")
         for note in small.quality_findings
     )
     large = portrait(frame)[1]
-    assert large.dataset_statistics["ml_difficulty"]["available"]
+    assert large.overview["ml_difficulty"]["available"]
 
 
 def test_the_profiler_applies_the_thread_cap(monkeypatch):

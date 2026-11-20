@@ -130,19 +130,19 @@ class Packaging(tracing.Tracing):
         self.certify(board, bundle, evaluation)
         self.release(board, store, evaluation)
         evaluation = results.evaluation(evaluation)
-        store.write_json("evaluation.json", evaluation)
+        store.write("evaluation.json", evaluation)
         evidence_graph = self.trace(board, store)
         graph_record = evidence_graph.to_dict()
         graph_record["graph_digest"] = evidence_graph.digest()
-        store.write_json("evidence_graph.json", graph_record)
+        store.write("evidence_graph.json", graph_record)
         result = results.Run(
-            run_id=store.run_id,
-            run_dir=store.directory,
+            identifier=store.run,
+            directory=store.directory,
             state=scmle.runtime.state.Progress.COMPLETED.value,
             plan=products.require(board.get(planning.Blueprint).plan, "plan"),
             profile=profile,
             trials=board.journal.trials,
-            selected_model=selected.model_name,
+            model=selected.model,
             evaluation=evaluation,
             bundle=bundle,
             diagnostics=board.get(examination.Readings).diagnostics,
@@ -181,12 +181,12 @@ class Packaging(tracing.Tracing):
         readings = board.get(examination.Readings)
         return scmle.artifacts.bundle.Bundle.create(
             exam.shipped if exam.shipped is not None else exam.pipeline,
-            profile.feature_plan,
+            profile.plan,
             split.features,
             board.services.spec.data.target,
             partition.task.value,
             partition.metric.name,
-            selected.model_name,
+            selected.model,
             model_params=selected.params,
             strategy=selected.strategy,
             decision_threshold=(evaluation["decision"] or {}).get("threshold"),
@@ -205,7 +205,7 @@ class Packaging(tracing.Tracing):
             split=split.manifest.fingerprint,
             reference=scmle.data.reference.Baseline.build(
                 split.features,
-                profile.feature_plan,
+                profile.plan,
                 products.require(readings.scores, "reference_scores"),
                 str(
                     products.require(
@@ -239,7 +239,7 @@ class Packaging(tracing.Tracing):
             board.get(selecting.Choice).selected, "selected"
         )
         profile = partition.profile
-        card = model_card.Card.from_run(
+        card = model_card.Card.assemble(
             board.get(ingestion.Intake).manifest,
             profile,
             bundle,
@@ -249,7 +249,7 @@ class Packaging(tracing.Tracing):
             ),
         )
         evaluation["model_card"] = card.to_dict()
-        store.write_json("model_card.json", card.to_dict())
+        store.write("model_card.json", card.to_dict())
         evaluation["reliability_plan"] = self.persist(board, store)
         evaluation["sbom"] = self.inventory(store, bundle)
         evaluation["provenance"] = self.notarise(board, store, bundle)
@@ -259,12 +259,12 @@ class Packaging(tracing.Tracing):
             signing_key=signing.keying(None),
         ).to_dict()
         evaluation["release_attestation"] = release_attestation
-        store.write_json("release_attestation.json", release_attestation)
+        store.write("release_attestation.json", release_attestation)
         evaluation["explanation_evidence"] = self.explain(board, store)
         evaluation["artifact_verification"] = bundle.roundtrip(
             store.path("model"), split.features.head(PARITY_ROWS)
         )
-        store.write_json(
+        store.write(
             "diagnostics/data_access.json",
             ledger.compose(
                 split,
@@ -273,7 +273,7 @@ class Packaging(tracing.Tracing):
                 evaluation["decision"] is not None,
             ),
         )
-        store.write_json(
+        store.write(
             "diagnostics/decision_log.json",
             {
                 "plan": [
@@ -284,7 +284,7 @@ class Packaging(tracing.Tracing):
                 ],
                 "outcomes": [d.to_dict() for d in board.journal.outcomes],
                 "selection": {
-                    "model": selected.model_name,
+                    "model": selected.model,
                     "strategy": selected.strategy,
                     "params": selected.params,
                     "policy": board.services.policy.description,

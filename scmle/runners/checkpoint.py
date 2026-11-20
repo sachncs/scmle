@@ -81,7 +81,7 @@ class Reading:
     reason: str = ""
 
 
-def content_digest(step: int, state: Any) -> str:
+def checksum(step: int, state: Any) -> str:
     """Digests the canonical JSON of a step and its state.
 
     Args:
@@ -95,7 +95,7 @@ def content_digest(step: int, state: Any) -> str:
     return hashlib.sha256(body.encode()).hexdigest()
 
 
-class CheckpointStore:
+class Store:
     """The checkpoints of one run.
 
     Attributes:
@@ -145,7 +145,7 @@ class CheckpointStore:
         if step < 0:
             raise CheckpointError("step must not be negative")
         try:
-            digest = content_digest(step, state)
+            digest = checksum(step, state)
             body = json.dumps(
                 {"step": step, "state": state, "sha256": digest},
                 sort_keys=True,
@@ -163,7 +163,7 @@ class CheckpointStore:
             included.
         """
         found = []
-        for meta in self.store.list_objects(self.prefix):
+        for meta in self.store.catalog(self.prefix):
             stem = meta.key.removeprefix(self.prefix).removesuffix(".json")
             if stem.isdigit():
                 found.append(int(stem))
@@ -205,7 +205,7 @@ class CheckpointStore:
             return damage(key, f"malformed: {type(error).__name__}: {error}")
         if stored != step:
             return damage(key, f"does not verify: holds step {stored!r}")
-        if digest != content_digest(step, state):
+        if digest != checksum(step, state):
             return damage(key, "does not verify: digest mismatch")
         return Reading(key, Condition.LOADED, Checkpoint(step, state, digest))
 

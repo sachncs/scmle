@@ -31,7 +31,7 @@ def main() -> None:
         make_dataset(800, 0),
         "price",
         metric="rmse",
-        time_budget=120,
+        budget=120,
         search=tasks.Search(top_models=0),
         strategies=tasks.Strategies(top_models=0),
     ).run()

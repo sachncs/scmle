@@ -1,6 +1,6 @@
 """An in-memory control plane for testing release logic.
 
-`MemoryPlane` implements `scmle.deploy.control.ControlPlane` and nothing
+`MemoryPlane` implements `scmle.deploy.control.Platform` and nothing
 else. It settles after a number of reads (or never), can run a different
 image than the one requested, and can refuse a traffic split. It is not a
 model of any platform; it lets the release logic be tested for what it does
@@ -24,7 +24,7 @@ OTHER = "sha256:" + "9" * 64
 NO_WAIT = control.Polling(attempts=4, delay=0, sleep=lambda seconds: None)
 
 
-class MemoryPlane(control.ControlPlane):
+class MemoryPlane(control.Platform):
     """A one-service plane whose served state lags what was asked.
 
     Args:
@@ -77,12 +77,12 @@ class MemoryPlane(control.ControlPlane):
                 observation.Traffic(name, percent)
                 for name, percent in self.served.items()
             ),
-            observed_at=support_release.NOW,
+            observed=support_release.NOW,
             revisions=tuple(self.digests.items()),
         )
 
     def deploy(self, image_digest):
-        contract.require_digest(image_digest, "image_digest")
+        contract.require(image_digest, "image_digest")
         self.calls.append("deploy")
         name = f"serve-{len(self.digests) + 1}"
         self.digests[name] = self.runs or image_digest
@@ -92,7 +92,7 @@ class MemoryPlane(control.ControlPlane):
             self.request({name: 100})
         return name
 
-    def set_traffic(self, allocation):
+    def route(self, allocation):
         self.calls.append("set_traffic")
         shares = {k: v for k, v in allocation.items() if v}
         if not self.split and len(shares) != 1:
@@ -123,10 +123,10 @@ def make_registry(root, versions=(1, 2, 3), signed=True):
         json.dumps({"models": {"churn": {"versions": entries, "aliases": {}}}}),
         encoding="utf-8",
     )
-    return registry.ModelRegistryStore(root)
+    return registry.Registry(root)
 
 
 def sanction(number, **changes):
     return support_release.approval(
-        version=number, content_id=str(number) * 64, **changes
+        version=number, content=str(number) * 64, **changes
     )

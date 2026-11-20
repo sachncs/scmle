@@ -33,18 +33,18 @@ class Manifest:
     """Provenance and compatibility metadata of a bundle.
 
     Attributes:
-        model_name: Selected model family.
-        model_version: Version label of this bundle.
+        model: Selected model family.
+        version: Version label of this bundle.
         metric: Optimized metric.
         format: Bundle format version.
-        scmle_version: Framework version that built it.
+        scmle: Framework version that built it.
         python: Python version that built it.
         sklearn: scikit-learn version that built it.
         pandas: pandas version that built it.
         files: SHA-256 per stored file.
-        model_params: Hyperparameter overrides of the selected model.
+        params: Hyperparameter overrides of the selected model.
         strategy: Data strategy of the selected candidate.
-        decision_threshold: Optimized binary decision threshold, if any.
+        threshold: Optimized binary decision threshold, if any.
         libraries: Versions of the installed libraries in `TRACKED_LIBRARIES`
             (numpy, scipy, joblib, lightgbm, xgboost, catboost, imblearn).
         calibration: Description of the probability calibration applied at
@@ -75,18 +75,18 @@ class Manifest:
         }
     )
 
-    model_name: str
-    model_version: str
+    model: str
+    version: str
     metric: str
     format: int = layout.BUNDLE_FORMAT
-    scmle_version: str = scmle.__version__
+    scmle: str = scmle.__version__
     python: str = dataclasses.field(default_factory=platform.python_version)
     sklearn: str = sklearn.__version__
     pandas: str = pandas.__version__
     files: dict[str, str] = dataclasses.field(default_factory=dict)
-    model_params: dict[str, Any] = dataclasses.field(default_factory=dict)
+    params: dict[str, Any] = dataclasses.field(default_factory=dict)
     strategy: str = "default"
-    decision_threshold: float | None = None
+    threshold: float | None = None
     libraries: dict[str, str] = dataclasses.field(
         default_factory=environment.detect
     )
@@ -101,7 +101,7 @@ class Manifest:
     threads: dict[str, int] = dataclasses.field(default_factory=dict)
     blas: str = ""
 
-    def environment_lock(self) -> str:
+    def lock(self) -> str:
         """Renders the build environment as a pinned requirements listing.
 
         Returns:
@@ -112,7 +112,7 @@ class Manifest:
             "# scmle environment lock",
             f"# python {self.python}",
             f"# platform {self.platform or 'unknown'}",
-            f"# scmle {self.scmle_version}",
+            f"# scmle {self.scmle}",
         ]
         pins = [
             f"{name}=={version}" for name, version in self.environment.items()
@@ -133,7 +133,7 @@ class Manifest:
 
         Args:
             stored: A `model_manifest.json` record, with the written keys or
-                with the version-1 field names.
+                with the version-1 keys.
 
         Returns:
             The manifest.
@@ -144,7 +144,7 @@ class Manifest:
         fields = {field.name for field in dataclasses.fields(cls)}
         layout = dict(stored)
         if set(layout) - fields:
-            layout = cls.KEYS.downgrade(layout)
+            layout = cls.KEYS.upgrade(layout)
         return cls(**layout)
 
     def incompatibilities(self) -> list[str]:

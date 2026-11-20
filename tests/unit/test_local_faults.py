@@ -22,9 +22,9 @@ def test_local_executor_passes_every_declared_scenario(tmp_path):
     harness = scmle.governance.reliability.Harness(
         registry,
         root / "evidence",
-        execution_id="local-fault-run",
+        execution="local-fault-run",
         reviewer="local-release-rehearsal",
-        recorded_at="2026-10-20T12:00:00+00:00",
+        recorded="2026-10-20T12:00:00+00:00",
     )
 
     for scenario in reliability.Contingency:
@@ -50,9 +50,7 @@ def test_local_executor_returns_declared_evidence_only(tmp_path, scenario):
         plan for plan in reliability.drills() if plan.scenario is scenario
     )
 
-    assert tuple(item.evidence_type for item in artifacts) == (
-        plan.requirements
-    )
+    assert tuple(item.kind for item in artifacts) == (plan.requirements)
 
 
 def test_local_executor_rejects_unknown_scenario(tmp_path):

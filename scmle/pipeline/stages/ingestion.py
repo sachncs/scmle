@@ -35,7 +35,7 @@ class Intake(products.Derived):
     """
 
     frame: pandas.DataFrame
-    manifest: provenance.DatasetManifest
+    manifest: provenance.Manifest
     notes: list[str]
     read: float
     stream: tuple[streaming.Feed, streaming.Totals] | None
@@ -171,7 +171,7 @@ class Ingest(interface.Stage):
     def enrol(
         self,
         board: engine.Board,
-        manifest: provenance.DatasetManifest,
+        manifest: provenance.Manifest,
         frame: pandas.DataFrame,
     ) -> None:
         """Records the source identity and refuses incompatible schema changes.
@@ -231,7 +231,7 @@ class Ingest(interface.Stage):
     def forbid(
         self,
         board: engine.Board,
-        manifest: provenance.DatasetManifest,
+        manifest: provenance.Manifest,
     ) -> None:
         """Rejects resuming trials computed on different data.
 
@@ -248,7 +248,7 @@ class Ingest(interface.Stage):
         saved = board.services.store.path("dataset_manifest.json")
         if not saved.exists():
             return
-        previous = provenance.DatasetManifest.from_dict(
+        previous = provenance.Manifest.from_dict(
             json.loads(saved.read_text(encoding="utf-8"))
         ).digests["data"]
         current = manifest.digests["data"]

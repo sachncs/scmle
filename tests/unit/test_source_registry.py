@@ -10,9 +10,9 @@ from scmle.contracts import data
 from scmle.data.readers import registry
 
 
-def make_manifest(snapshot_id: str, data_hash: str) -> data.DatasetManifest:
+def make_manifest(snapshot_id: str, data_hash: str) -> data.Manifest:
     """Build a small manifest for registry tests."""
-    return data.DatasetManifest(
+    return data.Manifest(
         identifier=f"dataset-{data_hash}",
         digests={"schema": "schema-hash", "data": data_hash},
         rows=2,

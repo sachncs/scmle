@@ -16,7 +16,7 @@ def coordinate(**changes):
     values = {
         "modality": axes.Modality.TABULAR,
         "task": tasks.Task.BINARY,
-        "model_family": "tree",
+        "family": "tree",
         "evaluation": axes.Evaluation.CALIBRATED,
         "uncertainty": axes.Uncertainty.NONE,
         "fairness": axes.Fairness.NONE,
@@ -31,12 +31,10 @@ def capability(status=axes.Status.SUPPORTED, **changes):
     values = {
         "key": coordinate(),
         "status": status,
-        "required_extras": ("core",),
-        "resources": declarations.Resources(
-            cpu_cores=2, memory_gb=4.0, disk_gb=1.0
-        ),
-        "failure_modes": ("fails",),
-        "evidence_links": ("tests/x.py",),
+        "extras": ("core",),
+        "resources": declarations.Resources(cores=2, memory=4.0, disk=1.0),
+        "modes": ("fails",),
+        "links": ("tests/x.py",),
     }
     values.update(changes)
     return declarations.Capability(**values)
@@ -44,22 +42,22 @@ def capability(status=axes.Status.SUPPORTED, **changes):
 
 def family(**changes):
     values = {
-        "model_family": "tree",
+        "family": "tree",
         "status": axes.Status.EXPERIMENTAL,
         "modalities": (axes.Modality.TABULAR,),
-        "required_extras": ("core",),
+        "extras": ("core",),
         "resources": declarations.Resources(),
-        "failure_modes": ("fails",),
+        "modes": ("fails",),
     }
     values.update(changes)
     return declarations.Declaration(**values)
 
 
 ENOUGH = declarations.Environment(
-    available_extras=frozenset({"core"}),
-    cpu_cores=2,
-    memory_gb=4.0,
-    disk_gb=1.0,
+    extras=frozenset({"core"}),
+    cores=2,
+    memory=4.0,
+    disk=1.0,
 )
 
 
@@ -68,7 +66,7 @@ ENOUGH = declarations.Environment(
 
 def test_resources_are_stored_in_single_words():
     assert declarations.RESOURCES.renames["cpu_cores"] == "cpu"
-    made = declarations.Resources(max_rows=10, notes=("b", "a", "b"))
+    made = declarations.Resources(rows=10, notes=("b", "a", "b"))
     assert made.notes == ("a", "b")
     assert made.to_dict() == {
         "cpu": 1,
@@ -108,8 +106,8 @@ def test_resources_refuse_impossible_assumptions(changes, error, message):
 
 
 def test_resources_accept_their_edges():
-    made = declarations.Resources(cpu_cores=1, disk_gb=0.0, max_rows=1)
-    assert made.max_rows == 1
+    made = declarations.Resources(cores=1, disk=0.0, rows=1)
+    assert made.rows == 1
 
 
 def test_a_coordinate_dumps_every_dimension():
@@ -161,11 +159,11 @@ def test_a_family_declaration_canonicalizes_its_lists():
             axes.Modality.IMAGE,
             axes.Modality.TEXT,
         ),
-        required_extras=("b", "a", "a"),
+        extras=("b", "a", "a"),
         limitations=("z", "y"),
     )
     assert made.modalities == (axes.Modality.IMAGE, axes.Modality.TEXT)
-    assert made.required_extras == ("a", "b")
+    assert made.extras == ("a", "b")
     assert made.to_dict() == {
         "family": "tree",
         "status": "experimental",
@@ -210,19 +208,17 @@ def test_a_family_declaration_refuses_bad_values(changes, error, message):
 
 
 def test_an_environment_records_what_was_observed():
-    made = declarations.Environment(
-        available_extras={"a"}, cpu_cores=1, memory_gb=0.0
-    )
-    assert made.available_extras == frozenset({"a"})
-    assert made.gpu_available is None
+    made = declarations.Environment(extras={"a"}, cores=1, memory=0.0)
+    assert made.extras == frozenset({"a"})
+    assert made.available is None
     with pytest.raises(errors.InputError, match="non-empty strings"):
-        declarations.Environment(available_extras={""})
+        declarations.Environment(extras={""})
     with pytest.raises(errors.InputError, match="cpu_cores must be at least 1"):
-        declarations.Environment(cpu_cores=0)
+        declarations.Environment(cores=0)
     with pytest.raises(errors.InputError, match="memory_gb must be finite"):
-        declarations.Environment(memory_gb=-1.0)
+        declarations.Environment(memory=-1.0)
     with pytest.raises(errors.InputError, match="disk_gb must be finite"):
-        declarations.Environment(disk_gb=float("inf"))
+        declarations.Environment(disk=float("inf"))
 
 
 def test_a_reason_dumps_its_fields():
@@ -273,15 +269,13 @@ def test_a_capability_refuses_incomplete_declarations(changes, error, message):
 
 
 def test_an_experimental_capability_may_lack_evidence():
-    made = capability(axes.Status.EXPERIMENTAL, evidence_links=())
-    assert made.evidence_links == ()
+    made = capability(axes.Status.EXPERIMENTAL, links=())
+    assert made.links == ()
 
 
 def test_the_default_families_cover_the_transformer_families():
-    names = [
-        d.model_family for d in declarations.DEFAULT_MODEL_FAMILY_DECLARATIONS
-    ]
-    assert names == [f.value for f in axes.ModelFamily]
+    names = [d.family for d in declarations.DEFAULT_MODEL_FAMILY_DECLARATIONS]
+    assert names == [f.value for f in axes.Family]
     assert declarations.UnsupportedError.category == "capability"
     assert issubclass(declarations.UnsupportedError, errors.ConfigError)
 
@@ -312,18 +306,18 @@ def test_a_catalog_refuses_duplicates_and_wrong_types():
 
 
 def test_a_catalog_lists_in_a_deterministic_order():
-    second = capability(key=coordinate(model_family="boost"))
+    second = capability(key=coordinate(family="boost"))
     made = catalog.Catalog(
-        [capability(), second], [family(), family(model_family="alpha")]
+        [capability(), second], [family(), family(family="alpha")]
     )
-    assert [c.key.model_family for c in made.catalogue()] == ["boost", "tree"]
-    assert [d.model_family for d in made.list_model_families()] == [
+    assert [c.key.family for c in made.catalogue()] == ["boost", "tree"]
+    assert [d.family for d in made.inventory()] == [
         "alpha",
         "tree",
     ]
     assert made.find("tree").status is axes.Status.EXPERIMENTAL
     assert made.find("none") is None
-    assert made.runtime_environment is None
+    assert made.environment is None
 
 
 def test_audit_passes_a_capable_environment():
@@ -335,10 +329,10 @@ def test_audit_passes_a_capable_environment():
 def test_audit_lists_missing_extras_and_short_resources():
     made = catalog.Catalog()
     poor = declarations.Environment(
-        available_extras=frozenset({"z"}),
-        cpu_cores=1,
-        memory_gb=3.9,
-        disk_gb=None,
+        extras=frozenset({"z"}),
+        cores=1,
+        memory=3.9,
+        disk=None,
     )
     found = made.audit(capability(), poor)
     assert [r.code for r in found] == [
@@ -356,22 +350,20 @@ def test_audit_lists_missing_extras_and_short_resources():
 def test_audit_checks_gpu_and_network_only_when_required():
     made = catalog.Catalog()
     needs = capability(
-        required_extras=(),
-        resources=declarations.Resources(
-            gpu_required=True, network_required=True
-        ),
+        extras=(),
+        resources=declarations.Resources(required=True, network=True),
     )
-    unknown = declarations.Environment(cpu_cores=1, memory_gb=1.0, disk_gb=0.0)
+    unknown = declarations.Environment(cores=1, memory=1.0, disk=0.0)
     assert [r.code for r in made.audit(needs, unknown)] == [
         "unknown_gpu_available",
         "unknown_network_available",
     ]
     absent = declarations.Environment(
-        cpu_cores=1,
-        memory_gb=1.0,
-        disk_gb=0.0,
-        gpu_available=False,
-        network_available=False,
+        cores=1,
+        memory=1.0,
+        disk=0.0,
+        available=False,
+        online=False,
     )
     found = made.audit(needs, absent)
     assert [r.code for r in found] == [
@@ -380,20 +372,20 @@ def test_audit_checks_gpu_and_network_only_when_required():
     ]
     assert found[0].message == "declared GPU resource is unavailable"
     present = declarations.Environment(
-        cpu_cores=1,
-        memory_gb=1.0,
-        disk_gb=0.0,
-        gpu_available=True,
-        network_available=True,
+        cores=1,
+        memory=1.0,
+        disk=0.0,
+        available=True,
+        online=True,
     )
     assert made.audit(needs, present) == ()
-    plain = capability(required_extras=(), resources=declarations.Resources())
+    plain = capability(extras=(), resources=declarations.Resources())
     assert made.audit(plain, unknown) == ()
 
 
 def test_audit_checks_a_row_limit_without_an_environment():
     made = catalog.Catalog()
-    limited = capability(resources=declarations.Resources(max_rows=100))
+    limited = capability(resources=declarations.Resources(rows=100))
     assert [r.code for r in made.audit(limited, None)] == ["unknown_row_count"]
     assert made.audit(limited, None, 100) == ()
     over = made.audit(limited, None, 101)
@@ -404,7 +396,7 @@ def test_audit_checks_a_row_limit_without_an_environment():
 
 def test_audit_uses_the_bound_environment_and_checks_types():
     made = catalog.Catalog()
-    made.bind(declarations.Environment(cpu_cores=1, memory_gb=1.0, disk_gb=0.0))
+    made.bind(declarations.Environment(cores=1, memory=1.0, disk=0.0))
     assert (
         next(r.code for r in made.audit(capability(), None)) == "missing_extra"
     )
@@ -441,7 +433,7 @@ def test_a_registered_supported_capability_crosses_the_boundary():
 
 def test_an_unregistered_key_is_refused_with_its_diagnostics():
     made = registry.Registry.seed()
-    key = coordinate(model_family="vision_transformer")
+    key = coordinate(family="vision_transformer")
     found = made.diagnose(key)
     assert [r.code for r in found] == [
         "missing_declaration",
@@ -464,14 +456,14 @@ def test_an_unregistered_key_is_refused_with_its_diagnostics():
 
 
 def test_an_unknown_family_only_lacks_a_declaration():
-    found = registry.Registry().diagnose(coordinate(model_family="mystery"))
+    found = registry.Registry().diagnose(coordinate(family="mystery"))
     assert [r.code for r in found] == ["missing_declaration"]
     assert found[0].observed == {"model_family_status": None}
 
 
 def test_a_family_in_an_allowed_status_and_modality_adds_nothing():
     made = registry.Registry.seed()
-    key = coordinate(model_family="jepa")
+    key = coordinate(family="jepa")
     found = made.diagnose(key, {axes.Status.EXPERIMENTAL})
     assert [r.code for r in found] == ["missing_declaration"]
 
@@ -492,11 +484,11 @@ def test_an_experimental_capability_needs_an_explicit_status():
 
 def test_diagnose_checks_resources_and_row_limits():
     made = registry.Registry([capability()])
-    poor = declarations.Environment(cpu_cores=1, memory_gb=1.0, disk_gb=0.0)
+    poor = declarations.Environment(cores=1, memory=1.0, disk=0.0)
     codes = [r.code for r in made.diagnose(coordinate(), environment=poor)]
     assert codes[0] == "missing_extra"
     limited = registry.Registry(
-        [capability(resources=declarations.Resources(max_rows=5))]
+        [capability(resources=declarations.Resources(rows=5))]
     )
     assert [r.code for r in limited.diagnose(coordinate())] == [
         "unknown_row_count"
@@ -536,7 +528,7 @@ def test_a_registry_dumps_canonical_json():
 def test_refuse_always_raises_with_the_registered_keys():
     made = registry.Registry([capability()])
     with pytest.raises(declarations.UnsupportedError) as caught:
-        made.refuse(coordinate(model_family="x"), "because")
+        made.refuse(coordinate(family="x"), "because")
     assert "because; key=" in str(caught.value)
     assert caught.value.details["registered_keys"] == [coordinate().to_dict()]
     assert caught.value.details["diagnostics"] == []

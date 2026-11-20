@@ -36,7 +36,7 @@ class Clock:
 
 @pytest.fixture
 def store(tmp_path):
-    return objectstore.LocalObjectStore(tmp_path / "state")
+    return objectstore.Disk(tmp_path / "state")
 
 
 def fast():
@@ -485,7 +485,7 @@ def test_of_two_executors_racing_for_an_expired_lease_one_wins(store):
     assert json.loads(store.get(lock)[0])["fence"] == 1
 
 
-class Racing(objectstore.LocalObjectStore):
+class Racing(objectstore.Disk):
     """A store that runs a hook once, right after a lease is read."""
 
     hook = None
@@ -730,7 +730,7 @@ def test_independent_steps_run_in_parallel_and_a_group_limit_holds(store):
     assert peak[0] == 1
 
 
-class Crashing(objectstore.LocalObjectStore):
+class Crashing(objectstore.Disk):
     """A store whose process dies before a settled run record is written."""
 
     def __init__(self, root):
@@ -956,7 +956,7 @@ def test_a_slot_that_cannot_start_is_deferred_and_stays_due(store):
 def test_a_schedule_is_required():
     with pytest.raises(errors.ConfigError):
         scmle.workflow.schedule.Scheduler(
-            pipeline(), objectstore.LocalObjectStore("/tmp/x-sched")
+            pipeline(), objectstore.Disk("/tmp/x-sched")
         )
 
 
@@ -966,23 +966,23 @@ def test_a_schedule_is_required():
 def test_a_training_step_runs_through_a_runner_and_resumes_inside_it(tmp_path):
     clock = Clock()
     fake = support_runners.FakeClock()
-    durable = objectstore.LocalObjectStore(tmp_path / "jobs")
+    durable = objectstore.Disk(tmp_path / "jobs")
     runner = local.Runner(
         durable,
         support_runners.toy_workload(fake),
-        serving_identity="serve",
+        identity="serve",
         clock=base.Clock(fake.now, fake.sleep),
-        poll_seconds=1.0,
+        interval=1.0,
         interruptions=lambda attempt, step: attempt == 1 and step == 3,
     )
 
     def spec_for(context):
         return base.Job(
-            run_id="job-" + context.key[:16],
+            identifier="job-" + context.key[:16],
             name="train",
             project={"data": "d", "target": "y"},
             identity="train",
-            budget=base.CostBudget(10.0, base.CostRate(per_cpu_hour=1.0)),
+            budget=base.Budget(10.0, base.Rate(per_cpu_hour=1.0)),
         )
 
     recorder = Recorder(clock)
@@ -991,7 +991,7 @@ def test_a_training_step_runs_through_a_runner_and_resumes_inside_it(tmp_path):
     handlers_["train"] = handlers.delegate(runner, spec_for)
     executor = scmle.workflow.executor.Executor(
         flow,
-        objectstore.LocalObjectStore(tmp_path / "state"),
+        objectstore.Disk(tmp_path / "state"),
         handlers_,
         approver_keys=KEYS,
         clock=clock,
@@ -1027,7 +1027,7 @@ def test_a_corrupt_record_names_its_key(store):
 # ---- characterization: the step-record transcript -------------------------
 
 
-class Transcript(objectstore.LocalObjectStore):
+class Transcript(objectstore.Disk):
     """A store that logs every record write under a run, lease excluded.
 
     The lease (`lock`) is excluded because its heartbeat renewals depend on
@@ -1213,7 +1213,7 @@ def test_records_written_before_the_engine_load_and_resume(tmp_path):
     # `Bucket`: one run failed at evaluate after train spent 3.0 and
     # evaluate 0.5, one waits at its approval. Both load and resume.
     stored = json.loads(RECORDS.read_text(encoding="utf-8"))["records"]
-    store = objectstore.LocalObjectStore(tmp_path / "state")
+    store = objectstore.Disk(tmp_path / "state")
     for key, record in stored.items():
         store.put(key, json.dumps(record, indent=2, sort_keys=True).encode())
     clock = Clock()

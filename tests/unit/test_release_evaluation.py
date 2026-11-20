@@ -41,7 +41,7 @@ def make_policy(
     fairness_policy = (
         evaluation.Fairness(
             method=evaluation.Technique.GROUP_REPORT,
-            sensitive_columns=("group",),
+            sensitive=("group",),
             metrics=("demographic_parity_difference",),
         )
         if fairness
@@ -52,7 +52,7 @@ def make_policy(
             evaluation.Equity(
                 metric="demographic_parity_difference",
                 maximum=0.10,
-                required_evidence=("fairness.report",),
+                evidence=("fairness.report",),
             ),
         )
         if fairness
@@ -62,7 +62,7 @@ def make_policy(
         evaluation.Requirement(
             name="metric_uncertainty",
             action=diagnostic_action,
-            required_evidence=("diagnostic.metric",),
+            evidence=("diagnostic.metric",),
         ),
     )
     if diagnostic_action is evaluation.Remedy.WARN:
@@ -70,39 +70,35 @@ def make_policy(
             evaluation.Requirement(
                 name="robustness",
                 action=evaluation.Remedy.BLOCK,
-                required_evidence=("diagnostic.robustness",),
+                evidence=("diagnostic.robustness",),
             ),
         )
     return evaluation.Criteria(
         task=tasks.Task.BINARY,
-        primary_metric="roc_auc",
+        metric="roc_auc",
         metrics=(
             evaluation.Declaration(
                 name="roc_auc", direction=evaluation.Orientation.MAXIMIZE
             ),
         ),
-        uncertainty=evaluation.Uncertainty(
-            method=evaluation.UncertaintyMethod.NONE
-        ),
+        uncertainty=evaluation.Uncertainty(method=evaluation.Method.NONE),
         calibration=evaluation.Calibration(method=evaluation.Procedure.NONE),
         fairness=fairness_policy,
-        small_groups=evaluation.Subgroups(
-            warning_threshold=30, blocking_threshold=10
-        ),
+        small=evaluation.Subgroups(warning=30, blocking=10),
         explanations=evaluation.Explanations(
             availability=evaluation.Explicability.NONE
         ),
         release=evaluation.Gates(
-            metric_gates=(
+            metrics=(
                 evaluation.Hurdle(
                     metric="roc_auc",
                     direction=evaluation.Orientation.MAXIMIZE,
                     threshold=0.75,
                 ),
             ),
-            diagnostic_gates=diagnostic_gates,
-            required_evidence=("release.manifest",),
-            fairness_gates=fairness_gates,
+            diagnostics=diagnostic_gates,
+            evidence=("release.manifest",),
+            fairness=fairness_gates,
         ),
     )
 
@@ -273,8 +269,8 @@ def test_explanation_quality_threshold_is_a_blocking_release_gate():
             **dict(make_policy()),
             "explanations": evaluation.Explanations(
                 availability=evaluation.Explicability.GLOBAL,
-                required_methods=("permutation_importance",),
-                required_evidence=("explanation.json",),
+                methods=("permutation_importance",),
+                evidence=("explanation.json",),
                 require_stability=True,
                 stability_threshold=0.8,
             ),
@@ -311,8 +307,8 @@ def test_explanation_quality_release_gate_passes_with_valid_evidence():
             **dict(make_policy()),
             "explanations": evaluation.Explanations(
                 availability=evaluation.Explicability.GLOBAL,
-                required_methods=("permutation_importance",),
-                required_evidence=("explanation.json",),
+                methods=("permutation_importance",),
+                evidence=("explanation.json",),
                 require_stability=True,
                 require_fidelity=True,
                 stability_threshold=0.8,

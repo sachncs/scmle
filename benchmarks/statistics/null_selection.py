@@ -112,7 +112,7 @@ def candidate_count(run: Any) -> int:
         baseline.
     """
     return sum(
-        t.status is experiments.Termination.OK and t.model_name != "dummy"
+        t.status is experiments.Termination.OK and t.model != "dummy"
         for t in run.trials
     )
 
@@ -129,15 +129,15 @@ def lead_exceeds_spread(run: Any) -> bool:
         dummy baseline, as in the report.
     """
     done = [t for t in run.trials if t.status is experiments.Termination.OK]
-    done.sort(key=lambda t: (-t.score_mean, t.trial_id))
+    done.sort(key=lambda t: (-t.score, t.identifier))
     selected = run.evaluation["selected"]["trial"]
-    chosen = next(t for t in done if t.trial_id == selected)
-    others = [t for t in done if t.trial_id != selected]
+    chosen = next(t for t in done if t.identifier == selected)
+    others = [t for t in done if t.identifier != selected]
     if not others:
         return False
     runner = others[0]
-    lead = chosen.score_mean - runner.score_mean
-    return bool(lead > max(chosen.score_std, runner.score_std))
+    lead = chosen.score - runner.score
+    return bool(lead > max(chosen.deviation, runner.deviation))
 
 
 def one_run(
@@ -169,10 +169,10 @@ def one_run(
     run = scmle.api.project.Project(
         frame,
         "y",
-        output_dir=directory,
+        directory=directory,
         folds=folds,
         seed=seed + index,
-        time_budget=300,
+        budget=300,
         enforcement="cooperative",
         search=tasks.Search(
             top_models=len(CANDIDATES) if configs_per_model else 0,
@@ -187,7 +187,7 @@ def one_run(
     test_low, test_high = run.diagnostics["metric_uncertainty"]["ci_95"]
     cv_low, cv_high = evaluation["confidence"]["interval"]
     chosen = next(
-        t for t in run.trials if t.trial_id == evaluation["selected"]["trial"]
+        t for t in run.trials if t.identifier == evaluation["selected"]["trial"]
     )
     truth = TRUE_SKILL
     if signal:
@@ -218,7 +218,7 @@ def one_run(
         "test_interval_below_truth": bool(test_high < truth),
         "selected_trial_id": evaluation["selected"]["trial"],
         "trial_fold_scores": {
-            t.trial_id: t.fold_scores
+            t.identifier: t.folds
             for t in run.trials
             if t.status is experiments.Termination.OK
         },

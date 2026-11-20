@@ -557,7 +557,7 @@ class Watcher:
             reference = expected.get(name)
             if reference is None or numpy.isnan(value) or reference == 0:
                 continue
-            sign = 1 if metrics.CATALOG.metrics[name].greater_is_better else -1
+            sign = 1 if metrics.CATALOG.metrics[name].maximize else -1
             change[name] = sign * (value - reference) / abs(reference)
         primary = self.bundle.info.metric
         degraded = (

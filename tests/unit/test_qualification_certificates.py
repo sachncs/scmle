@@ -56,7 +56,7 @@ def test_wilson_interval_matches_scipy(successes, n, confidence):
 def test_wilson_interval_agrees_with_the_certificate_lower_bound():
     cert = measured(planted=57, detected=49)
     low = certificates.bound(49, 57, 0.95)[0]
-    assert low == pytest.approx(cert.recall_lower_bound(0.95), abs=1e-12)
+    assert low == pytest.approx(cert.bound(0.95), abs=1e-12)
 
 
 @pytest.mark.parametrize(

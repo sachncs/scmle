@@ -76,7 +76,7 @@ class Prediction(command.Command):
             proba = model.predict_proba(args.data, mapping)
             for index, label in enumerate(model.classes):
                 frame[f"proba_{label}"] = proba[:, index]
-        durability.write_atomically(
+        durability.write(
             pathlib.Path(args.output), frame.to_csv(index=False).encode("utf-8")
         )
         LOGGER.info("wrote %d predictions to %s", len(frame), args.output)
@@ -221,11 +221,11 @@ class Serve(command.Command):
             model,
             args.host,
             args.port,
-            gateway=access.gateway_from_environment(os.environ),
+            gateway=access.assemble(os.environ),
             monitor=monitor,
             drain=args.drain_seconds,
         )
-        LOGGER.info("serving %s", model.info.model_name)
+        LOGGER.info("serving %s", model.info.model)
         runtime.hold(
             adapter,
             monitor,
@@ -281,8 +281,8 @@ class Export(command.Command):
             The exit status, EXIT_OK (0).
         """
         model = bundle.Bundle.load(args.bundle, trusted=args.trusted)
-        check = None if args.check is None else model.read_frame(args.check)
-        written = model.export_onnx(
+        check = None if args.check is None else model.read(args.check)
+        written = model.export(
             args.output,
             check=check,
             tolerance=args.tolerance,

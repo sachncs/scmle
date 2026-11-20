@@ -13,7 +13,7 @@ from scmle.decision import anytime
 def test_the_wealth_of_a_fair_bet_matches_a_hand_computed_value():
     stream = anytime.Stream(0.0, 1.0, 0.5)
     values = [1.0, 0.0, 1.0, 1.0]
-    got = anytime.log_wealth_paths(values, stream)
+    got = anytime.accumulate(values, stream)
     grid = anytime.bets(0.5)
     expected = []
     for t in range(1, 5):
@@ -32,7 +32,7 @@ def test_the_mixture_has_mean_exactly_one_under_the_null():
     )
     ones = sequences.sum(axis=1)
     probability = 0.3**ones * 0.7 ** (length - ones)
-    final = numpy.exp(anytime.log_wealth_paths(sequences, stream)[:, -1])
+    final = numpy.exp(anytime.accumulate(sequences, stream)[:, -1])
     assert float(probability @ final) == pytest.approx(1.0, abs=1e-9)
 
 
@@ -40,7 +40,7 @@ def test_peeking_at_every_unit_stays_inside_the_level():
     rng = numpy.random.default_rng(1)
     stream = anytime.Stream(0.0, 1.0, 0.5)
     data = (rng.random((3000, 400)) < 0.5).astype(float)
-    paths = anytime.log_wealth_paths(data, stream)
+    paths = anytime.accumulate(data, stream)
     ever = (paths.max(axis=1) >= math.log(20)).mean()
     assert ever <= 0.05 + 3 * math.sqrt(0.05 * 0.95 / 3000)
 
@@ -49,7 +49,7 @@ def test_a_true_effect_is_found():
     rng = numpy.random.default_rng(2)
     stream = anytime.Stream(0.0, 1.0, 0.5)
     data = (rng.random(600) < 0.7).astype(float)
-    assert anytime.log_wealth_paths(data, stream)[-1] > math.log(1000)
+    assert anytime.accumulate(data, stream)[-1] > math.log(1000)
 
 
 def test_direction_less_reflects_the_stream():
@@ -57,8 +57,8 @@ def test_direction_less_reflects_the_stream():
     data = (rng.random(600) < 0.3).astype(float)
     less = anytime.Stream(0.0, 1.0, 0.5, "less")
     greater = anytime.Stream(0.0, 1.0, 0.5, "greater")
-    assert anytime.log_wealth_paths(data, less)[-1] > math.log(100)
-    assert anytime.log_wealth_paths(data, greater)[-1] < 0.0
+    assert anytime.accumulate(data, less)[-1] > math.log(100)
+    assert anytime.accumulate(data, greater)[-1] < 0.0
 
 
 def test_batches_and_single_updates_agree_and_track_the_running_maximum():
@@ -72,7 +72,7 @@ def test_batches_and_single_updates_agree_and_track_the_running_maximum():
         pieces.update(chunk)
     assert pieces.log_e == pytest.approx(whole.log_e, abs=1e-9)
     assert pieces.count == 200
-    path = anytime.log_wealth_paths(data, stream)
+    path = anytime.accumulate(data, stream)
     assert whole.max_log_e == pytest.approx(max(0.0, path.max()))
     assert whole.crossed(0.5) == (whole.log_e >= math.log(2))
     assert whole.surpassed(0.5)
@@ -91,7 +91,7 @@ def test_the_e_value_enters_the_ledger_as_evidence():
 def test_pseudo_outcomes_have_the_mean_difference_and_the_stated_bounds():
     arm = numpy.array([1.0, 0.0, 1.0, 0.0])
     y = numpy.array([1.0, 1.0, 0.0, 0.0])
-    z = anytime.pseudo_outcomes(arm, y, 0.25)
+    z = anytime.transform(arm, y, 0.25)
     assert z.tolist() == [4.0, -1 / 0.75, 0.0, 0.0]
     assert z.max() <= 1 / 0.25 and z.min() >= -1 / 0.75
 
@@ -101,14 +101,12 @@ def test_the_confidence_bound_covers_and_tightens_with_data():
     stream = anytime.Stream(0.0, 1.0, 0.5)
     small = (rng.random(100) < 0.7).astype(float)
     large = (rng.random(4000) < 0.7).astype(float)
-    low_small = anytime.confidence_bound(small, stream, 0.05)
-    low_large = anytime.confidence_bound(large, stream, 0.05)
+    low_small = anytime.bound(small, stream, 0.05)
+    low_large = anytime.bound(large, stream, 0.05)
     assert low_small < low_large < 0.7
-    upper = anytime.confidence_bound(
-        large, anytime.Stream(0.0, 1.0, 0.5, "less"), 0.05
-    )
+    upper = anytime.bound(large, anytime.Stream(0.0, 1.0, 0.5, "less"), 0.05)
     assert upper > 0.7
-    assert anytime.confidence_bound([], stream, 0.05) == 0.0
+    assert anytime.bound([], stream, 0.05) == 0.0
 
 
 @pytest.mark.parametrize(
@@ -120,9 +118,9 @@ def test_the_confidence_bound_covers_and_tightens_with_data():
         lambda: anytime.Stream(0.0, 1.0, 0.5).rescale([2.0]),
         lambda: anytime.Stream(0.0, 1.0, 0.5).rescale([[1.0]]),
         lambda: anytime.Stream(0.0, 1.0, 0.5).rescale([math.nan]),
-        lambda: anytime.pseudo_outcomes([1.0], [2.0], 0.5),
-        lambda: anytime.pseudo_outcomes([2.0], [1.0], 0.5),
-        lambda: anytime.pseudo_outcomes([1.0], [1.0], 1.0),
+        lambda: anytime.transform([1.0], [2.0], 0.5),
+        lambda: anytime.transform([2.0], [1.0], 0.5),
+        lambda: anytime.transform([1.0], [1.0], 1.0),
         lambda: anytime.clamped(-1.0),
         lambda: anytime.Martingale(anytime.Stream(0.0, 1.0, 0.5)).crossed(1.0),
     ],
@@ -159,7 +157,7 @@ def test_a_centred_pseudo_outcome_keeps_the_mean_difference_exactly():
     weight = (q ** arm.sum(1) * (1 - q) ** (length - arm.sum(1))) * (
         p_y ** y.sum(1) * (1 - p_y) ** (length - y.sum(1))
     )
-    z = anytime.pseudo_outcomes(arm, y, q, anytime.centers(y))
+    z = anytime.transform(arm, y, q, anytime.centers(y))
     # arm and outcome independent: the difference in means is zero
     assert float((weight * z[:, -1]).sum()) == pytest.approx(0.0, abs=1e-12)
     assert p_arm == q
@@ -192,8 +190,8 @@ def test_centring_shortens_the_time_to_find_an_effect_on_a_high_mean_metric():
         rng.beta(2.0, 8.0, arm.shape),
     )
     target = math.log(50)
-    plain = anytime.log_wealth_paths(
-        anytime.pseudo_outcomes(arm, y, 0.5),
+    plain = anytime.accumulate(
+        anytime.transform(arm, y, 0.5),
         anytime.contrasts(0.5, 0.02),
     )
     centred = anytime.recentre(arm, y, 0.5, 0.02)

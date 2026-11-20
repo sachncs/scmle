@@ -21,15 +21,15 @@ def spec(**changes):
     values = {
         "version": "1.0",
         "environment": "staging",
-        "image": references.ImageRef("repo/serve", IMAGE),
-        "bundle": references.BundleRef("churn", "3", BUNDLE, True),
+        "image": references.Image("repo/serve", IMAGE),
+        "bundle": references.Bundle("churn", "3", BUNDLE, True),
         "resources": deployment.Resources(
             deployment.Quota(0.5, 256), deployment.Quota(1.0, 512)
         ),
         "config": {"LOG_LEVEL": "info"},
         "secrets": (
-            references.SecretRef("API_TOKEN", "env", "API_TOKEN_SOURCE"),
-            references.SecretRef("EXTRA", "file", "/run/x", required=False),
+            references.Secret("API_TOKEN", "env", "API_TOKEN_SOURCE"),
+            references.Secret("EXTRA", "file", "/run/x", required=False),
         ),
     }
     values.update(changes)
@@ -38,12 +38,12 @@ def spec(**changes):
 
 def report(made, **changes):
     values = {
-        "spec_digest": made.digest(),
-        "image_digest": IMAGE,
-        "bundle_digest": BUNDLE,
-        "model_version": "3",
+        "spec": made.digest(),
+        "image": IMAGE,
+        "digest": BUNDLE,
+        "version": "3",
         "ready": True,
-        "secret_names": ("API_TOKEN",),
+        "secrets": ("API_TOKEN",),
     }
     values.update(changes)
     return runtime.Runtime(**values)
@@ -55,7 +55,7 @@ def report(made, **changes):
 def test_reference_constants_are_the_documented_patterns():
     assert references.PRIVATE_KEY_MARKER == "-----BEGIN"
     assert references.Architecture.AMD64 == "amd64"
-    assert references.SecretSource.ENVIRONMENT == "env"
+    assert references.Source.ENVIRONMENT == "env"
     assert [e.value for e in references.Environment] == [
         "local",
         "staging",
@@ -69,11 +69,11 @@ def test_reference_constants_are_the_documented_patterns():
 )
 def test_require_digest_refuses_anything_but_a_sha256_digest(value):
     with pytest.raises(errors.ConfigError, match="f must be 'sha256:'"):
-        references.require_digest(value, "f")
+        references.require(value, "f")
 
 
 def test_require_digest_returns_a_digest():
-    assert references.require_digest(IMAGE, "f") == IMAGE
+    assert references.require(IMAGE, "f") == IMAGE
 
 
 def test_simple_accepts_names_up_to_128_characters():
@@ -90,16 +90,16 @@ def test_require_positive_refuses_non_positive_or_odd_values(value):
     with pytest.raises(
         errors.ConfigError, match="x must be positive and finite"
     ):
-        references.require_positive(value, "x")
+        references.enforce(value, "x")
 
 
 def test_require_positive_returns_small_positive_values():
-    assert references.require_positive(1e-9, "x") == 1e-9
-    assert references.require_positive(3, "x") == 3
+    assert references.enforce(1e-9, "x") == 1e-9
+    assert references.enforce(3, "x") == 3
 
 
 def test_an_image_reference_converts_and_sorts_architectures():
-    image = references.ImageRef("repo", IMAGE, ("arm64", "amd64"))
+    image = references.Image("repo", IMAGE, ("arm64", "amd64"))
     assert image.architectures == (
         references.Architecture.ARM64,
         references.Architecture.AMD64,
@@ -110,7 +110,7 @@ def test_an_image_reference_converts_and_sorts_architectures():
         "digest": IMAGE,
         "architectures": ["amd64", "arm64"],
     }
-    assert references.ImageRef.from_dict(image.to_dict()).to_dict() == (
+    assert references.Image.from_dict(image.to_dict()).to_dict() == (
         image.to_dict()
     )
 
@@ -118,31 +118,31 @@ def test_an_image_reference_converts_and_sorts_architectures():
 @pytest.mark.parametrize("architectures", [(), ("amd64", "amd64")])
 def test_an_image_needs_unique_architectures(architectures):
     with pytest.raises(errors.ConfigError, match="non-empty and unique"):
-        references.ImageRef("repo", IMAGE, architectures)
+        references.Image("repo", IMAGE, architectures)
 
 
 def test_an_image_with_an_unknown_architecture_is_a_value_error():
     with pytest.raises(ValueError):
-        references.ImageRef("repo", IMAGE, ("s390x",))
+        references.Image("repo", IMAGE, ("s390x",))
 
 
 def test_a_bundle_reference_validates_and_round_trips():
-    bundle = references.BundleRef("churn", "1.2+b", BUNDLE, False)
+    bundle = references.Bundle("churn", "1.2+b", BUNDLE, False)
     assert bundle.to_dict() == {
         "model": "churn",
         "version": "1.2+b",
         "digest": BUNDLE,
         "signed": False,
     }
-    assert references.BundleRef.from_dict(bundle.to_dict()) == bundle
+    assert references.Bundle.from_dict(bundle.to_dict()) == bundle
     with pytest.raises(
         errors.ConfigError, match=r"bundle\.version is not valid"
     ):
-        references.BundleRef("churn", "-1", BUNDLE, True)
+        references.Bundle("churn", "-1", BUNDLE, True)
     with pytest.raises(errors.ConfigError, match=r"bundle\.signed must be"):
-        references.BundleRef("churn", "1", BUNDLE, 1)
+        references.Bundle("churn", "1", BUNDLE, 1)
     with pytest.raises(errors.ConfigError, match=r"bundle\.digest"):
-        references.BundleRef("churn", "1", "sha256:x", True)
+        references.Bundle("churn", "1", "sha256:x", True)
 
 
 @pytest.mark.parametrize(
@@ -162,17 +162,17 @@ def test_a_secret_reference_refuses_inline_or_unsuitable_locators(
     source, locator, message
 ):
     with pytest.raises(errors.ConfigError, match=message):
-        references.SecretRef("TOKEN", source, locator)
+        references.Secret("TOKEN", source, locator)
 
 
 def test_a_secret_name_must_be_an_upper_case_variable():
     with pytest.raises(errors.ConfigError, match="upper-case variable"):
-        references.SecretRef("token", "env", "TOKEN")
+        references.Secret("token", "env", "TOKEN")
 
 
 def test_a_secret_reference_round_trips_and_defaults_to_required():
-    made = references.SecretRef("TOKEN", "store", "vault/path-1")
-    assert made.source is references.SecretSource.STORE
+    made = references.Secret("TOKEN", "store", "vault/path-1")
+    assert made.source is references.Source.STORE
     assert made.to_dict() == {
         "name": "TOKEN",
         "source": "store",
@@ -180,7 +180,7 @@ def test_a_secret_reference_round_trips_and_defaults_to_required():
         "required": True,
     }
     record = {"name": "TOKEN", "source": "file", "locator": "/a"}
-    assert references.SecretRef.from_dict(record).required is True
+    assert references.Secret.from_dict(record).required is True
 
 
 # ---- deployment ------------------------------------------------------------
@@ -298,8 +298,8 @@ def test_a_deployment_sorts_its_config_and_round_trips():
         (
             {
                 "secrets": (
-                    references.SecretRef("A", "env", "B"),
-                    references.SecretRef("A", "env", "C"),
+                    references.Secret("A", "env", "B"),
+                    references.Secret("A", "env", "C"),
                 )
             },
             "secret names must be unique",
@@ -313,7 +313,7 @@ def test_a_deployment_sorts_its_config_and_round_trips():
         (
             {
                 "config": {"LEVEL": "1"},
-                "secrets": (references.SecretRef("LEVEL", "env", "B"),),
+                "secrets": (references.Secret("LEVEL", "env", "B"),),
             },
             "names are both config and secret: LEVEL",
         ),
@@ -330,7 +330,7 @@ def test_ports_at_the_edges_are_accepted():
 
 
 def test_production_needs_a_signed_untrusted_bundle():
-    unsigned = references.BundleRef("churn", "3", BUNDLE, False)
+    unsigned = references.Bundle("churn", "3", BUNDLE, False)
     with pytest.raises(errors.ConfigError, match="requires a signed bundle"):
         spec(environment="production", bundle=unsigned)
     with pytest.raises(errors.ConfigError, match="requires a signed bundle"):
@@ -428,8 +428,8 @@ def test_a_runtime_report_needs_digests():
 
 def test_a_conforming_report_has_no_problems():
     made = spec()
-    assert runtime.conformance_problems(made, report(made)) == []
-    exact = report(made, memory_limit_mb=512, cpu_limit=1.0)
+    assert runtime.audit(made, report(made)) == []
+    exact = report(made, memory=512, limit=1.0)
     assert runtime.diff(made, exact) == []
 
 
@@ -437,10 +437,10 @@ def test_divergences_list_identity_differences_in_order():
     made = spec()
     seen = report(
         made,
-        spec_digest=OTHER,
-        image_digest=OTHER,
-        bundle_digest=OTHER,
-        model_version="4",
+        spec=OTHER,
+        image=OTHER,
+        digest=OTHER,
+        version="4",
         ready=False,
     )
     assert runtime.divergences(made, seen) == [
@@ -454,11 +454,11 @@ def test_divergences_list_identity_differences_in_order():
 
 def test_mounts_list_missing_and_undeclared_secrets():
     made = spec()
-    assert runtime.mounts(made, report(made, secret_names=("ZZ", "AA"))) == [
+    assert runtime.mounts(made, report(made, secrets=("ZZ", "AA"))) == [
         "required secrets not mounted: API_TOKEN",
         "undeclared secrets mounted: AA, ZZ",
     ]
-    optional = report(made, secret_names=("API_TOKEN", "EXTRA"))
+    optional = report(made, secrets=("API_TOKEN", "EXTRA"))
     assert runtime.mounts(made, optional) == []
 
 
@@ -466,10 +466,10 @@ def test_diff_lists_isolation_and_limit_differences():
     made = spec()
     seen = report(
         made,
-        read_only_root=False,
-        run_as_non_root=False,
-        memory_limit_mb=513,
-        cpu_limit=1.01,
+        immutable=False,
+        unprivileged=False,
+        memory=513,
+        limit=1.01,
     )
     assert runtime.diff(made, seen) == [
         "root filesystem is writable",
@@ -488,7 +488,7 @@ class Fake(runtime.Provider):
             references.Architecture(a) for a in architectures
         )
 
-    def supported_architectures(self):
+    def support(self):
         return self.architectures
 
     def apply(self, spec):
@@ -525,7 +525,7 @@ def test_a_provider_refuses_a_report_that_does_not_conform():
 
 def test_a_runtime_report_defaults_to_isolation():
     made = report(spec())
-    assert made.read_only_root is True
-    assert made.run_as_non_root is True
-    assert made.memory_limit_mb is None
+    assert made.immutable is True
+    assert made.unprivileged is True
+    assert made.memory is None
     assert dataclasses.replace(made, ready=False).ready is False

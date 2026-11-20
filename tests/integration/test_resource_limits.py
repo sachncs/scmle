@@ -112,9 +112,9 @@ def test_a_trial_past_the_hard_ceiling_is_killed_and_the_run_continues(
     project = support.make_project(
         binary_frame,
         "y",
-        time_budget=12,
+        budget=12,
         enforcement="hard",
-        output_dir=tmp_path,
+        directory=tmp_path,
     )
     project.orchestrator.registry = registry
     plan = dataclasses.replace(project.plan(), candidates=("dummy", "sleepy"))
@@ -124,10 +124,10 @@ def test_a_trial_past_the_hard_ceiling_is_killed_and_the_run_continues(
     # closes, and the post-training work fits the reserve.
     assert time.monotonic() - started <= 12 + limits.SLACK_SECONDS
     assert result.state == "COMPLETED"
-    sleepy = [t for t in result.trials if t.model_name == "sleepy"]
+    sleepy = [t for t in result.trials if t.model == "sleepy"]
     assert sleepy and sleepy[0].status == "failed"
     assert "hard time ceiling" in sleepy[0].error
-    assert result.selected_model != "sleepy"
+    assert result.model != "sleepy"
 
 
 def spawn_memory_hungry_subprocess(marker):

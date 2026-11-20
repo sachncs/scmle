@@ -24,7 +24,7 @@ def test_the_claim_is_hashed_and_registered_before_the_test_rows_open(
 ):
     # Enforces docs/ARTIFACTS.md:76.
     result = run(tmp_path, plan=False)
-    folder = pathlib.Path(result.run_dir)
+    folder = pathlib.Path(result.directory)
 
     claim = read(folder, "coverage_claim.json")
     report = read(folder, "coverage_report.json")
@@ -54,9 +54,9 @@ def test_a_run_without_a_charter_writes_the_claim_too(tmp_path):
     x = rng.normal(size=400)
     frame = pandas.DataFrame({"x": x, "y": 2 * x + rng.normal(size=400)})
     result = support.make_project(
-        frame, "y", time_budget=120, output_dir=tmp_path / "out"
+        frame, "y", budget=120, directory=tmp_path / "out"
     ).run()
-    folder = pathlib.Path(result.run_dir)
+    folder = pathlib.Path(result.directory)
 
     claim = read(folder, "coverage_claim.json")
     assert claim["task"] == "regression"
@@ -77,7 +77,7 @@ def test_declared_slices_are_in_the_claim_and_flagged_by_the_margin(tmp_path):
         plan=False,
         uncertainty=uncertainty.Uncertainty(None, ("grp", "z", "ghost")),
     )
-    folder = pathlib.Path(result.run_dir)
+    folder = pathlib.Path(result.directory)
 
     claim = read(folder, "coverage_claim.json")
     assert claim["slice_columns"] == ["grp", "z", "ghost"]
@@ -124,7 +124,7 @@ def test_the_coverage_claim_is_tested_once_on_c_after_the_model_is_frozen(
     # Enforces website/src/pages/docs/causal-decision.astro:76.
     # Enforces website/src/pages/docs/qualification.astro:72.
     result = confirmation_run(tmp_path)
-    folder = pathlib.Path(result.run_dir)
+    folder = pathlib.Path(result.directory)
 
     document = read(folder, "coverage_confirmation.json")
     assert document["claim_id"] == "coverage_nominal"
@@ -146,7 +146,7 @@ def test_the_coverage_claim_is_tested_once_on_c_after_the_model_is_frozen(
 def test_an_edited_confirmation_document_fails_the_verification(tmp_path):
     # Enforces docs/ARTIFACTS.md:76.
     result = confirmation_run(tmp_path)
-    folder = pathlib.Path(result.run_dir)
+    folder = pathlib.Path(result.directory)
     path = folder / "coverage_confirmation.json"
     document = json.loads(path.read_text())
     document["covered"] = document["rows"]
@@ -157,7 +157,7 @@ def test_an_edited_confirmation_document_fails_the_verification(tmp_path):
 
 def test_without_the_flag_c_is_not_held_back_for_coverage(tmp_path):
     result = run(tmp_path, plan=False)
-    folder = pathlib.Path(result.run_dir)
+    folder = pathlib.Path(result.directory)
 
     assert not (folder / "coverage_confirmation.json").exists()
     assert "ledger.deferred" not in kinds(folder)

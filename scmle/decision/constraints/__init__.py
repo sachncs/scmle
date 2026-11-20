@@ -25,14 +25,14 @@ the group thresholds fitted on development data.
 
 # The names below are re-exported for existing callers.
 
-from scmle.decision.constraints.cuts import development_gap
+from scmle.decision.constraints.cuts import contrast
 from scmle.decision.constraints.cuts import equalize
 from scmle.decision.constraints.cuts import frontier
 from scmle.decision.constraints.cuts import GRID
 from scmle.decision.constraints.cuts import Thresholds
 from scmle.decision.constraints.cuts import toll
-from scmle.decision.constraints.rates import base_rates
-from scmle.decision.constraints.rates import check_feasibility
+from scmle.decision.constraints.rates import check
+from scmle.decision.constraints.rates import count
 from scmle.decision.constraints.rates import CRITERION_RATES
 from scmle.decision.constraints.rates import INCOMPATIBLE
 from scmle.decision.constraints.rates import InfeasibleError
@@ -41,11 +41,11 @@ from scmle.decision.constraints.rates import prepared
 from scmle.decision.constraints.rates import RATE_PARTS
 from scmle.decision.constraints.rates import tabulate
 from scmle.decision.constraints.rates import wilson
-from scmle.decision.constraints.satisfaction import cluster_satisfaction_test
 from scmle.decision.constraints.satisfaction import MIN_CLUSTERS
 from scmle.decision.constraints.satisfaction import MIN_GROUPS
 from scmle.decision.constraints.satisfaction import NOT_ASSESSABLE
 from scmle.decision.constraints.satisfaction import NOT_SATISFIED
+from scmle.decision.constraints.satisfaction import resample
 from scmle.decision.constraints.satisfaction import Satisfaction
 from scmle.decision.constraints.satisfaction import SATISFIED
 from scmle.decision.constraints.satisfaction import satisfy
@@ -63,14 +63,14 @@ __all__ = [
     "InfeasibleError",
     "Satisfaction",
     "Thresholds",
-    "base_rates",
-    "check_feasibility",
-    "cluster_satisfaction_test",
-    "development_gap",
+    "check",
+    "contrast",
+    "count",
     "equalize",
     "frontier",
     "newcombe",
     "prepared",
+    "resample",
     "satisfy",
     "tabulate",
     "toll",

@@ -113,13 +113,13 @@ def test_builder_accepts_any_diagnostic_subclass_and_binds_all_evidence():
     assert evidence.model_fingerprint == "model-123"
     assert evidence.bundle_digest == "sha256:bundle-123"
     assert evidence.input_fingerprint == "input-123"
-    assert evidence.dataset_snapshot.digest == "sha256:data-123"
-    assert evidence.feature_graph.fingerprint == "graph-123"
+    assert evidence.snapshot.digest == "sha256:data-123"
+    assert evidence.lineage.fingerprint == "graph-123"
     assert evidence.uncertainty["confidence"] == 0.95
     assert evidence.stability["score"] == 0.98
     assert evidence.limitations == ("Associational attribution only.",)
-    assert evidence.privacy_decision.decision == "allowed"
-    assert evidence.evidence_links[0].uri == "artifact://run/evaluation.json"
+    assert evidence.clearance.decision == "allowed"
+    assert evidence.links[0].uri == "artifact://run/evaluation.json"
 
 
 def test_builder_output_has_deterministic_canonical_json():

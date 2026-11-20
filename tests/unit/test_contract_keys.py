@@ -33,7 +33,7 @@ STAMP = "2026-10-20T10:00:00+00:00"
 
 def resources():
     return capabilities.Resources(
-        cpu_cores=2, memory_gb=4.0, disk_gb=1.0, max_rows=100, notes=("n",)
+        cores=2, memory=4.0, disk=1.0, rows=100, notes=("n",)
     )
 
 
@@ -41,7 +41,7 @@ def coordinate():
     return capabilities.Coordinate(
         modality=axes.Modality.TABULAR,
         task=tasks.Task.BINARY,
-        model_family="tree",
+        family="tree",
         evaluation=axes.Evaluation.CALIBRATED,
         uncertainty=axes.Uncertainty.CALIBRATED_PROBABILITY,
         fairness=axes.Fairness.GROUP_REPORT,
@@ -54,7 +54,7 @@ def finding(identifier):
     return data.Finding(
         identifier=identifier,
         rule="rule.v1",
-        severity=data.FindingSeverity.ERROR,
+        severity=data.Severity.ERROR,
         confidence=0.9,
         scope={"columns": ["a"]},
         evidence={"message": "m"},
@@ -68,7 +68,7 @@ def finding(identifier):
 
 
 def manifest():
-    return data.DatasetManifest(
+    return data.Manifest(
         "ds_1",
         {"schema": "schema", "data": "data"},
         10,
@@ -84,19 +84,19 @@ def curation():
     return data.Curation(
         manifest=manifest(),
         source_rows=12,
-        profiled_rows=10,
-        read_seconds=0.25,
+        rows=10,
+        read=0.25,
         streamed=False,
-        cleaning_notes=("note",),
-        quality_findings=(finding("quality.a"),),
+        notes=("note",),
+        quality=(finding("quality.a"),),
         risk_findings=(finding("risk.b"),),
-        feature_columns={"numeric": ("amount",)},
-        dropped_columns={"email": "sensitive"},
+        features={"numeric": ("amount",)},
+        dropped={"email": "sensitive"},
     )
 
 
 def proof(stage):
-    return modalities.Proof(stage=stage, evidence_links=("tests/x.py",))
+    return modalities.Proof(stage=stage, links=("tests/x.py",))
 
 
 def observation(operation, elapsed=1.0):
@@ -124,61 +124,57 @@ def baseline():
 def records_by_kind():
     """One instance of each write-only record, its old and its new keys."""
     declaration = capabilities.Declaration(
-        model_family="tree",
+        family="tree",
         status=axes.Status.EXPERIMENTAL,
         modalities=(axes.Modality.TABULAR,),
-        required_extras=("core",),
+        extras=("core",),
         resources=resources(),
-        failure_modes=("f",),
-        evidence_links=("l",),
+        modes=("f",),
+        links=("l",),
     )
     capability = capabilities.Capability(
         key=coordinate(),
         status=axes.Status.SUPPORTED,
-        required_extras=("core",),
+        extras=("core",),
         resources=resources(),
-        failure_modes=("f",),
-        evidence_links=("l",),
+        modes=("f",),
+        links=("l",),
     )
     portrait = data.Portrait(
         manifest=manifest(),
-        column_statistics={},
-        quality_findings=("q",),
+        statistics={},
+        quality=("q",),
         risk_findings=("r",),
-        target_summary={},
-        feature_plan=data.Blueprint(
-            ("x",), (), extra_inputs=("raw",), high_cardinality=("c",)
-        ),
-        dataset_statistics={"shape": {}},
-        quality_evidence=({"seed": 1},),
+        summary={},
+        plan=data.Blueprint(("x",), (), extras=("raw",), cardinal=("c",)),
+        overview={"shape": {}},
+        evidence=({"seed": 1},),
     )
     declared = modalities.Declaration(
         modality=modalities.Modality.TABULAR,
         status=modalities.Status.EXPERIMENTAL,
-        stage_evidence=(proof(modalities.Phase.INGESTION),),
-        required_extras=("core",),
+        evidence=(proof(modalities.Phase.INGESTION),),
+        extras=("core",),
         resources=resources(),
-        failure_modes=("f",),
+        modes=("f",),
     )
     event = observability.Inference(
-        request_id="req",
-        run_id="run",
+        request="req",
+        run="run",
         model_fingerprint="model",
         outcome="ok",
-        latency_ms=2.0,
+        latency=2.0,
         timestamp=STAMP,
-        input_fingerprint="payload",
-        redacted_fields=("email",),
+        fingerprint="payload",
+        fields=("email",),
     )
     policy = observability.Requirements(
-        retention_days=30,
-        required_signals=(observability.Indicator.LATENCY,),
-        redacted_fields=("email",),
-        alert_thresholds={"latency": 1.0},
+        retention=30,
+        signals=(observability.Indicator.LATENCY,),
+        fields=("email",),
+        thresholds={"latency": 1.0},
     )
-    budget = performance.Budget(
-        {performance.Operation.INGEST: 2.0}, max_peak_memory_gb=1.0
-    )
+    budget = performance.Budget({performance.Operation.INGEST: 2.0}, memory=1.0)
     return {
         "declaration": (
             declaration,
@@ -197,7 +193,7 @@ def records_by_kind():
             {"extras", "failures", "links"},
         ),
         "blueprint": (
-            portrait.feature_plan,
+            portrait.plan,
             {"extra_inputs", "high_cardinality"},
             {"extras", "cardinal"},
         ),
@@ -313,19 +309,19 @@ def test_the_grouped_keys_hold_the_right_values():
 
 def trial():
     return experiments.Trial(
-        trial_id="trial_001",
-        model_name="logistic",
+        identifier="trial_001",
+        model="logistic",
         status=experiments.Termination.FAILED,
         metric="roc_auc",
-        score_mean=0.7,
-        score_std=0.1,
-        fold_scores=[0.6, 0.8],
-        fit_seconds=1.5,
+        score=0.7,
+        deviation=0.1,
+        folds=[0.6, 0.8],
+        fit=1.5,
         error="boom",
         failure={"type": "ValueError"},
-        observed_access=[{"rows": 3}],
-        evaluation_config={"folds": 2},
-        train_scores=[0.9, 0.9],
+        access=[{"rows": 3}],
+        evaluation={"folds": 2},
+        training=[0.9, 0.9],
     )
 
 
@@ -382,8 +378,8 @@ def test_a_policy_writes_the_new_keys_at_every_depth():
 def test_a_policy_keeps_its_field_names_in_code():
     loaded = policy()
     assert loaded.primary_metric == loaded.model_dump()["metric"]
-    assert loaded.small_groups.warning_threshold >= 1
-    assert loaded.release.metric_gates
+    assert loaded.small.warning >= 1
+    assert loaded.release.metrics
 
 
 def test_a_policy_digest_is_anchored_at_version_one():
@@ -402,22 +398,22 @@ def evidence():
         model_fingerprint="model",
         bundle_digest="bundle",
         input_fingerprint="payload",
-        dataset_snapshot=explanations.Snapshot(
+        snapshot=explanations.Snapshot(
             identifier="d", version="1", digest="sha"
         ),
-        feature_graph=explanations.Lineage(version=1, fingerprint="g"),
+        lineage=explanations.Lineage(version=1, fingerprint="g"),
         method=explanations.Method(name="permutation", parameters={}),
         output={"features": []},
         timestamp=datetime.datetime(2026, 10, 20, tzinfo=datetime.UTC),
-        software_version="0.1",
+        software="0.1",
         uncertainty={"method": "none"},
         stability={"score": 1.0},
         limitations=("associational",),
-        causal_warning="not causal",
-        privacy_decision=explanations.Clearance(
-            decision="redacted", reason="r", redacted_fields=("email",)
+        caveat="not causal",
+        clearance=explanations.Clearance(
+            decision="redacted", reason="r", redacted=("email",)
         ),
-        evidence_links=(explanations.Link(relation="r", uri="artifact://x"),),
+        links=(explanations.Link(relation="r", uri="artifact://x"),),
     )
 
 

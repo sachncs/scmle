@@ -39,7 +39,7 @@ def main() -> None:
         replace=True,
     )
     result = scmle.api.project.Project(
-        make_dataset(), "y", metric="roc_auc", time_budget=60
+        make_dataset(), "y", metric="roc_auc", budget=60
     ).run()
     board = result.leaderboard()
     LOGGER.info("\n%s", board[board.model == "gaussian_nb"])

@@ -15,9 +15,9 @@ def summary(tmp_path_factory):
     data["y"] = numpy.where(data["a"] + rng.normal(size=200) > 0, "p", "n")
     root = tmp_path_factory.mktemp("runs")
     result = scmle.api.project.Project(
-        data, "y", time_budget=15, seed=3, output_dir=root
+        data, "y", budget=15, seed=3, directory=root
     ).run()
-    return diagnostics.summarize_run(result.run_dir)
+    return diagnostics.summarize_run(result.directory)
 
 
 def test_the_budget_and_time_used_are_reported(summary):

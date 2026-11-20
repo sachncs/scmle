@@ -22,7 +22,7 @@ def world(tmp_path):
 
 def pending(controller):
     """The actions of the escalations that wait for a person."""
-    return [e.question["action"] for e in controller.loop.pending_escalations()]
+    return [e.question["action"] for e in controller.loop.survey()]
 
 
 @pytest.mark.parametrize("action", list(never_list.Forbidden))
@@ -51,7 +51,7 @@ def test_a_use_is_on_the_ledger_before_the_training_runs(world):
     seen = []
 
     def trainer():
-        ledger = deployment_ledger.DeploymentLedger.load(
+        ledger = deployment_ledger.Ledger.load(
             world.deploy / deployment_ledger.FILE_NAME
         )
         seen.append(

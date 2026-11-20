@@ -51,8 +51,8 @@ class Estimate:
         se: Robust standard error.
         wald_low: Lower limit of the 2SLS interval.
         wald_high: Upper limit of the 2SLS interval.
-        first_stage: First-stage coefficient.
-        f_stat: Robust first-stage F.
+        stage: First-stage coefficient.
+        fstat: Robust first-stage F.
         weak: Whether `f_stat < F_THRESHOLD`.
         ar_kind: `bounded`, `complement` or `whole_line`.
         ar_low: Lower end (bounded), end of the left ray (complement) or
@@ -72,8 +72,8 @@ class Estimate:
     se: float
     wald_low: float
     wald_high: float
-    first_stage: float
-    f_stat: float
+    stage: float
+    fstat: float
     weak: bool
     ar_kind: str
     ar_low: float
@@ -265,8 +265,8 @@ def estimate(
         se=se,
         wald_low=wald[0],
         wald_high=wald[1],
-        first_stage=pi,
-        f_stat=float(f_stat),
+        stage=pi,
+        fstat=float(f_stat),
         weak=bool(weak),
         ar_kind=kind,
         ar_low=ar_low,
@@ -292,4 +292,4 @@ def exclude(result: Estimate, direct_effect: float) -> float:
     Returns:
         The bias `gamma / pi`.
     """
-    return direct_effect / result.first_stage
+    return direct_effect / result.stage

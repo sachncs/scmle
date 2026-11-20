@@ -22,7 +22,7 @@ from scmle.runtime import state
 
 
 def completed(frame, folder):
-    return support.make_project(frame, "y", output_dir=folder).run()
+    return support.make_project(frame, "y", directory=folder).run()
 
 
 def uncomplete(run):
@@ -52,7 +52,7 @@ def test_deleting_the_evaluation_does_not_reopen_the_test_set(
     binary_frame, tmp_path
 ):
     # Enforces docs/CLI.md:23.
-    run = completed(binary_frame, tmp_path).run_dir
+    run = completed(binary_frame, tmp_path).directory
     uncomplete(run)
     with pytest.raises(errors.BlockedError, match="already opened"):
         scmle.api.project.Project.resume(run, data=binary_frame)
@@ -62,9 +62,9 @@ def test_editing_the_config_does_not_score_another_model(
     binary_frame, tmp_path
 ):
     result = completed(binary_frame, tmp_path)
-    run = result.run_dir
+    run = result.directory
     record = json.loads((run / "config.json").read_text(encoding="utf-8"))
-    record["models"]["exclude"]["models"].append(result.selected_model)
+    record["models"]["exclude"]["models"].append(result.model)
     (run / "config.json").write_text(json.dumps(record), encoding="utf-8")
     rehash(run)
     uncomplete(run)
@@ -74,7 +74,7 @@ def test_editing_the_config_does_not_score_another_model(
 
 
 def test_a_copied_run_has_no_custody_record(binary_frame, tmp_path):
-    run = completed(binary_frame, tmp_path).run_dir
+    run = completed(binary_frame, tmp_path).directory
     copy = tmp_path / "run_copy"
     shutil.copytree(run, copy)
     uncomplete(copy)
@@ -88,7 +88,7 @@ def rejected(frame, folder):
         gates=frozenset({state.Progress.PLANNING}),
     )
     project = support.make_project(
-        frame, "y", output_dir=folder, checkpoints=(reject,)
+        frame, "y", directory=folder, checkpoints=(reject,)
     )
     with pytest.raises(errors.BlockedError) as caught:
         project.run()

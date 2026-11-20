@@ -75,8 +75,8 @@ def run(
     return support.make_project(
         causal_frame() if frame is None else frame,
         "y",
-        time_budget=300,
-        output_dir=tmp_path / "out",
+        budget=300,
+        directory=tmp_path / "out",
         charter=charter_file(
             tmp_path, assumptions, dag, subgroups, attestors, signed
         ),
@@ -84,7 +84,7 @@ def run(
 
 
 def read(result, name):
-    return json.loads((pathlib.Path(result.run_dir) / name).read_text())
+    return json.loads((pathlib.Path(result.directory) / name).read_text())
 
 
 def test_an_identified_charter_estimates_on_the_single_opening_of_c(tmp_path):
@@ -106,7 +106,7 @@ def test_an_identified_charter_estimates_on_the_single_opening_of_c(tmp_path):
         "falsification_report.json",
         "sensitivity_report.json",
     }
-    folder = pathlib.Path(result.run_dir)
+    folder = pathlib.Path(result.directory)
     log = (folder / "custody_log.jsonl").read_text()
     assert log.count('"event":"open"') + log.count('"event": "open"') == 1
     ledger = scmle.assurance.ledger.ledger.Ledger.load(
@@ -133,20 +133,20 @@ def test_claims_prints_the_identification_status_and_verifies(tmp_path, capsys):
     # Enforces docs/ARTIFACTS.md:47.
     result = run(tmp_path, ASSUMPTIONS)
 
-    assert cli.main(["claims", "list", str(result.run_dir)]) == 0
+    assert cli.main(["claims", "list", str(result.directory)]) == 0
     printed = capsys.readouterr().out
     assert "registered causal_primary" in printed
     assert "identification=identified" in printed
-    verified = claims_audit.verify(result.run_dir)
+    verified = claims_audit.verify(result.directory)
     names = {f.name: f.status for f in verified.findings}
     assert names["registered claims: files hash to the sealed ledger"] == "pass"
     assert verified.ok
 
-    folder = pathlib.Path(result.run_dir)
+    folder = pathlib.Path(result.directory)
     report = json.loads((folder / "identification_report.json").read_text())
     report["estimate"]["point"] = 0.0
     (folder / "identification_report.json").write_text(json.dumps(report))
-    assert not claims_audit.verify(result.run_dir).ok
+    assert not claims_audit.verify(result.directory).ok
 
 
 def test_a_declared_dag_is_loaded_checked_and_lifts_the_adjustment_cap(
@@ -246,13 +246,13 @@ def test_subgroup_hypotheses_are_registered_and_reported_in_the_causal_files(
     assert "subgroups" not in read(plain, "causal_claims.json")
     registered = {}
     for name, result in (("plain", plain), ("split", split)):
-        folder = pathlib.Path(result.run_dir)
+        folder = pathlib.Path(result.directory)
         ledger = scmle.assurance.ledger.ledger.Ledger.load(
             folder / scmle.assurance.ledger.ledger.FILE_NAME
         )
         registered[name] = ledger.claims["causal_primary_theta_zero"]["sha256"]
     assert registered["plain"] != registered["split"]
-    assert claims_audit.verify(split.run_dir).ok
+    assert claims_audit.verify(split.directory).ok
 
 
 ATTESTORS = (
@@ -305,7 +305,7 @@ def test_verified_attestations_lift_the_claim_above_unverified(
         "J. Okafor",
     }
     assert len(claims["attestations"]["accepted"]) == 3
-    verified = claims_audit.verify(result.run_dir, KEY)
+    verified = claims_audit.verify(result.directory, KEY)
     names = {f.name: f.status for f in verified.findings}
     assert names["causal attestations verify"] == "pass"
     assert verified.ok
@@ -335,11 +335,11 @@ def test_verify_fails_when_the_attestations_do_not_check_out(
     tmp_path, monkeypatch
 ):
     result = attested_run(tmp_path, monkeypatch)
-    wrong = claims_audit.verify(result.run_dir, "other-key")
+    wrong = claims_audit.verify(result.directory, "other-key")
     status = {f.name: f.status for f in wrong.findings}
     assert status["causal attestations verify"] == "fail"
     monkeypatch.delenv("SCMLE_SIGNING_KEY")
-    nokey = claims_audit.verify(result.run_dir)
+    nokey = claims_audit.verify(result.directory)
     status = {f.name: f.status for f in nokey.findings}
     assert status["causal attestations verify"] == "skipped"
 
@@ -347,6 +347,6 @@ def test_verify_fails_when_the_attestations_do_not_check_out(
 def test_a_charter_without_attestors_stays_unverified_and_verifies(tmp_path):
     result = run(tmp_path, ASSUMPTIONS)
     assert read(result, "causal_claims.json")["tier"] == "unverified"
-    verified = claims_audit.verify(result.run_dir)
+    verified = claims_audit.verify(result.directory)
     names = {f.name: f.status for f in verified.findings}
     assert names["causal attestations verify"] == "pass"

@@ -51,7 +51,7 @@ class Storage(command.Command):
             The exit status, EXIT_OK (0); a run with nothing left to move
             succeeds too.
         """
-        store = objectstore.LocalObjectStore(args.root)
+        store = objectstore.Disk(args.root)
         moved = tenancy.Tenancy(store, args.tenant).adopt()
         for key in moved:
             print(key)

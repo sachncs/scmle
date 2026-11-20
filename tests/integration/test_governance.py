@@ -19,7 +19,7 @@ def read_events(run_dir):
 
 def run(frame, tmp_path, **kwargs):
     return support.make_project(
-        frame, "y", time_budget=300, output_dir=tmp_path, **kwargs
+        frame, "y", budget=300, directory=tmp_path, **kwargs
     ).run()
 
 
@@ -27,7 +27,7 @@ def test_every_decision_that_shapes_the_run_is_an_audit_event(
     binary_frame, tmp_path
 ):
     result = run(binary_frame, tmp_path)
-    events = read_events(result.run_dir)
+    events = read_events(result.directory)
     kinds = [e["kind"] for e in events]
     for expected in (
         "features.selected",
@@ -54,10 +54,10 @@ def test_every_decision_that_shapes_the_run_is_an_audit_event(
 
 def test_exclusions_are_audited_with_reasons(binary_frame, tmp_path):
     frame = binary_frame.assign(constant=1, rid=numpy.arange(len(binary_frame)))
-    result = run(frame, tmp_path, id_columns=["rid"])
+    result = run(frame, tmp_path, identifiers=["rid"])
     features = next(
         e
-        for e in read_events(result.run_dir)
+        for e in read_events(result.directory)
         if e["kind"] == "features.selected"
     )
     assert features["data"]["dropped"]["constant"] == "constant"
@@ -67,7 +67,7 @@ def test_exclusions_are_audited_with_reasons(binary_frame, tmp_path):
 def test_data_access_ledger_is_written_and_verified(binary_frame, tmp_path):
     result = run(binary_frame, tmp_path)
     record = json.loads(
-        (result.run_dir / "diagnostics" / "data_access.json").read_text()
+        (result.directory / "diagnostics" / "data_access.json").read_text()
     )
     assert all(record["verified"].values())
     partitions = record["partitions"]
@@ -96,11 +96,11 @@ def test_ledger_checks_what_trials_actually_received(binary_frame, tmp_path):
     spec = support.make_project(binary_frame, "y").spec
     task = tasks.Task(result.plan.task)
     split = splitters.Splitter(spec, task).split(binary_frame)
-    observed = [t for t in result.trials if t.observed_access]
+    observed = [t for t in result.trials if t.access]
     assert observed and all(
-        len(t.observed_access) == len(split.manifest.folds)
+        len(t.access) == len(split.manifest.folds)
         for t in observed
-        if t.status == "ok" and len(t.observed_access) > 2
+        if t.status == "ok" and len(t.access) > 2
     )
     honest = ledger.compose(split, result.trials, 1, False)
     assert honest["observed"]["folds_checked"] > 0
@@ -111,10 +111,10 @@ def test_ledger_checks_what_trials_actually_received(binary_frame, tmp_path):
         observed[0],
         observed_access=[
             {
-                **observed[0].observed_access[0],
+                **observed[0].access[0],
                 "fit": {"rows": 1, "digest": "x"},
             },
-            *observed[0].observed_access[1:],
+            *observed[0].access[1:],
         ],
     )
     swapped = [forged if t is observed[0] else t for t in result.trials]

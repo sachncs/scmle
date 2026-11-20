@@ -197,7 +197,7 @@ def crossfit(
                     **weigh(payload, sample),
                 )
             )
-            result.observed_access.append(
+            result.access.append(
                 {
                     "fit": summarise(payload.features.index.take(fit)),
                     "evaluate": summarise(
@@ -228,7 +228,7 @@ def evaluate(payload: Payload) -> experiments.Trial:
         metric.name,
         params=dict(job.params),
         strategy=job.strategy,
-        evaluation_config={
+        evaluation={
             "metric": metric.name,
             "folds": len(folds),
             "seed": payload.seed,
@@ -247,19 +247,19 @@ def evaluate(payload: Payload) -> experiments.Trial:
         )
         raw_scores, raw_train_scores = crossfit(payload, pipeline, result)
         scores = [metric.naturalise(float(s)) for s in raw_scores]
-        result.fold_scores = scores
-        result.train_scores = [
+        result.folds = scores
+        result.training = [
             metric.naturalise(float(s)) for s in raw_train_scores
         ]
-        result.score_mean = float(numpy.mean(scores))
-        result.score_std = float(numpy.std(scores))
+        result.score = float(numpy.mean(scores))
+        result.deviation = float(numpy.std(scores))
         result.status = experiments.Termination.OK
     except Exception as error:  # noqa: BLE001 -- isolation: any model failure is data
         # handled: model failure stored in the FAILED trial, with its trace
         failure = errors.Failure.of(error)
         result.error = failure.text
         result.failure = failure.dump()
-    result.fit_seconds = time.monotonic() - started
+    result.fit = time.monotonic() - started
     return result
 
 
@@ -354,7 +354,7 @@ class Runner:
         self.task = partition.task
         self.metric = partition.metric
         self.profile = partition.profile
-        self.plan = partition.profile.feature_plan
+        self.plan = partition.profile.plan
         self.folds = [
             (list(train), list(val)) for train, val in self.split.manifest.folds
         ]
@@ -483,15 +483,15 @@ class Runner:
         if (
             checkpoint is None
             or checkpoint.status not in usable
-            or checkpoint.model_name != job.model
+            or checkpoint.model != job.model
             or checkpoint.params != dict(job.params)
             or checkpoint.strategy != job.strategy
         ):
             return None
         wanted = len(self.folds) if job.folds is None else job.folds
-        if len(checkpoint.fold_scores) < wanted:
+        if len(checkpoint.folds) < wanted:
             return None
-        scores = checkpoint.fold_scores[:wanted]
+        scores = checkpoint.folds[:wanted]
         return experiments.Trial(
             job.trial,
             job.model,
@@ -500,16 +500,16 @@ class Runner:
             float(numpy.mean(scores)),
             float(numpy.std(scores)),
             list(scores),
-            checkpoint.fit_seconds,
+            checkpoint.fit,
             params=dict(checkpoint.params),
             strategy=checkpoint.strategy,
-            observed_access=list(checkpoint.observed_access[:wanted]),
-            evaluation_config={
-                **checkpoint.evaluation_config,
+            access=list(checkpoint.access[:wanted]),
+            evaluation={
+                **checkpoint.evaluation,
                 "folds": wanted,
             },
             runtime=dict(checkpoint.runtime),
-            train_scores=list(checkpoint.train_scores[:wanted]),
+            training=list(checkpoint.training[:wanted]),
         )
 
     def skip(

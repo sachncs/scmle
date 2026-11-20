@@ -150,8 +150,8 @@ class Attestation:
             raise kinds.MisuseError("attestation digests.question is required")
         if not isinstance(self.decision, kinds.Reply):
             raise kinds.MisuseError("decision must be a Reply")
-        issued = kinds.parse_date(self.date, "date")
-        if kinds.parse_date(self.expires, "expires") < issued:
+        issued = kinds.parse(self.date, "date")
+        if kinds.parse(self.expires, "expires") < issued:
             raise kinds.MisuseError("expires is before the date")
 
     def preimage(self) -> dict[str, Any]:
@@ -315,8 +315,8 @@ class Envelope:
                 raise kinds.MisuseError(
                     f"the limit for {action!r} must be a positive integer"
                 )
-        issued = kinds.parse_date(self.date, "date")
-        if kinds.parse_date(self.expires, "expires") < issued:
+        issued = kinds.parse(self.date, "date")
+        if kinds.parse(self.expires, "expires") < issued:
             raise kinds.MisuseError("expires is before the date")
 
     def preimage(self) -> dict[str, Any]:

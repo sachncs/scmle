@@ -19,15 +19,15 @@ def release(gates: list[evaluation.Hurdle]) -> evaluation.Gates:
         diagnostic, with the evidence every release needs.
     """
     return evaluation.Gates(
-        metric_gates=tuple(gates),
-        diagnostic_gates=(
+        metrics=tuple(gates),
+        diagnostics=(
             evaluation.Requirement(
                 name="metric_uncertainty",
                 action=evaluation.Remedy.BLOCK,
-                required_evidence=(EVIDENCE,),
+                evidence=(EVIDENCE,),
             ),
         ),
-        required_evidence=(
+        evidence=(
             "dataset_manifest.json",
             "model/model_manifest.json",
             EVIDENCE,
@@ -97,14 +97,12 @@ def derive(
         )
     return evaluation.Criteria(
         task=task,
-        primary_metric=primary_metric,
+        metric=primary_metric,
         metrics=tuple(declarations.values()),
-        uncertainty=evaluation.Uncertainty(
-            method=evaluation.UncertaintyMethod.NONE
-        ),
+        uncertainty=evaluation.Uncertainty(method=evaluation.Method.NONE),
         calibration=evaluation.Calibration(method=evaluation.Procedure.NONE),
         fairness=evaluation.Fairness(method=evaluation.Technique.NONE),
-        small_groups=evaluation.Subgroups(warning_threshold=30),
+        small=evaluation.Subgroups(warning=30),
         explanations=evaluation.Explanations(
             availability=evaluation.Explicability.NONE
         ),

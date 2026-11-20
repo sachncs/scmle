@@ -9,7 +9,7 @@ The pinned names, by module, are:
 
 * `scmle.api.project.Project`, `scmle.artifacts.results.Run` and
   `scmle.artifacts.bundle.Bundle` for lifecycle and artifacts;
-* `scmle.api.predict.load_model` and `scmle.api.predict.predict` for inference;
+* `scmle.api.predict.load` and `scmle.api.predict.predict` for inference;
 * `scmle.api.clustering` (`Segmentation`, `cluster`, `evaluate`) for
   clustering, and `scmle.api.erasure` (`Forgetting`, `Retirement`,
   `Deletion`, `Subject`, `Receipt`, `RetiredError`) for erasure;
@@ -96,7 +96,7 @@ optional `attestors` and `attestations` fields
 a format 4 causal charter keeps its hash and signature. The `subgroups` key
 of `identification_report.json` gained `gate`, `statement_gate` and a per
 hypothesis `certified_size`, and the summary in `causal_claims.json` a `gate`;
-`scmle.causal.identification.certified.subgroup_gate` and `SubgroupGate` are
+`scmle.causal.identification.certified.gate` and `Gate` are
 additions (extension surfaces).
 
 Charter format 10 adds the optional `uncertainty` block
@@ -114,7 +114,7 @@ surfaces); the per-slice records of `coverage_report.json` gained `flag`,
 `flag_margin` and `flag_gate`. `claims verify` gained the step "coverage claim
 on C: registered, recomputed, status matches". The snapshot is unchanged.
 
-`scmle.governance.uncertainty_feed.UncertaintyFeed` is an addition (an
+`scmle.governance.uncertainty_feed.Feed` is an addition (an
 extension surface; the snapshot is unchanged).
 
 `scmle.operations.rollout_hook.Hook` and
@@ -166,7 +166,7 @@ like the other qualification modules. A `Preregistration` does not let an alarm
 retrain unless `retrain` is set, and it should be set only when
 `python -m benchmarks.qualification --check loop` lists the detection-delay
 gate H2 as passed for the policy's settings (today it is descriptive).
-`ModelRegistryStore` gained the optional `guard` and `scope` arguments, the
+`Registry` gained the optional `guard` and `scope` arguments, the
 method `attach` and the optional `guard_detail` of `promote`; without a
 guard behaviour is unchanged.
 
@@ -195,9 +195,9 @@ and, inside `decision`, `f11`. `scmle.assurance.ledger.budget` gained
 ## Deployment contract
 
 `scmle.deploy.contract` is an extension surface, not a top-level export. It
-holds the typed deployment spec (`Deployment` with `ImageRef`,
-`BundleRef`, `SecretRef`, `Resources`, `Probes`), `Runtime`,
-`conformance_problems` and the `Provider` base class that a runtime
+holds the typed deployment spec (`Deployment` with `Image`,
+`Bundle`, `Secret`, `Resources`, `Probes`), `Runtime`,
+`audit` and the `Provider` base class that a runtime
 adapter written by a user implements.
 The snapshot's `surfaces` block pins the signature of each name above, and
 `scripts/check_api_compatibility.py` reports `surface added`, `surface
@@ -208,8 +208,8 @@ versioned (`SPEC_FORMAT`); `from_dict` refuses any other format.
 
 `scmle.security.tokens`, `scmle.security.access` and `scmle.security.audit`
 are extension surfaces like `scmle.deploy.contract`: token verification
-(`Verifier`, `Keystore`, `Key`, `RevocationList`, `Principal`),
-the request gateway (`Gateway`, `RateLimiter`, `DeniedError`) and the audit
+(`Verifier`, `Keystore`, `Key`, `Revocations`, `Principal`),
+the request gateway (`Gateway`, `Limiter`, `DeniedError`) and the audit
 log (`Log`) are pinned in the snapshot's `surfaces` block. Behaviour changes to existing classes:
 `HttpServing` gained the keyword-only `gateway` and refuses a non-loopback
 `host` without one; `ModalityHttpServing` kept its constructor, gained
@@ -282,6 +282,53 @@ The fields, methods and keywords of `Step`, `Workflow`, `Retries`, `Window`,
 [RENAMES](RENAMES.md) lists
 every renamed member.
 
+Phase 6 lane `rest` renamed these pinned names, with no alias:
+
+| Old name | New name |
+|---|---|
+| `contract.BundleRef` | `contract.Bundle` |
+| `contract.ImageRef` | `contract.Image` |
+| `contract.SecretRef` | `contract.Secret` |
+| `contract.SecretSource` | `contract.Source` |
+| `contract.conformance_problems` | `contract.audit` |
+| `control.ControlPlane` | `control.Platform` |
+| `control.RuntimeUnconfirmed` | `control.UnconfirmedError` |
+| `release_state.ReleaseRegistry` | `release_state.Registry` |
+| `release_state.ReleaseState` | `release_state.State` |
+| `release_state.RuntimeDisagrees` | `release_state.DisagreementError` |
+| `gate.GateDecision` | `gate.Decision` |
+| `gate.ImageScan` | `gate.Scan` |
+| `gate.model_digest_of` | `gate.fingerprint` |
+| `record.read_record` | `record.read` |
+| `record.write_record` | `record.write` |
+| `livetests.http_fetch` | `livetests.fetch` |
+| `livetests.run_checks` | `livetests.check` |
+| `tokens.RevocationList` | `tokens.Revocations` |
+| `tokens.sign_hs256` | `tokens.sign` |
+| `access.RateLimiter` | `access.Limiter` |
+| `access.gateway_from_environment` | `access.assemble` |
+| `access.require_authentication_for` | `access.insist` |
+| `objectstore.LocalObjectStore` | `objectstore.Disk` |
+| `objectstore.ObjectMeta` | `objectstore.Metadata` |
+| `objectstore.RetryingStore` | `objectstore.Retrier` |
+| `base.CostBudget` | `base.Budget` |
+| `base.CostRate` | `base.Rate` |
+| `base.RunManifest` | `base.Manifest` |
+| `roles.RoleStore` | `roles.Store` |
+| `roles.check_distinct` | `roles.check` |
+| `roles.check_separation` | `roles.separate` |
+| `checkpoint.CheckpointStore` | `checkpoint.Store` |
+| `non_tabular.UnsupportedNonTabularModelError` | `non_tabular.UnsupportedError` |
+| `predict.load_model` | `predict.load` |
+| `project.ModalityProject` | `project.Modality` |
+
+The fields, methods and keywords of `Project` (its configuration keywords,
+such as `output_dir`, now `directory`), `Modality`, `Curator`, `Modeler`,
+`Scope`, `Estimation`, `Run`, `Bundle`, `Job`, `Manifest`, `Store`,
+`Disk`, `Retrier`, `Gateway`, `Verifier` and the deploy contract classes
+changed with them, as did `Bundle.export_onnx` (now `Bundle.export`);
+[RENAMES](RENAMES.md) lists every renamed member.
+
 ## Training runners
 
 `scmle.runners` (`base`, `local`, `roles`, `checkpoint`,
@@ -296,12 +343,12 @@ extension surfaces pinned like the others.
 
 ## Release surfaces
 
-`scmle.deploy.gate` (`admit`, `certify`, `Candidate`, `GateDecision`, `ImageScan`,
-`model_digest_of`), `record` (`Record`), `livetests` (`run_checks`,
-`Target`, `CheckResult`, `Response`, `http_fetch`), `observation`
-(`Observation`, `Traffic`), `control` (`ControlPlane`, `confirm`,
-`expecting`, `Polling`) and `scmle.deploy.release_state` (`ReleaseRegistry`, `ReleaseState`,
-`Outcome`, `Reconciliation`, `Finding`, `RuntimeDisagrees`) are extension
+`scmle.deploy.gate` (`admit`, `certify`, `Candidate`, `Decision`, `Scan`,
+`fingerprint`), `record` (`Record`), `livetests` (`check`,
+`Target`, `CheckResult`, `Response`, `fetch`), `observation`
+(`Observation`, `Traffic`), `control` (`Platform`, `confirm`,
+`expecting`, `Polling`) and `scmle.deploy.release_state` (`Registry`, `State`,
+`Outcome`, `Reconciliation`, `Finding`, `DisagreementError`) are extension
 surfaces pinned like the others. The release manifest loader (`release`) is
 not pinned. The `deployment` row kind of the
 deployment ledger and the `release_state.json` file are additions; existing
@@ -334,10 +381,10 @@ security, and operational evidence is complete.
 
 ## Bundle migration
 
-Bundle format 5 is the current format. The single-word class names of
-phase 6 (format 5), the package layering (format 4) and the class renames
-before it (format 3) changed the module path and class name stored inside
-every bundle, so a bundle written by an earlier build (format 4, 3, 2 or 1)
+Bundle format 7 is the current format. The single-word class names of
+phase 6 (formats 5, 6 and 7), the package layering (format 4) and the class
+renames before it (format 3) changed the module path and class name stored
+in every bundle, so a bundle written by an earlier build (format 6 to 1)
 cannot be loaded or migrated: `Bundle.load` refuses it
 with an error that says to retrain and save again. A bundle whose pickled
 members name a module or class this build does not have is refused the same

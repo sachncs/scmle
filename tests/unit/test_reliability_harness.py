@@ -12,9 +12,9 @@ import scmle.governance.reliability
 def artifact(evidence_type: str) -> scmle.governance.reliability.Emission:
     """Build a safe fixture artifact for one requirement."""
     return scmle.governance.reliability.Emission(
-        evidence_type=evidence_type,
+        kind=evidence_type,
         content=f"observed:{evidence_type}".encode(),
-        observed_outcome=reliability.Outcome.SAFE_OUTCOME_OBSERVED,
+        outcome=reliability.Outcome.SAFE_OUTCOME_OBSERVED,
         observation="safe outcome observed in the injected execution",
     )
 
@@ -24,9 +24,9 @@ def harness(tmp_path):
     return scmle.governance.reliability.Harness(
         reliability.Registry.prerelease(),
         tmp_path,
-        execution_id="fault-run-001",
+        execution="fault-run-001",
         reviewer="reliability-reviewer",
-        recorded_at="2026-10-20T10:00:00+00:00",
+        recorded="2026-10-20T10:00:00+00:00",
     )
 
 
@@ -112,8 +112,8 @@ def test_harness_wraps_executor_failure_without_claiming_evidence(tmp_path):
 def test_harness_rejects_path_injection_in_evidence_name(tmp_path):
     with pytest.raises(ValueError, match="path-safe"):
         scmle.governance.reliability.Emission(
-            evidence_type="../escape",
+            kind="../escape",
             content=b"evidence",
-            observed_outcome=reliability.Outcome.INCONCLUSIVE,
+            outcome=reliability.Outcome.INCONCLUSIVE,
             observation="not enough evidence",
         )

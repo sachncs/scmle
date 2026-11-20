@@ -30,7 +30,7 @@ const quickstart = `<span class="tok-k">import</span> logging
     table = sklearn.datasets.load_breast_cancer(as_frame=<span class="tok-k">True</span>).frame
     table.to_parquet(<span class="tok-s">"cancer.parquet"</span>)
     project = scmle.api.project.Project(
-        <span class="tok-s">"cancer.parquet"</span>, target=<span class="tok-s">"target"</span>, metric=<span class="tok-s">"roc_auc"</span>, time_budget=60
+        <span class="tok-s">"cancer.parquet"</span>, target=<span class="tok-s">"target"</span>, metric=<span class="tok-s">"roc_auc"</span>, budget=60
     )
     logging.info(project.plan().summary())  <span class="tok-c"># inspect before any training</span>
     result = project.run()  <span class="tok-c"># profile, split, search, test, package</span>
@@ -146,7 +146,7 @@ const bw = 360;
               <li><b>Fingerprint</b><span>A full dataset fingerprint that ties results to the data</span></li>
               <li><b>Leakage</b><span><em class="flag">boat</em><em class="flag">body</em> flagged on the Titanic table: outcome-dependent recording</span></li>
             </ul>
-            <div class="callout-inline"><p>With <code>leakage_policy="block"</code> (opt-in; the default is <code>"warn"</code>) the run refuses to proceed. A flag is a statistical suspicion, not proof; see <a href={`${base}/docs/leakage/`}>what the leakage screen can and cannot tell you</a>. Titanic's unusually high score comes from those two columns, which is why the profiler flags them.</p></div>
+            <div class="callout-inline"><p>With <code>leakage="block"</code> (opt-in; the default is <code>"warn"</code>) the run refuses to proceed. A flag is a statistical suspicion, not proof; see <a href={`${base}/docs/leakage/`}>what the leakage screen can and cannot tell you</a>. Titanic's unusually high score comes from those two columns, which is why the profiler flags them.</p></div>
           </div>
         </div>
       </div>
@@ -369,7 +369,7 @@ const bw = 360;
             <pre tabindex="0"><code class="language-text" set:html={output}></code></pre>
           </div>
         </div>
-        <p class="note reveal" style="margin-top:16px;text-align:center">Output comes from running these calls on scikit-learn's breast-cancer data with <code>time_budget=60</code>. Trial order can differ between runs. <a href={`${base}/docs/quickstart/`}>Full command-line quickstart</a>.</p>
+        <p class="note reveal" style="margin-top:16px;text-align:center">Output comes from running these calls on scikit-learn's breast-cancer data with <code>budget=60</code>. Trial order can differ between runs. <a href={`${base}/docs/quickstart/`}>Full command-line quickstart</a>.</p>
       </div>
     </section>
 

@@ -175,7 +175,7 @@ class Linker:
                 "inference bundle digest does not match graph"
             )
         node = candidate.node()
-        graph.add_node(node)
+        graph.add(node)
         graph.connect(lineage.Edge("bundle", node.identifier, "serves"))
         graph_record = graph.to_dict()
         graph_record["graph_digest"] = graph.digest()
@@ -235,7 +235,7 @@ class Linker:
                 handle.flush()
                 os.fsync(handle.fileno())
             pathlib.Path(temporary_name).replace(path)
-            durability.sync_directory(path.parent)
+            durability.flush(path.parent)
         except BaseException:
             pathlib.Path(temporary_name).unlink(missing_ok=True)
             raise

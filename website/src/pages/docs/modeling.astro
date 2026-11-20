@@ -85,7 +85,7 @@ def main():
         ),
         search=Search(top_models=0),
         strategies=Strategies(top_models=0),
-        time_budget=300,
+        budget=300,
     )
     plan = project.plan()
     result = project.run(plan)
@@ -263,9 +263,9 @@ def main():
         task="regression",
         modality="tabular",
         estimand=estimand,
-        estimation_policy=policy,
-        output_dir="runs/conversion-score",
-        time_budget=60,
+        policy=policy,
+        directory="runs/conversion-score",
+        budget=60,
     )
     result = project.run()
     assert result.estimation is not None
@@ -304,8 +304,8 @@ long_frame = pd.DataFrame(rows, columns=[
 longitudinal_estimand = Estimand(
     name="period_specific_treatment_effect",
     subject_identity="subject_id",
-    time_column="period",
-    treatment_column="treated",
+    timestamp="period",
+    treatment="treated",
     outcome="outcome",
     covariates=("baseline_score",),
     population="eligible subjects observed in each study period",
@@ -356,8 +356,8 @@ long_frame = pd.DataFrame(rows, columns=[
 sequential_estimand = Estimand(
     name="sustained_treatment_effect",
     subject_identity="subject_id",
-    time_column="period",
-    treatment_column="treated",
+    timestamp="period",
+    treatment="treated",
     outcome="outcome",
     baseline_covariates=("baseline_score",),
     time_varying_covariates=("current_risk",),

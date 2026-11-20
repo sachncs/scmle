@@ -20,17 +20,15 @@ def test_criteria_become_directional_metric_and_evidence_gates():
     )
 
     assert policy is not None
-    assert policy.primary_metric == "roc_auc"
-    assert [gate.metric for gate in policy.release.metric_gates] == [
+    assert policy.metric == "roc_auc"
+    assert [gate.metric for gate in policy.release.metrics] == [
         "roc_auc",
         "log_loss",
     ]
-    assert policy.release.metric_gates[1].direction is (
+    assert policy.release.metrics[1].direction is (
         evaluation.Orientation.MINIMIZE
     )
-    assert "diagnostics/metric_uncertainty.json" in (
-        policy.release.required_evidence
-    )
+    assert "diagnostics/metric_uncertainty.json" in (policy.release.evidence)
 
 
 def test_unknown_metric_direction_fails_closed():

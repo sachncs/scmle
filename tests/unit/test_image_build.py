@@ -136,7 +136,7 @@ def test_the_build_command_passes_the_wheel_context_and_its_hash(tmp_path):
 
 
 def test_a_generated_service_dockerfile_defaults_to_the_pin(tmp_path):
-    info = types.SimpleNamespace(model_name="m", model_version="1")
+    info = types.SimpleNamespace(model="m", version="1")
     packaging.furnish(tmp_path, info, "python:3.12-slim")
     text = (tmp_path / "Dockerfile").read_text(encoding="utf-8")
     pin = base_image.PINNED["python:3.12-slim"]

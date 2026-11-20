@@ -37,8 +37,9 @@ class Declaration:
     blocked before a complete task/evaluation contract exists.
 
     Version 2 of the stored declaration writes `family`, `extras`,
-    `failures` and `links` for the fields `model_family`, `required_extras`,
-    `failure_modes` and `evidence_links`; `migrations` moves a stored layout
+    `failures` and `links` for the version-1 keys `model_family`,
+    `required_extras`, `failure_modes` and `evidence_links`; `migrations`
+    moves a stored layout
     between the versions.
     """
 
@@ -54,13 +55,13 @@ class Declaration:
         ),
     )
 
-    model_family: str
+    family: str
     status: axes.Status
     modalities: tuple[axes.Modality, ...]
-    required_extras: tuple[str, ...]
+    extras: tuple[str, ...]
     resources: "Resources"
-    failure_modes: tuple[str, ...]
-    evidence_links: tuple[str, ...] = ()
+    modes: tuple[str, ...]
+    links: tuple[str, ...] = ()
     limitations: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -73,11 +74,9 @@ class Declaration:
                 surrounding whitespace, no modality is declared, or a list
                 entry is blank.
         """
-        if not isinstance(self.model_family, str):
+        if not isinstance(self.family, str):
             raise errors.KindError("model_family must be a string")
-        if not self.model_family or self.model_family != (
-            self.model_family.strip().lower()
-        ):
+        if not self.family or self.family != (self.family.strip().lower()):
             raise errors.InputError(
                 "model_family must be lowercase and must not have surrounding "
                 "whitespace"
@@ -98,9 +97,9 @@ class Declaration:
             tuple(sorted(set(self.modalities), key=lambda item: item.value)),
         )
         for name, values in (
-            ("required_extras", self.required_extras),
-            ("failure_modes", self.failure_modes),
-            ("evidence_links", self.evidence_links),
+            ("extras", self.extras),
+            ("modes", self.modes),
+            ("links", self.links),
             ("limitations", self.limitations),
         ):
             entries: Iterable[object] = (
@@ -118,13 +117,13 @@ class Declaration:
     def to_dict(self) -> dict[str, object]:
         """Returns a stable JSON-compatible family declaration."""
         return {
-            "family": self.model_family,
+            "family": self.family,
             "status": self.status.value,
             "modalities": [item.value for item in self.modalities],
-            "extras": list(self.required_extras),
+            "extras": list(self.extras),
             "resources": self.resources.to_dict(),
-            "failures": list(self.failure_modes),
-            "links": list(self.evidence_links),
+            "failures": list(self.modes),
+            "links": list(self.links),
             "limitations": list(self.limitations),
         }
 
@@ -155,12 +154,12 @@ class Environment:
     fact.
     """
 
-    available_extras: frozenset[str] = frozenset()
-    cpu_cores: int | None = None
-    memory_gb: float | None = None
-    disk_gb: float | None = None
-    gpu_available: bool | None = None
-    network_available: bool | None = None
+    extras: frozenset[str] = frozenset()
+    cores: int | None = None
+    memory: float | None = None
+    disk: float | None = None
+    available: bool | None = None
+    online: bool | None = None
 
     def __post_init__(self) -> None:
         """Validates runtime observations before they are used for gating.
@@ -169,7 +168,7 @@ class Environment:
             ValueError: If an available extra is blank, the CPU count is below
                 one, or the memory or disk size is not finite and non-negative.
         """
-        extras: Iterable[object] = self.available_extras  # may hold non-strings
+        extras: Iterable[object] = self.extras  # may hold non-strings
         if any(
             not isinstance(extra, str) or not extra.strip() for extra in extras
         ):
@@ -178,14 +177,14 @@ class Environment:
             )
         object.__setattr__(
             self,
-            "available_extras",
-            frozenset(self.available_extras),
+            "extras",
+            frozenset(self.extras),
         )
-        if self.cpu_cores is not None and self.cpu_cores < 1:
+        if self.cores is not None and self.cores < 1:
             raise errors.InputError("cpu_cores must be at least 1")
         for name, value in (
-            ("memory_gb", self.memory_gb),
-            ("disk_gb", self.disk_gb),
+            ("memory_gb", self.memory),
+            ("disk_gb", self.disk),
         ):
             if value is not None and (not math.isfinite(value) or value < 0):
                 raise errors.InputError(
@@ -219,7 +218,7 @@ class Coordinate:
     Attributes:
         modality: Input data modality.
         task: Task type the capability covers.
-        model_family: Lowercase family identifier, not an adapter name.
+        family: Lowercase family identifier, not an adapter name.
         evaluation: Evaluation policy that must be available.
         uncertainty: Uncertainty contract that must be available.
         fairness: Fairness contract that must be available.
@@ -235,7 +234,7 @@ class Coordinate:
 
     modality: axes.Modality
     task: tasks.Task
-    model_family: str
+    family: str
     evaluation: axes.Evaluation
     uncertainty: axes.Uncertainty
     fairness: axes.Fairness
@@ -263,11 +262,11 @@ class Coordinate:
         for name, value, expected in dimensions:
             if not isinstance(value, expected):
                 raise errors.KindError(f"{name} must be {expected.__name__}")
-        if not isinstance(self.model_family, str):
+        if not isinstance(self.family, str):
             raise errors.KindError("model_family must be a string")
-        if not self.model_family:
+        if not self.family:
             raise errors.InputError("model_family must not be empty")
-        if self.model_family != self.model_family.strip().lower():
+        if self.family != self.family.strip().lower():
             raise errors.InputError(
                 "model_family must be lowercase and must not have surrounding "
                 "whitespace"
@@ -278,7 +277,7 @@ class Coordinate:
         return {
             "modality": self.modality.value,
             "task": self.task.value,
-            "family": self.model_family,
+            "family": self.family,
             "evaluation": self.evaluation.value,
             "uncertainty": self.uncertainty.value,
             "fairness": self.fairness.value,
@@ -292,27 +291,27 @@ class Resources:
     """Minimum resources and environmental assumptions for a capability.
 
     Attributes:
-        cpu_cores: Minimum number of CPU cores required; stored as `cpu`.
-        memory_gb: Minimum working memory required, in gigabytes; stored as
+        cores: Minimum number of CPU cores required; stored as `cpu`.
+        memory: Minimum working memory required, in gigabytes; stored as
             `memory`.
-        disk_gb: Minimum temporary disk space required, in gigabytes; stored
+        disk: Minimum temporary disk space required, in gigabytes; stored
             as `disk`.
-        gpu_required: Whether a compatible GPU is required; stored as `gpu`.
-        network_required: Whether network access is required at runtime;
+        required: Whether a compatible GPU is required; stored as `gpu`.
+        network: Whether network access is required at runtime;
             stored as `network`.
-        max_rows: Practical row limit, if one is known; stored as `rows`.
+        rows: Practical row limit, if one is known; stored as `rows`.
         notes: Human-readable constraints that belong in release evidence.
         migrations: Version steps of the stored resources.
     """
 
     migrations: ClassVar[tuple[records.Migration, ...]] = (RESOURCES,)
 
-    cpu_cores: int = 1
-    memory_gb: float = 1.0
-    disk_gb: float = 0.0
-    gpu_required: bool = False
-    network_required: bool = False
-    max_rows: int | None = None
+    cores: int = 1
+    memory: float = 1.0
+    disk: float = 0.0
+    required: bool = False
+    network: bool = False
+    rows: int | None = None
     notes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -324,15 +323,15 @@ class Resources:
                 and positive, the disk size is not finite and non-negative, the
                 row limit is below one, or a note is blank.
         """
-        if not isinstance(self.cpu_cores, int):
+        if not isinstance(self.cores, int):
             raise errors.KindError("cpu_cores must be an integer")
-        if self.cpu_cores < 1:
+        if self.cores < 1:
             raise errors.InputError("cpu_cores must be at least 1")
-        if not math.isfinite(self.memory_gb) or self.memory_gb <= 0:
+        if not math.isfinite(self.memory) or self.memory <= 0:
             raise errors.InputError("memory_gb must be greater than 0")
-        if not math.isfinite(self.disk_gb) or self.disk_gb < 0:
+        if not math.isfinite(self.disk) or self.disk < 0:
             raise errors.InputError("disk_gb must not be negative")
-        if self.max_rows is not None and self.max_rows < 1:
+        if self.rows is not None and self.rows < 1:
             raise errors.InputError("max_rows must be at least 1")
         notes: Iterable[object] = self.notes  # may hold non-strings at runtime
         if any(not isinstance(note, str) or not note.strip() for note in notes):
@@ -342,12 +341,12 @@ class Resources:
     def to_dict(self) -> dict[str, object]:
         """Returns a stable, JSON-compatible representation."""
         return {
-            "cpu": self.cpu_cores,
-            "memory": self.memory_gb,
-            "disk": self.disk_gb,
-            "gpu": self.gpu_required,
-            "network": self.network_required,
-            "rows": self.max_rows,
+            "cpu": self.cores,
+            "memory": self.memory,
+            "disk": self.disk,
+            "gpu": self.required,
+            "network": self.network,
+            "rows": self.rows,
             "notes": list(self.notes),
         }
 
@@ -359,10 +358,10 @@ class Capability:
     Attributes:
         key: The complete eight-dimension capability coordinate.
         status: Supported, experimental, or extension-only.
-        required_extras: Optional package extras needed to use the capability.
+        extras: Optional package extras needed to use the capability.
         resources: Minimum resource and environment assumptions.
-        failure_modes: Known conditions that must be handled or reported.
-        evidence_links: References to tests or evidence artifacts.
+        modes: Known conditions that must be handled or reported.
+        links: References to tests or evidence artifacts.
         limitations: User-visible limitations of the declaration.
         migrations: Version steps of the stored capability; version 2
             writes `extras`, `failures` and `links`, and the key and
@@ -385,10 +384,10 @@ class Capability:
 
     key: Coordinate
     status: axes.Status
-    required_extras: tuple[str, ...]
+    extras: tuple[str, ...]
     resources: Resources
-    failure_modes: tuple[str, ...]
-    evidence_links: tuple[str, ...] = ()
+    modes: tuple[str, ...]
+    links: tuple[str, ...] = ()
     limitations: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -405,18 +404,18 @@ class Capability:
             raise errors.KindError("status must be Status")
         if not isinstance(self.resources, Resources):
             raise errors.KindError("resources must be Resources")
-        object.__setattr__(self, "required_extras", tuple(self.required_extras))
-        object.__setattr__(self, "failure_modes", tuple(self.failure_modes))
-        object.__setattr__(self, "evidence_links", tuple(self.evidence_links))
+        object.__setattr__(self, "extras", tuple(self.extras))
+        object.__setattr__(self, "modes", tuple(self.modes))
+        object.__setattr__(self, "links", tuple(self.links))
         object.__setattr__(self, "limitations", tuple(self.limitations))
-        if not self.failure_modes:
+        if not self.modes:
             raise errors.InputError(
                 "failure_modes must declare at least one value"
             )
         for name, values in (
-            ("required_extras", self.required_extras),
-            ("failure_modes", self.failure_modes),
-            ("evidence_links", self.evidence_links),
+            ("required_extras", self.extras),
+            ("failure_modes", self.modes),
+            ("evidence_links", self.links),
             ("limitations", self.limitations),
         ):
             entries: Iterable[object] = (
@@ -429,7 +428,7 @@ class Capability:
                 raise errors.InputError(
                     f"{name} must contain non-empty strings"
                 )
-        if self.status is axes.Status.SUPPORTED and not self.evidence_links:
+        if self.status is axes.Status.SUPPORTED and not self.links:
             raise errors.InputError(
                 "supported capabilities must declare evidence_links"
             )
@@ -439,22 +438,22 @@ class Capability:
         return {
             "key": self.key.to_dict(),
             "status": self.status.value,
-            "extras": list(self.required_extras),
+            "extras": list(self.extras),
             "resources": self.resources.to_dict(),
-            "failures": list(self.failure_modes),
-            "links": list(self.evidence_links),
+            "failures": list(self.modes),
+            "links": list(self.links),
             "limitations": list(self.limitations),
         }
 
 
 DEFAULT_MODEL_FAMILY_DECLARATIONS = (
     Declaration(
-        model_family=axes.ModelFamily.TRANSFORMER.value,
+        family=axes.Family.TRANSFORMER.value,
         status=axes.Status.EXPERIMENTAL,
         modalities=(axes.Modality.TABULAR,),
-        required_extras=("deeplearning",),
-        resources=Resources(memory_gb=4.0, gpu_required=True),
-        failure_modes=(
+        extras=("deeplearning",),
+        resources=Resources(memory=4.0, required=True),
+        modes=(
             "torch runtime or tabular transformer adapter is unavailable",
             "numeric tabular feature tokenization fails",
             "end-to-end transformer evaluation contract is incomplete",
@@ -466,12 +465,12 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
         ),
     ),
     Declaration(
-        model_family=axes.ModelFamily.TEXT_TRANSFORMER.value,
+        family=axes.Family.TEXT_TRANSFORMER.value,
         status=axes.Status.EXTENSION_ONLY,
         modalities=(axes.Modality.TEXT, axes.Modality.DOCUMENT),
-        required_extras=("embeddings",),
-        resources=Resources(memory_gb=4.0),
-        failure_modes=(
+        extras=("embeddings",),
+        resources=Resources(memory=4.0),
+        modes=(
             "tokenization or text normalization fails",
             "pretrained weights are unavailable",
             "evaluation or explanation evidence is incomplete",
@@ -483,12 +482,12 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
         ),
     ),
     Declaration(
-        model_family=axes.ModelFamily.VISION_TRANSFORMER.value,
+        family=axes.Family.VISION_TRANSFORMER.value,
         status=axes.Status.EXTENSION_ONLY,
         modalities=(axes.Modality.IMAGE, axes.Modality.VIDEO),
-        required_extras=("multimodal",),
-        resources=Resources(memory_gb=8.0, gpu_required=True),
-        failure_modes=(
+        extras=("multimodal",),
+        resources=Resources(memory=8.0, required=True),
+        modes=(
             "image or video decoder is unavailable",
             "pretrained weights are unavailable",
             "modality-specific evaluation is incomplete",
@@ -500,12 +499,12 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
         ),
     ),
     Declaration(
-        model_family=axes.ModelFamily.AUDIO_TRANSFORMER.value,
+        family=axes.Family.AUDIO_TRANSFORMER.value,
         status=axes.Status.EXTENSION_ONLY,
         modalities=(axes.Modality.AUDIO,),
-        required_extras=("multimodal",),
-        resources=Resources(memory_gb=8.0, gpu_required=True),
-        failure_modes=(
+        extras=("multimodal",),
+        resources=Resources(memory=8.0, required=True),
+        modes=(
             "audio decoder or resampler is unavailable",
             "pretrained weights are unavailable",
             "audio evaluation is incomplete",
@@ -517,12 +516,12 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
         ),
     ),
     Declaration(
-        model_family=axes.ModelFamily.VIDEO_TRANSFORMER.value,
+        family=axes.Family.VIDEO_TRANSFORMER.value,
         status=axes.Status.EXTENSION_ONLY,
         modalities=(axes.Modality.VIDEO,),
-        required_extras=("multimodal",),
-        resources=Resources(memory_gb=12.0, gpu_required=True),
-        failure_modes=(
+        extras=("multimodal",),
+        resources=Resources(memory=12.0, required=True),
+        modes=(
             "video decoder or frame sampler is unavailable",
             "pretrained weights are unavailable",
             "video evaluation is incomplete",
@@ -534,7 +533,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
         ),
     ),
     Declaration(
-        model_family=axes.ModelFamily.MULTIMODAL_TRANSFORMER.value,
+        family=axes.Family.MULTIMODAL_TRANSFORMER.value,
         status=axes.Status.EXTENSION_ONLY,
         modalities=(
             axes.Modality.TEXT,
@@ -543,9 +542,9 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
             axes.Modality.AUDIO,
             axes.Modality.VIDEO,
         ),
-        required_extras=("multimodal",),
-        resources=Resources(memory_gb=12.0, gpu_required=True),
-        failure_modes=(
+        extras=("multimodal",),
+        resources=Resources(memory=12.0, required=True),
+        modes=(
             "modality adapter is caller-supplied",
             "cross-modal alignment is not evidenced",
             "deployment and monitoring contracts are incomplete",
@@ -556,12 +555,12 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
         ),
     ),
     Declaration(
-        model_family=axes.ModelFamily.JEPA.value,
+        family=axes.Family.JEPA.value,
         status=axes.Status.EXPERIMENTAL,
         modalities=(axes.Modality.TABULAR,),
-        required_extras=("deeplearning",),
-        resources=Resources(memory_gb=2.0),
-        failure_modes=(
+        extras=("deeplearning",),
+        resources=Resources(memory=2.0),
+        modes=(
             "torch runtime is unavailable",
             "numeric tabular input is not compatible",
             "representation quality and downstream task evidence are absent",

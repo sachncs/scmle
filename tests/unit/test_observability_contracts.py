@@ -8,13 +8,13 @@ from scmle.contracts import observability
 def policy() -> observability.Requirements:
     """Builds a representative observability policy."""
     return observability.Requirements(
-        retention_days=30,
-        required_signals=(
+        retention=30,
+        signals=(
             observability.Indicator.ERROR,
             observability.Indicator.LATENCY,
         ),
-        redacted_fields=("email", "phone"),
-        alert_thresholds={"latency_p95_ms": 250.0},
+        fields=("email", "phone"),
+        thresholds={"latency_p95_ms": 250.0},
     )
 
 
@@ -28,14 +28,14 @@ def test_metrics_events_and_policy_have_deterministic_json():
         labels={"model": "baseline"},
     )
     event = observability.Inference(
-        request_id="req-1",
-        run_id="run-1",
+        request="req-1",
+        run="run-1",
         model_fingerprint="model-sha",
         outcome="error",
-        latency_ms=20.0,
+        latency=20.0,
         timestamp="2026-10-20T12:00:00+00:00",
-        error_category="schema",
-        redacted_fields=("email",),
+        category="schema",
+        fields=("email",),
     )
 
     payload = observability.canonize((metric,), (event,), policy())
@@ -49,11 +49,11 @@ def test_metrics_events_and_policy_have_deterministic_json():
 def test_event_requires_error_category_for_failed_request():
     with pytest.raises(ValueError, match="error_category"):
         observability.Inference(
-            request_id="req-1",
-            run_id="run-1",
+            request="req-1",
+            run="run-1",
             model_fingerprint="model-sha",
             outcome="error",
-            latency_ms=20.0,
+            latency=20.0,
             timestamp="2026-10-20T12:00:00+00:00",
         )
 

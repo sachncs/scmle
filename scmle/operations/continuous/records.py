@@ -141,9 +141,7 @@ class History:
                 json.dumps(content, sort_keys=True).encode()
             ).hexdigest(),
         }
-        durability.append_text(
-            self.path, json.dumps(row, sort_keys=True) + "\n"
-        )
+        durability.append(self.path, json.dumps(row, sort_keys=True) + "\n")
         return row
 
     def select(self, kind: str) -> list[dict[str, Any]]:

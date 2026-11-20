@@ -13,8 +13,8 @@ def run_dataset(dataset, tmp_path):
         dataset.target,
         task=dataset.task,
         metric=dataset.metric,
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
     )
     return frame, project.run()
 
@@ -64,7 +64,7 @@ def test_openml_credit_german_with_mixed_types(tmp_path):
         pytest.skip(f"OpenML unavailable: {error}")
     frame, result = run_dataset(dataset, tmp_path)
     assert result.evaluation["metrics"]["roc_auc"] > 0.7
-    assert result.profile.feature_plan.categorical
+    assert result.profile.plan.categorical
     assert set(result.predict(frame.drop(columns="class"))) <= {"good", "bad"}
 
 
@@ -78,8 +78,8 @@ def test_openml_titanic_leakage_is_flagged(tmp_path):
         frame,
         "survived",
         task="classification",
-        time_budget=120,
-        output_dir=tmp_path,
+        budget=120,
+        directory=tmp_path,
     )
     project.plan()
     findings = " ".join(project.profile.risk_findings)

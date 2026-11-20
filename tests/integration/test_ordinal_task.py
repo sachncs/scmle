@@ -27,8 +27,8 @@ def run(tmp_path, data, **kwargs):
         data,
         "level",
         task="ordinal",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
         **kwargs,
     ).run()
 
@@ -40,8 +40,8 @@ def result(tmp_path_factory):
 
 def test_the_model_beats_the_median_baseline_on_agreement(result):
     assert result.evaluation["metrics"]["qwk"] > 0.4
-    baseline = next(t for t in result.trials if t.model_name == "dummy")
-    assert baseline.score_mean < 0.1
+    baseline = next(t for t in result.trials if t.model == "dummy")
+    assert baseline.score < 0.1
 
 
 def test_predictions_are_the_users_labels_in_the_stated_order(result):
@@ -65,26 +65,26 @@ def test_probabilities_follow_the_label_order(result):
 
 def test_an_order_that_omits_a_present_label_is_refused(tmp_path):
     with pytest.raises(errors.BlockedError, match="omits"):
-        run(tmp_path, frame(), ordinal_order=["low", "medium", "high"])
+        run(tmp_path, frame(), order=["low", "medium", "high"])
 
 
 def test_an_order_that_lists_an_absent_label_is_refused(tmp_path):
     with pytest.raises(errors.BlockedError, match="no rows"):
-        run(tmp_path, frame(), ordinal_order=[*ORDER, "never"])
+        run(tmp_path, frame(), order=[*ORDER, "never"])
 
 
 def test_ordinal_needs_an_order_and_other_tasks_forbid_one(tmp_path):
     with pytest.raises(ValueError, match="ordinal_order"):
         support.make_project(
-            frame(), "level", task="ordinal", output_dir=tmp_path
+            frame(), "level", task="ordinal", directory=tmp_path
         )
     with pytest.raises(ValueError, match="ordinal_order"):
         support.make_project(
             frame(),
             "level",
             task="multiclass_classification",
-            ordinal_order=ORDER,
-            output_dir=tmp_path,
+            order=ORDER,
+            directory=tmp_path,
         )
 
 
@@ -95,8 +95,8 @@ def test_ordinal_modelling_misses_by_fewer_levels_than_plain_classes(
         frame(),
         "level",
         task="multiclass_classification",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
     ).run()
     fresh = frame(3000, seed=9)
     truth = fresh.level.map(ORDER.index).to_numpy()

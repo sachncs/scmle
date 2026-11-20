@@ -21,7 +21,7 @@ class Gatekeeper(desk.Desk):
 
         `elevate`, `revertible` and `enlist(promote=True)`
         of a `Maintainer` over this registry then need an attestation,
-        as `move_champion` does. Moving the alias by editing the registry's
+        as `move` does. Moving the alias by editing the registry's
         files is not stopped.
 
         Args:
@@ -29,7 +29,7 @@ class Gatekeeper(desk.Desk):
         """
         registry.attach(self.guard, self.policy.scope)
 
-    def move_champion(
+    def move(
         self,
         registry: Any,
         model: str,
@@ -61,7 +61,7 @@ class Gatekeeper(desk.Desk):
             try:
                 return move()
             finally:
-                self.save_state()
+                self.save()
         return self.perform(
             never_list.Forbidden.MOVE_CHAMPION,
             {"model": model, "version": version},
@@ -82,9 +82,7 @@ class Gatekeeper(desk.Desk):
             never_list.Forbidden.MOVE_CHAMPION, {"rollback": dict(detail)}, do
         )
 
-    def reopen_sealed(
-        self, do: Callable[[], Any], detail: Mapping[str, Any]
-    ) -> Any:
+    def reopen(self, do: Callable[[], Any], detail: Mapping[str, Any]) -> Any:
         """Runs `do()` that reopens `C` or `F` or touches a sealed set.
 
         It runs only with an attestation for that exact detail.
@@ -114,7 +112,7 @@ class Gatekeeper(desk.Desk):
         """
         return self.perform(never_list.Forbidden.EDIT_LEDGER, dict(detail), do)
 
-    def act_on_unverified(self, kind: str, do: Callable[[], Any]) -> Any:
+    def act(self, kind: str, do: Callable[[], Any]) -> Any:
         """Runs `do()` that retrains, promotes or rolls back unverified.
 
         It runs only with an attestation naming the kind of action.
@@ -146,9 +144,7 @@ class Gatekeeper(desk.Desk):
             never_list.Forbidden.SUPPRESS_ALERT, {"alert": name}, do
         )
 
-    def change_label_policy(
-        self, change: Mapping[str, Any], do: Callable[[], Any]
-    ) -> Any:
+    def relabel(self, change: Mapping[str, Any], do: Callable[[], Any]) -> Any:
         """Runs `do()` that changes the labelling or randomization policy.
 
         It runs only with an attestation for exactly this change.
@@ -180,7 +176,7 @@ class Gatekeeper(desk.Desk):
             never_list.Forbidden.DELETE_OR_EXTERNAL, {"what": what}, do
         )
 
-    def amend_policy(self, **changes: Any) -> terms.Preregistration:
+    def amend(self, **changes: Any) -> terms.Preregistration:
         """Changes the policy: tightening is free, anything else is gated.
 
         A field in ``NUMERIC_ORIENTATION`` (for example ``target`` or
@@ -257,5 +253,5 @@ class Gatekeeper(desk.Desk):
         )
         self.policy = updated
         self.arm()
-        self.save_state()
+        self.save()
         return updated

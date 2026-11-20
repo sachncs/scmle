@@ -9,7 +9,7 @@ from scmle.storage import objectstore
 
 
 def make_local(tmp_path):
-    return objectstore.LocalObjectStore(tmp_path / "root")
+    return objectstore.Disk(tmp_path / "root")
 
 
 @pytest.fixture
@@ -18,7 +18,7 @@ def store(tmp_path):
 
 
 def test_the_conformance_suite_passes_on_the_local_backend(store):
-    report = conformance.run_conformance(store, run_id="unit")
+    report = conformance.certify(store, run_id="unit")
     failed = [(r.name, r.detail) for r in report.results if not r.passed]
     assert failed == []
     assert report.passed
@@ -26,16 +26,16 @@ def test_the_conformance_suite_passes_on_the_local_backend(store):
 
 
 def test_the_suite_leaves_nothing_behind(store):
-    conformance.run_conformance(store, run_id="clean")
-    assert store.list_objects("") == []
+    conformance.certify(store, run_id="clean")
+    assert store.catalog("") == []
 
 
 def test_the_suite_catches_a_backend_that_breaks_a_promise(tmp_path):
-    class Overwriting(objectstore.LocalObjectStore):
+    class Overwriting(objectstore.Disk):
         def put(self, key, data, *, if_absent=False, if_version=None):
             return super().put(key, data, if_version=if_version)
 
-    report = conformance.run_conformance(Overwriting(tmp_path / "bad"))
+    report = conformance.certify(Overwriting(tmp_path / "bad"))
     failed = {r.name for r in report.results if not r.passed}
     assert failed == {"if_absent", "if_absent_race"}
     assert not report.passed
@@ -43,11 +43,11 @@ def test_the_suite_catches_a_backend_that_breaks_a_promise(tmp_path):
 
 def test_the_suite_catches_a_backend_without_compare_and_swap(tmp_path):
     # CON-1: leases need a swap that refuses a stale version.
-    class Blind(objectstore.LocalObjectStore):
+    class Blind(objectstore.Disk):
         def put(self, key, data, *, if_absent=False, if_version=None):
             return super().put(key, data, if_absent=if_absent)
 
-    report = conformance.run_conformance(Blind(tmp_path / "blind"))
+    report = conformance.certify(Blind(tmp_path / "blind"))
     failed = {r.name for r in report.results if not r.passed}
     assert failed == {"if_version", "if_version_race"}
 
@@ -81,7 +81,7 @@ def test_a_local_key_cannot_leave_the_root(tmp_path):
     assert not (tmp_path / "outside").exists()
 
 
-class Flaky(objectstore.LocalObjectStore):
+class Flaky(objectstore.Disk):
     """A local store whose first writes fail transiently, or permanently."""
 
     def __init__(self, root, failures):
@@ -103,11 +103,11 @@ def test_transient_failures_are_retried_with_the_declared_backoff(tmp_path):
     inner = Flaky(
         tmp_path / "r",
         [
-            objectstore.TransientStoreError("a"),
-            objectstore.TransientStoreError("b"),
+            objectstore.TransientError("a"),
+            objectstore.TransientError("b"),
         ],
     )
-    store = objectstore.RetryingStore(
+    store = objectstore.Retrier(
         inner,
         retry.Retries(attempts=4, base_delay_seconds=1, factor=2),
         sleep=waits.append,
@@ -121,9 +121,9 @@ def test_retries_stop_at_the_budget_and_never_retry_a_permanent_error(
     tmp_path,
 ):
     waits = []
-    transient = objectstore.TransientStoreError("slow")
+    transient = objectstore.TransientError("slow")
     inner = Flaky(tmp_path / "r", [transient] * 3)
-    store = objectstore.RetryingStore(
+    store = objectstore.Retrier(
         inner,
         retry.Retries(attempts=3, base_delay_seconds=0.1),
         sleep=waits.append,
@@ -168,7 +168,7 @@ def test_a_denied_link_onto_a_missing_path_is_a_real_error(tmp_path):
 
 
 def test_a_racer_that_dies_is_reported_with_its_error(tmp_path):
-    class Broken(objectstore.LocalObjectStore):
+    class Broken(objectstore.Disk):
         def put(self, key, data, *, if_absent=False):
             raise OSError("disk on fire")
 
@@ -177,7 +177,7 @@ def test_a_racer_that_dies_is_reported_with_its_error(tmp_path):
 
 
 def test_path_of_is_lexical_and_never_leaves_the_root(tmp_path):
-    local = objectstore.LocalObjectStore(tmp_path / "root")
+    local = objectstore.Disk(tmp_path / "root")
     deep = local.locate("a/b/c.json")
     assert deep == local.root / "a" / "b" / "c.json"
     assert not deep.parent.exists()

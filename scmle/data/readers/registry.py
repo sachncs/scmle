@@ -137,7 +137,7 @@ class Observation:
     @classmethod
     def restore(
         cls,
-        manifest: data.DatasetManifest,
+        manifest: data.Manifest,
         layout: Mapping[str, str],
         captured: str,
     ) -> Self:
@@ -606,7 +606,7 @@ class Registry:
                 handle.flush()
                 os.fsync(handle.fileno())
             pathlib.Path(temporary_name).replace(self.path)
-            durability.sync_directory(self.path.parent)
+            durability.flush(self.path.parent)
         except BaseException:
             pathlib.Path(temporary_name).unlink(missing_ok=True)
             raise

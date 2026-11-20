@@ -98,24 +98,24 @@ class Alarms(contest.Contest):
             The newest escalation opened, or None if none was opened.
         """
         newest: terms.Escalation | None = None
-        if self.coverage_test is not None and bool(self.coverage_test.crossed):
+        if self.test is not None and bool(self.test.crossed):
             newest = (
                 self.escalate("coverage_below_nominal", {"batch": batch})
                 or newest
             )
-            self.coverage_test = sequential_tests.Mixture(
+            self.test = sequential_tests.Mixture(
                 self.policy.coverage or 0.9,
                 sequential_tests.LESS,
                 self.policy.alarm,
             )
-        if bool(self.novelty_test.crossed):
+        if bool(self.novelty.crossed):
             newest = (
                 self.escalate(
                     "out_of_support_rate_above_bound", {"batch": batch}
                 )
                 or newest
             )
-            self.novelty_test = sequential_tests.Mixture(
+            self.novelty = sequential_tests.Mixture(
                 min(max(self.policy.novelty, 1e-6), 1 - 1e-6),
                 sequential_tests.GREATER,
                 self.policy.alarm,

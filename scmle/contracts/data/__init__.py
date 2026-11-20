@@ -6,8 +6,8 @@ dataset and `profiles` its feature plan, profile, curation and datasheet.
 
 from scmle.contracts.data.findings import Disposition
 from scmle.contracts.data.findings import Finding
-from scmle.contracts.data.findings import FindingSeverity
 from scmle.contracts.data.findings import Observation
+from scmle.contracts.data.findings import Severity
 from scmle.contracts.data.profiles import Blueprint
 from scmle.contracts.data.profiles import Curation
 from scmle.contracts.data.profiles import Datasheet
@@ -16,7 +16,7 @@ from scmle.contracts.data.profiles import Portrait
 from scmle.contracts.data.profiles import Preprocessing
 from scmle.contracts.data.provenance import Ancestry
 from scmle.contracts.data.provenance import Confidentiality
-from scmle.contracts.data.provenance import DatasetManifest
+from scmle.contracts.data.provenance import Manifest
 from scmle.contracts.data.provenance import Origin
 from scmle.contracts.data.provenance import Passport
 
@@ -26,14 +26,14 @@ __all__ = [
     "Blueprint",
     "Confidentiality",
     "Curation",
-    "DatasetManifest",
     "Datasheet",
     "Disposition",
     "Finding",
-    "FindingSeverity",
+    "Manifest",
     "Observation",
     "Origin",
     "Passport",
     "Portrait",
     "Preprocessing",
+    "Severity",
 ]

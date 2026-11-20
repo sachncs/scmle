@@ -122,14 +122,14 @@ class Segmentation:
             shutil.rmtree(stage)
         try:
             self.bundle.save(stage, signing_key)
-            durability.write_atomically(
+            durability.write(
                 stage / REPORT_FILE, self.describe().encode("utf-8")
             )
             stage.replace(target)
         finally:
             with contextlib.suppress(FileNotFoundError):
                 shutil.rmtree(stage)
-        durability.sync_directory(target.parent)
+        durability.flush(target.parent)
         return target
 
 

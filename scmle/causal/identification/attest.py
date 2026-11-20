@@ -98,7 +98,7 @@ class Attestation:
             "evidence",
             "scope",
         ):
-            evidence.require_text(getattr(self, name), name)
+            evidence.require(getattr(self, name), name)
         issued = provenance.parse(self.date, "date")
         if provenance.parse(self.expires, "expires") < issued:
             raise errors.InputError("expires must not precede date")
@@ -175,13 +175,13 @@ class Applied:
         accepted: Assumption to the attestor who verifiably signed it.
         records: The accepted records, with their signatures.
         rejected: Assumption to why no attestation counts for it.
-        evaluated_on: The ISO date the validity windows were checked on.
+        evaluated: The ISO date the validity windows were checked on.
     """
 
     accepted: Mapping[str, str]
     records: tuple[Attestation, ...]
     rejected: Mapping[str, str]
-    evaluated_on: str
+    evaluated: str
 
     KEYS: ClassVar[scmle.contracts.records.Migration] = (
         scmle.contracts.records.Migration(renames={"evaluated_on": "evaluated"})
@@ -197,7 +197,7 @@ class Applied:
         """
         return self.KEYS.upgrade(
             {
-                "evaluated_on": self.evaluated_on,
+                "evaluated_on": self.evaluated,
                 "accepted": [r.to_dict() for r in self.records],
                 "rejected": dict(self.rejected),
             }

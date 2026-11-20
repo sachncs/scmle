@@ -192,7 +192,7 @@ def test_a_failed_write_spends_nothing(tmp_path, monkeypatch):
     def refuse(path, content):
         raise OSError("disk full")
 
-    monkeypatch.setattr(thresholdout.durability, "write_atomically", refuse)
+    monkeypatch.setattr(thresholdout.durability, "write", refuse)
     with pytest.raises(OSError, match="disk full"):
         guard.query(agreeing)
     assert (guard.asked, guard.spent, guard.answers) == (0, 0, [])

@@ -160,7 +160,7 @@ class Verdict:
 class Ledger:
     """`Maintainer`'s memory of its last attempt, read by the `Cadence`."""
 
-    registry: scmle.governance.registry.ModelRegistryStore
+    registry: scmle.governance.registry.Registry
     model: str
     policy: Cadence
 
@@ -191,9 +191,7 @@ class Ledger:
         Args:
             state: The state to save, as returned by `recall`.
         """
-        durability.write_atomically(
-            self.statefile, json.dumps(state).encode("utf-8")
-        )
+        durability.write(self.statefile, json.dumps(state).encode("utf-8"))
 
     def skip(
         self, state: dict[str, Any], fresh: pandas.DataFrame
@@ -243,7 +241,7 @@ class Ledger:
 class Rollback:
     """Takes a clearly worse champion back; a mixin of `Maintainer`."""
 
-    registry: scmle.governance.registry.ModelRegistryStore
+    registry: scmle.governance.registry.Registry
     model: str
     decides: bool
 
@@ -484,7 +482,7 @@ class Rollback:
 class Staging:
     """Registers runs and stages challengers; a mixin of `Maintainer`."""
 
-    registry: scmle.governance.registry.ModelRegistryStore
+    registry: scmle.governance.registry.Registry
     model: str
     workspace: str
     decides: bool
@@ -515,8 +513,8 @@ class Staging:
         Raises:
             ArtifactError: If the run has no `config.json`.
         """
-        bundle_dir = result.save(result.run_dir / "export")
-        config_path = result.run_dir / "config.json"
+        bundle_dir = result.save(result.directory / "export")
+        config_path = result.directory / "config.json"
         if not config_path.exists():
             raise errors.ArtifactError("run has no config.json")
         project: dict[str, Any] = json.loads(
@@ -527,7 +525,7 @@ class Staging:
             bundle_dir,
             metrics=result.evaluation["metrics"],
             config=result.plan.to_dict() | {"project": project},
-            run_id=result.run_id,
+            run_id=result.identifier,
             trusted=True,  # exported moments ago by this very process
         )
         if promote:
@@ -566,7 +564,7 @@ class Staging:
         options.setdefault("task", current.schema.task)
         options.setdefault("metric", current.info.metric)
         challenger_run = scmle.api.project.Project(
-            train, target, output_dir=self.workspace, **options
+            train, target, directory=self.workspace, **options
         ).run()
         comparison = champion.Referee(current, challenger_run.bundle).compare(
             holdout.drop(columns=[target]), holdout[target]
@@ -617,7 +615,7 @@ class Maintainer(Ledger, Staging, Rollback):
 
     def __init__(
         self,
-        registry: scmle.governance.registry.ModelRegistryStore,
+        registry: scmle.governance.registry.Registry,
         model: str,
         work_dir: str,
         policy: Cadence | None = None,

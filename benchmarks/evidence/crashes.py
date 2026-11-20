@@ -999,7 +999,7 @@ class Engine(Subject):
             self.frame(),
             "y",
             folder / "runs",
-            time_budget=BUDGET_SECONDS,
+            budget=BUDGET_SECONDS,
             seed=SEED,
         ).run()
 
@@ -1112,7 +1112,7 @@ class Executor(Subject):
     """The workflow executor: a four-step run under a lease."""
 
     name = "executor"
-    STORE = "scmle.storage.objectstore:LocalObjectStore"
+    STORE = "scmle.storage.objectstore:Disk"
     operations = (
         Operation("lease", LEASE, STORE, "put", "/lock"),
         Operation("release", LEASE, STORE, "delete", "/lock"),
@@ -1153,7 +1153,7 @@ class Executor(Subject):
         calls = folder / "calls.txt"
         return executor.Executor(
             flow,
-            objectstore.LocalObjectStore(folder / "store"),
+            objectstore.Disk(folder / "store"),
             {step: Handler(step, calls) for step in self.STEPS},
             clock=lambda: clock,
             lease_seconds=LEASE_SECONDS,
@@ -1189,10 +1189,10 @@ class Executor(Subject):
         root = folder / "store"
         if not root.is_dir():
             return {}
-        store = objectstore.LocalObjectStore(root)
+        store = objectstore.Disk(root)
         return {
             meta.key: json.loads(store.get(meta.key)[0])
-            for meta in store.list_objects()
+            for meta in store.catalog()
         }
 
     def contents(self, folder: Path) -> dict[str, bytes]:
@@ -1293,14 +1293,14 @@ class Batch(Subject):
             "journal",
             APPEND,
             "scmle.durability",
-            "write_atomically",
+            "write",
             ".progress.json",
         ),
         Operation(
             "manifest",
             OUTPUT,
             "scmle.durability",
-            "write_atomically",
+            "write",
             ".manifest.json",
         ),
         Operation("swap", OUTPUT, "scmle.durability", "swap"),

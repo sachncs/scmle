@@ -92,7 +92,7 @@ def identities(path: pathlib.Path) -> frozenset[str]:
         ArtifactError: If the manifest cannot be read.
     """
     try:
-        manifest = provenance.DatasetManifest.from_dict(read(path))
+        manifest = provenance.Manifest.from_dict(read(path))
     except (KeyError, TypeError, errors.InputError) as error:
         raise errors.ArtifactError(f"cannot read {path}: {error}") from error
     found = {
@@ -242,7 +242,7 @@ class Survey:
             bundle: The bundle directory.
         """
         if (bundle / layout.MANIFEST_FILE).is_file():
-            self.bundles.add(scmle.deploy.provenance.bundle_digest(bundle))
+            self.bundles.add(scmle.deploy.provenance.digest(bundle))
 
     def predictions(self) -> None:
         """Plans removing every prediction log a retired bundle wrote."""

@@ -500,7 +500,7 @@ class Retirement(Erasure):
         if self.model:
             if not (self.target / registry.INDEX_FILE).is_file():
                 raise errors.ArtifactError(f"no registry at {self.target}")
-            store = registry.ModelRegistryStore(self.target)
+            store = registry.Registry(self.target)
             record = store.resolve(self.model, self.version)
             bundle = self.target / record.path
             root, model, version = (

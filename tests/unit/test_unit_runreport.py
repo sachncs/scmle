@@ -9,7 +9,7 @@ from scmle.artifacts import report
 
 def run(evaluation=None, diagnostics=None, warning=None, importance=None):
     profile = types.SimpleNamespace(
-        quality_findings=("missing <a>", "warn"),
+        quality=("missing <a>", "warn"),
         risk_findings=("risky",),
         admonition=warning,
     )
@@ -27,7 +27,7 @@ def run(evaluation=None, diagnostics=None, warning=None, importance=None):
             else pandas.DataFrame({"feature": [], "importance": []})
         ),
         summary=lambda: "done & dusted",
-        selected_model="ridge",
+        model="ridge",
     )
 
 

@@ -62,7 +62,7 @@ def make_dated_inputs(rows=800):
         ("signal", "when__month"),
         ("group",),
         derived=(month,),
-        extra_inputs=("when",),
+        extras=("when",),
     )
     rng = numpy.random.default_rng(0)
     frame = pandas.DataFrame(

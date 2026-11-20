@@ -42,7 +42,7 @@ def test_failures_are_classified(error, expected):
 
 
 def test_the_store_wrapper_retries_a_busy_file(tmp_path):
-    inner = objectstore.LocalObjectStore(tmp_path)
+    inner = objectstore.Disk(tmp_path)
     calls = {"n": 0}
     real = inner.put
 
@@ -53,7 +53,7 @@ def test_the_store_wrapper_retries_a_busy_file(tmp_path):
         return real(key, data, **options)
 
     inner.put = busy
-    store = objectstore.RetryingStore(
+    store = objectstore.Retrier(
         inner, retry.Retries(3, 0.0, 1.0, 0.0), sleep=lambda seconds: None
     )
     store.put("a", b"1")
@@ -65,7 +65,7 @@ def test_a_succeeded_handler_is_not_run_again_when_its_record_fails_once(
 ):
     from tests.unit import test_workflow
 
-    store = objectstore.LocalObjectStore(tmp_path / "state")
+    store = objectstore.Disk(tmp_path / "state")
     clock = test_workflow.Clock()
     recorder = test_workflow.Recorder(clock)
     flow = test_workflow.pipeline()
@@ -77,7 +77,7 @@ def test_a_succeeded_handler_is_not_run_again_when_its_record_fails_once(
         first = not failed["done"]
         if state.value == "succeeded" and step.name == "ingest" and first:
             failed["done"] = True
-            raise objectstore.TransientStoreError("throttled")
+            raise objectstore.TransientError("throttled")
         return real(run_id, step, state, **fields)
 
     executor.stash = flaky

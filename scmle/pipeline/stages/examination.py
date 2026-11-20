@@ -165,7 +165,7 @@ class Examination(interface.Stage):
         health = fit_health.sanity(
             selected,
             board.journal.trials,
-            board.get(profiling.Partition).metric.greater_is_better,
+            board.get(profiling.Partition).metric.maximize,
         )
         return None if health is None else health.to_dict()
 
@@ -206,11 +206,11 @@ class Examination(interface.Stage):
             features = part.drop(columns=[data.target])
             labels.append(part[data.target].to_numpy())
             guesses.append(numpy.asarray(pipeline.predict(features)))
-            if task.is_classification:
+            if task.classification:
                 scores.append(numpy.asarray(pipeline.predict_proba(features)))
         truth = pandas.Series(numpy.concatenate(labels))
         replay_class = (
-            replay.Predictions if task.is_classification else replay.Replayed
+            replay.Predictions if task.classification else replay.Replayed
         )
         # Metrics only call predict and predict_proba on the stand-in.
         stand_in = cast(

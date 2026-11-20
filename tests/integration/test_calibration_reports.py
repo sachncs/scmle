@@ -30,8 +30,8 @@ def test_a_multiclass_run_reports_its_reliability(tmp_path):
         three_class_frame(),
         "y",
         task="multiclass_classification",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
     ).run()
 
     report = result.diagnostics["calibration"]
@@ -42,7 +42,7 @@ def test_a_multiclass_run_reports_its_reliability(tmp_path):
 
 def test_quantile_coverage_tracks_the_nominal_level_on_locked_rows(tmp_path):
     result = support.make_project(
-        noisy_line(), "y", time_budget=300, output_dir=tmp_path
+        noisy_line(), "y", budget=300, directory=tmp_path
     ).run()
 
     curve = result.evaluation["quantiles"]

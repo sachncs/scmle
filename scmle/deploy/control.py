@@ -1,6 +1,6 @@
 """The control plane a release talks to, and how it waits for confirmation.
 
-A `ControlPlane` is the thin interface the registry's promotion, staged
+A `Platform` is the thin interface the registry's promotion, staged
 traffic allocation and rollback go through. An implementation knows one
 platform (or is a test double); it can read what runs
 (`observe`), start a new revision of an image digest (`deploy`) and send
@@ -23,7 +23,7 @@ from scmle.contracts import errors
 from scmle.deploy import observation
 
 
-class RuntimeUnconfirmed(errors.ScmleError):
+class UnconfirmedError(errors.ScmleError):
     """The platform did not report what a request asked for in time."""
 
     category = "runtime"
@@ -61,7 +61,7 @@ class Polling:
             raise errors.ConfigError("delay must not be negative")
 
 
-class ControlPlane(abc.ABC):
+class Platform(abc.ABC):
     """What a release needs from a platform; nothing provider-specific else.
 
     Attributes:
@@ -94,7 +94,7 @@ class ControlPlane(abc.ABC):
         """
 
     @abc.abstractmethod
-    def set_traffic(self, allocation: Mapping[str, int]) -> None:
+    def route(self, allocation: Mapping[str, int]) -> None:
         """Requests a split (revision to percent, summing to 100).
 
         Args:
@@ -106,7 +106,7 @@ class ControlPlane(abc.ABC):
 
 
 def confirm(
-    plane: ControlPlane,
+    plane: Platform,
     check: Callable[[observation.Observation], list[str]],
     policy: Polling | None = None,
 ) -> observation.Observation:
@@ -140,7 +140,7 @@ def confirm(
         reasons = check(seen)
         if not reasons:
             return seen
-    raise RuntimeUnconfirmed(
+    raise UnconfirmedError(
         "the platform did not confirm: " + "; ".join(reasons),
         {"reasons": reasons},
     )

@@ -90,7 +90,7 @@ def test_invalid_inputs_are_refused():
 
 def test_risk_coverage_curve_and_area():
     data = streams.draw_calibration(20_000, 0.05, seed=4)
-    curve = escalation.risk_coverage(data["score"], data["loss"])
+    curve = escalation.sweep(data["score"], data["loss"])
     assert curve.coverage[0] < curve.coverage[-1] == pytest.approx(1.0)
     assert curve.risk[-1] == pytest.approx(0.1, abs=0.01)
     assert 0.0 < curve.aurc < 0.1
@@ -133,4 +133,4 @@ def test_halt_answers_nothing_and_blocked_cases_are_escalated():
 
 def test_risk_coverage_of_an_empty_calibration_set_is_a_value_error():
     with pytest.raises(ValueError, match="empty"):
-        escalation.risk_coverage([], [])
+        escalation.sweep([], [])

@@ -39,9 +39,7 @@ def rare_frame(rare, rows=60, seed=0):
     return frame, pandas.Series(labels)
 
 
-PLAN = data.Blueprint(
-    numeric=("x",), categorical=("code",), high_cardinality=("code",)
-)
+PLAN = data.Blueprint(numeric=("x",), categorical=("code",), cardinal=("code",))
 
 
 @pytest.mark.parametrize("task", [tasks.Task.BINARY, tasks.Task.REGRESSION])

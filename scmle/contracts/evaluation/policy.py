@@ -20,30 +20,27 @@ class Criteria(records.Spelled, records.Record):
 
     Version 2 stores single-word keys (`primary_metric` as `metric`,
     `small_groups` as `small`, and the renamed keys of each part); the
-    fields keep their names. A version-1 policy loads through `migrations`.
+    fields take the stored names. A version-1 policy loads through
+    `migrations`.
 
     Attributes:
-        spelling: Field names to stored keys at the top level.
         migrations: Version steps of the stored policy and its parts.
     """
 
-    spelling: ClassVar[records.Migration] = records.Migration(
-        renames={"primary_metric": "metric", "small_groups": "small"}
-    )
     migrations: ClassVar[tuple[records.Migration, ...]] = (
         records.nest(
             renames={"primary_metric": "metric", "small_groups": "small"},
             parts={
-                "uncertainty": parts.Uncertainty.spelling,
-                "calibration": parts.Calibration.spelling,
-                "fairness": parts.Fairness.spelling,
-                "small": parts.Subgroups.spelling,
-                "explanations": parts.Explanations.spelling,
+                "uncertainty": parts.Uncertainty.former,
+                "calibration": parts.Calibration.former,
+                "fairness": parts.Fairness.former,
+                "small": parts.Subgroups.former,
+                "explanations": parts.Explanations.former,
                 "release": records.nest(
-                    renames=dict(parts.Gates.spelling.renames),
+                    renames=dict(parts.Gates.former.renames),
                     parts={
-                        "diagnostics": parts.Requirement.spelling,
-                        "fairness": parts.Equity.spelling,
+                        "diagnostics": parts.Requirement.former,
+                        "fairness": parts.Equity.former,
                     },
                 ),
             },
@@ -51,12 +48,12 @@ class Criteria(records.Spelled, records.Record):
     )
 
     task: tasks.Task
-    primary_metric: str
+    metric: str
     metrics: tuple[parts.Declaration, ...]
     uncertainty: parts.Uncertainty
     calibration: parts.Calibration
     fairness: parts.Fairness
-    small_groups: parts.Subgroups
+    small: parts.Subgroups
     explanations: parts.Explanations
     release: parts.Gates
 
@@ -76,18 +73,16 @@ class Criteria(records.Spelled, records.Record):
                 metric has the wrong direction, or a release gate is
                 inconsistent with the declarations.
         """
-        parts.sanitize(self.primary_metric, "policy.primary_metric")
+        parts.sanitize(self.metric, "policy.primary_metric")
         if not self.metrics:
             raise errors.InputError("evaluation policy requires metrics")
         metric_names = [metric.name for metric in self.metrics]
         if len(metric_names) != len(set(metric_names)):
             raise errors.InputError("evaluation metrics must be unique")
-        if self.primary_metric not in metric_names:
+        if self.metric not in metric_names:
             raise errors.InputError("primary_metric must be one of metrics")
         primary = next(
-            metric
-            for metric in self.metrics
-            if metric.name == self.primary_metric
+            metric for metric in self.metrics if metric.name == self.metric
         )
         if not primary.required:
             raise errors.InputError("primary_metric must be required")
@@ -173,7 +168,7 @@ class Criteria(records.Spelled, records.Record):
                 a direction that differs from the declaration.
         """
         declared_metrics = {metric.name: metric for metric in self.metrics}
-        for gate in self.release.metric_gates:
+        for gate in self.release.metrics:
             declaration = declared_metrics.get(gate.metric)
             if declaration is None:
                 if gate.metric not in support.SUPPORTED_METRICS[self.task]:
@@ -204,25 +199,25 @@ class Criteria(records.Spelled, records.Record):
                 method or a fairness method has no gates.
         """
         self.gatekeep()
-        for fairness_gate in self.release.fairness_gates:
+        for fairness_gate in self.release.fairness:
             if fairness_gate.metric not in self.fairness.metrics:
                 raise errors.InputError(
                     f"release fairness gate '{fairness_gate.metric}' is "
                     "undeclared"
                 )
         supported_diagnostics = support.SUPPORTED_DIAGNOSTICS[self.task]
-        for diagnostic_gate in self.release.diagnostic_gates:
+        for diagnostic_gate in self.release.diagnostics:
             if diagnostic_gate.name not in supported_diagnostics:
                 raise support.UnsupportedError(
                     f"diagnostic '{diagnostic_gate.name}' is unsupported for "
                     f"task '{self.task.value}'"
                 )
         declared = self.fairness.method is not support.Technique.NONE
-        if not declared and self.release.fairness_gates:
+        if not declared and self.release.fairness:
             raise errors.InputError(
                 "fairness release gates need a fairness declaration"
             )
-        if declared and not self.release.fairness_gates:
+        if declared and not self.release.fairness:
             raise errors.InputError(
                 "fairness declaration needs release fairness gates"
             )
@@ -296,7 +291,7 @@ class Registry:
             )
         return policy
 
-    def list_policies(self) -> tuple[Criteria, ...]:
+    def tabulate(self) -> tuple[Criteria, ...]:
         """Returns policies in deterministic task order."""
         return tuple(
             self.records[task]
@@ -308,8 +303,7 @@ class Registry:
         return {
             "schema_version": Criteria.latest(),
             "policies": [
-                policy.model_dump(mode="json")
-                for policy in self.list_policies()
+                policy.model_dump(mode="json") for policy in self.tabulate()
             ],
         }
 

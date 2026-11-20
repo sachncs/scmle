@@ -18,7 +18,7 @@ def test_a_pointwise_adapter_wraps_a_seeded_boosting_regressor():
     assert (
         adapter.capabilities.tasks == adapters.RANKING == {tasks.Task.RANKING}
     )
-    assert adapter.capabilities.handles_missing is True
+    assert adapter.capabilities.missing is True
 
 
 def test_a_library_ranker_keeps_its_library_and_seed():
@@ -46,7 +46,7 @@ def test_a_ranker_declares_its_name_library_and_requirements():
     custom = adapters.Ranker(library="lightgbm")
     assert custom.library == "lightgbm"
     assert custom.requires == adapters.Ranker.requires
-    names = list(adapters.Ranker.search_space.names())
+    names = list(adapters.Ranker.space.names())
     assert names == ["learning_rate", "max_leaves"]
     assert [type(a) for a in adapters.RANKING_ADAPTERS] == [
         adapters.Pointwise,

@@ -67,8 +67,8 @@ def test_custom_components_round_trip_through_a_saved_bundle(
         "y",
         metric="business_cost",
         models=tasks.Candidates(exclude_models=sorted(registry.inventory())),
-        time_budget=300,
-        output_dir=tmp_path / "runs",
+        budget=300,
+        directory=tmp_path / "runs",
     ).run()
     saved = result.save(tmp_path / "bundle")
     rows = binary_frame.drop(columns="y")

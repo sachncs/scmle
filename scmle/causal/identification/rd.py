@@ -171,7 +171,7 @@ class Estimate:
 
     Attributes:
         estimate: Conventional (local linear) estimate.
-        bias_corrected: Local quadratic estimate (the interval's centre).
+        corrected: Local quadratic estimate (the interval's centre).
         se: Robust standard error of the bias-corrected estimate.
         low: Lower interval limit.
         high: Upper interval limit.
@@ -179,7 +179,7 @@ class Estimate:
         bandwidth: The bandwidth used on both sides.
         n_left: Rows inside the bandwidth to the left.
         n_right: Rows inside the bandwidth to the right.
-        density_p: Binomial p-value of the left/right counts.
+        density: Binomial p-value of the left/right counts.
         placebos: Placebo name (`left_median` or `right_median`) to its
             `cutoff` and the `discontinuity` record at that cutoff.
         balance: Covariate to its `discontinuity` record.
@@ -188,7 +188,7 @@ class Estimate:
     """
 
     estimate: float
-    bias_corrected: float
+    corrected: float
     se: float
     low: float
     high: float
@@ -196,7 +196,7 @@ class Estimate:
     bandwidth: float
     n_left: int
     n_right: int
-    density_p: float
+    density: float
     placebos: dict[str, dict[str, float]]
     balance: dict[str, dict[str, float]]
     sensitivity: dict[str, dict[str, float]]
@@ -409,7 +409,7 @@ def estimate(
     )
     return Estimate(
         estimate=main["estimate"],
-        bias_corrected=main["bias_corrected"],
+        corrected=main["bias_corrected"],
         se=main["se"],
         low=main["low"],
         high=main["high"],
@@ -417,7 +417,7 @@ def estimate(
         bandwidth=h,
         n_left=inside_left,
         n_right=inside_right,
-        density_p=density_p,
+        density=density_p,
         placebos=placebos,
         balance=balance,
         sensitivity=sensitivity,

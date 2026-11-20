@@ -19,7 +19,7 @@ def base(rows=200, seed=0):
 
 def run(frame, tmp_path, target="y", **kwargs):
     return support.make_project(
-        frame, target, time_budget=300, output_dir=tmp_path, **kwargs
+        frame, target, budget=300, directory=tmp_path, **kwargs
     ).run()
 
 
@@ -44,7 +44,7 @@ def test_single_feature(tmp_path):
 def test_all_missing_and_constant_columns_are_dropped(tmp_path):
     frame = base().assign(empty=numpy.nan, same=7)
     result = run(frame, tmp_path)
-    dropped = result.profile.feature_plan.dropped
+    dropped = result.profile.plan.dropped
     assert dropped["empty"] == "missing >95%" and dropped["same"] == "constant"
     infer(result, frame)
 
@@ -127,8 +127,8 @@ def test_datetime_feature_becomes_date_parts_and_inference_needs_the_raw_column(
         when=pandas.date_range("2024-01-01", periods=200, freq="D")
     )
     result = run(frame, tmp_path)
-    plan = result.profile.feature_plan
-    assert "when" in plan.extra_inputs
+    plan = result.profile.plan
+    assert "when" in plan.extras
     assert {"when__month", "when__dayofweek"} <= set(plan.numeric)
     infer(result, frame)
 

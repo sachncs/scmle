@@ -33,18 +33,18 @@ class Optimizer(abc.ABC):
         self,
         space: search.Space,
         seed: int,
-        greater_is_better: bool = True,
+        maximize: bool = True,
     ) -> None:
         """Initializes the optimizer.
 
         Args:
             space: Parameters to tune.
             seed: Random seed.
-            greater_is_better: Orientation of the scores passed to `tell`.
+            maximize: Orientation of the scores passed to `tell`.
         """
         self.space = space
         self.seed = seed
-        self.greater_is_better = greater_is_better
+        self.maximize = maximize
 
     @classmethod
     def is_available(cls) -> bool:

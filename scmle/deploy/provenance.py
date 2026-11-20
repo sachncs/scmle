@@ -45,7 +45,7 @@ def manifest_digest(manifest: Mapping[str, Any]) -> str:
     )
 
 
-def bundle_digest(directory: str | pathlib.Path) -> str:
+def digest(directory: str | pathlib.Path) -> str:
     """Digests a bundle directory by its manifest.
 
     Args:

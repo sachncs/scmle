@@ -23,12 +23,12 @@ from scmle.rehearsal import demo
 from scmle.rehearsal.faults import harness
 
 
-class Processes(control.ControlPlane):
+class Processes(control.Platform):
     """Revisions are local service processes; the interface is the same.
 
     ``deploy(digest)`` starts a revision of the folder registered for the
     digest and leaves earlier ones running, as a managed platform keeps
-    earlier revisions; ``set_traffic`` points the single entry at one of
+    earlier revisions; ``route`` points the single entry at one of
     them; ``observe`` reports the revision that holds the traffic, with its
     readiness from ``/readyz``.
     """
@@ -93,7 +93,7 @@ class Processes(control.ControlPlane):
             self.primary = revision
         return revision
 
-    def set_traffic(self, allocation: Mapping[str, int]) -> None:
+    def route(self, allocation: Mapping[str, int]) -> None:
         """Points all traffic at one revision.
 
         Args:
@@ -148,7 +148,7 @@ class Processes(control.ControlPlane):
             image_digest=self.digests[self.primary],
             ready=self.ready(self.primary),
             traffic=(observation.Traffic(self.primary, 100),),
-            observed_at=demo.now(),
+            observed=demo.now(),
             revisions=tuple(sorted(self.digests.items())),
         )
 
@@ -167,8 +167,8 @@ class Processes(control.ControlPlane):
 
 
 def register(
-    store: registry.ModelRegistryStore,
-    release: release_state.ReleaseRegistry,
+    store: registry.Registry,
+    release: release_state.Registry,
     spec: dict[str, Any],
     work: pathlib.Path,
     label: str,
@@ -242,7 +242,7 @@ def degradation(
 def assemble(
     fleet: harness.Fleet, base: pathlib.Path
 ) -> tuple[
-    release_state.ReleaseRegistry,
+    release_state.Registry,
     Processes,
     list[registry.Release],
     list[str],
@@ -261,11 +261,11 @@ def assemble(
         time-scaled polling), the plane, the three registered versions and
         their image digests, in that order.
     """
-    store = registry.ModelRegistryStore(base / "registry")
-    ledger = deployment_ledger.DeploymentLedger.create(
+    store = registry.Registry(base / "registry")
+    ledger = deployment_ledger.Ledger.create(
         None, charter_hash="recovery", policy={}, alpha_promo="1/20"
     )
-    release = release_state.ReleaseRegistry(
+    release = release_state.Registry(
         store,
         ledger,
         control.Polling(attempts=40, delay=recovery.scaled(0.5)),
@@ -279,15 +279,15 @@ def assemble(
     ]
     plane = Processes(fleet)
     images = [
-        plane.enroll(harness.export_service(base / "img1", good_spec)),
-        plane.enroll(harness.export_service(base / "img2", harness.invert())),
-        plane.enroll(harness.export_service(base / "img3", third_spec)),
+        plane.enroll(harness.export(base / "img1", good_spec)),
+        plane.enroll(harness.export(base / "img2", harness.invert())),
+        plane.enroll(harness.export(base / "img3", third_spec)),
     ]
     return release, plane, versions, images
 
 
 def promote(
-    release: release_state.ReleaseRegistry,
+    release: release_state.Registry,
     plane: Processes,
     record: registry.Release,
     image: str,
@@ -314,7 +314,7 @@ def promote(
 
 
 def recover(
-    release: release_state.ReleaseRegistry,
+    release: release_state.Registry,
     plane: Processes,
     known_good: list[Any] | None,
 ) -> tuple[int | None, float | None, release_state.Outcome, Any, bool]:
@@ -354,7 +354,7 @@ def recover(
 
 
 def withhold(
-    release: release_state.ReleaseRegistry,
+    release: release_state.Registry,
     plane: Processes,
     record: registry.Release,
     image: str,
@@ -384,7 +384,7 @@ def withhold(
     return unready, before == after, still
 
 
-def bad_release() -> recovery.Outcome:
+def release() -> recovery.Outcome:
     """Promotes a wrong release, detects it from labels and rolls it back.
 
     A good and an inverted-coefficient version are promoted in turn. Noisy

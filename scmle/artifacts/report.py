@@ -30,7 +30,7 @@ class Renderer:
             for name, value in result.evaluation["metrics"].items()
         )
         findings = (
-            *result.profile.quality_findings,
+            *result.profile.quality,
             *result.profile.risk_findings,
         )
         warning = result.profile.admonition
@@ -71,12 +71,12 @@ class Renderer:
         )
         return (
             f"<!doctype html><meta charset=utf-8>"
-            f"<title>{escape(result.run_id)}</title>"
-            f"<h1>{escape(result.run_id)}</h1>"
+            f"<title>{escape(result.identifier)}</title>"
+            f"<h1>{escape(result.identifier)}</h1>"
             f"<p><b>{escape(result.summary())}</b></p>"
             f"<h2>Findings</h2><ul>{items}</ul>"
             f"<h2>Leaderboard</h2>{leaderboard.to_html(index=False, border=0)}"
-            f"<h2>Final test metrics ({escape(result.selected_model)})</h2>"
+            f"<h2>Final test metrics ({escape(result.model)})</h2>"
             f"<table>{metric_rows}</table>"
             f"<h2>Feature importance (permutation)</h2>{importance_html}"
             f"{calibration_html}"

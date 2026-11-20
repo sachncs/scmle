@@ -32,7 +32,7 @@ class Disposition(enum.StrEnum):
     BLOCKED = "blocked"
 
 
-def require_text(value: str, field_name: str) -> str:
+def require(value: str, field_name: str) -> str:
     """Returns a non-empty, trimmed string for a contract field.
 
     Args:
@@ -110,7 +110,7 @@ class Record:
             ("reviewer", self.reviewer),
             ("observed", self.observed),
         ):
-            require_text(value, field_name)
+            require(value, field_name)
         if not self.scope:
             raise errors.InputError("scope must not be empty")
         if not self.inputs:
@@ -207,7 +207,7 @@ class Index:
         self.signature = signature
         self.version = VERSION
         if signature is not None:
-            require_text(signature, "signature")
+            require(signature, "signature")
         for record in records:
             self.register(record)
 
@@ -343,7 +343,7 @@ class Index:
                 raise errors.InputError(
                     "unsupported evidence index signature algorithm"
                 )
-            signature = require_text(
+            signature = require(
                 str(signature_record.get("value", "")),
                 "signature",
             )

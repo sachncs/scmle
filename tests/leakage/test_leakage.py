@@ -21,7 +21,7 @@ def test_pure_noise_is_not_inflated_by_the_pipeline(tmp_path):
     frame["cat"] = rng.choice(list("abcdefgh"), rows)
     frame["y"] = rng.integers(0, 2, rows)
     result = support.make_project(
-        frame, "y", output_dir=tmp_path, time_budget=120
+        frame, "y", directory=tmp_path, budget=120
     ).run()
     assert abs(result.evaluation["metrics"]["roc_auc"] - 0.5) < 0.12
     assert abs(result.evaluation["selected"]["score"] - 0.5) < 0.12
@@ -40,13 +40,13 @@ def test_leaked_feature_is_flagged_and_can_block(binary_frame, tmp_path):
     # Enforces website/src/pages/docs/operating-loop.astro:18.
     leaky = binary_frame.assign(leak=binary_frame.y * 3.0 + 1)
     result = support.make_project(
-        leaky, "y", output_dir=tmp_path, leakage_policy="warn"
+        leaky, "y", directory=tmp_path, leakage="warn"
     ).run()
     assert any("'leak'" in w for w in result.profile.risk_findings)
     assert result.profile.blockers == ("leak",)
     with pytest.raises(errors.BlockedError, match="leakage") as raised:
         support.make_project(
-            leaky, "y", output_dir=tmp_path, leakage_policy="block"
+            leaky, "y", directory=tmp_path, leakage="block"
         ).run()
     assert "leak" in str(raised.value)
     assert raised.value.details["leakage"]["blocking"] == ["leak"]
@@ -67,14 +67,14 @@ def test_a_noisy_copy_and_a_value_recorded_for_one_class_also_block(
     for frame in (noisy, recorded):
         with pytest.raises(errors.BlockedError, match="leakage"):
             support.make_project(
-                frame, "y", output_dir=tmp_path, leakage_policy="block"
+                frame, "y", directory=tmp_path, leakage="block"
             ).run()
 
 
 def test_strong_legitimate_signal_is_not_blocked(binary_frame, tmp_path):
     """The fixture's own features are strong predictors; none is a leak."""
     result = support.make_project(
-        binary_frame, "y", output_dir=tmp_path, leakage_policy="block"
+        binary_frame, "y", directory=tmp_path, leakage="block"
     ).run()
     assert result.profile.blockers == ()
     assert not result.profile.risk_findings
@@ -101,8 +101,8 @@ def test_a_regression_leak_blocks_under_block(tmp_path):
             regression_leak(),
             "y",
             task="regression",
-            output_dir=tmp_path,
-            leakage_policy="block",
+            directory=tmp_path,
+            leakage="block",
         ).run()
     assert raised.value.details["leakage"]["blocking"] == ["leak"]
 
@@ -116,8 +116,8 @@ def test_a_regression_leak_warns_under_warn(tmp_path):
         regression_leak(),
         "y",
         task="regression",
-        output_dir=tmp_path,
-        leakage_policy="warn",
+        directory=tmp_path,
+        leakage="warn",
     ).run()
     assert any("'leak'" in w for w in result.profile.risk_findings)
     assert result.profile.blockers == ("leak",)
@@ -127,10 +127,10 @@ def test_groups_never_straddle_the_test_boundary(binary_frame, tmp_path):
     # Enforces website/src/pages/docs/architecture.astro:48.
     frame = binary_frame.assign(g=numpy.arange(len(binary_frame)) % 40)
     result = support.make_project(
-        frame, "y", group_column="g", output_dir=tmp_path
+        frame, "y", group="g", directory=tmp_path
     ).run()
     manifest = json.loads(
-        (result.run_dir / "validation_manifest.json").read_text()
+        (result.directory / "validation_manifest.json").read_text()
     )
     train_groups = set(frame.g.iloc[manifest["training"]])
     test_groups = set(frame.g.iloc[manifest["test"]])
@@ -141,9 +141,9 @@ def test_groups_never_straddle_the_test_boundary(binary_frame, tmp_path):
 def test_test_set_is_opened_exactly_once_per_run(binary_frame, tmp_path):
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:61.
     # Enforces website/src/learn/what-scmle-cannot-do.html:16-17.
-    result = support.make_project(binary_frame, "y", output_dir=tmp_path).run()
+    result = support.make_project(binary_frame, "y", directory=tmp_path).run()
     assert result.evaluation["opened"] is True
-    events = (result.run_dir / "events.jsonl").read_text().splitlines()
+    events = (result.directory / "events.jsonl").read_text().splitlines()
     testing = [e for e in events if json.loads(e)["kind"] == "state.TESTING"]
     assert len(testing) == 1
 
@@ -152,8 +152,8 @@ def run_default(frame, directory):
     return scmle.api.project.Project(
         frame,
         "y",
-        time_budget=600,
-        output_dir=directory,
+        budget=600,
+        directory=directory,
         validation="random",  # Stratified splits legitimately use labels.
         search=tasks.Search(top_models=1, configs_per_model=4),
         strategies=tasks.Strategies(top_models=1),
@@ -171,7 +171,7 @@ def test_search_is_invariant_to_test_labels_and_test_features(
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:61.
     first = run_default(imbalanced_frame, tmp_path / "a")
     manifest = json.loads(
-        (first.run_dir / "validation_manifest.json").read_text()
+        (first.directory / "validation_manifest.json").read_text()
     )
     test_ids = numpy.array(manifest["test"])
 
@@ -189,13 +189,13 @@ def test_search_is_invariant_to_test_labels_and_test_features(
         == first.evaluation["digests"]["split"]
     )
     assert [
-        (t.trial_id, t.model_name, t.strategy, t.params) for t in second.trials
+        (t.identifier, t.model, t.strategy, t.params) for t in second.trials
     ] == [
-        (t.trial_id, t.model_name, t.strategy, t.params) for t in first.trials
+        (t.identifier, t.model, t.strategy, t.params) for t in first.trials
     ]
     for a, b in zip(first.trials, second.trials, strict=True):
-        assert a.fold_scores == pytest.approx(b.fold_scores)
-    assert second.selected_model == first.selected_model
+        assert a.folds == pytest.approx(b.folds)
+    assert second.model == first.model
     assert (
         second.evaluation["selected"]["params"]
         == first.evaluation["selected"]["params"]
@@ -218,7 +218,7 @@ def without_timings(statistics):
 def test_profile_and_feature_plan_never_see_the_locked_test_rows(
     binary_frame, tmp_path
 ):
-    base = support.make_project(binary_frame, "y", output_dir=tmp_path / "a")
+    base = support.make_project(binary_frame, "y", directory=tmp_path / "a")
     base.plan()
     from scmle.data.splitting import splitters
 
@@ -229,16 +229,16 @@ def test_profile_and_feature_plan_never_see_the_locked_test_rows(
     altered.loc[altered.index[test_positions], "a"] = numpy.nan  # all missing
     altered.loc[altered.index[test_positions], "b"] = 1e9  # absurd values
     altered.loc[altered.index[test_positions], "c"] = "never-seen"
-    other = support.make_project(altered, "y", output_dir=tmp_path / "b")
+    other = support.make_project(altered, "y", directory=tmp_path / "b")
     other.plan()
 
     before, after = base.profile, other.profile
-    assert before.column_statistics == after.column_statistics
-    assert before.feature_plan == after.feature_plan
-    assert without_timings(before.dataset_statistics) == without_timings(
-        after.dataset_statistics
+    assert before.statistics == after.statistics
+    assert before.plan == after.plan
+    assert without_timings(before.overview) == without_timings(
+        after.overview
     )
-    rows = before.dataset_statistics["shape"]
+    rows = before.overview["shape"]
     assert rows["rows"] == len(split.manifest.training)
     assert rows["total_rows"] == len(binary_frame)
     assert rows["rows"] + len(test_positions) == rows["total_rows"]
@@ -249,7 +249,7 @@ def test_a_leak_present_only_in_the_test_rows_is_not_a_profile_finding(
 ):
     from scmle.data.splitting import splitters
 
-    project = support.make_project(binary_frame, "y", output_dir=tmp_path)
+    project = support.make_project(binary_frame, "y", directory=tmp_path)
     split = splitters.Splitter(project.spec, tasks.Task.BINARY).split(
         binary_frame
     )
@@ -260,7 +260,7 @@ def test_a_leak_present_only_in_the_test_rows_is_not_a_profile_finding(
     leaky.loc[leaky.index[test_positions], "late"] = (
         leaky.loc[leaky.index[test_positions], "y"] * 5.0
     )
-    probe = support.make_project(leaky, "y", output_dir=tmp_path / "p")
+    probe = support.make_project(leaky, "y", directory=tmp_path / "p")
     probe.plan()
     assert not any("'late'" in r for r in probe.profile.risk_findings)
 
@@ -289,19 +289,19 @@ def test_hard_enforcement_moves_the_test_rows_out_of_reach(
     result = support.make_project(
         frame,
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
         enforcement="hard",
     ).run()
 
     manifest = json.loads(
-        (result.run_dir / "validation_manifest.json").read_text()
+        (result.directory / "validation_manifest.json").read_text()
     )
     test_ids = set(manifest["test"])
     test_values = {float(frame.loc[i, "sentinel"]) for i in test_ids}
     events = [
         json.loads(line)
-        for line in (result.run_dir / "events.jsonl").read_text().splitlines()
+        for line in (result.directory / "events.jsonl").read_text().splitlines()
     ]
     created = next(e for e in events if e["kind"] == "split.created")
 
@@ -315,12 +315,12 @@ def test_cooperative_mode_says_it_relies_on_the_in_process_protocol(
     binary_frame, tmp_path
 ):
     result = support.make_project(
-        binary_frame, "y", time_budget=300, output_dir=tmp_path
+        binary_frame, "y", budget=300, directory=tmp_path
     ).run()
 
     events = [
         json.loads(line)
-        for line in (result.run_dir / "events.jsonl").read_text().splitlines()
+        for line in (result.directory / "events.jsonl").read_text().splitlines()
     ]
     created = next(e for e in events if e["kind"] == "split.created")
     assert created["data"]["test_set_isolation"] == "in-process protocol"

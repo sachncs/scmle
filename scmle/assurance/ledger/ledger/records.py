@@ -111,7 +111,7 @@ class Test:
             ("null", self.null),
             ("digests.code", self.digests.code),
         ):
-            scmle.contracts.evidence.require_text(value, field)
+            scmle.contracts.evidence.require(value, field)
         if self.direction not in bivariate.DIRECTIONS:
             raise errors.InputError(
                 f"direction must be one of {bivariate.DIRECTIONS}"

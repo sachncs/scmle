@@ -58,8 +58,8 @@ def test_a_missing_assumption_or_design_field_makes_a_strategy_ineligible():
     )
     plan = select.select(spec)
     verdict = plan.verdict("iv")
-    assert verdict.missing_assumptions == ("independence", "monotonicity")
-    assert verdict.missing_design == ("instrument",)
+    assert verdict.assumptions == ("independence", "monotonicity")
+    assert verdict.design == ("instrument",)
     assert plan.status == select.NOT_IDENTIFIED
     report = select.refusal(plan, spec)
     assert report["estimate"] is None
@@ -71,7 +71,7 @@ def test_a_missing_assumption_or_design_field_makes_a_strategy_ineligible():
 def test_unconfoundedness_without_covariates_is_missing():
     spec = block(assumptions=("positivity", "no_interference"))
     verdict = select.select(spec).verdict("backdoor_aipw")
-    assert verdict.missing_assumptions == ("unconfoundedness_given:<columns>",)
+    assert verdict.assumptions == ("unconfoundedness_given:<columns>",)
 
 
 def test_an_unlisted_strategy_name_is_ineligible():
@@ -82,7 +82,7 @@ def test_an_unlisted_strategy_name_is_ineligible():
 
 def test_no_chartered_order_uses_the_registry_order_and_says_so():
     plan = select.select(block())
-    assert not plan.chartered_order
+    assert not plan.chartered
     assert plan.order == tuple(select.STRATEGIES)
     assert plan.to_dict()["chartered"] is False
 

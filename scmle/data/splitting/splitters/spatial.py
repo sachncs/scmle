@@ -111,9 +111,7 @@ class Tiling(Partitioner):
                 `folds + 1` distinct places exist.
         """
         points = self.points(frame)
-        label = blocks.encode(
-            frame[self.data.target], self.task.is_classification
-        )
+        label = blocks.encode(frame[self.data.target], self.task.classification)
         gram = blocks.variogram(points, label, self.validation.seed)
         side, places = blocks.design(points, gram, self.validation.folds + 1)
         return side, gram.reach, places

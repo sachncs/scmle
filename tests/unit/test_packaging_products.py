@@ -48,7 +48,7 @@ def undeclared():
     """A fake board whose spec declares no success criteria."""
     partition = types.SimpleNamespace(
         task=tasks.Task.BINARY,
-        metric=types.SimpleNamespace(name="roc_auc", greater_is_better=True),
+        metric=types.SimpleNamespace(name="roc_auc", maximize=True),
     )
     return blank(
         {profiling.Partition: partition},
@@ -62,7 +62,7 @@ def undeclared():
 
 def graph():
     made = lineage.Graph()
-    made.add_node(lineage.Node("raw-source", lineage.Kind.RAW_SOURCE, "0" * 64))
+    made.add(lineage.Node("raw-source", lineage.Kind.RAW_SOURCE, "0" * 64))
     return made
 
 
@@ -126,23 +126,23 @@ def test_diagnostics_gathers_the_four_reports_in_record_order(monkeypatch):
 
 def test_uncertainty_without_test_rows_measures_nothing():
     bundle = types.SimpleNamespace(
-        conformal=None, quantile=None, coverage_report=None
+        conformal=None, quantile=None, report=None
     )
     exam = types.SimpleNamespace(rows=None)
     found = packaging.Packaging().gauge(blank({assessment.Exam: exam}), bundle)
     assert found == bracketing.Uncertainty(None, None)
     assert found.entries() == {}
     found.equip(bundle)
-    assert bundle.coverage_report is None
+    assert bundle.report is None
 
 
 def test_uncertainty_equips_the_bundle_with_its_report():
-    bundle = types.SimpleNamespace(coverage_report=None)
+    bundle = types.SimpleNamespace(report=None)
     made = bracketing.Uncertainty(
         None, None, [{"level": 0.9, "coverage": 0.88}], {"methods": {}}
     )
     made.equip(bundle)
-    assert bundle.coverage_report == {"methods": {}}
+    assert bundle.report == {"methods": {}}
     assert made.entries() == {
         "quantile_coverage": [{"level": 0.9, "coverage": 0.88}]
     }

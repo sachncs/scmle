@@ -36,13 +36,13 @@ class Outcome:
         gain: Mean held-out score change from adding pseudo-labels, in the
             scorer's larger-is-better orientation.
         folds: Number of folds judged.
-        pseudo_rows: Average pseudo-labeled rows added per fold.
+        pseudo: Average pseudo-labeled rows added per fold.
         accepted: Whether self-training will be used.
     """
 
     gain: float
     folds: int
-    pseudo_rows: float
+    pseudo: float
     accepted: bool
 
     KEYS: ClassVar[records.Migration] = records.Migration(
@@ -54,8 +54,7 @@ class Outcome:
         """Converts the outcome to a JSON-ready record.
 
         Returns:
-            A dictionary with one entry per attribute, `pseudo_rows`
-            written as `pseudo`.
+            A dictionary with one entry per attribute.
         """
         return self.KEYS.upgrade(dataclasses.asdict(self))
 

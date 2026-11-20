@@ -192,11 +192,11 @@ class Orchestrator:
         self.spec = bind(self.spec, approved)
         store = scmle.artifacts.store.Workspace.create(output_dir)
         declare(store, parameter_estimation_declaration, self.spec)
-        store.write_json("config.json", json.loads(self.spec.canonize()))
+        store.write("config.json", json.loads(self.spec.canonize()))
         store.write_text("environment.lock", lock())
         journal.Journal.locate(store.directory).start(self.spec.config_hash())
         docket = archive.Directory(store.directory, self.spec.config_hash())
-        with logs.bind(run=store.run_id):
+        with logs.bind(run=store.run):
             return self.execute(store, approved, docket, "run created")
 
     def resume(self, run_directory: str | pathlib.Path) -> results.Run:
@@ -231,7 +231,7 @@ class Orchestrator:
         """
         store = scmle.artifacts.store.Workspace.open(run_directory)
         docket = archive.Directory.open(store.directory, self.spec)
-        with logs.bind(run=store.run_id):
+        with logs.bind(run=store.run):
             return self.execute(store, docket.plan(), docket, "run resumed")
 
     @classmethod
@@ -321,9 +321,7 @@ class Orchestrator:
         """
         log = events.Log(store.path("events.jsonl"))
         tracker = enlist(self.tracker, store, self.spec, log)
-        machine = state.Tracker(
-            store.run_id, log, self.spec.config_hash(), reason
-        )
+        machine = state.Tracker(store.run, log, self.spec.config_hash(), reason)
         board = self.start(
             store=store,
             log=log,
@@ -372,14 +370,14 @@ def enlist(
     Returns:
         The experiment store.
     """
-    tracker = tracker or stores.SqliteExperimentStore(
+    tracker = tracker or stores.Sqlite(
         store.directory.parent / "experiments.sqlite"
     )
     tracker.commence(
-        store.run_id, spec.config_hash(), str(store.directory), events.stamp()
+        store.run, spec.config_hash(), str(store.directory), events.stamp()
     )
-    tracker.revise(store.run_id, config_json=spec.canonize())
-    log.listeners.append(functools.partial(tracker.listen, store.run_id))
+    tracker.revise(store.run, config_json=spec.canonize())
+    log.listeners.append(functools.partial(tracker.listen, store.run))
     return tracker
 
 
@@ -399,7 +397,7 @@ def recall(
     if tracker is None:
         if path is None or not path.exists():
             return ()
-        tracker = stores.SqliteExperimentStore(path)
+        tracker = stores.Sqlite(path)
     return tuple(tracker.history())
 
 
@@ -449,7 +447,7 @@ def declare(
     digest = hashlib.sha256(
         json.dumps(body, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
-    store.write_json(
+    store.write(
         "parameter_estimation_declaration.json", {**body, "digest": digest}
     )
     store.write_text("parameter_estimation_declaration.lock", f"{digest}\n")

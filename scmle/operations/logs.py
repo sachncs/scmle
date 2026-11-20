@@ -208,7 +208,7 @@ class Journal:
             if self.sink is not None:
                 self.sink(line)
             elif self.path is not None:
-                durability.append_text(self.path, line + "\n")
+                durability.append(self.path, line + "\n")
         return record
 
     def request(

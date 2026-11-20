@@ -151,7 +151,7 @@ class Referee:
         frame, target, groups, temporal = self.arrange(data, outcomes)
         champion_view = self.champion.prepare(frame)
         challenger_view = self.challenger.prepare(frame)
-        sign = 1.0 if metric.greater_is_better else -1.0
+        sign = 1.0 if metric.maximize else -1.0
         score = functools.partial(
             rate, metric, target, metrics.positive_label(target, task)
         )

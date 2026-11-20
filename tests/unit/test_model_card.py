@@ -7,21 +7,21 @@ from scmle.governance import model_card
 
 def test_model_card_requires_review_and_preserves_evaluation_context():
     card = model_card.Card(
-        model_name="logistic_regression",
-        model_version="run-1",
-        model_fingerprint="sha256:model-manifest",
+        model="logistic_regression",
+        version="run-1",
+        fingerprint="sha256:model-manifest",
         task="binary_classification",
         metric="roc_auc",
-        dataset_id="ds_1",
-        snapshot_id="snap_1",
-        intended_use="Inference for the declared binary classification task.",
-        out_of_scope=("Not a causal claim.",),
+        dataset="ds_1",
+        snapshot="snap_1",
+        use="Inference for the declared binary classification task.",
+        excluded=("Not a causal claim.",),
         limitations=("Human review is required.",),
-        feature_names=("amount",),
+        features=("amount",),
         evaluation={"test_metrics": {"roc_auc": 0.91}},
         resources={"model_mb": 1.2},
-        evidence_artifacts=("evaluation.json",),
-        support_status="tabular_beta_library_inference",
+        artifacts=("evaluation.json",),
+        support="tabular_beta_library_inference",
     )
 
     record = card.to_dict()
@@ -35,15 +35,15 @@ def build(evaluation):
     import types
 
     manifest = types.SimpleNamespace(identifier="ds_1", snapshot="snap_1")
-    plan = types.SimpleNamespace(features=("amount",), text=(), extra_inputs=())
-    profile = types.SimpleNamespace(feature_plan=plan)
+    plan = types.SimpleNamespace(features=("amount",), text=(), extras=())
+    profile = types.SimpleNamespace(plan=plan)
     bundle = types.SimpleNamespace(
         info=types.SimpleNamespace(
-            model_name="m", model_version="v1", metric="roc_auc"
+            model="m", version="v1", metric="roc_auc"
         ),
         schema=types.SimpleNamespace(task="binary_classification"),
     )
-    return model_card.Card.from_run(
+    return model_card.Card.assemble(
         manifest, profile, bundle, evaluation, "sha256:x"
     )
 

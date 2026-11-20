@@ -220,33 +220,31 @@ def scaffold(
     image = f"python:{python_minor}-slim"
 
     closure = pin(root, info, scmle_pin)
-    bundle.environment_lock(root / "environment.lock")
+    bundle.pin(root / "environment.lock")
     furnish(root, info, image)
-    digest = provenance.bundle_digest(root / "model")
+    digest = provenance.digest(root / "model")
     service_sbom = sbom.catalogue(
         closure,
-        model_name=info.model_name,
-        model_version=info.model_version,
+        model_name=info.model,
+        model_version=info.version,
         bundle_digest=digest,
         base_image=image,
-        software_version=info.scmle_version,
+        software_version=info.scmle,
     )
-    write_text(
-        root / "sbom.cdx.json", json.dumps(service_sbom, indent=2) + "\n"
-    )
+    write(root / "sbom.cdx.json", json.dumps(service_sbom, indent=2) + "\n")
     attest.stamp(
         root,
         digest,
-        builder=f"scmle package {info.scmle_version}",
+        builder=f"scmle package {info.scmle}",
         base_image=image,
         signing_key=signing_key,
     )
-    write_text(
+    write(
         root / "README.md",
         README.format(
-            name=info.model_name,
-            version=info.model_version,
-            scmle=info.scmle_version,
+            name=info.model,
+            version=info.version,
+            scmle=info.scmle,
             python=info.python,
             digest=digest,
         ),
@@ -269,11 +267,11 @@ def pin(root: pathlib.Path, info: Any, scmle_pin: str | None) -> dict[str, str]:
     # Imported lazily for the reason given in `scaffold`.
     from scmle.deploy import lockfile  # noqa: PLC0415 -- lazy, see scaffold
 
-    framework = scmle_pin or f"scmle=={info.scmle_version}"
+    framework = scmle_pin or f"scmle=={info.scmle}"
     pins = [framework]
     pins += [f"scikit-learn=={info.sklearn}", f"pandas=={info.pandas}"]
     pins += [f"{name}=={version}" for name, version in info.libraries.items()]
-    write_text(root / "requirements.txt", "\n".join(pins) + "\n")
+    write(root / "requirements.txt", "\n".join(pins) + "\n")
 
     unresolved: list[str] = []
     closure = lockfile.transitive(
@@ -283,7 +281,7 @@ def pin(root: pathlib.Path, info: Any, scmle_pin: str | None) -> dict[str, str]:
             "scikit-learn": info.sklearn,
             "pandas": info.pandas,
             **info.libraries,
-            "scmle": info.scmle_version,
+            "scmle": info.scmle,
         },
         unresolved=unresolved,
     )
@@ -305,7 +303,7 @@ def pin(root: pathlib.Path, info: Any, scmle_pin: str | None) -> dict[str, str]:
             )
             + "\n"
         )
-    write_text(root / "requirements.lock", lock_text)
+    write(root / "requirements.lock", lock_text)
     return closure
 
 
@@ -322,8 +320,8 @@ def furnish(root: pathlib.Path, info: Any, image: str) -> None:
     from scmle.deploy import context  # noqa: PLC0415 -- lazy, see scaffold
     from scmle.deploy import vuln_gate  # noqa: PLC0415 -- lazy, see scaffold
 
-    write_text(root / "serve.py", SERVER)
-    write_text(
+    write(root / "serve.py", SERVER)
+    write(
         root / "Dockerfile",
         DOCKERFILE.format(
             image=image,
@@ -331,22 +329,22 @@ def furnish(root: pathlib.Path, info: Any, image: str) -> None:
             placeholder=base_image.PLACEHOLDER,
         ),
     )
-    write_text(root / ".dockerignore", "\n".join(context.IGNORED) + "\n")
+    write(root / ".dockerignore", "\n".join(context.IGNORED) + "\n")
     build = root / "build.sh"
-    write_text(
+    write(
         build,
         BUILD_SCRIPT.format(
-            name=info.model_name, version=info.model_version, image=image
+            name=info.model, version=info.version, image=image
         ),
     )
     build.chmod(build.stat().st_mode | stat.S_IXUSR)
-    write_text(
+    write(
         root / "vuln-policy.json",
         json.dumps(vuln_gate.DEFAULT_POLICY, indent=2) + "\n",
     )
 
 
-def write_text(path: pathlib.Path, text: str) -> None:
+def write(path: pathlib.Path, text: str) -> None:
     """Writes UTF-8 text with Unix newlines.
 
     Args:

@@ -59,7 +59,7 @@ def main():
     table = sklearn.datasets.load_breast_cancer(as_frame=True).frame
     table.to_parquet("cancer.parquet")
     project = scmle.api.project.Project(
-        "cancer.parquet", target="target", metric="roc_auc", time_budget=60
+        "cancer.parquet", target="target", metric="roc_auc", budget=60
     )
     logging.info(project.plan().summary())  # inspect before any training
     result = project.run()  # profile, split, search, test, package
@@ -111,7 +111,7 @@ The hosted documentation is available at
    Benjamini-Yekutieli error control (including outcome-dependent recording
    such as Titanic's `boat` / `body`). A suspicion is not proof, so by
    default a flagged column is reported and the run goes on; with
-   `leakage_policy="block"` any flagged column blocks the run.
+   `leakage="block"` any flagged column blocks the run.
 2. **Splits** without leakage (stratified / random / group / temporal) behind
    a locked test set that opens once.
 3. **Engineers features** declaratively (`Derivation`: ratios, bins,
@@ -199,7 +199,7 @@ the locked test rows by about 0.026 PR-AUC (a 15%-positive set with few
 positives in the test rows, so the score is noisy). Titanic's near-perfect score comes from leaked columns (`boat`,
 `body`): the leakage screen flags both (`boat` by skill, missingness and record
 purity; `body` by record purity only, because it is recorded for 9% of
-passengers, all of whom died), and `leakage_policy="block"` (opt-in; the default is
+passengers, all of whom died), and `leakage="block"` (opt-in; the default is
 `"warn"`) refuses to proceed. See [`docs/LEAKAGE.md`](docs/LEAKAGE.md). Choosing the best of many trials carries a mild optimism bias, which
 is why the locked-test score is the number to trust.
 

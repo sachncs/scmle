@@ -74,7 +74,7 @@ def invert() -> dict[str, Any]:
     return dict(spec)
 
 
-def export_service(
+def export(
     folder: pathlib.Path, spec: dict[str, Any], key: str = demo.DEMO_SIGNING_KEY
 ) -> pathlib.Path:
     """Writes a signed service folder for a specification.
@@ -239,7 +239,7 @@ def predict(base: str, count: int = 3) -> tuple[int, dict[str, Any]]:
         if the connection fails or times out.
     """
     try:
-        return demo.post_json(
+        return demo.post(
             f"{base}/predict",
             {"records": records(count)},
             timeout=recovery.scaled(5.0),

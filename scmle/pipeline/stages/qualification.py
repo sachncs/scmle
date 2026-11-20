@@ -131,10 +131,10 @@ class Qualification(screening.Screening):
             time period of the exploration rows compared with the first.
         """
         data = board.services.spec.data
-        plan = board.get(surveying.Portrait).profile.feature_plan
+        plan = board.get(surveying.Portrait).profile.plan
         candidates = [*plan.numeric, *plan.categorical]
-        codes = explore.vectorize(view.target, task.is_classification)
-        kind = explore.classify(view.target, task.is_classification)
+        codes = explore.vectorize(view.target, task.classification)
+        kind = explore.classify(view.target, task.classification)
         reference = (
             tabular.read(data.reference_uri) if data.reference_uri else None
         )

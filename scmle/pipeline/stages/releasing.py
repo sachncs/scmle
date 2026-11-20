@@ -168,7 +168,7 @@ class Releasing(interface.Stage):
         policy = policies.derive(
             task,
             metric.name,
-            metric.greater_is_better,
+            metric.maximize,
             board.services.spec.problem.success_criteria,
         )
         if policy is None:
@@ -208,11 +208,11 @@ class Releasing(interface.Stage):
             outcome.to_dict(),
             evidence_index.to_dict(),
         )
-        store.write_json(
+        store.write(
             "evaluation_policy.json", policy.model_dump(mode="json")
         )
-        store.write_json("release_evidence.json", evidence_index.to_dict())
-        store.write_json("release_evaluation.json", outcome.to_dict())
+        store.write("release_evidence.json", evidence_index.to_dict())
+        store.write("release_evaluation.json", outcome.to_dict())
         return verdict
 
     def abstain(self, store: Any) -> Verdict:
@@ -236,7 +236,7 @@ class Releasing(interface.Stage):
             ],
             "findings": [],
         }
-        store.write_json("release_evaluation.json", record)
+        store.write("release_evaluation.json", record)
         return Verdict(None, record, {"records": [], "ready": False})
 
     def vouch(self, evaluation: records.Layout) -> bool:

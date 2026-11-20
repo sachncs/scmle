@@ -21,7 +21,7 @@ class Promotion(approval.Approval, rollout.Rollout):
         self,
         model: str,
         version: int,
-        plane: control.ControlPlane,
+        plane: control.Platform,
         environment: str,
         image_digest: str,
         steps: tuple[int, ...] = (100,),
@@ -64,7 +64,7 @@ class Promotion(approval.Approval, rollout.Rollout):
                 previous revision raises it inside the rollout, where it is
                 caught and reported.)
         """
-        contract.require_digest(image_digest, "image_digest")
+        contract.require(image_digest, "image_digest")
         if (
             not steps
             or steps[-1] != status.FULL_ROLLOUT
@@ -98,7 +98,7 @@ class Promotion(approval.Approval, rollout.Rollout):
         self,
         model: str,
         version: int,
-        plane: control.ControlPlane,
+        plane: control.Platform,
         environment: str,
         image_digest: str,
         steps: tuple[int, ...],
@@ -138,7 +138,7 @@ class Promotion(approval.Approval, rollout.Rollout):
                 signing_key,
             )
         except (
-            control.RuntimeUnconfirmed,
+            control.UnconfirmedError,
             control.Unsupported,
             errors.ScmleError,
         ) as error:
@@ -213,16 +213,16 @@ class Promotion(approval.Approval, rollout.Rollout):
                     self.move(
                         entry,
                         previous["version"],
-                        status.ReleaseState.RETIRED,
+                        status.State.RETIRED,
                         f"superseded by v{version}",
-                        status.ReleaseState.PRODUCTION,
+                        status.State.PRODUCTION,
                     )
                 self.move(
                     entry,
                     version,
-                    status.ReleaseState.PRODUCTION,
+                    status.State.PRODUCTION,
                     f"confirmed by the runtime in {environment}",
-                    status.ReleaseState.APPROVED,
+                    status.State.APPROVED,
                 )
             entry["environments"][environment] = {
                 "version": version,

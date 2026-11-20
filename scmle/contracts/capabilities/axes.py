@@ -79,7 +79,7 @@ class Status(enum.StrEnum):
     EXTENSION_ONLY = "extension-only"
 
 
-class ModelFamily(enum.StrEnum):
+class Family(enum.StrEnum):
     """Named model families with an explicit support boundary.
 
     These values describe model-family identity only. A family is usable for a

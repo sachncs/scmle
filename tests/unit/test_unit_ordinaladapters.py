@@ -12,7 +12,7 @@ from scmle.models.ordinal import estimators
 def test_the_ordinal_constants_are_fixed():
     assert {tasks.Task.ORDINAL} == adapters.ORDINAL
     assert adapters.LEVELS == "levels"
-    assert dict(adapters.Ordinal.conformance_params) == {"levels": 3}
+    assert dict(adapters.Ordinal.params) == {"levels": 3}
     assert adapters.ORDINAL_ADAPTERS == (
         adapters.ORDINAL_RIDGE,
         adapters.ORDINAL_FOREST,
@@ -44,10 +44,10 @@ def test_an_ordinal_adapter_without_levels_infers_them():
 def test_the_ordinal_adapters_declare_their_capabilities():
     assert adapters.ORDINAL_RIDGE.name == "ordinal_ridge"
     assert adapters.ORDINAL_RIDGE.family == "linear"
-    assert adapters.ORDINAL_RIDGE.capabilities.needs_scaling is True
+    assert adapters.ORDINAL_RIDGE.capabilities.scaling is True
     assert adapters.ORDINAL_RIDGE.capabilities.cost == 2
-    assert adapters.ORDINAL_FOREST.capabilities.memory_factor == 6.0
-    assert adapters.ORDINAL_BOOSTING.capabilities.handles_missing is True
+    assert adapters.ORDINAL_FOREST.capabilities.factor == 6.0
+    assert adapters.ORDINAL_BOOSTING.capabilities.missing is True
     assert (
         adapters.ORDINAL_BOOSTING.regressor
         is ensemble.HistGradientBoostingRegressor
@@ -55,7 +55,7 @@ def test_the_ordinal_adapters_declare_their_capabilities():
     for adapter in adapters.ORDINAL_ADAPTERS:
         assert adapter.capabilities.tasks == {tasks.Task.ORDINAL}
         assert adapter.capabilities.probabilities is True
-    names = list(adapters.ORDINAL_FOREST.search_space.names())
+    names = list(adapters.ORDINAL_FOREST.space.names())
     assert names == ["n_estimators", "min_samples_leaf"]
 
 

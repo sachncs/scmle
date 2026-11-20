@@ -18,7 +18,7 @@ PRODUCTION_ENVIRONMENT = "production"
 FULL_ROLLOUT = 100  # percent of traffic when a revision serves everything
 
 
-class ReleaseState(enum.StrEnum):
+class State(enum.StrEnum):
     """Where a registered version stands in its release."""
 
     CANDIDATE = "candidate"
@@ -28,30 +28,26 @@ class ReleaseState(enum.StrEnum):
     RETIRED = "retired"
 
 
-ALLOWED: dict[ReleaseState, frozenset[ReleaseState]] = {
-    ReleaseState.CANDIDATE: frozenset(
-        {ReleaseState.CHALLENGER, ReleaseState.APPROVED, ReleaseState.RETIRED}
+ALLOWED: dict[State, frozenset[State]] = {
+    State.CANDIDATE: frozenset(
+        {State.CHALLENGER, State.APPROVED, State.RETIRED}
     ),
-    ReleaseState.CHALLENGER: frozenset(
-        {ReleaseState.APPROVED, ReleaseState.RETIRED}
-    ),
-    ReleaseState.APPROVED: frozenset(
-        {ReleaseState.PRODUCTION, ReleaseState.RETIRED}
-    ),
-    ReleaseState.PRODUCTION: frozenset({ReleaseState.RETIRED}),
-    ReleaseState.RETIRED: frozenset({ReleaseState.PRODUCTION}),
+    State.CHALLENGER: frozenset({State.APPROVED, State.RETIRED}),
+    State.APPROVED: frozenset({State.PRODUCTION, State.RETIRED}),
+    State.PRODUCTION: frozenset({State.RETIRED}),
+    State.RETIRED: frozenset({State.PRODUCTION}),
 }
 """Transitions. Into ``production`` only `promote` and `rollback` move."""
 MANUAL = frozenset(
     {
-        ReleaseState.CHALLENGER,
-        ReleaseState.RETIRED,
+        State.CHALLENGER,
+        State.RETIRED,
     }
 )
 """States `transition` may set by hand (``approved`` needs `approve`)."""
 
 
-class RuntimeDisagrees(errors.ScmleError):
+class DisagreementError(errors.ScmleError):
     """The registry's claim and the platform's report differ."""
 
     category = "runtime"
@@ -104,7 +100,7 @@ def halt(percent: int, reasons: Sequence[str]) -> NoReturn:
     Raises:
         RuntimeUnconfirmed: Always.
     """
-    raise control.RuntimeUnconfirmed(
+    raise control.UnconfirmedError(
         f"health stopped the rollout at {percent}%: " + "; ".join(reasons)
     )
 

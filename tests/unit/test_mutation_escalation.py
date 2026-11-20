@@ -8,7 +8,7 @@ from scmle.governance import escalation
 
 
 def test_a_score_at_the_threshold_is_answered() -> None:
-    curve = escalation.risk_coverage([1.0, 0.5], [0.0, 1.0], points=3)
+    curve = escalation.sweep([1.0, 0.5], [0.0, 1.0], points=3)
     numpy.testing.assert_array_equal(curve.coverage, [0.5, 1.0, 1.0])
 
 

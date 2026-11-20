@@ -88,12 +88,12 @@ def test_the_pipeline_blocks_a_target_copy_stored_as_text(
         label_text=numpy.where(binary_frame.y == 1, "yes", "no")
     )
     result = support.make_project(
-        leaky, "y", output_dir=tmp_path / "warn", leakage_policy="warn"
+        leaky, "y", directory=tmp_path / "warn", leakage="warn"
     ).run()
     assert "label_text" in result.profile.blockers
     with pytest.raises(errors.BlockedError, match="leakage") as raised:
         support.make_project(
-            leaky, "y", output_dir=tmp_path / "block", leakage_policy="block"
+            leaky, "y", directory=tmp_path / "block", leakage="block"
         ).run()
     assert "label_text" in raised.value.details["leakage"]["blocking"]
 
@@ -108,6 +108,6 @@ def test_the_pipeline_blocks_a_statistic_fitted_on_all_rows(
     leaky = binary_frame.assign(full_fit=fitted.predict_proba(features)[:, 1])
     with pytest.raises(errors.BlockedError, match="leakage") as raised:
         support.make_project(
-            leaky, "y", output_dir=tmp_path, leakage_policy="block"
+            leaky, "y", directory=tmp_path, leakage="block"
         ).run()
     assert "full_fit" in raised.value.details["leakage"]["blocking"]

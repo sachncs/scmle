@@ -44,7 +44,7 @@ def openings(
     return None
 
 
-def frozen_selection_problem(
+def collate(
     entries: list[dict[str, Any]],
     names: list[str],
     document: dict[str, Any],
@@ -119,7 +119,7 @@ def custodial(
     early = openings(name, document, opened)
     if early is not None:
         return early
-    problem = frozen_selection_problem(entries, names, document)
+    problem = collate(entries, names, document)
     if problem is not None:
         return verdict.Finding(name, verdict.FAIL, problem)
     return verdict.Finding(
@@ -142,7 +142,7 @@ def tampered(run_dir: Path, registered: dict[str, Any]) -> list[str]:
     for file_name in reports.DECISION_FILES:
         expected = registered.get(file_name)
         try:
-            found = reports.file_digest(run_dir / file_name)
+            found = reports.digest(run_dir / file_name)
         except ValueError as error:
             # handled: returned as failed finding/problem/refusal with error
             # text
@@ -157,7 +157,7 @@ def tampered(run_dir: Path, registered: dict[str, Any]) -> list[str]:
     return problems
 
 
-def check_decision_files(
+def audit(
     run_dir: Path, signing_key: str | bytes | None
 ) -> verdict.Finding | None:
     """Checks that decision files hash to what the custody log registered.
@@ -215,9 +215,7 @@ def check_decision_files(
     )
 
 
-def coverage_report_problems(
-    report_path: Path, claim_hash: str | None
-) -> list[str]:
+def examine(report_path: Path, claim_hash: str | None) -> list[str]:
     """Checks that a coverage report names the registered claim.
 
     Args:
@@ -301,7 +299,7 @@ def corroborate(
         return verdict.Finding(
             name, verdict.SKIPPED, f"{files.CUSTODY_FILE} is not in the run"
         )
-    problems.extend(coverage_report_problems(report_path, found))
+    problems.extend(examine(report_path, found))
     if problems:
         return verdict.Finding(name, verdict.FAIL, "; ".join(problems))
     return verdict.Finding(

@@ -137,7 +137,7 @@ class Constructor(base.TransformerMixin, base.BaseEstimator):  # type: ignore[mi
         return numpy.asarray(names, dtype=object)
 
 
-class SparseSelector(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base classes are Any
+class Selector(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base classes are Any
     """Keeps the columns an L1-penalised linear model gives weight.
 
     The matrix should be scaled so the penalty treats columns alike. At

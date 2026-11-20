@@ -152,17 +152,17 @@ def sanity(
         (
             t
             for t in trials
-            if t.model_name == BASELINE_MODEL
+            if t.model == BASELINE_MODEL
             and t.strategy == DEFAULT_STRATEGY
-            and t.fold_scores
+            and t.folds
         ),
         None,
     )
-    if baseline is None or not trial.train_scores or not trial.fold_scores:
+    if baseline is None or not trial.training or not trial.folds:
         return None
     sign = 1.0 if greater_is_better else -1.0
     return assess(
-        [sign * s for s in trial.train_scores],
-        [sign * s for s in trial.fold_scores],
-        sign * float(numpy.mean(baseline.fold_scores)),
+        [sign * s for s in trial.training],
+        [sign * s for s in trial.folds],
+        sign * float(numpy.mean(baseline.folds)),
     )

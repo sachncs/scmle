@@ -82,7 +82,7 @@ def frame_with_everything(rows=600):
 def test_fingerprint_covers_every_dimension():
     result = profile_of(
         frame_with_everything(), group_column="grp", time_column="when"
-    ).dataset_statistics
+    ).overview
     assert set(result) == {
         "shape",
         "types",
@@ -132,7 +132,7 @@ def test_regression_target_fingerprint():
     rng = numpy.random.default_rng(3)
     frame = pandas.DataFrame({"x": rng.normal(size=300)})
     frame["y"] = numpy.exp(frame.x * 2)
-    result = profile_of(frame, tasks.Task.REGRESSION).dataset_statistics
+    result = profile_of(frame, tasks.Task.REGRESSION).overview
     assert result["target"]["skew"] > 1 and result["target"]["outlier_rate"] > 0
     assert "structure" in result and result["structure"] == {}
 
@@ -150,7 +150,7 @@ def test_ml_difficulty_reports_baselines_and_headroom():
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
     frame["y"] = (frame.a * frame.b > 0).astype(int)  # purely non-linear
-    stats = profile_of(frame).dataset_statistics["ml_difficulty"]
+    stats = profile_of(frame).overview["ml_difficulty"]
     assert stats["available"] and stats["metric"] == "roc_auc"
     assert stats["constant_baseline"] == pytest.approx(0.5, abs=0.02)
     assert stats["linear_baseline"] < 0.6  # a line cannot separate XOR
@@ -174,11 +174,7 @@ def test_ml_difficulty_fails_closed_when_scores_are_all_undefined(
     spec = tasks.Config(data=tasks.Dataset(uri="m", target="y"))
     manifest = tabular.manifested(frame, "y")
     task = tasks.Task.BINARY
-    plan = (
-        profiler.Profiler(spec)
-        .profile(frame, manifest, task, 0.25)
-        .feature_plan
-    )
+    plan = profiler.Profiler(spec).profile(frame, manifest, task, 0.25).plan
 
     result = fingerprint.gauge(frame, spec, task, plan)
 
@@ -202,7 +198,7 @@ def test_missingness_patterns_types_and_scale_are_described():
     blank = numpy.arange(rows) % 7 == 0
     frame.loc[blank, ["small", "other"]] = numpy.nan  # they go missing together
     frame["y"] = (rng.random(rows) < 0.5).astype(int)
-    result = profile_of(frame).dataset_statistics
+    result = profile_of(frame).overview
     patterns = result["missingness"]["patterns"]
     assert patterns["pattern_count"] == 2
     assert patterns["co_missing"] == 1

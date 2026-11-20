@@ -194,7 +194,7 @@ class Handler(server.BaseHTTPRequestHandler):
             self.problem(400, "content digest mismatch")
             return
         path.parent.mkdir(parents=True, exist_ok=True)
-        durability.write_atomically(path, body)
+        durability.write(path, body)
         self.reply(200, b"", {"ETag": digest})
 
     def do_GET(self) -> None:
@@ -290,11 +290,11 @@ class Sink(server.BaseHTTPRequestHandler):
     """Serves the metrics sink's requests.
 
     Attributes:
-        sink: The metrics sink served; `MetricsSink.handler` sets it on a
+        sink: The metrics sink served; `Collector.handler` sets it on a
             subclass.
     """
 
-    sink: ClassVar["MetricsSink"]
+    sink: ClassVar["Collector"]
 
     def reply(self, status: int, payload: dict[str, Any]) -> None:
         """Sends a JSON response.
@@ -370,7 +370,7 @@ class Sink(server.BaseHTTPRequestHandler):
         """
 
 
-class MetricsSink(Stub):
+class Collector(Stub):
     """Accepts metric samples on POST /metrics and replays them on GET.
 
     Attributes:
@@ -452,7 +452,7 @@ def deposit(base: str, path: str, data: bytes, timeout: float = 30.0) -> str:
     return etag
 
 
-def get_object(
+def download(
     base: str, path: str, expected: str | None = None, timeout: float = 30.0
 ) -> bytes:
     """Downloads `base/path`, refusing bytes whose digest is not `expected`.
@@ -528,7 +528,7 @@ def main(arguments: list[str] | None = None) -> int:
     service: Stub = (
         Depot(options.root, options.host, options.port)
         if options.service == "object-store"
-        else MetricsSink(options.file, options.host, options.port)
+        else Collector(options.file, options.host, options.port)
     )
     service.start()
     print(f"{options.service} listening on {service.address}", flush=True)  # noqa: T201 -- command-line output

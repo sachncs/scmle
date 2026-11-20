@@ -38,8 +38,8 @@ def run(tmp_path, charter, **kwargs):
     return support.make_project(
         panel(),
         "y",
-        time_budget=300,
-        output_dir=tmp_path / "out",
+        budget=300,
+        directory=tmp_path / "out",
         charter=charter,
         **kwargs,
     ).run()
@@ -52,10 +52,10 @@ def events(run_dir):
 
 def test_a_new_entity_charter_calibrates_on_one_score_per_entity(tmp_path):
     path = charter_file(tmp_path, purpose=contracts.NEW_ENTITY)
-    result = run(tmp_path, path, group_column="entity")
+    result = run(tmp_path, path, group="entity")
     found = [
         e
-        for e in events(result.run_dir)
+        for e in events(result.directory)
         if e["kind"] == "conformal.entity_wise"
     ]
     assert found
@@ -63,14 +63,14 @@ def test_a_new_entity_charter_calibrates_on_one_score_per_entity(tmp_path):
     assert 20 <= entities <= 120
     calibrator = result.bundle.conformal
     assert calibrator is not None and len(calibrator.scores) == entities
-    assert result.bundle.cv_plus is None
+    assert result.bundle.plus is None
 
 
 def test_without_the_field_calibration_stays_row_wise(tmp_path):
     path = charter_file(tmp_path)
-    result = run(tmp_path, path, group_column="entity")
+    result = run(tmp_path, path, group="entity")
     assert all(
-        e["kind"] != "conformal.entity_wise" for e in events(result.run_dir)
+        e["kind"] != "conformal.entity_wise" for e in events(result.directory)
     )
     assert len(result.bundle.conformal.scores) > 120
 

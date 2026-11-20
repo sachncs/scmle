@@ -40,7 +40,7 @@ def make_frame(rows, seed, relabel=False):
 def trained(tmp_path_factory):
     directory = tmp_path_factory.mktemp("deploy")
     return support.make_project(
-        make_frame(700, 0), "y", time_budget=300, output_dir=directory
+        make_frame(700, 0), "y", budget=300, directory=directory
     ).run()
 
 
@@ -59,12 +59,12 @@ def sanction(record):
     return registry.Sanction(
         model=record.model,
         version=record.version,
-        content_id=record.content_id,
+        content=record.content,
         reviewer="integration-reviewer",
         decision=registry.Verdict.APPROVED,
         reason="verified integration fixture",
         evidence=("integration-evidence.json",),
-        approved_at="2026-10-20T00:00:00+00:00",
+        approved="2026-10-20T00:00:00+00:00",
     ).sign(APPROVAL_KEY)
 
 
@@ -80,7 +80,7 @@ def register_champion(manager, store, result):
 
 
 def test_registry_versions_aliases_and_audit(trained, tmp_path):
-    store = registry.ModelRegistryStore(tmp_path / "registry")
+    store = registry.Registry(tmp_path / "registry")
     bundle_dir = trained.save(tmp_path / "export")
     first = store.register(
         "churn", bundle_dir, {"roc_auc": 0.9}, run_id="r1", trusted=True
@@ -121,12 +121,12 @@ def test_registry_versions_aliases_and_audit(trained, tmp_path):
     numpy.testing.assert_array_equal(
         store.load("churn").predict(features), trained.predict(features)
     )
-    reopened = registry.ModelRegistryStore(tmp_path / "registry")
+    reopened = registry.Registry(tmp_path / "registry")
     assert [v.version for v in reopened.versions("churn")] == [1, 2]
 
 
 def test_registry_rejects_bad_requests(trained, tmp_path):
-    store = registry.ModelRegistryStore(tmp_path / "registry")
+    store = registry.Registry(tmp_path / "registry")
     with pytest.raises(errors.ArtifactError, match="unknown model"):
         store.versions("ghost")
     store.register("m", trained.save(tmp_path / "export"), trusted=True)
@@ -143,7 +143,7 @@ def test_registry_rejects_bad_requests(trained, tmp_path):
 def test_champion_promotion_requires_matching_independent_approval(
     trained, tmp_path
 ):
-    store = registry.ModelRegistryStore(tmp_path / "registry")
+    store = registry.Registry(tmp_path / "registry")
     record = store.register(
         "m", trained.save(tmp_path / "export"), trusted=True
     )
@@ -191,7 +191,7 @@ def test_registry_refuses_tampered_bundles(trained, tmp_path):
     bundle_dir = trained.save(tmp_path / "export")
     with (bundle_dir / "pipeline.joblib").open("ab") as handle:
         handle.write(b"x")
-    store = registry.ModelRegistryStore(tmp_path / "registry")
+    store = registry.Registry(tmp_path / "registry")
     with pytest.raises(errors.ArtifactError, match="checksum"):
         store.register("m", bundle_dir, trusted=True)
     assert not (tmp_path / "registry" / "m").exists()
@@ -206,7 +206,7 @@ def test_http_serving_predict_health_schema_and_errors(trained):
             health = json.loads(response.read())
             assert health["status"] == "ok"
             assert health["task"] == "binary_classification"
-            assert health["model_version"] == trained.bundle.info.model_version
+            assert health["model_version"] == trained.bundle.info.version
         with urllib.request.urlopen(f"{base}/schema") as response:
             assert json.loads(response.read())["schema"]["target"] == "y"
         records = make_frame(5, 2).drop(columns="y").to_dict("records")
@@ -256,7 +256,7 @@ def test_batch_serving_scores_files(trained, tmp_path, monkeypatch):
     make_frame(40, 3).drop(columns="y").to_csv(source, index=False)
     adapter = server.Batcher(trained.bundle)
     writes = []
-    real_write = server.durability.write_atomically
+    real_write = server.durability.write
 
     def record_write(path, content):
         writes.append((path, content))
@@ -269,7 +269,7 @@ def test_batch_serving_scores_files(trained, tmp_path, monkeypatch):
         swaps.append((staged, path))
         return real_swap(staged, path)
 
-    monkeypatch.setattr(server.durability, "write_atomically", record_write)
+    monkeypatch.setattr(server.durability, "write", record_write)
     monkeypatch.setattr(server.durability, "swap", record_swap)
     destination = tmp_path / "out.csv"
     assert adapter.score(source, destination) == 40
@@ -285,7 +285,7 @@ def test_batch_serving_scores_files(trained, tmp_path, monkeypatch):
 
 
 def test_lifecycle_keeps_a_healthy_champion(trained, tmp_path):
-    store = registry.ModelRegistryStore(tmp_path / "registry")
+    store = registry.Registry(tmp_path / "registry")
     manager = lifecycle.Maintainer(store, "churn", str(tmp_path / "work"))
     record = register_champion(manager, store, trained)
     assert store.resolve("churn").version == record.version == 1
@@ -295,7 +295,7 @@ def test_lifecycle_keeps_a_healthy_champion(trained, tmp_path):
 
 
 def test_lifecycle_retrains_and_promotes_after_concept_drift(trained, tmp_path):
-    store = registry.ModelRegistryStore(tmp_path / "registry")
+    store = registry.Registry(tmp_path / "registry")
     manager = lifecycle.Maintainer(store, "churn", str(tmp_path / "work"))
     register_champion(manager, store, trained)
     drifted = make_frame(2400, 5, relabel=True)
@@ -324,7 +324,7 @@ def test_lifecycle_retrains_and_promotes_after_concept_drift(trained, tmp_path):
 
 
 def test_review_can_be_report_only(trained, tmp_path):
-    store = registry.ModelRegistryStore(tmp_path / "registry")
+    store = registry.Registry(tmp_path / "registry")
     manager = lifecycle.Maintainer(store, "churn", str(tmp_path / "work"))
     register_champion(manager, store, trained)
     outcome = manager.review(
@@ -335,7 +335,7 @@ def test_review_can_be_report_only(trained, tmp_path):
 
 
 def test_registering_identical_content_is_idempotent(trained, tmp_path):
-    store = registry.ModelRegistryStore(tmp_path / "registry")
+    store = registry.Registry(tmp_path / "registry")
     bundle_dir = trained.save(tmp_path / "export")
     first = store.register("churn", bundle_dir, run_id="r1", trusted=True)
     again = store.register("churn", bundle_dir, run_id="r2", trusted=True)
@@ -351,7 +351,7 @@ def test_registering_identical_content_is_idempotent(trained, tmp_path):
 def test_registry_refuses_unsigned_bundles_unless_vouched_for(
     trained, tmp_path
 ):
-    store = registry.ModelRegistryStore(tmp_path / "registry")
+    store = registry.Registry(tmp_path / "registry")
     bundle_dir = trained.save(tmp_path / "export")
     with pytest.raises(errors.ArtifactError, match="unauthenticated"):
         store.register("m", bundle_dir)
@@ -364,7 +364,7 @@ def test_registry_accepts_signed_bundles_and_reauthenticates_on_load(
     trained, tmp_path
 ):
     key = "registry-test-key"
-    store = registry.ModelRegistryStore(tmp_path / "registry")
+    store = registry.Registry(tmp_path / "registry")
     bundle_dir = trained.bundle.save(tmp_path / "export", signing_key=key)
     record = store.register("m", bundle_dir, signing_key=key)
     assert record.signed is True
@@ -410,7 +410,7 @@ def test_repeated_checks_of_the_same_drift_retrain_exactly_once(
     trained, tmp_path, monkeypatch
 ):
     runs = count_trainings(monkeypatch)
-    store = registry.ModelRegistryStore(tmp_path / "registry")
+    store = registry.Registry(tmp_path / "registry")
     manager = lifecycle.Maintainer(store, "churn", str(tmp_path / "work"))
     register_champion(manager, store, trained)
     runs.clear()
@@ -431,7 +431,7 @@ def test_a_rejected_challenger_is_recorded_and_not_retried_at_once(
     trained, tmp_path, monkeypatch
 ):
     runs = count_trainings(monkeypatch)
-    store = registry.ModelRegistryStore(tmp_path / "registry")
+    store = registry.Registry(tmp_path / "registry")
     manager = lifecycle.Maintainer(
         store,
         "churn",
@@ -476,7 +476,7 @@ def test_too_few_labeled_rows_do_not_trigger_training(
     trained, tmp_path, monkeypatch
 ):
     runs = count_trainings(monkeypatch)
-    store = registry.ModelRegistryStore(tmp_path / "registry")
+    store = registry.Registry(tmp_path / "registry")
     manager = lifecycle.Maintainer(
         store,
         "churn",
@@ -503,7 +503,7 @@ def test_a_bound_rollout_stages_the_challenger_whatever_the_bootstrap_says(
             "roc_auc", len(data), 0.9, 0.9, 0.0, (-0.01, 0.01), 0.5, "keep"
         ),
     )
-    store = registry.ModelRegistryStore(tmp_path / "registry")
+    store = registry.Registry(tmp_path / "registry")
     manager = lifecycle.Maintainer(store, "churn", str(tmp_path / "work"))
     register_champion(manager, store, trained)
     manager.delegate()

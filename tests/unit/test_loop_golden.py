@@ -198,22 +198,22 @@ def scenario_replies(tmp_path):
     outcomes = []
     for version in (3, 4):
         try:
-            loop.move_champion(registry, "m", version, None)
+            loop.move(registry, "m", version, None)
         except Exception as error:  # noqa: BLE001 -- the golden record keeps the type name of whatever error is raised
             outcomes.append(type(error).__name__)
-    first, second = loop.pending_escalations()
+    first, second = loop.survey()
     outcomes.append(loop.reply(first.id, test_loop.reply_to(first)))
     outcomes.append(
         loop.reply(second.id, test_loop.reply_to(second, decision="reject"))
     )
-    outcomes.append(loop.move_champion(registry, "m", 3, None))
-    with pytest.raises(never_list.AttestationRequired):
-        loop.move_champion(registry, "m", 4, None)
+    outcomes.append(loop.move(registry, "m", 3, None))
+    with pytest.raises(never_list.UnattestedError):
+        loop.move(registry, "m", 4, None)
     try:
-        loop.amend_policy(target=0.9)
+        loop.amend(target=0.9)
     except Exception as error:  # noqa: BLE001 -- the golden record keeps the type name of whatever error is raised
         outcomes.append(type(error).__name__)
-    outcomes.append(loop.amend_policy(target=0.04))
+    outcomes.append(loop.amend(target=0.04))
     try:
         loop.rewrite(lambda: None, {"op": "truncate"})
     except Exception as error:  # noqa: BLE001 -- the golden record keeps the type name of whatever error is raised
@@ -255,6 +255,6 @@ def test_the_loop_reproduces_its_recorded_ledger_and_state(name, tmp_path):
         FIXTURE, name, lambda: SCENARIOS[name](tmp_path)
     )
     assert actual == expected
-    assert deployment_ledger.DeploymentLedger.load(
+    assert deployment_ledger.Ledger.load(
         tmp_path / "deploy" / deployment_ledger.FILE_NAME
     )

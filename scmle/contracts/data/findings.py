@@ -71,7 +71,7 @@ class Observation:
         )
 
 
-class FindingSeverity(enum.StrEnum):
+class Severity(enum.StrEnum):
     """Severity assigned to a curation finding."""
 
     INFO = "info"
@@ -124,7 +124,7 @@ class Finding:
 
     identifier: str
     rule: str
-    severity: FindingSeverity
+    severity: Severity
     confidence: float
     scope: Mapping[str, Any]
     evidence: Mapping[str, Any]
@@ -160,8 +160,8 @@ class Finding:
         if not self.timestamp.strip():
             raise errors.InputError("timestamp must not be empty")
         severity: Any = self.severity  # may be a raw value at runtime
-        if not isinstance(severity, FindingSeverity):
-            object.__setattr__(self, "severity", FindingSeverity(severity))
+        if not isinstance(severity, Severity):
+            object.__setattr__(self, "severity", Severity(severity))
         disposition: Any = self.disposition  # may be a raw value at runtime
         if not isinstance(disposition, Disposition):
             object.__setattr__(self, "disposition", Disposition(disposition))
@@ -188,7 +188,7 @@ class Finding:
         cls,
         message: str,
         category: str,
-        severity: FindingSeverity = FindingSeverity.WARNING,
+        severity: Severity = Severity.WARNING,
     ) -> Self:
         """Creates a structured finding from a pipeline observation.
 
@@ -245,7 +245,7 @@ class Finding:
         return cls(
             identifier=str(record["identifier"]),
             rule=str(record["rule"]),
-            severity=FindingSeverity(record["severity"]),
+            severity=Severity(record["severity"]),
             confidence=float(record["confidence"]),
             scope=dict(record["scope"]),
             evidence=dict(record["evidence"]),

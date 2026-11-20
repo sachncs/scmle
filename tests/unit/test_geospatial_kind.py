@@ -357,9 +357,9 @@ def test_the_survey_adds_spatial_findings_to_the_profilers_portrait(tmp_path):
         frame, manifest, tasks.Task.BINARY
     )
     assert isinstance(found, scmle.contracts.data.Portrait)
-    assert found.feature_plan == expected.feature_plan
-    assert any("geometry types" in item for item in found.quality_findings)
-    assert any("EPSG:3857" in item for item in found.quality_findings)
+    assert found.plan == expected.plan
+    assert any("geometry types" in item for item in found.quality)
+    assert any("EPSG:3857" in item for item in found.quality)
 
 
 def test_the_featuriser_decoder_and_cost_follow_the_shared_contract():
@@ -384,7 +384,7 @@ def test_the_featuriser_decoder_and_cost_follow_the_shared_contract():
 
 def test_the_declared_capabilities_cover_real_families_and_regression():
     declared = geospatial.GEOSPATIAL.declare()
-    keys = {(item.key.task, item.key.model_family) for item in declared}
+    keys = {(item.key.task, item.key.family) for item in declared}
     assert (tasks.Task.REGRESSION, "boosting") in keys
     assert (tasks.Task.BINARY, "tree") in keys
     assert (tasks.Task.MULTICLASS, "neighbors") in keys

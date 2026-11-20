@@ -546,13 +546,13 @@ def run(task: Null, budget: int = BUDGET) -> dict[str, Any]:
                 task="regression"
                 if task.kind == "regression"
                 else "classification",
-                time_budget=budget,
+                budget=budget,
                 seed=task.seed,
-                output_dir=Path(folder) / "run",
+                directory=Path(folder) / "run",
             ).run()
             evaluation = result.evaluation
             split = json.loads(
-                (Path(result.run_dir) / "validation_manifest.json").read_text(
+                (Path(result.directory) / "validation_manifest.json").read_text(
                     "utf-8"
                 )
             )

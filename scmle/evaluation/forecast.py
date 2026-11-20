@@ -149,7 +149,7 @@ class Metric(metrics.Metric):
                 positive number.
         """
         kind = self.kind
-        sign = 1.0 if self.greater_is_better else -1.0
+        sign = 1.0 if self.maximize else -1.0
         scale = self.scale
         if kind == "mase_insample" and (scale is None or scale <= 0):
             raise errors.InputError("mase_insample needs a positive scale")

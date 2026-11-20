@@ -80,8 +80,8 @@ def fake(ranked=(), pareto=False, unlabeled="none"):
             pareto_tolerance=0.0,
         ),
         data=types.SimpleNamespace(
-            baseline_column=None,
-            baseline_subject=None,
+            baseline=None,
+            subject=None,
             unlabeled=unlabeled,
         ),
         validation=types.SimpleNamespace(seed=0),
@@ -116,7 +116,7 @@ def partition():
         split=types.SimpleNamespace(
             manifest=types.SimpleNamespace(folds=[([0], [1])] * 5)
         ),
-        metric=types.SimpleNamespace(greater_is_better=True),
+        metric=types.SimpleNamespace(maximize=True),
     )
 
 
@@ -173,7 +173,7 @@ def searched(monkeypatch):
 def test_the_search_is_a_copy_of_the_journal_after_training(searched):
     held, made = searched
     assert isinstance(made, training.Search)
-    assert [t.trial_id for t in made.trials] == [
+    assert [t.identifier for t in made.trials] == [
         "trial_001",
         "trial_002",
         "trial_003",

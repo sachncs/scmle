@@ -22,9 +22,7 @@ def imbalanced(rows=400, minority=40, seed=0):
 
 def test_oversampling_equalizes_classes_with_only_existing_rows():
     features, target = imbalanced()
-    sampled, labels = resampling.RandomOverSampler().resample(
-        features, target, 0
-    )
+    sampled, labels = resampling.Oversampler().resample(features, target, 0)
     assert labels.value_counts().to_dict() == {0: 360, 1: 360}
     original = {tuple(row) for row in features.to_numpy()}
     assert {tuple(row) for row in sampled.to_numpy()} <= original
@@ -32,9 +30,7 @@ def test_oversampling_equalizes_classes_with_only_existing_rows():
 
 def test_undersampling_equalizes_classes_without_duplicates():
     features, target = imbalanced()
-    sampled, labels = resampling.RandomUnderSampler().resample(
-        features, target, 0
-    )
+    sampled, labels = resampling.Undersampler().resample(features, target, 0)
     assert labels.value_counts().to_dict() == {0: 40, 1: 40}
     assert not sampled.duplicated().any()
 
@@ -42,16 +38,16 @@ def test_undersampling_equalizes_classes_without_duplicates():
 def test_multiclass_resampling_reaches_the_extreme_class_size():
     features = pandas.DataFrame({"a": numpy.arange(60.0)})
     target = pandas.Series([0] * 40 + [1] * 15 + [2] * 5)
-    over = resampling.RandomOverSampler().resample(features, target, 0)[1]
-    under = resampling.RandomUnderSampler().resample(features, target, 0)[1]
+    over = resampling.Oversampler().resample(features, target, 0)[1]
+    under = resampling.Undersampler().resample(features, target, 0)[1]
     assert set(over.value_counts()) == {40} and set(under.value_counts()) == {5}
 
 
 def test_resampling_is_seeded():
     features, target = imbalanced()
-    first = resampling.RandomOverSampler().resample(features, target, 3)[0]
-    second = resampling.RandomOverSampler().resample(features, target, 3)[0]
-    other = resampling.RandomOverSampler().resample(features, target, 4)[0]
+    first = resampling.Oversampler().resample(features, target, 3)[0]
+    second = resampling.Oversampler().resample(features, target, 3)[0]
+    other = resampling.Oversampler().resample(features, target, 4)[0]
     pandas.testing.assert_frame_equal(first, second)
     assert not first.equals(other)
 
@@ -65,9 +61,7 @@ def test_validation_fold_keeps_its_original_distribution():
             seen.append(pandas.Series(labels).value_counts().to_dict())
             return super().fit(features, labels, **kwargs)
 
-    model = resampling.ResamplingClassifier(
-        Spy(), resampling.RandomOverSampler()
-    )
+    model = resampling.ResamplingClassifier(Spy(), resampling.Oversampler())
     folds = model_selection.StratifiedKFold(3).split(features, target)
     scores = [
         model.fit(features.iloc[tr], target.iloc[tr]).score(
@@ -82,7 +76,7 @@ def test_validation_fold_keeps_its_original_distribution():
 def test_wrapper_predicts_and_clones():
     features, target = imbalanced()
     model = resampling.ResamplingClassifier(
-        linear_model.LogisticRegression(), resampling.RandomUnderSampler(), 1
+        linear_model.LogisticRegression(), resampling.Undersampler(), 1
     ).fit(features, target)
     assert model.predict(features).shape == (400,)
     assert model.predict_proba(features).shape == (400, 2)

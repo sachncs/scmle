@@ -32,7 +32,7 @@ def make_plan(
     """Build one representative scenario plan."""
     return reliability.Plan(
         scenario=reliability.Contingency.PROCESS_DEATH,
-        outcome=reliability.SafeOutcome.RESUME_DURABLE_CHECKPOINT,
+        outcome=reliability.Expectation.RESUME_DURABLE_CHECKPOINT,
         recoverability=reliability.Recoverability.AUTOMATIC,
         requirements=("process_termination", "checkpoint_resume"),
         blocking=True,
@@ -147,7 +147,7 @@ def test_registry_serialization_is_deterministic_and_round_trips():
 
     first = registry.to_json()
     second = reliability.Registry.prerelease().to_json()
-    restored = reliability.Registry.from_json(first)
+    restored = reliability.Registry.parse(first)
 
     assert first == second
     assert json.loads(first) == json.loads(second)

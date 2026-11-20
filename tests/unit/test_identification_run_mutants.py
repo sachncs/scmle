@@ -211,11 +211,11 @@ def test_the_base_adapter_stores_its_settings_and_does_nothing_by_default():
     assert adapter.x is frame
     assert adapter.seed == 7
     assert adapter.learner == "boosted"
-    assert adapter.alpha_falsify == 0.02
+    assert adapter.falsify == 0.02
     assert adapter.design == {}
     assert adapter.refusal is None
     assert adapter.weak is False
-    assert adapter.single_unit is False
+    assert adapter.unit is False
     assert adapter.notes == []
     assert adapter.prepare() is None
     assert adapter.controls(frame, 0.95) == []
@@ -602,7 +602,7 @@ def test_naming_the_subgroup_gate_makes_the_family_gating():
         "(a result for a subgroup under `rows` is still descriptive)"
     )
     flags = [row["certified_size"] for row in found["hypotheses"]]
-    shipped = certified.subgroup_gate(run.stratify).min_rows
+    shipped = certified.gate(run.stratify).rows
     if shipped is None:
         assert flags == [True, True, False, False]
     else:
@@ -627,8 +627,8 @@ def test_leaving_the_subgroup_gate_out_keeps_the_family_descriptive():
 
 def test_the_minimum_rows_come_from_the_shipped_certificate():
     found = label((certified.SUBGROUP_GATE,))
-    shipped = certified.subgroup_gate(run.stratify)
-    assert found["gate"]["rows"] == shipped.min_rows
+    shipped = certified.gate(run.stratify)
+    assert found["gate"]["rows"] == shipped.rows
     unnamed = label(None)
     assert unnamed["gate"] == shipped.to_dict()
     if shipped.status == "descriptive":
@@ -639,25 +639,25 @@ def test_subgroup_results_need_declared_subgroups_and_several_units():
     spec = subgroup_block()
     adapter = stub_for(spec)
     frame = strata_frame(a=60, b=60)
-    out = run.subgroup_results(adapter, spec, frame, 0.95, ())
+    out = run.estimate(adapter, spec, frame, 0.95, ())
     assert out is not None
     assert out["gate"]["status"] == "descriptive"
     assert out["family_size"] == 3
-    plain = run.subgroup_results(adapter, block(), frame, 0.95, ())
+    plain = run.estimate(adapter, block(), frame, 0.95, ())
     assert plain is None
     single = stub_for(spec)
-    single.single_unit = True
-    assert run.subgroup_results(single, spec, frame, 0.95, ()) is None
+    single.unit = True
+    assert run.estimate(single, spec, frame, 0.95, ()) is None
 
 
 def test_subgroup_estimation_does_not_leave_the_instrument_weak():
     spec = subgroup_block()
     adapter = stub_for(spec)
     adapter.weak = False
-    run.subgroup_results(adapter, spec, strata_frame(a=60, b=60), 0.95, ())
+    run.estimate(adapter, spec, strata_frame(a=60, b=60), 0.95, ())
     assert adapter.weak is False
     adapter.weak = True
-    run.subgroup_results(adapter, spec, strata_frame(a=60, b=60), 0.95, ())
+    run.estimate(adapter, spec, strata_frame(a=60, b=60), 0.95, ())
     assert adapter.weak is True
 
 
@@ -666,13 +666,13 @@ def test_subgroup_estimation_does_not_leave_the_instrument_weak():
 
 def test_sensitivity_of_a_single_treated_unit_is_the_placebo_note():
     adapter = stub_for(block())
-    adapter.single_unit = True
+    adapter.unit = True
     frame = strata_frame(a=3)
     assert run.fragility(adapter, frame, 0.95) == {
         "holds": None,
         "note": "single treated unit: inference is the placebo permutation",
     }
-    adapter.single_unit = False
+    adapter.unit = False
     assert run.fragility(adapter, frame, 0.95) == {
         "holds": None,
         "note": "no sensitivity analysis for this strategy",
@@ -966,10 +966,10 @@ def test_the_randomized_adapter_is_the_difference_in_means():
         ),
     )
     x = observational(300, 1)
-    adapter = run.RandomizedEstimator(spec, x, 0, "linear", 0.01)
+    adapter = run.Experiment(spec, x, 0, "linear", 0.01)
     assert adapter.name == "randomized_diff"
     c = observational(600, 2)
-    direct = aipw.difference_in_means(c, "t", "y", 0.9)
+    direct = aipw.contrast(c, "t", "y", 0.9)
     out = adapter.estimate(c, 0.9)
     assert (out.estimate, out.se, out.low, out.high, out.n) == (
         direct.estimate,
@@ -979,7 +979,7 @@ def test_the_randomized_adapter_is_the_difference_in_means():
         direct.n,
     )
     assert out.detail == {}
-    other = aipw.difference_in_means(c, "t", "nco", 0.9)
+    other = aipw.contrast(c, "t", "nco", 0.9)
     assert adapter.reckon(c, 0.9, "nco").estimate == other.estimate
     assert adapter.reckon(c, 0.9).estimate == direct.estimate
     tests = adapter.controls(c, 0.9)
@@ -1033,11 +1033,13 @@ def early_adopters(frame):
 
 def test_the_did_adapter_needs_all_three_panel_columns():
     frame = did_frame(1, 100)
-    ok = run.DiD(did_spec(), frame, 0, "linear", 0.01)
+    ok = run.Differences(did_spec(), frame, 0, "linear", 0.01)
     assert ok.name == "did"
     assert ok.columns() == ("id", "t", "g")
     for missing in ("unit", "time", "adoption"):
-        adapter = run.DiD(did_spec(**{missing: None}), frame, 0, "linear", 0.01)
+        adapter = run.Differences(
+            did_spec(**{missing: None}), frame, 0, "linear", 0.01
+        )
         with pytest.raises(
             ValueError, match="did needs unit, time and adoption"
         ):
@@ -1046,25 +1048,25 @@ def test_the_did_adapter_needs_all_three_panel_columns():
 
 def test_the_did_design_is_read_from_x_at_the_default_level():
     frame = did_frame(1, 200)
-    adapter = run.DiD(did_spec(), frame, 0, "linear", 0.01)
+    adapter = run.Differences(did_spec(), frame, 0, "linear", 0.01)
     adapter.prepare()
     fit = did.estimate(frame, "id", "t", "g", "y")
     assert adapter.design == {
         "groups": fit.groups,
-        "n_never_treated": fit.n_never,
+        "n_never_treated": fit.untreated,
         "events": list(fit.events),
-        "pretrend_p_on_x": fit.pretrend_p,
+        "pretrend_p_on_x": fit.pretrend,
         "pre_periods_support_sensitivity": True,
     }
     early = early_adopters(frame)
-    other = run.DiD(did_spec(), early, 0, "linear", 0.01)
+    other = run.Differences(did_spec(), early, 0, "linear", 0.01)
     other.prepare()
     assert other.design["pre_periods_support_sensitivity"] is False
     assert other.design["pretrend_p_on_x"] is None
 
 
 def test_the_did_estimate_is_the_overall_att_with_its_event_study():
-    adapter = run.DiD(did_spec(), did_frame(1, 200), 0, "linear", 0.01)
+    adapter = run.Differences(did_spec(), did_frame(1, 200), 0, "linear", 0.01)
     c = did_frame(2, 200)
     out = adapter.estimate(c, 0.9)
     fit = did.estimate(c, "id", "t", "g", "y", 0.9)
@@ -1076,7 +1078,7 @@ def test_the_did_estimate_is_the_overall_att_with_its_event_study():
     )
     assert out.n == len(c)
     assert out.detail == {
-        "pretrend_p": fit.pretrend_p,
+        "pretrend_p": fit.pretrend,
         "event_study": dict(zip(fit.events, fit.coefficients, strict=True)),
     }
     other = adapter.reckon(c, 0.9, "nco")
@@ -1093,11 +1095,11 @@ def test_the_did_estimate_is_the_overall_att_with_its_event_study():
 
 
 def test_the_did_controls_start_with_the_pretrend_wald_test():
-    adapter = run.DiD(did_spec(), did_frame(1, 200), 0, "linear", 0.01)
+    adapter = run.Differences(did_spec(), did_frame(1, 200), 0, "linear", 0.01)
     c = did_frame(2, 200)
     tests = adapter.controls(c, 0.9)
     fit = did.estimate(c, "id", "t", "g", "y", 0.9)
-    assert tests[0] == battery.Test("pretrend_wald", "placebo", fit.pretrend_p)
+    assert tests[0] == battery.Test("pretrend_wald", "placebo", fit.pretrend)
     direct = did.estimate(c, "id", "t", "g", "nco", 0.9)
     assert tests[1:] == [
         battery.wald(
@@ -1112,7 +1114,7 @@ def test_the_did_controls_start_with_the_pretrend_wald_test():
 
 
 def test_the_did_sensitivity_widens_the_interval_at_m_max():
-    adapter = run.DiD(did_spec(), did_frame(1, 200), 0, "linear", 0.01)
+    adapter = run.Differences(did_spec(), did_frame(1, 200), 0, "linear", 0.01)
     c = did_frame(2, 200)
     out = adapter.sensitivity(c, 0.9)
     fit = did.estimate(c, "id", "t", "g", "y", 0.9)
@@ -1123,10 +1125,10 @@ def test_the_did_sensitivity_widens_the_interval_at_m_max():
         "low": low,
         "high": high,
         "breakdown_m": fit.breakdown(),
-        "max_pre_change": fit.max_pre_change,
+        "max_pre_change": fit.drift,
         "note": "simplified relative-magnitudes bound, not HonestDiD",
     }
-    wide = run.DiD(
+    wide = run.Differences(
         did_spec(sensitivity=causal.Confounding(multiple=50.0)),
         did_frame(1, 200),
         0,
@@ -1138,14 +1140,14 @@ def test_the_did_sensitivity_widens_the_interval_at_m_max():
 
 
 def test_the_did_sensitivity_says_when_it_cannot_run():
-    adapter = run.DiD(
+    adapter = run.Differences(
         did_spec(sensitivity=None), did_frame(1, 100), 0, "linear", 0.01
     )
     assert adapter.sensitivity(did_frame(2, 100), 0.9) == {
         "holds": None,
         "note": "no sensitivity block in the charter",
     }
-    full = run.DiD(did_spec(), did_frame(1, 100), 0, "linear", 0.01)
+    full = run.Differences(did_spec(), did_frame(1, 100), 0, "linear", 0.01)
     assert full.sensitivity(early_adopters(did_frame(2, 100)), 0.9) == {
         "holds": None,
         "note": "fewer than two pre-periods",
@@ -1211,10 +1213,10 @@ def test_the_iv_fit_needs_an_instrument_and_passes_controls_and_outcome():
     adapter = run.Instrument(spec, frame, 0, "linear", 0.01)
     fit = adapter.fit(frame, 0.9)
     direct = iv.estimate(frame, "d", "y", "z", ("nco",), 0.9)
-    assert (fit.estimate, fit.se, fit.f_stat) == (
+    assert (fit.estimate, fit.se, fit.fstat) == (
         direct.estimate,
         direct.se,
-        direct.f_stat,
+        direct.fstat,
     )
     other = adapter.fit(frame, 0.9, "nco")
     assert (
@@ -1230,7 +1232,7 @@ def test_the_iv_design_records_the_first_stage_on_x():
     fit = iv.estimate(frame, "d", "y", "z", (), 0.95)
     assert adapter.weak is False
     assert adapter.design == {
-        "first_stage_F_on_x": fit.f_stat,
+        "first_stage_F_on_x": fit.fstat,
         "threshold": iv.F_THRESHOLD,
         "weak_on_x": False,
         "overidentification": "not applicable: one instrument, just identified",
@@ -1263,7 +1265,7 @@ def test_the_iv_estimate_marks_a_weak_confirmation_set_and_keeps_weakness():
         "estimand": "LATE",
     }
     assert adapter.weak is False
-    assert adapter.design["first_stage_F_on_c"] == fit.f_stat
+    assert adapter.design["first_stage_F_on_c"] == fit.fstat
     adapter.estimate(faint, 0.9)
     assert adapter.weak is True
     adapter.estimate(strong, 0.9)
@@ -1329,11 +1331,11 @@ def rd_spec(**changes):
 
 
 def test_the_rd_adapter_balances_on_the_negative_control_outcomes():
-    adapter = run.RdEstimator(rd_spec(), rd_world(100, 1), 0, "linear", 0.01)
+    adapter = run.Discontinuity(rd_spec(), rd_world(100, 1), 0, "linear", 0.01)
     assert adapter.name == "rd"
     assert adapter.bandwidth == 0.0
     assert adapter.pretreatment() == ("cov",)
-    none = run.RdEstimator(
+    none = run.Discontinuity(
         rd_spec(controls=()), rd_world(100, 1), 0, "linear", 0.01
     )
     assert none.pretreatment() == ()
@@ -1341,13 +1343,13 @@ def test_the_rd_adapter_balances_on_the_negative_control_outcomes():
 
 def test_the_rd_design_fixes_the_bandwidth_on_x():
     frame = rd_world(2000, 1)
-    adapter = run.RdEstimator(rd_spec(), frame, 0, "linear", 0.01)
+    adapter = run.Discontinuity(rd_spec(), frame, 0, "linear", 0.01)
     adapter.prepare()
     fit = rd.estimate(frame, "x", "y", 0.0, covariates=("cov",))
     assert adapter.bandwidth == fit.bandwidth > 0
     assert adapter.design == {
         "bandwidth": fit.bandwidth,
-        "density_p_on_x": fit.density_p,
+        "density_p_on_x": fit.density,
         "alpha_density": 0.01,
         "n_left_in_bandwidth": fit.n_left,
         "n_right_in_bandwidth": fit.n_right,
@@ -1361,13 +1363,13 @@ def test_the_rd_density_check_refuses_below_the_level_only():
         frame.x.between(-0.2, 0) & (numpy.arange(2000) % 2 == 0), "x"
     ] *= -1
     fit = rd.estimate(frame, "x", "y", 0.0, covariates=("cov",))
-    refusing = run.RdEstimator(rd_spec(), frame, 0, "linear", fit.density_p * 2)
+    refusing = run.Discontinuity(rd_spec(), frame, 0, "linear", fit.density * 2)
     refusing.prepare()
     assert refusing.refusal == (
         "the density check rejects at the cutoff on X: possible manipulation "
         "of the running variable"
     )
-    exact = run.RdEstimator(rd_spec(), frame, 0, "linear", fit.density_p)
+    exact = run.Discontinuity(rd_spec(), frame, 0, "linear", fit.density)
     exact.prepare()
     assert exact.refusal is None
 
@@ -1375,7 +1377,7 @@ def test_the_rd_density_check_refuses_below_the_level_only():
 def test_the_rd_adapter_needs_a_running_variable_and_cutoff():
     frame = rd_world(100, 1)
     for change in ({"running_variable": None}, {"cutoff": None}):
-        adapter = run.RdEstimator(rd_spec(**change), frame, 0, "linear", 0.01)
+        adapter = run.Discontinuity(rd_spec(**change), frame, 0, "linear", 0.01)
         with pytest.raises(
             ValueError, match="rd needs a running variable and cutoff"
         ):
@@ -1388,19 +1390,19 @@ def test_the_rd_adapter_needs_a_running_variable_and_cutoff():
 
 def test_a_cutoff_of_zero_is_a_valid_cutoff():
     frame = rd_world(1500, 1)
-    adapter = run.RdEstimator(rd_spec(cutoff=0.0), frame, 0, "linear", 0.01)
+    adapter = run.Discontinuity(rd_spec(cutoff=0.0), frame, 0, "linear", 0.01)
     adapter.prepare()
     assert adapter.bandwidth > 0
 
 
 def test_the_rd_estimate_is_bias_corrected_at_the_frozen_bandwidth():
     x, c = rd_world(1500, 1), rd_world(1500, 2)
-    adapter = run.RdEstimator(rd_spec(), x, 0, "linear", 0.01)
+    adapter = run.Discontinuity(rd_spec(), x, 0, "linear", 0.01)
     adapter.prepare()
     out = adapter.estimate(c, 0.9)
     fit = rd.estimate(c, "x", "y", 0.0, 0.9, adapter.bandwidth, ())
     assert (out.estimate, out.se, out.low, out.high) == (
-        fit.bias_corrected,
+        fit.corrected,
         fit.se,
         fit.low,
         fit.high,
@@ -1413,19 +1415,19 @@ def test_the_rd_estimate_is_bias_corrected_at_the_frozen_bandwidth():
     other = adapter.reckon(c, 0.9, "cov")
     direct = rd.estimate(c, "x", "cov", 0.0, 0.9, adapter.bandwidth, ())
     assert (other.estimate, other.se, other.low, other.high, other.n) == (
-        direct.bias_corrected,
+        direct.corrected,
         direct.se,
         direct.low,
         direct.high,
         direct.n_left + direct.n_right,
     )
     assert other.detail == {}
-    assert adapter.reckon(c, 0.9).estimate == fit.bias_corrected
+    assert adapter.reckon(c, 0.9).estimate == fit.corrected
 
 
 def test_the_rd_controls_are_the_placebo_cutoffs_and_covariate_balance():
     x, c = rd_world(1500, 1), rd_world(1500, 2)
-    adapter = run.RdEstimator(rd_spec(), x, 0, "linear", 0.01)
+    adapter = run.Discontinuity(rd_spec(), x, 0, "linear", 0.01)
     adapter.prepare()
     tests = adapter.controls(c, 0.9)
     fit = rd.estimate(c, "x", "y", 0.0, 0.9, adapter.bandwidth, ("cov",))
@@ -1455,7 +1457,7 @@ def test_the_rd_controls_are_the_placebo_cutoffs_and_covariate_balance():
 
 def test_the_rd_sensitivity_is_descriptive_and_compares_conclusions():
     x, c = rd_world(1500, 1), rd_world(1500, 2)
-    adapter = run.RdEstimator(rd_spec(), x, 0, "linear", 0.01)
+    adapter = run.Discontinuity(rd_spec(), x, 0, "linear", 0.01)
     adapter.prepare()
     out = adapter.sensitivity(c, 0.9)
     fit = rd.estimate(c, "x", "y", 0.0, 0.9, adapter.bandwidth, ())
@@ -1508,7 +1510,7 @@ def test_the_synthetic_adapter_runs_on_x_and_marks_a_single_unit():
     panel = synthetic_panel()
     adapter = run.Synth(synth_spec(), panel, 0, "linear", 0.01)
     assert adapter.name == "synth"
-    assert adapter.single_unit is True
+    assert adapter.unit is True
     out = adapter.estimate(panel.iloc[:0], 0.95)
     fit = synth.estimate(panel, "u", "t", "y", 0, 12, 0.05)
     assert out.estimate == fit.effect
@@ -1519,7 +1521,7 @@ def test_the_synthetic_adapter_runs_on_x_and_marks_a_single_unit():
     assert out.detail == {"p_value": fit.p_value, "ratio": fit.ratio}
     assert adapter.design == {
         "donors": fit.donors,
-        "min_attainable_p": fit.min_p,
+        "min_attainable_p": fit.floor,
         "pre_rmspe": fit.pre_rmspe,
         "weights": fit.weights,
     }
@@ -1575,7 +1577,7 @@ def scripted(**attributes):
 
         def __init__(self, *args):
             super().__init__(*args)
-            self.single_unit = self.single
+            self.unit = self.single
             type(self).seen = [args[2:], 0]
 
         def prepare(self):
@@ -1711,21 +1713,21 @@ def test_identify_runs_the_adapter_and_documents_every_step(monkeypatch):
         identified=True,
         needed=(COVARIATES, "positivity", "no_interference"),
         attestors={"positivity": "A"},
-        estimated_on_c=True,
-        design_passed=True,
-        design_gates=("overlap",),
-        interval_gate="coverage_aipw",
-        battery_ran=True,
-        battery_passed=True,
-        negative_control_declared=True,
-        battery_gate="battery_nco",
-        replication_passed=True,
-        sensitivity_holds=True,
-        sensitivity_gate="sensitivity_bound",
-        single_unit=False,
-        weak_instrument=False,
+        confirmatory=True,
+        sound=True,
+        gates=("overlap",),
+        interval="coverage_aipw",
+        ran=True,
+        passed=True,
+        negative=True,
+        gate="battery_nco",
+        replicated=True,
+        holds=True,
+        sensitivity="sensitivity_bound",
+        unit=False,
+        instrument=False,
         certified=("coverage_aipw", "overlap"),
-        adjustment_checked=False,
+        checked=False,
     )
     claims = out.documents["causal_claims.json"]
     assert claims["certified_gates_used"] == ["coverage_aipw", "overlap"]
@@ -1795,9 +1797,9 @@ def test_a_controls_error_is_a_note_and_the_battery_did_not_run(monkeypatch):
     report = out.documents["identification_report.json"]
     assert report["notes"][0] == "controls could not run: no controls"
     assert len(report["notes"]) == 2
-    assert decisions[0].battery_ran is False
-    assert decisions[0].battery_passed is False
-    assert decisions[0].negative_control_declared is False
+    assert decisions[0].ran is False
+    assert decisions[0].passed is False
+    assert decisions[0].negative is False
     assert out.documents["falsification_report.json"]["ran"] is False
 
 
@@ -1815,9 +1817,9 @@ def test_a_single_treated_unit_is_neither_replicated_nor_subgrouped(
     falsification = out.documents["falsification_report.json"]
     assert falsification["replication"] == {"by_column": {}, "passed": None}
     assert "subgroups" not in out.documents["identification_report.json"]
-    assert decisions[0].single_unit is True
-    assert decisions[0].estimated_on_c is False
-    assert decisions[0].replication_passed is None
+    assert decisions[0].unit is True
+    assert decisions[0].confirmatory is False
+    assert decisions[0].replicated is None
     assert out.documents["sensitivity_report.json"] == {
         "holds": None,
         "note": "single treated unit: inference is the placebo permutation",
@@ -1837,7 +1839,7 @@ def test_the_weak_flag_of_the_adapter_reaches_the_tier(monkeypatch):
     decisions = record_decisions(monkeypatch)
     x, c = frames()
     run.identify(block(), x, c, BUDGET, certified=())
-    assert decisions[0].weak_instrument is True
+    assert decisions[0].instrument is True
 
 
 def test_declared_subgroups_are_estimated_and_reported(monkeypatch):
@@ -1865,7 +1867,7 @@ def test_unnamed_gates_come_from_the_shipped_certificate_sorted(monkeypatch):
     assert decisions[0].certified == ("alpha", "mid", "zeta")
     claims = out.documents["causal_claims.json"]
     assert claims["certified_gates_used"] == ["alpha", "mid", "zeta"]
-    shipped = certified.subgroup_gate(run.stratify)
+    shipped = certified.gate(run.stratify)
     group = out.documents["identification_report.json"]["subgroups"]
     assert group["gate"]["status"] == shipped.status
 
@@ -1889,7 +1891,7 @@ def test_a_declared_dag_checks_the_set_and_the_reports_carry_the_extras(
         dag_checks={"hash": "h"},
         attestation_report={"applied": []},
     )
-    assert decisions[0].adjustment_checked is True
+    assert decisions[0].checked is True
     report = out.documents["identification_report.json"]
     assert report["notes"] == []
     assert report["dag"] == {"hash": "h"}
@@ -1918,11 +1920,11 @@ def test_other_strategies_count_as_checked_and_use_their_own_gates(
     )
     out = run.identify(spec, x, c, BUDGET, certified=())
     facts = decisions[0]
-    assert facts.adjustment_checked is True
-    assert facts.interval_gate == "coverage_randomized"
-    assert facts.battery_gate == "battery_nco"
-    assert facts.design_gates == ()
-    assert facts.sensitivity_gate is None
+    assert facts.checked is True
+    assert facts.interval == "coverage_randomized"
+    assert facts.gate == "battery_nco"
+    assert facts.gates == ()
+    assert facts.sensitivity is None
     assert facts.needed == ("randomized_assignment", "no_interference")
     assert out.documents["identification_report.json"]["notes"] == []
     assert out.documents["causal_claims.json"]["strategy"] == "randomized_diff"
@@ -1952,7 +1954,7 @@ def test_design_only_documents_a_design_with_no_estimate(monkeypatch):
     adapter = install(monkeypatch)
     x = frames()[0]
     spec = block(strategies=("backdoor_aipw", "randomized_diff"))
-    out = run.design_only(
+    out = run.diagnose(
         spec,
         x,
         BUDGET,
@@ -2009,24 +2011,24 @@ def test_design_only_documents_a_design_with_no_estimate(monkeypatch):
 def test_design_only_without_a_dag_check_has_no_dag_entry(monkeypatch):
     install(monkeypatch)
     x = frames()[0]
-    out = run.design_only(block(), x, BUDGET)
+    out = run.diagnose(block(), x, BUDGET)
     assert "dag" not in out.documents["identification_report.json"]
 
 
 def test_design_only_refuses_like_identify(monkeypatch):
     x = frames()[0]
-    none = run.design_only(
+    none = run.diagnose(
         block(assumptions=("positivity",)), x, BUDGET, dag_checks={"hash": "h"}
     )
     assert none.documents["identification_report.json"]["dag"] == {"hash": "h"}
     assert none.documents["causal_claims.json"]["status"] == "not_identified"
     install(monkeypatch, prepare_error="boom")
-    broken = run.design_only(block(), x, BUDGET, dag_checks={"hash": "h"})
+    broken = run.diagnose(block(), x, BUDGET, dag_checks={"hash": "h"})
     report = broken.documents["identification_report.json"]
     assert report["reason"] == "design could not be assessed: boom"
     assert report["dag"] == {"hash": "h"}
     install(monkeypatch, refusal_text="no overlap")
-    refused = run.design_only(block(), x, BUDGET, dag_checks={"hash": "h"})
+    refused = run.diagnose(block(), x, BUDGET, dag_checks={"hash": "h"})
     report = refused.documents["identification_report.json"]
     assert report["reason"] == "no overlap"
     assert report["dag"] == {"hash": "h"}
@@ -2106,12 +2108,10 @@ def test_the_boosted_learner_and_seed_reach_every_nuisance_fit():
 
 def test_the_randomized_estimate_for_another_outcome_keeps_level_and_counts():
     spec = block(strategies=("randomized_diff",))
-    adapter = run.RandomizedEstimator(
-        spec, observational(300, 1), 0, "linear", 0.01
-    )
+    adapter = run.Experiment(spec, observational(300, 1), 0, "linear", 0.01)
     c = observational(600, 2)
     out = adapter.reckon(c, 0.8, "nco")
-    direct = aipw.difference_in_means(c, "t", "nco", 0.8)
+    direct = aipw.contrast(c, "t", "nco", 0.8)
     assert (out.estimate, out.se, out.low, out.high, out.n) == (
         direct.estimate,
         direct.se,
@@ -2134,7 +2134,7 @@ def test_the_backdoor_adapter_names_the_missing_preparation_exactly():
 
 def test_the_adapters_name_their_missing_declarations_exactly():
     frame = did_frame(1, 50)
-    did_adapter = run.DiD(did_spec(unit=None), frame, 0, "linear", 0.01)
+    did_adapter = run.Differences(did_spec(unit=None), frame, 0, "linear", 0.01)
     with pytest.raises(
         ValueError, match=r"^did needs unit, time and adoption$"
     ):
@@ -2144,7 +2144,7 @@ def test_the_adapters_name_their_missing_declarations_exactly():
     )
     with pytest.raises(ValueError, match=r"^iv needs an instrument$"):
         iv_adapter.fit(iv_world(50, 1), 0.95)
-    rd_adapter = run.RdEstimator(
+    rd_adapter = run.Discontinuity(
         rd_spec(cutoff=None), rd_world(50, 1), 0, "linear", 0.01
     )
     message = r"^rd needs a running variable and cutoff$"
@@ -2176,7 +2176,7 @@ def test_the_synthetic_interval_limits_are_not_a_number():
 
 def test_the_rd_design_reads_the_balance_covariates_from_x():
     frame = rd_world(500, 1).drop(columns="cov")
-    adapter = run.RdEstimator(rd_spec(), frame, 0, "linear", 0.01)
+    adapter = run.Discontinuity(rd_spec(), frame, 0, "linear", 0.01)
     with pytest.raises(KeyError, match="cov"):
         adapter.prepare()
 
@@ -2195,7 +2195,7 @@ def test_the_rd_bandwidth_sensitivity_is_compared_with_the_headline_on_a_null():
     other = frame.assign(
         y=0.3 * frame["x"] + rng.normal(scale=0.5, size=n),
     )
-    adapter = run.RdEstimator(rd_spec(), frame, 0, "linear", 0.01)
+    adapter = run.Discontinuity(rd_spec(), frame, 0, "linear", 0.01)
     adapter.prepare()
     out = adapter.sensitivity(other, 0.95)
     fit = rd.estimate(other, "x", "y", 0.0, 0.95, adapter.bandwidth, ())
@@ -2218,7 +2218,7 @@ def small_effect_panel(tau):
 
 def test_the_did_sensitivity_holds_only_when_the_widened_interval_avoids_zero():
     spec = did_spec(sensitivity=causal.Confounding(multiple=0.01))
-    adapter = run.DiD(spec, did_frame(1, 100), 0, "linear", 0.01)
+    adapter = run.Differences(spec, did_frame(1, 100), 0, "linear", 0.01)
     positive = adapter.sensitivity(small_effect_panel(0.5), 0.95)
     assert 0 < positive["low"] < 1
     assert positive["holds"] is True
@@ -2379,13 +2379,13 @@ def test_design_only_asks_the_declared_dag_about_the_adjustment_set(
         ("u", "t"),
         ("u", "y"),
     )
-    refused = run.design_only(block(), x, BUDGET, dag=bad)
+    refused = run.diagnose(block(), x, BUDGET, dag=bad)
     assert refused.documents["causal_claims.json"]["status"] == "not_identified"
     declared = block(dag="dag.json")
-    missing = run.design_only(declared, x, BUDGET)
+    missing = run.diagnose(declared, x, BUDGET)
     assert missing.documents["causal_claims.json"]["status"] == "not_identified"
     good = scmle_dag(("a", "t"), ("a", "y"), ("b", "t"), ("b", "y"), ("t", "y"))
-    kept = run.design_only(declared, x, BUDGET, dag=good)
+    kept = run.diagnose(declared, x, BUDGET, dag=good)
     assert kept.documents["causal_claims.json"]["status"] == "identified"
     assert kept.documents["causal_claims.json"]["strategy"] == "backdoor_aipw"
 

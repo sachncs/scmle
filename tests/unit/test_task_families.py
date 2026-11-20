@@ -105,9 +105,9 @@ def test_the_linear_ranker_adapter_is_registered_and_conforms():
 
     assert adapter.name == "pairwise_linear_ranker"
     assert adapter.family == "linear"
-    assert adapter.capabilities.needs_scaling is True
-    assert adapter.capabilities.handles_missing is False
-    assert list(adapter.search_space.names()) == ["penalty"]
+    assert adapter.capabilities.scaling is True
+    assert adapter.capabilities.missing is False
+    assert list(adapter.space.names()) == ["penalty"]
     built = adapter.build(tasks.Task.RANKING, 7, {"penalty": 2.0})
     assert (built.penalty, built.random_state) == (2.0, 7)
     assert scmle.models.ranking.adapters.RANKING_ADAPTERS[-1] is adapter
@@ -198,8 +198,8 @@ def test_the_linear_uplift_adapter_is_registered_and_conforms():
 
     assert adapter.name == "uplift_linear_t_learner"
     assert adapter.family == "linear"
-    assert adapter.capabilities.handles_missing is False
-    assert adapter.capabilities.needs_scaling is True
+    assert adapter.capabilities.missing is False
+    assert adapter.capabilities.scaling is True
     built = adapter.build(tasks.Task.UPLIFT, 5, {"classify": False})
     assert (built.kind, built.classify, built.random_state) == (
         "linear",

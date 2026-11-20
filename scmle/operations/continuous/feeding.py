@@ -56,9 +56,7 @@ class Feeding:
             sort_keys=True,
             default=str,
         )
-        durability.append_text(
-            self.directory / records.LABELS_FILE, line + "\n"
-        )
+        durability.append(self.directory / records.LABELS_FILE, line + "\n")
 
     def absorb(
         self,
@@ -174,7 +172,7 @@ class Feeding:
                 / (version.replace(":", "-") + ".csv")
             )
             if not path.exists():
-                durability.write_atomically(path, records.serialize(frame))
+                durability.write(path, records.serialize(frame))
         return self.history.record(
             "training",
             self.clock(),

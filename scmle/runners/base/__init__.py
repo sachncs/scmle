@@ -22,16 +22,16 @@ does everything that must not differ between places:
 * **Separate roles.** A job may not run as the serving identity.
 """
 
+from scmle.runners.base.job import Budget
 from scmle.runners.base.job import Clock
 from scmle.runners.base.job import ConflictError
-from scmle.runners.base.job import CostBudget
-from scmle.runners.base.job import CostRate
 from scmle.runners.base.job import Exit
 from scmle.runners.base.job import FINAL
 from scmle.runners.base.job import Job
 from scmle.runners.base.job import MAX_RUN_ID_LENGTH
 from scmle.runners.base.job import Meter
 from scmle.runners.base.job import Progress
+from scmle.runners.base.job import Rate
 from scmle.runners.base.job import Resources
 from scmle.runners.base.job import RUN_ID_PATTERN
 from scmle.runners.base.job import SECRET_WORDS
@@ -41,8 +41,8 @@ from scmle.runners.base.job import Status
 from scmle.runners.base.job import TERMINAL
 from scmle.runners.base.job import Ticket
 from scmle.runners.base.ledger import Attempt
+from scmle.runners.base.ledger import Manifest
 from scmle.runners.base.ledger import MANIFEST_FORMAT
-from scmle.runners.base.ledger import RunManifest
 from scmle.runners.base.runner import Runner
 
 __all__ = [
@@ -53,16 +53,16 @@ __all__ = [
     "SECRET_WORDS",
     "TERMINAL",
     "Attempt",
+    "Budget",
     "Clock",
     "ConflictError",
-    "CostBudget",
-    "CostRate",
     "Exit",
     "Job",
+    "Manifest",
     "Meter",
     "Progress",
+    "Rate",
     "Resources",
-    "RunManifest",
     "Runner",
     "State",
     "Status",

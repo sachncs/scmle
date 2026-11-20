@@ -176,11 +176,11 @@ class Removal(Step):
         path = pathlib.Path(self.target)
         if path.is_dir() and not path.is_symlink():
             shutil.rmtree(path)
-            durability.sync_directory(path.parent)
+            durability.flush(path.parent)
             return {"removed": True}
         if path.exists() or path.is_symlink():
             path.unlink()
-            durability.sync_directory(path.parent)
+            durability.flush(path.parent)
             return {"removed": True}
         return {"removed": False}
 
@@ -254,9 +254,9 @@ class Mark(Step):
             tombstone.mark(root, record)
         state = ""
         if self.registry:
-            store = registry.ModelRegistryStore(self.registry)
-            machine = release_state.ReleaseRegistry(store)
-            retired = release_state.ReleaseState.RETIRED
+            store = registry.Registry(self.registry)
+            machine = release_state.Registry(store)
+            retired = release_state.State.RETIRED
             if machine.lookup(self.model, self.version) is not retired:
                 machine.transition(
                     self.model,
@@ -446,7 +446,7 @@ class Purge(Step):
         flagged = matches(frame, self.column, self.hashes)
         removed = int(flagged.sum())
         if removed:
-            durability.write_atomically(path, table.write(frame[~flagged]))
+            durability.write(path, table.write(frame[~flagged]))
         return {"rows": removed, "sha256": tabular.raw_source_hash(path)}
 
 
@@ -476,7 +476,7 @@ class Retraining(Step):
             run, frame=frame
         )
         result = orchestrator.run(run.parent)
-        return {"run": os.fspath(result.run_dir)}
+        return {"run": os.fspath(result.directory)}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -502,7 +502,7 @@ class Unlisting(Step):
         path = pathlib.Path(self.target)
         if not path.is_file():
             return {"rows": 0}
-        database = stores.SqliteExperimentStore(path)
+        database = stores.Sqlite(path)
         with database.session() as connection:
             trials = connection.execute(
                 "DELETE FROM trials WHERE run_id = ?", (self.run,)

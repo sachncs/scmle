@@ -39,8 +39,8 @@ def run(tmp_path, frame, targets, task, **kwargs):
         frame,
         targets,
         task=task,
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
         **kwargs,
     ).run()
 
@@ -92,7 +92,7 @@ def test_folds_keep_every_label_when_the_data_allow(multilabel):
     import json
 
     manifest = json.loads(
-        (multilabel.run_dir / "validation_manifest.json").read_text()
+        (multilabel.directory / "validation_manifest.json").read_text()
     )
     dev = numpy.array(manifest["training"])
     for fold in manifest["folds"]:
@@ -127,11 +127,11 @@ def test_bad_target_sets_are_refused(tmp_path):
         run(tmp_path, frame, LABELS, "multilabel")
     with pytest.raises(ValueError, match="targets"):
         support.make_project(
-            frame, "common", task="multilabel", output_dir=tmp_path
+            frame, "common", task="multilabel", directory=tmp_path
         )
     with pytest.raises(ValueError, match="targets"):
         support.make_project(
-            frame, LABELS, task="binary_classification", output_dir=tmp_path
+            frame, LABELS, task="binary_classification", directory=tmp_path
         )
 
 
@@ -140,8 +140,8 @@ def test_the_boosted_multi_target_model_survives_a_tight_budget(tmp_path):
         quantities(),
         ["first", "second"],
         task="multioutput",
-        time_budget=60,
-        output_dir=tmp_path,
+        budget=60,
+        directory=tmp_path,
     ).plan()
 
     assert "multi_hist_gradient_boosting" in plan.candidates

@@ -798,12 +798,12 @@ def gate_a5(runs: int, base: int = 0) -> dict[str, Any]:
                 q,
             )
             estimate = ope.evaluate(log, estimator, clip=clip)
-            tally[name]["ess"].append(estimate.ess_ratio)
+            tally[name]["ess"].append(estimate.ess)
             if estimate.status == ope.REFUSED:
                 continue
             low, high = estimate.interval or (math.nan, math.nan)
             tally[name]["values"].append(estimate.value)
-            if estimate.ess_ratio >= ESS_RATIO_FLOOR:
+            if estimate.ess >= ESS_RATIO_FLOOR:
                 tally[name]["used"] += 1
                 tally[name]["hits"] += int(low <= truth <= high)
     table = {}
@@ -1124,11 +1124,9 @@ def gate_b8(runs: int, base: int = 0) -> dict[str, Any]:
         stops.append(int(hit[0]) + 1 if hit.size else None)
     promoted = [s for s in stops if s is not None]
     direction = (p1 - p0) > 0 and bool(promoted)
-    z_stream = anytime.pseudo_outcomes(
-        arm_all, y_all, share, anytime.centers(y_all)
-    )
+    z_stream = anytime.transform(arm_all, y_all, share, anytime.centers(y_all))
     stream = anytime.deviations(share, delta_min)
-    bound = anytime.confidence_bound(z_stream, stream, ALPHA_PROMOTE)
+    bound = anytime.bound(z_stream, stream, ALPHA_PROMOTE)
     share_promoted = len(promoted) / runs
     return {
         "reference_fixed_sample": reference,
@@ -1189,9 +1187,7 @@ def gate_a7(runs: int, base: int = 0) -> dict[str, Any]:
                 y, (score >= 0.0).astype(float), groups, rule
             )
             satisfied += int(test.status == constraints.SATISFIED)
-            covered += int(
-                test.upper_bound is not None and test.upper_bound >= gap
-            )
+            covered += int(test.upper is not None and test.upper >= gap)
         cover = wilson(covered, runs)
         row: dict[str, Any] = {
             "satisfied_rate": satisfied / runs,
@@ -1287,7 +1283,7 @@ def gate_a8(runs: int, base: int = 0) -> dict[str, Any]:
                 (0.2, 0.5),
             )
             try:
-                constraints.check_feasibility(declared, y, groups)
+                constraints.check(declared, y, groups)
             except constraints.InfeasibleError:
                 count += 1
         refused["/".join(pair)] = count
@@ -1304,7 +1300,7 @@ def gate_a8(runs: int, base: int = 0) -> dict[str, Any]:
             rng_for(base, "a8.equal", index), 4000, (0.3, 0.3)
         )
         try:
-            constraints.check_feasibility(declared, y, groups)
+            constraints.check(declared, y, groups)
         except constraints.InfeasibleError:
             false_refusals += 1
     bound = 0.05 + tol(0.05, equal_runs)
@@ -1848,12 +1844,12 @@ def hook_approval(record: Any) -> scmle.governance.registry.Sanction:
     return scmle.governance.registry.Sanction(
         model=record.model,
         version=record.version,
-        content_id=record.content_id,
+        content=record.content_id,
         reviewer="f11-b9-reviewer",
         decision=scmle.governance.registry.Verdict.APPROVED,
         reason="benchmark fixture",
         evidence=("f11_certify.py",),
-        approved_at="2026-11-06T00:00:00+00:00",
+        approved="2026-11-06T00:00:00+00:00",
     ).sign(HOOK_KEY)
 
 
@@ -1867,7 +1863,7 @@ def hook_registry(root: Path) -> tuple[Any, Any, Any]:
         The registry store, the lifecycle manager and the challenger's
         record.
     """
-    store = scmle.governance.registry.ModelRegistryStore(root / "registry")
+    store = scmle.governance.registry.Registry(root / "registry")
     manager = lifecycle.Maintainer(store, "m", str(root / "work"))
     first = store.register(
         "m", hook_bundle(0).save(root / "export1"), trusted=True
@@ -1892,7 +1888,7 @@ def hook_in(manager: Any, plan: Any) -> rollout_hook.Hook:
     Returns:
         The rollout hook.
     """
-    ledger = deployment_ledger.DeploymentLedger.create(
+    ledger = deployment_ledger.Ledger.create(
         None, charter_hash="b" * 64, policy={"b9": 1}, alpha_promo="1/20"
     )
     return rollout_hook.Hook(manager, plan, ledger)
@@ -2351,11 +2347,11 @@ def sources() -> dict[str, list[Any]]:
             f11_generators.fairness_world,
         ],
         "A7b": [constraints.equalize, gate_a7b],
-        "A8": [constraints.check_feasibility, gate_a8],
+        "A8": [constraints.check, gate_a8],
         "B1": [
             anytime.grow,
             anytime.bets,
-            anytime.pseudo_outcomes,
+            anytime.transform,
             anytime.centers,
             anytime.recentre,
             anytime.deviations,
@@ -2366,17 +2362,17 @@ def sources() -> dict[str, list[Any]]:
         ],
         "B2": [
             anytime.grow,
-            anytime.pseudo_outcomes,
+            anytime.transform,
             anytime.centers,
             anytime.recentre,
             anytime.deviations,
-            rollout.metric_stream,
-            rollout.metric_values,
+            rollout.feed,
+            rollout.centre,
             gate_b2,
         ],
         "B3": [
             anytime.grow,
-            anytime.pseudo_outcomes,
+            anytime.transform,
             anytime.centers,
             anytime.recentre,
             anytime.deviations,
@@ -2385,7 +2381,7 @@ def sources() -> dict[str, list[Any]]:
         ],
         "B4": [
             anytime.grow,
-            anytime.pseudo_outcomes,
+            anytime.transform,
             anytime.centers,
             anytime.recentre,
             anytime.deviations,
@@ -2400,7 +2396,7 @@ def sources() -> dict[str, list[Any]]:
         "B6": [design.srm_log_bayes_factor, design.mismatch, gate_b6],
         "B7": [
             anytime.grow,
-            anytime.pseudo_outcomes,
+            anytime.transform,
             anytime.centers,
             anytime.recentre,
             anytime.deviations,
@@ -2409,16 +2405,16 @@ def sources() -> dict[str, list[Any]]:
         ],
         "B8": [
             anytime.grow,
-            anytime.pseudo_outcomes,
+            anytime.transform,
             anytime.centers,
             anytime.recentre,
             anytime.deviations,
-            anytime.confidence_bound,
+            anytime.bound,
             gate_b8,
         ],
         "B9": [
             anytime.grow,
-            anytime.pseudo_outcomes,
+            anytime.transform,
             anytime.centers,
             anytime.recentre,
             anytime.deviations,

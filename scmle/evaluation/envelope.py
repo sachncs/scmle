@@ -293,7 +293,7 @@ class Envelope:
                 handle.flush()
                 os.fsync(handle.fileno())
             require(temporary).replace(destination)
-            durability.sync_directory(destination.parent)
+            durability.flush(destination.parent)
         except BaseException:
             if temporary is not None:
                 temporary.unlink(missing_ok=True)

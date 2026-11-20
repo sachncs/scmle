@@ -78,9 +78,9 @@ def trial_of(name, losses):
         name,
         experiments.Termination.OK,
         "rmse",
-        score_mean=float(numpy.mean(rmse)),
-        score_std=float(numpy.std(rmse, ddof=1)),
-        fold_scores=rmse,
+        score=float(numpy.mean(rmse)),
+        deviation=float(numpy.std(rmse, ddof=1)),
+        folds=rmse,
     )
 
 
@@ -131,10 +131,10 @@ def test_a_run_on_pure_noise_does_not_claim_skill_over_the_baseline(tmp_path):
         result = scmle.api.project.Project(
             noise_table(seed),
             "y",
-            output_dir=tmp_path / f"run_{seed}",
+            directory=tmp_path / f"run_{seed}",
             folds=5,
             seed=seed,
-            time_budget=300,
+            budget=300,
             enforcement="cooperative",
             search=tasks.Search(top_models=0),
             strategies=tasks.Strategies(top_models=0),

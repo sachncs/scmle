@@ -226,9 +226,9 @@ def test_the_survey_names_the_order_and_the_unconnected_nodes(tmp_path):
     frame = graph.GRAPH.read(spec)[0]
     manifest = tabular.manifested(frame, "label", str(root), "graph")
     portrait = graph.GRAPH.survey(spec, frame, manifest, tasks.Task.BINARY)
-    assert rows.KEY not in portrait.column_statistics
-    assert set(graph.STRUCTURE) & set(portrait.feature_plan.numeric)
-    notes = " ".join(portrait.quality_findings)
+    assert rows.KEY not in portrait.statistics
+    assert set(graph.STRUCTURE) & set(portrait.plan.numeric)
+    notes = " ".join(portrait.quality)
     assert "latest-seen nodes are held out" in notes
 
 
@@ -253,7 +253,7 @@ def test_the_featuriser_cost_decoder_and_capabilities(tmp_path):
             tabular.manifested(frame, "label", str(root), "graph"),
             tasks.Task.BINARY,
         )
-        .feature_plan
+        .plan
     )
     values = graph.GRAPH.featurise(
         plan, scmle.contracts.data.Preprocessing()
@@ -266,19 +266,19 @@ def test_a_graph_run_trains_tests_explains_and_packages(tmp_path, monkeypatch):
     run = project.Project(
         str(root),
         "label",
-        time_budget=120,
+        budget=120,
         modality="graph",
         models=support.optin(tasks.Task.BINARY),
         enforcement="cooperative",
-        output_dir=tmp_path / "runs",
+        directory=tmp_path / "runs",
     ).run()
     assert run.state == "COMPLETED"
     manifest = json.loads(
-        (run.run_dir / "validation_manifest.json").read_text(encoding="utf-8")
+        (run.directory / "validation_manifest.json").read_text(encoding="utf-8")
     )
     assert manifest["strategy"] == "temporal"
     assert len(set(run.plan.candidates)) > 2
-    assert (run.run_dir / "explanations").is_dir()
+    assert (run.directory / "explanations").is_dir()
 
 
 def test_a_numeric_node_label_is_a_regression(tmp_path, monkeypatch):
@@ -290,11 +290,11 @@ def test_a_numeric_node_label_is_a_regression(tmp_path, monkeypatch):
     run = project.Project(
         str(root),
         "label",
-        time_budget=120,
+        budget=120,
         modality="graph",
         models=support.optin(tasks.Task.REGRESSION),
         enforcement="cooperative",
-        output_dir=tmp_path / "runs",
+        directory=tmp_path / "runs",
     ).run()
     assert run.state == "COMPLETED"
     assert run.plan.task == "regression"

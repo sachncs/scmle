@@ -219,7 +219,7 @@ NOT_MEASURED: tuple[tuple[str, str], ...] = (
         "the promotion and rollback e-process",
     ),
     (
-        "scmle/decision/anytime.py:confidence_bound",
+        "scmle/decision/anytime.py:bound",
         "the anytime-valid confidence bound",
     ),
     (
@@ -767,7 +767,7 @@ def jump(rng: numpy.random.Generator) -> dict[str, float]:
         "balance": found.balance.get("z", {}).get("p"),
         "left": found.placebos.get("left_median", {}).get("p"),
         "right": found.placebos.get("right_median", {}).get("p"),
-        "density": found.density_p,
+        "density": found.density,
     }
     for name, p in tests.items():
         if p is not None:
@@ -797,9 +797,9 @@ def adopt(rng: numpy.random.Generator) -> dict[str, float]:
         pandas.DataFrame(rows), "unit", "time", "adoption", "y", LEVEL
     )
     records = {"covered": float(found.low <= EFFECT <= found.high)}
-    if found.pretrend_p is not None:
-        records["pretrend.rejected"] = float(found.pretrend_p <= 1 - LEVEL)
-        records["pretrend.rank"] = rank(found.pretrend_p)
+    if found.pretrend is not None:
+        records["pretrend.rejected"] = float(found.pretrend <= 1 - LEVEL)
+        records["pretrend.rank"] = rank(found.pretrend)
     return records
 
 
@@ -821,9 +821,7 @@ def randomize(rng: numpy.random.Generator) -> dict[str, float]:
     frame = pandas.DataFrame(
         {"t": t, "y": rng.exponential(1.0, RANDOM_ROWS) + EFFECT * t}
     )
-    adapter = adjustment.RandomizedEstimator(
-        question(), frame, 0, "linear", 1 - LEVEL
-    )
+    adapter = adjustment.Experiment(question(), frame, 0, "linear", 1 - LEVEL)
     found = adapter.estimate(frame, LEVEL)
     return {"covered": float(found.low <= EFFECT <= found.high)}
 
@@ -841,9 +839,7 @@ def divide(rng: numpy.random.Generator) -> dict[str, float]:
         }
     )
     spec = question(subgroups=(causal.Subgroup("g", GROUPS),))
-    adapter = adjustment.RandomizedEstimator(
-        spec, frame, 0, "linear", 1 - LEVEL
-    )
+    adapter = adjustment.Experiment(spec, frame, 0, "linear", 1 - LEVEL)
     found = strata.stratify(adapter, frame, LEVEL, spec.subgroups)
     first = found["hypotheses"][0]
     records = {"rejected": float(bool(found["rejected"]))}
@@ -1332,8 +1328,7 @@ SCENARIOS: tuple[Scenario, ...] = (
     ),
     Scenario(
         "randomized.effect",
-        "scmle/causal/identification/run/adjustment.py:"
-        "RandomizedEstimator.estimate",
+        "scmle/causal/identification/run/adjustment.py:Experiment.estimate",
         randomize,
         (Rate("covered", LEVEL, -1),),
     ),

@@ -26,9 +26,7 @@ class Ordinal(classical.Learner):
     training fold missing the top level still yields a full probability row.
     """
 
-    conformance_params: Mapping[str, Any] | None = types.MappingProxyType(
-        {LEVELS: 3}
-    )
+    params: Mapping[str, Any] | None = types.MappingProxyType({LEVELS: 3})
 
     def build(
         self,
@@ -60,7 +58,7 @@ ORDINAL_RIDGE = Ordinal(
     name="ordinal_ridge",
     family="linear",
     capabilities=models.Capabilities(
-        ORDINAL, needs_scaling=True, cost=2, probabilities=True
+        ORDINAL, scaling=True, cost=2, probabilities=True
     ),
     regressor=linear_model.Ridge,
     search_space=search.Space((search.Real("alpha", 1e-3, 100.0, log=True),)),
@@ -70,7 +68,7 @@ ORDINAL_FOREST = Ordinal(
     name="ordinal_random_forest",
     family="tree",
     capabilities=models.Capabilities(
-        ORDINAL, cost=3, memory_factor=6.0, probabilities=True
+        ORDINAL, cost=3, factor=6.0, probabilities=True
     ),
     regressor=ensemble.RandomForestRegressor,
     search_space=search.Space(
@@ -86,9 +84,9 @@ ORDINAL_BOOSTING = Ordinal(
     family="boosting",
     capabilities=models.Capabilities(
         ORDINAL,
-        handles_missing=True,
+        missing=True,
         cost=3,
-        memory_factor=3.0,
+        factor=3.0,
         probabilities=True,
     ),
     regressor=ensemble.HistGradientBoostingRegressor,

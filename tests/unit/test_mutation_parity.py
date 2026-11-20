@@ -30,7 +30,7 @@ def test_the_hand_written_model_records_its_metric() -> None:
 
 def test_a_differing_label_is_named_by_record() -> None:
     expected = {"labels": [1], "probability_of_class_1": [0.9]}
-    tolerance = parity.Tolerance(probability_abs=0.01)
+    tolerance = parity.Tolerance(probability=0.01)
     found = parity.compare(expected, [0], [[0.1, 0.9]], tolerance)
     assert found.to_dict() == {
         "passed": False,
@@ -73,13 +73,13 @@ def test_a_reply_without_the_contract_keys_fails(monkeypatch) -> None:
 
 def test_the_goldens_read_each_file_by_its_exact_name(monkeypatch) -> None:
     read = []
-    real = parity.read_json
+    real = parity.read
 
     def spy(path):
         read.append(pathlib.Path(path).name)
         return real(path)
 
-    monkeypatch.setattr(parity, "read_json", spy)
+    monkeypatch.setattr(parity, "read", spy)
     parity.goldens(GOLDEN)
     assert sorted(read) == [
         "model_spec.json",

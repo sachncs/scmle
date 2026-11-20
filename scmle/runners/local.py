@@ -51,7 +51,7 @@ GRACE = 10.0
 # same cut the inline runner applies to an exception's text.
 TAIL = 300
 ENTRYPOINT = ("-m", "scmle.runners.entrypoint")
-DEFAULT_WORKLOAD = "scmle.runners.project:run_project"
+DEFAULT_WORKLOAD = "scmle.runners.project:project"
 
 
 class PreemptedError(errors.ScmleError):
@@ -68,18 +68,18 @@ class Context:
 
     Attributes:
         store: Durable storage, limited to the training role.
-        run_id: The run.
+        run: The run.
         attempt: Attempt number, from 1.
         spec: The job spec.
         checkpoints: This run's checkpoints.
         hook: Called by `step` after saving (interruption, budget).
     """
 
-    store: roles.RoleStore
-    run_id: str
+    store: roles.Store
+    run: str
     attempt: int
     spec: base.Job
-    checkpoints: checkpoint.CheckpointStore
+    checkpoints: checkpoint.Store
     hook: Callable[[int], None] = lambda step: None  # noqa: ARG005 -- hook signature
 
     def resume(self) -> checkpoint.Checkpoint | None:
@@ -117,7 +117,7 @@ class Context:
             result: JSON-serializable mapping, stored as the run's result.
         """
         body = json.dumps(dict(result), indent=2, sort_keys=True).encode()
-        self.store.put(f"runs/{self.run_id}/result.json", body)
+        self.store.put(f"runs/{self.run}/result.json", body)
 
 
 Workload = Callable[[Context], None]
@@ -151,7 +151,7 @@ class Runner(base.Runner):
         store: Any,
         workload: Workload,
         *,
-        serving_identity: str,
+        identity: str,
         interruptions: Interruption | None = None,
         **options: Any,
     ) -> None:
@@ -160,12 +160,12 @@ class Runner(base.Runner):
         Args:
             store: Durable storage (any `Depot`).
             workload: The training function.
-            serving_identity: The serving identity (see `Runner`).
+            identity: The serving identity (see `Runner`).
             interruptions: `(attempt, step) -> bool`; true makes the job
                 interrupted right after that step's checkpoint.
-            **options: `clock` and `poll_seconds` (see `Runner`).
+            **options: `clock` and `interval` (see `Runner`).
         """
-        super().__init__(store, serving_identity=serving_identity, **options)
+        super().__init__(store, identity=identity, **options)
         self.workload = workload
         self.interruptions = interruptions
         self.jobs: dict[str, Outcome] = {}
@@ -185,7 +185,7 @@ class Runner(base.Runner):
         Returns:
             The handle of the finished attempt.
         """
-        handle = base.Ticket(f"local-{spec.run_id}-{attempt}", attempt)
+        handle = base.Ticket(f"local-{spec.identifier}-{attempt}", attempt)
 
         def hook(step: int) -> None:
             """Lets the supervisor act after a checkpoint.
@@ -204,11 +204,11 @@ class Runner(base.Runner):
                 raise PreemptedError
 
         context = Context(
-            roles.RoleStore(self.store, roles.TRAINING_ROLE),
-            spec.run_id,
+            roles.Store(self.store, roles.TRAINING_ROLE),
+            spec.identifier,
             attempt,
             spec,
-            checkpoint.CheckpointStore(self.store, spec.run_id),
+            checkpoint.Store(self.store, spec.identifier),
             hook,
         )
         try:
@@ -289,7 +289,7 @@ class Process(base.Runner):
         self,
         store: objectstore.Depot,
         *,
-        serving_identity: str,
+        identity: str,
         workload: str = DEFAULT_WORKLOAD,
         grace: float = GRACE,
         directory: str | pathlib.Path | None = None,
@@ -301,12 +301,12 @@ class Process(base.Runner):
             store: Durable storage; a `LocalObjectStore`, or a tenant's
                 `Tenancy` over one, so the job can open it by its `file://`
                 URI and the tenant (`environment`).
-            serving_identity: The serving identity (see `base.Runner`).
+            identity: The serving identity (see `base.Runner`).
             workload: The workload as `module:function`, importable in the
                 job's environment.
             grace: Seconds between SIGTERM and SIGKILL on a stop.
             directory: Working directory of the job process.
-            **options: `clock` and `poll_seconds` (see `base.Runner`).
+            **options: `clock` and `interval` (see `base.Runner`).
 
         Raises:
             ConfigError: If the store is not a local object store, or a
@@ -314,7 +314,7 @@ class Process(base.Runner):
                 grace is negative.
         """
         inner = store.inner if isinstance(store, tenancy.Tenancy) else store
-        if not isinstance(inner, objectstore.LocalObjectStore):
+        if not isinstance(inner, objectstore.Disk):
             raise errors.ConfigError(
                 f"the {self.kind} runner needs a LocalObjectStore the job "
                 f"can open by URI, not {type(inner).__name__}"
@@ -323,7 +323,7 @@ class Process(base.Runner):
             raise errors.ConfigError(
                 "workload must be module:function and grace not negative"
             )
-        super().__init__(store, serving_identity=serving_identity, **options)
+        super().__init__(store, identity=identity, **options)
         self.root = inner.root
         self.workload = workload
         self.grace = grace
@@ -356,7 +356,7 @@ class Process(base.Runner):
         return {
             **spec.environment,
             tenancy.VARIABLE: tenant,
-            "SCMLE_RUN_ID": spec.run_id,
+            "SCMLE_RUN_ID": spec.identifier,
             "SCMLE_ATTEMPT": str(attempt),
             "SCMLE_STORE_URI": self.uri(),
             "SCMLE_SPEC_DIGEST": spec.digest(),
@@ -385,7 +385,7 @@ class Process(base.Runner):
         Returns:
             `scmle-<kind>-<run_id>-<attempt>`, also the container name.
         """
-        return f"scmle-{self.kind}-{spec.run_id}-{attempt}"
+        return f"scmle-{self.kind}-{spec.identifier}-{attempt}"
 
     def prepare(self, name: str) -> None:
         """Clears what an earlier supervisor left under `name` (nothing here).
@@ -425,7 +425,7 @@ class Process(base.Runner):
             raise errors.ConfigError(
                 f"cannot start {command[0]}: {error}"
             ) from error
-        self.jobs[name] = Child(process, log, spec.run_id)
+        self.jobs[name] = Child(process, log, spec.identifier)
         return base.Ticket(name, attempt)
 
     def poll(self, handle: base.Ticket) -> base.Status:
@@ -521,7 +521,7 @@ class Container(Process):
         self,
         store: objectstore.Depot,
         *,
-        serving_identity: str,
+        identity: str,
         image: str,
         client: str = "docker",
         user: str | None = None,
@@ -532,12 +532,12 @@ class Container(Process):
         Args:
             store: Durable storage, a `LocalObjectStore` on a path the Docker
                 daemon can mount.
-            serving_identity: The serving identity (see `base.Runner`).
+            identity: The serving identity (see `base.Runner`).
             image: The image that holds scmle.
             client: The Docker CLI.
             user: `uid:gid` for the job; defaults to ours, so the files it
                 writes are ours, or to the image's 10001 when we are root.
-            **options: `workload`, `grace`, `clock` and `poll_seconds` (see
+            **options: `workload`, `grace`, `clock` and `interval` (see
                 `Process`).
 
         Raises:
@@ -545,7 +545,7 @@ class Container(Process):
         """
         if not image.strip():
             raise errors.ConfigError("the container runner needs an image")
-        super().__init__(store, serving_identity=serving_identity, **options)
+        super().__init__(store, identity=identity, **options)
         self.image = image
         self.client = client
         owner = getattr(os, "getuid", lambda: 0)()
@@ -702,9 +702,7 @@ def main(arguments: list[str] | None = None) -> int:
     )
     options = parser.parse_args(arguments)
     try:
-        store = tenancy.confine(
-            objectstore.LocalObjectStore(options.store), os.environ
-        )
+        store = tenancy.confine(objectstore.Disk(options.store), os.environ)
         for item in options.put:
             key, separator, path = item.partition("=")
             if not separator:
@@ -716,9 +714,9 @@ def main(arguments: list[str] | None = None) -> int:
         )
         runner = RUNNERS[options.runner](
             store,
-            serving_identity=options.serving,
+            identity=options.serving,
             workload=options.workload,
-            poll_seconds=options.poll,
+            interval=options.poll,
             **extra,
         )
         manifest = runner.run(base.Job.read(record))

@@ -599,9 +599,7 @@ def test_diagnostic_verdict_reads_the_first_verdict_key():
 
 
 def make_gate(action=evaluation.Remedy.BLOCK):
-    return evaluation.Requirement(
-        name="diag", action=action, required_evidence=("e1",)
-    )
+    return evaluation.Requirement(name="diag", action=action, evidence=("e1",))
 
 
 def diagnose(report, action=evaluation.Remedy.BLOCK):
@@ -679,7 +677,7 @@ def test_diagnostic_gate_judges_errors_availability_and_verdicts():
 
 def make_policy_namespace(**fields):
     explanations = types.SimpleNamespace(
-        required_methods=("shap",),
+        methods=("shap",),
         require_stability=True,
         stability_threshold=0.5,
         require_fidelity=True,
@@ -753,7 +751,7 @@ def test_explanation_findings_need_a_threshold_for_each_requirement():
 
 
 def fairness_gate(**bounds):
-    return evaluation.Equity(metric="gap", required_evidence=("fe",), **bounds)
+    return evaluation.Equity(metric="gap", evidence=("fe",), **bounds)
 
 
 def test_fairness_gate_maximum_uses_the_worst_value():
@@ -816,7 +814,7 @@ def test_fairness_gate_without_values_or_bound_fails_closed():
     minimum = release.audit(fairness_gate(minimum=0.25), {})
     assert minimum.expected == 0.25
     unbounded = types.SimpleNamespace(
-        metric="gap", maximum=None, minimum=None, required_evidence=("fe",)
+        metric="gap", maximum=None, minimum=None, evidence=("fe",)
     )
     finding = release.audit(unbounded, {"a": {"gap": 1.0}})
     assert finding.to_dict() == {
@@ -978,11 +976,11 @@ def test_a_decisive_gate_fails_a_report_without_a_verdict():
     decisive = evaluation.Requirement(
         name="diag",
         action=evaluation.Remedy.BLOCK,
-        required_evidence=("e1",),
+        evidence=("e1",),
         decisive=True,
     )
     presence = evaluation.Requirement(
-        name="diag", action=evaluation.Remedy.BLOCK, required_evidence=("e1",)
+        name="diag", action=evaluation.Remedy.BLOCK, evidence=("e1",)
     )
     report = {"diag": {"value": 1.0}}
     failed = release.adjudge(decisive, report)
@@ -994,6 +992,6 @@ def test_a_decisive_gate_fails_a_report_without_a_verdict():
         evaluation.Requirement(
             name="diag",
             action=evaluation.Remedy.BLOCK,
-            required_evidence=("e1",),
+            evidence=("e1",),
             decisive=1,
         )

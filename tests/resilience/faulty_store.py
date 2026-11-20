@@ -4,7 +4,7 @@ from scmle.storage import objectstore
 
 
 def throttled():
-    return objectstore.TransientStoreError("throttled")
+    return objectstore.TransientError("throttled")
 
 
 class FaultyStore(objectstore.Depot):
@@ -71,9 +71,9 @@ class FaultyStore(objectstore.Depot):
         self.strike("head", key)
         return self.inner.head(key)
 
-    def list_objects(self, prefix=""):
+    def catalog(self, prefix=""):
         self.strike("list_objects", prefix)
-        return self.inner.list_objects(prefix)
+        return self.inner.catalog(prefix)
 
     def delete(self, key, *, if_version=None):
         self.strike("delete", key)

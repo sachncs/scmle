@@ -80,7 +80,7 @@ def measure(rows: int) -> dict[str, object]:
         project = scmle.api.project.Project(
             frame,
             "y",
-            output_dir=folder,
+            directory=folder,
             search=tasks.Search(top_models=0),
             strategies=tasks.Strategies(top_models=0),
             ensemble=tasks.Stacking(size=0),

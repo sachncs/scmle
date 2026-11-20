@@ -26,8 +26,8 @@ def run(tmp_path, criteria):
     return support.make_project(
         frame(),
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
         problem=tasks.Problem(
             decision="approve or decline",
             population="applicants",
@@ -50,44 +50,44 @@ def test_met_criteria_are_reported_and_the_summary_says_so(tmp_path):
     assert result.evaluation["provenance"]["config_hash"]
     assert result.evaluation["provenance"]["dataset"]["snapshot_id"]
     assert result.evaluation["provenance"]["model"]["manifest_sha256"]
-    assert (result.run_dir / "provenance.json").exists()
+    assert (result.directory / "provenance.json").exists()
     assert result.evaluation["sbom"]["bomFormat"] == "CycloneDX"
-    assert (result.run_dir / "sbom.json").exists()
+    assert (result.directory / "sbom.json").exists()
     assert result.evaluation["release"]["attestation"]["schema_version"] == 2
-    assert (result.run_dir / "release_attestation.json").exists()
+    assert (result.directory / "release_attestation.json").exists()
     assert result.evaluation["reliability"]["release_blocked"] is True
-    assert (result.run_dir / "fault_injection_plan.json").exists()
+    assert (result.directory / "fault_injection_plan.json").exists()
     source_registry = json.loads(
-        (result.run_dir / "source_registry.json").read_text()
+        (result.directory / "source_registry.json").read_text()
     )
     assert source_registry["schema_compatibility"]["status"] == "initial"
-    model_card = json.loads((result.run_dir / "model_card.json").read_text())
+    model_card = json.loads((result.directory / "model_card.json").read_text())
     assert (
         model_card["snapshot"]
         == result.evaluation["provenance"]["dataset"]["snapshot_id"]
     )
     assert model_card["review"] == "machine_generated_unreviewed"
     assert (
-        result.run_dir / "explanations/permutation_importance.json"
+        result.directory / "explanations/permutation_importance.json"
     ).exists()
     explanation_html = (
-        result.run_dir / "explanations/permutation_importance.html"
+        result.directory / "explanations/permutation_importance.html"
     )
     assert explanation_html.exists()
     assert "Explanation output" in explanation_html.read_text()
-    run_report = (result.run_dir / "report.html").read_text()
+    run_report = (result.directory / "report.html").read_text()
     assert 'href="explanations/permutation_importance.html"' in run_report
-    assert (result.run_dir / "capability_registry.json").exists()
+    assert (result.directory / "capability_registry.json").exists()
     capability_registry = json.loads(
-        (result.run_dir / "capability_registry.json").read_text()
+        (result.directory / "capability_registry.json").read_text()
     )
     assert capability_registry["schema_version"] == 2
     assert any(
         family["family"] == "jepa" and family["status"] == "experimental"
         for family in capability_registry["model_families"]
     )
-    assert (result.run_dir / "evaluation_policy.json").exists()
-    assert (result.run_dir / "release_evidence.json").exists()
+    assert (result.directory / "evaluation_policy.json").exists()
+    assert (result.directory / "release_evidence.json").exists()
     assert "success criteria met" in result.summary()
 
 
@@ -136,7 +136,7 @@ def test_packaged_release_attestation_is_signed_when_key_is_configured(
         result.evaluation["release"]["evidence"]
     )
     assert evidence_index.verify("release-key")
-    assert (result.run_dir / "release_evidence.json").exists()
+    assert (result.directory / "release_evidence.json").exists()
     assert not any(
         finding["kind"] == "security"
         for finding in result.evaluation["release"]["evaluation"]["findings"]

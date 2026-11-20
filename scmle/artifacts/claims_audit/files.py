@@ -82,7 +82,7 @@ def rehydrate(run_dir: str | Path) -> scmle.assurance.ledger.ledger.Ledger:
         raise errors.ArtifactError(str(error)) from error
 
 
-def read_optional(path: Path) -> dict[str, Any] | None:
+def read(path: Path) -> dict[str, Any] | None:
     """Reads a JSON object file.
 
     Args:

@@ -38,7 +38,7 @@ def test_the_wald_ratio_equals_the_closed_form_two_by_two_case():
         - frame.loc[frame.z == 0, "d"].mean()
     )
     assert out.estimate == pytest.approx(reduced / first, abs=1e-12)
-    assert out.first_stage == pytest.approx(first, abs=1e-12)
+    assert out.stage == pytest.approx(first, abs=1e-12)
 
 
 def test_controls_are_partialled_out_with_an_intercept():

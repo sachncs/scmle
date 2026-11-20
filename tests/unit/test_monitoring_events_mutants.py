@@ -20,10 +20,10 @@ from scmle.monitoring import events
 
 def make_policy(retention_days=30, redacted=("features",)):
     return observability.Requirements(
-        retention_days=retention_days,
-        required_signals=(observability.Indicator.LATENCY,),
-        redacted_fields=redacted,
-        alert_thresholds={},
+        retention=retention_days,
+        signals=(observability.Indicator.LATENCY,),
+        fields=redacted,
+        thresholds={},
     )
 
 
@@ -47,7 +47,7 @@ def make_bundle(task="binary_classification", fail=None, files=None):
         predict_proba=predict_proba,
         schema=types.SimpleNamespace(task=task),
         info=types.SimpleNamespace(
-            model_version="v7",
+            version="v7",
             files={} if files is None else files,
         ),
     )

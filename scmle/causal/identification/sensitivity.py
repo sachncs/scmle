@@ -113,7 +113,7 @@ def evalues(estimate: float, low: float, high: float) -> dict[str, float]:
     }
 
 
-def smd_to_rr(d: float) -> float:
+def convert(d: float) -> float:
     """Converts a standardised mean difference to a risk ratio.
 
     Args:
@@ -347,7 +347,7 @@ class Sensitivity:
     Attributes:
         estimate: Linear-model coefficient of `D`.
         rv: Robustness value for a full reduction (`q = 1`).
-        rv_alpha: Robustness value for losing significance.
+        rvalpha: Robustness value for losing significance.
         benchmark: What bounded the confounder (words).
         r2yz: Assumed partial R2 of the confounder with the outcome.
         r2dz: Assumed partial R2 with the treatment.
@@ -360,7 +360,7 @@ class Sensitivity:
 
     estimate: float
     rv: float
-    rv_alpha: float
+    rvalpha: float
     benchmark: str
     r2yz: float
     r2dz: float
@@ -456,7 +456,7 @@ def assess(
     return Sensitivity(
         estimate=fit.estimate,
         rv=rvalue(fit.t, fit.dof, 1.0),
-        rv_alpha=rvalue(fit.t, fit.dof, 1.0, 1 - level),
+        rvalpha=rvalue(fit.t, fit.dof, 1.0, 1 - level),
         benchmark=words,
         r2yz=r2yz,
         r2dz=r2dz,

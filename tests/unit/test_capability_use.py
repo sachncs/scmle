@@ -30,7 +30,7 @@ def high_cardinality_frame(rows=900, levels=40, seed=0):
 
 
 PLAN = scmle.contracts.data.Blueprint(
-    numeric=("x",), categorical=("cat",), high_cardinality=("cat",)
+    numeric=("x",), categorical=("cat",), cardinal=("cat",)
 )
 
 
@@ -101,11 +101,11 @@ def test_target_encoding_strategy_is_cross_fitted_and_conditional(registry):
     assert pipeline_.predict_proba(features).shape == (len(features), 2)
     profile = scmle.contracts.data.Portrait(
         manifest=None,
-        column_statistics={},
-        quality_findings=(),
+        statistics={},
+        quality=(),
         risk_findings=(),
-        target_summary={},
-        feature_plan=scmle.contracts.data.Blueprint(("x",), ("cat",)),
+        summary={},
+        plan=scmle.contracts.data.Blueprint(("x",), ("cat",)),
     )
     reason = strategy.applicability(profile, tasks.Task.BINARY, adapter)
     assert reason == "no high-cardinality categorical feature"
@@ -113,14 +113,14 @@ def test_target_encoding_strategy_is_cross_fitted_and_conditional(registry):
 
 def planning_context(spec, plan):
     profile = scmle.contracts.data.Portrait(
-        manifest=scmle.contracts.data.DatasetManifest(
+        manifest=scmle.contracts.data.Manifest(
             "ds", {"schema": "s", "data": "h"}, 900, 3, "y", "<in-memory>"
         ),
-        column_statistics={},
-        quality_findings=(),
+        statistics={},
+        quality=(),
         risk_findings=(),
-        target_summary={"imbalance_ratio": 1.0},
-        feature_plan=plan,
+        summary={"imbalance_ratio": 1.0},
+        plan=plan,
     )
     return planner.Situation(spec, profile, tasks.Task.BINARY)
 

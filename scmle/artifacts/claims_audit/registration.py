@@ -96,7 +96,7 @@ def reconfirm(
         row.
     """
     name = "coverage claim on C: registered, recomputed, status matches"
-    document = files.read_optional(run_dir / coverage_confirm.DOCUMENT)
+    document = files.read(run_dir / coverage_confirm.DOCUMENT)
     if document is None:
         return None
     registered = ledger.claims.get(coverage_confirm.CLAIM_ID)
@@ -104,7 +104,7 @@ def reconfirm(
     if early is not None:
         return early
     problems = []
-    claim = files.read_optional(run_dir / coverage_run.CLAIM_FILE)
+    claim = files.read(run_dir / coverage_run.CLAIM_FILE)
     try:
         claim_hash = scmle.assurance.ledger.ledger.digest(claim or {})
         choice = document["primary"]
@@ -147,7 +147,7 @@ def misnamed(
         A message for each baseline claim whose registration the report does
         not name; empty if there is no report or all match.
     """
-    stored = files.read_optional(run_dir / files.BASELINE_FILE)
+    stored = files.read(run_dir / files.BASELINE_FILE)
     if stored is None:
         return []
     report = records.load("Outcome", baseline.Outcome.migrations, stored)
@@ -159,7 +159,7 @@ def misnamed(
     ]
 
 
-def check_registered(
+def check(
     run_dir: Path,
     document: dict[str, Any],
     ledger: scmle.assurance.ledger.ledger.Ledger,
@@ -187,7 +187,7 @@ def check_registered(
         if stated is None or stated.get("sha256") != item["sha256"]:
             problems.append(f"{claim_id}: registration hash differs")
     for file_name, expected in sorted(attachments.items()):
-        found = files.read_optional(run_dir / file_name)
+        found = files.read(run_dir / file_name)
         if found is None:
             problems.append(f"{file_name}: missing")
         elif scmle.assurance.ledger.ledger.digest(found) != expected:

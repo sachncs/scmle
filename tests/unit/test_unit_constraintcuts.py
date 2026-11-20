@@ -41,16 +41,16 @@ def test_a_development_gap_is_the_largest_rate_difference():
     y = numpy.array([1, 1, 0, 0, 1, 1, 0, 0], dtype=float)
     a = numpy.array([1, 1, 1, 0, 1, 0, 0, 0], dtype=float)
     g = numpy.array(list("aaaabbbb"))
-    assert cuts.development_gap(y, a, g, "demographic_parity") == 0.5
-    assert cuts.development_gap(y, a, g, "equal_opportunity") == 0.5
-    assert cuts.development_gap(y, a, g, "equalized_odds") == 0.5
+    assert cuts.contrast(y, a, g, "demographic_parity") == 0.5
+    assert cuts.contrast(y, a, g, "equal_opportunity") == 0.5
+    assert cuts.contrast(y, a, g, "equalized_odds") == 0.5
 
 
 def test_an_empty_denominator_counts_as_rate_zero():
     y = numpy.array([1, 1, 0, 0], dtype=float)
     a = numpy.array([1, 1, 0, 0], dtype=float)
     g = numpy.array(["a", "a", "b", "b"])
-    assert cuts.development_gap(y, a, g, "equal_opportunity") == 1.0
+    assert cuts.contrast(y, a, g, "equal_opportunity") == 1.0
 
 
 def test_an_alignment_cuts_each_group_at_its_quantile():
@@ -79,23 +79,21 @@ def test_an_equalization_keeps_the_common_cut_when_it_already_meets_the_bound():
     found = cuts.equalize(s, y, g, constraint(gap=0.2), 0.5)
     common = (s >= 0.5).astype(float)
     assert found.cuts == {"a": 0.5, "b": 0.5}
-    assert found.target_rate is None
+    assert found.target is None
     assert found.constrained is False
-    assert found.net_benefit == costs.net_benefit(y, common, 0.5)
-    assert found.development_gap == cuts.development_gap(
-        y, common, g, "demographic_parity"
-    )
+    assert found.benefit == costs.net_benefit(y, common, 0.5)
+    assert found.gap == cuts.contrast(y, common, g, "demographic_parity")
 
 
 def test_an_equalization_sweeps_when_the_common_cut_is_unfair():
     s, y, g = shifted()
     found = cuts.equalize(s, y, g, constraint(gap=0.05), 0.4)
     assert found.constrained is True
-    assert found.development_gap <= 0.025
+    assert found.gap <= 0.025
     assert found.cuts["b"] < found.cuts["a"]
     acts = found.act(s, g)
-    assert found.net_benefit == pytest.approx(costs.net_benefit(y, acts, 0.4))
-    assert 0.01 <= found.target_rate <= 0.99
+    assert found.benefit == pytest.approx(costs.net_benefit(y, acts, 0.4))
+    assert 0.01 <= found.target <= 0.99
     best = cuts.sweep((s, y, g), ["a", "b"], "demographic_parity", 0.4, 0.025)
     assert best == found
 
@@ -103,10 +101,10 @@ def test_an_equalization_sweeps_when_the_common_cut_is_unfair():
 def test_the_margin_scales_the_bound():
     s, y, g = shifted()
     loose = cuts.equalize(s, y, g, constraint(gap=0.05), 0.4, margin=1.0)
-    assert loose.development_gap <= 0.05
+    assert loose.gap <= 0.05
     assert (
-        loose.net_benefit
-        >= cuts.equalize(s, y, g, constraint(gap=0.05), 0.4).net_benefit
+        loose.benefit
+        >= cuts.equalize(s, y, g, constraint(gap=0.05), 0.4).benefit
     )
 
 
@@ -139,8 +137,8 @@ def test_a_frontier_reports_each_bound_in_order():
     assert rows[1] == {
         "max_gap": 0.05,
         "feasible": True,
-        "net_benefit": fitted.net_benefit,
-        "development_gap": fitted.development_gap,
+        "net_benefit": fitted.benefit,
+        "development_gap": fitted.gap,
     }
 
 

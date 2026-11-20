@@ -20,8 +20,8 @@ def run(frame, tmp_path, strategies=STRATEGIES, search=NO_SEARCH, **kwargs):
     project = support.make_project(
         frame,
         "y",
-        time_budget=600,
-        output_dir=tmp_path,
+        budget=600,
+        directory=tmp_path,
         search=search,
         strategies=strategies,
         **kwargs,
@@ -31,7 +31,7 @@ def run(frame, tmp_path, strategies=STRATEGIES, search=NO_SEARCH, **kwargs):
 
 def decision_log(result):
     return json.loads(
-        (result.run_dir / "diagnostics" / "decision_log.json").read_text()
+        (result.directory / "diagnostics" / "decision_log.json").read_text()
     )
 
 
@@ -41,7 +41,7 @@ def test_imbalanced_data_triggers_strategy_trials(imbalanced_frame, tmp_path):
     result = run(imbalanced_frame, tmp_path)
     tried = {t.strategy for t in result.trials if t.strategy != "default"}
     assert {"class_weight", "random_oversample", "random_undersample"} <= tried
-    ids = [t.trial_id for t in result.trials]
+    ids = [t.identifier for t in result.trials]
     assert len(ids) == len(set(ids))
     log = decision_log(result)
     verdicts = [o for o in log["outcomes"] if "@" in o["technique"]]
@@ -49,7 +49,7 @@ def test_imbalanced_data_triggers_strategy_trials(imbalanced_frame, tmp_path):
         " vs default " in o["reason"] or "not applicable" in o["reason"]
         for o in verdicts
     )
-    assert log["selection"]["model"] == result.selected_model
+    assert log["selection"]["model"] == result.model
 
 
 def test_every_strategy_is_compared_on_the_original_validation_folds(
@@ -57,21 +57,21 @@ def test_every_strategy_is_compared_on_the_original_validation_folds(
 ):
     result = run(imbalanced_frame, tmp_path)
     fold_counts = {
-        len(t.fold_scores) for t in result.trials if t.status == "ok"
+        len(t.folds) for t in result.trials if t.status == "ok"
     }
     assert fold_counts == {5}
     default = next(
         t
         for t in result.trials
-        if t.model_name == "logistic_regression" and t.strategy == "default"
+        if t.model == "logistic_regression" and t.strategy == "default"
     )
     weighted = next(
         t
         for t in result.trials
-        if t.model_name == "logistic_regression"
+        if t.model == "logistic_regression"
         and t.strategy == "class_weight"
     )
-    assert default.fold_scores != weighted.fold_scores
+    assert default.folds != weighted.folds
 
 
 def test_adopted_strategy_is_used_for_the_final_model(
@@ -84,11 +84,11 @@ def test_adopted_strategy_is_used_for_the_final_model(
     selected = next(
         t
         for t in result.trials
-        if t.model_name == result.selected_model
+        if t.model == result.model
         and t.strategy == result.evaluation["selected"]["strategy"]
         and t.params == result.evaluation["selected"]["params"]
     )
-    assert selected.score_mean == pytest.approx(
+    assert selected.score == pytest.approx(
         result.evaluation["selected"]["score"]
     )
     features = imbalanced_frame.drop(columns="y")
@@ -113,15 +113,15 @@ def test_strategies_can_be_forced_to_win_and_are_then_used(
         "random_undersample",
     }
     best_under = max(
-        t.score_mean
+        t.score
         for t in result.trials
         if t.strategy == "random_undersample" and t.status == "ok"
     )
     best_default = max(
-        t.score_mean
+        t.score
         for t in result.trials
         if t.strategy == "default"
-        and t.model_name != "dummy"
+        and t.model != "dummy"
         and t.status == "ok"
     )
     assert (
@@ -163,11 +163,11 @@ def test_feature_strategies_apply_to_skewed_linear_models(
     linear = {
         t.strategy
         for t in result.trials
-        if t.model_name == "logistic_regression"
+        if t.model == "logistic_regression"
     }
     assert {"log_skewed", "interactions"} <= linear
     trees = {
-        t.strategy for t in result.trials if t.model_name == "random_forest"
+        t.strategy for t in result.trials if t.model == "random_forest"
     }
     assert not trees & {"log_skewed", "interactions"}
 
@@ -177,7 +177,7 @@ def test_tuning_runs_under_the_winning_strategy(imbalanced_frame, tmp_path):
     result = run(imbalanced_frame, tmp_path, search=search)
     tuned = [t for t in result.trials if t.params]
     assert tuned and len({t.strategy for t in tuned}) == 1
-    ids = [t.trial_id for t in result.trials]
+    ids = [t.identifier for t in result.trials]
     assert len(ids) == len(set(ids))
 
 
@@ -192,8 +192,8 @@ def test_strategy_run_resumes_without_recomputation(
         support.make_project(
             imbalanced_frame,
             "y",
-            time_budget=600,
-            output_dir=tmp_path,
+            budget=600,
+            directory=tmp_path,
             search=search,
             strategies=STRATEGIES,
         )
@@ -203,7 +203,7 @@ def test_strategy_run_resumes_without_recomputation(
     monkeypatch.setattr(
         trials,
         "evaluate",
-        lambda p: calls.append(p.job.trial_id) or real(p),
+        lambda p: calls.append(p.job.identifier) or real(p),
     )
     resumed = scmle.api.project.Project.resume(directory, data=imbalanced_frame)
     assert calls == []
@@ -211,8 +211,8 @@ def test_strategy_run_resumes_without_recomputation(
         resumed.evaluation["selected"]["strategy"]
         == original.evaluation["selected"]["strategy"]
     )
-    assert [(t.trial_id, t.strategy) for t in resumed.trials] == [
-        (t.trial_id, t.strategy) for t in original.trials
+    assert [(t.identifier, t.strategy) for t in resumed.trials] == [
+        (t.identifier, t.strategy) for t in original.trials
     ]
 
 
@@ -225,7 +225,7 @@ def test_leaderboard_marks_exactly_the_selected_trial(
     assert board["selected"].sum() == 1
     winner = board[board["selected"]].iloc[0]
     assert winner["identifier"] == result.evaluation["selected"]["trial"]
-    assert winner["model"] == result.selected_model
+    assert winner["model"] == result.model
     assert winner["score"] == pytest.approx(
         result.evaluation["selected"]["score"]
     )
@@ -253,7 +253,7 @@ def test_smote_variants_are_evaluated_on_the_original_folds_when_installed(
     )
     tried = {t.strategy for t in result.trials if t.strategy != "default"}
     assert tried == {"smote", "borderline_smote", "adasyn"}
-    assert {len(t.fold_scores) for t in result.trials if t.status == "ok"} == {
+    assert {len(t.folds) for t in result.trials if t.status == "ok"} == {
         5
     }
     features = numeric_imbalanced().drop(columns="y")
@@ -281,7 +281,7 @@ def test_jitter_augmentation_must_be_requested_explicitly(tmp_path):
     result = run(frame, tmp_path, strategies=opted, metric="pr_auc")
     assert any(t.strategy == "jitter_augment" for t in result.trials)
     verdicts = json.loads(
-        (result.run_dir / "diagnostics" / "decision_log.json").read_text()
+        (result.directory / "diagnostics" / "decision_log.json").read_text()
     )["outcomes"]
     assert any(o["technique"].startswith("jitter_augment@") for o in verdicts)
 
@@ -295,9 +295,9 @@ def test_copula_augmentation_is_opt_in_and_judged_on_original_folds(tmp_path):
     opted = tasks.Strategies(names=["copula_augment"], top_models=1)
     result = run(frame, tmp_path, strategies=opted, metric="pr_auc")
     tried = [t for t in result.trials if t.strategy == "copula_augment"]
-    assert tried and tried[0].status == "ok" and len(tried[0].fold_scores) == 5
+    assert tried and tried[0].status == "ok" and len(tried[0].folds) == 5
     verdicts = json.loads(
-        (result.run_dir / "diagnostics" / "decision_log.json").read_text()
+        (result.directory / "diagnostics" / "decision_log.json").read_text()
     )["outcomes"]
     assert any(o["technique"].startswith("copula_augment@") for o in verdicts)
     features = frame.drop(columns="y")

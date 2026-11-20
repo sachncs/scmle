@@ -39,7 +39,7 @@ REQUIRED = (
 )
 
 
-def read_json(path: pathlib.Path) -> Any:
+def read(path: pathlib.Path) -> Any:
     """Reads JSON or raises an `ArtifactError` naming the file.
 
     Args:
@@ -97,7 +97,7 @@ def rebuild(record: Mapping[str, Any]) -> observation.Observation:
         image_digest=record["image_digest"],
         ready=bool(record["ready"]),
         traffic=tuple(observation.Traffic(**t) for t in record["traffic"]),
-        observed_at=record["observed_at"],
+        observed=record["observed_at"],
         revisions=tuple((a, b) for a, b in record.get("revisions", [])),
     )
 
@@ -106,7 +106,7 @@ def triage(
     report: pathlib.Path,
     container_digest: str,
     policy: pathlib.Path | None = None,
-) -> gate.ImageScan:
+) -> gate.Scan:
     """Applies the vulnerability policy to a scanner report.
 
     A report that cannot be parsed, an empty scan or any blocking finding is
@@ -131,12 +131,12 @@ def triage(
         )
     except vuln_gate.GateError:
         # handled: unparseable report becomes failed ImageScan, documented
-        return gate.ImageScan(
-            container_digest=container_digest,
+        return gate.Scan(
+            digest=container_digest,
             passed=False,
-            report_digest=digest,
+            report=digest,
         )
-    return gate.ImageScan(container_digest, bool(verdict["passed"]), digest)
+    return gate.Scan(container_digest, bool(verdict["passed"]), digest)
 
 
 def locate(
@@ -173,7 +173,7 @@ def gather(manifest_path: str | pathlib.Path) -> gate.Candidate:
             registry has no such version.
     """
     path = pathlib.Path(manifest_path)
-    manifest = read_json(path)
+    manifest = read(path)
     if not isinstance(manifest, dict):
         raise errors.ArtifactError(f"{path} is not a release manifest")
     missing = [name for name in REQUIRED if name not in manifest]
@@ -181,7 +181,7 @@ def gather(manifest_path: str | pathlib.Path) -> gate.Candidate:
         raise errors.ArtifactError("manifest lacks " + ", ".join(missing))
     base = path.parent
 
-    store = registry.ModelRegistryStore(base / manifest["registry"])
+    store = registry.Registry(base / manifest["registry"])
     version = store.resolve(manifest["model"], int(manifest["version"]))
     approval_path = locate(manifest, base, "approval")
     scan_path = locate(manifest, base, "scan_report")
@@ -192,17 +192,17 @@ def gather(manifest_path: str | pathlib.Path) -> gate.Candidate:
     return gate.Candidate(
         environment=manifest["environment"],
         provider=manifest["provider"],
-        source_commit=manifest["source_commit"],
+        commit=manifest["source_commit"],
         model=version,
-        model_digest=gate.model_digest_of(store, version),
+        reported=gate.fingerprint(store, version),
         approval=(
-            None if approval_path is None else revive(read_json(approval_path))
+            None if approval_path is None else revive(read(approval_path))
         ),
-        container_digest=container,
-        config_digest=manifest["config_digest"],
-        requested_by=manifest["requested_by"],
+        container=container,
+        digest=manifest["config_digest"],
+        requester=manifest["requested_by"],
         approver=manifest["approver"],
-        approved_at=manifest["approved_at"],
+        approved=manifest["approved_at"],
         scan=(
             None
             if scan_path is None
@@ -214,16 +214,13 @@ def gather(manifest_path: str | pathlib.Path) -> gate.Candidate:
             ()
             if checks_path is None
             else tuple(
-                livetests.Check.from_dict(item)
-                for item in read_json(checks_path)
+                livetests.Check.from_dict(item) for item in read(checks_path)
             )
         ),
-        observation=(
-            None if seen_path is None else rebuild(read_json(seen_path))
-        ),
-        staging_record=(
+        observation=(None if seen_path is None else rebuild(read(seen_path))),
+        record=(
             None
             if staging_path is None
-            else scmle.deploy.record.read_record(staging_path)
+            else scmle.deploy.record.read(staging_path)
         ),
     )

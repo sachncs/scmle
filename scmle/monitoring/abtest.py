@@ -115,7 +115,7 @@ def tally(
         The metric on those requests, in natural units.
     """
     outcomes = pandas.Series(arm.outcomes[rows])
-    classification = task.is_classification
+    classification = task.classification
     stand_in = (
         replay.Predictions(
             arm.predictions[rows],
@@ -165,7 +165,7 @@ def compare(
         them remain the interval is NaN and the decision `inconclusive`.
     """
     metric = metrics.CATALOG.resolve(metric_name, task)
-    sign = 1.0 if metric.greater_is_better else -1.0
+    sign = 1.0 if metric.maximize else -1.0
     every = {
         "control": numpy.arange(len(control.outcomes)),
         "treatment": numpy.arange(len(treatment.outcomes)),

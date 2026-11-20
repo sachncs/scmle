@@ -51,8 +51,8 @@ def test_identical_runs_are_exact():
 
     assert verdict.level == reproducibility.EXACT
     assert verdict.reasons == []
-    assert verdict.max_abs_difference == 0.0
-    assert verdict.trials_compared == 2
+    assert verdict.discrepancy == 0.0
+    assert verdict.compared == 2
     assert verdict.notes == []
 
 
@@ -75,7 +75,7 @@ def test_small_score_drift_is_comparable():
     verdict = reproducibility.judge(facts(), other)
 
     assert verdict.level == reproducibility.COMPARABLE
-    assert math.isclose(verdict.max_abs_difference, 0.01)
+    assert math.isclose(verdict.discrepancy, 0.01)
     assert verdict.reasons == ["fold scores differ within tolerance"]
 
 
@@ -87,7 +87,7 @@ def test_large_score_drift_is_different():
     verdict = reproducibility.judge(facts(), other)
 
     assert verdict.level == reproducibility.DIFFERENT
-    assert verdict.trials_compared == 2
+    assert verdict.compared == 2
     assert any("t2: mean score moved" in r for r in verdict.reasons)
 
 
@@ -161,8 +161,8 @@ def test_structural_differences_short_circuit():
         "parameter-estimation evidence differs",
         "the executed trials differ",
     ]
-    assert math.isnan(verdict.max_abs_difference)
-    assert verdict.trials_compared == 0
+    assert math.isnan(verdict.discrepancy)
+    assert verdict.compared == 0
 
 
 def test_changed_trial_params_are_detected():
@@ -266,6 +266,6 @@ def test_loaded_reruns_compare_exact_and_detect_new_evidence(tmp_path):
     )
 
     assert same.level == reproducibility.EXACT
-    assert same.trials_compared == 2
+    assert same.compared == 2
     assert changed.level == reproducibility.DIFFERENT
     assert changed.reasons == ["configurations differ"]

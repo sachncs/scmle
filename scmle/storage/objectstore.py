@@ -93,14 +93,14 @@ class EscapeError(StoreError):
     category = "store_escape"
 
 
-class TransientStoreError(retry.TransientError, StoreError):
+class TransientError(retry.TransientError, StoreError):
     """Throttling, a timeout or a 5xx: the operation may be retried."""
 
     category = "store_transient"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ObjectMeta:
+class Metadata:
     """What a store knows about one object.
 
     Attributes:
@@ -166,7 +166,7 @@ def partial(name: str) -> bool:
     """Whether a file name is a half-written temp file, not an object.
 
     Both the exclusive-create path (``.put-*``) and
-    `scmle.durability.write_atomically` (``.<name>.<random>.tmp``) write a
+    `scmle.durability.write` (``.<name>.<random>.tmp``) write a
     temp file first, and a conditional write holds a lock file
     (``.lock-*``). A writer killed between the two steps leaves one behind;
     it must not make the store unlistable.
@@ -237,7 +237,7 @@ class Depot(abc.ABC):
         *,
         if_absent: bool = False,
         if_version: str | None = None,
-    ) -> ObjectMeta:
+    ) -> Metadata:
         """Stores `data`, replacing any object unless a condition fails.
 
         Args:
@@ -258,7 +258,7 @@ class Depot(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get(self, key: str) -> tuple[bytes, ObjectMeta]:
+    def get(self, key: str) -> tuple[bytes, Metadata]:
         """Reads an object.
 
         Args:
@@ -273,7 +273,7 @@ class Depot(abc.ABC):
         """
 
     @abc.abstractmethod
-    def head(self, key: str) -> ObjectMeta:
+    def head(self, key: str) -> Metadata:
         """Reads an object's metadata without its content.
 
         Args:
@@ -287,7 +287,7 @@ class Depot(abc.ABC):
         """
 
     @abc.abstractmethod
-    def list_objects(self, prefix: str = "") -> list[ObjectMeta]:
+    def catalog(self, prefix: str = "") -> list[Metadata]:
         """Lists the objects whose key starts with a prefix.
 
         Args:
@@ -429,7 +429,7 @@ def direct(path: pathlib.Path) -> bool:
     return os.path.normcase(real) == os.path.normcase(str(path))
 
 
-class LocalObjectStore(Depot):
+class Disk(Depot):
     """Objects as files under a root directory.
 
     Attributes:
@@ -477,7 +477,7 @@ class LocalObjectStore(Depot):
             raise EscapeError(f"key {key!r} passes through a symbolic link")
         return target
 
-    def describe(self, key: str, path: pathlib.Path, data: bytes) -> ObjectMeta:
+    def describe(self, key: str, path: pathlib.Path, data: bytes) -> Metadata:
         """Builds the metadata of a file whose bytes are known.
 
         Args:
@@ -492,7 +492,7 @@ class LocalObjectStore(Depot):
         """
         stat = path.stat()
         digest = checksum(data)
-        return ObjectMeta(key, len(data), digest, iso(stat.st_mtime), digest)
+        return Metadata(key, len(data), digest, iso(stat.st_mtime), digest)
 
     def put(
         self,
@@ -501,11 +501,11 @@ class LocalObjectStore(Depot):
         *,
         if_absent: bool = False,
         if_version: str | None = None,
-    ) -> ObjectMeta:
+    ) -> Metadata:
         """Stores `data` atomically.
 
         An unconditional put replaces the file through
-        `scmle.durability.write_atomically`; `if_absent` links a fully
+        `scmle.durability.write`; `if_absent` links a fully
         written temp file into place only if no object exists, and raises
         `ExistsError` if one does; `if_version` compares and replaces
         under an exclusive lock that other processes respect. An invalid
@@ -532,9 +532,9 @@ class LocalObjectStore(Depot):
         elif if_version is not None:
             with locked(path):
                 self.expect(key, path, if_version)
-                durability.write_atomically(path, data)
+                durability.write(path, data)
         else:
-            durability.write_atomically(path, data)
+            durability.write(path, data)
         return self.describe(key, path, data)
 
     def expect(self, key: str, path: pathlib.Path, version: str) -> None:
@@ -590,7 +590,7 @@ class LocalObjectStore(Depot):
         finally:
             discard(temporary)
 
-    def get(self, key: str) -> tuple[bytes, ObjectMeta]:
+    def get(self, key: str) -> tuple[bytes, Metadata]:
         """Reads an object.
 
         An invalid key raises `StoreError`.
@@ -613,7 +613,7 @@ class LocalObjectStore(Depot):
             raise AbsentError(f"no object {key!r}") from None
         return data, self.describe(key, path, data)
 
-    def head(self, key: str) -> ObjectMeta:
+    def head(self, key: str) -> Metadata:
         """Reads an object's metadata; the file is read to hash it.
 
         An invalid key raises `StoreError`, and a key with no file raises
@@ -627,7 +627,7 @@ class LocalObjectStore(Depot):
         """
         return self.get(key)[1]
 
-    def list_objects(self, prefix: str = "") -> list[ObjectMeta]:
+    def catalog(self, prefix: str = "") -> list[Metadata]:
         """Lists the objects under a prefix, sorted by key.
 
         Temporary files left by interrupted writers are not listed, nor is
@@ -669,7 +669,7 @@ class LocalObjectStore(Depot):
             path.unlink()
 
 
-class RetryingStore(Depot):
+class Retrier(Depot):
     """Wraps a store so transient failures are retried under a policy.
 
     Attributes:
@@ -719,7 +719,7 @@ class RetryingStore(Depot):
         *,
         if_absent: bool = False,
         if_version: str | None = None,
-    ) -> ObjectMeta:
+    ) -> Metadata:
         """See `Depot.put`.
 
         A conditional put whose first try landed but was reported as a
@@ -741,7 +741,7 @@ class RetryingStore(Depot):
             )
         )
 
-    def get(self, key: str) -> tuple[bytes, ObjectMeta]:
+    def get(self, key: str) -> tuple[bytes, Metadata]:
         """Reads an object, retrying transient failures.
 
         Args:
@@ -752,7 +752,7 @@ class RetryingStore(Depot):
         """
         return self.run(lambda: self.inner.get(key))
 
-    def head(self, key: str) -> ObjectMeta:
+    def head(self, key: str) -> Metadata:
         """Reads an object's metadata, retrying transient failures.
 
         Args:
@@ -763,16 +763,16 @@ class RetryingStore(Depot):
         """
         return self.run(lambda: self.inner.head(key))
 
-    def list_objects(self, prefix: str = "") -> list[ObjectMeta]:
+    def catalog(self, prefix: str = "") -> list[Metadata]:
         """Lists objects under a prefix, retrying transient failures.
 
         Args:
             prefix: Key prefix; empty for every object.
 
         Returns:
-            The metadata, as from `Depot.list_objects`.
+            The metadata, as from `Depot.catalog`.
         """
-        return self.run(lambda: self.inner.list_objects(prefix))
+        return self.run(lambda: self.inner.catalog(prefix))
 
     def delete(self, key: str, *, if_version: str | None = None) -> None:
         """Removes an object, retrying transient failures.

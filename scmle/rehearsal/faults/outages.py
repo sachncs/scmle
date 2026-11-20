@@ -14,7 +14,7 @@ from scmle.rehearsal import demo
 from scmle.rehearsal.faults import harness
 
 
-def object_store_loss() -> recovery.Outcome:
+def disconnect() -> recovery.Outcome:
     """The store goes away; the service keeps serving; access returns.
 
     Returns:
@@ -27,7 +27,7 @@ def object_store_loss() -> recovery.Outcome:
     with harness.stage(
         "store", "lost_object_store_access", "local emulator + subprocess"
     ) as (fleet, base, result):
-        service = harness.export_service(base / "service", harness.specify())
+        service = harness.export(base / "service", harness.specify())
         port = demo.unused()
         store = mocks.Depot(base / "objects", port=port)
         fleet.serve(store)
@@ -41,7 +41,7 @@ def object_store_loss() -> recovery.Outcome:
         store.stop()
         fetch_failed = False
         try:
-            mocks.get_object(url, "models/m/v1/serve.py", timeout=2.0)
+            mocks.download(url, "models/m/v1/serve.py", timeout=2.0)
         except OSError:
             # handled: recorded as fetch_failed check
             fetch_failed = True
@@ -56,9 +56,9 @@ def object_store_loss() -> recovery.Outcome:
         lost = sum(not found for found in intact.values())
         second = base / "refetched"
         demo.download(url, "models/m/v1", etags, second)
-        same = provenance.bundle_digest(
-            second / "model"
-        ) == provenance.bundle_digest(service / "model")
+        same = provenance.digest(second / "model") == provenance.digest(
+            service / "model"
+        )
         replacement = fleet.start(second)
         seconds = harness.boot(replacement)
         elapsed = time.monotonic() - restored
@@ -66,7 +66,7 @@ def object_store_loss() -> recovery.Outcome:
         victim.write_bytes(victim.read_bytes() + b"# altered")
         mismatch = False
         try:
-            mocks.get_object(
+            mocks.download(
                 url, "models/m/v1/serve.py", expected=etags["serve.py"]
             )
         except errors.ArtifactError:
@@ -108,7 +108,7 @@ def blackout() -> recovery.Outcome:
         base,
         result,
     ):
-        service = harness.export_service(base / "service", harness.specify())
+        service = harness.export(base / "service", harness.specify())
         running = fleet.start(service)
         if harness.boot(running) is None:
             raise errors.ScmleError("the service did not become ready")
@@ -138,7 +138,7 @@ def blackout() -> recovery.Outcome:
         )
         restarted = spool.Spool(base / "spool.jsonl", send, batch_size=20)
         survived = restarted.pending()
-        sink = mocks.MetricsSink(base / "sink.jsonl", port=port)
+        sink = mocks.Collector(base / "sink.jsonl", port=port)
         fleet.serve(sink)
         back = time.monotonic()
         done = restarted.flush()

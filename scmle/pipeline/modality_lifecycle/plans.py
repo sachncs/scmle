@@ -309,7 +309,7 @@ class Plan:
             independent=self.independent,
             status=status,
         ).sign(self.key)
-        durability.write_atomically(
+        durability.write(
             self.target,
             (
                 json.dumps(record.to_dict(), indent=2, sort_keys=True) + "\n"
@@ -483,7 +483,7 @@ def publish(
     records = tuple(
         modalities.Proof(
             stage=stage,
-            evidence_links=("modality_lifecycle.json",),
+            links=("modality_lifecycle.json",),
             evidence=board.made[stage].evidence,
             notes=(f"completed {stage.value}",),
         )
@@ -506,7 +506,7 @@ def publish(
         recovery=board.get(state.Resilience).evidence,
     ).sign(plan.key)
     if plan.report_target is not None:
-        durability.write_atomically(
+        durability.write(
             plan.report_target,
             (
                 json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n"

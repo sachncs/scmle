@@ -29,21 +29,21 @@ class Client(threading.Thread):
         """
         super().__init__(daemon=True)
         self.router = router
-        self.stop_flag = threading.Event()
+        self.halt = threading.Event()
         self.sent = 0
         self.failed = 0
-        self.longest_gap = 0.0
+        self.gap = 0.0
 
     def run(self) -> None:
         """Sends one request every 50 ms until stopped."""
         gap_start: float | None = None
-        while not self.stop_flag.is_set():
+        while not self.halt.is_set():
             status = harness.predict(self.router["current"].base, 1)[0]
             self.sent += 1
             now = time.monotonic()
             if status == http.HTTPStatus.OK:
                 if gap_start is not None:
-                    self.longest_gap = max(self.longest_gap, now - gap_start)
+                    self.gap = max(self.gap, now - gap_start)
                     gap_start = None
             else:
                 self.failed += 1
@@ -81,7 +81,7 @@ def restart() -> recovery.Outcome:
     with harness.stage(
         "rolling", "unhealthy_container_rolling_restart", "local subprocess"
     ) as (fleet, base, result):
-        service = harness.export_service(base / "service", harness.specify())
+        service = harness.export(base / "service", harness.specify())
         broken = harness.corrupt(service, base / "broken")
         old = fleet.start(service)
         if harness.boot(old) is None:
@@ -104,10 +104,10 @@ def restart() -> recovery.Outcome:
             old.process.terminate()
             old.process.wait(timeout=15)
             time.sleep(0.8)
-            client.stop_flag.set()
+            client.halt.set()
             client.join(timeout=10)
         finally:
-            client.stop_flag.set()
+            client.halt.set()
         window = time.monotonic() - started
         result.checks = {
             "the unready replacement stayed alive and unready": (
@@ -120,7 +120,7 @@ def restart() -> recovery.Outcome:
         result.measurements = [
             recovery.Measurement(
                 "service",
-                client.longest_gap,
+                client.gap,
                 client.failed,
                 "a client sends one /predict every 50 ms to the instance "
                 "the runner has declared current; RTO is the longest run of "
@@ -150,7 +150,7 @@ def invalid_credentials() -> recovery.Outcome:
     with harness.stage(
         "credentials", "invalid_credentials", "local subprocess"
     ) as (fleet, base, result):
-        service = harness.export_service(base / "service", harness.specify())
+        service = harness.export(base / "service", harness.specify())
         wrong = fleet.start(service, key=harness.WRONG_KEY)
         verdict = harness.failing(wrong)
         detected = time.monotonic()
@@ -200,14 +200,14 @@ def rekey() -> recovery.Outcome:
     with harness.stage(
         "rotation", "secret_rotation_recovery", "local subprocess"
     ) as (fleet, base, result):
-        old_service = harness.export_service(
+        old_service = harness.export(
             base / "old", harness.specify(), demo.DEMO_SIGNING_KEY
         )
         first = fleet.start(old_service, key=demo.DEMO_SIGNING_KEY)
         before = harness.boot(first)
         first.process.kill()
         first.process.wait(timeout=15)
-        new_service = harness.export_service(
+        new_service = harness.export(
             base / "new", harness.specify(), harness.ROTATED_KEY
         )
         stale = fleet.start(new_service, key=demo.DEMO_SIGNING_KEY)
@@ -245,7 +245,7 @@ def rekey() -> recovery.Outcome:
     return result
 
 
-def corrupted_bundle() -> recovery.Outcome:
+def bundle() -> recovery.Outcome:
     """A tampered bundle never serves; a digest-checked copy restores it.
 
     Returns:
@@ -257,7 +257,7 @@ def corrupted_bundle() -> recovery.Outcome:
         base,
         result,
     ):
-        service = harness.export_service(base / "service", harness.specify())
+        service = harness.export(base / "service", harness.specify())
         expected = harness.digest(service)
         pristine = base / "pristine"
         shutil.copytree(service, pristine)
@@ -314,7 +314,7 @@ def refuse(url: str) -> tuple[float, list[int], classify.Classification]:
     watch = signals.Monitor(signals.Window(minimum=30))
     statuses = []
     for step in range(40):
-        code = demo.post_json(url, {"records": missing})[0]
+        code = demo.post(url, {"records": missing})[0]
         statuses.append(code)
         watch.tally(100.0 + step, "/predict", code, 0.01)
     return started, statuses, classify.classify(watch.evaluate(140.0))
@@ -340,24 +340,24 @@ def incompatible_schema() -> recovery.Outcome:
         base,
         result,
     ):
-        service = harness.export_service(base / "service", harness.specify())
+        service = harness.export(base / "service", harness.specify())
         running = fleet.start(service)
         if harness.boot(running) is None:
             raise errors.ScmleError("the service did not become ready")
         url = f"{running.base}/predict"
-        wrong_digest = demo.post_json(
+        wrong_digest = demo.post(
             url,
             {
                 "records": harness.records(1),
                 "expected_schema_digest": "sha256:" + "0" * 64,
             },
         )[0]
-        wrong_version = demo.post_json(
+        wrong_version = demo.post(
             url, {"records": harness.records(1), "schema_version": "9"}
         )[0]
         started, statuses, verdict = refuse(url)
         digest = demo.retrieve(f"{running.base}/schema")[1]["schema_digest"]
-        adapted = demo.post_json(
+        adapted = demo.post(
             url,
             {"records": harness.records(1), "expected_schema_digest": digest},
         )[0]

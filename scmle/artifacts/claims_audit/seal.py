@@ -17,7 +17,7 @@ from scmle.contracts import errors
 from scmle.contracts import qualification
 
 
-def check_ledger_head(
+def anchor(
     document: dict[str, Any], ledger: scmle.assurance.ledger.ledger.Ledger
 ) -> verdict.Finding:
     """Checks that the claims file names the ledger's current head.
@@ -280,7 +280,7 @@ def rederive(document: dict[str, Any]) -> verdict.Finding:
     )
 
 
-def stage_two_record_problems(
+def screen(
     record: dict[str, Any],
     survivors: Any,
     withdrawn: set[str],
@@ -340,9 +340,7 @@ def tally(
     expected = scmle.assurance.ledger.ledger.digest(
         {"survivors_sha256": survivors.sha256, "family": family}
     )
-    problems = stage_two_record_problems(
-        record, survivors, withdrawn, family, expected
-    )
+    problems = screen(record, survivors, withdrawn, family, expected)
     tested = {
         files.migrate(qualification.Check, c)["identifier"].split(":")[0]
         for c in document["checks"]

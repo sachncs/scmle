@@ -13,7 +13,7 @@ from scmle.data.readers import tabular
 
 def run(data, tmp_path, **kwargs):
     return support.make_project(
-        data, "y", time_budget=300, output_dir=tmp_path, **kwargs
+        data, "y", budget=300, directory=tmp_path, **kwargs
     ).run()
 
 

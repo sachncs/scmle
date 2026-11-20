@@ -79,7 +79,7 @@ class Indexed(Resampler):
         )
 
 
-class RandomOverSampler(Indexed):
+class Oversampler(Indexed):
     """Duplicates minority-class rows until every class matches the largest."""
 
     name = "random_oversample"
@@ -110,7 +110,7 @@ class RandomOverSampler(Indexed):
         return rng.permutation(numpy.concatenate(chosen))
 
 
-class RandomUnderSampler(Indexed):
+class Undersampler(Indexed):
     """Drops majority-class rows until every class matches the smallest."""
 
     name = "random_undersample"
@@ -139,7 +139,7 @@ class RandomUnderSampler(Indexed):
         return rng.permutation(numpy.concatenate(chosen))
 
 
-class Jittered(RandomOverSampler):
+class Jittered(Oversampler):
     """Experimental: oversamples with Gaussian-jittered copies of minority rows.
 
     Synthetic rows copy a real minority row and add noise (a fraction of the
@@ -362,7 +362,7 @@ class ResamplingClassifier(base.ClassifierMixin, base.BaseEstimator):  # type: i
         return probabilities
 
 
-class DensityWeightedRegressor(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Density(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Fits a regression pipeline with weights that favour rare target values.
 
     Rows whose target falls in a sparsely populated region of the target's

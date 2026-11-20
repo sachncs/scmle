@@ -212,7 +212,7 @@ def project(
         reliability.binary_data(seed=seed),
         "y",
         directory,
-        time_budget=budget,
+        budget=budget,
         enforcement="hard",
     )
 
@@ -247,12 +247,12 @@ def outcome(run: Any) -> dict[str, Any]:
     evaluation = run.evaluation
     found: dict[str, Any] = clean(
         {
-            "selected_model": run.selected_model,
+            "selected_model": run.model,
             "selected_params": evaluation["selected"]["params"],
             "selected_cv_score": evaluation["selected"]["score"],
             "test_metrics": evaluation["metrics"],
             "trials": [
-                [t.trial_id, t.model_name, str(t.status), t.score_mean]
+                [t.identifier, t.model, str(t.status), t.score]
                 for t in run.trials
             ],
         }
@@ -712,9 +712,9 @@ def table(arguments: list[str]) -> int:
         run = scmle.api.project.Project(
             frame,
             target,
-            time_budget=int(budget),
+            budget=int(budget),
             enforcement="hard",
-            output_dir=Path(directory),
+            directory=Path(directory),
             **options,
         ).run()
     except errors.BlockedError as caught:
@@ -722,7 +722,7 @@ def table(arguments: list[str]) -> int:
         print(json.dumps({"seconds": seconds, "blocked": str(caught)}))
         return 0
     seconds = time.monotonic() - started
-    print(json.dumps({"seconds": seconds, "model": run.selected_model}))
+    print(json.dumps({"seconds": seconds, "model": run.model}))
     return 0
 
 

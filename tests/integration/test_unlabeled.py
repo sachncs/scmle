@@ -20,7 +20,7 @@ def partly_labeled(rows=900, unlabeled=300, seed=0):
 
 def run(tmp_path, frame, **kwargs):
     return support.make_project(
-        frame, "y", time_budget=300, output_dir=tmp_path, **kwargs
+        frame, "y", budget=300, directory=tmp_path, **kwargs
     ).run()
 
 

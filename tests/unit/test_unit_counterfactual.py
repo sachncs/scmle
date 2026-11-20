@@ -29,7 +29,7 @@ def recourse(threshold=60.0, max_changes=3, actionable=("income", "city")):
         predict=lambda f: numpy.where(score(f) >= threshold, "yes", "no"),
         background=BACKGROUND,
         actionable=actionable,
-        max_changes=max_changes,
+        sparsity=max_changes,
     )
 
 

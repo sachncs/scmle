@@ -84,7 +84,7 @@ def test_generators_are_pluggable():
         def sample(self, rows, rng):
             return pandas.concat([self.row] * rows, ignore_index=True)
 
-    class ConstantOverSampler(synthesis.GeneratorOverSampler):
+    class ConstantOverSampler(synthesis.Generator):
         generator_class = Constant
 
     real = correlated_frame(rows=200)
@@ -95,7 +95,5 @@ def test_generators_are_pluggable():
 
 def test_generator_resampler_implements_the_resample_contract_directly():
     """Synthetic rows use the general contract, not source row indices."""
-    assert issubclass(
-        synthesis.GeneratorOverSampler, synthesis.resampling.Resampler
-    )
-    assert not hasattr(synthesis.GeneratorOverSampler, "indices")
+    assert issubclass(synthesis.Generator, synthesis.resampling.Resampler)
+    assert not hasattr(synthesis.Generator, "indices")

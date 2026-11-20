@@ -8,6 +8,7 @@ and compared with what a serving path returns under tolerances that were
 declared before the comparison (`tolerances.json`).
 """
 
+from collections.abc import Mapping
 import dataclasses
 import json
 import pathlib
@@ -38,7 +39,7 @@ POSITIVE_CLASS_THRESHOLD = 0.5
 REMOTE_URL_SCHEMES = ("http", "https")
 
 
-def read_json(path: str | pathlib.Path) -> dict[str, Any]:
+def read(path: str | pathlib.Path) -> dict[str, Any]:
     """Reads a JSON object from `path`.
 
     Args:
@@ -65,24 +66,39 @@ class Tolerance:
     """How closely one environment must match the reference.
 
     Attributes:
-        probability_abs: Largest allowed absolute difference in the class-1
+        probability: Largest allowed absolute difference in the class-1
             probability, in [0, 1).
         label: Label comparison mode; only "exact" is supported.
     """
 
-    probability_abs: float
+    probability: float
     label: str = "exact"
+
+    @classmethod
+    def load(cls, stored: Mapping[str, Any]) -> "Tolerance":
+        """Builds a tolerance from its stored form in `tolerances.json`.
+
+        Args:
+            stored: The stored tolerance (`probability_abs`, `label`).
+
+        Returns:
+            The tolerance.
+        """
+        return cls(
+            probability=stored["probability_abs"],
+            label=stored.get("label", "exact"),
+        )
 
     def __post_init__(self) -> None:
         """Validates the tolerance.
 
         Raises:
-            ConfigError: If `label` is not "exact" or `probability_abs` is
+            ConfigError: If `label` is not "exact" or `probability` is
                 outside [0, 1).
         """
         if self.label != "exact":
             raise errors.ConfigError("labels are compared exactly")
-        if not (0 <= self.probability_abs < 1):
+        if not (0 <= self.probability < 1):
             raise errors.ConfigError("probability_abs must be in [0, 1)")
 
 
@@ -93,14 +109,14 @@ class Goldens:
     Attributes:
         spec: The hand-written model specification.
         records: The input records.
-        same_process: Tolerance for a comparison within one process.
-        cross_environment: Tolerance for a comparison across environments.
+        process: Tolerance for a comparison within one process.
+        environment: Tolerance for a comparison across environments.
     """
 
     spec: dict[str, Any]
     records: list[dict[str, Any]]
-    same_process: Tolerance
-    cross_environment: Tolerance
+    process: Tolerance
+    environment: Tolerance
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -110,7 +126,7 @@ class Parity:
     Attributes:
         passed: Whether labels and probabilities were all within tolerance.
         records: Number of expected records.
-        max_probability_error: Largest absolute class-1 probability
+        error: Largest absolute class-1 probability
             difference; infinite when the output count was wrong.
         tolerance: The probability tolerance applied.
         mismatches: Description of each difference found.
@@ -124,7 +140,7 @@ class Parity:
 
     passed: bool
     records: int
-    max_probability_error: float
+    error: float
     tolerance: float
     mismatches: tuple[str, ...]
 
@@ -139,7 +155,7 @@ class Parity:
             {
                 "passed": self.passed,
                 "records": self.records,
-                "max_probability_error": self.max_probability_error,
+                "max_probability_error": self.error,
                 "tolerance": self.tolerance,
                 "mismatches": list(self.mismatches),
             }
@@ -155,16 +171,16 @@ def goldens(directory: str | pathlib.Path) -> Goldens:
 
     Returns:
         The golden set. A file that cannot be read or is not a JSON object
-        makes `read_json` raise `ArtifactError`; a missing key in a file
+        makes `read` raise `ArtifactError`; a missing key in a file
         raises `KeyError`.
     """
     root = pathlib.Path(directory)
-    tolerances = read_json(root / "tolerances.json")
+    tolerances = read(root / "tolerances.json")
     return Goldens(
-        spec=read_json(root / "model_spec.json"),
-        records=read_json(root / "records.json")["records"],
-        same_process=Tolerance(**tolerances["same_process"]),
-        cross_environment=Tolerance(**tolerances["cross_environment"]),
+        spec=read(root / "model_spec.json"),
+        records=read(root / "records.json")["records"],
+        process=Tolerance.load(tolerances["same_process"]),
+        environment=Tolerance.load(tolerances["cross_environment"]),
     )
 
 
@@ -370,8 +386,8 @@ def compare(
         return Parity(
             passed=False,
             records=count,
-            max_probability_error=float("inf"),
-            tolerance=tolerance.probability_abs,
+            error=float("inf"),
+            tolerance=tolerance.probability,
             mismatches=(f"expected {count} outputs, got {len(predictions)}",),
         )
     worst = 0.0
@@ -383,13 +399,13 @@ def compare(
             - expected["probability_of_class_1"][index]
         )
         worst = max(worst, error)
-        if error > tolerance.probability_abs:
+        if error > tolerance.probability:
             mismatches.append(f"record {index}: probability off by {error:.3g}")
     return Parity(
         passed=not mismatches,
         records=count,
-        max_probability_error=worst,
-        tolerance=tolerance.probability_abs,
+        error=worst,
+        tolerance=tolerance.probability,
         mismatches=tuple(mismatches),
     )
 
@@ -419,7 +435,7 @@ def crosscheck(
         status, or a response that is not an object with `predictions` and
         `probabilities`, only `passed` (False) and `mismatches` are returned
         (with `level` for the latter). An unreadable golden file raises
-        `ArtifactError` from `read_json`; other network errors propagate.
+        `ArtifactError` from `read`; other network errors propagate.
 
     Raises:
         ValueError: If `url` does not use http or https.
@@ -428,7 +444,7 @@ def crosscheck(
         raise errors.InputError(f"url must use http or https, got {url!r}")
     root = pathlib.Path(directory)
     golden = goldens(root)
-    expected = read_json(root / "expected.json")
+    expected = read(root / "expected.json")
     request = urllib.request.Request(  # noqa: S310 -- scheme checked above
         url.rstrip("/") + "/predict",
         json.dumps({"records": golden.records}).encode(),
@@ -443,9 +459,7 @@ def crosscheck(
         # handled: returned as failed parity with HTTP code
         return {"passed": False, "mismatches": [f"HTTP {error.code}"]}
     tolerance = (
-        golden.same_process
-        if level == "same_process"
-        else golden.cross_environment
+        golden.process if level == "same_process" else golden.environment
     )
     if (
         not isinstance(body, dict)

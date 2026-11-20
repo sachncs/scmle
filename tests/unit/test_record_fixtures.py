@@ -37,7 +37,7 @@ def stored(name):
 
 
 def write(record):
-    """The bytes the run store writes for a record (`Store.write_json`)."""
+    """The bytes the run store writes for a record (`Store.write`)."""
     return json.dumps(record.model_dump(mode="json"), indent=2) + "\n"
 
 

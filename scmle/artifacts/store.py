@@ -18,18 +18,18 @@ class Workspace:
     existing one.
 
     Attributes:
-        run_id: Identifier of the run.
+        run: Identifier of the run.
         directory: The run directory.
     """
 
-    def __init__(self, run_id: str, directory: pathlib.Path) -> None:
+    def __init__(self, run: str, directory: pathlib.Path) -> None:
         """Initializes the store over an existing directory.
 
         Args:
-            run_id: Identifier of the run.
+            run: Identifier of the run.
             directory: The run directory.
         """
-        self.run_id = run_id
+        self.run = run
         self.directory = directory
 
     @classmethod
@@ -85,7 +85,7 @@ class Workspace:
         """
         return self.directory / relative
 
-    def write_json(self, relative: str, payload: Any) -> None:
+    def write(self, relative: str, payload: Any) -> None:
         """Writes `payload` as indented JSON, creating parent directories.
 
         Values `json` cannot encode are rendered with `str`. The write goes
@@ -125,7 +125,7 @@ class Workspace:
                 handle.flush()
                 os.fsync(handle.fileno())
             temporary.replace(target)
-            durability.sync_directory(target.parent)
+            durability.flush(target.parent)
         except BaseException:
             temporary.unlink(missing_ok=True)
             raise

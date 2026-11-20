@@ -232,11 +232,11 @@ def test_an_empty_spool_and_bad_batch_sizes():
 def test_a_killed_writers_temp_file_does_not_make_the_store_unlistable(
     tmp_path,
 ):
-    store = objectstore.LocalObjectStore(tmp_path)
+    store = objectstore.Disk(tmp_path)
     store.put("runs/a/step.json", b"{}")
     (tmp_path / "runs" / "a" / ".step.json.q1w2e3r4.tmp").write_bytes(b"half")
     (tmp_path / "runs" / "a" / ".put-abcdef").write_bytes(b"half")
-    assert [m.key for m in store.list_objects("runs/")] == ["runs/a/step.json"]
+    assert [m.key for m in store.catalog("runs/")] == ["runs/a/step.json"]
     assert objectstore.partial(".x.json.abc.tmp")
     assert not objectstore.partial("x.tmp")
     assert not objectstore.partial("step.json")

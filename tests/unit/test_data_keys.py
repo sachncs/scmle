@@ -303,7 +303,7 @@ def finding(identifier, blocking):
     """A modality curation finding."""
     return curation.flaw(
         identifier,
-        data.FindingSeverity.ERROR,
+        data.Severity.ERROR,
         {"source": "s"},
         {},
         "fix it",

@@ -96,7 +96,7 @@ KINDS = (
 @pytest.fixture
 def finished(tmp_path):
     """A store whose run finished: every input processed and checkpointed."""
-    store = objectstore.LocalObjectStore(tmp_path / "root")
+    store = objectstore.Disk(tmp_path / "root")
     failpoints.seed(store)
     failpoints.processor(store).run()
     return store
@@ -131,7 +131,7 @@ def test_a_damaged_checkpoint_stops_a_bounded_run_too(finished):
 
 
 def test_a_checkpoint_that_never_existed_starts_from_nothing(tmp_path):
-    store = objectstore.LocalObjectStore(tmp_path / "root")
+    store = objectstore.Disk(tmp_path / "root")
     failpoints.seed(store)
     result = failpoints.processor(store).run()
     assert result.skipped == () and len(result.processed) == 4
@@ -154,7 +154,7 @@ def test_a_stale_lock_from_a_dead_process_is_released_only_by_break_lock(
     tmp_path,
 ):
     root = tmp_path / "root"
-    store = objectstore.LocalObjectStore(root)
+    store = objectstore.Disk(root)
     failpoints.seed(store)
     child = subprocess.run(
         [
@@ -192,14 +192,14 @@ def test_a_stale_lock_from_a_dead_process_is_released_only_by_break_lock(
 
 
 def test_breaking_a_lock_that_is_not_there_is_harmless(tmp_path):
-    store = objectstore.LocalObjectStore(tmp_path / "root")
+    store = objectstore.Disk(tmp_path / "root")
     failpoints.processor(store).lock()
     failpoints.seed(store)
     assert failpoints.processor(store).run().failed is None
 
 
 def test_a_refused_run_leaves_the_holders_lock_alone(tmp_path):
-    store = objectstore.LocalObjectStore(tmp_path / "root")
+    store = objectstore.Disk(tmp_path / "root")
     failpoints.seed(store)
     store.put(failpoints.LOCK_KEY, b"someone else")
     with pytest.raises(processing.LockError):
@@ -231,7 +231,7 @@ def race_for_lock(store, racers):
 
 
 def test_only_one_of_many_racing_writers_takes_the_lock(tmp_path):
-    store = objectstore.LocalObjectStore(tmp_path / "root")
+    store = objectstore.Disk(tmp_path / "root")
     racers = 8
     for round_number in range(15):
         winners, losers = race_for_lock(store, racers)
@@ -243,7 +243,7 @@ def test_only_one_of_many_racing_writers_takes_the_lock(tmp_path):
 
 def test_racing_processors_never_work_at_the_same_time(tmp_path):
     root = tmp_path / "root"
-    store = objectstore.LocalObjectStore(root)
+    store = objectstore.Disk(root)
     failpoints.seed(store)
     racers = 6
     barrier = threading.Barrier(racers)
@@ -262,7 +262,7 @@ def test_racing_processors_never_work_at_the_same_time(tmp_path):
 
     def race():
         run = processing.Processor(
-            objectstore.LocalObjectStore(root),
+            objectstore.Disk(root),
             failpoints.CONTRACT,
             slow_upper,
         )
@@ -292,7 +292,7 @@ def test_racing_processors_never_work_at_the_same_time(tmp_path):
 
 def test_a_second_process_is_refused_while_the_first_holds_the_lock(tmp_path):
     root = tmp_path / "root"
-    store = objectstore.LocalObjectStore(root)
+    store = objectstore.Disk(root)
     failpoints.seed(store)
     marker = tmp_path / "marker"
     release = tmp_path / "release"

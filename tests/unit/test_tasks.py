@@ -65,5 +65,5 @@ def test_spec_is_immutable():
 
 
 def test_task_type_classification_flag():
-    assert tasks.Task.BINARY.is_classification
-    assert not tasks.Task.REGRESSION.is_classification
+    assert tasks.Task.BINARY.classification
+    assert not tasks.Task.REGRESSION.classification

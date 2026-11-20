@@ -243,9 +243,7 @@ class Robustness(diagnostics.Diagnostic):
                 inputs.target,
                 inputs.positive,
             )
-            loss = (
-                (clean - score) if metric.greater_is_better else (score - clean)
-            )
+            loss = (clean - score) if metric.maximize else (score - clean)
             scenarios[stressor.name] = {
                 "score": float(score),
                 "loss": float(loss),

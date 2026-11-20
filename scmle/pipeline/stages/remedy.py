@@ -118,8 +118,8 @@ class Remedy(examination.Examination):
         split = partition.split
         task = partition.task
         strategy = strategies.lookup(selected.strategy)
-        adapter = board.services.registry.get(selected.model_name)
-        plan = partition.profile.feature_plan
+        adapter = board.services.registry.get(selected.model)
+        plan = partition.profile.plan
         seed = board.services.spec.validation.seed
         return thresholds.heldout(
             lambda: strategy.build(

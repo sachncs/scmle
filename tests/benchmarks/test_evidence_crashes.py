@@ -454,7 +454,7 @@ def test_settings_carry_every_operation_as_json() -> None:
     ] == {
         "label": "lease",
         "kind": crashes.LEASE,
-        "owner": "scmle.storage.objectstore:LocalObjectStore",
+        "owner": "scmle.storage.objectstore:Disk",
         "attribute": "put",
         "suffix": "/lock",
     }
@@ -496,7 +496,7 @@ def test_the_hook_wraps_a_method_that_takes_no_argument(tmp_path: Path) -> None:
 def test_a_batch_killed_before_its_swap_leaves_an_orphaned_temporary(
     batch: Batches,
 ) -> None:
-    # Product finding: `durability.write_atomically` cleans its temporary
+    # Product finding: `durability.write` cleans its temporary
     # file only on an exception, so SIGKILL between the write and the swap
     # leaves `.<name>.<random>.tmp` beside the output, and nothing removes it.
     scratch, subject, base = batch

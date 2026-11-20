@@ -110,9 +110,7 @@ class Record:
         if COMMIT_PATTERN.fullmatch(self.commit) is None:
             raise errors.ConfigError("commit must be 40 hex characters")
         for name in DIGESTS.values():
-            contract.require_digest(
-                str(self.digests.get(name)), f"digests.{name}"
-            )
+            contract.require(str(self.digests.get(name)), f"digests.{name}")
         if self.environment not in ENVIRONMENTS:
             raise errors.ConfigError(
                 "environment must be staging or production"
@@ -133,7 +131,7 @@ class Record:
         if not self.evidence:
             raise errors.ConfigError("a record needs evidence")
         for check, digest in self.evidence:
-            contract.require_digest(digest, f"evidence[{check}]")
+            contract.require(digest, f"evidence[{check}]")
 
     def preimage(self) -> dict[str, Any]:
         """Builds the signed content, in the layout the record is stored in.
@@ -235,7 +233,7 @@ class Record:
         return cls(**values)
 
 
-def write_record(path: str | pathlib.Path, record: Record) -> None:
+def write(path: str | pathlib.Path, record: Record) -> None:
     """Writes the record as JSON.
 
     Args:
@@ -251,11 +249,11 @@ def write_record(path: str | pathlib.Path, record: Record) -> None:
     )
 
 
-def read_record(path: str | pathlib.Path) -> Record:
+def read(path: str | pathlib.Path) -> Record:
     """Reads a record; the caller still verifies the signature.
 
     Args:
-        path: File written by `write_record`.
+        path: File written by `write`.
 
     Returns:
         The record.

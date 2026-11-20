@@ -92,22 +92,18 @@ def smoke(
         ConfigError: If a declared capability is not honoured.
     """
     name, caps = adapter.name, adapter.capabilities
-    if caps.handles_missing:
+    if caps.missing:
         holes = features.copy()
         holes.iloc[::7, 0] = numpy.nan
-        fitted = adapter.build(task, 0, adapter.conformance_params).fit(
-            holes, target
-        )
+        fitted = adapter.build(task, 0, adapter.params).fit(holes, target)
         if len(numpy.asarray(fitted.predict(holes))) != len(holes):
             raise errors.ConfigError(f"{name}: failed on missing values")
-    if caps.sparse_input:
+    if caps.sparse:
         matrix = sparse.csr_matrix(features.to_numpy())
-        fitted = adapter.build(task, 0, adapter.conformance_params).fit(
-            matrix, target
-        )
+        fitted = adapter.build(task, 0, adapter.params).fit(matrix, target)
         if len(numpy.asarray(fitted.predict(matrix))) != len(features):
             raise errors.ConfigError(f"{name}: failed on sparse input")
-    if caps.native_categorical:
+    if caps.categorical:
         extra = adapter.nominals([0])
         if not extra:
             raise errors.ConfigError(
@@ -116,14 +112,12 @@ def smoke(
             )
         codes = features.copy()
         codes["a"] = numpy.arange(len(codes)) % 5
-        params = {**(adapter.conformance_params or {}), **extra}
+        params = {**(adapter.params or {}), **extra}
         fitted = adapter.build(task, 0, params).fit(codes, target)
         if len(numpy.asarray(fitted.predict(codes))) != len(codes):
             raise errors.ConfigError(f"{name}: failed with native categoricals")
     if caps.serializable:
-        fitted = adapter.build(task, 0, adapter.conformance_params).fit(
-            features, target
-        )
+        fitted = adapter.build(task, 0, adapter.params).fit(features, target)
         buffer = io.BytesIO()
         joblib.dump(fitted, buffer)
         buffer.seek(0)
@@ -152,7 +146,7 @@ def searchable(
     Raises:
         ConfigError: If a sampled parameter is not applied by `build`.
     """
-    space = adapter.search_space
+    space = adapter.space
     if space is None:
         return
     sampled = space.sample(random.Random(0))  # noqa: S311 -- seeded, not security  # nosec B311
@@ -181,14 +175,14 @@ def comply(adapter: models.Model) -> None:
         raise errors.ConfigError(f"{name}: declares no supported tasks")
     for task in adapter.capabilities.tasks:
         features, target = toy(task)
-        estimator: Any = adapter.build(task, 0, adapter.conformance_params)
+        estimator: Any = adapter.build(task, 0, adapter.params)
         for method in ("fit", "predict", "get_params", "set_params"):
             if not hasattr(estimator, method):
                 raise errors.ConfigError(f"{name}: estimator lacks '{method}'")
         estimator.fit(features, target)
         if len(numpy.asarray(estimator.predict(features))) != len(features):
             raise errors.ConfigError(f"{name}: predict returned wrong length")
-        if task.is_classification and adapter.capabilities.probabilities:
+        if task.classification and adapter.capabilities.probabilities:
             if not hasattr(estimator, "predict_proba"):
                 raise errors.ConfigError(
                     f"{name}: declares probabilities but lacks predict_proba"
@@ -200,7 +194,7 @@ def comply(adapter: models.Model) -> None:
                 )
         searchable(adapter, task, features, target)
         smoke(adapter, task, features, target)
-        first = adapter.build(task, 7, adapter.conformance_params)
-        second = adapter.build(task, 7, adapter.conformance_params)
+        first = adapter.build(task, 7, adapter.params)
+        second = adapter.build(task, 7, adapter.params)
         if first.get_params().keys() != second.get_params().keys():
             raise errors.ConfigError(f"{name}: build is not deterministic")

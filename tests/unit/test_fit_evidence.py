@@ -99,10 +99,10 @@ def situation(rows, columns, seconds):
     )
     profile = types.SimpleNamespace(
         manifest=types.SimpleNamespace(rows=rows),
-        feature_plan=types.SimpleNamespace(
+        plan=types.SimpleNamespace(
             features=tuple(f"c{i}" for i in range(columns))
         ),
-        target_summary={"n_classes": 2},
+        summary={"n_classes": 2},
     )
     return types.SimpleNamespace(
         spec=spec, profile=profile, cost=profiler.estimate
@@ -180,7 +180,7 @@ def board(trials):
     record = journal.Journal(spec, None, None, None)
     record.trials.extend(trials)
     partition = types.SimpleNamespace(
-        metric=types.SimpleNamespace(greater_is_better=True, name="roc_auc")
+        metric=types.SimpleNamespace(maximize=True, name="roc_auc")
     )
     return types.SimpleNamespace(
         get={profiling.Partition: partition}.__getitem__, journal=record

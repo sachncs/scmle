@@ -19,7 +19,7 @@ def make_evidence(
 ) -> modalities.Proof:
     return modalities.Proof(
         stage=stage,
-        evidence_links=links,
+        links=links,
         notes=(f"verified {stage.value}",),
     )
 
@@ -32,7 +32,7 @@ def make_declaration(
     return modalities.Declaration(
         modality=modality,
         status=status,
-        stage_evidence=(
+        evidence=(
             tuple(
                 make_evidence(stage)
                 for stage in modalities.REQUIRED_LIFECYCLE_STAGES
@@ -40,14 +40,14 @@ def make_declaration(
             if stage_evidence is None
             else stage_evidence
         ),
-        required_extras=("core",),
+        extras=("core",),
         resources=capabilities.Resources(
-            cpu_cores=2,
-            memory_gb=4.0,
-            disk_gb=1.0,
+            cores=2,
+            memory=4.0,
+            disk=1.0,
             notes=("bounded local execution",),
         ),
-        failure_modes=("malformed input", "resource exhaustion"),
+        modes=("malformed input", "resource exhaustion"),
         limitations=("library-first support",),
     )
 
@@ -110,7 +110,7 @@ def test_complete_declaration_serializes_evidence_in_required_stage_order():
     declaration = make_declaration()
 
     assert declaration.complete
-    assert declaration.missing_stages == ()
+    assert declaration.stages == ()
     payload = declaration.to_dict()
     stage_records = cast("list[dict[str, object]]", payload["evidence"])
     resources = cast("dict[str, object]", payload["resources"])
@@ -278,7 +278,7 @@ def test_empty_stage_evidence_is_incomplete_and_fails_closed():
     )
     registry = modalities.Registry((declaration,))
 
-    assert declaration.missing_stages == (modalities.Phase.INFERENCE,)
+    assert declaration.stages == (modalities.Phase.INFERENCE,)
     with pytest.raises(
         modalities.UnsupportedError,
         match="declaration is incomplete",
@@ -354,5 +354,5 @@ def test_declaration_rejects_duplicate_stages_and_missing_failure_modes():
         modalities.Declaration(
             modality=modalities.Modality.TEXT,
             status=modalities.Status.EXPERIMENTAL,
-            stage_evidence=(),
+            evidence=(),
         )

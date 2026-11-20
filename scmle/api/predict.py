@@ -10,7 +10,7 @@ from scmle.artifacts import bundle
 import scmle.inference.mapping
 
 
-def load_model(
+def load(
     directory: str | pathlib.Path,
     trusted: bool = False,
     signing_key: str | bytes | None = None,
@@ -56,7 +56,7 @@ def predict(
         Predictions, one per row (one column per target for multi-target
         models).
     """
-    model = load_model(directory, trusted, signing_key)
+    model = load(directory, trusted, signing_key)
     return model.predict(data, mapping)
 
 
@@ -81,5 +81,5 @@ def score(
         `diagnostics`; classifiers also get `classes` and `probabilities`,
         and a bundle with a novelty detector gets `out_of_distribution`.
     """
-    model = load_model(directory, trusted, signing_key)
+    model = load(directory, trusted, signing_key)
     return model.score(data, mapping)

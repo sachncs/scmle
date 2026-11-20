@@ -142,7 +142,7 @@ def test_sensitivity_below_the_minimum_rows_is_skipped_not_raised():
             governor=SimpleNamespace(overdue=lambda seconds, keep=0.0: None),
         ),
     )
-    selected = SimpleNamespace(fit_seconds=0.0, fold_scores=[])
+    selected = SimpleNamespace(fit=0.0, folds=[])
 
     record = stages.Packaging().sensitivity(context, selected)
 

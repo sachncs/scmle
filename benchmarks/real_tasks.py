@@ -152,7 +152,7 @@ def split_ids(
         integer arrays.
     """
     manifest = json.loads(
-        (result.run_dir / "validation_manifest.json").read_text()
+        (result.directory / "validation_manifest.json").read_text()
     )
     return (
         numpy.array(manifest.get("training", manifest.get("train_ids"))),
@@ -192,7 +192,7 @@ def project(
     kw.setdefault("time_budget", BUDGET)
     kw.setdefault("workers", 2)
     kw.setdefault("leakage_policy", "warn")  # public tables, see run_benchmarks
-    return scmle.api.project.Project(frame, target, output_dir=root, **kw)
+    return scmle.api.project.Project(frame, target, directory=root, **kw)
 
 
 BUDGET = 150
@@ -229,8 +229,8 @@ def forecast_case(
         root,
         task="forecast",
         horizon=horizon,
-        time_column=clock,
-        seasonal_period=period,
+        timestamp=clock,
+        period=period,
         folds=3,
     ).run()
     steps = result.evaluation["backtest"]["steps"]
@@ -251,7 +251,7 @@ def forecast_case(
         framework=model,
         baseline=naive[best],
         baseline_name=best,
-        selected=result.selected_model,
+        selected=result.model,
         note=f"{horizon} steps ahead, period {period}; baselines "
         + ", ".join(f"{k} {v:.2f}" for k, v in naive.items()),
     )
@@ -279,7 +279,7 @@ def survival_case(
         The row, scored by concordance index on the run's locked rows.
     """
     result = project(
-        frame, duration, root, task="survival", event_column=event
+        frame, duration, root, task="survival", event=event
     ).run()
     train, test = split_ids(result)
     features = frame.drop(columns=[duration, event])
@@ -306,7 +306,7 @@ def survival_case(
         framework=result.evaluation["metrics"]["c_index"],
         baseline=base,
         baseline_name="untuned ridge Cox",
-        selected=result.selected_model,
+        selected=result.model,
         note=note + f" events {int(frame[event].sum())}/{len(frame)}",
     )
 
@@ -327,7 +327,7 @@ def ordinal_case(
     """
     order = sorted(frame[target].unique(), key=float)
     result = project(
-        frame, target, root, task="ordinal", ordinal_order=order
+        frame, target, root, task="ordinal", order=order
     ).run()
     train, test = split_ids(result)
     ranks = frame[target].map({v: i for i, v in enumerate(order)}).to_numpy()
@@ -346,7 +346,7 @@ def ordinal_case(
         framework=result.evaluation["metrics"]["qwk"],
         baseline=base,
         baseline_name="multiclass boosted classifier",
-        selected=result.selected_model,
+        selected=result.model,
         note=f"{len(order)} ordered levels; MAE in levels "
         f"{result.evaluation['metrics']['mace']:.3f} vs "
         f"{ordinal.distance(ranks[test], guess):.3f}",
@@ -393,7 +393,7 @@ def multilabel_case(
         framework=result.evaluation["metrics"]["f1_macro_labels"],
         baseline=base,
         baseline_name="one boosted classifier per label",
-        selected=result.selected_model,
+        selected=result.model,
         note=f"{len(labels)} labels; split {result.evaluation['validation']}",
     )
 
@@ -431,7 +431,7 @@ def multioutput_case(
         framework=result.evaluation["metrics"]["r2_mean"],
         baseline=base,
         baseline_name="one boosted regressor per target",
-        selected=result.selected_model,
+        selected=result.model,
     )
 
 
@@ -458,7 +458,7 @@ def uplift_case(
         baseline is the mean Qini of 50 random rankings.
     """
     result = project(
-        frame, outcome, root, task="uplift", treatment_column=treatment
+        frame, outcome, root, task="uplift", treatment=treatment
     ).run()
     test = split_ids(result)[1]
     arm = frame[treatment].to_numpy()[test]
@@ -482,7 +482,7 @@ def uplift_case(
         framework=result.evaluation["metrics"]["qini"],
         baseline=chance,
         baseline_name="random ranking (mean of 50)",
-        selected=result.selected_model,
+        selected=result.model,
         note=note + f" propensity AUC {report['propensity']['auc']:.2f}; "
         f"overall effect {report['average_effect']:+.4f}",
     )
@@ -526,7 +526,7 @@ def ranking_case(root: pathlib.Path) -> Row:
 
     frame = cached("mslr_700", load)
     result = project(
-        frame, "relevance", root, task="ranking", query_column="query"
+        frame, "relevance", root, task="ranking", query="query"
     ).run()
     train, test = split_ids(result)
     features = frame.drop(columns=["relevance", "query"])
@@ -547,7 +547,7 @@ def ranking_case(root: pathlib.Path) -> Row:
         framework=result.evaluation["metrics"]["ndcg"],
         baseline=base,
         baseline_name="pointwise boosting",
-        selected=result.selected_model,
+        selected=result.model,
         note=f"{frame['query'].nunique()} queries, 136 features",
     )
 
@@ -573,10 +573,10 @@ def streaming_case(root: pathlib.Path) -> Row:
         str(path),
         "Cover_Type",
         task="classification",
-        time_budget=BUDGET,
+        budget=BUDGET,
         workers=2,
-        leakage_policy="warn",
-        output_dir=root,
+        leakage="warn",
+        directory=root,
         memory_budget_gb=0.05,
     ).run()
     streamed = result.evaluation["streamed"]
@@ -604,7 +604,7 @@ def streaming_case(root: pathlib.Path) -> Row:
         framework=streamed["metrics"]["accuracy"],
         baseline=base,
         baseline_name="boosting on every development row",
-        selected=result.selected_model,
+        selected=result.model,
         note=f"{streamed['rows']} locked rows scored by streaming; "
         f"{result.evaluation['rows']['development']} development rows in "
         "memory",
@@ -648,7 +648,7 @@ def text_case(root: pathlib.Path) -> Row:
             "spam",
             root / encoding,
             task="binary_classification",
-            text_encoding=encoding,
+            encoding=encoding,
         ).run()
     return Row(
         "sms-spam",
@@ -659,7 +659,7 @@ def text_case(root: pathlib.Path) -> Row:
         framework=runs["embedding"].evaluation["metrics"]["roc_auc"],
         baseline=runs["tfidf"].evaluation["metrics"]["roc_auc"],
         baseline_name="TF-IDF terms",
-        selected=runs["embedding"].selected_model,
+        selected=runs["embedding"].model,
         note="same framework run with the text encoder switched",
     )
 

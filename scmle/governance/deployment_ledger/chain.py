@@ -13,7 +13,7 @@ from scmle.governance.deployment_ledger import kinds
 from scmle.governance.deployment_ledger import rules
 
 
-class DeploymentLedger(rules.Automation):
+class Ledger(rules.Automation):
     """The ledger of one deployment (file-backed or in memory)."""
 
     __module__ = "scmle.governance.deployment_ledger"  # pinned signatures
@@ -171,7 +171,7 @@ class DeploymentLedger(rules.Automation):
         if self.rows and kind == kinds.OPEN:
             raise kinds.MisuseError("a ledger has exactly one 'open' row")
         handlers: dict[str, Callable[[Mapping[str, Any]], None]] = {
-            kinds.OPEN: self.apply_open,
+            kinds.OPEN: self.apply,
             kinds.CHALLENGER_RESULT: self.replay,
             kinds.ESCALATION: self.escalate,
             kinds.ATTESTATION: self.attest,
@@ -206,9 +206,9 @@ class DeploymentLedger(rules.Automation):
                 from this ledger, or the rows fail to replay.
         """
         if self.path is None:
-            again = DeploymentLedger(None)
+            again = Ledger(None)
             for row in self.rows:
                 again.ingest(row)
             return
-        if DeploymentLedger.load(self.path).rows != self.rows:
+        if Ledger.load(self.path).rows != self.rows:
             raise kinds.MisuseError("ledger file differs from memory")

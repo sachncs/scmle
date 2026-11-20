@@ -716,8 +716,8 @@ def declare(dataset: relational.Dataset, declared: str) -> dict[str, Any]:
         The keyword arguments.
     """
     child = dataset.child
-    entity: dict[str, Any] = {"group_column": child.key}
-    time: dict[str, Any] = {"time_column": child.event}
+    entity: dict[str, Any] = {"group": child.key}
+    time: dict[str, Any] = {"timestamp": child.event}
     rolling: dict[str, Any] = {"validation": "rolling"}
     unseen: dict[str, Any] = {"entities": "unseen"}
     options: dict[str, dict[str, Any]] = {
@@ -766,7 +766,7 @@ def hygiene(
     """
     with tempfile.TemporaryDirectory() as folder:
         spec = scmle.api.project.Project(
-            frame, target, output_dir=folder, **options
+            frame, target, directory=folder, **options
         ).spec
     data = spec.data
     rows = frame.loc[frame[data.target].notna()].reset_index(drop=True)

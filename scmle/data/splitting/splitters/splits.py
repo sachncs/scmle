@@ -434,7 +434,7 @@ class Preset(Random):
         dev_ids = numpy.flatnonzero(side == streaming.DEVELOPMENT)
         test_ids = numpy.flatnonzero(side == streaming.LOCKED)
         notes = ["split decided by hashing row positions while streaming"]
-        if self.task.is_classification:
+        if self.task.classification:
             labels = frame[self.data.target].iloc[dev_ids]
             folds = min(self.validation.folds, int(labels.value_counts().min()))
             splitter = model_selection.StratifiedKFold(
@@ -491,7 +491,7 @@ class Group(Partitioner):
         dev_groups = groups[dev_ids]
         folds = min(folds, len(set(dev_groups)))
         notes: list[str] = []
-        if not self.task.is_classification:
+        if not self.task.classification:
             splitter = model_selection.GroupKFold(n_splits=folds)
             return Partition(
                 dev_ids,

@@ -136,12 +136,12 @@ def scans(count=60, seed=0):
   <h2>Run the lifecycle with explicit governance</h2>
   <p>Save this as <code>train.py</code> next to the adapter and run <code>python train.py</code>.</p>
   <pre><code class="language-python">{`from pointcloud import PointCloudAdapter, scans
-from scmle.api.project import ModalityProject
+from scmle.api.project import Modality
 
-project = ModalityProject(
+project = Modality(
     PointCloudAdapter(scans()),
-    signing_key="load-this-from-your-secret-manager",
-    output_dir="runs/point-cloud",
+    key="load-this-from-your-secret-manager",
+    directory="runs/point-cloud",
 )
 report = project.run()
 
@@ -157,8 +157,8 @@ from scmle.api.project import Curator
 
 curation = Curator(
     PointCloudAdapter(scans()),
-    signing_key="load-this-from-your-secret-manager",
-    output_dir="runs/point-cloud-curation",
+    key="load-this-from-your-secret-manager",
+    directory="runs/point-cloud-curation",
 ).run()
 
 print(curation.card["curation"])
@@ -190,7 +190,7 @@ adapter = Extension(
     ),
     limitations=("The caller owns point-cloud validation.",),
 )
-Curator(adapter, signing_key="load-this-from-your-secret-manager", output_dir="runs/curation").run()`}</code></pre>
+Curator(adapter, key="load-this-from-your-secret-manager", directory="runs/curation").run()`}</code></pre>
   <p>This is the honest starting point for data curation: make the raw snapshot understandable first. Do not implement modelling methods merely to satisfy a curation-only workflow.</p>
   <p>Move to <code>ModalityProject</code> only after labels, a task, a split policy, a bounded representation, and a modelling decision are justified by the curation evidence. A failed or incomplete curation decision should stop the hand-off.</p>
 

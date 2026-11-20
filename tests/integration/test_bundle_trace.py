@@ -9,7 +9,7 @@ import scmle.artifacts.bundle
 def test_the_bundle_names_the_seed_configuration_data_and_split(tmp_path):
     project = reliability.fast_project(reliability.binary_data(), "y", tmp_path)
     result = project.run()
-    run = result.run_dir
+    run = result.directory
     info = scmle.artifacts.bundle.Bundle.load(run / "model", trusted=True).info
     evaluation = json.loads((run / "evaluation.json").read_text("utf-8"))
     dataset = json.loads((run / "dataset_manifest.json").read_text("utf-8"))

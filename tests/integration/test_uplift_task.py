@@ -33,9 +33,9 @@ def run(tmp_path, frame):
         frame,
         "bought",
         task="uplift",
-        treatment_column="treated",
-        time_budget=300,
-        output_dir=tmp_path,
+        treatment="treated",
+        budget=300,
+        directory=tmp_path,
     ).run()
 
 
@@ -90,13 +90,13 @@ def test_uplift_needs_a_treatment_column_and_others_forbid_one(tmp_path):
     frame = trial(200)[0]
     with pytest.raises(ValueError, match="treatment_column"):
         support.make_project(
-            frame, "bought", task="uplift", output_dir=tmp_path
+            frame, "bought", task="uplift", directory=tmp_path
         )
     with pytest.raises(ValueError, match="treatment_column"):
         support.make_project(
             frame,
             "bought",
             task="binary_classification",
-            treatment_column="treated",
-            output_dir=tmp_path,
+            treatment="treated",
+            directory=tmp_path,
         )

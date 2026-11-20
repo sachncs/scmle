@@ -73,7 +73,7 @@ class Intake(contest.Contest):
             for i in range(size)
         )
         self.pend(frame, ids, score, routing, novel)
-        self.novelty_test.update(float(novel.mean()))
+        self.novelty.update(float(novel.mean()))
         self.ledger.commit(
             deployment_ledger.OBSERVE_SUMMARY,
             {
@@ -91,7 +91,7 @@ class Intake(contest.Contest):
             },
         )
         self.batch += 1
-        self.save_state()
+        self.save()
         return terms.Observation(self.batch - 1, routing, actions)
 
     def pend(
@@ -128,7 +128,7 @@ class Intake(contest.Contest):
             "covered": {},
             "challenger_losses": {},
         }
-        self.pending_batches.append(terms.jsonify(record))
+        self.batches.append(terms.jsonify(record))
 
     def route(
         self, frame: pandas.DataFrame, decisions: Sequence[Any]
@@ -209,7 +209,7 @@ class Intake(contest.Contest):
             Number of entries of `losses` that matched a pending batch.
         """
         index: dict[str, dict[str, Any]] = {}
-        for record in self.pending_batches:
+        for record in self.batches:
             for identity in record["ids"]:
                 index[identity] = record
         matched = 0
@@ -228,7 +228,7 @@ class Intake(contest.Contest):
                 if found is not None:
                     store = found["challenger_losses"].setdefault(name, {})
                     store[str(identity)] = float(value)
-        self.save_state()
+        self.save()
         return matched
 
     def feed(self, record: dict[str, Any]) -> bool:
@@ -281,8 +281,8 @@ class Intake(contest.Contest):
             selective = self.estimate(record, losses, observed, answered)
             if selective.mean is not None:
                 self.selective.update(selective.mean)
-        if self.coverage_test is not None and record["covered"]:
+        if self.test is not None and record["covered"]:
             values = list(record["covered"].values())
-            self.coverage_test.update(float(numpy.mean(values)))
+            self.test.update(float(numpy.mean(values)))
         self.challenge(record, ids, losses, observed, model_cases)
         return True

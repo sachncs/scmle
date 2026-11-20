@@ -138,13 +138,13 @@ class Averager(Selector):
         if self.rule.uncertainty != "bayesian":
             return False
         if (
-            len(best.fold_scores) != len(other.fold_scores)
-            or len(best.fold_scores) < comparison.MIN_FOLDS
+            len(best.folds) != len(other.folds)
+            or len(best.folds) < comparison.MIN_FOLDS
         ):
             return False
         verdict = comparison.pair(
-            [sign * s for s in best.fold_scores],
-            [sign * s for s in other.fold_scores],
+            [sign * s for s in best.folds],
+            [sign * s for s in other.folds],
             rope=self.rule.rope,
         )
         return verdict.superior < self.rule.bayesian_confidence
@@ -176,17 +176,17 @@ class Averager(Selector):
             raise errors.ScmleError(
                 "all trials failed", {"errors": [t.error for t in trials]}
             )
-        pool = [t for t in ok if t.model_name != BASELINE] or ok
-        sign = 1 if metric.greater_is_better else -1
+        pool = [t for t in ok if t.model != BASELINE] or ok
+        sign = 1 if metric.maximize else -1
 
         def merit(trial: experiments.Trial) -> tuple[float, ...]:
-            return (-sign * round(trial.score_mean, SCORE_PRECISION),)
+            return (-sign * round(trial.score, SCORE_PRECISION),)
 
         def tiebreak(trial: experiments.Trial) -> tuple[Any, ...]:
-            cost = registry.get(trial.model_name).capabilities.cost
+            cost = registry.get(trial.model).capabilities.cost
             plain = trial.strategy == experiments.DEFAULT_STRATEGY
             ordering = (
-                (round(trial.score_std, SCORE_PRECISION),)
+                (round(trial.deviation, SCORE_PRECISION),)
                 if self.rule.tie_breaker == "lower_variance"
                 else ()
             )
@@ -194,21 +194,21 @@ class Averager(Selector):
                 *ordering,
                 cost,
                 not plain,
-                trial.model_name,
+                trial.model,
                 trial.strategy,
-                trial.trial_id,
+                trial.identifier,
             )
 
         ordered = sorted(pool, key=lambda t: (*merit(t), *tiebreak(t)))
         best = ordered[0]
-        folds = max(len(best.fold_scores), 1)
+        folds = max(len(best.folds), 1)
         tolerance = self.rule.tie_tolerance
         if self.rule.uncertainty == "one_standard_error":
-            tolerance = max(tolerance, best.score_std / math.sqrt(folds))
+            tolerance = max(tolerance, best.deviation / math.sqrt(folds))
         tied = [
             t
             for t in ordered
-            if sign * (best.score_mean - t.score_mean) <= tolerance + 1e-12
+            if sign * (best.score - t.score) <= tolerance + 1e-12
             or self.equivalent(best, t, sign)
         ]
         rest = [t for t in ordered if t not in tied]

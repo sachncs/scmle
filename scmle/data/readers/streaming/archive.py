@@ -164,7 +164,7 @@ class Archive(sidecar.Sidecar):
                 "state does not belong to the current source snapshot",
             ),
         )
-        durability.write_atomically(
+        durability.write(
             self.path,
             (json.dumps(state.to_dict(), sort_keys=True) + "\n").encode(
                 "utf-8"
@@ -191,7 +191,7 @@ class Archive(sidecar.Sidecar):
                 "acknowledgement belongs to another source snapshot",
             ),
         )
-        durability.write_atomically(
+        durability.write(
             self.pending,
             (
                 json.dumps(acknowledgement.to_dict(), sort_keys=True) + "\n"
@@ -240,7 +240,7 @@ class Archive(sidecar.Sidecar):
         """
         try:
             self.pending.unlink()
-            durability.sync_directory(self.pending.parent)
+            durability.flush(self.pending.parent)
         except FileNotFoundError:
             # handled: documented no-op when no acknowledgement staged
             return

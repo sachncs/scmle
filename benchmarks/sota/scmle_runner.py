@@ -224,10 +224,10 @@ def run_frames(
             target,
             task="regression" if kind == "regression" else "classification",
             metric=record.metric,
-            time_budget=budget_s,
+            budget=budget_s,
             workers=workers,
             seed=seed_for(task_id, fold, repeat),
-            output_dir=runs_dir / f"t{task_id}_f{fold}_r{repeat}_b{budget_s}",
+            directory=runs_dir / f"t{task_id}_f{fold}_r{repeat}_b{budget_s}",
         )
         result = project.run()
         record.score = score(result, test, target, kind)

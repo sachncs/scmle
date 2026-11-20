@@ -49,9 +49,9 @@ def test_the_unstable_note_word_for_word() -> None:
 
 def test_sanity_keeps_the_scale_of_a_larger_is_better_metric() -> None:
     baseline = types.SimpleNamespace(
-        model_name="dummy", strategy="default", fold_scores=[0.0]
+        model="dummy", strategy="default", folds=[0.0]
     )
-    trial = types.SimpleNamespace(train_scores=[2.0], fold_scores=[2.0])
+    trial = types.SimpleNamespace(training=[2.0], folds=[2.0])
     found = fit_health.sanity(trial, [baseline], greater_is_better=True)
     assert found.train_gain == 2.0
     assert found.validation_gain == 2.0

@@ -1,7 +1,7 @@
 """Live checks of a deployed service: health, schema, inference, security.
 
 The checks take a ``fetch`` function so the same code runs against a real
-HTTPS endpoint (`http_fetch`) and against recorded responses in tests. Each
+HTTPS endpoint (`fetch`) and against recorded responses in tests. Each
 check returns a `CheckResult` that names the environment, the source commit
 and the container digest it was run for, and the digest of the exchange it is
 based on, so the promotion gate can refuse evidence that belongs to another
@@ -234,7 +234,7 @@ def bearer(token: str | None) -> dict[str, str]:
     return {} if token is None else {"Authorization": f"Bearer {token}"}
 
 
-def json_headers(token: str | None) -> dict[str, str]:
+def prepare(token: str | None) -> dict[str, str]:
     """Builds the headers of a JSON request.
 
     Args:
@@ -361,7 +361,7 @@ def infer(
     wire = Recorder(fetch)
     problems: list[str] = []
     request = json.dumps({"records": golden.records}).encode()
-    reply = wire.call("POST", "/predict", json_headers(target.token), request)
+    reply = wire.call("POST", "/predict", prepare(target.token), request)
     body = reply.json()
     if reply.status != http.HTTPStatus.OK:
         problems.append(f"/predict answered {reply.status}")
@@ -374,7 +374,7 @@ def infer(
             expected,
             body["predictions"],
             body["probabilities"],
-            golden.cross_environment,
+            golden.environment,
         )
         problems.extend(report.mismatches)
     if body.get("artifact_digest") != target.model_digest:
@@ -406,7 +406,7 @@ def breach(fetch: Fetch, target: Target) -> Check:
         ("no token", None),
         ("forged token", "forged.token.x"),
     ):
-        reply = wire.call("POST", "/predict", json_headers(token), request)
+        reply = wire.call("POST", "/predict", prepare(token), request)
         if reply.status not in DENIED:
             problems.append(f"/predict with {label} answered {reply.status}")
         if b"Traceback" in reply.body:
@@ -414,7 +414,7 @@ def breach(fetch: Fetch, target: Target) -> Check:
     anonymous = wire.call("GET", "/schema")
     if anonymous.status not in DENIED:
         problems.append(f"/schema without a token answered {anonymous.status}")
-    challenge = wire.call("POST", "/predict", json_headers(None), request)
+    challenge = wire.call("POST", "/predict", prepare(None), request)
     if (
         challenge.status == http.HTTPStatus.UNAUTHORIZED
         and "www-authenticate" not in {k.lower() for k in challenge.headers}
@@ -422,7 +422,7 @@ def breach(fetch: Fetch, target: Target) -> Check:
         problems.append("a 401 carries no WWW-Authenticate header")
     if target.read_only_token is not None:
         scoped = wire.call(
-            "POST", "/predict", json_headers(target.read_only_token), request
+            "POST", "/predict", prepare(target.read_only_token), request
         )
         if scoped.status != http.HTTPStatus.FORBIDDEN:
             problems.append(
@@ -431,7 +431,7 @@ def breach(fetch: Fetch, target: Target) -> Check:
     return finish("security", target, wire, problems)
 
 
-def run_checks(
+def check(
     fetch: Fetch,
     target: Target,
     golden: parity.Goldens,
@@ -457,7 +457,7 @@ def run_checks(
     ]
 
 
-def http_fetch(base_url: str, timeout: float = 30.0) -> Fetch:
+def fetch(base_url: str, timeout: float = 30.0) -> Fetch:
     """Builds a `Fetch` over HTTP(S) to ``base_url`` (no redirects followed).
 
     Args:

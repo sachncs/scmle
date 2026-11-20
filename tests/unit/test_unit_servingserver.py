@@ -120,7 +120,7 @@ def test_a_server_without_a_bundle_is_not_loaded():
 
 def test_digests_name_the_manifest_and_the_schema(scorer, bundle):
     assert scorer.digest == provenance.manifest_digest(bundle.info.to_dict())
-    assert scorer.layout == serving.schema_digest(bundle.schema.anchor())
+    assert scorer.layout == serving.digest(bundle.schema.anchor())
     assert scorer.layout.startswith("sha256:")
 
 

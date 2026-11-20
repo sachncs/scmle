@@ -99,7 +99,7 @@ def test_a_feedback_loop_is_recorded_escalated_and_survives_reopening(
     assert record["feedback_test"]["n_bypass"] == 300
     assert any(
         e.question["action"] == "feedback_loop_detected"
-        for e in loop.pending_escalations()
+        for e in loop.survey()
     )
     again = test_loop.open_loop(tmp_path, test_loop.make_policy(bypass=0.3))
     assert not again.halted
@@ -111,7 +111,7 @@ def test_no_feedback_loop_is_reported_without_an_escalation(tmp_path):
     bypass, model = feedback_groups(0.0)
     loop.performativity(bypass, model)
     assert read_mechanism(loop)["feedback"] == "no_loop_detected"
-    assert not loop.pending_escalations()
+    assert not loop.survey()
 
 
 # ------------------------------------------------------------ guarded registry
@@ -147,12 +147,12 @@ def sanction(record):
     return scmle.governance.registry.Sanction(
         model=record.model,
         version=record.version,
-        content_id=record.content_id,
+        content=record.content,
         reviewer="unit-reviewer",
         decision=scmle.governance.registry.Verdict.APPROVED,
         reason="verified unit fixture",
         evidence=("unit-evidence.json",),
-        approved_at="2026-10-20T00:00:00+00:00",
+        approved="2026-10-20T00:00:00+00:00",
     ).sign(APPROVAL_KEY)
 
 
@@ -167,7 +167,7 @@ def exported(tmp_path_factory):
 
 def guarded(tmp_path, exported):
     loop = test_loop.open_loop(tmp_path)
-    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
+    store = scmle.governance.registry.Registry(tmp_path / "registry")
     loop.intercept(store)
     first = store.register("m", exported[0], trusted=True)
     second = store.register("m", exported[1], trusted=True)
@@ -175,7 +175,7 @@ def guarded(tmp_path, exported):
 
 
 def approve_pending(loop):
-    pending = loop.pending_escalations()
+    pending = loop.survey()
     assert len(pending) == 1
     loop.reply(pending[0].id, test_loop.reply_to(pending[0]))
 
@@ -185,12 +185,12 @@ def test_an_unattested_champion_move_is_refused_and_escalated(
 ):
     loop, store, *records = guarded(tmp_path, exported)
     first = records[0]
-    with pytest.raises(never_list.AttestationRequired):
+    with pytest.raises(never_list.UnattestedError):
         store.promote(
             "m", 1, approval=sanction(first), signing_key=APPROVAL_KEY
         )
     assert "champion" not in store.aliases("m")
-    assert loop.pending_escalations()[0].question["detail"] == {
+    assert loop.survey()[0].question["detail"] == {
         "model": "m",
         "version": 1,
     }
@@ -212,7 +212,7 @@ def test_promote_challenger_needs_the_attestation_and_the_approval(
     store.promote("m", 2, alias=scmle.governance.registry.CHALLENGER)
     manager = lifecycle.Maintainer(store, "m", str(tmp_path / "work"))
     approval = sanction(second)
-    with pytest.raises(never_list.AttestationRequired):
+    with pytest.raises(never_list.UnattestedError):
         manager.elevate(approval, signing_key=APPROVAL_KEY)
     approve_pending(loop)
     record = manager.elevate(approval, signing_key=APPROVAL_KEY)
@@ -234,7 +234,7 @@ def test_a_rollback_needs_an_attestation_naming_the_rollback(
         )
     loop.intercept(store)
     manager = lifecycle.Maintainer(store, "m", str(tmp_path / "work"))
-    with pytest.raises(never_list.AttestationRequired):
+    with pytest.raises(never_list.UnattestedError):
         manager.revertible(
             traffic(1200, seed=20),
             "y",
@@ -257,14 +257,14 @@ def test_a_guarded_loop_move_spends_a_single_use_attestation_once(
 ):
     # Enforces website/src/pages/docs/operating-loop.astro:49.
     loop = test_loop.open_loop(tmp_path, single_use_attestations=True)
-    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
+    store = scmle.governance.registry.Registry(tmp_path / "registry")
     loop.intercept(store)
     record = store.register("m", exported[0], trusted=True)
     approval = sanction(record)
-    with pytest.raises(never_list.AttestationRequired):
-        loop.move_champion(store, "m", 1, approval, APPROVAL_KEY)
+    with pytest.raises(never_list.UnattestedError):
+        loop.move(store, "m", 1, approval, APPROVAL_KEY)
     approve_pending(loop)
-    loop.move_champion(store, "m", 1, approval, APPROVAL_KEY)
+    loop.move(store, "m", 1, approval, APPROVAL_KEY)
     assert store.resolve("m").version == 1
     assert len(test_loop.rows(loop, deployment_ledger.ATTESTATION_USED)) == 1
 
@@ -273,11 +273,11 @@ def test_a_refused_approval_does_not_spend_a_single_use_attestation(
     tmp_path, exported
 ):
     loop = test_loop.open_loop(tmp_path, single_use_attestations=True)
-    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
+    store = scmle.governance.registry.Registry(tmp_path / "registry")
     loop.intercept(store)
     record = store.register("m", exported[0], trusted=True)
     approval = sanction(record)
-    with pytest.raises(never_list.AttestationRequired):
+    with pytest.raises(never_list.UnattestedError):
         store.promote("m", 1, approval=approval, signing_key=APPROVAL_KEY)
     approve_pending(loop)
     with pytest.raises(scmle.governance.registry.errors.ArtifactError):

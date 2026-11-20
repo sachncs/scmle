@@ -107,12 +107,12 @@ def case_anytime():
     return {
         "grid": anytime.bets(0.4, 5),
         "wealth": anytime.grow(values[:6], 0.4, 4),
-        "paths": anytime.log_wealth_paths(values[:8], stream, 4),
+        "paths": anytime.accumulate(values[:8], stream, 4),
         "process": process.log_e,
         "max": process.max_log_e,
-        "bound": anytime.confidence_bound(values, stream, 0.05, 6, 8),
-        "pseudo": anytime.pseudo_outcomes(arm, values, 0.25),
-        "pseudo_c": anytime.pseudo_outcomes(arm, values, 0.25, values * 0.9),
+        "bound": anytime.bound(values, stream, 0.05, 6, 8),
+        "pseudo": anytime.transform(arm, values, 0.25),
+        "pseudo_c": anytime.transform(arm, values, 0.25, values * 0.9),
         "center": anytime.centers(values),
         "positive": anytime.fractional(0.05),
         "centered": anytime.recentre(arm, values, 0.5, 0.0),
@@ -129,8 +129,8 @@ def case_design():
     ids = [f"user-{i}" for i in range(500)]
     return {
         "assign": design.assign(ids, "salt", 0.3)[:60],
-        "rows": design.fixed_horizon_rows(0.10, 0.02, alpha=0.05, power=0.8),
-        "rows_de": design.fixed_horizon_rows(
+        "rows": design.size(0.10, 0.02, alpha=0.05, power=0.8),
+        "rows_de": design.size(
             0.10, 0.02, alpha=0.05, power=0.9, design_effect=1.5
         ),
         "srm_p": [design.mismatch(k, 1000, 0.5) for k in (480, 500, 530, 560)],
@@ -169,9 +169,9 @@ def case_rollout():
         "decisions": decisions,
         "harm": harm,
         "monitor": outcomes,
-        "hash": rollout.row_hash({"a": 1, "b": [1, 2]}),
-        "stream": rollout.metric_stream(plan(), None),
-        "stream_guard": rollout.metric_stream(
+        "hash": rollout.digest({"a": 1, "b": [1, 2]}),
+        "stream": rollout.feed(plan(), None),
+        "stream_guard": rollout.feed(
             plan(), decision.Guardrail("bounce", margin=0.05)
         ),
     }
@@ -206,8 +206,8 @@ def case_constraints():
         }
     result["wilson"] = constraints.wilson(30, 100, 1.96)
     result["newcombe"] = constraints.newcombe(40, 100, 20, 100, 0.9)
-    result["base"] = constraints.base_rates(y, groups)
-    result["feasible"] = constraints.check_feasibility(
+    result["base"] = constraints.count(y, groups)
+    result["feasible"] = constraints.check(
         [fairness(), fairness("demographic_parity")], y, groups
     )
     result["price"] = constraints.toll(
@@ -241,7 +241,7 @@ def case_netbenefit():
     p, y = score_world(1500, 1)
     acts = (p > 0.1).astype(float)
     return {
-        "hash": netbenefit.rule_hash("rule", 0.1),
+        "hash": netbenefit.digest("rule", 0.1),
         "band": netbenefit.lowerband(y, acts, (0.02, 0.15), replicates=60),
         "band_inc": netbenefit.lowerband(
             y,

@@ -167,10 +167,8 @@ def test_signature_envelope_rejects_tampering_and_wrong_algorithm():
 
 def test_timestamp_parser_accepts_zulu_and_offset_forms():
     """Both common UTC spellings normalize to offset-aware timestamps."""
-    assert keyring.parse_timestamp("2026-10-21T00:00:00Z", "timestamp").tzinfo
-    assert isinstance(
-        keyring.parse_timestamp(OBSERVED, "timestamp"), datetime.datetime
-    )
+    assert keyring.parse("2026-10-21T00:00:00Z", "timestamp").tzinfo
+    assert isinstance(keyring.parse(OBSERVED, "timestamp"), datetime.datetime)
 
 
 def test_a_retired_key_found_compromised_can_still_be_revoked():

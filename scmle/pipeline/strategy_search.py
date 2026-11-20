@@ -59,7 +59,7 @@ def odds(
         better; 0 when the two were not scored on the same, enough folds or
         a score is not finite.
     """
-    first, second = variant.fold_scores, reference.fold_scores
+    first, second = variant.folds, reference.folds
     if len(first) != len(second) or len(first) < comparison.MIN_FOLDS:
         return 0.0
     if not all(math.isfinite(s) for s in [*first, *second]):
@@ -110,23 +110,23 @@ class Strategist:
             for name, adapter in registry.adapters.items()
             if adapter.family == "baseline"
         )
-        sign = 1 if self.metric.greater_is_better else -1
+        sign = 1 if self.metric.maximize else -1
         default_trials = [
             t
             for t in screened
             if t.status is experiments.Termination.OK
             and not t.params
             and t.strategy == experiments.DEFAULT_STRATEGY
-            and t.model_name not in baselines
+            and t.model not in baselines
         ]
-        leaders = sorted(default_trials, key=lambda t: -sign * t.score_mean)[
+        leaders = sorted(default_trials, key=lambda t: -sign * t.score)[
             : spec.top_models
         ]
         for leader in leaders:
             reason = self.board.services.governor.skip(first=False)
             if reason:
                 self.board.journal.forgo(
-                    f"strategy search for {leader.model_name}", reason
+                    f"strategy search for {leader.model}", reason
                 )
                 continue
             self.board.services.check()
@@ -144,7 +144,7 @@ class Strategist:
             leader: The model's default-pipeline trial.
             names: Names of the strategies to try.
         """
-        adapter = self.board.services.registry.get(leader.model_name)
+        adapter = self.board.services.registry.get(leader.model)
         chosen: list[str] = []
         for name in names:
             strategy = strategies.lookup(name)
@@ -153,13 +153,13 @@ class Strategist:
                 chosen.append(name)
             else:
                 self.board.journal.enter(
-                    f"{name}@{leader.model_name}",
+                    f"{name}@{leader.model}",
                     experiments.Edict.REJECT,
                     f"not applicable: {reason}",
                 )
         ids = self.board.journal.allocate(len(chosen))
         jobs = [
-            trials.Job(trial_id, leader.model_name, {}, None, name)
+            trials.Job(trial_id, leader.model, {}, None, name)
             for trial_id, name in zip(ids, chosen, strict=True)
         ]
         for outcome in self.runner.dispatch(jobs):
@@ -179,7 +179,7 @@ class Strategist:
             leader: The model's default-pipeline trial.
             outcome: The strategy trial's result.
         """
-        technique = f"{outcome.strategy}@{outcome.model_name}"
+        technique = f"{outcome.strategy}@{outcome.model}"
         if outcome.status is not experiments.Termination.OK:
             self.board.journal.enter(
                 technique,
@@ -187,8 +187,8 @@ class Strategist:
                 f"trial {outcome.status}: {outcome.error}",
             )
             return
-        sign = 1 if self.metric.greater_is_better else -1
-        gain = sign * (outcome.score_mean - leader.score_mean)
+        sign = 1 if self.metric.maximize else -1
+        gain = sign * (outcome.score - leader.score)
         chance = odds(outcome, leader, sign)
         verdict = (
             experiments.Edict.INCLUDE
@@ -198,7 +198,7 @@ class Strategist:
         self.board.journal.enter(
             technique,
             verdict,
-            f"cv {self.metric.name} {outcome.score_mean:.4f} vs default "
-            f"{leader.score_mean:.4f} ({gain:+.4f} in the metric's favour; "
+            f"cv {self.metric.name} {outcome.score:.4f} vs default "
+            f"{leader.score:.4f} ({gain:+.4f} in the metric's favour; "
             f"probability better {chance:.3f}, needed {CONFIDENCE:.3f})",
         )

@@ -127,14 +127,14 @@ def produce(task, folder):
         exclude_models=OPTIONAL,
     )
     project = support.make_project(
-        table(task), "y", output_dir=folder, models=models, **options
+        table(task), "y", directory=folder, models=models, **options
     )
     # The goldens record the built-in catalog. Estimators registered in this
     # process (`custom.register`, or a plugin enrolled by an earlier test's
     # `load_plugins`) join every later stock catalog and would add trials.
     project.orchestrator.registry = registry.Catalog.stock(include_user=False)
     result = project.run()
-    return capture(pathlib.Path(result.run_dir))
+    return capture(pathlib.Path(result.directory))
 
 
 def compare(found, expected):

@@ -44,12 +44,12 @@ def sanction(record):
     return scmle.governance.registry.Sanction(
         model=record.model,
         version=record.version,
-        content_id=record.content_id,
+        content=record.content,
         reviewer="unit-reviewer",
         decision=scmle.governance.registry.Verdict.APPROVED,
         reason="verified unit fixture",
         evidence=("unit-evidence.json",),
-        approved_at="2026-10-20T00:00:00+00:00",
+        approved="2026-10-20T00:00:00+00:00",
     ).sign(APPROVAL_KEY)
 
 
@@ -138,7 +138,7 @@ def test_too_few_requests_never_decide(good, weak):
 
 
 def registry_with(tmp_path, first, second):
-    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
+    store = scmle.governance.registry.Registry(tmp_path / "registry")
     manager = lifecycle.Maintainer(store, "m", str(tmp_path / "work"))
     for index, model in enumerate((first, second), start=1):
         directory = model.save(tmp_path / f"export{index}")
@@ -206,7 +206,7 @@ def test_a_new_champion_that_holds_up_stays(good, tmp_path):
 
 
 def test_nothing_to_roll_back_to_or_too_little_evidence(good, tmp_path):
-    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
+    store = scmle.governance.registry.Registry(tmp_path / "registry")
     manager = lifecycle.Maintainer(store, "m", str(tmp_path / "work"))
     record = store.register("m", good.save(tmp_path / "e"), trusted=True)
     store.promote(

@@ -122,10 +122,10 @@ class Evidence(reader.Reader):
             "test_metrics": evaluation.get("metrics"),
             "n_test": evaluation["rows"].get("test"),
         }
-        self.run_id = str(evaluation.get("run", ""))
+        self.run = str(evaluation.get("run", ""))
         if manifest is not None:
-            self.content_id = records.checksum(manifest)
-            facts["content_id"] = self.content_id
+            self.content = records.checksum(manifest)
+            facts["content_id"] = self.content
         run_dir = self.base / "run"
         if run_dir.is_dir():
             verdict = claims_audit.verify(run_dir, self.keys.get("analyst"))

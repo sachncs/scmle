@@ -40,7 +40,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     data = make_dataset()
     result = scmle.api.project.Project(
-        data, "approved", metric="roc_auc", time_budget=60
+        data, "approved", metric="roc_auc", budget=60
     ).run()
     with tempfile.TemporaryDirectory() as directory:
         bundle_directory = pathlib.Path(directory) / "approval"
@@ -54,9 +54,7 @@ def main() -> None:
             ),
         )
         try:
-            scmle.api.predict.load_model(
-                bundle_directory, signing_key="wrong-key"
-            )
+            scmle.api.predict.load(bundle_directory, signing_key="wrong-key")
         except errors.ScmleError as error:
             LOGGER.info("wrong key refused: %s", type(error).__name__)
 

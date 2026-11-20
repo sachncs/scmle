@@ -20,8 +20,8 @@ def test_nested_validation_reports_the_optimism_of_the_winning_score(tmp_path):
     result = support.make_project(
         frame(),
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
         selection=tasks.Selection(nested_cv=True),
     ).run()
 
@@ -32,7 +32,7 @@ def test_nested_validation_reports_the_optimism_of_the_winning_score(tmp_path):
 
 def test_nested_validation_is_off_unless_asked(tmp_path):
     result = support.make_project(
-        frame(), "y", time_budget=300, output_dir=tmp_path
+        frame(), "y", budget=300, directory=tmp_path
     ).run()
 
     assert result.evaluation["nested"] is None
@@ -44,7 +44,7 @@ def test_perfectly_equal_classes_get_a_down_sampling_warning(tmp_path):
     data["y"] = numpy.tile([0, 1], 200)
 
     result = support.make_project(
-        data, "y", time_budget=300, output_dir=tmp_path
+        data, "y", budget=300, directory=tmp_path
     ).run()
 
     assert any(
@@ -62,8 +62,8 @@ def test_the_bias_variance_report_names_the_dominant_error(tmp_path):
         data,
         "y",
         task="regression",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
         selection=tasks.Selection(bias_variance_replicates=15),
     ).run()
 
@@ -79,7 +79,7 @@ def test_the_bias_variance_report_names_the_dominant_error(tmp_path):
 
 def test_the_bias_variance_report_is_off_by_default(tmp_path):
     result = support.make_project(
-        frame(), "y", time_budget=300, output_dir=tmp_path
+        frame(), "y", budget=300, directory=tmp_path
     ).run()
 
     assert result.evaluation["decomposition"] is None
@@ -89,8 +89,8 @@ def test_the_sensitivity_report_separates_training_split_and_noise(tmp_path):
     result = support.make_project(
         frame(),
         "y",
-        time_budget=300,
-        output_dir=tmp_path,
+        budget=300,
+        directory=tmp_path,
         selection=tasks.Selection(sensitivity_repeats=4),
     ).run()
 
@@ -103,7 +103,7 @@ def test_the_sensitivity_report_separates_training_split_and_noise(tmp_path):
 
 def test_the_sensitivity_report_is_off_by_default(tmp_path):
     result = support.make_project(
-        frame(), "y", time_budget=300, output_dir=tmp_path
+        frame(), "y", budget=300, directory=tmp_path
     ).run()
 
     assert result.evaluation["sensitivity"] is None

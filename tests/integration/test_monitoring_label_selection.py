@@ -13,7 +13,7 @@ import scmle.monitoring.monitor
 def monitor(tmp_path_factory):
     directory = tmp_path_factory.mktemp("label_selection")
     run = support.make_project(
-        make_frame(800, 0), "y", time_budget=300, output_dir=directory
+        make_frame(800, 0), "y", budget=300, directory=directory
     ).run()
     return scmle.monitoring.monitor.Watcher(run.bundle)
 

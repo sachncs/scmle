@@ -204,7 +204,7 @@ def test_cost_interval_covers_the_expected_cost_per_row():
     for ignored in range(SIMULATIONS):
         outcome = (rng.random(rows) < rate).astype(float)
         action = (rng.random(rows) < act).astype(float)
-        low, high = threshold.cost_interval(
+        low, high = threshold.bound(
             outcome,
             action,
             cost_model(),
@@ -227,7 +227,7 @@ def test_cost_interval_resamples_whole_clusters():
     for ignored in range(SIMULATIONS):
         outcome = (rng.random(groups * per_group) < rate).astype(float)
         action = (rng.random(groups * per_group) < act).astype(float)
-        low, high = threshold.cost_interval(
+        low, high = threshold.bound(
             outcome,
             action,
             cost_model(),

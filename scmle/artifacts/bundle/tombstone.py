@@ -36,7 +36,7 @@ def mark(directory: str | pathlib.Path, record: records.Layout) -> None:
     if not root.is_dir():
         raise errors.ArtifactError(f"no such bundle directory: {root}")
     text = json.dumps(dict(record), indent=2, sort_keys=True) + "\n"
-    durability.write_atomically(root / FILE, text.encode("utf-8"))
+    durability.write(root / FILE, text.encode("utf-8"))
 
 
 def read(directory: str | pathlib.Path) -> records.Layout | None:

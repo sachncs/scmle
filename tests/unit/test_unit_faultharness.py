@@ -59,7 +59,7 @@ def test_invert_negates_every_coefficient():
 
 
 def test_corrupt_appends_to_the_model_file_and_changes_its_digest(tmp_path):
-    folder = harness.export_service(tmp_path / "svc", harness.specify())
+    folder = harness.export(tmp_path / "svc", harness.specify())
     assert (folder / "serve.py").is_file()
     before = harness.digest(folder)
     assert before.startswith("sha256:")
@@ -162,7 +162,7 @@ def test_unready_means_alive_but_refusing(livez, readyz, predict, expected):
 
 
 def test_a_real_service_boots_and_predicts(tmp_path):
-    folder = harness.export_service(tmp_path / "svc", harness.specify())
+    folder = harness.export(tmp_path / "svc", harness.specify())
     fleet = harness.Fleet()
     try:
         running = fleet.start(folder)
@@ -185,7 +185,7 @@ def passed(result):
 
 
 def test_the_object_store_outage_recovers_without_loss():
-    result = outages.object_store_loss()
+    result = outages.disconnect()
     passed(result)
     assert result.fault == "lost_object_store_access"
     assert result.environment == "local emulator + subprocess"
@@ -212,8 +212,8 @@ def test_a_metrics_outage_spools_and_drains_every_sample():
 
 
 def test_the_catalogue_maps_every_local_fault_to_its_scenario():
-    assert catalogue.SCENARIOS["process_kill"] is crashes.process_kill
-    assert catalogue.SCENARIOS["bad_release"] is release.bad_release
+    assert catalogue.SCENARIOS["process_kill"] is crashes.process
+    assert catalogue.SCENARIOS["bad_release"] is release.release
     assert catalogue.SCENARIOS["dependency_outage"] is outages.blackout
     assert catalogue.SCENARIOS["secret_rotation_recovery"] is service.rekey
     assert set(catalogue.SCENARIOS) == {
@@ -222,14 +222,14 @@ def test_the_catalogue_maps_every_local_fault_to_its_scenario():
 
 
 def test_run_all_reports_unselected_faults_as_not_run():
-    report = catalogue.run_all(["no-such-fault"])
+    report = catalogue.rehearse(["no-such-fault"])
     statuses = {r["fault"]: r["status"] for r in report["results"]}
     assert set(statuses.values()) == {recovery.NOT_RUN}
     assert set(statuses) == {f.id for f in recovery.CATALOGUE}
 
 
 def test_run_all_runs_only_the_selected_fault():
-    report = catalogue.run_all(["job_interruption"])
+    report = catalogue.rehearse(["job_interruption"])
     found = {r["fault"]: r for r in report["results"]}
     assert found["job_interruption"]["status"] == recovery.PASSED
     assert found["process_kill"]["status"] == recovery.NOT_RUN

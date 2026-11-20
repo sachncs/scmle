@@ -36,8 +36,8 @@ def foldcost(trial: experiments.Trial) -> float:
     Returns:
         The trial's seconds per fold times `FIT_MARGIN`.
     """
-    folds = max(len(trial.fold_scores), 1)
-    return FIT_MARGIN * trial.fit_seconds / folds
+    folds = max(len(trial.folds), 1)
+    return FIT_MARGIN * trial.fit / folds
 
 
 def refitcost(board: engine.Board, trial: experiments.Trial) -> float:
@@ -80,12 +80,12 @@ def affordable(
         if reason is None:
             return trial
         board.journal.forgo(
-            f"selecting {trial.model_name}/{trial.strategy}",
+            f"selecting {trial.model}/{trial.strategy}",
             f"its refit {reason}",
         )
     cheapest = min(ranked, key=lambda t: refitcost(board, t))
     board.journal.forgo(
-        f"selecting {cheapest.model_name}/{cheapest.strategy}",
+        f"selecting {cheapest.model}/{cheapest.strategy}",
         "no refit fits before the run's end; the cheapest refit is taken",
     )
     return cheapest
@@ -106,7 +106,7 @@ def late(board: engine.Board, trial: experiments.Trial) -> bool:
     reason = board.services.governor.overdue(refitcost(board, trial))
     if reason is None:
         return False
-    label = f"{trial.model_name}/{trial.strategy}"
+    label = f"{trial.model}/{trial.strategy}"
     board.journal.enter(label, experiments.Edict.REJECT, f"refit {reason}")
     board.journal.forgo(f"measuring {label}", f"its refit {reason}")
     return True
@@ -187,5 +187,5 @@ def dimensions(
     named = {data.target, *data.targets}
     columns = sum(1 for column in frame.columns if column not in named)
     task = task or scmle.data.validation.target.Resolver(spec).resolve(target)
-    classes = int(target.nunique()) if task.is_classification else 0
+    classes = int(target.nunique()) if task.classification else 0
     return len(target), columns, classes

@@ -104,7 +104,7 @@ class Server(abc.ABC):
     @property
     def layout(self) -> str:
         """Digest of the input schema of the bundle being served."""
-        return serving.schema_digest(self.bundle.schema.anchor())
+        return serving.digest(self.bundle.schema.anchor())
 
     def identity(self) -> dict[str, Any]:
         """Reports the model version and digest.
@@ -116,7 +116,7 @@ class Server(abc.ABC):
         if self.loaded is None:
             return {}
         return {
-            "model_version": self.loaded.info.model_version,
+            "model_version": self.loaded.info.version,
             "artifact_digest": self.digest,
         }
 
@@ -259,7 +259,7 @@ class Server(abc.ABC):
             "predict",
             {
                 "scmle.rows": len(frame),
-                "scmle.model_version": bundle.info.model_version,
+                "scmle.model_version": bundle.info.version,
             },
         )
         with traced, held:

@@ -26,7 +26,7 @@ TERMINAL = {
 }
 
 
-class MlflowExperimentStore(stores.Store):
+class Mlflow(stores.Store):
     """Experiment store backed by an MLflow tracking server or database."""
 
     def __init__(
@@ -54,7 +54,7 @@ class MlflowExperimentStore(stores.Store):
             mlflow.set_tracking_uri(tracking_uri)
         self.client = tracking.MlflowClient(tracking_uri)
         existing = self.client.get_experiment_by_name(experiment)
-        self.experiment_id = (
+        self.experiment = (
             existing.experiment_id
             if existing is not None
             else self.client.create_experiment(
@@ -98,7 +98,7 @@ class MlflowExperimentStore(stores.Store):
         if run_id in self.parents:
             return self.parents[run_id]
         found = self.client.search_runs(
-            [self.experiment_id],
+            [self.experiment],
             f"tags.`{RUN_TAG}` = '{run_id}' and tags.`scmle.kind` = 'run'",
         )
         if found:
@@ -122,7 +122,7 @@ class MlflowExperimentStore(stores.Store):
         parent = self.climb(run_id)
         if parent is None:
             created = self.client.create_run(
-                self.experiment_id,
+                self.experiment,
                 run_name=run_id,
                 tags={
                     RUN_TAG: run_id,
@@ -196,30 +196,30 @@ class MlflowExperimentStore(stores.Store):
         if parent is None:
             return
         child = self.client.create_run(
-            self.experiment_id,
-            run_name=trial.trial_id,
+            self.experiment,
+            run_name=trial.identifier,
             tags={
                 PARENT_TAG: parent,
                 RUN_TAG: run_id,
                 "scmle.kind": "trial",
-                "scmle.trial_id": trial.trial_id,
-                "scmle.model": trial.model_name,
+                "scmle.trial_id": trial.identifier,
+                "scmle.model": trial.model,
                 "scmle.strategy": trial.strategy,
                 "scmle.status": str(trial.status),
                 "scmle.error": trial.error[:250],
             },
         )
         child_id = child.info.run_id
-        self.client.log_param(child_id, "model", trial.model_name)
+        self.client.log_param(child_id, "model", trial.model)
         self.client.log_param(child_id, "strategy", trial.strategy)
         for key, value in trial.params.items():
             self.client.log_param(child_id, f"param.{key}", str(value)[:250])
-        if trial.score_mean == trial.score_mean:
+        if trial.score == trial.score:
             self.client.log_metric(
-                child_id, trial.metric or "score", trial.score_mean
+                child_id, trial.metric or "score", trial.score
             )
-            self.client.log_metric(child_id, "score_std", trial.score_std)
-        self.client.log_metric(child_id, "fit_seconds", trial.fit_seconds)
+            self.client.log_metric(child_id, "score_std", trial.deviation)
+        self.client.log_metric(child_id, "fit_seconds", trial.fit)
         self.client.set_terminated(
             child_id,
             "FINISHED" if str(trial.status) in ("ok", "pruned") else "FAILED",
@@ -233,7 +233,7 @@ class MlflowExperimentStore(stores.Store):
             run's logged metrics.
         """
         found = self.client.search_runs(
-            [self.experiment_id],
+            [self.experiment],
             "tags.`scmle.kind` = 'run'",
             order_by=["attributes.start_time DESC"],
         )
@@ -258,7 +258,7 @@ class MlflowExperimentStore(stores.Store):
             `status` and the trial's logged metrics, sorted by `trial_id`.
         """
         found = self.client.search_runs(
-            [self.experiment_id],
+            [self.experiment],
             f"tags.`{RUN_TAG}` = '{run_id}' and tags.`scmle.kind` = 'trial'",
         )
         rows = [
@@ -282,7 +282,7 @@ class MlflowExperimentStore(stores.Store):
         """
         history = []
         for run in self.client.search_runs(
-            [self.experiment_id],
+            [self.experiment],
             "tags.`scmle.kind` = 'run' and tags.`scmle.state` = 'COMPLETED'",
         ):
             tags = run.data.tags

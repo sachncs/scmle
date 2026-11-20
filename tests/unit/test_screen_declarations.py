@@ -200,8 +200,8 @@ def test_a_project_declaring_a_column_known_after_the_outcome_is_blocked(
         frame,
         "y",
         known={"duration": "outcome"},
-        leakage_policy="block",
-        output_dir=tmp_path,
+        leakage="block",
+        directory=tmp_path,
     )
     assert project.spec.data.known == {"duration": "outcome"}
     with pytest.raises(errors.BlockedError, match="duration"):

@@ -49,7 +49,7 @@ def edit_json(path, change):
 
 def audit_rows(folder):
     """The registry audit rows."""
-    return records.read_lines(folder / "retained/registry/audit.jsonl")
+    return records.scan(folder / "retained/registry/audit.jsonl")
 
 
 def write_rows(path, rows):
@@ -81,7 +81,7 @@ def test_the_committed_trail_verifies_from_its_own_folder():
 
 
 def test_every_step_names_the_records_it_rests_on(folder):
-    document = records.read_json(folder / records.TRAIL_FILE)
+    document = records.read(folder / records.TRAIL_FILE)
     assert [s["kind"] for s in document["steps"]] == list(trace.KINDS)
     for step in document["steps"]:
         for relative, held in step["records"].items():
@@ -94,7 +94,7 @@ def test_every_step_names_the_records_it_rests_on(folder):
 
 
 def test_the_joins_hold_across_the_records(folder):
-    document = records.read_json(folder / records.TRAIL_FILE)
+    document = records.read(folder / records.TRAIL_FILE)
     facts = {s["kind"]: s["facts"] for s in document["steps"]}
     charter = facts["question"]["charter_hash"]
     assert document["charter_hash"] == charter
@@ -108,7 +108,7 @@ def test_the_reports_are_deterministic(folder):
     first = chain.verify(folder, KEYS)
     second = chain.verify(folder, KEYS)
     assert first == second
-    stored = records.read_json(folder / records.EXPLORATORY)
+    stored = records.read(folder / records.EXPLORATORY)
     body = {k: v for k, v in stored.items() if k != "sha256"}
     assert stored["sha256"] == records.digest(body)
 
@@ -129,7 +129,7 @@ def test_a_deleted_record_is_a_missing_link(folder):
 
 def test_a_step_removed_and_rechained_is_a_missing_link(folder):
     path = folder / records.TRAIL_FILE
-    document = records.read_json(path)
+    document = records.read(path)
     document["steps"] = [
         s for s in document["steps"] if s["kind"] != "approval"
     ]
@@ -143,7 +143,7 @@ def test_a_step_removed_and_rechained_is_a_missing_link(folder):
     document["builder_signature"] = chain.sign(
         document["head"], document["retained"], KEYS["analyst"]
     )
-    records.write_json(path, document)
+    records.write(path, document)
     report = chain.verify(folder, KEYS)
     assert trace.MISSING_LINK in kinds(report)
     assert any(f.step == "approval" for f in report.findings)
@@ -157,7 +157,7 @@ def test_an_edited_step_breaks_the_chain(folder):
 
 def test_an_edited_deployment_ledger_row_breaks_its_chain(folder):
     path = folder / "retained/deployment/deployment_ledger.jsonl"
-    rows = records.read_lines(path)
+    rows = records.scan(path)
     rows[2]["body"]["cases"] = 1
     write_rows(path, rows)
     assert trace.BROKEN_CHAIN in kinds(reseal(folder))
@@ -165,7 +165,7 @@ def test_an_edited_deployment_ledger_row_breaks_its_chain(folder):
 
 def test_an_edited_claim_ledger_row_breaks_its_chain(folder):
     path = folder / "retained/run/hypothesis_ledger.jsonl"
-    rows = records.read_lines(path)
+    rows = records.scan(path)
     rows[3]["body"]["source"] = "edited"
     write_rows(path, rows)
     assert trace.BROKEN_CHAIN in kinds(reseal(folder))
@@ -260,7 +260,7 @@ def test_outcomes_outside_the_approved_expectation_are_reported(folder):
     edit_json(folder / "retained/deployment/observed_outcomes.json", worsen)
     report = reseal(folder)
     assert trace.OUTSIDE in kinds(report)
-    tracking = records.read_json(folder / records.OUTCOME_TRACKING)
+    tracking = records.read(folder / records.OUTCOME_TRACKING)
     assert tracking["status"] == outcomes.ABOVE
     assert "not a forecast" in tracking["uncertainty"]
 
@@ -277,10 +277,10 @@ def test_a_feed_that_disagrees_with_the_ledger_is_reported(folder):
 
 def test_a_failed_quality_threshold_is_reported(folder):
     path = folder / records.INPUTS
-    record = records.read_json(path)
+    record = records.read(path)
     record["reviewer"]["thresholds"][0]["value"] = 10**6
     path.write_text(
-        json.dumps(inputs.sign_inputs(record, KEYS), indent=2) + "\n",
+        json.dumps(inputs.sign(record, KEYS), indent=2) + "\n",
         encoding="utf-8",
     )
     report = reseal(folder)
@@ -305,9 +305,7 @@ def test_the_charter_hash_must_agree_across_records(folder):
 
 
 def test_inputs_structure_problems_are_listed():
-    record = copy.deepcopy(
-        records.read_json(EVIDENCE / "trail" / records.INPUTS)
-    )
+    record = copy.deepcopy(records.read(EVIDENCE / "trail" / records.INPUTS))
     assert inputs.lint(record) == []
     record["stakeholder"].pop("expectation")
     record["reviewer"]["thresholds"][0]["op"] = "~"

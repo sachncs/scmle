@@ -181,7 +181,7 @@ class Policy:
                 `cost` is set but not finite, or `calibration` is not
                 strictly in (0, 1).
         """
-        evidence.require_text(self.unit, "unit")
+        evidence.require(self.unit, "unit")
         qualification.tupled(self.baselines, "baselines")
         if not self.baselines or len(set(self.baselines)) != len(
             self.baselines
@@ -268,7 +268,7 @@ class Constraint:
                 non-blank `attestation`, or `minimum` is not an integer of
                 at least 2.
         """
-        evidence.require_text(self.attribute, "attribute")
+        evidence.require(self.attribute, "attribute")
         if self.criterion not in CRITERIA:
             raise errors.InputError(f"unknown criterion {self.criterion!r}")
         confine(self.gap, "gap")
@@ -357,7 +357,7 @@ class Guardrail:
                 positive, `low` is not finite and below a finite `high`, or
                 `direction` is not in `DIRECTIONS`.
         """
-        evidence.require_text(self.name, "name")
+        evidence.require(self.name, "name")
         check(self.margin, "margin")
         if self.direction not in DIRECTIONS:
             raise errors.InputError(f"direction must be one of {DIRECTIONS}")
@@ -456,9 +456,9 @@ class Experiment:
                 `guardrails` is not a tuple; or guardrail names repeat or
                 include `primary`.
         """
-        evidence.require_text(self.unit, "unit")
-        evidence.require_text(self.primary, "primary")
-        evidence.require_text(self.salt, "salt")
+        evidence.require(self.unit, "unit")
+        evidence.require(self.primary, "primary")
+        evidence.require(self.salt, "salt")
         confine(self.assignment, "assignment")
         check(self.delta, "delta")
         check(self.tolerance, "tolerance")

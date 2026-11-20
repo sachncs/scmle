@@ -27,16 +27,16 @@ def test_a_declared_outcome_column_is_quarantined_in_a_charter_run(
     result = support.make_project(
         binary_frame,
         "y",
-        time_budget=300,
-        output_dir=tmp_path / "out",
+        budget=300,
+        directory=tmp_path / "out",
         charter=path,
         known={"b": "outcome"},
     ).run()
 
-    done = completed(result.run_dir)
+    done = completed(result.directory)
     assert "b" in done["suspects"]
     assert "b" in done["quarantined"]
     plan = json.loads(
-        (pathlib.Path(result.run_dir) / "dataset_profile.json").read_text()
+        (pathlib.Path(result.directory) / "dataset_profile.json").read_text()
     )
     assert "b" in plan["plan"]["dropped"]
