@@ -80,7 +80,7 @@ def test_a_shasum_is_the_sha256_of_the_whole_file(tmp_path):
 
 
 def test_the_layout_names_the_format_and_every_member():
-    assert layout.BUNDLE_FORMAT == 5
+    assert layout.BUNDLE_FORMAT == 6
     assert layout.MODEL_FILE == "pipeline.joblib"
     assert layout.SCHEMA_FILE == "schema.json"
     assert layout.MANIFEST_FILE == "model_manifest.json"
@@ -464,7 +464,7 @@ def test_admit_refuses_another_format(binary, tmp_path):
     info, legacy = archive.admit(document, False, False)
     assert legacy is False
     assert info.model_name == "lr"
-    for value in (4, 6, None):
+    for value in (5, 7, None):
         with pytest.raises(errors.ArtifactError, match=f"format {value}"):
             archive.admit({**document, "format": value}, True, True)
 
@@ -573,10 +573,8 @@ def test_unpickle_explains_a_member_from_another_build(monkeypatch):
 
 def test_every_optional_member_round_trips(regressor, tmp_path):
     bundle = regressor[0]
-    bundle.conformal = (
-        scmle.evaluation.conformal.ConformalCalibrator.for_regression(
-            numpy.arange(40.0), numpy.arange(40.0) + 1.0
-        )
+    bundle.conformal = scmle.evaluation.conformal.ConformalCalibrator.calibrate(
+        numpy.arange(40.0), numpy.arange(40.0) + 1.0
     )
     bundle.coverage_report = {"b": 2, "a": 1}
     bundle.quantile = {"q": 1}
@@ -727,10 +725,8 @@ def test_residual_intervals_add_the_conformal_margin(regressor):
     bundle, features = regressor[0], regressor[1]
     with pytest.raises(errors.ArtifactError, match="no regression conformal"):
         bundle.predict_interval(features)
-    bundle.conformal = (
-        scmle.evaluation.conformal.ConformalCalibrator.for_regression(
-            numpy.zeros(99), numpy.ones(99)
-        )
+    bundle.conformal = scmle.evaluation.conformal.ConformalCalibrator.calibrate(
+        numpy.zeros(99), numpy.ones(99)
     )
     frame = bundle.predict_interval(features.head(3), coverage=0.9)
     assert list(frame.columns) == ["prediction", "lower", "upper"]
@@ -769,10 +765,8 @@ def test_prediction_sets_need_a_classification_calibrator(binary):
     bundle, features = binary[0], binary[1]
     with pytest.raises(errors.ArtifactError, match="no classification"):
         bundle.predict_set(features)
-    bundle.conformal = (
-        scmle.evaluation.conformal.ConformalCalibrator.for_regression(
-            numpy.zeros(30), numpy.ones(30)
-        )
+    bundle.conformal = scmle.evaluation.conformal.ConformalCalibrator.calibrate(
+        numpy.zeros(30), numpy.ones(30)
     )
     with pytest.raises(errors.ArtifactError, match="no classification"):
         bundle.predict_set(features)

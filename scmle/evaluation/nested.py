@@ -35,15 +35,15 @@ class Scores:
     """Outcome of a nested validation.
 
     Attributes:
-        outer_scores: Score of each outer fold's winner on its own test rows
+        outer: Score of each outer fold's winner on its own test rows
             (larger is better, in the scorer's orientation).
-        inner_scores: The winner's inner score in each outer fold.
+        inner: The winner's inner score in each outer fold.
         mean: Mean outer score, the honest estimate.
         optimism: Mean inner score minus mean outer score.
         folds: Number of outer folds.
         configurations: Configurations compared in each fold.
         migrations: The written layout's version steps, oldest first;
-            version 2 writes `outer_scores` as `outer` and `inner_scores` as
+            version 2 writes `outer` as `outer` and `inner` as
             `inner`.
     """
 
@@ -53,8 +53,8 @@ class Scores:
         ),
     )
 
-    outer_scores: tuple[float, ...]
-    inner_scores: tuple[float, ...]
+    outer: tuple[float, ...]
+    inner: tuple[float, ...]
     mean: float
     optimism: float
     folds: int

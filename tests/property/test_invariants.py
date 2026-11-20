@@ -293,7 +293,7 @@ def test_optimized_threshold_never_loses_to_the_default(values, seed):
     for objective in (
         thresholds.F1(),
         thresholds.Accuracy(),
-        thresholds.BalancedAccuracyObjective(),
+        thresholds.Balance(),
     ):
         best, score = thresholds.argmax(probabilities, actual, objective)
         assert best in thresholds.GRID

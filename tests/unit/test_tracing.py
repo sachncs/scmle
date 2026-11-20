@@ -61,7 +61,7 @@ def test_tracing_is_off_by_default_and_spans_are_no_ops():
 def test_a_request_span_continues_the_callers_trace_and_parents_predict(
     exported, golden, bundle
 ):
-    adapter = server.HttpServing(bundle)
+    adapter = server.Service(bundle)
     adapter.start()
     try:
         request = urllib.request.Request(
@@ -127,7 +127,7 @@ def test_pipeline_stages_and_batch_files_are_spans(
     engine.Pipeline((Load(),)).advance(Board())
     source = tmp_path / "records.csv"
     pandas.DataFrame(golden.records).to_csv(source, index=False)
-    server.Batcher(bundle).score_file(source, tmp_path / "out.csv", 3)
+    server.Batcher(bundle).score(source, tmp_path / "out.csv", 3)
     tracing.TRACING.flush()
     finished = exported.get_finished_spans()
     names = [span.name for span in finished]

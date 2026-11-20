@@ -30,7 +30,7 @@ class Ratios:
     Attributes:
         calibration: Weights of the calibration rows.
         target: Weights of the target rows.
-        effective_size: Kish effective size of the calibration weights.
+        effective: Kish effective size of the calibration weights.
         clip: Upper bound applied to the size-corrected odds.
         discriminator: The fitted classifier (target = 1); None when not
             kept, in which case `ratio` cannot be used.
@@ -39,7 +39,7 @@ class Ratios:
 
     calibration: numpy.ndarray
     target: numpy.ndarray
-    effective_size: float
+    effective: float
     clip: float
     discriminator: Any = None
     scale: float = 1.0
@@ -115,16 +115,16 @@ def weigh(
         model,
         len(first) / len(second),
     )
-    if result.effective_size < minimum:
+    if result.effective < minimum:
         raise RefusedError(
-            f"effective sample size {result.effective_size:.1f} is below "
+            f"effective sample size {result.effective:.1f} is below "
             f"{minimum:.0f}; weighted conformal is refused"
         )
     return result
 
 
 @dataclasses.dataclass(frozen=True)
-class StoredShiftWeights:
+class Weights:
     """Shift weights as a bundle keeps them.
 
     Attributes:
@@ -135,7 +135,7 @@ class StoredShiftWeights:
     weights: Ratios
     columns: tuple[str, ...]
 
-    def test_weights(self, frame: Any) -> numpy.ndarray:
+    def test(self, frame: Any) -> numpy.ndarray:
         """Returns the likelihood ratios of new rows, read from `columns`.
 
         Args:

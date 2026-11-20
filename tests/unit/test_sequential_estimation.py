@@ -8,20 +8,20 @@ import pandas
 import pytest
 
 from scmle.evaluation.sequential import Config
+from scmle.evaluation.sequential import Diagnostics
 from scmle.evaluation.sequential import Estimand
+from scmle.evaluation.sequential import Estimate
 from scmle.evaluation.sequential import Estimation
 from scmle.evaluation.sequential import Estimator
-from scmle.evaluation.sequential import PeriodDiagnostics
-from scmle.evaluation.sequential import RegimeEstimate
 
 
 def make_estimand() -> Estimand:
     """Return an identified sustained-treatment declaration."""
     return Estimand(
         name="sustained_treatment_effect",
-        subject_identity="subject_id",
-        time_column="time",
-        treatment_column="treatment",
+        subject="subject_id",
+        time="time",
+        treatment="treatment",
         outcome="outcome",
         baseline_covariates=("baseline_score",),
         time_varying_covariates=("state",),
@@ -87,7 +87,7 @@ def make_policy() -> Config:
         minimum_subjects=100,
         minimum_arm_rows=2,
         minimum_effective_sample_size=2.0,
-        maximum_weight=12.0,
+        weight=12.0,
     )
 
 
@@ -205,9 +205,9 @@ def test_required_assumptions_are_not_implicit() -> None:
     with pytest.raises(ValueError, match="required assumptions"):
         Estimand(
             name="sustained_treatment_effect",
-            subject_identity="subject_id",
-            time_column="time",
-            treatment_column="treatment",
+            subject="subject_id",
+            time="time",
+            treatment="treatment",
             outcome="outcome",
             baseline_covariates=(),
             time_varying_covariates=("state",),
@@ -260,33 +260,33 @@ def test_estimand_rejects_ambiguous_declarations(change: str) -> None:
 
 def test_contract_dataclasses_reject_invalid_evidence() -> None:
     """Period, regime, and result contracts reject inconsistent evidence."""
-    period = PeriodDiagnostics(
+    period = Diagnostics(
         period="0",
         rows=4,
-        treated_rows=2,
-        control_rows=2,
+        treated=2,
+        control=2,
         denominator_propensity_min=0.2,
         denominator_propensity_max=0.8,
         numerator_propensity_min=0.4,
         numerator_propensity_max=0.6,
-        fraction_weight_truncated=0.0,
-        maximum_untruncated_weight=2.0,
-        maximum_weight=2.0,
-        effective_sample_size=4.0,
+        truncated=0.0,
+        untruncated=2.0,
+        weight=2.0,
+        ess=4.0,
     )
     with pytest.raises(ValueError, match="arm counts"):
-        dataclasses.replace(period, treated_rows=1)
+        dataclasses.replace(period, treated=1)
     with pytest.raises(ValueError, match="strictly between"):
         dataclasses.replace(period, denominator_propensity_min=0.0)
-    regime = RegimeEstimate(
+    regime = Estimate(
         regime="always_treated",
         treatment=1,
         estimate=1.0,
         standard_error=0.1,
         interval=(0.8, 1.2),
         rows=2,
-        weight_sum=2.0,
-        effective_sample_size=2.0,
+        weights=2.0,
+        ess=2.0,
     )
     with pytest.raises(ValueError, match="regime treatment"):
         dataclasses.replace(regime, treatment=2)
@@ -302,9 +302,9 @@ def test_contract_dataclasses_reject_invalid_evidence() -> None:
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("confidence_level", 1.0),
-        ("propensity_clip", 0.0),
-        ("maximum_weight", 1.0),
+        ("confidence", 1.0),
+        ("clip", 0.0),
+        ("weight", 1.0),
         ("seed", -1),
         ("tolerance", 0.0),
         ("minimum_subjects", 0),

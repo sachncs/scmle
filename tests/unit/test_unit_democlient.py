@@ -40,7 +40,7 @@ def running(golden, tmp_path_factory):
     folder = tmp_path_factory.mktemp("bundle") / "b"
     golden.save(folder)
     loaded = scmle.artifacts.bundle.Bundle.load(folder, trusted=True)
-    adapter = web.HttpServing(loaded)
+    adapter = web.Service(loaded)
     adapter.start()
     yield adapter
     adapter.stop()

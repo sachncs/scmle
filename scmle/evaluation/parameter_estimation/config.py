@@ -7,7 +7,6 @@ from typing import ClassVar
 
 from scmle.contracts import errors
 from scmle.contracts import records
-from scmle.evaluation.parameter_estimation.declaration import BayesianPrior
 from scmle.evaluation.parameter_estimation.declaration import CAUSAL_ESTIMATORS
 from scmle.evaluation.parameter_estimation.declaration import CausalAssumption
 from scmle.evaluation.parameter_estimation.declaration import (
@@ -29,6 +28,7 @@ from scmle.evaluation.parameter_estimation.declaration import (
 )
 from scmle.evaluation.parameter_estimation.declaration import HierarchicalMethod
 from scmle.evaluation.parameter_estimation.declaration import MissingPolicy
+from scmle.evaluation.parameter_estimation.declaration import Prior
 from scmle.evaluation.parameter_estimation.declaration import (
     REQUIRED_BAYESIAN_ATE_ASSUMPTIONS,
 )
@@ -78,40 +78,40 @@ class Config(Rules):
     Attributes:
         estimator: Estimator to run.
         covariance: Covariance estimator for the coefficients.
-        confidence_level: Confidence level of the reported intervals, strictly
+        confidence: Confidence level of the reported intervals, strictly
             between 0 and 1.
         missing: Whether missing values are rejected or rows with them are
             dropped.
-        cluster_name: Name of the cluster column, or None when the data are
+        cluster: Name of the cluster column, or None when the data are
             not clustered.
-        bootstrap_replicates: Number of bootstrap replicates for the
+        replicates: Number of bootstrap replicates for the
             sensitivity report; 0 disables the bootstrap.
         seed: Seed of the random number generator.
-        max_iterations: Iteration limit of iterative fits.
+        iterations: Iteration limit of iterative fits.
         tolerance: Convergence tolerance of iterative fits.
-        reference_tolerance: Tolerance for agreement with the independent
+        reference: Tolerance for agreement with the independent
             reference computation.
         prior: Conjugate prior for the Bayesian estimators, else None.
-        treatment_position: Index of the treatment column among the features
+        treatment: Index of the treatment column among the features
             for the causal estimators, else None.
-        propensity_clip: Propensity scores are clipped to
+        clip: Propensity scores are clipped to
             ``[propensity_clip, 1 - propensity_clip]``; strictly between 0
             and 0.5.
         causal_assumptions: Declared assumptions for the binary-treatment
             causal estimators.
         continuous_treatment_assumptions: Declared assumptions for
             ``continuous_ipw_ate``.
-        continuous_weight_cap: Upper cap on the continuous-treatment weights;
+        cap: Upper cap on the continuous-treatment weights;
             greater than 1.
         hierarchical_assumptions: Declared assumptions for
             ``hierarchical_linear``.
-        cross_fitting_folds: Number of cross-fitting folds for ``aipw_ate``;
+        folds: Number of cross-fitting folds for ``aipw_ate``;
             a positive integer.
-        hierarchical_method: Variance-component method for
+        hierarchy: Variance-component method for
             ``hierarchical_linear``.
-        reml_variance_bounds: Lower and upper bound of the variance
+        bounds: Lower and upper bound of the variance
             components in the REML search.
-        random_slope_position: Index of the feature carrying a random slope
+        slope: Index of the feature carrying a random slope
             in ``hierarchical_linear``, or None for a random intercept only.
         migrations: The written layout's version steps, oldest first;
             version 2 writes `confidence`, `cluster`, `replicates`,
@@ -145,27 +145,27 @@ class Config(Rules):
 
     estimator: EstimatorKind
     covariance: CovarianceKind = "hc3"
-    confidence_level: float = 0.95
+    confidence: float = 0.95
     missing: MissingPolicy = "reject"
-    cluster_name: str | None = None
-    bootstrap_replicates: int = 0
+    cluster: str | None = None
+    replicates: int = 0
     seed: int = 0
-    max_iterations: int = 100
+    iterations: int = 100
     tolerance: float = 1e-8
-    reference_tolerance: float = 1e-6
-    prior: BayesianPrior | None = None
-    treatment_position: int | None = None
-    propensity_clip: float = DEFAULT_PROPENSITY_CLIP
+    reference: float = 1e-6
+    prior: Prior | None = None
+    treatment: int | None = None
+    clip: float = DEFAULT_PROPENSITY_CLIP
     causal_assumptions: tuple[CausalAssumption, ...] = ()
     continuous_treatment_assumptions: tuple[
         ContinuousTreatmentAssumption, ...
     ] = ()
-    continuous_weight_cap: float = DEFAULT_CONTINUOUS_WEIGHT_CAP
+    cap: float = DEFAULT_CONTINUOUS_WEIGHT_CAP
     hierarchical_assumptions: tuple[HierarchicalAssumption, ...] = ()
-    cross_fitting_folds: int = 1
-    hierarchical_method: HierarchicalMethod = "moment_gls"
-    reml_variance_bounds: tuple[float, float] = DEFAULT_REML_VARIANCE_BOUNDS
-    random_slope_position: int | None = None
+    folds: int = 1
+    hierarchy: HierarchicalMethod = "moment_gls"
+    bounds: tuple[float, float] = DEFAULT_REML_VARIANCE_BOUNDS
+    slope: int | None = None
 
     def __post_init__(self) -> None:
         """Validates the policy before data is touched.
@@ -177,7 +177,7 @@ class Config(Rules):
                 covariance kind or exact assumption set is missing or wrong.
         """
         self.vet()
-        self.check_ranges()
+        self.check()
         self.fence()
         self.relevant()
         if self.estimator in {"bayesian_linear", "bayesian_ate"}:
@@ -209,12 +209,12 @@ class Config(Rules):
             raise errors.InputError(
                 f"{self.estimator} estimation supports only iid covariance"
             )
-        if self.bootstrap_replicates:
+        if self.replicates:
             raise errors.InputError(
                 f"{self.estimator} bootstrap sensitivity is unsupported"
             )
         if self.estimator == "bayesian_ate":
-            if self.treatment_position is None:
+            if self.treatment is None:
                 raise errors.InputError(
                     "bayesian_ate requires treatment_position"
                 )
@@ -229,7 +229,7 @@ class Config(Rules):
                     "conditional_exchangeability, positivity, and "
                     "linearity assumptions"
                 )
-            if self.cluster_name is not None:
+            if self.cluster is not None:
                 raise errors.InputError(
                     "bayesian_ate does not support clustered data"
                 )
@@ -250,7 +250,7 @@ class Config(Rules):
                 f"{self.estimator} supports only iid or clustered "
                 "covariance; hc3 is unsupported"
             )
-        if self.treatment_position is None:
+        if self.treatment is None:
             raise errors.InputError(
                 f"{self.estimator} requires treatment_position"
             )
@@ -298,11 +298,11 @@ class Config(Rules):
             raise errors.InputError(
                 "hierarchical_linear supplies its own covariance model"
             )
-        if not self.cluster_name:
+        if not self.cluster:
             raise errors.InputError("hierarchical_linear requires cluster_name")
         required_hierarchical_assumptions = (
             REQUIRED_HIERARCHICAL_RANDOM_SLOPE_ASSUMPTIONS
-            if self.random_slope_position is not None
+            if self.slope is not None
             else REQUIRED_HIERARCHICAL_ASSUMPTIONS
         )
         if (
@@ -324,17 +324,17 @@ class Config(Rules):
                 estimator.
         """
         if self.estimator != "hierarchical_linear":
-            if self.random_slope_position is not None:
+            if self.slope is not None:
                 raise errors.InputError(
                     "random_slope_position is supported only by "
                     "hierarchical_linear"
                 )
-            if self.hierarchical_method != "moment_gls":
+            if self.hierarchy != "moment_gls":
                 raise errors.InputError(
                     "hierarchical_method is supported only by "
                     "hierarchical_linear"
                 )
-            if self.reml_variance_bounds != DEFAULT_REML_VARIANCE_BOUNDS:
+            if self.bounds != DEFAULT_REML_VARIANCE_BOUNDS:
                 raise errors.InputError(
                     "reml_variance_bounds is supported only by "
                     "hierarchical_linear"
@@ -351,21 +351,21 @@ class Config(Rules):
             "aipw_ate",
             "continuous_ipw_ate",
         }:
-            values.pop("treatment_position")
+            values.pop("treatment")
         if self.estimator not in {"bayesian_ate", "ipw_ate", "aipw_ate"}:
             values.pop("causal_assumptions")
         if self.estimator != "continuous_ipw_ate":
             values.pop("continuous_treatment_assumptions")
-            values.pop("continuous_weight_cap")
+            values.pop("cap")
         if self.estimator not in {"ipw_ate", "aipw_ate"}:
-            values.pop("propensity_clip")
+            values.pop("clip")
         if self.estimator != "aipw_ate":
-            values.pop("cross_fitting_folds")
+            values.pop("folds")
         if self.estimator != "hierarchical_linear":
             values.pop("hierarchical_assumptions")
-            values.pop("hierarchical_method")
-            values.pop("reml_variance_bounds")
-            values.pop("random_slope_position")
+            values.pop("hierarchy")
+            values.pop("bounds")
+            values.pop("slope")
         if self.prior is not None:
             values["prior"] = self.prior.to_dict()
         return records.upgrade(self.migrations, values, records.ORIGIN)

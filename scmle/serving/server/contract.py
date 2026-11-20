@@ -44,7 +44,7 @@ class Server(abc.ABC):
 
         Args:
             bundle: Model to serve. `None` defers loading to a subclass that
-                drives `readiness` itself (see `HttpServing`).
+                drives `readiness` itself (see `Service`).
             on_null: `impute` lets the fitted imputers handle null features
                 and reports them per row; `reject` answers 422 instead.
             on_unseen: `report` scores rows with categories never seen in
@@ -65,9 +65,9 @@ class Server(abc.ABC):
             )
         self.loaded: scmle.artifacts.bundle.Bundle | None = bundle
         self.lock = threading.Lock()
-        self.on_null = on_null
-        self.on_unseen = on_unseen
-        self.warmup_records = warmup_records
+        self.missing = on_null
+        self.unseen = on_unseen
+        self.records = warmup_records
         self.readiness = guard.Readiness()
         if bundle is not None:
             note = "bundle provided by the caller"
@@ -97,12 +97,12 @@ class Server(abc.ABC):
         return bool(self.loaded and self.loaded.schema.series)
 
     @property
-    def artifact_digest(self) -> str:
+    def digest(self) -> str:
         """Digest of the manifest of the bundle being served."""
         return provenance.manifest_digest(self.bundle.info.to_dict())
 
     @property
-    def schema_digest(self) -> str:
+    def layout(self) -> str:
         """Digest of the input schema of the bundle being served."""
         return serving.schema_digest(self.bundle.schema.anchor())
 
@@ -110,14 +110,14 @@ class Server(abc.ABC):
         """Reports the model version and digest.
 
         Returns:
-            `model_version` and `artifact_digest`; an empty mapping before
+            `model_version` and `digest`; an empty mapping before
             the model is loaded.
         """
         if self.loaded is None:
             return {}
         return {
             "model_version": self.loaded.info.model_version,
-            "artifact_digest": self.artifact_digest,
+            "artifact_digest": self.digest,
         }
 
     def synthesise(
@@ -147,7 +147,7 @@ class Server(abc.ABC):
     def rehearse(self, bundle: scmle.artifacts.bundle.Bundle) -> str:
         """Scores the warm-up records once on `bundle`.
 
-        Warm-up records come from `warmup_records` or `synthesise`. The
+        Warm-up records come from `records` or `synthesise`. The
         call never feeds series history.
 
         Args:
@@ -156,7 +156,7 @@ class Server(abc.ABC):
         Returns:
             What was scored, or why nothing was.
         """
-        records = self.warmup_records
+        records = self.records
         note = "explicit warm-up records"
         if records is None:
             record = self.synthesise(bundle)
@@ -271,8 +271,8 @@ class Server(abc.ABC):
         response.update(
             {
                 "schema_version": serving.SCHEMA_VERSION,
-                "artifact_digest": self.artifact_digest,
-                "schema_digest": self.schema_digest,
+                "artifact_digest": self.digest,
+                "schema_digest": self.layout,
                 "record_count": len(rows),
                 "rows": rows,
             }
@@ -286,18 +286,18 @@ class Server(abc.ABC):
             rows: Per-row reports with `missing` and `unseen` entries.
 
         Raises:
-            PolicyError: If `on_null` is `reject` and a row has null
-                features, or `on_unseen` is `reject` and a row has unseen
+            PolicyError: If `missing` is `reject` and a row has null
+                features, or `unseen` is `reject` and a row has unseen
                 categories; the details list up to 20 record indexes.
         """
-        if self.on_null == "reject":
+        if self.missing == "reject":
             nulls = [i for i, row in enumerate(rows) if row["missing"]]
             if nulls:
                 raise serving.PolicyError(
                     "null features are rejected by policy",
                     {"records": nulls[:20]},
                 )
-        if self.on_unseen == "reject":
+        if self.unseen == "reject":
             unseen = [i for i, row in enumerate(rows) if row["unseen"]]
             if unseen:
                 raise serving.PolicyError(

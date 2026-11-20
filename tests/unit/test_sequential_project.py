@@ -16,9 +16,9 @@ def make_estimand() -> Estimand:
     """Return a complete sequential causal declaration."""
     return Estimand(
         name="sustained_treatment_effect",
-        subject_identity="subject_id",
-        time_column="time",
-        treatment_column="treatment",
+        subject="subject_id",
+        time="time",
+        treatment="treatment",
         outcome="outcome",
         baseline_covariates=("baseline_score",),
         time_varying_covariates=("state",),
@@ -130,7 +130,7 @@ def test_replay_detects_policy_changes(tmp_path) -> None:
         make_frame(), make_estimand(), policy, output_dir=tmp_path
     )
     project.run()
-    changed = dataclasses.replace(policy, maximum_weight=10.0)
+    changed = dataclasses.replace(policy, weight=10.0)
     replay = Estimation(
         make_frame(), make_estimand(), changed, output_dir=project.output_dir
     ).verify_replay()

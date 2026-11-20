@@ -21,7 +21,7 @@
 <tr><th scope="row">A number, all mistakes count the same</th><td><code>mae</code></td><td>The typical miss</td></tr>
 <tr><th scope="row">Many categories</th><td><code>f1_macro</code> or <code>log_loss</code></td><td>Counts every category equally</td></tr>
 </tbody></table></div>
-<p>SCMLE lists the others it knows in <code>scmle.evaluation.metrics.CATALOG</code>. You can also add your own with <code>scmle.evaluation.metrics.register_metric</code>, for example the money lost.</p>
+<p>SCMLE lists the others it knows in <code>scmle.evaluation.metrics.CATALOG</code>. You can also add your own with <code>scmle.evaluation.metrics.register</code>, for example the money lost.</p>
 <p><strong>If you choose wrong.</strong> The search picks the model that is best at the wrong thing. Accuracy on a rare event rewards a model that says "no" to every row. The tool's pick is <code>roc_auc</code> for two answers by default; that is only a default.</p>
 <p><strong>Command.</strong> <code>--metric pr_auc</code>.</p>
 <h2 id="3-which-columns-may-the-model-use-what-you-may-not-use">3. Which columns may the model use? (what you may not use)</h2>

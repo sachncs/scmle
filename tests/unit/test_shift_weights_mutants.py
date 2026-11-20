@@ -73,13 +73,13 @@ def test_the_discriminator_separates_calibration_from_target():
 def test_the_effective_size_is_that_of_the_calibration_weights():
     calibration, target = sample(seed=2)
     result = shift_weights.weigh(calibration, target, minimum=1.0)
-    assert result.effective_size == pytest.approx(
+    assert result.effective == pytest.approx(
         shift_weights.effective_sample_size(result.calibration)
     )
-    assert result.effective_size != pytest.approx(
+    assert result.effective != pytest.approx(
         shift_weights.effective_sample_size(result.target)
     )
-    assert isinstance(result.effective_size, float)
+    assert isinstance(result.effective, float)
 
 
 def test_a_perfectly_separated_target_is_pinned_at_the_clip():
@@ -93,9 +93,9 @@ def test_a_perfectly_separated_target_is_pinned_at_the_clip():
 
 def test_the_minimum_is_inclusive_and_the_refusal_says_both_sizes():
     calibration, target = sample(seed=3)
-    size = shift_weights.weigh(calibration, target, minimum=0.0).effective_size
+    size = shift_weights.weigh(calibration, target, minimum=0.0).effective
     kept = shift_weights.weigh(calibration, target, minimum=size)
-    assert kept.effective_size == size
+    assert kept.effective == size
     with pytest.raises(shift_weights.RefusedError) as raised:
         shift_weights.weigh(calibration, target, minimum=size + 1)
     assert str(raised.value) == (
@@ -143,9 +143,9 @@ def test_the_stored_weights_read_the_named_columns_in_order():
     weights = shift_weights.Ratios(
         numpy.ones(1), numpy.ones(1), 1.0, 5.0, stub, 1.0
     )
-    stored = shift_weights.StoredShiftWeights(weights, ("b", "a"))
+    stored = shift_weights.Weights(weights, ("b", "a"))
     frame = pandas.DataFrame({"a": [1, 2], "b": [3, 4], "c": [9, 9]})
-    out = stored.test_weights(frame)
+    out = stored.test(frame)
     numpy.testing.assert_allclose(out, [1.0, 1.0])
     numpy.testing.assert_array_equal(
         stub.seen, numpy.array([[3.0, 1.0], [4.0, 2.0]])

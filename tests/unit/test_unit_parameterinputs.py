@@ -28,7 +28,7 @@ def ipw(**changes):
     values = {
         "estimator": "ipw_ate",
         "covariance": "iid",
-        "treatment_position": 0,
+        "treatment": 0,
         "causal_assumptions": CAUSAL,
     }
     values.update(changes)
@@ -62,7 +62,7 @@ def test_an_admission_accepts_matching_inputs():
             VALUES,
             None,
             config.Config(
-                estimator="linear", covariance="clustered", cluster_name="c"
+                estimator="linear", covariance="clustered", cluster="c"
             ),
             "gaussian",
             "clustered covariance needs cluster labels",
@@ -73,7 +73,7 @@ def test_an_admission_accepts_matching_inputs():
             config.Config(
                 estimator="hierarchical_linear",
                 covariance="iid",
-                cluster_name="c",
+                cluster="c",
                 hierarchical_assumptions=HIERARCHICAL,
             ),
             "gaussian",
@@ -113,15 +113,15 @@ def test_an_admission_rejects_a_random_slope_outside_the_features():
     policy = config.Config(
         estimator="hierarchical_linear",
         covariance="iid",
-        cluster_name="c",
+        cluster="c",
         hierarchical_assumptions=(*HIERARCHICAL, "random_slope"),
-        random_slope_position=2,
+        slope=2,
     )
     with pytest.raises(
         errors.InputError, match="random_slope_position is outside"
     ):
         inputs.admit(MATRIX, VALUES, numpy.zeros(5), policy, estimand())
-    inside = config.Config(**{**fields(policy), "random_slope_position": 1})
+    inside = config.Config(**{**fields(policy), "slope": 1})
     assert (
         inputs.admit(MATRIX, VALUES, numpy.zeros(5), inside, estimand()) is None
     )
@@ -131,9 +131,9 @@ def fields(policy):
     return {
         "estimator": policy.estimator,
         "covariance": policy.covariance,
-        "cluster_name": policy.cluster_name,
+        "cluster": policy.cluster,
         "hierarchical_assumptions": policy.hierarchical_assumptions,
-        "random_slope_position": policy.random_slope_position,
+        "slope": policy.slope,
     }
 
 
@@ -156,9 +156,9 @@ def test_a_screen_rejects_bad_logistic_outcomes_and_positions():
     with pytest.raises(
         errors.InputError, match="treatment_position is outside"
     ):
-        inputs.screen(MATRIX, VALUES, None, ipw(treatment_position=2))
-    inputs.screen(MATRIX, VALUES, None, ipw(treatment_position=1))
-    prior = declaration.BayesianPrior(
+        inputs.screen(MATRIX, VALUES, None, ipw(treatment=2))
+    inputs.screen(MATRIX, VALUES, None, ipw(treatment=1))
+    prior = declaration.Prior(
         (0.0,) * 3,
         tuple(tuple(float(i == j) for j in range(3)) for i in range(3)),
     )
@@ -177,17 +177,15 @@ def test_a_screen_rejects_bad_logistic_outcomes_and_positions():
 
 
 def test_a_fingerprint_binds_shape_values_and_clusters():
-    base = inputs.raw_input_fingerprint([[1, 2], [3, 4]], [1, 2])
-    assert base == inputs.raw_input_fingerprint(
+    base = inputs.imprint([[1, 2], [3, 4]], [1, 2])
+    assert base == inputs.imprint(
         numpy.array([[1.0, 2.0], [3.0, 4.0]]), [[1.0], [2.0]]
     )
-    assert base != inputs.raw_input_fingerprint([[1, 2, 3, 4]], [1, 2])
-    assert base != inputs.raw_input_fingerprint([[1, 2], [3, 5]], [1, 2])
-    assert base != inputs.raw_input_fingerprint(
-        [[1, 2], [3, 4]], [1, 2], ["a", "b"]
-    )
-    assert inputs.raw_input_fingerprint([[1, 2], [3, 4]], [1, 2], [1, 2]) != (
-        inputs.raw_input_fingerprint([[1, 2], [3, 4]], [1, 2], ["1", "2"])
+    assert base != inputs.imprint([[1, 2, 3, 4]], [1, 2])
+    assert base != inputs.imprint([[1, 2], [3, 5]], [1, 2])
+    assert base != inputs.imprint([[1, 2], [3, 4]], [1, 2], ["a", "b"])
+    assert inputs.imprint([[1, 2], [3, 4]], [1, 2], [1, 2]) != (
+        inputs.imprint([[1, 2], [3, 4]], [1, 2], ["1", "2"])
     )
 
 
@@ -209,27 +207,27 @@ def test_an_absorption_of_numbers_matches_the_documented_layout():
 
 
 def test_a_matrix_validation_needs_the_shape_and_enough_rows():
-    inputs.validate_matrix(numpy.zeros((3, 2)), 2, "m")
+    inputs.check(numpy.zeros((3, 2)), 2, "m")
     with pytest.raises(
         errors.InputError, match=r"m must have shape \(rows, 3\)"
     ):
-        inputs.validate_matrix(numpy.zeros((3, 2)), 3, "m")
+        inputs.check(numpy.zeros((3, 2)), 3, "m")
     with pytest.raises(errors.InputError, match="must have shape"):
-        inputs.validate_matrix(numpy.zeros(3), 1, "m")
+        inputs.check(numpy.zeros(3), 1, "m")
     with pytest.raises(errors.InputError, match="more rows than parameters"):
-        inputs.validate_matrix(numpy.zeros((2, 2)), 2, "m")
+        inputs.check(numpy.zeros((2, 2)), 2, "m")
 
 
 def test_a_cluster_validation_checks_shape_and_length():
-    assert inputs.validate_clusters(None, 3) is None
-    found = inputs.validate_clusters([1, "a", 2], 3)
+    assert inputs.validate(None, 3) is None
+    found = inputs.validate([1, "a", 2], 3)
     assert found.dtype == object and list(found) == [1, "a", 2]
     with pytest.raises(
         errors.InputError, match=r"clusters must have shape \(rows,\)"
     ):
-        inputs.validate_clusters([[1], [2]], 2)
+        inputs.validate([[1], [2]], 2)
     with pytest.raises(errors.InputError, match="same row count as outcome"):
-        inputs.validate_clusters([1, 2], 3)
+        inputs.validate([1, 2], 3)
 
 
 def test_a_condition_report_classifies_the_covariance():

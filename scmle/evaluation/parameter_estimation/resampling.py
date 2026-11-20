@@ -57,7 +57,7 @@ def rerun(
         ValueError: If the estimate has an unexpected shape, is not finite,
             or fails its independent reference check.
     """
-    result = parameter_estimation.estimate_parameters(
+    result = parameter_estimation.infer(
         sampled_matrix,
         sampled_values,
         estimand,
@@ -118,9 +118,7 @@ def hierarchical_bootstrap_sensitivity(
     """
     rng = numpy.random.default_rng(policy.seed)
     limitations = list(
-        INTERCEPT_LIMITS
-        if policy.random_slope_position is None
-        else SLOPE_LIMITS
+        INTERCEPT_LIMITS if policy.slope is None else SLOPE_LIMITS
     )
     source_labels = tuple(dict.fromkeys(clusters.tolist()))
     source_unit_count = len(source_labels)
@@ -128,7 +126,7 @@ def hierarchical_bootstrap_sensitivity(
         functools.partial(clone, matrix, values, clusters, rng),
         {
             "resampling_unit": "cluster",
-            "estimator_method": policy.hierarchical_method,
+            "estimator_method": policy.hierarchy,
         },
         (estimand, policy, coefficients),
         "hierarchical",
@@ -136,13 +134,13 @@ def hierarchical_bootstrap_sensitivity(
     return {
         "status": "partial" if failures else "available",
         "method": "nonparametric_percentile_bootstrap",
-        "bootstrap_replicates": policy.bootstrap_replicates,
+        "bootstrap_replicates": policy.replicates,
         "successful_replicates": len(estimates),
         "failed_replicates": len(failures),
-        "confidence_level": policy.confidence_level,
+        "confidence_level": policy.confidence,
         "seed": policy.seed,
         "resampling_unit": "cluster",
-        "estimator_method": policy.hierarchical_method,
+        "estimator_method": policy.hierarchy,
         "source_unit_count": source_unit_count,
         "source_row_count": len(values),
         "cluster_identity_policy": "fresh_identity_per_selected_cluster",
@@ -150,7 +148,7 @@ def hierarchical_bootstrap_sensitivity(
         "failures": failures,
         "reference_checks": checks(estimates, failures),
         "limitations": limitations,
-        "bootstrap_intervals": intervals(estimates, policy.confidence_level),
+        "bootstrap_intervals": intervals(estimates, policy.confidence),
     }
 
 
@@ -202,8 +200,8 @@ def clone(
             "sampled_rows": len(indices),
             "sampled_units": len(row_groups),
             "source_unit_count": len(labels),
-            "sample_digest": bootstrap_sample_digest(source_indices),
-            "fresh_cluster_identity_digest": bootstrap_sample_digest(
+            "sample_digest": digest(source_indices),
+            "fresh_cluster_identity_digest": digest(
                 numpy.arange(len(row_groups), dtype=numpy.int64)
             ),
         },
@@ -250,9 +248,7 @@ def causal_bootstrap_sensitivity(
         else len(values)
     )
     estimates, draws, failures = replicate(
-        functools.partial(
-            draw_causal_bootstrap_sample, matrix, values, clusters, rng
-        ),
+        functools.partial(draw, matrix, values, clusters, rng),
         {"resampling_unit": resampling_unit},
         (estimand, policy, coefficients),
         "causal",
@@ -260,10 +256,10 @@ def causal_bootstrap_sensitivity(
     return {
         "status": "partial" if failures else "available",
         "method": "nonparametric_percentile_bootstrap",
-        "bootstrap_replicates": policy.bootstrap_replicates,
+        "bootstrap_replicates": policy.replicates,
         "successful_replicates": len(estimates),
         "failed_replicates": len(failures),
-        "confidence_level": policy.confidence_level,
+        "confidence_level": policy.confidence,
         "seed": policy.seed,
         "resampling_unit": resampling_unit,
         "source_unit_count": source_unit_count,
@@ -271,11 +267,11 @@ def causal_bootstrap_sensitivity(
         "draws": draws,
         "failures": failures,
         "reference_checks": checks(estimates, failures),
-        "bootstrap_intervals": intervals(estimates, policy.confidence_level),
+        "bootstrap_intervals": intervals(estimates, policy.confidence),
     }
 
 
-def draw_causal_bootstrap_sample(
+def draw(
     matrix: numpy.ndarray,
     values: numpy.ndarray,
     clusters: numpy.ndarray | None,
@@ -308,7 +304,7 @@ def draw_causal_bootstrap_sample(
             {
                 "sampled_rows": len(indices),
                 "source_unit_count": len(values),
-                "sample_digest": bootstrap_sample_digest(indices),
+                "sample_digest": digest(indices),
             },
         )
 
@@ -339,12 +335,12 @@ def draw_causal_bootstrap_sample(
             "sampled_rows": len(indices),
             "sampled_units": len(row_groups),
             "source_unit_count": len(labels),
-            "sample_digest": bootstrap_sample_digest(source_indices),
+            "sample_digest": digest(source_indices),
         },
     )
 
 
-def bootstrap_sample_digest(indices: numpy.ndarray) -> str:
+def digest(indices: numpy.ndarray) -> str:
     """Returns a digest of bootstrap draw indices without exposing raw rows.
 
     Args:
@@ -395,11 +391,11 @@ def replicate(
             itself propagate.
     """
     estimand, policy, coefficients = point
-    bootstrap_policy = dataclasses.replace(policy, bootstrap_replicates=0)
+    bootstrap_policy = dataclasses.replace(policy, replicates=0)
     estimates = []
     failures: list[Mapping[str, Any]] = []
     draws: list[Mapping[str, Any]] = []
-    for index in range(policy.bootstrap_replicates):
+    for index in range(policy.replicates):
         sampled_matrix, sampled_values, sampled_clusters, record = draw()
         draws.append({"replicate": index, **labels, **record})
         try:
@@ -434,7 +430,7 @@ def replicate(
     if len(estimates) < MIN_REPLICATES:
         raise errors.InputError(
             f"{kind} bootstrap needs at least two successful replicates; "
-            f"received {len(estimates)} of {policy.bootstrap_replicates}"
+            f"received {len(estimates)} of {policy.replicates}"
         )
     return estimates, draws, failures
 

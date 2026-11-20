@@ -67,7 +67,7 @@ def odds(
     verdict = comparison.pair(
         [sign * s for s in first], [sign * s for s in second]
     )
-    return verdict.probability_first_better
+    return verdict.superior
 
 
 class Strategist:

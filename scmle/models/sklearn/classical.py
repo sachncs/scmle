@@ -6,11 +6,11 @@ construction logic once and takes everything that merely describes a model
 space) as keyword arguments, so a model that only declares data is one
 configured instance, such as `RIDGE`, not a subclass. A model that really
 behaves differently stays a subclass that overrides a method (`Svm`
-overrides `build`, `HistGradientBoosting` overrides `nominals`) and
+overrides `build`, `Histogram` overrides `nominals`) and
 is configured the same way. Instances are registered like any adapter and
 must be treated as immutable. Adapters written as subclasses that declare
 class attributes, including user adapters registered through
-`register_estimator`, keep working: `Learner` only sets an attribute when it
+`custom.register`, keep working: `Learner` only sets an attribute when it
 is given, so class-level declarations are left alone.
 """
 
@@ -81,12 +81,12 @@ class Learner(models.Model):
     Attributes:
         classifier: Estimator class used for classification tasks.
         regressor: Estimator class used for regression tasks.
-        fixed_params: Constructor parameters applied to every build.
+        fixed: Constructor parameters applied to every build.
     """
 
     classifier: type | None = None
     regressor: type | None = None
-    fixed_params: Mapping[str, Any] = NO_PARAMS
+    fixed: Mapping[str, Any] = NO_PARAMS
 
     def __init__(
         self,
@@ -96,7 +96,7 @@ class Learner(models.Model):
         capabilities: models.Capabilities | None = None,
         classifier: type | None = None,
         regressor: type | None = None,
-        fixed_params: Mapping[str, Any] | None = None,
+        fixed: Mapping[str, Any] | None = None,
         search_space: search.Space | None = None,
         monotonic_param: str | None = None,
     ) -> None:
@@ -108,7 +108,7 @@ class Learner(models.Model):
             capabilities: Declared capabilities.
             classifier: Estimator class used for classification tasks.
             regressor: Estimator class used for regression tasks.
-            fixed_params: Constructor parameters applied to every build.
+            fixed: Constructor parameters applied to every build.
             search_space: Tunable hyperparameters.
             monotonic_param: Name of the estimator parameter that takes one
                 monotonic sign per input column.
@@ -119,7 +119,7 @@ class Learner(models.Model):
             "capabilities": capabilities,
             "classifier": classifier,
             "regressor": regressor,
-            "fixed_params": fixed_params,
+            "fixed": fixed,
             "search_space": search_space,
             "monotonic_param": monotonic_param,
         }
@@ -138,7 +138,7 @@ class Learner(models.Model):
         Args:
             task: Resolved task type.
             seed: Random seed.
-            params: Search-space overrides applied over `fixed_params`.
+            params: Search-space overrides applied over `fixed`.
 
         Returns:
             An unfitted estimator.
@@ -153,7 +153,7 @@ class Learner(models.Model):
             raise errors.ConfigError(
                 f"{self.name}: no estimator class for {task.value}"
             )
-        kwargs: dict[str, Any] = {**self.fixed_params, **(params or {})}
+        kwargs: dict[str, Any] = {**self.fixed, **(params or {})}
         if "random_state" in inspect.signature(estimator_class).parameters:
             kwargs["random_state"] = seed
         built: models.Estimator = estimator_class(**kwargs)
@@ -212,16 +212,16 @@ class Dummy(models.Model):
             tasks.Task.FORECAST,
         ):
             classify = task is tasks.Task.MULTILABEL
-            return scmle.models.multitarget.estimators.PerTarget(
+            return scmle.models.multitarget.estimators.Panel(
                 dummy.DummyClassifier(strategy="prior")
                 if classify
                 else dummy.DummyRegressor(strategy="mean"),
                 classify,
             )
         if task is tasks.Task.RANKING:
-            return scmle.models.ranking.estimators.ConstantRanker()
+            return scmle.models.ranking.estimators.Constant()
         if task is tasks.Task.ORDINAL:
-            return scmle.models.ordinal.estimators.CumulativeThresholdRegressor(
+            return scmle.models.ordinal.estimators.Threshold(
                 dummy.DummyRegressor(strategy="median"),
                 (params or {}).get("levels"),
                 seed,
@@ -280,7 +280,7 @@ class Boosted(ensemble.HistGradientBoostingClassifier):  # type: ignore[misc]  #
         return self
 
 
-class HistGradientBoosting(Learner):
+class Histogram(Learner):
     """Histogram-based gradient boosting, which takes native categoricals."""
 
     def nominals(self, indices: list[int]) -> dict[str, Any]:
@@ -352,7 +352,7 @@ LOGISTIC_REGRESSION = Learner(
         CLASSIFICATION, sparse_input=True, needs_scaling=True, memory_factor=2.0
     ),
     classifier=linear_model.LogisticRegression,
-    fixed_params={"max_iter": 1000},
+    fixed={"max_iter": 1000},
     search_space=search.Space((search.Real("C", 1e-3, 1e2, log=True),)),
 )
 
@@ -381,7 +381,7 @@ SGD_LOGISTIC = Learner(
         memory_factor=1.5,
     ),
     classifier=linear_model.SGDClassifier,
-    fixed_params={"loss": "log_loss", "max_iter": 50, "tol": 1e-4},
+    fixed={"loss": "log_loss", "max_iter": 50, "tol": 1e-4},
     search_space=search.Space((search.Real("alpha", 1e-7, 1e-1, log=True),)),
 )
 
@@ -397,7 +397,7 @@ SGD_REGRESSION = Learner(
         memory_factor=1.5,
     ),
     regressor=linear_model.SGDRegressor,
-    fixed_params={"max_iter": 50, "tol": 1e-4},
+    fixed={"max_iter": 50, "tol": 1e-4},
     search_space=search.Space((search.Real("alpha", 1e-7, 1e-1, log=True),)),
 )
 
@@ -412,7 +412,7 @@ ELASTIC_NET = Learner(
         memory_factor=2.0,
     ),
     regressor=linear_model.ElasticNet,
-    fixed_params={"alpha": 0.1, "max_iter": 5000},
+    fixed={"alpha": 0.1, "max_iter": 5000},
     search_space=search.Space(
         (
             search.Real("alpha", 1e-3, 10.0, log=True),
@@ -455,7 +455,7 @@ EXTRA_TREES = Learner(
     search_space=TREE_ENSEMBLE_SPACE,
 )
 
-HIST_GRADIENT_BOOSTING = HistGradientBoosting(
+HIST_GRADIENT_BOOSTING = Histogram(
     name="hist_gradient_boosting",
     family="boosting",
     capabilities=models.Capabilities(
@@ -468,7 +468,7 @@ HIST_GRADIENT_BOOSTING = HistGradientBoosting(
     ),
     classifier=Boosted,
     regressor=ensemble.HistGradientBoostingRegressor,
-    fixed_params=STOPPING,
+    fixed=STOPPING,
     monotonic_param="monotonic_cst",
     search_space=search.Space(
         (
@@ -539,7 +539,7 @@ NEURAL_NETWORK = Learner(
     ),
     classifier=neural_network.MLPClassifier,
     regressor=neural_network.MLPRegressor,
-    fixed_params={
+    fixed={
         "max_iter": 300,
         "early_stopping": True,
         "n_iter_no_change": 10,

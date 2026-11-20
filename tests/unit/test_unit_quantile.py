@@ -72,9 +72,7 @@ def test_a_margin_outside_the_open_unit_interval_raises(coverage):
 
 def intervals():
     band = quantile.Band(tuple(float(i) for i in range(1, 21)))
-    return quantile.QuantileIntervals(
-        Constant([0.0, 10.0]), Constant([4.0, 6.0]), band
-    )
+    return quantile.Intervals(Constant([0.0, 10.0]), Constant([4.0, 6.0]), band)
 
 
 def test_an_interval_widens_the_native_band_by_the_margin():
@@ -94,7 +92,7 @@ def test_a_native_band_is_the_uncalibrated_corridor():
 def test_a_covering_reports_nominal_empirical_and_width():
     frame = pandas.DataFrame({"a": [0, 0]})
     band = quantile.Band((-4.0,) * 20)
-    model = quantile.QuantileIntervals(
+    model = quantile.Intervals(
         Constant([0.0, 0.0]), Constant([10.0, 10.0]), band
     )
     curve = model.covering(frame, [5.0, 9.5], [0.5])
@@ -104,7 +102,7 @@ def test_a_covering_reports_nominal_empirical_and_width():
 def test_a_covering_counts_values_on_the_edges_as_inside():
     frame = pandas.DataFrame({"a": [0, 0]})
     band = quantile.Band((0.0,) * 20)
-    model = quantile.QuantileIntervals(
+    model = quantile.Intervals(
         Constant([0.0, 0.0]), Constant([10.0, 10.0]), band
     )
     curve = model.covering(frame, [0.0, 10.0], [0.5, 0.9])

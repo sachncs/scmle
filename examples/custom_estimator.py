@@ -32,7 +32,7 @@ def make_dataset(rows: int = 500) -> pandas.DataFrame:
 def main() -> None:
     """Registers the estimator and finds it in the leaderboard."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    scmle.models.custom.register_estimator(
+    scmle.models.custom.register(
         "gaussian_nb",
         classifier=naive_bayes.GaussianNB,
         cost=1,  # budgets under 300 s only search cheap models

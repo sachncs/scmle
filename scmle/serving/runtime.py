@@ -97,7 +97,7 @@ def lingering(environ: Mapping[str, str]) -> float:
 
 
 def withdraw(
-    adapter: server.HttpServing, inbox: queue.SimpleQueue[int], linger: float
+    adapter: server.Service, inbox: queue.SimpleQueue[int], linger: float
 ) -> None:
     """Takes the service out of rotation and serves on for `linger` seconds.
 
@@ -123,17 +123,17 @@ def withdraw(
 
 
 def settings(environ: Mapping[str, str]) -> dict[str, Any]:
-    """Builds the `HttpServing` keywords an environment asks for.
+    """Builds the `Service` keywords an environment asks for.
 
     The default host is every interface, so a service started without the
-    `SCMLE_AUTH_*` settings is refused by `HttpServing` unless `HOST` is a
+    `SCMLE_AUTH_*` settings is refused by `Service` unless `HOST` is a
     loopback address: no container exposes an unauthenticated backend.
 
     Args:
         environ: The environment (`HOST`, `PORT`, `SCMLE_*` settings).
 
     Returns:
-        Keyword arguments for `HttpServing`: host, port, request and concurrency
+        Keyword arguments for `Service`: host, port, request and concurrency
         limits, scoring timeout, null and unseen-value policies, the access
         gateway and the drain time (`SCMLE_DRAIN_SECONDS`; unset or 0 keeps
         the derived default).
@@ -141,10 +141,10 @@ def settings(environ: Mapping[str, str]) -> dict[str, Any]:
     return {
         "host": environ.get("HOST", DEFAULT_HOST),
         "port": int(number(environ, "PORT", 8000)),
-        "max_request_bytes": int(
+        "payload": int(
             number(environ, "SCMLE_MAX_REQUEST_BYTES", server.MAX_REQUEST_BYTES)
         ),
-        "max_records": int(
+        "batch": int(
             number(environ, "SCMLE_MAX_RECORDS", server.MAX_REQUEST_RECORDS)
         ),
         "max_concurrent": int(
@@ -160,7 +160,7 @@ def settings(environ: Mapping[str, str]) -> dict[str, Any]:
         "on_null": environ.get("SCMLE_ON_NULL", "impute"),
         "on_unseen": environ.get("SCMLE_ON_UNSEEN", "report"),
         "gateway": access.gateway_from_environment(environ),
-        "drain_seconds": (number(environ, "SCMLE_DRAIN_SECONDS", 0.0) or None),
+        "drain": (number(environ, "SCMLE_DRAIN_SECONDS", 0.0) or None),
     }
 
 
@@ -313,7 +313,7 @@ def fetch(path: pathlib.Path, trusted: bool) -> server.Loader:
     return loader
 
 
-def refresh(adapter: server.HttpServing, loader: server.Loader | None) -> None:
+def refresh(adapter: server.Service, loader: server.Loader | None) -> None:
     """Reloads the served bundle; a failure keeps the old one serving.
 
     Args:
@@ -329,7 +329,7 @@ def refresh(adapter: server.HttpServing, loader: server.Loader | None) -> None:
 
 
 def hold(
-    adapter: server.HttpServing,
+    adapter: server.Service,
     monitor: signals.SignalMonitor,
     path: pathlib.Path | str | None,
     interval: float,
@@ -340,10 +340,10 @@ def hold(
 
     Must run on the main thread, which receives the signals. Starts the
     server and the thread that writes the signals; each SIGHUP reloads the
-    bundle while the old one keeps serving (`HttpServing.reload`). SIGTERM
+    bundle while the old one keeps serving (`Service.reload`). SIGTERM
     or SIGINT makes `/readyz` answer 503 and keeps serving for the linger
     (`withdraw`), then stops accepting connections, lets the requests in
-    flight finish (`HttpServing.stop`), writes the signals one last time and
+    flight finish (`Service.stop`), writes the signals one last time and
     restores the previous signal handlers.
 
     Args:
@@ -413,7 +413,7 @@ def run(folder: pathlib.Path, environ: Mapping[str, str]) -> None:
     monitor = signals.SignalMonitor(
         signals.Window(window_seconds=chosen["window"])
     )
-    adapter = server.HttpServing(
+    adapter = server.Service(
         loader=prime(folder, environ),
         monitor=monitor,
         **settings(environ),

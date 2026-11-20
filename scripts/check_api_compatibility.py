@@ -345,9 +345,9 @@ ROOT_SURFACES = {
         "Estimand",
         "Estimation",
         "Estimator",
-        "PeriodATE",
+        "Period",
     ),
-    "scmle.evaluation.metrics": ("register_metric",),
+    "scmle.evaluation.metrics": ("register",),
     # Constants (FAMILIES, ALPHA, PAIRS, TIMED, ENTITY_AWARE and the
     # calibration constants) have no signature, so only callables are
     # pinned here.
@@ -397,28 +397,28 @@ ROOT_SURFACES = {
         "vector",
     ),
     "scmle.evaluation.parameter_estimation": (
-        "BayesianPrior",
         "Config",
         "Estimand",
+        "Estimate",
         "Estimation",
-        "ParameterEstimate",
-        "estimate_parameters",
+        "Prior",
+        "infer",
     ),
     "scmle.evaluation.sequential": (
         "Config",
+        "Diagnostics",
         "Estimand",
+        "Estimate",
         "Estimation",
         "Estimator",
-        "PeriodDiagnostics",
-        "RegimeEstimate",
     ),
     "scmle.serving.modality": (
+        "Decoder",
         "ModalityHttpServing",
-        "ModalitySampleDecoder",
     ),
     "scmle.models.custom": (
-        "register_estimator",
-        "unregister_estimator",
+        "register",
+        "unregister",
     ),
     "scmle.pipeline.modality_lifecycle": (
         "Cancellation",

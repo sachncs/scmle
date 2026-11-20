@@ -61,7 +61,7 @@ def crosscheck(
     return {
         "method": "scipy.linalg.solve:explicit_random_intercept_covariance",
         "max_absolute_difference": difference,
-        "passed": difference <= policy.reference_tolerance,
+        "passed": difference <= policy.reference,
     }
 
 
@@ -115,8 +115,8 @@ def reference_hierarchical_reml(
         "max_absolute_difference": coefficient_difference,
         "objective_difference": objective_difference,
         "passed": bool(
-            coefficient_difference <= policy.reference_tolerance
-            and objective_difference <= policy.reference_tolerance * 10
+            coefficient_difference <= policy.reference
+            and objective_difference <= policy.reference * 10
         ),
     }
 
@@ -175,7 +175,7 @@ def reference_hierarchical_random_slope(
         "random_slope_position": random_slope_position,
         "max_absolute_difference": difference,
         "random_effect_covariance": random_effect_covariance.tolist(),
-        "passed": difference <= policy.reference_tolerance,
+        "passed": difference <= policy.reference,
     }
 
 
@@ -235,8 +235,8 @@ def reference_hierarchical_random_slope_reml(
         "objective_difference": objective_difference,
         "random_effect_covariance": random_effect_covariance.tolist(),
         "passed": bool(
-            coefficient_difference <= policy.reference_tolerance
-            and objective_difference <= policy.reference_tolerance * 10
+            coefficient_difference <= policy.reference
+            and objective_difference <= policy.reference * 10
         ),
     }
 

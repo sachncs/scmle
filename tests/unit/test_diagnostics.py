@@ -45,7 +45,7 @@ def make_inputs(task, seed=0, rows=600):
         frame.iloc[:split], target.iloc[:split]
     )
     metric = metrics.CATALOG.resolve(None, task)
-    return diagnostics.DiagnosticInput(
+    return diagnostics.Input(
         model, frame.iloc[split:], target.iloc[split:], task, metric, PLAN, 0
     )
 
@@ -80,7 +80,7 @@ def make_dated_inputs(rows=800):
     model = preprocessing.instantiate(
         plan, REGISTRY.get("logistic_regression"), task, 0
     ).fit(frame.iloc[:split], target.iloc[:split])
-    return diagnostics.DiagnosticInput(
+    return diagnostics.Input(
         model,
         frame.iloc[split:],
         target.iloc[split:],
@@ -88,7 +88,7 @@ def make_dated_inputs(rows=800):
         metrics.CATALOG.resolve(None, task),
         plan,
         0,
-        reference_features=frame.iloc[:split],
+        reference=frame.iloc[:split],
     )
 
 
@@ -217,8 +217,8 @@ def test_suite_selects_by_task_and_isolates_failures():
 
 def test_positive_label_comes_from_the_fitted_classes():
     inputs = make_inputs(tasks.Task.BINARY)
-    assert inputs.positive_label == 1
-    assert make_inputs(tasks.Task.REGRESSION).positive_label is None
+    assert inputs.positive == 1
+    assert make_inputs(tasks.Task.REGRESSION).positive is None
 
 
 def make_clustered_inputs(clusters=40, per_cluster=15, seed=0, grouped=True):
@@ -244,7 +244,7 @@ def make_clustered_inputs(clusters=40, per_cluster=15, seed=0, grouped=True):
     )
     metric = metrics.CATALOG.resolve("accuracy", tasks.Task.BINARY)
     held = frame.iloc[split:]
-    return diagnostics.DiagnosticInput(
+    return diagnostics.Input(
         model,
         held,
         target.iloc[split:],
@@ -285,13 +285,13 @@ def test_group_bootstrap_is_wider_than_a_naive_row_bootstrap():
 def test_temporal_inputs_use_contiguous_blocks():
     # Enforces docs/ARCHITECTURE.md:128.
     inputs = make_inputs(tasks.Task.BINARY)
-    temporal = diagnostics.DiagnosticInput(
+    temporal = diagnostics.Input(
         inputs.estimator,
         inputs.features,
         inputs.target,
         inputs.task,
         inputs.metric,
-        inputs.feature_plan,
+        inputs.plan,
         0,
         temporal=True,
     )
@@ -360,13 +360,13 @@ def test_uncertainty_is_unavailable_when_every_resample_fails():
 
     Failing.first = True
     inputs = make_inputs(tasks.Task.BINARY)
-    inputs = diagnostics.DiagnosticInput(
+    inputs = diagnostics.Input(
         inputs.estimator,
         inputs.features,
         inputs.target,
         inputs.task,
         Failing(),
-        inputs.feature_plan,
+        inputs.plan,
         0,
     )
     report = bootstrap.Uncertainty().compute(inputs)
@@ -378,8 +378,8 @@ def test_small_evaluation_sets_get_more_resamples_than_large_ones():
     diagnostic = bootstrap.Uncertainty()
 
     assert diagnostic.replicates(200) == diagnostic.resamples
-    assert diagnostic.replicates(100_000) == diagnostic.minimum_resamples
-    assert diagnostic.replicates(10**9) == diagnostic.minimum_resamples
+    assert diagnostic.replicates(100_000) == diagnostic.floor
+    assert diagnostic.replicates(10**9) == diagnostic.floor
     assert diagnostic.replicates(4000) == 1000
 
 
@@ -463,7 +463,7 @@ def test_uncertainty_skips_rather_than_report_too_few_resamples(monkeypatch):
     monkeypatch.setattr(diagnostics, "clock", clock)
     base = make_inputs(tasks.Task.BINARY)
     diagnostic = bootstrap.Uncertainty()
-    room = (diagnostic.minimum_resamples - 1) * diagnostic.cost(base)
+    room = (diagnostic.floor - 1) * diagnostic.cost(base)
     inputs = dataclasses.replace(base, deadline=clock.now + room)
 
     report = diagnostic.compute(inputs)
@@ -496,7 +496,7 @@ def test_uncertainty_stops_at_the_deadline_mid_loop(monkeypatch):
     report = bootstrap.Uncertainty().compute(inputs)
 
     assert report["skipped"] and report["ci_95"] is None
-    assert report["resamples"] < bootstrap.Uncertainty.minimum_resamples
+    assert report["resamples"] < bootstrap.Uncertainty.floor
 
 
 def test_uncertainty_cost_grows_with_rows_and_classes():

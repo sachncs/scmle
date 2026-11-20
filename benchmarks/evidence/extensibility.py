@@ -808,7 +808,7 @@ DISCOVER = (
     "                    self.register(found)\n"
 )
 METRICS = "scmle/evaluation/metrics.py"
-RESOLVE = """        name = name or self.default_metric[task]
+RESOLVE = """        name = name or self.default[task]
         if name == "roc_auc" and task is tasks.Task.MULTICLASS:
             name = "roc_auc_ovr"
 """
@@ -918,7 +918,7 @@ EXERCISES = (
         reason={
             METRICS: (
                 "the metric catalog never reads the `scmle.metrics` group; "
-                "only `register_metric` in the same process adds a metric"
+                "only `metrics.register` in the same process adds a metric"
             ),
         },
     ),
@@ -1029,11 +1029,11 @@ EXERCISES = (
                 METRICS,
                 RESOLVE,
                 "        if name not in self.metrics or task not in "
-                "self.default_metric:\n"
+                "self.default:\n"
                 + DISCOVER
-                + "        name = name or self.default_metric.get(task) or "
+                + "        name = name or self.default.get(task) or "
                 "next(\n"
-                "            iter(self.report_names.get(task, ())), None\n"
+                "            iter(self.reported.get(task, ())), None\n"
                 "        )\n" + RESOLVE.split("\n", 1)[1],
             ),
             Edit(
@@ -1043,8 +1043,8 @@ EXERCISES = (
             ),
             Edit(
                 METRICS,
-                "        names = self.report_names[task]\n",
-                "        names = self.report_names.get(task, ())\n",
+                "        names = self.reported[task]\n",
+                "        names = self.reported.get(task, ())\n",
             ),
             Edit(
                 KINDS,

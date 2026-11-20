@@ -95,6 +95,29 @@ def unfold(layout: records.Layout, groups: Groups) -> records.Layout:
     return moved
 
 
+def rename(kind: Any, part: Mapping[str, Any]) -> records.Layout:
+    """Renames the version-1 keys of a stored part to its kind's fields.
+
+    Only the keys whose new spelling is a field are renamed: a field that
+    kept its old name (such as `standard_error`, written as `se`) keeps it.
+
+    Args:
+        kind: The part's dataclass; its first migration step renames the
+            keys.
+        part: The part with its version-1 keys.
+
+    Returns:
+        The part keyed by field name.
+    """
+    fields = {field.name for field in dataclasses.fields(kind)}
+    renames = {
+        old: new
+        for old, new in kind.migrations[0].renames.items()
+        if new in fields
+    }
+    return {renames.get(key, key): value for key, value in part.items()}
+
+
 def canon(record: Mapping[str, Any]) -> str:
     """Returns the SHA-256 digest of a record's sorted compact JSON.
 
@@ -163,7 +186,7 @@ def lowercase(digest: object, name: str) -> None:
         raise errors.InputError(f"{name} must be a lowercase SHA-256 digest")
 
 
-def created_temporary(temporary: Path | None) -> Path:
+def require(temporary: Path | None) -> Path:
     """Returns the temporary report file, which must have been created.
 
     Args:
@@ -269,7 +292,7 @@ class Envelope:
                 handle.write("\n")
                 handle.flush()
                 os.fsync(handle.fileno())
-            created_temporary(temporary).replace(destination)
+            require(temporary).replace(destination)
             durability.sync_directory(destination.parent)
         except BaseException:
             if temporary is not None:

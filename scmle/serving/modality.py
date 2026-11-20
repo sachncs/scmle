@@ -2,7 +2,7 @@
 
 The core package does not guess how an arbitrary document, image, audio file,
 video container, graph, or geospatial object should be decoded. A caller-owned
-``ModalitySampleDecoder`` makes that trust boundary explicit while this module
+``Decoder`` makes that trust boundary explicit while this module
 provides the same bounded, inspectable HTTP surface as tabular serving.
 """
 
@@ -37,7 +37,7 @@ MAX_REQUEST_ID_LENGTH = 128
 REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
 
 
-class ModalitySampleDecoder(abc.ABC):
+class Decoder(abc.ABC):
     """Decodes one request payload into caller-owned modality samples."""
 
     @abc.abstractmethod
@@ -80,12 +80,12 @@ class ModalityHttpServing:
     def __init__(
         self,
         predictor: modality_lifecycle.Predictor,
-        decoder: ModalitySampleDecoder,
+        decoder: Decoder,
         host: str = "127.0.0.1",
         port: int = 0,
-        max_request_bytes: int = MAX_MODALITY_REQUEST_BYTES,
-        max_samples: int = MAX_MODALITY_REQUEST_SAMPLES,
-        require_lifecycle_report: bool = False,
+        payload: int = MAX_MODALITY_REQUEST_BYTES,
+        batch: int = MAX_MODALITY_REQUEST_SAMPLES,
+        audited: bool = False,
     ) -> None:
         """Binds a verified predictor and an explicit sample decoder.
 
@@ -99,24 +99,22 @@ class ModalityHttpServing:
             decoder: Caller-owned decoder for request payloads.
             host: Interface to bind.
             port: Port to bind; 0 picks a free port.
-            max_request_bytes: Largest accepted request body, in bytes.
-            max_samples: Largest accepted number of samples per request.
-            require_lifecycle_report: Whether to enable the
+            payload: Largest accepted request body, in bytes.
+            batch: Largest accepted number of samples per request.
+            audited: Whether to enable the
                 production-boundary mode, in which the predictor must have
                 been loaded with a verified, identity-matching signed
                 lifecycle report.
 
         Raises:
             ValueError: If a request bound is below 1, or
-                `require_lifecycle_report` is set and the predictor carries
+                `audited` is set and the predictor carries
                 no lifecycle report digest.
         """
-        if max_request_bytes < 1 or max_samples < 1:
+        if payload < 1 or batch < 1:
             raise errors.InputError("request bounds must be positive")
         self.gateway: access.Gateway | None = None
-        if require_lifecycle_report and (
-            predictor.lifecycle_report_digest is None
-        ):
+        if audited and (predictor.lifecycle_report_digest is None):
             raise errors.InputError(
                 "release-bound serving requires a verified lifecycle report"
             )
@@ -124,9 +122,9 @@ class ModalityHttpServing:
         self.decoder = decoder
         self.host = host
         self.port = port
-        self.max_request_bytes = max_request_bytes
-        self.max_samples = max_samples
-        self.require_lifecycle_report = require_lifecycle_report
+        self.payload = payload
+        self.batch = batch
+        self.audited = audited
         self.admission = guard.Admission(8, 30.0)
         self.readiness = guard.Readiness()
         for step in guard.STEPS[:2]:
@@ -161,7 +159,7 @@ class ModalityHttpServing:
         return f"http://{self.host}:{self.httpd.server_address[1]}"
 
     @property
-    def artifact_digest(self) -> str:
+    def digest(self) -> str:
         """The `sha256:` digest of the verified model package."""
         return "sha256:" + self.predictor.package.model_sha256
 
@@ -180,23 +178,23 @@ class ModalityHttpServing:
 
         Raises:
             ValueError: If the decoder returns no samples.
-            OverflowError: If there are more samples than `max_samples`.
+            OverflowError: If there are more samples than `batch`.
                 Errors raised by the decoder or the predictor also
                 propagate.
         """
         samples = self.decoder.decode(payload)
         if not samples:
             raise errors.InputError("samples must not be empty")
-        if len(samples) > self.max_samples:
+        if len(samples) > self.batch:
             raise OverflowError(
-                f"request contains more than {self.max_samples} samples"
+                f"request contains more than {self.batch} samples"
             )
         predictions = self.predictor.predict(samples)
         probabilities = self.predictor.predict_proba(samples)
         return {
             "schema_version": serving.SCHEMA_VERSION,
-            "model_version": self.artifact_digest,
-            "artifact_digest": self.artifact_digest,
+            "model_version": self.digest,
+            "artifact_digest": self.digest,
             "modality": modalities.serialise(self.predictor.adapter.modality),
             "predictions": numpy.asarray(predictions).tolist(),
             "probabilities": numpy.asarray(probabilities).tolist(),
@@ -230,7 +228,7 @@ class ModalityHttpServing:
         state = guard.assess(self.readiness, self.admission)
         status = 200 if state["ready"] else 503
         if path == "/readyz":
-            return status, {**state, "artifact_digest": self.artifact_digest}
+            return status, {**state, "artifact_digest": self.digest}
         if state["ready"]:
             return status, {}
         return status, {
@@ -457,7 +455,7 @@ class Responder(server.BaseHTTPRequestHandler):
                 200,
                 {
                     **adapter.predictor.health(),
-                    "artifact_digest": adapter.artifact_digest,
+                    "artifact_digest": adapter.digest,
                 },
                 request_id,
             )
@@ -504,9 +502,9 @@ class Responder(server.BaseHTTPRequestHandler):
             raise RejectedError(
                 400, "Content-Length must be an integer"
             ) from error
-        if length < 0 or length > self.adapter.max_request_bytes:
+        if length < 0 or length > self.adapter.payload:
             raise OverflowError(
-                f"request body exceeds {self.adapter.max_request_bytes} bytes"
+                f"request body exceeds {self.adapter.payload} bytes"
             )
         body = self.rfile.read(length)
         if len(body) != length:
@@ -607,4 +605,4 @@ class Responder(server.BaseHTTPRequestHandler):
         """
 
 
-__all__ = ["ModalityHttpServing", "ModalitySampleDecoder"]
+__all__ = ["Decoder", "ModalityHttpServing"]

@@ -48,7 +48,7 @@ def test_the_estimated_optimism_follows_the_true_optimism():
         true, estimated = [], []
         for ignored in range(runs):
             chosen, every, held = winner_scores(rng, candidates)
-            report = confidence.cv_interval(
+            report = confidence.bound(
                 chosen, TRAINING, held, "random", every, False
             )
             true.append(TRUTH - report["mean"])
@@ -68,10 +68,8 @@ def test_moving_the_interval_by_the_optimism_helps_and_never_hurts_much():
     gained = lost = covered = 0
     for ignored in range(runs):
         chosen, every, held = winner_scores(rng, 30)
-        plain = confidence.cv_interval(chosen, TRAINING, held, "random")
-        moved = confidence.cv_interval(
-            chosen, TRAINING, held, "random", every, False
-        )
+        plain = confidence.bound(chosen, TRAINING, held, "random")
+        moved = confidence.bound(chosen, TRAINING, held, "random", every, False)
         before = plain["interval"][0] <= TRUTH <= plain["interval"][1]
         after = moved["interval"][0] <= TRUTH <= moved["interval"][1]
         gained += after and not before

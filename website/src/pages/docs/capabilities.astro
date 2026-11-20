@@ -72,14 +72,14 @@ except UnsupportedError as refusal:
   <section class="doc-section">
     <p class="eyebrow">Reference serving</p>
     <h2>Bring the decoder. Keep the boundary visible.</h2>
-    <p><code>ModalityHttpServing</code> exposes a signed <code>Predictor</code> through <code>/health</code>, <code>/schema</code>, and <code>/predict</code>. The core deliberately does not guess how a PDF, image, audio stream, graph, or geospatial object should be decoded. Supply a <code>ModalitySampleDecoder</code> that owns that policy, validates its payload, and returns the adapter's sample type.</p>
+    <p><code>ModalityHttpServing</code> exposes a signed <code>Predictor</code> through <code>/health</code>, <code>/schema</code>, and <code>/predict</code>. The core deliberately does not guess how a PDF, image, audio stream, graph, or geospatial object should be decoded. Supply a <code>Decoder</code> that owns that policy, validates its payload, and returns the adapter's sample type.</p>
     <pre><code class="language-python">{`import json
 import urllib.request
 
 from scmle.data.modalities.document import Dataset, Sample
 from scmle.pipeline.modality_lifecycle import DocumentPreparer, Lifecycle
 from scmle.pipeline.modality_lifecycle import Predictor
-from scmle.serving.modality import ModalityHttpServing, ModalitySampleDecoder
+from scmle.serving.modality import Decoder, ModalityHttpServing
 
 # A small signed document package to serve.
 adapter = DocumentPreparer(Dataset(tuple(
@@ -93,7 +93,7 @@ predictor = Predictor.from_package(
 )
 
 
-class DocumentDecoder(ModalitySampleDecoder):
+class DocumentDecoder(Decoder):
     def decode(self, payload):
         return tuple(Sample(item["document_id"], item["content"])
                      for item in payload["samples"])
@@ -113,7 +113,7 @@ request = urllib.request.Request(
 with urllib.request.urlopen(request) as response:
     print(json.loads(response.read()))
 serving.stop()`}</code></pre>
-    <p>The server bounds body size and sample count, verifies the package before prediction, and returns structured request errors. For a release-bound serving process, load the predictor with the signed lifecycle report and set <code>require_lifecycle_report=True</code>; health and prediction evidence then include the report digest. It is still a reference transport: put it behind authentication, TLS, request tracing, redaction, and an owned operational gateway before claiming production service coverage.</p>
+    <p>The server bounds body size and sample count, verifies the package before prediction, and returns structured request errors. For a release-bound serving process, load the predictor with the signed lifecycle report and set <code>audited=True</code>; health and prediction evidence then include the report digest. It is still a reference transport: put it behind authentication, TLS, request tracing, redaction, and an owned operational gateway before claiming production service coverage.</p>
   </section>
   <p class="meta">* The supported claim is intentionally narrow: the explicitly gated tabular library workflow, not every possible tabular source or model.</p>
 

@@ -517,13 +517,13 @@ def check_failure_isolation(directory: pathlib.Path) -> CheckRecord:
         "A crashing candidate is recorded as failed; the run still completes.",
         threshold="run COMPLETED, crashing trial not ok, another trial ok",
     )
-    scmle.models.custom.register_estimator(
+    scmle.models.custom.register(
         "crashing_probe", classifier=CrashingClassifier, cost=1, replace=True
     )
     try:
         result = fast_project(binary_data(), "y", directory / "run").run()
     finally:
-        scmle.models.custom.unregister_estimator("crashing_probe")
+        scmle.models.custom.unregister("crashing_probe")
     board = result.leaderboard()
     crashed = board[board.model == "crashing_probe"]
     others_ok = bool((board.status == "ok").any())

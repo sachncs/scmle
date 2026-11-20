@@ -179,6 +179,42 @@ marked `Breaking:` and listed first in their group.
   runs `python -m scmle.serving.runtime`; folders generated earlier pin the
   scmle version that built them. Logger names follow the module path, so a log
   filter on an old path must change.
+* **Single-word names in `scmle.evaluation`, `scmle.models`,
+  `scmle.inference` and `scmle.serving` (phase 6).** Classes, functions,
+  methods and attributes of these packages take single-word names; the full
+  old-to-new list is in [`docs/RENAMES.md`](docs/RENAMES.md) under "Name
+  renames". Stored record keys do not change (they were renamed in phase
+  5), so files written earlier still read. The pinned surface changes:
+  `scmle.evaluation.parameter_estimation.BayesianPrior`,
+  `ParameterEstimate` and `estimate_parameters` are `Prior`, `Estimate`
+  and `infer`; `scmle.evaluation.longitudinal.PeriodATE` is `Period`;
+  `scmle.evaluation.sequential.PeriodDiagnostics` and `RegimeEstimate` are
+  `Diagnostics` and `Estimate`; `scmle.evaluation.metrics.register_metric`
+  is `register`; `scmle.models.custom.register_estimator` and
+  `unregister_estimator` are `register` and `unregister`;
+  `scmle.serving.modality.ModalitySampleDecoder` is `Decoder`. The fields
+  and keywords of the parameter-estimation, longitudinal and sequential
+  `Config`, `Estimand` and result classes follow the list, and
+  `ModalityHttpServing` takes `payload`, `batch` and `audited` (was
+  `max_request_bytes`, `max_samples` and `require_lifecycle_report`);
+  `Bundle`'s `quantile` argument is typed `Intervals`. The
+  constructor keywords of the boosting `Booster`, the scikit-learn
+  `Learner` and the deep-learning `Network` adapters and of the HTTP
+  `Service` take the attribute names (`classifier`, `regressor`,
+  `relabel`, `predictions`, `fixed`, `fitting`, `rounds`, `contract`;
+  `payload`, `batch`, `timeout`, `drain`). Replace the old name with the new one
+  to migrate; no alias is kept.
+* **Bundle format 6.** The single-word names of phase 6 (lane `models`)
+  rename classes pickled inside a bundle, among them
+  `scmle.evaluation.cv_plus.CvPlusEnsemble` (`Ensemble`),
+  `scmle.evaluation.quantile.QuantileIntervals` (`Intervals`),
+  `scmle.evaluation.shift_weights.StoredShiftWeights` (`Weights`),
+  `scmle.evaluation.dirichlet.DirichletCalibrator` (`Dirichlet`) and the
+  ranking, uplift, survival, ordinal, multi-target and bagging estimators.
+  `BUNDLE_FORMAT` goes from 5 to 6 and `Bundle.load` refuses a format 5
+  bundle with the existing message: retrain and save it again.
+  Deep-learning checkpoints pickle no renamed class (the concrete
+  estimator classes keep their names) and keep their version.
 * **Single-word names in `scmle.data` and `scmle.assurance` (phase 6).**
   Classes, functions, methods and attributes of the data and assurance
   packages take single-word names; the full old-to-new list is in

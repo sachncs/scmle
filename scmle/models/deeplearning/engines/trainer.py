@@ -52,7 +52,7 @@ class Trainer(Descent):
 
     __module__ = "scmle.models.deeplearning.engines"
 
-    def validation_score(
+    def evaluate(
         self, torch: Any, network: Any, tensors: dict[str, Any], rows: Any
     ) -> float:
         """Scores the held-out rows in evaluation mode.
@@ -68,7 +68,7 @@ class Trainer(Descent):
         """
         network.eval()
         with torch.no_grad():
-            return float(self.weighted_loss(torch, network, tensors, rows))
+            return float(self.weigh(torch, network, tensors, rows))
 
     def divide(self, rows: int) -> tuple[numpy.ndarray, numpy.ndarray]:
         """Shuffles the row indices and holds some out for early stopping.
@@ -137,7 +137,7 @@ class Trainer(Descent):
             shuffled = torch.from_numpy(generator.permutation(training)).to(
                 device
             )
-            epoch_loss, alive, step = self.train_epoch(
+            epoch_loss, alive, step = self.train(
                 torch,
                 network,
                 optimizer,
@@ -148,11 +148,11 @@ class Trainer(Descent):
             )
             if not alive:
                 break
-            monitor.losses.append(epoch_loss / plan.updates_per_epoch)
+            monitor.losses.append(epoch_loss / plan.updates)
             self.n_iter_ = epoch + 1
             if not held:
                 continue
-            score = self.validation_score(
+            score = self.evaluate(
                 torch, network, tensors, torch.from_numpy(validation).to(device)
             )
             if score < best:
@@ -169,7 +169,7 @@ class Trainer(Descent):
         self.network_ = network.cpu()
         return self
 
-    def raw_outputs(self, features: Any) -> numpy.ndarray:
+    def emit(self, features: Any) -> numpy.ndarray:
         """Member outputs for new rows, shape (rows, members, outputs).
 
         Single networks have one member. Evaluation mode, on the CPU.

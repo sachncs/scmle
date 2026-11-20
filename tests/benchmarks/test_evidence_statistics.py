@@ -73,9 +73,7 @@ def test_every_deciding_statistic_exists_and_has_two_references() -> None:
 
 def test_inventory_lists_every_reported_metric() -> None:
     reported = {
-        name
-        for names in metrics.Repertoire.report_names.values()
-        for name in names
+        name for names in metrics.Repertoire.reported.values() for name in names
     }
     assert statistics.reported() == reported
 
@@ -127,7 +125,7 @@ def test_simulated_metrics_agree_with_their_reference(
     statistic = one(f"metrics.{task.value}")
     case = statistics.simulate(task, 0)
     found = statistics.compare(statistic, case, 1e-8, deciding=False)
-    assert {c.key for c in found} == set(metrics.CATALOG.report_names[task])
+    assert {c.key for c in found} == set(metrics.CATALOG.reported[task])
     assert [c.key for c in found if not c.within] == []
 
 
@@ -158,8 +156,8 @@ def test_latency_replay_feeds_the_product_the_given_spans() -> None:
     ticks = statistics.ticks([1.0, 2.0, 2.0, 2.0, 9.0])
     assert statistics.spans(ticks) == pytest.approx([1.0, 2.0, 2.0, 2.0, 9.0])
     usage = statistics.timed(statistics.Clock(ticks), 5)
-    assert usage.rows_timed == 5
-    assert usage.p95_latency_ms == pytest.approx(7.6)
+    assert usage.timed == 5
+    assert usage.latency == pytest.approx(7.6)
     assert vars(resources)["time"] is time
 
 

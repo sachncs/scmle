@@ -12,7 +12,7 @@ from sklearn import ensemble
 MIN_DISTINCT_VALUES = 2
 
 
-class PerTarget(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Panel(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Fits one clone of an estimator for each target column.
 
     Attributes:

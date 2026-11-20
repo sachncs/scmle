@@ -15,7 +15,7 @@ from scmle.evaluation.release.assessment import assess
 from scmle.evaluation.release.assessment import audit
 from scmle.evaluation.release.assessment import citations
 from scmle.evaluation.release.assessment import disparities
-from scmle.evaluation.release.assessment import explanation_findings
+from scmle.evaluation.release.assessment import explain
 from scmle.evaluation.release.assessment import grade
 from scmle.evaluation.release.assessment import judge
 from scmle.evaluation.release.assessment import referenced
@@ -23,8 +23,8 @@ from scmle.evaluation.release.assessment import ruling
 from scmle.evaluation.release.assessment import unreadable
 from scmle.evaluation.release.finding import exhaustive
 from scmle.evaluation.release.finding import Finding
-from scmle.evaluation.release.finding import finite_real
 from scmle.evaluation.release.finding import Kind
+from scmle.evaluation.release.finding import parse
 from scmle.evaluation.release.finding import quantify
 from scmle.evaluation.release.finding import Readiness
 from scmle.evaluation.release.finding import tallies
@@ -50,11 +50,11 @@ __all__ = [
     "countersign",
     "disparities",
     "exhaustive",
-    "explanation_findings",
+    "explain",
     "faults",
-    "finite_real",
     "grade",
     "judge",
+    "parse",
     "quantify",
     "referenced",
     "ruling",

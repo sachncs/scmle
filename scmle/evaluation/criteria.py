@@ -54,10 +54,10 @@ class Criterion:
         metric: Metric name.
         required: The threshold from the problem statement.
         achieved: The locked-test score (NaN when it could not be computed).
-        higher_is_better: The metric's direction.
+        direction: The metric's direction.
         met: Whether the score satisfies the threshold.
         migrations: The written layout's version steps, oldest first;
-            version 2 writes `higher_is_better` as `direction`, `higher` or
+            version 2 writes `direction` as `direction`, `higher` or
             `lower`.
     """
 
@@ -72,7 +72,7 @@ class Criterion:
     metric: str
     required: float
     achieved: float
-    higher_is_better: bool
+    direction: bool
     met: bool
 
     def to_dict(self) -> dict[str, Any]:

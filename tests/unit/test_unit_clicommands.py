@@ -115,7 +115,7 @@ def test_batch_scores_the_file_through_the_serving_path(saved, monkeypatch):
         def __init__(self, model, on_null, on_unseen):
             calls.append((model.info.model_name, on_null, on_unseen))
 
-        def score_file(self, data, output, chunk_rows, resume):
+        def score(self, data, output, chunk_rows, resume):
             calls.append((data, output, chunk_rows, resume))
             return 5
 
@@ -209,14 +209,14 @@ def test_serve_hands_the_server_to_the_serving_loop(monkeypatch):
     events = []
 
     class Server:
-        def __init__(self, model, host, port, gateway, monitor, drain_seconds):
-            events.append(("init", host, port, drain_seconds))
+        def __init__(self, model, host, port, gateway, monitor, drain):
+            events.append(("init", host, port, drain))
 
     model = types.SimpleNamespace(info=types.SimpleNamespace(model_name="m"))
     monkeypatch.setattr(
         delivery.bundle.Bundle, "load", lambda path, trusted: model
     )
-    monkeypatch.setattr(delivery.server, "HttpServing", Server)
+    monkeypatch.setattr(delivery.server, "Service", Server)
     monkeypatch.setattr(
         delivery.runtime, "fetch", lambda path, trusted: ("fetch", trusted)
     )

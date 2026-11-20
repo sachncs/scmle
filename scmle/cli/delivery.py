@@ -143,7 +143,7 @@ class Batch(command.Command):
         adapter = server.Batcher(
             model, on_null=args.on_null, on_unseen=args.on_unseen
         )
-        rows = adapter.score_file(
+        rows = adapter.score(
             args.data, args.output, args.chunk_rows, resume=not args.restart
         )
         LOGGER.info("wrote %d predictions to %s", rows, args.output)
@@ -219,13 +219,13 @@ class Serve(command.Command):
         monitor = signals.SignalMonitor(
             signals.Window(window_seconds=args.signals_window)
         )
-        adapter = server.HttpServing(
+        adapter = server.Service(
             model,
             args.host,
             args.port,
             gateway=access.gateway_from_environment(os.environ),
             monitor=monitor,
-            drain_seconds=args.drain_seconds,
+            drain=args.drain_seconds,
         )
         LOGGER.info("serving %s", model.info.model_name)
         runtime.hold(

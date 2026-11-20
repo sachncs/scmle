@@ -45,7 +45,7 @@ class SklearnRegressorEngine(foundation.Regressor):
 class WorkerClassifier(estimators.TabPfnClassifier):
     """Worker-backed classifier whose engine lives in this module."""
 
-    engine_path = "test_foundation.SklearnClassifierEngine"
+    engine = "test_foundation.SklearnClassifierEngine"
 
 
 def separable(rows=300):

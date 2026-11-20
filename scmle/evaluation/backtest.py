@@ -15,7 +15,7 @@ import pandas
 from scmle.evaluation import forecast
 
 
-def seasonal_naive(
+def repeat(
     frame: pandas.DataFrame,
     positions: numpy.ndarray,
     value: str,
@@ -92,7 +92,7 @@ def report(
     model = score(
         truth, numpy.asarray(estimator.predict(features), dtype=float)
     )
-    last = score(truth, forecast.last_value(estimator, features, steps))
+    last = score(truth, forecast.persist(estimator, features, steps))
     season = None if seasonal is None else score(truth, seasonal)
     return [
         {

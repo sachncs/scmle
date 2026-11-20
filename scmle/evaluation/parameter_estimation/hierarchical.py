@@ -34,12 +34,12 @@ from scmle.evaluation.parameter_estimation.mixed import distinct
 from scmle.evaluation.parameter_estimation.mixed import intercept
 from scmle.evaluation.parameter_estimation.mixed import project
 from scmle.evaluation.parameter_estimation.mixed import slope
-from scmle.evaluation.parameter_estimation.reml import fit_hierarchical_reml
+from scmle.evaluation.parameter_estimation.reml import fit
 from scmle.evaluation.parameter_estimation.reml import optimise
 from scmle.evaluation.parameter_estimation.report import Fit
 
 
-def hierarchical_reference(
+def recheck(
     design: numpy.ndarray,
     values: numpy.ndarray,
     cluster_values: numpy.ndarray,
@@ -66,13 +66,13 @@ def hierarchical_reference(
         random_intercept_variance,
         random_effect_covariance,
     ) = fitted
-    if policy.random_slope_position is not None:
-        if policy.hierarchical_method == "reml":
+    if policy.slope is not None:
+        if policy.hierarchy == "reml":
             return reference_hierarchical_random_slope_reml(
                 design,
                 values,
                 cluster_values,
-                policy.random_slope_position,
+                policy.slope,
                 residual_variance,
                 random_effect_covariance,
                 coefficients,
@@ -83,13 +83,13 @@ def hierarchical_reference(
             design,
             values,
             cluster_values,
-            policy.random_slope_position,
+            policy.slope,
             residual_variance,
             random_effect_covariance,
             coefficients,
             policy,
         )
-    if policy.hierarchical_method == "reml":
+    if policy.hierarchy == "reml":
         return reference_hierarchical_reml(
             design,
             values,
@@ -111,7 +111,7 @@ def hierarchical_reference(
     )
 
 
-def fit_hierarchical_estimator(
+def nest(
     design: numpy.ndarray,
     values: numpy.ndarray,
     policy: Config,
@@ -145,7 +145,7 @@ def fit_hierarchical_estimator(
     ) = parameter_estimation.fit_hierarchical_linear(  # type: ignore[attr-defined]
         design, values, cluster_values, policy
     )
-    reference = hierarchical_reference(
+    reference = recheck(
         design,
         values,
         cluster_values,
@@ -160,7 +160,7 @@ def fit_hierarchical_estimator(
     )
     likelihood = "gaussian"
     degrees_of_freedom = max(len(dict.fromkeys(cluster_values.tolist())) - 1, 1)
-    pivot = stats.t.ppf(0.5 + policy.confidence_level / 2.0, degrees_of_freedom)
+    pivot = stats.t.ppf(0.5 + policy.confidence / 2.0, degrees_of_freedom)
     p_values = 2.0 * stats.t.sf(
         numpy.abs(
             coefficients
@@ -225,14 +225,14 @@ def fit_hierarchical_linear(
             variance is not positive, or the GLS system is not identifiable.
             Errors from the random-slope and REML fits also propagate.
     """
-    if policy.random_slope_position is not None:
+    if policy.slope is not None:
         return fit_hierarchical_random_slope(design, values, clusters, policy)
     labels, initial_residuals = start(design, values, clusters)
     residual_variance, random_intercept_variance = moments(
         clusters, labels, initial_residuals
     )
-    if policy.hierarchical_method == "reml":
-        return fit_hierarchical_reml(
+    if policy.hierarchy == "reml":
+        return fit(
             design,
             values,
             clusters,
@@ -289,14 +289,14 @@ def fit_hierarchical_random_slope(
             within-cluster variance is not positive, or the GLS system is not
             identifiable.
     """
-    random_slope_position = policy.random_slope_position
+    random_slope_position = policy.slope
     if random_slope_position is None:
         raise errors.InputError("random slope position must be declared")
     labels, initial_residuals = start(design, values, clusters)
     residual_variance, random_effect_covariance, cluster_sizes = slopes(
         design, clusters, labels, initial_residuals, random_slope_position
     )
-    if policy.hierarchical_method == "reml":
+    if policy.hierarchy == "reml":
         return optimise(
             design,
             values,

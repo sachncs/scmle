@@ -30,7 +30,7 @@ def test_a_small_regression_run_stores_the_fold_models(result):
     ensemble = result.bundle.cv_plus
     assert ensemble is not None
     assert len(ensemble.models) >= 2
-    assert len(ensemble.residuals) == len(ensemble.fold_of_row)
+    assert len(ensemble.residuals) == len(ensemble.folds)
 
 
 def test_cv_plus_intervals_cover_new_rows(result):

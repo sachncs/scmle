@@ -357,7 +357,7 @@ def test_the_ensemble_architecture_averages_several_members():
     raw = worker.client().request(
         "call",
         (
-            model.engine_path,
+            model.engine,
             model.state_id_,
             model.state_,
             "raw_outputs",

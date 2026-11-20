@@ -71,9 +71,7 @@ class Hazard(models.Model):
         Returns:
             An unfitted discrete-time boosting hazard model.
         """
-        return estimators.DiscreteTimeBoosting(
-            random_state=seed, **dict(params or {})
-        )
+        return estimators.Boosting(random_state=seed, **dict(params or {}))
 
 
 SURVIVAL_ADAPTERS: tuple[type[models.Model], ...] = (

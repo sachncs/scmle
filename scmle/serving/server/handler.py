@@ -1,4 +1,4 @@
-"""The request handlers behind `HttpServing`."""
+"""The request handlers behind `Service`."""
 
 from __future__ import annotations
 
@@ -32,16 +32,14 @@ class Exchange(server.BaseHTTPRequestHandler):
     Attributes:
         adapter: The serving adapter whose bundle, limits and gateway answer
             the requests.
-        request_id: The ID of the request being handled.
+        identifier: The ID of the request being handled.
         started: Monotonic time at which the current request began.
     """
 
-    request_id = ""
+    identifier = ""
     started = 0.0
 
-    def __init__(
-        self, *args: Any, adapter: web.HttpServing, **kwargs: Any
-    ) -> None:
+    def __init__(self, *args: Any, adapter: web.Service, **kwargs: Any) -> None:
         """Binds the handler to its adapter and handles the request.
 
         Args:
@@ -56,7 +54,7 @@ class Exchange(server.BaseHTTPRequestHandler):
     def setup(self) -> None:
         """Applies the request I/O timeout to the connection."""
         super().setup()
-        self.connection.settimeout(self.adapter.request_timeout_seconds)
+        self.connection.settimeout(self.adapter.timeout)
 
     def version_string(self) -> str:
         """Names the server without leaking library versions.
@@ -79,14 +77,14 @@ class Exchange(server.BaseHTTPRequestHandler):
             payload: Response body; the request ID is added to it.
             headers: Extra response headers.
         """
-        body = json.dumps({**payload, "request_id": self.request_id}).encode()
+        body = json.dumps({**payload, "request_id": self.identifier}).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("X-Request-ID", self.request_id)
+        self.send_header("X-Request-ID", self.identifier)
         for name, value in (headers or {}).items():
             self.send_header(name, value)
         self.end_headers()
@@ -130,10 +128,10 @@ class Exchange(server.BaseHTTPRequestHandler):
         self.started = time.monotonic()
         caller = self.headers.get("X-Request-ID")
         if caller is None:
-            self.request_id = guard.mint()
+            self.identifier = guard.mint()
             return True
-        self.request_id = caller if guard.wellformed(caller) else guard.mint()
-        if self.request_id != caller:
+        self.identifier = caller if guard.wellformed(caller) else guard.mint()
+        if self.identifier != caller:
             self.fail(
                 400,
                 "X-Request-ID must be 1-128 ASCII characters from "
@@ -163,7 +161,7 @@ class Exchange(server.BaseHTTPRequestHandler):
                 self.path,
                 self.headers.get("Authorization"),
                 self.client_address[0],
-                self.request_id,
+                self.identifier,
             )
         except access.DeniedError as denied:
             # handled: gateway denial sent as refusal response; returns False
@@ -205,14 +203,14 @@ class Exchange(server.BaseHTTPRequestHandler):
 
 
 class Responder(Exchange):
-    """Handles the requests of one `HttpServing` adapter."""
+    """Handles the requests of one `Service` adapter."""
 
     def do_GET(self) -> None:
         """Serves the probes, health and schema endpoints."""
         with self.traced():
             if not self.identify() or not self.authorize("GET"):
                 return
-            with logs.bind(request=self.request_id):
+            with logs.bind(request=self.identifier):
                 self.probe()
 
     def probe(self) -> None:
@@ -252,7 +250,7 @@ class Responder(Exchange):
                     "model_sha256": info.files.get(
                         scmle.artifacts.bundle.MODEL_FILE, ""
                     ),
-                    "artifact_digest": adapter.artifact_digest,
+                    "artifact_digest": adapter.digest,
                     "task": adapter.bundle.schema.task,
                 },
             )
@@ -262,7 +260,7 @@ class Responder(Exchange):
                 {
                     "schema_version": serving.SCHEMA_VERSION,
                     "schema": adapter.bundle.schema.to_dict(),
-                    "schema_digest": adapter.schema_digest,
+                    "schema_digest": adapter.layout,
                     "request_schema": serving.REQUEST_JSON_SCHEMA,
                     "response_schema": serving.RESPONSE_JSON_SCHEMA,
                     "limits": adapter.limits(),
@@ -297,10 +295,10 @@ class Responder(Exchange):
             # handled: non-integer Content-Length answered with HTTP 400
             self.fail(400, "Content-Length must be an integer", "request")
             return None
-        if length < 0 or length > self.adapter.max_request_bytes:
+        if length < 0 or length > self.adapter.payload:
             self.fail(
                 413,
-                f"request body exceeds {self.adapter.max_request_bytes} bytes",
+                f"request body exceeds {self.adapter.payload} bytes",
                 "request",
             )
             return None
@@ -339,7 +337,7 @@ class Responder(Exchange):
         with self.traced():
             if not self.identify() or not self.authorize("POST"):
                 return
-            with logs.bind(request=self.request_id):
+            with logs.bind(request=self.identifier):
                 self.accept()
 
     def accept(self) -> None:
@@ -443,7 +441,7 @@ class Responder(Exchange):
             self.fail(400, f"invalid JSON request: {error.msg}", "request")
             return
         adapter = self.adapter
-        request = serving.parse(payload, adapter.max_records)
+        request = serving.parse(payload, adapter.batch)
         response = adapter.admission.run(lambda: adapter.score(request))
-        response["request_id"] = self.request_id
+        response["request_id"] = self.identifier
         self.transmit(200, response)

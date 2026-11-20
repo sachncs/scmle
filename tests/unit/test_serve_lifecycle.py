@@ -69,19 +69,17 @@ def call(url, payload=None, timeout=20):
 
 
 def test_the_drain_time_is_derived_from_the_request_bounds(bundle):
-    adapter = server.HttpServing(
-        bundle, request_timeout_seconds=4.0, scoring_timeout_seconds=7.0
-    )
-    assert adapter.drain_seconds == 15.0
-    assert server.HttpServing(bundle, drain_seconds=2.5).drain_seconds == 2.5
+    adapter = server.Service(bundle, timeout=4.0, scoring_timeout_seconds=7.0)
+    assert adapter.drain == 15.0
+    assert server.Service(bundle, drain=2.5).drain == 2.5
     with pytest.raises(errors.InputError, match="drain time"):
-        server.HttpServing(bundle, drain_seconds=0)
+        server.Service(bundle, drain=0)
 
 
 def test_stop_lets_a_request_in_flight_finish_then_refuses_connections(
     golden, bundle, monkeypatch
 ):
-    adapter = server.HttpServing(bundle)
+    adapter = server.Service(bundle)
     entered, release = threading.Event(), threading.Event()
     original = adapter.respond
 
@@ -124,7 +122,7 @@ def test_stop_lets_a_request_in_flight_finish_then_refuses_connections(
 def test_a_connection_waiting_in_the_backlog_is_answered_not_reset(bundle):
     # C7: closing the listening socket reset every connection the kernel
     # had completed but the server had not yet accepted.
-    adapter = server.HttpServing(bundle)
+    adapter = server.Service(bundle)
     adapter.warm()
     listener = server.Listener(
         ("127.0.0.1", 0),
@@ -153,7 +151,7 @@ def test_a_connection_waiting_in_the_backlog_is_answered_not_reset(bundle):
 def test_the_backlog_holds_a_burst_of_connections(bundle):
     # C7: with the standard backlog of 5, a burst of callers connecting at
     # once was refused or reset before the server could accept them.
-    adapter = server.HttpServing(bundle)
+    adapter = server.Service(bundle)
     listener = server.Listener(
         ("127.0.0.1", 0),
         functools.partial(handler.Responder, adapter=adapter),
@@ -184,7 +182,7 @@ def test_the_backlog_holds_a_burst_of_connections(bundle):
 def test_stop_gives_up_on_a_request_after_the_grace(
     golden, bundle, monkeypatch, caplog
 ):
-    adapter = server.HttpServing(bundle)
+    adapter = server.Service(bundle)
     entered, release = threading.Event(), threading.Event()
 
     def stuck(records):
@@ -213,7 +211,7 @@ def test_stop_gives_up_on_a_request_after_the_grace(
 def test_reload_swaps_the_bundle_while_requests_keep_succeeding(
     golden, bundle, folders
 ):
-    adapter = server.HttpServing(bundle)
+    adapter = server.Service(bundle)
     adapter.start()
     try:
         url = f"{adapter.address}/predict"
@@ -248,7 +246,7 @@ def test_reload_swaps_the_bundle_while_requests_keep_succeeding(
 
 
 def test_a_failed_reload_keeps_the_old_bundle_serving(golden, bundle):
-    adapter = server.HttpServing(bundle)
+    adapter = server.Service(bundle)
     adapter.start()
     try:
 
@@ -277,7 +275,7 @@ def test_reload_recovers_a_service_whose_first_load_failed(folders):
         readiness.begin(guard.Phase.VERIFYING)
         raise errors.ArtifactError("not yet")
 
-    adapter = server.HttpServing(loader=refuse)
+    adapter = server.Service(loader=refuse)
     adapter.start()
     try:
         adapter.loading.join(20)
@@ -294,7 +292,7 @@ def test_hold_reloads_on_sighup_and_drains_on_sigterm(
     bundle, folders, tmp_path
 ):
     monitor = signals.SignalMonitor()
-    adapter = server.HttpServing(bundle, monitor=monitor)
+    adapter = server.Service(bundle, monitor=monitor)
     written = tmp_path / "signals.jsonl"
     before = signal.getsignal(signal.SIGTERM)
     reloaded = threading.Event()
@@ -329,7 +327,7 @@ def test_hold_reloads_on_sighup_and_drains_on_sigterm(
 def test_hold_keeps_serving_out_of_rotation_for_the_linger(golden, bundle):
     # C7: SIGTERM closed the socket at once, while the platform still
     # routed callers here; each connection it then completed was reset.
-    adapter = server.HttpServing(bundle)
+    adapter = server.Service(bundle)
     seen = {}
 
     def drive():
@@ -361,7 +359,7 @@ def test_hold_keeps_serving_out_of_rotation_for_the_linger(golden, bundle):
 
 @POSIX
 def test_a_second_stop_signal_ends_the_linger(bundle):
-    adapter = server.HttpServing(bundle)
+    adapter = server.Service(bundle)
 
     def drive():
         deadline = time.monotonic() + 20
@@ -391,7 +389,7 @@ def test_the_linger_comes_from_the_environment(monkeypatch):
 
 
 def test_hold_refuses_a_bad_interval_and_a_worker_thread(bundle):
-    adapter = server.HttpServing(bundle)
+    adapter = server.Service(bundle)
     monitor = signals.SignalMonitor()
     with pytest.raises(errors.ConfigError, match="interval"):
         runtime.hold(adapter, monitor, None, 0)
@@ -410,16 +408,16 @@ def test_hold_refuses_a_bad_interval_and_a_worker_thread(bundle):
 
 
 def test_a_failed_refresh_is_logged_and_serving_continues(bundle, caplog):
-    adapter = server.HttpServing(bundle)
+    adapter = server.Service(bundle)
     runtime.refresh(adapter, None)
     assert "reload failed; the previous bundle keeps serving" in caplog.text
     assert adapter.loaded is bundle
 
 
 def test_the_drain_time_comes_from_the_environment():
-    assert runtime.settings({})["drain_seconds"] is None
+    assert runtime.settings({})["drain"] is None
     assert runtime.settings({"SCMLE_DRAIN_SECONDS": "12"})[
-        "drain_seconds"
+        "drain"
     ] == pytest.approx(12.0)
 
 
@@ -510,7 +508,7 @@ def test_the_monitor_follows_the_reference_of_the_bundle_served(
     second.reference = support_ops.profile(seed=2)
     folder = pathlib.Path(second.save(tmp_path / "two"))
     monitor = signals.SignalMonitor()
-    adapter = server.HttpServing(first, monitor=monitor)
+    adapter = server.Service(first, monitor=monitor)
     assert monitor.profile is first.reference
     adapter.reload(runtime.fetch(folder, trusted=True))
     assert adapter.loaded.info.model_version == "golden-2"
@@ -527,7 +525,7 @@ def test_a_lazily_loaded_bundle_gives_the_monitor_its_reference(
     model.reference = support_ops.profile()
     folder = pathlib.Path(model.save(tmp_path / "one"))
     monitor = signals.SignalMonitor()
-    adapter = server.HttpServing(
+    adapter = server.Service(
         loader=runtime.fetch(folder, trusted=True), monitor=monitor
     )
     assert monitor.profile is None
@@ -547,7 +545,7 @@ def test_a_monitor_failing_on_a_new_bundle_is_logged(bundle, caplog):
         def adopt(self, profile):
             raise RuntimeError("monitor down")
 
-    adapter = server.HttpServing(bundle, monitor=Broken())
+    adapter = server.Service(bundle, monitor=Broken())
     assert adapter.loaded is bundle
     assert "the signal monitor failed on a new bundle" in caplog.text
 
@@ -560,7 +558,7 @@ def test_the_serve_command_takes_the_signals_window():
 
 
 def test_a_request_accepted_while_draining_is_still_scored(golden, bundle):
-    adapter = server.HttpServing(bundle)
+    adapter = server.Service(bundle)
     adapter.start()
     try:
         # Drain has begun but this connection was already accepted: it is

@@ -33,7 +33,7 @@ def make_counts(**changes):
         "passed": 0,
         "failed": 0,
         "blocking": 0,
-        "blocking_failures": 0,
+        "failures": 0,
     }
     fields.update(changes)
     return release.Tally(**fields)
@@ -81,12 +81,12 @@ def sample_summary():
 
 
 def test_finite_real_accepts_only_finite_real_numbers():
-    assert release.finite_real(2) == 2.0
-    assert release.finite_real(Fraction(1, 2)) == 0.5
-    assert release.finite_real(-1.5) == -1.5
+    assert release.parse(2) == 2.0
+    assert release.parse(Fraction(1, 2)) == 0.5
+    assert release.parse(-1.5) == -1.5
     for value in (True, False, "1", None, [1], float("inf"), float("nan")):
-        assert release.finite_real(value) is None
-    assert release.finite_real(float("-inf")) is None
+        assert release.parse(value) is None
+    assert release.parse(float("-inf")) is None
 
 
 def test_normalize_measure_names_the_field_in_errors():
@@ -159,9 +159,7 @@ def test_finding_to_dict_lists_every_field_and_skips_none_measures():
 
 
 def test_counts_serialize_and_name_the_bad_field():
-    counts = make_counts(
-        total=5, passed=3, failed=2, blocking=4, blocking_failures=1
-    )
+    counts = make_counts(total=5, passed=3, failed=2, blocking=4, failures=1)
     assert counts.to_dict() == {
         "total": 5,
         "passed": 3,
@@ -169,15 +167,18 @@ def test_counts_serialize_and_name_the_bad_field():
         "blocking": 4,
         "blockers": 1,
     }
-    for name in (field.name for field in dataclasses.fields(make_counts())):
+    # The messages name the fields by their written keys.
+    legacy = {"failures": "blocking_failures"}
+    for field in (item.name for item in dataclasses.fields(make_counts())):
+        name = legacy.get(field, field)
         with pytest.raises(
             TypeError, match=rf"^{name} must be a non-negative integer$"
         ):
-            make_counts(**{name: "x"})
+            make_counts(**{field: "x"})
         with pytest.raises(
             TypeError, match=rf"^{name} must be a non-negative integer$"
         ):
-            make_counts(**{name: 1.0})
+            make_counts(**{field: 1.0})
     with pytest.raises(TypeError, match="non-negative integer"):
         make_counts(total=True, passed=1)
     with pytest.raises(ValueError, match=r"^total must be a non-negative"):
@@ -187,11 +188,11 @@ def test_counts_serialize_and_name_the_bad_field():
     with pytest.raises(ValueError, match=r"^blocking must not exceed total$"):
         make_counts(blocking=1)
     with pytest.raises(ValueError, match=r"^blocking_failures must not exceed"):
-        make_counts(total=2, passed=2, blocking=2, blocking_failures=1)
+        make_counts(total=2, passed=2, blocking=2, failures=1)
     with pytest.raises(
         ValueError, match=r"^blocking_failures must not exceed blocking$"
     ):
-        make_counts(total=2, failed=2, blocking=1, blocking_failures=2)
+        make_counts(total=2, failed=2, blocking=1, failures=2)
 
 
 def test_check_count_values_rejects_bools_non_integers_and_negatives():
@@ -230,33 +231,28 @@ def test_summary_validation_messages():
         with pytest.raises(
             ValueError, match=r"^policy_schema_version must be non-negative$"
         ):
-            dataclasses.replace(summary, policy_schema_version=bad)
-    assert (
-        dataclasses.replace(
-            summary, policy_schema_version=0
-        ).policy_schema_version
-        == 0
-    )
+            dataclasses.replace(summary, policy=bad)
+    assert dataclasses.replace(summary, policy=0).policy == 0
     with pytest.raises(TypeError, match=r"^status must be Readiness$"):
         dataclasses.replace(summary, status="blocked")
-    for name in (
-        "total_findings",
-        "passed_findings",
-        "failed_findings",
-        "blocking_findings",
-        "blocking_failures",
-        "non_blocking_failures",
+    for field, name in (
+        ("total_findings", "total_findings"),
+        ("passed_findings", "passed_findings"),
+        ("failed_findings", "failed_findings"),
+        ("findings", "blocking_findings"),
+        ("failures", "blocking_failures"),
+        ("warnings", "non_blocking_failures"),
     ):
         with pytest.raises(
             TypeError, match=rf"^{name} must be a non-negative integer$"
         ):
-            dataclasses.replace(summary, **{name: "x"})
+            dataclasses.replace(summary, **{field: "x"})
     with pytest.raises(ValueError, match=r"^total_findings must equal passed"):
         dataclasses.replace(summary, total_findings=9)
     with pytest.raises(ValueError, match=r"^failed_findings must equal"):
-        dataclasses.replace(summary, non_blocking_failures=5)
+        dataclasses.replace(summary, warnings=5)
     with pytest.raises(ValueError, match=r"^blocking_failures must not exceed"):
-        dataclasses.replace(summary, blocking_findings=0, blocking_failures=1)
+        dataclasses.replace(summary, findings=0, failures=1)
     with pytest.raises(
         ValueError, match=r"^status does not match blocking_failures$"
     ):
@@ -264,15 +260,14 @@ def test_summary_validation_messages():
     with pytest.raises(
         ValueError, match=r"^aggregate counts do not match counts_by_kind$"
     ):
-        dataclasses.replace(summary, blocking_findings=3)
+        dataclasses.replace(summary, findings=3)
     assert summary.status is release.Readiness.BLOCKED
 
 
 def test_summary_serializes_exactly():
     summary = sample_summary()
     expected_kinds = {
-        kind.value: summary.counts_by_kind[kind.value].to_dict()
-        for kind in release.Kind
+        kind.value: summary.kinds[kind.value].to_dict() for kind in release.Kind
     }
     assert summary.to_dict() == {
         "task": "binary",
@@ -358,9 +353,9 @@ def test_reliability_gate_finding_is_exact():
         "expected": "execution_status=passed and release_blocked=false",
         "evidence": ["fault_injection_plan.json"],
     }
-    assert blocked.blocking_reasons == (blocked.findings[0].reason,)
+    assert blocked.reasons == (blocked.findings[0].reason,)
     assert blocked.task == "binary"
-    assert blocked.policy_schema_version == 3
+    assert blocked.policy == 3
     for plan, observed in ((None, "missing"), ("x", "missing"), ({}, "None")):
         finding = release.faults(outcome, plan).findings[0]
         assert finding.observed == observed
@@ -369,7 +364,7 @@ def test_reliability_gate_finding_is_exact():
 def test_reliability_gate_keeps_passed_blocking_findings_out_of_reasons():
     outcome = passing_outcome()
     blocked = release.faults(outcome, None)
-    assert len(blocked.blocking_reasons) == 1
+    assert len(blocked.reasons) == 1
     assert len(blocked.findings) == len(outcome.findings) + 1
 
 
@@ -417,7 +412,7 @@ def test_attestation_gate_finding_is_exact():
         "expected": "verified hmac-sha256 attestation signature",
         "evidence": ["release_attestation.json"],
     }
-    assert blocked.blocking_reasons == (blocked.findings[0].reason,)
+    assert blocked.reasons == (blocked.findings[0].reason,)
     observed = {}
     for label, record, verified in (
         ("signed_false", {"signature": {"algorithm": "x"}}, False),
@@ -435,7 +430,7 @@ def test_attestation_gate_finding_is_exact():
         "unsigned_false": "unsigned",
         "none_record": "unsigned",
     }
-    assert release.certify(passing_outcome(), None, True).blocking_reasons == (
+    assert release.certify(passing_outcome(), None, True).reasons == (
         blocked.findings[0].reason,
     )
 
@@ -476,7 +471,7 @@ def test_evidence_index_gate_observed_states_and_exact_finding():
         "expected": "verified hmac-sha256 evidence index signature",
         "evidence": ["release_evidence.json"],
     }
-    assert blocked.blocking_reasons == (blocked.findings[0].reason,)
+    assert blocked.reasons == (blocked.findings[0].reason,)
     good = passing_outcome()
     assert release.countersign(good, signed, True) is good
     assert len(release.countersign(good, None, True).findings) == (
@@ -698,7 +693,7 @@ def make_policy_namespace(**fields):
 def test_explanation_findings_report_each_required_quality():
     policy = make_policy_namespace()
     reports = {"shap": {"quality": {"stability_score": 0.5}}}
-    found = release.explanation_findings(policy, reports)
+    found = release.explain(policy, reports)
     assert [item.name for item in found] == ["shap.stability", "shap.fidelity"]
     assert found[0].to_dict() == {
         "kind": "explanation",
@@ -724,14 +719,14 @@ def test_explanation_findings_report_each_required_quality():
 def test_explanation_findings_fail_a_score_below_the_threshold():
     policy = make_policy_namespace(require_stability=False)
     reports = {"shap": {"quality": {"fidelity_score": 0.5}}}
-    found = release.explanation_findings(policy, reports)
+    found = release.explain(policy, reports)
     assert [item.name for item in found] == ["shap.fidelity"]
     assert found[0].passed is False
     assert found[0].reason == "explanation 'shap' fidelity failed: 0.5 >= 0.75"
     assert found[0].observed == 0.5
     assert found[0].expected == 0.75
     assert (
-        release.explanation_findings(
+        release.explain(
             make_policy_namespace(
                 require_stability=False, require_fidelity=False
             ),
@@ -745,13 +740,11 @@ def test_explanation_findings_need_a_threshold_for_each_requirement():
     with pytest.raises(
         ValueError, match=r"^explanation 'shap' has no stability threshold$"
     ):
-        release.explanation_findings(
-            make_policy_namespace(stability_threshold=None), {}
-        )
+        release.explain(make_policy_namespace(stability_threshold=None), {})
     with pytest.raises(
         ValueError, match=r"^explanation 'shap' has no fidelity threshold$"
     ):
-        release.explanation_findings(
+        release.explain(
             make_policy_namespace(
                 fidelity_threshold=None, require_stability=False
             ),
@@ -888,7 +881,7 @@ def test_evaluate_release_names_foreign_metric_keys_as_text():
         {},
         make_index(policy),
     )
-    reasons = set(result.blocking_reasons)
+    reasons = set(result.reasons)
     assert "metric '1' is not declared by the evaluation policy" in reasons
     assert "metric 'zz' is not declared by the evaluation policy" in reasons
     names = [
@@ -966,11 +959,11 @@ def test_diagnostic_failures_are_not_passed():
 
 def test_every_missing_explanation_score_is_reported():
     policy = make_policy_namespace()
-    found = release.explanation_findings(policy, {"shap": {"quality": {}}})
+    found = release.explain(policy, {"shap": {"quality": {}}})
     assert [item.name for item in found] == ["shap.stability", "shap.fidelity"]
     assert [item.passed for item in found] == [False, False]
     only_fidelity = {"shap": {"quality": {"fidelity_score": 0.75}}}
-    found = release.explanation_findings(policy, only_fidelity)
+    found = release.explain(policy, only_fidelity)
     assert [item.passed for item in found] == [False, True]
     assert found[1].reason == "explanation 'shap' fidelity passed: 0.75 >= 0.75"
 

@@ -126,7 +126,7 @@ def test_forgetting_finds_registry_copies_and_prediction_logs(world):
     # the manifest `scmle batch` writes beside its output names the bundle
     # by the digest the serving adapter reports
     log.with_name("scored.csv.manifest.json").write_text(
-        json.dumps({"artifact_digest": server.Batcher(loaded).artifact_digest}),
+        json.dumps({"artifact_digest": server.Batcher(loaded).digest}),
         encoding="utf-8",
     )
     unrelated = base / "scores" / "kept.csv"

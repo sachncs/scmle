@@ -239,7 +239,7 @@ def test_nan_outputs_do_not_pass_the_parity_check(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(
         onnx_export,
-        "load_converter",
+        "load",
         lambda: (None, types.SimpleNamespace(InferenceSession=Session)),
     )
     monkeypatch.setattr(onnx_export, "feed", lambda b, rows: {})

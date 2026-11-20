@@ -18,7 +18,7 @@ class CustomExplanation(diagnostics.Diagnostic):
 
     name = "custom_explanation"
 
-    def compute(self, inputs: diagnostics.DiagnosticInput) -> dict[str, Any]:
+    def compute(self, inputs: diagnostics.Input) -> dict[str, Any]:
         """Returns a representative explanation result."""
         del inputs
         return {"features": {"signal": {"importance": 0.8}}}
@@ -27,7 +27,7 @@ class CustomExplanation(diagnostics.Diagnostic):
 class UnnamedExplanation(diagnostics.Diagnostic):
     """Diagnostic without a method identity for rejection testing."""
 
-    def compute(self, inputs: diagnostics.DiagnosticInput) -> dict[str, Any]:
+    def compute(self, inputs: diagnostics.Input) -> dict[str, Any]:
         """Returns an empty result."""
         del inputs
         return {}

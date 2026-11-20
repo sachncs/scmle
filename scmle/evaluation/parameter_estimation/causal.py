@@ -26,7 +26,7 @@ from scmle.evaluation.parameter_estimation.weighting import dispersion
 from scmle.evaluation.parameter_estimation.weighting import hajek
 
 
-def fit_propensity_estimator(
+def balance(
     matrix: numpy.ndarray,
     values: numpy.ndarray,
     policy: Config,
@@ -48,7 +48,7 @@ def fit_propensity_estimator(
             parameter_estimation.fit_ipw_ate(  # type: ignore[attr-defined]
                 matrix,
                 values,
-                policy.treatment_position,
+                policy.treatment,
                 policy,
                 cluster_values,
             )
@@ -56,7 +56,7 @@ def fit_propensity_estimator(
         reference = reference_ipw_ate(
             propensity_design,
             values,
-            matrix[:, policy.treatment_position],
+            matrix[:, policy.treatment],
             coefficients,
             policy,
             cluster_values,
@@ -70,7 +70,7 @@ def fit_propensity_estimator(
         ) = parameter_estimation.dr(  # type: ignore[attr-defined]
             matrix,
             values,
-            policy.treatment_position,
+            policy.treatment,
             policy,
             cluster_values,
         )
@@ -82,7 +82,7 @@ def fit_propensity_estimator(
             cluster_values,
         )
     likelihood = "gaussian"
-    pivot = stats.norm.ppf(0.5 + policy.confidence_level / 2.0)
+    pivot = stats.norm.ppf(0.5 + policy.confidence / 2.0)
     p_values = 2.0 * stats.norm.sf(
         numpy.abs(coefficients)
         / numpy.maximum(numpy.sqrt(numpy.diag(covariance)), 1e-15)
@@ -237,9 +237,7 @@ def fit_ipw_ate(
             "iterations": propensity_diagnostics["iterations"],
             "log_likelihood": propensity_diagnostics["log_likelihood"],
         },
-        "positivity": positivity(
-            raw_propensity, propensity, policy.propensity_clip
-        ),
+        "positivity": positivity(raw_propensity, propensity, policy.clip),
         "effective_sample_size": evidence["effective_sample_size"],
         "treatment_means": evidence["treatment_means"],
         "influence_function": {
@@ -358,7 +356,7 @@ def augment(
         "uncertainty_method": (
             (
                 "influence_function_with_cross_fitted_nuisance"
-                if policy.cross_fitting_folds > 1
+                if policy.folds > 1
                 else "influence_function_with_fitted_nuisance"
             )
             if policy.covariance == "iid"
@@ -371,9 +369,7 @@ def augment(
         "treated_rows": treated_count,
         "control_rows": control_count,
         **fitted.records(),
-        "positivity": positivity(
-            fitted.raw, fitted.propensity, policy.propensity_clip
-        ),
+        "positivity": positivity(fitted.raw, fitted.propensity, policy.clip),
         "influence_function": {
             "method": "centered_augmented_ipw_score",
             "variance": variance,

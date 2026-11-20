@@ -34,9 +34,9 @@ class Estimand:
 
     Attributes:
         name: Non-empty label of the estimand.
-        subject_identity: Column identifying each subject.
-        time_column: Column giving the period of each row.
-        treatment_column: Binary (0/1) treatment column.
+        subject: Column identifying each subject.
+        time: Column giving the period of each row.
+        treatment: Binary (0/1) treatment column.
         outcome: Outcome column.
         covariates: Adjustment columns; each must be constant within a
             subject.
@@ -61,9 +61,9 @@ class Estimand:
     __module__ = "scmle.evaluation.longitudinal"
 
     name: str
-    subject_identity: str
-    time_column: str
-    treatment_column: str
+    subject: str
+    time: str
+    treatment: str
     outcome: str
     covariates: tuple[str, ...]
     population: str
@@ -81,9 +81,9 @@ class Estimand:
         if not isinstance(name, str) or not name.strip():
             raise errors.InputError("estimand name must not be empty")
         names: tuple[object, ...] = (
-            self.subject_identity,
-            self.time_column,
-            self.treatment_column,
+            self.subject,
+            self.time,
+            self.treatment,
             self.outcome,
             *self.covariates,
         )
@@ -121,23 +121,23 @@ class Config:
     """Bounded numerical and missingness policy for longitudinal IPW.
 
     Attributes:
-        confidence_level: Two-sided confidence level of the intervals, in
+        confidence: Two-sided confidence level of the intervals, in
             (0, 1).
-        propensity_clip: Bound in (0, 0.5) to which fitted propensities are
+        clip: Bound in (0, 0.5) to which fitted propensities are
             clipped before weighting.
         missingness: Either "reject" (any missing value is an error) or
             "complete_case" (rows with a missing value are dropped).
         seed: Non-negative integer recorded with the policy.
         tolerance: Convergence threshold on the largest absolute Newton step
             of the propensity fit.
-        max_iterations: Maximum Newton iterations per propensity fit.
+        iterations: Maximum Newton iterations per propensity fit.
         minimum_rows_per_period: Minimum number of rows in each period and in
             the analysed frame; at least twice `minimum_rows_per_arm`.
         minimum_rows_per_arm: Minimum number of rows in each treatment arm
             of each period.
         minimum_effective_sample_size: Minimum Kish effective sample size of
             the weights of each arm in each period.
-        reference_tolerance: Largest absolute difference allowed between the
+        reference: Largest absolute difference allowed between the
             primary period estimates and their independent recomputation.
         migrations: The written layout's version steps, oldest first;
             version 2 writes `confidence`, `clip`, `iterations`,
@@ -164,16 +164,16 @@ class Config:
 
     __module__ = "scmle.evaluation.longitudinal"
 
-    confidence_level: float = 0.95
-    propensity_clip: float = 0.01
+    confidence: float = 0.95
+    clip: float = 0.01
     missingness: str = "reject"
     seed: int = 0
     tolerance: float = 1e-8
-    max_iterations: int = 100
+    iterations: int = 100
     minimum_rows_per_period: int = 8
     minimum_rows_per_arm: int = 2
     minimum_effective_sample_size: float = 2.0
-    reference_tolerance: float = 1e-6
+    reference: float = 1e-6
 
     def __post_init__(self) -> None:
         """Rejects an unbounded or ambiguous estimation policy.
@@ -184,11 +184,11 @@ class Config:
                 `minimum_rows_per_period` is below twice
                 `minimum_rows_per_arm`.
         """
-        if not 0.0 < self.confidence_level < 1.0:
+        if not 0.0 < self.confidence < 1.0:
             raise errors.InputError(
                 "confidence_level must lie strictly between 0 and 1"
             )
-        if not 0.0 < self.propensity_clip < PROPENSITY_CLIP_CEILING:
+        if not 0.0 < self.clip < PROPENSITY_CLIP_CEILING:
             raise errors.InputError(
                 "propensity_clip must lie strictly between 0 and 0.5"
             )
@@ -199,9 +199,9 @@ class Config:
         seed: object = self.seed  # may be a non-integer at runtime
         if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
             raise errors.InputError("seed must be a non-negative integer")
-        self.check_limits()
+        self.check()
 
-    def check_limits(self) -> None:
+    def check(self) -> None:
         """Checks the tolerances, iteration limit and row minimums.
 
         Raises:
@@ -212,12 +212,12 @@ class Config:
         """
         for name, value in (
             ("tolerance", self.tolerance),
-            ("reference_tolerance", self.reference_tolerance),
+            ("reference_tolerance", self.reference),
         ):
             if not math.isfinite(float(value)) or value <= 0.0:
                 raise errors.InputError(f"{name} must be positive and finite")
         counts: tuple[tuple[str, object], ...] = (
-            ("max_iterations", self.max_iterations),
+            ("max_iterations", self.iterations),
             ("minimum_rows_per_period", self.minimum_rows_per_period),
             ("minimum_rows_per_arm", self.minimum_rows_per_arm),
         )
@@ -252,7 +252,7 @@ class Config:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class PeriodATE:
+class Period:
     """A period-specific Hájek IPW treatment-effect estimate.
 
     Attributes:
@@ -261,11 +261,11 @@ class PeriodATE:
         standard_error: Influence-function standard error of the estimate.
         interval: Lower and upper confidence limits of the estimate.
         rows: Number of rows in the period.
-        treated_rows: Number of treated rows in the period.
-        control_rows: Number of control rows in the period.
+        treated: Number of treated rows in the period.
+        control: Number of control rows in the period.
         propensity_min: Smallest fitted propensity before clipping.
         propensity_max: Largest fitted propensity before clipping.
-        fraction_clipped: Share of rows whose propensity was changed by
+        clipped: Share of rows whose propensity was changed by
             clipping, in [0, 1].
         effective_sample_size_treated: Kish effective sample size of the
             treated-arm weights.
@@ -306,11 +306,11 @@ class PeriodATE:
     standard_error: float
     interval: tuple[float, float]
     rows: int
-    treated_rows: int
-    control_rows: int
+    treated: int
+    control: int
     propensity_min: float
     propensity_max: float
-    fraction_clipped: float
+    clipped: float
     effective_sample_size_treated: float
     effective_sample_size_control: float
     converged: bool
@@ -329,25 +329,25 @@ class PeriodATE:
         """
         if not self.period:
             raise errors.InputError("period label must not be empty")
-        if self.rows < 1 or self.treated_rows < 1 or self.control_rows < 1:
+        if self.rows < 1 or self.treated < 1 or self.control < 1:
             raise errors.InputError("period row counts must be positive")
-        if self.treated_rows + self.control_rows != self.rows:
+        if self.treated + self.control != self.rows:
             raise errors.InputError("period arm counts must reconcile to rows")
         if self.iterations < 1:
             raise errors.InputError("period iterations must be positive")
         if not self.converged:
             raise errors.InputError("a period result must be converged")
-        self.check_finite()
+        self.check()
         if self.standard_error < 0.0:
             raise errors.InputError("standard_error must not be negative")
         if self.interval[0] > self.interval[1]:
             raise errors.InputError("period interval must be ordered")
-        if not 0.0 <= self.fraction_clipped <= 1.0:
+        if not 0.0 <= self.clipped <= 1.0:
             raise errors.InputError("fraction_clipped must lie between 0 and 1")
         if self.propensity_min < 0.0 or self.propensity_max > 1.0:
             raise errors.InputError("propensities must lie between 0 and 1")
 
-    def check_finite(self) -> None:
+    def check(self) -> None:
         """Checks that every numeric field of the period is finite.
 
         Raises:
@@ -360,7 +360,7 @@ class PeriodATE:
             ("interval_upper", self.interval[1]),
             ("propensity_min", self.propensity_min),
             ("propensity_max", self.propensity_max),
-            ("fraction_clipped", self.fraction_clipped),
+            ("fraction_clipped", self.clipped),
             (
                 "effective_sample_size_treated",
                 self.effective_sample_size_treated,

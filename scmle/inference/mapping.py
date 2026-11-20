@@ -15,14 +15,14 @@ class Mapper:
 
     Attributes:
         renames: Incoming name -> expected name.
-        case_insensitive: Match remaining columns ignoring letter case.
-        strip_whitespace: Match remaining columns ignoring surrounding
+        insensitive: Match remaining columns ignoring letter case.
+        whitespace: Match remaining columns ignoring surrounding
             whitespace.
     """
 
     renames: dict[str, str] = dataclasses.field(default_factory=dict)
-    case_insensitive: bool = False
-    strip_whitespace: bool = False
+    insensitive: bool = False
+    whitespace: bool = False
 
     def normalize(self, name: str) -> str:
         """Applies the matching normalizations to a column name.
@@ -32,12 +32,12 @@ class Mapper:
 
         Returns:
             The name stripped of surrounding whitespace when
-            `strip_whitespace` is set and lower-cased when `case_insensitive`
+            `whitespace` is set and lower-cased when `insensitive`
             is set.
         """
-        if self.strip_whitespace:
+        if self.whitespace:
             name = name.strip()
-        return name.lower() if self.case_insensitive else name
+        return name.lower() if self.insensitive else name
 
     def apply(
         self, frame: pandas.DataFrame, expected: list[str]
@@ -74,9 +74,7 @@ class Mapper:
             if column in expected:
                 continue
             target = self.renames.get(column)
-            if target is None and (
-                self.case_insensitive or self.strip_whitespace
-            ):
+            if target is None and (self.insensitive or self.whitespace):
                 target = by_key.get(self.normalize(column))
             if target is not None:
                 mapping[column] = target

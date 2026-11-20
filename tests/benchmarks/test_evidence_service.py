@@ -39,7 +39,7 @@ def folder(golden, tmp_path_factory):
 @pytest.fixture
 def adapter(folder):
     bundle = scmle.artifacts.bundle.Bundle.load(folder, trusted=True)
-    serving = server.HttpServing(bundle)
+    serving = server.Service(bundle)
     serving.start()
     yield serving
     serving.stop()
@@ -153,7 +153,7 @@ def test_a_load_stops_once_its_gate_closes(adapter, golden):
 
 def test_a_slow_body_is_answered_408(folder):
     bundle = scmle.artifacts.bundle.Bundle.load(folder, trusted=True)
-    serving = server.HttpServing(bundle, request_timeout_seconds=0.3)
+    serving = server.Service(bundle, timeout=0.3)
     serving.start()
     try:
         slow = traffic.crawl(serving.httpd.server_address, 2)

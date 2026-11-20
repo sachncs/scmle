@@ -198,13 +198,13 @@ def test_the_estimation_report_answers_the_acceptance_questions():
         outcome="outcome",
         population="adults treated in 2025",
         likelihood="gaussian",
-        feature_names=("dose", "age"),
+        features=("dose", "age"),
         assumptions=("dose precedes the outcome",),
     )
     policy = parameter_estimation.Config(
-        estimator="linear", bootstrap_replicates=50, seed=3
+        estimator="linear", replicates=50, seed=3
     )
-    report = parameter_estimation.estimate_parameters(
+    report = parameter_estimation.infer(
         features, outcome, estimand, policy
     ).to_dict()
     # The estimand and its population; the assumptions; the estimator, its
@@ -214,7 +214,7 @@ def test_the_estimation_report_answers_the_acceptance_questions():
     assert report["estimand"]["population"] == "adults treated in 2025"
     assert report["estimand"]["assumptions"] == ("dose precedes the outcome",)
     assert report["policy"]["estimator"] == "linear"
-    assert report["policy"]["iterations"] == policy.max_iterations
+    assert report["policy"]["iterations"] == policy.iterations
     assert report["diagnostics"]["converged"] is True
     assert report["policy"]["covariance"] == "hc3"
     assert report["policy"]["replicates"] == 50

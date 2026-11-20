@@ -309,7 +309,7 @@ def test_raw_outputs_ask_the_network_quietly_in_float32(keras):
     engine.network_ = Network([])
     Network.outputs = [[1.5]]
 
-    found = engine.raw_outputs([[1, 2]])
+    found = engine.emit([[1, 2]])
 
     assert isinstance(found, numpy.ndarray)
     assert found.tolist() == [[1.5]]

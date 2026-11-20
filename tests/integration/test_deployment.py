@@ -198,7 +198,7 @@ def test_registry_refuses_tampered_bundles(trained, tmp_path):
 
 
 def test_http_serving_predict_health_schema_and_errors(trained):
-    adapter = server.HttpServing(trained.bundle)
+    adapter = server.Service(trained.bundle)
     adapter.start()
     try:
         base = adapter.address
@@ -237,7 +237,7 @@ def test_http_serving_predict_health_schema_and_errors(trained):
 
 
 def test_http_serving_reports_diagnostics_for_messy_input(trained):
-    adapter = server.HttpServing(trained.bundle)
+    adapter = server.Service(trained.bundle)
     adapter.start()
     try:
         records = [{"a": 0.1, "b": None, "c": "never_seen", "extra": 1}]
@@ -272,7 +272,7 @@ def test_batch_serving_scores_files(trained, tmp_path, monkeypatch):
     monkeypatch.setattr(server.durability, "write_atomically", record_write)
     monkeypatch.setattr(server.durability, "swap", record_swap)
     destination = tmp_path / "out.csv"
-    assert adapter.score_file(source, destination) == 40
+    assert adapter.score(source, destination) == 40
     # The scored rows are staged beside the destination and swapped in whole;
     # the progress journal and the manifest are written atomically.
     placed = [staged for staged, path in swaps if path == destination]

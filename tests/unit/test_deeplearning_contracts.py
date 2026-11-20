@@ -143,9 +143,9 @@ def test_torch_adapters_expose_the_same_fail_closed_modality_contract():
     transformer = networks.FT_TRANSFORMER
     jepa_adapter = networks.Jepa()
 
-    assert transformer.family_contract.accommodates("tabular")
-    assert not transformer.family_contract.accommodates("image")
-    assert jepa_adapter.family_contract is contracts.TABULAR_JEPA_CONTRACT
+    assert transformer.contract.accommodates("tabular")
+    assert not transformer.contract.accommodates("image")
+    assert jepa_adapter.contract is contracts.TABULAR_JEPA_CONTRACT
 
 
 def test_jepa_rejection_reason_includes_both_training_boundaries():

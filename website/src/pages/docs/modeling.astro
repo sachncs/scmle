@@ -50,7 +50,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
         <tr><th scope="row">Text embeddings</th><td>Install <code>scmle[embeddings]</code> for the sentence-transformers integration. The text transformer runs in the isolated worker; if unavailable, the documented fallback is TF-IDF.</td><td><span class="status status-experimental">Experimental</span></td></tr>
         <tr><th scope="row">TabPFN</th><td>The explicit adapter (<code>scmle[tabpfn]</code>, which is not part of <code>scmle[all]</code>) remains extension-only until the external package, model-weight license, token custody, and independent evidence are supplied. The engine refuses <code>sample_weight</code> rather than ignore it.</td><td><span class="status status-extension">Extension-only</span></td></tr>
         <tr><th scope="row">Tabular JEPA</th><td>Install <code>scmle[deeplearning]</code> and explicitly opt in with <code>Candidates(experimental_models=["torch_jepa"])</code>. The project adapter composes the self-supervised <code>Embedder</code> with a supervised head, so the same representation is evaluated, packaged, loaded, and used by <code>RunResult.predict</code>.</td><td><span class="status status-experimental">Experimental</span></td></tr>
-        <tr><th scope="row">Parameter estimation</th><td><code>estimate_parameters</code> supports declared linear, logistic, Bayesian Gaussian, binary and continuous-treatment IPW/AIPW paths, and grouped random-intercept or one-random-slope estimators, with explicit assumptions, uncertainty, sensitivity, and independent reference evidence. Clustered uncertainty names its sampling units and diagnostics. Reports are digest-bound and can be persisted with <code>Estimation.write</code>.</td><td><span class="status status-experimental">Bounded API</span></td></tr>
+        <tr><th scope="row">Parameter estimation</th><td><code>infer</code> supports declared linear, logistic, Bayesian Gaussian, binary and continuous-treatment IPW/AIPW paths, and grouped random-intercept or one-random-slope estimators, with explicit assumptions, uncertainty, sensitivity, and independent reference evidence. Clustered uncertainty names its sampling units and diagnostics. Reports are digest-bound and can be persisted with <code>Estimation.write</code>.</td><td><span class="status status-experimental">Bounded API</span></td></tr>
         <tr><th scope="row">Longitudinal causal estimation</th><td><code>Estimator</code> accepts validated subject/time rows and estimates period-specific binary-treatment Hájek IPW effects with overlap, effective sample size, subject-aligned covariance, and digest-bound reports.</td><td><span class="status status-experimental">Bounded API</span></td></tr>
         <tr><th scope="row">Sequential causal estimation</th><td><code>Estimator</code> estimates a static always-treated versus always-control contrast over two or more periods using stabilized treatment-history weights and declared pre-treatment time-varying covariates.</td><td><span class="status status-experimental">Bounded API</span></td></tr>
       </tbody>
@@ -196,7 +196,7 @@ print(score)`}</code></pre>
   <pre><code class="language-python">{`import numpy as np
 
 from scmle.evaluation.parameter_estimation import Config, Estimand, Estimation
-from scmle.evaluation.parameter_estimation import estimate_parameters
+from scmle.evaluation.parameter_estimation import infer
 
 features = np.array([
     [0.0, 1.0], [1.0, 1.0], [0.0, 2.0], [1.0, 2.0],
@@ -218,7 +218,7 @@ policy = Config(
     confidence_level=0.95,
     seed=7,
 )
-report = estimate_parameters(features, outcome, estimand, policy)
+report = infer(features, outcome, estimand, policy)
 report.write("artifacts/parameter-estimation.json")
 verified = Estimation.read("artifacts/parameter-estimation.json")
 print(verified.parameters)
@@ -385,7 +385,7 @@ report.write("artifacts/sequential-ate.json")
 
 from scmle.evaluation.parameter_estimation import Estimand
 from scmle.evaluation.parameter_estimation import Config
-from scmle.evaluation.parameter_estimation import estimate_parameters
+from scmle.evaluation.parameter_estimation import infer
 
 # 400 observations from 20 sites; the dose depends on age and risk.
 rng = np.random.default_rng(11)
@@ -418,7 +418,7 @@ policy = Config(
         "normal_conditional_treatment_density",
     ),
 )
-report = estimate_parameters(
+report = infer(
     features,
     outcome,
     estimand,

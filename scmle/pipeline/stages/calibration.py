@@ -121,7 +121,7 @@ class Calibration(documentation.Documentation):
                 numpy.asarray(held_labels, dtype=float),
                 numpy.asarray(held_scores, dtype=float),
             )
-            return conformal.ConformalCalibrator.for_regression(
+            return conformal.ConformalCalibrator.calibrate(
                 held_labels, held_scores
             )
         return conformal.ConformalCalibrator.classify(
@@ -259,7 +259,7 @@ class Calibration(documentation.Documentation):
                 data={"reason": plan.reason},
             )
             return
-        bundle.cv_plus = cv_plus.CvPlusEnsemble(
+        bundle.cv_plus = cv_plus.Ensemble(
             tuple(models), plan.folds, numpy.abs(observed - predicted)
         )
 

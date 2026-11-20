@@ -40,7 +40,7 @@ def ols(
         The fitted quantities.
     """
     coefficients, diagnostics = regress(
-        design, values, policy.max_iterations, policy.tolerance
+        design, values, policy.iterations, policy.tolerance
     )
     fitted = design @ coefficients
     residuals = values - fitted
@@ -54,11 +54,11 @@ def ols(
     reference = {
         "method": "numpy.linalg.lstsq",
         "max_absolute_difference": reference_difference,
-        "passed": reference_difference <= policy.reference_tolerance,
+        "passed": reference_difference <= policy.reference,
     }
     likelihood = "gaussian"
     degrees_of_freedom = max(len(values) - design.shape[1], 1)
-    pivot = stats.t.ppf(0.5 + policy.confidence_level / 2.0, degrees_of_freedom)
+    pivot = stats.t.ppf(0.5 + policy.confidence / 2.0, degrees_of_freedom)
     p_values = 2.0 * stats.t.sf(
         numpy.abs(
             coefficients
@@ -105,7 +105,7 @@ def fit_logistic_estimator(
         The fitted quantities.
     """
     coefficients, probabilities, diagnostics = logit(
-        design, values, policy.max_iterations, policy.tolerance
+        design, values, policy.iterations, policy.tolerance
     )
     residuals = values - probabilities
     covariance = parameter_estimation.covariance_matrix(  # type: ignore[attr-defined]
@@ -113,7 +113,7 @@ def fit_logistic_estimator(
     )
     reference = corroborate(design, values, coefficients, policy)
     likelihood = "bernoulli"
-    pivot = stats.norm.ppf(0.5 + policy.confidence_level / 2.0)
+    pivot = stats.norm.ppf(0.5 + policy.confidence / 2.0)
     p_values = 2.0 * stats.norm.sf(
         numpy.abs(
             coefficients
@@ -274,16 +274,14 @@ def corroborate(
         coefficients,
         jac=lambda candidate: objective(candidate)[1],
         method="BFGS",
-        options={"gtol": policy.reference_tolerance, "maxiter": 1000},
+        options={"gtol": policy.reference, "maxiter": 1000},
     )
     difference = float(numpy.max(numpy.abs(result.x - coefficients)))
     return {
         "method": "scipy.optimize.minimize:BFGS",
         "converged": bool(result.success),
         "max_absolute_difference": difference,
-        "passed": bool(
-            result.success and difference <= policy.reference_tolerance * 10
-        ),
+        "passed": bool(result.success and difference <= policy.reference * 10),
         "message": str(result.message),
     }
 

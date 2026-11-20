@@ -61,7 +61,7 @@ class Monitor:
         return Drift(
             reference_hash=self.reference.dataset_hash,
             observed_hash=current.dataset_hash,
-            mean_pixel_distance=distance,
-            duplicate_rate=float(duplicate_rate),
+            pixels=distance,
+            duplicates=float(duplicate_rate),
             threshold=self.threshold,
         )

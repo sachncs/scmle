@@ -24,9 +24,9 @@ class Dependence(diagnostics.Diagnostic):
     """
 
     name = "partial_dependence"
-    applies_to = diagnostics.BINARY_ONLY | diagnostics.REGRESSION_ONLY
+    tasks = diagnostics.BINARY_ONLY | diagnostics.REGRESSION_ONLY
 
-    def compute(self, inputs: diagnostics.DiagnosticInput) -> dict[str, Any]:
+    def compute(self, inputs: diagnostics.Input) -> dict[str, Any]:
         """Sweeps each selected feature over its central range.
 
         Args:
@@ -36,8 +36,8 @@ class Dependence(diagnostics.Diagnostic):
             For each selected feature, the grid and the mean prediction (the
             positive-class probability for binary targets).
         """
-        columns = list(inputs.feature_plan.sourced)
-        numeric = [c for c in inputs.feature_plan.numeric if c in columns]
+        columns = list(inputs.plan.sourced)
+        numeric = [c for c in inputs.plan.numeric if c in columns]
         sample = inputs.features[columns].head(MAX_ROWS)
         outcome = self.numerify(inputs).head(MAX_ROWS)
         ranked = sorted(
@@ -82,7 +82,7 @@ class Dependence(diagnostics.Diagnostic):
         return abs(values.corr(outcome, method="spearman") or 0.0)
 
     @staticmethod
-    def numerify(inputs: diagnostics.DiagnosticInput) -> pandas.Series:
+    def numerify(inputs: diagnostics.Input) -> pandas.Series:
         """Returns the target as numbers (1 for the positive class if binary).
 
         Args:
@@ -100,7 +100,7 @@ class Dependence(diagnostics.Diagnostic):
             ).reset_index(drop=True)
             return numeric
         indicator: pandas.Series = (
-            (inputs.target == inputs.positive_label)
+            (inputs.target == inputs.positive)
             .astype(float)
             .reset_index(drop=True)
         )
@@ -108,7 +108,7 @@ class Dependence(diagnostics.Diagnostic):
 
     @staticmethod
     def prediction(
-        inputs: diagnostics.DiagnosticInput,
+        inputs: diagnostics.Input,
         sample: pandas.DataFrame,
         column: str,
         value: float,

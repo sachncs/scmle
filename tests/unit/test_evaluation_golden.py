@@ -23,9 +23,7 @@ def case_conformal():
     rng = numpy.random.default_rng(0)
     predicted = rng.normal(size=300)
     observed = predicted + rng.normal(size=300)
-    regression = conformal.ConformalCalibrator.for_regression(
-        observed, predicted
-    )
+    regression = conformal.ConformalCalibrator.calibrate(observed, predicted)
     classes = ["a", "b", "c"]
     labels = rng.choice(classes, 300)
     logits = rng.normal(size=(300, 3))
@@ -61,7 +59,7 @@ def case_conformal():
         ),
         "margin": [regression.margin(c) for c in (0.5, 0.9)],
         "interval": regression.interval(new, 0.8),
-        "weighted_interval": regression.weighted_interval(
+        "weighted_interval": regression.reweight(
             new, numpy.ones(300), numpy.array([1, 2, 1, 2, 1.0]), 0.8
         ),
         "class_margins": classification.class_margins(0.8),
@@ -82,7 +80,7 @@ def case_coverage():
         "holm": coverage.stepdown([0.001, 0.02, 0.04, 0.5], 0.05),
         "under": [coverage.deficit(c, 100, 0.9) for c in (70, 85, 95)],
         "summary": coverage.summarise(covered, widths, 0.9),
-        "slices": coverage.slice_coverage(covered, labels, 0.9),
+        "slices": coverage.stratify(covered, labels, 0.9),
         "classes": coverage.classwise(covered, labels, 0.9),
         "tier": [
             coverage.grade(
@@ -91,7 +89,7 @@ def case_coverage():
             for flag in (False, True)
             for clean in (False, True)
         ],
-        "report": coverage.coverage_report(
+        "report": coverage.report(
             covered, widths, 0.9, list(labels), list(labels)
         ),
     }
@@ -136,9 +134,9 @@ def case_ipcw():
     covariate = ipcw.reweight(observed, event, x, floor=0.1)
     return {
         "marginal": marginal.weights[:30],
-        "floored": [marginal.floor, marginal.n_floored],
+        "floored": [marginal.floor, marginal.floored],
         "covariate": covariate.weights[:30],
-        "flags": [covariate.covariate_dependent, marginal.covariate_dependent],
+        "flags": [covariate.dependent, marginal.dependent],
         "cindex": [
             ipcw.uno(observed, event, risk, tau, w)
             for tau in (0.5, 1.5)
@@ -156,13 +154,13 @@ def case_reconcile():
     base = rng.normal(size=(4, 5))
     covariance = reconcile.shrunk_covariance(residuals)
     return {
-        "bottom_up": reconcile.bottom_up(base[:, 2:], summing),
+        "bottom_up": reconcile.aggregate(base[:, 2:], summing),
         "covariance": covariance,
         "mint": reconcile.mint(base, summing, covariance),
         "mint_eye": reconcile.mint(base, summing, numpy.eye(5)),
         "residual": [
-            reconcile.coherence_residual(base, summing),
-            reconcile.coherence_residual(
+            reconcile.measure(base, summing),
+            reconcile.measure(
                 reconcile.mint(base, summing, covariance), summing
             ),
         ],

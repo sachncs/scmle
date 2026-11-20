@@ -13,7 +13,7 @@ ATE = ("consistency", "conditional_exchangeability", "positivity", "linearity")
 
 
 def prior(size=3, precision=0.5, shape=2.0, scale=1.0):
-    return declaration.BayesianPrior(
+    return declaration.Prior(
         (0.0,) * size,
         tuple(
             tuple(precision if i == j else 0.0 for j in range(size))
@@ -35,7 +35,7 @@ def ate_policy():
         estimator="bayesian_ate",
         covariance="iid",
         prior=prior(),
-        treatment_position=0,
+        treatment=0,
         causal_assumptions=ATE,
     )
 
@@ -52,9 +52,7 @@ def world(rows=60, seed=2):
 
 def test_a_posterior_is_the_conjugate_update():
     ignored, design, y = world()
-    mean, covariance, diagnostics = bayesian.fit_bayesian_linear(
-        design, y, prior()
-    )
+    mean, covariance, diagnostics = bayesian.update(design, y, prior())
     precision = 0.5 * numpy.eye(3) + design.T @ design
     expected = numpy.linalg.solve(precision, design.T @ y)
     numpy.testing.assert_allclose(mean, expected)
@@ -78,26 +76,24 @@ def test_a_posterior_is_the_conjugate_update():
 def test_a_posterior_rejects_a_mismatched_prior_and_few_degrees():
     ignored, design, y = world()
     with pytest.raises(errors.InputError, match="prior dimension must match"):
-        bayesian.fit_bayesian_linear(design, y, prior(size=2))
+        bayesian.update(design, y, prior(size=2))
     with pytest.raises(
         errors.InputError, match="more than two degrees of freedom"
     ):
-        bayesian.fit_bayesian_linear(design[:1], y[:1], prior(shape=0.25))
+        bayesian.update(design[:1], y[:1], prior(shape=0.25))
     bayesian.conform(prior(size=3), 3)
 
 
 def test_credible_intervals_use_the_student_scale():
     ignored, design, y = world()
-    mean, covariance, diagnostics = bayesian.fit_bayesian_linear(
-        design, y, prior()
-    )
+    mean, covariance, diagnostics = bayesian.update(design, y, prior())
     fit = bayesian.credible(
         ("a", "b", "c"),
         mean,
         covariance,
         diagnostics,
         {},
-        linear_policy(confidence_level=0.9),
+        linear_policy(confidence=0.9),
     )
     degrees = diagnostics["posterior_degrees_of_freedom"]
     scale = numpy.asarray(diagnostics["posterior_scale"])
@@ -178,7 +174,7 @@ def test_a_bayesian_ate_fit_names_the_treatment():
 
 def test_the_references_fail_for_off_coefficients():
     ignored, design, y = world()
-    mean, ignored, ignored = bayesian.fit_bayesian_linear(design, y, prior())
+    mean, ignored, ignored = bayesian.update(design, y, prior())
     off = bayesian.reference_bayesian_linear(
         design, y, prior(), mean + 1e-3, linear_policy()
     )

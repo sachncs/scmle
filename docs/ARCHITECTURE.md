@@ -215,7 +215,7 @@ plain string as the kind, and `models.registry.adopt`, `extensions` and
 `deregister`, are deprecated.
 
 An adapter from the `scmle.models` entry point, or an estimator added with
-`register_estimator`, must pass `scmle.models.conformance.comply` or it is
+`custom.register`, must pass `scmle.models.conformance.comply` or it is
 not registered. `Catalog.register` does not run the check; call `comply`
 yourself on an adapter you register that way.
 
@@ -231,7 +231,7 @@ The public API can be called from several threads of one process, including
 on the free-threaded build (`tests/unit/test_thread_safety.py`).
 
 * **Registries.** `plugins.REGISTRY` holds one lock for every kind.
-  `register_estimator` / `unregister_estimator`
+  `custom.register` / `custom.unregister`
   (`models.registry.USER_ADAPTERS`) and `register_metric`
   (`Repertoire`) check and change under a lock, so a duplicate name has
   exactly one winner. Readers take a snapshot: `Catalog.stock`

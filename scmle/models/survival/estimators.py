@@ -66,7 +66,7 @@ def stair(
     return padded[position]
 
 
-class SurvivalEstimator(base.RegressorMixin, base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-learn ships no type information
+class Survival(base.RegressorMixin, base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-learn ships no type information
     """Base class: `predict` is a risk score, `predict_survival` a curve."""
 
     @abc.abstractmethod
@@ -107,7 +107,7 @@ class SurvivalEstimator(base.RegressorMixin, base.BaseEstimator, abc.ABC):  # ty
         """
 
 
-class Marginal(SurvivalEstimator):
+class Marginal(Survival):
     """Ignores the features and predicts the population curve.
 
     Attributes:
@@ -158,7 +158,7 @@ class Marginal(SurvivalEstimator):
         return numpy.tile(curve, (features.shape[0], 1))
 
 
-class Hazards(SurvivalEstimator):
+class Hazards(Survival):
     """Cox proportional hazards with a ridge penalty.
 
     The log hazard is linear in the features. Coefficients maximise the
@@ -285,7 +285,7 @@ class Hazards(SurvivalEstimator):
         return numpy.exp(-numpy.outer(relative, cumulative))
 
 
-class DiscreteTimeBoosting(SurvivalEstimator):
+class Boosting(Survival):
     """Boosted trees on a discrete-time hazard.
 
     Time is cut into intervals at quantiles of the observed durations. Each

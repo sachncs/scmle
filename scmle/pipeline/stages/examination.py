@@ -210,9 +210,7 @@ class Examination(interface.Stage):
                 scores.append(numpy.asarray(pipeline.predict_proba(features)))
         truth = pandas.Series(numpy.concatenate(labels))
         replay_class = (
-            replay.ClassifierPredictions
-            if task.is_classification
-            else replay.Replayed
+            replay.Predictions if task.is_classification else replay.Replayed
         )
         # Metrics only call predict and predict_proba on the stand-in.
         stand_in = cast(
@@ -265,9 +263,7 @@ class Examination(interface.Stage):
         return {
             "assumption": uplift.ASSUMPTION,
             "propensity": partition.propensity,
-            "average_effect": uplift.average_effect(
-                outcome.to_numpy(float), arm
-            ),
+            "average_effect": uplift.average(outcome.to_numpy(float), arm),
             "mean_predicted_effect": float(predicted.mean()),
             "qini_curve": {
                 "rows": rows[keep].tolist(),

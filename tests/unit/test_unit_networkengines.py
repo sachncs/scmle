@@ -288,15 +288,15 @@ def test_a_plan_is_frozen():
     plan = network.Plan(8, False, 2, 3, 30, 3)
 
     assert dataclasses.asdict(plan) == {
-        "batch_rows": 8,
-        "second_order": False,
+        "rows": 8,
+        "order": False,
         "accumulate": 2,
-        "updates_per_epoch": 3,
-        "total_steps": 30,
-        "warmup_steps": 3,
+        "updates": 3,
+        "steps": 30,
+        "warmup": 3,
     }
     with pytest.raises(dataclasses.FrozenInstanceError):
-        plan.batch_rows = 9
+        plan.rows = 9
 
 
 def test_the_engines_keep_every_hyperparameter():
@@ -416,12 +416,10 @@ def test_the_weighted_loss_averages_rows_by_their_weights(torch):
         "w": tensor([1.0, 3.0, 100.0]),
     }
 
-    found = engine.weighted_loss(torch, net, tensors, numpy.array([0, 1]))
+    found = engine.weigh(torch, net, tensors, numpy.array([0, 1]))
 
     assert float(found) == pytest.approx((1.0 * 1.0 + 3.0 * 4.0) / 4.0)
-    everything = engine.weighted_loss(
-        torch, net, tensors, numpy.array([0, 1, 2])
-    )
+    everything = engine.weigh(torch, net, tensors, numpy.array([0, 1, 2]))
     assert float(everything) == pytest.approx((1.0 + 12.0 + 400.0) / 104.0)
 
 
@@ -435,7 +433,7 @@ def test_the_weighted_loss_averages_ensemble_members_first(torch):
         "w": tensor([1.0, 1.0]),
     }
 
-    found = engine.weighted_loss(torch, net, tensors, numpy.array([0, 1]))
+    found = engine.weigh(torch, net, tensors, numpy.array([0, 1]))
 
     assert float(found) == pytest.approx((4.0 + 1.0) / 2.0)
 
@@ -477,11 +475,11 @@ def test_an_apportion_sizes_auto_batches_from_the_rows():
     plan = engine.apportion(4096)
 
     assert (
-        plan.batch_rows
+        plan.rows
         == scmle.models.deeplearning.training.batching("auto", 4096)
         == 128
     )
-    assert plan.updates_per_epoch == 32
+    assert plan.updates == 32
 
 
 def test_prepare_multiplies_class_and_sample_weights():
@@ -641,7 +639,7 @@ def test_an_epoch_accumulates_batches_and_steps_on_the_last_partial_one(torch):
     plan = network.Plan(2, False, 2, 2, 20, 0)
     tensors, rows = epoch_inputs(5)
 
-    loss, alive, step = engine.train_epoch(
+    loss, alive, step = engine.train(
         torch, Net(1, 1), optimizer, tensors, monitor, plan, (rows, 3)
     )
 
@@ -662,7 +660,7 @@ def test_an_epoch_without_clipping_uses_an_infinite_limit(torch):
     monitor = scmle.models.deeplearning.training.Monitor()
     tensors, rows = epoch_inputs(2)
 
-    loss, alive, step = engine.train_epoch(
+    loss, alive, step = engine.train(
         torch,
         Net(1, 1),
         Optimizer("Adam", []),
@@ -684,7 +682,7 @@ def test_an_epoch_stops_at_a_non_finite_gradient(torch):
     monitor = scmle.models.deeplearning.training.Monitor()
     tensors, rows = epoch_inputs(3)
 
-    loss, alive, step = engine.train_epoch(
+    loss, alive, step = engine.train(
         torch,
         Net(1, 1),
         optimizer,
@@ -708,7 +706,7 @@ def test_a_second_order_epoch_takes_one_lbfgs_step_per_batch(torch):
     monitor = scmle.models.deeplearning.training.Monitor()
     tensors, rows = epoch_inputs(3)
 
-    loss, alive, step = engine.train_epoch(
+    loss, alive, step = engine.train(
         torch,
         Net(1, 1),
         optimizer,
@@ -730,7 +728,7 @@ def test_a_second_order_epoch_stops_when_the_loss_diverges(torch):
     engine = heads.Regressor(optimizer="lbfgs")
     tensors, rows = epoch_inputs(2)
 
-    loss, alive, step = engine.train_epoch(
+    loss, alive, step = engine.train(
         torch,
         Net(1, 1),
         Optimizer("LBFGS", []),
@@ -796,7 +794,7 @@ def test_a_classifier_averages_member_probabilities(monkeypatch):
     raw = numpy.array(
         [[[0.0, math.log(3.0)], [0.0, 0.0]], [[1000.0, 0.0], [1000.0, 0.0]]]
     )
-    monkeypatch.setattr(engine, "raw_outputs", lambda features: raw)
+    monkeypatch.setattr(engine, "emit", lambda features: raw)
 
     found = engine.predict_proba([[0.0]])
 
@@ -848,7 +846,7 @@ def test_a_regressor_restores_the_original_units(monkeypatch):
     engine = heads.Regressor()
     engine.vectorize([0.0, 4.0])
     raw = numpy.array([[[1.0, 9.0], [3.0, 9.0]], [[-1.0, 9.0], [-1.0, 9.0]]])
-    monkeypatch.setattr(engine, "raw_outputs", lambda features: raw)
+    monkeypatch.setattr(engine, "emit", lambda features: raw)
 
     assert engine.predict([[0.0]]).tolist() == [6.0, 0.0]
 
@@ -878,7 +876,7 @@ def test_a_validation_score_runs_the_network_in_evaluation_mode(torch):
         "w": tensor([1.0, 1.0]),
     }
 
-    found = engine.validation_score(torch, net, tensors, numpy.array([0, 1]))
+    found = engine.evaluate(torch, net, tensors, numpy.array([0, 1]))
 
     assert found == 5.0
     assert type(found) is float
@@ -938,7 +936,7 @@ def test_fit_with_patience_one_keeps_training_while_scores_improve(
 ):
     scores = iter([3.0, 2.0, 1.0, 1.5, 0.5])
     monkeypatch.setattr(
-        heads.Regressor, "validation_score", lambda self, *args: next(scores)
+        heads.Regressor, "evaluate", lambda self, *args: next(scores)
     )
     engine = heads.Regressor(architecture="linear", epochs=5, patience=1)
 
@@ -965,7 +963,7 @@ def test_a_fitted_classifier_predicts_its_own_labels(torch, linear):
     engine.network_.weight = numpy.array([[1.0, 0.0], [0.0, 1.0]])
 
     assert engine.predict(numpy.eye(2)[::-1]).tolist() == ["right", "left"]
-    assert engine.raw_outputs(numpy.eye(2)).shape == (2, 1, 2)
+    assert engine.emit(numpy.eye(2)).shape == (2, 1, 2)
 
 
 def test_raw_outputs_keep_member_outputs(torch):
@@ -973,7 +971,7 @@ def test_raw_outputs_keep_member_outputs(torch):
     engine.network_ = Net(2, 1, members=3)
     engine.network_.weight = numpy.array([[1.0], [2.0]])
 
-    found = engine.raw_outputs(sparse.csr_matrix([[1.0, 1.0]]))
+    found = engine.emit(sparse.csr_matrix([[1.0, 1.0]]))
 
     assert type(found) is numpy.ndarray
     assert found.shape == (1, 3, 1)

@@ -44,7 +44,7 @@ class Core:
         calibrator: Any = None,
         conformal: scmle.evaluation.conformal.ConformalCalibrator | None = None,
         novelty: scmle.inference.novelty.Strangeness | None = None,
-        quantile: scmle.evaluation.quantile.QuantileIntervals | None = None,
+        quantile: scmle.evaluation.quantile.Intervals | None = None,
     ) -> None:
         """Initializes the bundle.
 
@@ -74,10 +74,10 @@ class Core:
         self.quantile = quantile
         # The fold models behind `predict_interval(method="cv_plus")`; set
         # by the run or by `load`, kept out of the constructor signature.
-        self.cv_plus: cv_plus.CvPlusEnsemble | None = None
+        self.cv_plus: cv_plus.Ensemble | None = None
         # Calibration weights for covariate shift, attached on demand by
         # `tilt`.
-        self.shift_weights: shift_weights.StoredShiftWeights | None = None
+        self.shift_weights: shift_weights.Weights | None = None
         # Measured coverage of the stored intervals or sets on the final test
         # rows (`coverage_run.report`), set by the run.
         self.coverage_report: dict[str, Any] | None = None

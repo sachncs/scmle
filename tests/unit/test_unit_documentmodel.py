@@ -160,13 +160,13 @@ def test_an_unfitted_estimator_refuses_to_predict():
     model = estimator.Estimator()
     assert model.config == records.Config()
     assert model.fitted is False
-    assert model.curation_report is None
+    assert model.report is None
     with pytest.raises(
         errors.OrderError, match="document classifier has not been fitted"
     ):
         model.predict(HELD)
     with pytest.raises(errors.OrderError):
-        ignored = model.model_digest
+        ignored = model.digest
 
 
 def test_a_fit_matches_tfidf_and_logistic_regression(fitted):
@@ -183,7 +183,7 @@ def test_a_fit_matches_tfidf_and_logistic_regression(fitted):
     assert fitted.predict(HELD) == ("fruit", "water")
     assert fitted.predict(()) == ()
     assert fitted.predict_proba(()) == ()
-    assert fitted.curation_report is not None
+    assert fitted.report is not None
 
 
 def test_a_model_digest_hashes_the_fitted_state(fitted):
@@ -200,7 +200,7 @@ def test_a_model_digest_hashes_the_fitted_state(fitted):
     encoded = json.dumps(
         state, ensure_ascii=True, sort_keys=True, separators=(",", ":")
     ).encode()
-    assert fitted.model_digest == hashlib.sha256(encoded).hexdigest()
+    assert fitted.digest == hashlib.sha256(encoded).hexdigest()
 
 
 def test_a_fit_rejects_empty_unlabelled_single_class_or_tokenless_input():
@@ -224,7 +224,7 @@ def test_a_fit_rejects_empty_unlabelled_single_class_or_tokenless_input():
 
 def test_an_evaluation_scores_held_out_documents(fitted):
     found = fitted.evaluate(HELD)
-    assert found.sample_count == 2
+    assert found.samples == 2
     assert found.accuracy == 1.0
     assert found.macro_f1 == 1.0
     probabilities = numpy.asarray(fitted.predict_proba(HELD))
@@ -256,7 +256,7 @@ def test_an_overview_ranks_mean_absolute_coefficients(fitted):
     assert found.terms == tuple(expected)
     assert found.input_hash is None
     assert found.method == "linear_global_term_weight"
-    assert found.model_digest == fitted.model_digest
+    assert found.digest == fitted.digest
     assert len(found.limitations) == 2
     with pytest.raises(errors.InputError, match="top_k must be positive"):
         fitted.overview(top_k=0)
@@ -363,13 +363,13 @@ def test_a_package_round_trips_with_trust(tmp_path, fitted):
     target = tmp_path / "model"
     package = fitted.save(target)
     assert package.path == str(target)
-    assert package.digest == archive.file_digest(target / "model.joblib")
+    assert package.digest == archive.digest(target / "model.joblib")
     manifest = json.loads((target / "manifest.json").read_text())
     assert manifest["schema_version"] == 1
     assert manifest["model_path"] == "model.joblib"
-    assert manifest["model_digest"] == fitted.model_digest
+    assert manifest["model_digest"] == fitted.digest
     loaded = classifier.Classifier.load(target, trusted=True)
-    assert loaded.model_digest == fitted.model_digest
+    assert loaded.digest == fitted.digest
     with pytest.raises(FileExistsError, match="model package already exists"):
         fitted.save(target)
 
@@ -400,7 +400,7 @@ def test_a_package_load_rejects_missing_and_bad_manifests(tmp_path, fitted):
 def test_a_file_digest_is_the_sha256_of_the_bytes(tmp_path):
     path = tmp_path / "f"
     path.write_bytes(b"abc")
-    assert archive.file_digest(path) == hashlib.sha256(b"abc").hexdigest()
+    assert archive.digest(path) == hashlib.sha256(b"abc").hexdigest()
 
 
 # monitor
@@ -420,9 +420,9 @@ def test_a_monitor_needs_a_threshold_in_the_unit_interval():
 def test_a_monitor_of_the_same_corpus_reports_no_shift():
     reference = Dataset(TRAINING).curate()
     drift = monitor.Monitor(reference).observe(Dataset(TRAINING))
-    assert drift.language_distance == 0.0
-    assert drift.mean_character_delta == 0.0
-    assert drift.duplicate_rate == 0.0
+    assert drift.language == 0.0
+    assert drift.characters == 0.0
+    assert drift.duplicates == 0.0
     assert drift.reference_hash == reference.dataset_hash
     assert drift.shifted is False
 
@@ -437,7 +437,7 @@ def test_a_monitor_measures_length_and_duplicate_shift():
     drift = watcher.observe(Dataset(long))
     base = watcher.measure(reference)
     assert base == pytest.approx(sum(len(s.content) for s in TRAINING) / 4)
-    assert drift.mean_character_delta == pytest.approx(
+    assert drift.characters == pytest.approx(
         (watcher.measure(Dataset(long).curate()) - base) / base
     )
     assert drift.shifted is True
@@ -447,4 +447,4 @@ def test_a_monitor_measures_length_and_duplicate_shift():
         *TRAINING[1:3],
     )
     duplicated = watcher.observe(Dataset(copies))
-    assert duplicated.duplicate_rate == pytest.approx(2 / 4)
+    assert duplicated.duplicates == pytest.approx(2 / 4)

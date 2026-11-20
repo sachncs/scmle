@@ -24,7 +24,7 @@ def test_a_cox_adapter_builds_a_penalised_model():
 def test_a_hazard_adapter_builds_seeded_discrete_time_boosting():
     adapter = adapters.Hazard()
     built = adapter.build(tasks.Task.SURVIVAL, 4, {"learning_rate": 0.05})
-    assert isinstance(built, estimators.DiscreteTimeBoosting)
+    assert isinstance(built, estimators.Boosting)
     assert built.random_state == 4
     assert built.learning_rate == 0.05
     assert adapter.name == "discrete_time_boosting"

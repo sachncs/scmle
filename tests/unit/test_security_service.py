@@ -75,7 +75,7 @@ def call(base, path, token=None, payload=None):
 def service(reference):
     clock = support_identity.Clock()
     gateway = make_gateway(clock, tenant="acme")
-    adapter = server.HttpServing(reference, gateway=gateway)
+    adapter = server.Service(reference, gateway=gateway)
     adapter.start()
     try:
         yield adapter, gateway, clock
@@ -165,7 +165,7 @@ def test_the_rate_limit_answers_429_with_retry_after(reference):
     gateway = make_gateway(
         clock, limiter=access.RateLimiter(1.0, 2, clock=ticks)
     )
-    adapter = server.HttpServing(reference, gateway=gateway)
+    adapter = server.Service(reference, gateway=gateway)
     adapter.start()
     try:
         token = bearer(clock)
@@ -188,7 +188,7 @@ def test_guessing_credentials_is_slowed(reference):
     gateway = make_gateway(
         clock, failure_limiter=access.RateLimiter(1.0, 3, clock=ticks)
     )
-    adapter = server.HttpServing(reference, gateway=gateway)
+    adapter = server.Service(reference, gateway=gateway)
     adapter.start()
     try:
         codes = [
@@ -204,9 +204,7 @@ def test_the_request_size_limit_still_applies_behind_the_gateway(
 ):
     # Enforces website/src/pages/docs/threat-model.astro:21.
     clock = support_identity.Clock()
-    adapter = server.HttpServing(
-        reference, gateway=make_gateway(clock), max_request_bytes=64
-    )
+    adapter = server.Service(reference, gateway=make_gateway(clock), payload=64)
     adapter.start()
     try:
         big = {"records": record_of(reference) * 20}
@@ -230,7 +228,7 @@ def test_audit_records_activation_access_and_admin_in_a_valid_chain(
         clock=clock,
     )
     gateway = access.Gateway(check, audit=log)
-    adapter = server.HttpServing(reference, gateway=gateway)
+    adapter = server.Service(reference, gateway=gateway)
     adapter.start()
     try:
         call(adapter.address, "/health", bearer(clock))
@@ -252,7 +250,7 @@ def test_audit_records_activation_access_and_admin_in_a_valid_chain(
         "access",
         "admin",
     ]
-    assert rows[0]["artifact_digest"] == adapter.artifact_digest
+    assert rows[0]["artifact_digest"] == adapter.digest
     assert rows[1]["outcome"] == "allowed" and rows[1]["actor"] == "alice"
     assert rows[2]["outcome"] == "denied"
     assert rows[2]["reason"] == "malformed"
@@ -284,7 +282,7 @@ def test_a_failed_activation_is_audited(tmp_path):
     def failing(readiness):
         raise errors.ArtifactError("bundle is tampered with")
 
-    adapter = server.HttpServing(loader=failing, gateway=gateway)
+    adapter = server.Service(loader=failing, gateway=gateway)
     adapter.start()
     try:
         adapter.loading.join(10)
@@ -305,11 +303,11 @@ def test_no_unauthenticated_server_can_listen_beyond_loopback(reference):
     # Enforces website/src/pages/docs/tenant-isolation.astro:55.
     # Enforces website/src/pages/docs/threat-model.astro:19.
     with pytest.raises(errors.ConfigError, match="without authentication"):
-        server.HttpServing(reference, host="0.0.0.0")  # nosec B104
+        server.Service(reference, host="0.0.0.0")  # nosec B104
     for host in ("127.0.0.1", "::1", "localhost"):
-        server.HttpServing(reference, host=host)
+        server.Service(reference, host=host)
     clock = support_identity.Clock()
-    server.HttpServing(
+    server.Service(
         reference,
         host="0.0.0.0",
         gateway=make_gateway(clock),  # nosec B104

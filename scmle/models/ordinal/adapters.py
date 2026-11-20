@@ -51,7 +51,7 @@ class Ordinal(classical.Learner):
         settings = dict(params or {})
         levels = settings.pop(LEVELS, None)
         inner = super().build(tasks.Task.REGRESSION, seed, settings)
-        return estimators.CumulativeThresholdRegressor(
+        return estimators.Threshold(
             cast("base.BaseEstimator", inner), levels, seed
         )
 

@@ -18,7 +18,7 @@ def policy(estimator="ipw_ate", **changes):
     values = {
         "estimator": estimator,
         "covariance": "iid",
-        "treatment_position": 0,
+        "treatment": 0,
         "causal_assumptions": CAUSAL,
     }
     values.update(changes)
@@ -120,7 +120,7 @@ def test_a_clustered_ipw_fit_adds_cluster_diagnostics():
     matrix, y = world()
     clusters = numpy.repeat(numpy.arange(20), 20)
     ignored, ignored, diagnostics, ignored = causal.fit_ipw_ate(
-        matrix, y, 0, policy(covariance="clustered", cluster_name="c"), clusters
+        matrix, y, 0, policy(covariance="clustered", cluster="c"), clusters
     )
     assert (
         diagnostics["uncertainty_method"]
@@ -161,7 +161,7 @@ def test_an_aipw_fit_averages_the_augmented_score():
 def test_a_cross_fitted_aipw_fit_names_its_uncertainty():
     matrix, y = world()
     ignored, ignored, diagnostics, inputs = causal.dr(
-        matrix, y, 0, policy("aipw_ate", cross_fitting_folds=2), None
+        matrix, y, 0, policy("aipw_ate", folds=2), None
     )
     assert (
         diagnostics["uncertainty_method"]
@@ -176,9 +176,7 @@ def test_a_propensity_estimator_reports_the_ate_with_normal_p_values():
         ("ipw_ate", "scipy.optimize.minimize:BFGS_propensity"),
         ("aipw_ate", "scipy.optimize.minimize:BFGS_plus_lstsq"),
     ):
-        fit = causal.fit_propensity_estimator(
-            matrix, y, policy(estimator), None
-        )
+        fit = causal.balance(matrix, y, policy(estimator), None)
         assert fit.names == ("ate",)
         assert fit.likelihood == "gaussian"
         assert fit.diagnostics["likelihood"] == "gaussian"

@@ -48,7 +48,7 @@ customers about to leave. SCMLE has no way to know what you meant; only you do.
 | Many categories | `f1_macro` or `log_loss` | Counts every category equally |
 
 SCMLE lists the others it knows in `scmle.evaluation.metrics.CATALOG`. You can
-also add your own with `scmle.evaluation.metrics.register_metric`, for example the money lost.
+also add your own with `scmle.evaluation.metrics.register`, for example the money lost.
 
 **If you choose wrong.** The search picks the model that is best at the wrong
 thing. Accuracy on a rare event rewards a model that says "no" to every row. The

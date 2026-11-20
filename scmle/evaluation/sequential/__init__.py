@@ -15,7 +15,7 @@ callers and tests are unchanged; its classes keep that module path as
 `__module__`, which the public API snapshot records in their signatures.
 """
 
-from scmle.evaluation.envelope import created_temporary
+from scmle.evaluation.envelope import require
 from scmle.evaluation.sequential.declaration import Config
 from scmle.evaluation.sequential.declaration import COVARIANCE_DIMENSION
 from scmle.evaluation.sequential.declaration import Estimand
@@ -35,9 +35,9 @@ from scmle.evaluation.sequential.panel import prepare
 from scmle.evaluation.sequential.panel import pretreat
 from scmle.evaluation.sequential.panel import situate
 from scmle.evaluation.sequential.panel import tabulate
+from scmle.evaluation.sequential.report import Diagnostics
+from scmle.evaluation.sequential.report import Estimate
 from scmle.evaluation.sequential.report import Estimation
-from scmle.evaluation.sequential.report import PeriodDiagnostics
-from scmle.evaluation.sequential.report import RegimeEstimate
 from scmle.evaluation.sequential.weighting import average
 from scmle.evaluation.sequential.weighting import covary
 from scmle.evaluation.sequential.weighting import effective_sample_size
@@ -56,16 +56,15 @@ __all__ = [
     "REQUIRED_ASSUMPTIONS",
     "SHA256_HEX_LENGTH",
     "Config",
+    "Diagnostics",
     "Estimand",
+    "Estimate",
     "Estimation",
     "Estimator",
-    "PeriodDiagnostics",
-    "RegimeEstimate",
     "average",
     "chronologize",
     "conform",
     "covary",
-    "created_temporary",
     "effective_sample_size",
     "imprint",
     "nonrepeating",
@@ -77,6 +76,7 @@ __all__ = [
     "pretreat",
     "referee",
     "regress",
+    "require",
     "situate",
     "tabulate",
 ]

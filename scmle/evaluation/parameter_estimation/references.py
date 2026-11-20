@@ -42,8 +42,8 @@ def reference_ipw_ate(
     result = bfgs(propensity_design, treatment, policy)
     reference_propensity = numpy.clip(
         special.expit(propensity_design @ result.x),
-        policy.propensity_clip,
-        1.0 - policy.propensity_clip,
+        policy.clip,
+        1.0 - policy.clip,
     )
     (
         reference_ate,
@@ -67,9 +67,7 @@ def reference_ipw_ate(
         "variance_status": (
             "declared_influence_calculation_not_independently_verified"
         ),
-        "passed": bool(
-            result.success and difference <= policy.reference_tolerance * 10
-        ),
+        "passed": bool(result.success and difference <= policy.reference * 10),
         "message": str(result.message),
     }
 
@@ -100,7 +98,7 @@ def reference_aipw_ate(
         the optimizer message.  With cross-fitting it is the result of
         `reference_cross_fitted_aipw_ate`.
     """
-    if policy.cross_fitting_folds > 1:
+    if policy.folds > 1:
         return reference_cross_fitted_aipw_ate(
             inputs, values, coefficients, policy, clusters
         )
@@ -109,8 +107,8 @@ def reference_aipw_ate(
     propensity_fit = bfgs(nuisance_design, treatment, policy)
     propensity = numpy.clip(
         special.expit(nuisance_design @ propensity_fit.x),
-        policy.propensity_clip,
-        1.0 - policy.propensity_clip,
+        policy.clip,
+        1.0 - policy.clip,
     )
     treated = treatment == 1.0
     control = ~treated
@@ -139,8 +137,7 @@ def reference_aipw_ate(
             "declared_influence_calculation_not_independently_verified"
         ),
         "passed": bool(
-            propensity_fit.success
-            and difference <= policy.reference_tolerance * 10
+            propensity_fit.success and difference <= policy.reference * 10
         ),
         "message": str(propensity_fit.message),
     }
@@ -177,7 +174,7 @@ def reference_cross_fitted_aipw_ate(
         raise ValueError("cross-fitting reference fold assignments are invalid")
     reference_scores = numpy.empty(len(values), dtype=float)
     fold_records = []
-    for fold in range(policy.cross_fitting_folds):
+    for fold in range(policy.folds):
         validation = fold_assignments == fold
         reference_scores[validation], fold_record = refold(
             inputs, values, policy, fold_assignments != fold, fold
@@ -198,9 +195,7 @@ def reference_cross_fitted_aipw_ate(
             "declared_influence_calculation_not_independently_verified"
         ),
         "folds": fold_records,
-        "passed": bool(
-            converged and difference <= policy.reference_tolerance * 10
-        ),
+        "passed": bool(converged and difference <= policy.reference * 10),
     }
 
 
@@ -237,8 +232,8 @@ def refold(
     propensity_fit = bfgs(training_design, training_treatment, policy)
     propensity = numpy.clip(
         special.expit(validation_design @ propensity_fit.x),
-        policy.propensity_clip,
-        1.0 - policy.propensity_clip,
+        policy.clip,
+        1.0 - policy.clip,
     )
     outcome_control, outcome_treated = outcomes(
         training_design,
@@ -298,7 +293,7 @@ def bfgs(
         numpy.zeros(design.shape[1]),
         jac=lambda candidate: objective(candidate)[1],
         method="BFGS",
-        options={"gtol": policy.reference_tolerance, "maxiter": 1000},
+        options={"gtol": policy.reference, "maxiter": 1000},
     )
 
 

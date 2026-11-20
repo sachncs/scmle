@@ -68,7 +68,7 @@ def test_the_wrapper_hands_the_ranker_contiguous_query_sizes():
     labels = grade[frame.sample(frac=1.0, random_state=1).index]
     seen = {}
 
-    class Spy(estimators.PointwiseRanker):
+    class Spy(estimators.Scorer):
         def fit(self, features, target, group=None):
             seen["group"] = list(group)
             return super().fit(features, target, group)
@@ -104,7 +104,7 @@ def test_library_rankers_learn_the_ordering(library):
     features = frame[["signal", "noise"]].to_numpy()
     sizes = [12] * 60
 
-    model = estimators.LibraryRanker(library).fit(features, grade, group=sizes)
+    model = estimators.Library(library).fit(features, grade, group=sizes)
 
     value = ranking.mean_ndcg(
         grade, model.predict(features), frame["query"], cutoff=3

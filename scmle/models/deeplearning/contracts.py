@@ -27,9 +27,9 @@ class Checkpoint:
     Attributes:
         format: Identifier of the checkpoint format.
         schema_version: Positive version of the checkpoint schema.
-        trusted_local_storage: Whether checkpoints may only be loaded from
+        trusted: Whether checkpoints may only be loaded from
             trusted local storage.
-        atomic_replace: Whether saving replaces the file atomically.
+        replace: Whether saving replaces the file atomically.
         migrations: The written layout's version steps, oldest first;
             version 2 writes `trusted` and `atomic`. `schema_version` is the
             checkpoint file's version, not this declaration's.
@@ -46,8 +46,8 @@ class Checkpoint:
 
     format: str
     schema_version: int
-    trusted_local_storage: bool
-    atomic_replace: bool
+    trusted: bool
+    replace: bool
 
     def __post_init__(self) -> None:
         """Validates the checkpoint declaration.
@@ -69,8 +69,8 @@ class Checkpoint:
             {
                 "format": self.format,
                 "schema_version": self.schema_version,
-                "trusted_local_storage": self.trusted_local_storage,
-                "atomic_replace": self.atomic_replace,
+                "trusted_local_storage": self.trusted,
+                "atomic_replace": self.replace,
             },
             records.ORIGIN,
         )
@@ -82,8 +82,8 @@ class Contract:
 
     Attributes:
         modality: Input modality the family accepts.
-        input_rank: Number of dimensions of the input array.
-        input_dtype: Name of the dtype the input is converted to.
+        rank: Number of dimensions of the input array.
+        dtype: Name of the dtype the input is converted to.
         methods: Inference methods offered, sorted and de-duplicated.
         output: Description of what the methods return.
         deterministic: Whether repeated inference gives identical output.
@@ -98,8 +98,8 @@ class Contract:
     )
 
     modality: capabilities.Modality
-    input_rank: int
-    input_dtype: str
+    rank: int
+    dtype: str
     methods: tuple[str, ...]
     output: str
     deterministic: bool
@@ -111,9 +111,9 @@ class Contract:
             ValueError: If the input rank is below 1, the dtype or output is
                 blank, or no method (or a blank method) is declared.
         """
-        if self.input_rank < 1:
+        if self.rank < 1:
             raise errors.InputError("inference input rank must be positive")
-        if not self.input_dtype.strip() or not self.output.strip():
+        if not self.dtype.strip() or not self.output.strip():
             raise errors.InputError(
                 "inference dtype and output must not be empty"
             )
@@ -131,8 +131,8 @@ class Contract:
             self.migrations,
             {
                 "modality": self.modality.value,
-                "input_rank": self.input_rank,
-                "input_dtype": self.input_dtype,
+                "input_rank": self.rank,
+                "input_dtype": self.dtype,
                 "methods": list(self.methods),
                 "output": self.output,
                 "deterministic": self.deterministic,
@@ -195,9 +195,9 @@ class Contribution:
             as float64.
         method: Name of the attribution method.
         target: What the attribution is taken with respect to.
-        feature_count: Number of input features, equal to the column count.
+        features: Number of input features, equal to the column count.
         migrations: The written layout's version steps, oldest first;
-            version 2 writes `feature_count` as `features`.
+            version 2 writes `features` as `features`.
     """
 
     migrations: ClassVar[tuple[records.Migration, ...]] = (
@@ -207,14 +207,14 @@ class Contribution:
     values: numpy.ndarray
     method: str
     target: str
-    feature_count: int
+    features: int
 
     def __post_init__(self) -> None:
         """Validates the returned attribution matrix.
 
         Raises:
             ValueError: If `values` is not two-dimensional, its column count
-                differs from `feature_count`, it contains non-finite numbers, or
+                differs from `features`, it contains non-finite numbers, or
                 the method or target is blank.
         """
         values = numpy.asarray(self.values, dtype=numpy.float64)
@@ -222,7 +222,7 @@ class Contribution:
             raise errors.InputError(
                 "explanation values must be a two-dimensional matrix"
             )
-        if values.shape[1] != self.feature_count:
+        if values.shape[1] != self.features:
             raise errors.InputError(
                 "explanation feature count does not match values"
             )
@@ -241,7 +241,7 @@ class Contribution:
             {
                 "method": self.method,
                 "target": self.target,
-                "feature_count": self.feature_count,
+                "feature_count": self.features,
                 "row_count": int(self.values.shape[0]),
                 "values": self.values.tolist(),
             },
@@ -254,10 +254,10 @@ class Boundary:
     """Reusable capability boundary for one deep-learning model family.
 
     Attributes:
-        model_family: Name of the model family.
+        family: Name of the model family.
         status: Support status of the family.
         modalities: Modalities the family accepts, sorted by value.
-        required_extras: Optional install extras the family needs.
+        extras: Optional install extras the family needs.
         checkpoint: Serialization contract.
         inference: Input and output contract.
         explanation: Explanation contract, or None when the family offers no
@@ -278,10 +278,10 @@ class Boundary:
         ),
     )
 
-    model_family: str
+    family: str
     status: capabilities.Status
     modalities: tuple[capabilities.Modality, ...]
-    required_extras: tuple[str, ...]
+    extras: tuple[str, ...]
     checkpoint: Checkpoint
     inference: Contract
     explanation: Explainability | None
@@ -295,7 +295,7 @@ class Boundary:
                 an extra or limitation is blank.
             TypeError: If a modality is not a `Modality` value.
         """
-        if not self.model_family.strip():
+        if not self.family.strip():
             raise errors.InputError("model family must not be empty")
         if not self.modalities:
             raise errors.InputError("model family must declare a modality")
@@ -306,7 +306,7 @@ class Boundary:
             raise errors.KindError(
                 "model family modalities must use Modality values"
             )
-        if any(not item.strip() for item in self.required_extras):
+        if any(not item.strip() for item in self.extras):
             raise errors.InputError("required extras must not be empty")
         if any(not item.strip() for item in self.limitations):
             raise errors.InputError(
@@ -317,9 +317,7 @@ class Boundary:
             "modalities",
             tuple(sorted(set(self.modalities), key=lambda item: item.value)),
         )
-        object.__setattr__(
-            self, "required_extras", tuple(sorted(set(self.required_extras)))
-        )
+        object.__setattr__(self, "extras", tuple(sorted(set(self.extras))))
         object.__setattr__(
             self, "limitations", tuple(sorted(set(self.limitations)))
         )
@@ -355,7 +353,7 @@ class Boundary:
         """
         if not self.accommodates(capabilities.Modality.TABULAR):
             raise errors.InputError(
-                f"{self.model_family} has no numeric tabular input contract"
+                f"{self.family} has no numeric tabular input contract"
             )
         try:
             if hasattr(features, "toarray"):
@@ -363,31 +361,29 @@ class Boundary:
             matrix = numpy.asarray(features, dtype=numpy.float32)
         except (TypeError, ValueError) as error:
             raise errors.InputError(
-                f"{self.model_family} requires a finite numeric 2-D matrix"
+                f"{self.family} requires a finite numeric 2-D matrix"
             ) from error
-        if matrix.ndim != self.inference.input_rank:
+        if matrix.ndim != self.inference.rank:
             raise errors.InputError(
-                f"{self.model_family} requires a {self.inference.input_rank}-D "
+                f"{self.family} requires a {self.inference.rank}-D "
                 f"numeric matrix, received {matrix.ndim}-D input"
             )
         if expected_width is not None and matrix.shape[1] != expected_width:
             raise errors.InputError(
-                f"{self.model_family} expected {expected_width} features, "
+                f"{self.family} expected {expected_width} features, "
                 f"received {matrix.shape[1]}"
             )
         if not numpy.isfinite(matrix).all():
-            raise errors.InputError(
-                f"{self.model_family} requires finite features"
-            )
+            raise errors.InputError(f"{self.family} requires finite features")
         return matrix
 
     def to_dict(self) -> dict[str, object]:
         """Returns the complete declaration for evidence and diagnostics."""
         return {
-            "family": self.model_family,
+            "family": self.family,
             "status": self.status.value,
             "modalities": [item.value for item in self.modalities],
-            "extras": list(self.required_extras),
+            "extras": list(self.extras),
             "checkpoint": self.checkpoint.to_dict(),
             "inference": self.inference.to_dict(),
             "explanation": (
@@ -398,20 +394,20 @@ class Boundary:
 
 
 TABULAR_TRANSFORMER_CONTRACT = Boundary(
-    model_family=capabilities.ModelFamily.TRANSFORMER.value,
+    family=capabilities.ModelFamily.TRANSFORMER.value,
     status=capabilities.Status.EXPERIMENTAL,
     modalities=(capabilities.Modality.TABULAR,),
-    required_extras=("deeplearning",),
+    extras=("deeplearning",),
     checkpoint=Checkpoint(
         format="scmle.tabular-transformer.v1",
         schema_version=1,
-        trusted_local_storage=True,
-        atomic_replace=True,
+        trusted=True,
+        replace=True,
     ),
     inference=Contract(
         modality=capabilities.Modality.TABULAR,
-        input_rank=2,
-        input_dtype="float32",
+        rank=2,
+        dtype="float32",
         methods=("predict", "predict_proba"),
         output="prediction or class probability",
         deterministic=True,
@@ -435,20 +431,20 @@ TABULAR_TRANSFORMER_CONTRACT = Boundary(
 
 
 TABULAR_JEPA_CONTRACT = Boundary(
-    model_family=capabilities.ModelFamily.JEPA.value,
+    family=capabilities.ModelFamily.JEPA.value,
     status=capabilities.Status.EXPERIMENTAL,
     modalities=(capabilities.Modality.TABULAR,),
-    required_extras=("deeplearning",),
+    extras=("deeplearning",),
     checkpoint=Checkpoint(
         format="scmle.tabular-jepa.v2",
         schema_version=1,
-        trusted_local_storage=True,
-        atomic_replace=True,
+        trusted=True,
+        replace=True,
     ),
     inference=Contract(
         modality=capabilities.Modality.TABULAR,
-        input_rank=2,
-        input_dtype="float32",
+        rank=2,
+        dtype="float32",
         methods=("transform", "encode"),
         output="context embedding",
         deterministic=True,
@@ -472,20 +468,20 @@ TABULAR_JEPA_CONTRACT = Boundary(
 
 
 TABULAR_TORCH_CONTRACT = Boundary(
-    model_family="deep_learning",
+    family="deep_learning",
     status=capabilities.Status.SUPPORTED,
     modalities=(capabilities.Modality.TABULAR,),
-    required_extras=("deeplearning",),
+    extras=("deeplearning",),
     checkpoint=Checkpoint(
         format="scmle.tabular-torch.v1",
         schema_version=1,
-        trusted_local_storage=True,
-        atomic_replace=True,
+        trusted=True,
+        replace=True,
     ),
     inference=Contract(
         modality=capabilities.Modality.TABULAR,
-        input_rank=2,
-        input_dtype="float32",
+        rank=2,
+        dtype="float32",
         methods=("predict", "predict_proba"),
         output="prediction or class probability",
         deterministic=True,

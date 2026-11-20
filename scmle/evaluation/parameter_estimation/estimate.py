@@ -16,31 +16,25 @@ from scmle.contracts import errors
 from scmle.evaluation import parameter_estimation
 from scmle.evaluation.envelope import Counts
 from scmle.evaluation.parameter_estimation.bayesian import bayes
-from scmle.evaluation.parameter_estimation.causal import (
-    fit_propensity_estimator,
-)
+from scmle.evaluation.parameter_estimation.causal import balance
 from scmle.evaluation.parameter_estimation.config import Config
-from scmle.evaluation.parameter_estimation.continuous import (
-    fit_continuous_estimator,
-)
+from scmle.evaluation.parameter_estimation.continuous import reweight
 from scmle.evaluation.parameter_estimation.declaration import Estimand
-from scmle.evaluation.parameter_estimation.declaration import ParameterEstimate
-from scmle.evaluation.parameter_estimation.hierarchical import (
-    fit_hierarchical_estimator,
-)
+from scmle.evaluation.parameter_estimation.declaration import Estimate
+from scmle.evaluation.parameter_estimation.hierarchical import nest
 from scmle.evaluation.parameter_estimation.inputs import admit
+from scmle.evaluation.parameter_estimation.inputs import check
 from scmle.evaluation.parameter_estimation.inputs import clustering
 from scmle.evaluation.parameter_estimation.inputs import condition
+from scmle.evaluation.parameter_estimation.inputs import imprint
 from scmle.evaluation.parameter_estimation.inputs import prepare
-from scmle.evaluation.parameter_estimation.inputs import raw_input_fingerprint
 from scmle.evaluation.parameter_estimation.inputs import screen
-from scmle.evaluation.parameter_estimation.inputs import validate_clusters
-from scmle.evaluation.parameter_estimation.inputs import validate_matrix
+from scmle.evaluation.parameter_estimation.inputs import validate
 from scmle.evaluation.parameter_estimation.linear import fit_logistic_estimator
 from scmle.evaluation.parameter_estimation.linear import ols
 from scmle.evaluation.parameter_estimation.report import Estimation
 from scmle.evaluation.parameter_estimation.report import Fit
-from scmle.evaluation.parameter_estimation.sensitivity import sensitivity_report
+from scmle.evaluation.parameter_estimation.sensitivity import perturb
 
 
 def compute(
@@ -64,7 +58,7 @@ def compute(
     Returns:
         The fitted quantities of the chosen estimator.
     """
-    names = ("intercept", *estimand.feature_names)
+    names = ("intercept", *estimand.features)
     if policy.estimator == "linear":
         return ols(design, values, policy, cluster_values, names)
     if policy.estimator == "logistic":
@@ -74,17 +68,13 @@ def compute(
     if policy.estimator in {"bayesian_linear", "bayesian_ate"}:
         return bayes(matrix, design, values, policy, estimand, names)
     if policy.estimator in {"ipw_ate", "aipw_ate"}:
-        return fit_propensity_estimator(matrix, values, policy, cluster_values)
+        return balance(matrix, values, policy, cluster_values)
     if policy.estimator == "continuous_ipw_ate":
-        return fit_continuous_estimator(
-            matrix, values, policy, estimand, cluster_values
-        )
-    return fit_hierarchical_estimator(
-        design, values, policy, cluster_values, names
-    )
+        return reweight(matrix, values, policy, estimand, cluster_values)
+    return nest(design, values, policy, cluster_values, names)
 
 
-def estimate_parameters(
+def infer(
     features: Any,
     outcome: Any,
     estimand: Estimand,
@@ -123,7 +113,7 @@ def estimate_parameters(
         matrix, design, values, estimand, policy, cluster_values
     )
     diagnostics, parameters = summarise(fit, policy, cluster_values)
-    sensitivity = sensitivity_report(
+    sensitivity = perturb(
         matrix,
         values,
         policy,
@@ -189,11 +179,11 @@ def ingest(
     """
     matrix = numpy.asarray(features, dtype=float)
     values = numpy.asarray(outcome, dtype=float)
-    validate_matrix(matrix, len(estimand.feature_names), "features")
+    check(matrix, len(estimand.features), "features")
     if values.ndim != 1:
         raise errors.InputError("outcome must have shape (rows,)")
-    input_clusters = validate_clusters(clusters, len(values))
-    fingerprint = raw_input_fingerprint(matrix, values, input_clusters)
+    input_clusters = validate(clusters, len(values))
+    fingerprint = imprint(matrix, values, input_clusters)
     input_rows = matrix.shape[0]
     admit(matrix, values, input_clusters, policy, estimand)
     matrix, values, kept, dropped = prepare(
@@ -215,7 +205,7 @@ def ingest(
 
 def summarise(
     fit: Fit, policy: Config, cluster_values: numpy.ndarray | None
-) -> tuple[Mapping[str, Any], tuple[ParameterEstimate, ...]]:
+) -> tuple[Mapping[str, Any], tuple[Estimate, ...]]:
     """Adds the covariance evidence to a fit and builds its coefficients.
 
     Args:
@@ -256,7 +246,7 @@ def summarise(
             else fit.interval_errors
         )
     parameters = tuple(
-        ParameterEstimate(
+        Estimate(
             name,
             float(value),
             float(error),

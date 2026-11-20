@@ -458,7 +458,7 @@ def gate_g5(replicates: int, base: int = 0) -> dict[str, Any]:
         rng = numpy.random.default_rng(base + index)
         q = conformal.cutoff(numpy.abs(rng.standard_normal(1000)), LEVEL)
         err = numpy.abs(rng.standard_normal(8 * size))
-        report = coverage.slice_coverage(
+        report = coverage.stratify(
             err <= q, numpy.repeat(numpy.arange(8), size).tolist(), LEVEL
         )
         flagged += bool(report["flagged"])
@@ -471,7 +471,7 @@ def gate_g5(replicates: int, base: int = 0) -> dict[str, Any]:
             q = conformal.cutoff(numpy.abs(rng.standard_normal(1000)), LEVEL)
             err = numpy.abs(rng.standard_normal(8 * rows))
             err[:rows] *= 3.0
-            report = coverage.slice_coverage(
+            report = coverage.stratify(
                 err <= q, numpy.repeat(numpy.arange(8), rows).tolist(), LEVEL
             )
             hits += "0" in report["flagged"]
@@ -617,7 +617,7 @@ def gate_g6(replicates: int, base: int = 0) -> dict[str, Any]:
                 est = shift_weights.weigh(xc, unlabeled)
                 wc = est.calibration
                 wt = est.ratio(xt)
-                sizes.append(est.effective_size)
+                sizes.append(est.effective)
             else:
                 wc = numpy.exp(xc @ mu - mu @ mu / 2)
                 wt = numpy.exp(xt @ mu - mu @ mu / 2)
@@ -685,8 +685,8 @@ def gate_g9(replicates: int, base: int = 0) -> dict[str, Any]:
         truth = bottom @ summing.T
         base_f = truth + rng.standard_normal((20, 7)) @ chol.T
         mint = reconcile.mint(base_f, summing, w)
-        bu = reconcile.bottom_up(base_f[:, 3:], summing)
-        worst = max(worst, reconcile.coherence_residual(mint, summing))
+        bu = reconcile.aggregate(base_f[:, 3:], summing)
+        worst = max(worst, reconcile.measure(mint, summing))
         diffs[index] = ((mint - truth) ** 2).mean() - ((bu - truth) ** 2).mean()
     upper = float(
         diffs.mean() + 1.645 * diffs.std(ddof=1) / math.sqrt(replicates)
@@ -745,9 +745,7 @@ def gate_g11i(replicates: int, base: int = 0) -> dict[str, Any]:
     rng = numpy.random.default_rng(999_999)
     _, risk, full, _, _ = survival_world(rng, 6000, censor=False)
     tau = float(numpy.quantile(full, 0.7))
-    flat = ipcw.Censoring(
-        numpy.ones(len(full)), 0.05, 0, covariate_dependent=False
-    )
+    flat = ipcw.Censoring(numpy.ones(len(full)), 0.05, 0, dependent=False)
     truth = ipcw.uno(full, numpy.ones(len(full)), risk, tau, flat)
     cox, marginal, share = [], [], []
     for index in range(replicates):
@@ -757,7 +755,7 @@ def gate_g11i(replicates: int, base: int = 0) -> dict[str, Any]:
         wm = ipcw.reweight(time, event, None)
         cox.append(ipcw.uno(time, event, risk, tau, wc))
         marginal.append(ipcw.uno(time, event, risk, tau, wm))
-        share.append(wc.n_floored / len(time))
+        share.append(wc.floored / len(time))
     cox_a, marginal_a = numpy.array(cox), numpy.array(marginal)
     se_cox = float(cox_a.std(ddof=1) / math.sqrt(replicates))
     se_marginal = float(marginal_a.std(ddof=1) / math.sqrt(replicates))
@@ -838,7 +836,7 @@ def sources() -> dict[str, list[Any]]:
         "G2": [conformal.cvplus, gate_g2, cv_plus_replicate],
         "G3": [quantile.Band, gate_g3],
         "G4": [conformal.ConformalCalibrator, gate_g4, class_world],
-        "G5": [coverage.slice_coverage, coverage.stepdown, gate_g5],
+        "G5": [coverage.stratify, coverage.stepdown, gate_g5],
         "G5b": [
             coverage.undercovered,
             coverage.stepdown,

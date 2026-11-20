@@ -36,12 +36,12 @@ class Descent(Network):
         batches_per_epoch = max(math.ceil(training_rows / batch_rows), 1)
         updates_per_epoch = max(math.ceil(batches_per_epoch / accumulate), 1)
         return Plan(
-            batch_rows=batch_rows,
-            second_order=second_order,
+            rows=batch_rows,
+            order=second_order,
             accumulate=accumulate,
-            updates_per_epoch=updates_per_epoch,
-            total_steps=updates_per_epoch * self.epochs,
-            warmup_steps=updates_per_epoch * self.warmup_epochs,
+            updates=updates_per_epoch,
+            steps=updates_per_epoch * self.epochs,
+            warmup=updates_per_epoch * self.warmup_epochs,
         )
 
     def prepare(
@@ -77,15 +77,15 @@ class Descent(Network):
         """
         rate = scmle.models.deeplearning.training.anneal(
             step,
-            plan.total_steps,
+            plan.steps,
             self.learning_rate,
-            plan.warmup_steps,
+            plan.warmup,
             self.schedule,
         )
         for group in optimizer.param_groups:
             group["lr"] = rate
 
-    def train_epoch(
+    def train(
         self,
         torch: Any,
         network: Any,
@@ -115,9 +115,9 @@ class Descent(Network):
         shuffled, step = batches
         epoch_loss, alive = 0.0, True
         pending, running = 0, 0.0
-        for start in range(0, len(shuffled), plan.batch_rows):
-            batch = shuffled[start : start + plan.batch_rows]
-            if plan.second_order:
+        for start in range(0, len(shuffled), plan.rows):
+            batch = shuffled[start : start + plan.rows]
+            if plan.order:
                 value, norm = self.lbfgs_step(
                     torch, network, optimizer, tensors, batch
                 )
@@ -130,11 +130,11 @@ class Descent(Network):
             if pending == 0:
                 self.adjust(optimizer, step, plan)
                 optimizer.zero_grad()
-            loss = self.weighted_loss(torch, network, tensors, batch)
+            loss = self.weigh(torch, network, tensors, batch)
             (loss / plan.accumulate).backward()
             running += float(loss.detach())
             pending += 1
-            last = start + plan.batch_rows >= len(shuffled)
+            last = start + plan.rows >= len(shuffled)
             if pending < plan.accumulate and not last:
                 continue
             norm = float(
@@ -231,7 +231,7 @@ class Descent(Network):
 
         def closure() -> Any:
             optimizer.zero_grad()
-            loss = self.weighted_loss(torch, network, tensors, batch)
+            loss = self.weigh(torch, network, tensors, batch)
             loss.backward()
             return loss
 

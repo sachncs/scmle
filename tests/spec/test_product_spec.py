@@ -781,7 +781,7 @@ def test_l399_l409_evaluation_contract(run):
     } <= set(result.diagnostics)
     from scmle.evaluation import metrics
 
-    defaults = set(metrics.Repertoire.default_metric.values())
+    defaults = set(metrics.Repertoire.default.values())
     assert not defaults & {
         "accuracy",
         "f1",
@@ -789,10 +789,10 @@ def test_l399_l409_evaluation_contract(run):
     assert (
         result.evaluation["metric"] == "roc_auc"
     )  # user-selected objective honoured
-    reg = metrics.CATALOG.report_names[tasks.Task.REGRESSION]
+    reg = metrics.CATALOG.reported[tasks.Task.REGRESSION]
     assert set(reg) == {"mae", "rmse", "r2"}
     assert {"log_loss", "f1_macro", "balanced_accuracy"} <= set(
-        metrics.CATALOG.report_names[tasks.Task.MULTICLASS]
+        metrics.CATALOG.reported[tasks.Task.MULTICLASS]
     )
 
 
@@ -972,7 +972,7 @@ def test_l480_l496_inference_contract(run, frame, tmp_path):
     features.to_csv(path, index=False)
     from scmle.serving import server
 
-    assert server.Batcher(result.bundle).score_file(
+    assert server.Batcher(result.bundle).score(
         path, tmp_path / "out.csv"
     ) == len(features)  # batch
     assert result.bundle.pipeline.predict(
@@ -1056,7 +1056,7 @@ def test_l610_l629_backlog_priorities(run):
     assert len(result.predict(make_frame().drop(columns="y"))) == len(
         make_frame()
     )  # project API and inference-ready artifact
-    assert issubclass(server.HttpServing, server.Server)  # serving
+    assert issubclass(server.Service, server.Server)  # serving
     assert callable(registry.ModelRegistryStore.promote)  # deployment
     report = monitor.Watcher(result.bundle).assess(
         make_frame(seed=3).drop(columns="y"), make_frame(seed=3)["y"]

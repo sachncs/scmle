@@ -28,10 +28,10 @@ def policy(method="moment_gls", slope=None):
     return config.Config(
         estimator="hierarchical_linear",
         covariance="iid",
-        cluster_name="site",
+        cluster="site",
         hierarchical_assumptions=assumptions,
-        hierarchical_method=method,
-        random_slope_position=slope,
+        hierarchy=method,
+        slope=slope,
     )
 
 
@@ -115,9 +115,7 @@ def test_a_random_slope_gls_matches_the_block_precisions():
     design, y, labels = grouped()
     names = mixed.distinct(labels)
     cov = numpy.array([[0.6, 0.1], [0.1, 0.2]])
-    information, rhs = mixed.hierarchical_random_slope_gls_system(
-        design, y, labels, names, 0, 0.25, cov
-    )
+    information, rhs = mixed.assemble(design, y, labels, names, 0, 0.25, cov)
     expected = numpy.zeros((2, 2))
     for label in names:
         g = labels == label
@@ -204,9 +202,7 @@ def test_slopes_need_within_cluster_variation():
 
 def test_a_moment_fit_matches_the_explicit_crosscheck():
     design, y, labels = grouped()
-    fit = hierarchical.fit_hierarchical_estimator(
-        design, y, policy(), labels, ("intercept", "x")
-    )
+    fit = hierarchical.nest(design, y, policy(), labels, ("intercept", "x"))
     assert (
         fit.reference["method"]
         == "scipy.linalg.solve:explicit_random_intercept_covariance"
@@ -228,14 +224,12 @@ def test_a_moment_fit_matches_the_explicit_crosscheck():
 def test_a_hierarchical_fit_needs_cluster_labels():
     design, y, ignored = grouped()
     with pytest.raises(errors.InputError, match="requires cluster labels"):
-        hierarchical.fit_hierarchical_estimator(
-            design, y, policy(), None, ("i", "x")
-        )
+        hierarchical.nest(design, y, policy(), None, ("i", "x"))
 
 
 def test_a_reml_fit_passes_its_dense_reference():
     design, y, labels = grouped()
-    fit = hierarchical.fit_hierarchical_estimator(
+    fit = hierarchical.nest(
         design, y, policy("reml"), labels, ("intercept", "x")
     )
     assert fit.reference["passed"] is True
@@ -271,7 +265,7 @@ def test_a_reml_fit_passes_its_dense_reference():
 def test_random_slope_fits_pass_their_references():
     design, y, labels = grouped()
     for method in ("moment_gls", "reml"):
-        fit = hierarchical.fit_hierarchical_estimator(
+        fit = hierarchical.nest(
             design, y, policy(method, slope=0), labels, ("intercept", "x")
         )
         assert fit.reference["passed"] is True, (method, fit.reference)
@@ -290,9 +284,7 @@ def test_a_random_slope_fit_needs_a_declared_position():
 
 
 def test_a_random_slope_covariance_uses_the_scaled_tanh_correlation():
-    found = reml.random_slope_covariance_from_reml_point(
-        numpy.array([9.0, 4.0, 1.0]), 0.5
-    )
+    found = reml.decode(numpy.array([9.0, 4.0, 1.0]), 0.5)
     rho = 0.999999 * math.tanh(0.5)
     numpy.testing.assert_allclose(found, [[4.0, rho * 2.0], [rho * 2.0, 1.0]])
 
@@ -307,16 +299,14 @@ def test_the_reml_objectives_check_their_dimensions():
     with pytest.raises(
         errors.InputError, match="four bounded covariance parameters"
     ):
-        reml.random_slope_reml_profile_objective(
-            numpy.zeros(3), design, y, labels, names, 0
-        )
+        reml.score(numpy.zeros(3), design, y, labels, names, 0)
     with numpy.errstate(over="ignore"):
         assert (
             reml.deviance(numpy.array([1000.0, 0.0]), design, y, labels, names)
             == math.inf
         )
         assert (
-            reml.random_slope_reml_profile_objective(
+            reml.score(
                 numpy.array([1000.0, 0.0, 0.0, 0.0]),
                 design,
                 y,
@@ -365,7 +355,7 @@ BOUNDS = ((-1.0, 1.0), (-1.0, 1.0))
 
 
 def test_an_optimizer_result_is_accepted_when_valid():
-    assert reml.validate_reml_optimizer_result(result(), BOUNDS) is None
+    assert reml.vet(result(), BOUNDS) is None
 
 
 @pytest.mark.parametrize(
@@ -415,7 +405,7 @@ def test_an_optimizer_result_is_accepted_when_valid():
 )
 def test_an_invalid_optimizer_result_is_rejected(changes, error, message):
     with pytest.raises(error, match=message):
-        reml.validate_reml_optimizer_result(result(**changes), BOUNDS)
+        reml.vet(result(**changes), BOUNDS)
 
 
 # audit

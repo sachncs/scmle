@@ -9,8 +9,8 @@ from scmle.contracts import errors
 from scmle.contracts import evaluation
 from scmle.contracts import evidence
 from scmle.evaluation.release.finding import Finding
-from scmle.evaluation.release.finding import finite_real
 from scmle.evaluation.release.finding import Kind
+from scmle.evaluation.release.finding import parse
 from scmle.evaluation.release.verdict import Verdict
 
 # The quality record's score keys before version 2 (explainability.quality).
@@ -75,7 +75,7 @@ def disparities(report: Any, metric: str) -> tuple[float, ...]:
             for key in sorted(current, key=str, reverse=True):
                 value = current[key]
                 if key == metric:
-                    numeric = finite_real(value)
+                    numeric = parse(value)
                     if numeric is not None:
                         values.append(numeric)
                 elif isinstance(value, (Mapping, list, tuple)):
@@ -322,7 +322,7 @@ def adjudge(
     )
 
 
-def explanation_findings(
+def explain(
     policy: evaluation.Criteria, diagnostic_reports: Mapping[str, Any]
 ) -> list[Finding]:
     """Applies the required explanation quality thresholds.
@@ -584,7 +584,7 @@ def screen(
         adjudge(diagnostic_gate, diagnostic_reports)
         for diagnostic_gate in policy.release.diagnostic_gates
     )
-    findings.extend(explanation_findings(policy, diagnostic_reports))
+    findings.extend(explain(policy, diagnostic_reports))
     findings.extend(
         audit(fairness_gate, fairness_reports)
         for fairness_gate in policy.release.fairness_gates
@@ -662,7 +662,7 @@ def assess(
             0,
             passed=False,
             findings=(finding,),
-            blocking_reasons=(finding.reason,),
+            reasons=(finding.reason,),
         )
 
     findings = screen(
@@ -679,8 +679,8 @@ def assess(
     )
     return Verdict(
         task=policy.task.value,
-        policy_schema_version=policy.schema_version,
+        policy=policy.schema_version,
         passed=not blocking_reasons,
         findings=immutable_findings,
-        blocking_reasons=blocking_reasons,
+        reasons=blocking_reasons,
     )

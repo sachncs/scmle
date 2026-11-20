@@ -74,10 +74,10 @@ class Monitor:
         return Drift(
             reference_hash=self.reference.dataset_hash,
             observed_hash=current.dataset_hash,
-            language_distance=language_distance,
-            mean_character_delta=(current_mean - reference_mean)
+            language=language_distance,
+            characters=(current_mean - reference_mean)
             / max(reference_mean, 1.0),
-            duplicate_rate=duplicate_rate,
+            duplicates=duplicate_rate,
             threshold=self.threshold,
         )
 

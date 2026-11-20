@@ -15,7 +15,7 @@ class Importance(diagnostics.Diagnostic):
 
     name = "permutation_importance"
 
-    def compute(self, inputs: diagnostics.DiagnosticInput) -> dict[str, Any]:
+    def compute(self, inputs: diagnostics.Input) -> dict[str, Any]:
         """Measures the metric drop when each feature is shuffled.
 
         The cost grows with the number of features, so rows are capped, the
@@ -36,12 +36,12 @@ class Importance(diagnostics.Diagnostic):
             first, each with its mean `importance` and standard deviation
             `std` over the shuffle repeats.
         """
-        columns = list(inputs.feature_plan.sourced)
+        columns = list(inputs.plan.sourced)
         rng = numpy.random.default_rng(inputs.seed)
         rows = rng.permutation(len(inputs.features))[:IMPORTANCE_ROWS]
         features = inputs.features[columns].iloc[rows].reset_index(drop=True)
         target = inputs.target.iloc[rows].reset_index(drop=True)
-        scorer = inputs.metric.scorer(inputs.positive_label)
+        scorer = inputs.metric.scorer(inputs.positive)
         baseline = scorer(inputs.estimator, features, target)
         if not numpy.isfinite(baseline):
             # A drop from an undefined score is undefined: ROC AUC on rows

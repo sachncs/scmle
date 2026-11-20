@@ -166,7 +166,7 @@ class Classifier(base.ClassifierMixin, Trainer):  # type: ignore[misc]  # scikit
             Array of shape `(n_rows, n_classes)`: the softmax probabilities
             averaged over ensemble members.
         """
-        scores = self.raw_outputs(features)
+        scores = self.emit(features)
         scores = scores - scores.max(axis=2, keepdims=True)
         exp = numpy.exp(scores)
         probabilities = exp / exp.sum(axis=2, keepdims=True)
@@ -259,5 +259,5 @@ class Regressor(base.RegressorMixin, Trainer):  # type: ignore[misc]  # scikit-l
         Returns:
             Array of shape `(n_rows,)`, averaged over ensemble members.
         """
-        scaled = self.raw_outputs(features)[:, :, 0].mean(axis=1)
+        scaled = self.emit(features)[:, :, 0].mean(axis=1)
         return numpy.asarray(scaled * self.target_scale_ + self.target_mean_)

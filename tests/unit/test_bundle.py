@@ -139,7 +139,7 @@ def test_invalid_bundles(tmp_path, trained):
 def test_a_bundle_from_before_the_class_renames_is_refused_with_a_reason(
     tmp_path, trained
 ):
-    # Enforces docs/API_STABILITY.md:295.
+    # Enforces docs/API_STABILITY.md:310.
     directory = trained[0].save(tmp_path / "earlier")
     path = directory / scmle.artifacts.bundle.MANIFEST_FILE
     manifest = json.loads(path.read_text())
@@ -156,7 +156,7 @@ def test_a_bundle_from_before_the_class_renames_is_refused_with_a_reason(
 
 
 def test_a_member_naming_a_missing_module_is_refused(tmp_path, trained):
-    # Enforces docs/API_STABILITY.md:300.
+    # Enforces docs/API_STABILITY.md:315.
     vanished = types.ModuleType("vanished")
     vanished.Thing = type("Thing", (), {"__module__": "vanished"})
     sys.modules["vanished"] = vanished
@@ -176,7 +176,7 @@ def test_a_member_naming_a_missing_module_is_refused(tmp_path, trained):
 
 
 def test_legacy_bundle_requires_opt_in_and_can_be_migrated(tmp_path, trained):
-    # Enforces docs/API_STABILITY.md:295.
+    # Enforces docs/API_STABILITY.md:310.
     # Enforces website/src/pages/docs/api-stability.astro:83.
     # Enforces website/src/pages/docs/api.astro:489.
     directory = trained[0].save(tmp_path / "legacy")
@@ -468,13 +468,11 @@ def test_case_and_whitespace_insensitive_matching_is_opt_in(trained):
     messy = features.rename(columns={"num": "  NUM ", "cat": "Cat"})
     with pytest.raises(errors.SchemaError):
         bundle.predict(messy)
-    loose = scmle.inference.mapping.Mapper(
-        case_insensitive=True, strip_whitespace=True
-    )
+    loose = scmle.inference.mapping.Mapper(insensitive=True, whitespace=True)
     numpy.testing.assert_array_equal(
         bundle.predict(messy, loose), bundle.predict(features)
     )
-    only_case = scmle.inference.mapping.Mapper(case_insensitive=True)
+    only_case = scmle.inference.mapping.Mapper(insensitive=True)
     with pytest.raises(errors.SchemaError):  # whitespace still differs
         bundle.predict(messy, only_case)
 
@@ -483,9 +481,7 @@ def test_ambiguous_or_unknown_mappings_are_rejected(trained):
     bundle, features = trained
     clash = features.rename(columns={"num": "NUM"}).assign(Num=1.0)
     with pytest.raises(errors.SchemaError, match="ambiguous"):
-        bundle.predict(
-            clash, scmle.inference.mapping.Mapper(case_insensitive=True)
-        )
+        bundle.predict(clash, scmle.inference.mapping.Mapper(insensitive=True))
     double = features.assign(other=features["num"]).rename(columns={"num": "a"})
     with pytest.raises(errors.SchemaError, match="ambiguous"):
         bundle.predict(
@@ -500,9 +496,7 @@ def test_ambiguous_or_unknown_mappings_are_rejected(trained):
 
 def test_exact_matches_are_never_renamed(trained):
     bundle, features = trained
-    mapping = scmle.inference.mapping.Mapper(
-        {"num": "cat"}, case_insensitive=True
-    )
+    mapping = scmle.inference.mapping.Mapper({"num": "cat"}, insensitive=True)
     # "num" already exists exactly, so the rename request is ignored.
     numpy.testing.assert_array_equal(
         bundle.predict(features, mapping), bundle.predict(features)

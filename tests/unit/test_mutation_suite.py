@@ -26,7 +26,7 @@ class Model:
         return [0] * len(features)
 
 
-def inputs(clock: Clock) -> diagnostics.DiagnosticInput:
+def inputs(clock: Clock) -> diagnostics.Input:
     frame = pandas.DataFrame({"signal": [0.0] * ROWS})
     return dataclasses.replace(
         make_inputs(tasks.Task.BINARY), estimator=Model(clock), features=frame

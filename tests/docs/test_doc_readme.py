@@ -139,7 +139,7 @@ def test_an_entry_point_adapter_is_registered_only_if_it_complies(
     # train `plugin_nb` as an extra candidate.
     monkeypatch.setattr(plugins, "REGISTRY", plugins.Registry())
     catalog = registry.Catalog.stock()
-    assert catalog.load_plugins() == ["bad"]
+    assert catalog.load() == ["bad"]
     assert catalog.get("plugin_nb") is good
     assert "taskless" not in catalog.adapters
-    assert "declares no supported tasks" in catalog.plugin_failures["bad"]
+    assert "declares no supported tasks" in catalog.failures["bad"]

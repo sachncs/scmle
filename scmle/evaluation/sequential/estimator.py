@@ -16,9 +16,9 @@ from scmle.evaluation.sequential.panel import order
 from scmle.evaluation.sequential.panel import prepare
 from scmle.evaluation.sequential.panel import tabulate
 from scmle.evaluation.sequential.report import Contrast
+from scmle.evaluation.sequential.report import Diagnostics
+from scmle.evaluation.sequential.report import Estimate
 from scmle.evaluation.sequential.report import Estimation
-from scmle.evaluation.sequential.report import PeriodDiagnostics
-from scmle.evaluation.sequential.report import RegimeEstimate
 from scmle.evaluation.sequential.weighting import average
 from scmle.evaluation.sequential.weighting import covary
 from scmle.evaluation.sequential.weighting import effective_sample_size
@@ -85,17 +85,17 @@ class Estimator:
             frame, self.estimand, self.policy
         )
         fingerprint = imprint(frame)
-        period_values = order(prepared, self.estimand.time_column)
+        period_values = order(prepared, self.estimand.time)
         # Subjects of mixed types sort by type name, then by `repr`.
         subject_values = sorted(
-            prepared[self.estimand.subject_identity].drop_duplicates().tolist(),
+            prepared[self.estimand.subject].drop_duplicates().tolist(),
             key=lambda value: (type(value).__name__, repr(value)),
         )
         matrices = tabulate(
             prepared, self.estimand, period_values, subject_values
         )
         critical_value = float(
-            stats.norm.ppf(0.5 + self.policy.confidence_level / 2.0)
+            stats.norm.ppf(0.5 + self.policy.confidence / 2.0)
         )
         cumulative, period_diagnostics, iterations = accumulate(
             matrices, period_values, len(subject_values), self.policy
@@ -147,7 +147,7 @@ def record(
     denominator: numpy.ndarray,
     cumulative: numpy.ndarray,
     policy: Config,
-) -> PeriodDiagnostics:
+) -> Diagnostics:
     """Builds one period's diagnostics and checks its effective sample size.
 
     Args:
@@ -166,27 +166,22 @@ def record(
         ValueError: If the effective sample size of the truncated weights is
             below the policy minimum.
     """
-    truncated = numpy.minimum(cumulative, policy.maximum_weight)
-    period_diagnostic = PeriodDiagnostics(
+    truncated = numpy.minimum(cumulative, policy.weight)
+    period_diagnostic = Diagnostics(
         period=periodize(value),
         rows=rows,
-        treated_rows=arms[0],
-        control_rows=arms[1],
+        treated=arms[0],
+        control=arms[1],
         denominator_propensity_min=float(numpy.min(denominator)),
         denominator_propensity_max=float(numpy.max(denominator)),
         numerator_propensity_min=float(numpy.min(numerator)),
         numerator_propensity_max=float(numpy.max(numerator)),
-        fraction_weight_truncated=float(
-            numpy.mean(cumulative > policy.maximum_weight)
-        ),
-        maximum_untruncated_weight=float(numpy.max(cumulative)),
-        maximum_weight=float(numpy.max(truncated)),
-        effective_sample_size=effective_sample_size(truncated),
+        truncated=float(numpy.mean(cumulative > policy.weight)),
+        untruncated=float(numpy.max(cumulative)),
+        weight=float(numpy.max(truncated)),
+        ess=effective_sample_size(truncated),
     )
-    if (
-        period_diagnostic.effective_sample_size
-        < policy.minimum_effective_sample_size
-    ):
+    if period_diagnostic.ess < policy.minimum_effective_sample_size:
         raise errors.InputError(
             f"period {value!r} has insufficient effective sample size"
         )
@@ -198,7 +193,7 @@ def accumulate(
     period_values: list[Any],
     rows: int,
     policy: Config,
-) -> tuple[numpy.ndarray, list[PeriodDiagnostics], dict[str, int]]:
+) -> tuple[numpy.ndarray, list[Diagnostics], dict[str, int]]:
     """Multiplies the stabilized weight increments of every period.
 
     Args:
@@ -219,7 +214,7 @@ def accumulate(
     """
     treatment = matrices["treatment"]
     cumulative = numpy.ones(rows, dtype=float)
-    period_diagnostics: list[PeriodDiagnostics] = []
+    period_diagnostics: list[Diagnostics] = []
     iterations: dict[str, int] = {}
     for index, value in enumerate(period_values):
         current_treatment = treatment[:, index]
@@ -247,7 +242,7 @@ def accumulate(
         denominator, denominator_iterations = regress(
             denominator_features, current_treatment, policy
         )
-        overlap(denominator, value, policy.propensity_clip)
+        overlap(denominator, value, policy.clip)
         increment = numpy.where(
             current_treatment == 1.0,
             numerator / denominator,
@@ -279,9 +274,7 @@ def compare(
     matrices: dict[str, numpy.ndarray],
     cumulative: numpy.ndarray,
     critical_value: float,
-) -> tuple[
-    tuple[RegimeEstimate, RegimeEstimate], numpy.ndarray, Mapping[str, Any]
-]:
+) -> tuple[tuple[Estimate, Estimate], numpy.ndarray, Mapping[str, Any]]:
     """Estimates both regime means with the truncated final weights.
 
     Args:
@@ -297,7 +290,7 @@ def compare(
     """
     treatment = matrices["treatment"]
     outcome = matrices["outcome"][:, -1]
-    final_weights = numpy.minimum(cumulative, policy.maximum_weight)
+    final_weights = numpy.minimum(cumulative, policy.weight)
     target_mask = numpy.all(treatment == estimand.target_treatment, axis=1)
     comparator_mask = numpy.all(
         treatment == estimand.comparator_treatment, axis=1
@@ -339,7 +332,7 @@ def compare(
         outcome,
         target,
         comparator,
-        policy.reference_tolerance,
+        policy.reference,
     )
     return (target, comparator), covariance, reference
 
@@ -347,7 +340,7 @@ def compare(
 def summarize(
     estimand: Estimand,
     policy: Config,
-    period_diagnostics: list[PeriodDiagnostics],
+    period_diagnostics: list[Diagnostics],
     subjects: int,
     iterations: dict[str, int],
 ) -> Mapping[str, Any]:
@@ -374,10 +367,8 @@ def summarize(
             "comparator": [estimand.comparator_treatment] * periods,
         },
         "weight_truncation": {
-            "maximum_weight": policy.maximum_weight,
-            "fraction_truncated_final": period_diagnostics[
-                -1
-            ].fraction_weight_truncated,
+            "maximum_weight": policy.weight,
+            "fraction_truncated_final": period_diagnostics[-1].truncated,
         },
         "periods": [item.to_dict() for item in period_diagnostics],
         "fit_iterations_final_period": iterations,

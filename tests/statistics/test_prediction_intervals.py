@@ -57,7 +57,7 @@ def test_regression_calibrator_covers_a_new_row_with_heavy_tails():
     for ignored in range(runs):
         predicted = rng.uniform(0, 10, rows)
         observed = predicted + rng.standard_t(3, rows)
-        calibrator = conformal.ConformalCalibrator.for_regression(
+        calibrator = conformal.ConformalCalibrator.calibrate(
             observed, predicted
         )
         new_prediction = rng.uniform(0, 10)

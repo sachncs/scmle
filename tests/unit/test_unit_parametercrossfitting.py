@@ -17,10 +17,10 @@ def policy(folds=1, clip=0.01):
     return config.Config(
         estimator="aipw_ate",
         covariance="iid",
-        treatment_position=0,
+        treatment=0,
         causal_assumptions=CAUSAL,
-        cross_fitting_folds=folds,
-        propensity_clip=clip,
+        folds=folds,
+        clip=clip,
     )
 
 
@@ -46,7 +46,7 @@ def test_a_support_check_counts_each_fold():
     treatment = numpy.array([1, 0, 1, 0, 1, 0, 1, 0.0])
     folds = crossfitting.interleave(8, 2)
     shifted = numpy.array([0, 0, 1, 1, 0, 0, 1, 1])
-    support = crossfitting.validate_cross_fitting_support(treatment, shifted, 2)
+    support = crossfitting.overlap(treatment, shifted, 2)
     assert support[0] == {
         "fold": 0,
         "training_treated_rows": 2,
@@ -57,15 +57,13 @@ def test_a_support_check_counts_each_fold():
     with pytest.raises(
         errors.InputError, match="both treatment arms in every validation fold"
     ):
-        crossfitting.validate_cross_fitting_support(treatment, folds, 2)
+        crossfitting.overlap(treatment, folds, 2)
     thin = numpy.array([1, 0, 1, 0, 0, 0.0])
     with pytest.raises(
         errors.InputError,
         match="at least two rows per treatment arm in every training",
     ):
-        crossfitting.validate_cross_fitting_support(
-            thin, crossfitting.interleave(6, 3), 3
-        )
+        crossfitting.overlap(thin, crossfitting.interleave(6, 3), 3)
 
 
 def test_the_caveats_add_the_same_row_scoring_note_without_cross_fitting():
@@ -97,15 +95,15 @@ def test_a_nuisance_fit_needs_two_rows_per_arm():
     with pytest.raises(
         errors.InputError, match="each training fold needs at least two rows"
     ):
-        crossfitting.fit_aipw_nuisance_models(
+        crossfitting.train(
             design, numpy.array([1, 0, 0, 0, 0, 0.0]), y, design, policy()
         )
 
 
 def test_a_nuisance_fit_predicts_both_outcomes_and_reports_ranks():
     design, t, y = world()
-    propensity, raw, control, treated, diagnostics = (
-        crossfitting.fit_aipw_nuisance_models(design, t, y, design, policy())
+    propensity, raw, control, treated, diagnostics = crossfitting.train(
+        design, t, y, design, policy()
     )
     expected_control, expected_treated = weighting.outcomes(
         design, y, (t == 1, t == 0), design, "x"
@@ -154,7 +152,7 @@ def test_a_cross_fitted_nuisance_scores_each_row_from_its_held_out_fold():
         "2": 40,
     }
     validation = fitted.folds == 1
-    expected = crossfitting.fit_aipw_nuisance_models(
+    expected = crossfitting.train(
         design[~validation],
         t[~validation],
         y[~validation],

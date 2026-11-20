@@ -56,7 +56,7 @@ def test_compare_matches_online_and_batch_with_the_bundle(prepared):
     loaded = bundle.Bundle.load(
         paths["service"] / "model", signing_key=fixture.DEMO_SIGNING_KEY
     )
-    adapter = web.HttpServing(loaded)
+    adapter = web.Service(loaded)
     adapter.start()
     try:
         checks = stages.compare(

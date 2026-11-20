@@ -27,12 +27,8 @@ def test_f1_optimum_is_not_the_default_cutoff_on_imbalanced_data():
 
 def test_cost_objective_moves_the_threshold_with_the_costs():
     probability, actual = labelled()
-    cheap_miss = thresholds.Costs(
-        false_positive_cost=5.0, false_negative_cost=1.0
-    )
-    costly_miss = thresholds.Costs(
-        false_positive_cost=1.0, false_negative_cost=10.0
-    )
+    cheap_miss = thresholds.Costs(alarm=5.0, miss=1.0)
+    costly_miss = thresholds.Costs(alarm=1.0, miss=10.0)
     high = thresholds.argmax(probability, actual, cheap_miss)[0]
     low = thresholds.argmax(probability, actual, costly_miss)[0]
     assert low < high
@@ -43,7 +39,7 @@ def test_objectives_on_known_decisions():
     flagged = numpy.array([True, False, True, False])
     assert thresholds.F1().score(actual, flagged) == pytest.approx(0.5)
     assert thresholds.Accuracy().score(actual, flagged) == 0.5
-    assert thresholds.BalancedAccuracyObjective().score(actual, flagged) == 0.5
+    assert thresholds.Balance().score(actual, flagged) == 0.5
     assert thresholds.Costs(2.0, 3.0).score(actual, flagged) == pytest.approx(
         -1.25
     )

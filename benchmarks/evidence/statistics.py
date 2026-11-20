@@ -2244,7 +2244,7 @@ def latency(case: Case) -> Values:
     """The product's p95 latency, replaying the case's timer readings."""
     readings = case.data["ticks"]
     usage = timed(Clock(readings), len(readings) // 2)
-    return {"p95": usage.p95_latency_ms}
+    return {"p95": usage.latency}
 
 
 def percentile(flavour: str) -> Callable[[Case], Values]:
@@ -2487,7 +2487,7 @@ RESIDUE = {
 
 def reported() -> set[str]:
     """Every metric name a run reports, over all tasks."""
-    return {n for names in metrics.CATALOG.report_names.values() for n in names}
+    return {n for names in metrics.CATALOG.reported.values() for n in names}
 
 
 def tolerance() -> float:

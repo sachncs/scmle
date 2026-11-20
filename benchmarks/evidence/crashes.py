@@ -1335,7 +1335,7 @@ class Batch(Subject):
         from scmle.serving import server
 
         model = bundle.Bundle.load(folder / "model", trusted=True)
-        server.Batcher(model).score_file(
+        server.Batcher(model).score(
             folder / "score.csv",
             folder / "scores" / "predictions.csv",
             CHUNK_ROWS,

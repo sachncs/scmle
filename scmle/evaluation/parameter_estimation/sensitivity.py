@@ -8,9 +8,9 @@ import numpy
 from scmle.contracts import errors
 from scmle.evaluation.parameter_estimation.bayesian import conform
 from scmle.evaluation.parameter_estimation.config import Config
-from scmle.evaluation.parameter_estimation.declaration import BayesianPrior
 from scmle.evaluation.parameter_estimation.declaration import Estimand
-from scmle.evaluation.parameter_estimation.inputs import validate_matrix
+from scmle.evaluation.parameter_estimation.declaration import Prior
+from scmle.evaluation.parameter_estimation.inputs import check
 from scmle.evaluation.parameter_estimation.linear import logit
 from scmle.evaluation.parameter_estimation.linear import regress
 from scmle.evaluation.parameter_estimation.resampling import (
@@ -23,7 +23,7 @@ from scmle.evaluation.parameter_estimation.resampling import intervals
 
 
 def reprior(
-    prior: BayesianPrior,
+    prior: Prior,
     design: numpy.ndarray,
     values: numpy.ndarray,
     coefficients: numpy.ndarray,
@@ -67,11 +67,11 @@ def reprior(
             ),
         }
         if policy.estimator == "bayesian_ate":
-            if policy.treatment_position is None:
+            if policy.treatment is None:
                 raise errors.InputError(
                     "bayesian_ate requires treatment_position"
                 )
-            target_index = policy.treatment_position + 1
+            target_index = policy.treatment + 1
             alternative_record["treatment_coefficient_change"] = float(
                 alternative[target_index] - baseline[target_index]
             )
@@ -99,7 +99,7 @@ def transport(matrix: numpy.ndarray, shift_reference: Any) -> dict[str, Any]:
             non-finite values.
     """
     reference = numpy.asarray(shift_reference, dtype=float)
-    validate_matrix(reference, matrix.shape[1], "shift_reference")
+    check(reference, matrix.shape[1], "shift_reference")
     if not numpy.isfinite(reference).all():
         raise errors.InputError(
             "shift_reference must contain only finite values"
@@ -115,7 +115,7 @@ def transport(matrix: numpy.ndarray, shift_reference: Any) -> dict[str, Any]:
     }
 
 
-def sensitivity_report(
+def perturb(
     matrix: numpy.ndarray,
     values: numpy.ndarray,
     policy: Config,
@@ -124,7 +124,7 @@ def sensitivity_report(
     shift_reference: Any | None,
     estimand: Estimand,
     clusters: numpy.ndarray | None,
-    prior: BayesianPrior | None = None,
+    prior: Prior | None = None,
 ) -> dict[str, Any]:
     """Records declared sensitivity coverage without inventing causal claims.
 
@@ -163,10 +163,8 @@ def sensitivity_report(
             "rows": len(values),
         },
         "sampling": {
-            "status": (
-                "available" if policy.bootstrap_replicates else "not_requested"
-            ),
-            "bootstrap_replicates": policy.bootstrap_replicates,
+            "status": ("available" if policy.replicates else "not_requested"),
+            "bootstrap_replicates": policy.replicates,
         },
         "distribution_shift": {
             "status": (
@@ -215,7 +213,7 @@ def sample(
             two valid replicates.
     """
     matrix, values, design, coefficients = data
-    if not policy.bootstrap_replicates:
+    if not policy.replicates:
         return
     if policy.estimator in {"ipw_ate", "aipw_ate", "continuous_ipw_ate"}:
         report["sampling"] = causal_bootstrap_sensitivity(
@@ -234,7 +232,7 @@ def sample(
     rng = numpy.random.default_rng(policy.seed)
     estimates: list[numpy.ndarray] = []
     bootstrap_replicate = 0
-    while bootstrap_replicate < policy.bootstrap_replicates:
+    while bootstrap_replicate < policy.replicates:
         rows = rng.integers(0, len(values), size=len(values))
         if policy.estimator == "linear":
             linear_fit = regress(design[rows], values[rows], 1, 1e-8)
@@ -243,12 +241,12 @@ def sample(
             logistic_fit = logit(
                 design[rows],
                 values[rows],
-                policy.max_iterations,
+                policy.iterations,
                 policy.tolerance,
             )
             estimate = logistic_fit[0]
         estimates.append(estimate)
         bootstrap_replicate += 1
     report["sampling"]["bootstrap_intervals"] = intervals(
-        estimates, policy.confidence_level
+        estimates, policy.confidence
     )

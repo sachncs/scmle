@@ -32,14 +32,14 @@ def test_a_replay_without_probabilities_raises_an_input_error():
 
 
 def test_the_classifier_replay_is_a_classifier_and_the_other_a_regressor():
-    assert base.is_classifier(replay.ClassifierPredictions(numpy.array([1])))
-    assert not base.is_regressor(replay.ClassifierPredictions(numpy.array([1])))
+    assert base.is_classifier(replay.Predictions(numpy.array([1])))
+    assert not base.is_regressor(replay.Predictions(numpy.array([1])))
     assert base.is_regressor(replay.Replayed(numpy.array([1.0])))
     assert not base.is_classifier(replay.Replayed(numpy.array([1.0])))
 
 
 def test_a_classifier_replay_scores_its_stored_predictions():
-    model = replay.ClassifierPredictions(numpy.array([1, 0, 1, 1]))
+    model = replay.Predictions(numpy.array([1, 0, 1, 1]))
     assert model.score(None, numpy.array([1, 0, 0, 1])) == 0.75
 
 

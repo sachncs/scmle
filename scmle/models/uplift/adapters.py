@@ -25,7 +25,7 @@ class Uplift(models.Model):
             `estimators.KINDS`.
     """
 
-    learner: type = estimators.TLearner
+    learner: type = estimators.Pair
     kind = "boosting"
     family = "causal"
 
@@ -100,7 +100,7 @@ T_LEARNER = Uplift(
     capabilities=models.Capabilities(
         UPLIFT, handles_missing=True, cost=3, memory_factor=4.0
     ),
-    learner=estimators.TLearner,
+    learner=estimators.Pair,
 )
 
 S_LEARNER = Uplift(
@@ -108,7 +108,7 @@ S_LEARNER = Uplift(
     capabilities=models.Capabilities(
         UPLIFT, handles_missing=True, cost=3, memory_factor=3.0
     ),
-    learner=estimators.SingleModelLearner,
+    learner=estimators.Pool,
 )
 
 X_LEARNER = Uplift(
@@ -116,14 +116,14 @@ X_LEARNER = Uplift(
     capabilities=models.Capabilities(
         UPLIFT, handles_missing=True, cost=4, memory_factor=5.0
     ),
-    learner=estimators.CrossLearner,
+    learner=estimators.Cross,
 )
 
 LINEAR = Uplift(
     name="uplift_linear_t_learner",
     family="linear",
     capabilities=models.Capabilities(UPLIFT, needs_scaling=True, cost=1),
-    learner=estimators.TLearner,
+    learner=estimators.Pair,
     kind="linear",
 )
 """T-learner on logistic or ridge outcome models: the linear family."""

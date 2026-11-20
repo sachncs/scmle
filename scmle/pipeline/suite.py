@@ -63,7 +63,7 @@ def panoply() -> tuple[diagnostics.Diagnostic, ...]:
 
 
 def run_suite(
-    inputs: diagnostics.DiagnosticInput,
+    inputs: diagnostics.Input,
     suite: tuple[diagnostics.Diagnostic, ...] | None = None,
     total_seconds: float | None = None,
     deadline: float | None = None,
@@ -95,7 +95,7 @@ def run_suite(
     chosen = [
         d
         for d in (suite if suite is not None else panoply())
-        if inputs.task in d.applies_to
+        if inputs.task in d.tasks
     ]
     limits = [
         limit
@@ -139,7 +139,7 @@ def run_suite(
     return reports
 
 
-def gauge(inputs: diagnostics.DiagnosticInput) -> float | None:
+def gauge(inputs: diagnostics.Input) -> float | None:
     """Times one prediction over the evaluation rows.
 
     Predicts the first `PROBE_ROWS` rows and scales linearly to all rows,

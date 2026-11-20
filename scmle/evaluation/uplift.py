@@ -114,7 +114,7 @@ def lift(
     return float(y[t == 1].mean() - y[t == 0].mean())
 
 
-def average_effect(outcome: numpy.ndarray, treatment: numpy.ndarray) -> float:
+def average(outcome: numpy.ndarray, treatment: numpy.ndarray) -> float:
     """Computes the overall treated-minus-control difference in the outcome.
 
     Args:
@@ -137,7 +137,7 @@ class Propensity:
     """How well the features predict who was treated.
 
     Attributes:
-        treated_share: Share of rows treated.
+        treated: Share of rows treated.
         auc: Cross-validated ROC-AUC of predicting treatment from features
             (0.5 in a randomized experiment); a description, not the rule.
         randomized: Whether the treatment looks randomized: the permutation
@@ -151,7 +151,7 @@ class Propensity:
         balance_p_value: Permutation p-value of the balance test, or None
             when the test did not run.
         migrations: The written layout's version steps, oldest first;
-            version 2 writes `treated_share` as `treated` and
+            version 2 writes `treated` as `treated` and
             `balance_p_value` (the balance test's p-value) as `balance`.
     """
 
@@ -161,7 +161,7 @@ class Propensity:
         ),
     )
 
-    treated_share: float
+    treated: float
     auc: float
     randomized: bool
     note: str

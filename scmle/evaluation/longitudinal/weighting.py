@@ -15,7 +15,7 @@ from scipy import special
 from scmle.contracts import errors
 from scmle.evaluation.longitudinal.declaration import Config
 from scmle.evaluation.longitudinal.declaration import MATRIX_NDIM
-from scmle.evaluation.longitudinal.declaration import PeriodATE
+from scmle.evaluation.longitudinal.declaration import Period
 
 
 def regress(
@@ -49,7 +49,7 @@ def regress(
     coefficients = numpy.zeros(design.shape[1], dtype=float)
     ridge = 1e-8
     ridge_matrix = ridge * numpy.eye(design.shape[1])
-    for iteration in range(1, policy.max_iterations + 1):
+    for iteration in range(1, policy.iterations + 1):
         probabilities = special.expit(design @ coefficients)
         variance = numpy.maximum(probabilities * (1.0 - probabilities), 1e-12)
         gradient = design.T @ (probabilities - treatment) + ridge * coefficients
@@ -221,7 +221,7 @@ def sandwich(fitted: Sequence[Mapping[str, Any]]) -> numpy.ndarray:
 
 def periodise(
     fitted: Mapping[str, Any], variance: float, critical_value: float
-) -> PeriodATE:
+) -> Period:
     """Builds a serializable period result after covariance is available.
 
     Args:
@@ -237,7 +237,7 @@ def periodise(
     """
     standard_error = math.sqrt(max(float(variance), 0.0))
     estimate = float(fitted["estimate"])
-    return PeriodATE(
+    return Period(
         period=str(fitted["period"]),
         estimate=estimate,
         standard_error=standard_error,
@@ -246,11 +246,11 @@ def periodise(
             estimate + critical_value * standard_error,
         ),
         rows=int(fitted["rows"]),
-        treated_rows=int(fitted["treated_rows"]),
-        control_rows=int(fitted["control_rows"]),
+        treated=int(fitted["treated_rows"]),
+        control=int(fitted["control_rows"]),
         propensity_min=float(fitted["propensity_min"]),
         propensity_max=float(fitted["propensity_max"]),
-        fraction_clipped=float(fitted["fraction_clipped"]),
+        clipped=float(fitted["fraction_clipped"]),
         effective_sample_size_treated=float(
             fitted["effective_sample_size_treated"]
         ),

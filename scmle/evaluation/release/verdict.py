@@ -50,15 +50,15 @@ class Scorecard:
 
     Attributes:
         task: Task type the policy applies to.
-        policy_schema_version: Schema version of the evaluated policy.
+        policy: Schema version of the evaluated policy.
         status: Blocked when any blocking finding failed, otherwise ready.
         total_findings: Number of findings.
         passed_findings: Number of passed findings.
         failed_findings: Number of failed findings.
-        blocking_findings: Number of findings that are blocking gates.
-        blocking_failures: Number of failed blocking findings.
-        non_blocking_failures: Number of failed non-blocking findings.
-        counts_by_kind: Counts for every finding kind, keyed by the kind's
+        findings: Number of findings that are blocking gates.
+        failures: Number of failed blocking findings.
+        warnings: Number of failed non-blocking findings.
+        kinds: Counts for every finding kind, keyed by the kind's
             value; stored as a read-only mapping.
         migrations: The written layout's version steps, oldest first;
             version 2 writes `policy`, `findings.{total, passed, failed,
@@ -87,34 +87,34 @@ class Scorecard:
     )
 
     task: str
-    policy_schema_version: int
+    policy: int
     status: Readiness
     total_findings: int
     passed_findings: int
     failed_findings: int
-    blocking_findings: int
-    blocking_failures: int
-    non_blocking_failures: int
-    counts_by_kind: Mapping[str, Tally]
+    findings: int
+    failures: int
+    warnings: int
+    kinds: Mapping[str, Tally]
 
     def __post_init__(self) -> None:
         """Validates summary counts, status, and kind coverage.
 
         Raises:
             ValueError: If `task` is not a string or is blank,
-                `policy_schema_version` is not a non-negative integer, a
+                `policy` is not a non-negative integer, a
                 count is negative, the counts are
                 inconsistent with one another, `status` does not match
-                `blocking_failures`, `counts_by_kind` does not cover every
+                `failures`, `kinds` does not cover every
                 finding kind, or its totals differ from the aggregate counts.
             TypeError: If `status` is not a `Readiness`, a count is not
-                an integer, or `counts_by_kind` is not a mapping of strings
+                an integer, or `kinds` is not a mapping of strings
                 to `Tally`.
         """
         task: object = self.task  # may be a non-string at runtime
         if not isinstance(task, str) or not task.strip():
             raise errors.InputError("task must not be empty")
-        schema_version: object = self.policy_schema_version  # may be non-int
+        schema_version: object = self.policy  # may be non-int
         if (
             isinstance(schema_version, bool)
             or not isinstance(schema_version, int)
@@ -129,50 +129,48 @@ class Scorecard:
             "total_findings": self.total_findings,
             "passed_findings": self.passed_findings,
             "failed_findings": self.failed_findings,
-            "blocking_findings": self.blocking_findings,
-            "blocking_failures": self.blocking_failures,
-            "non_blocking_failures": self.non_blocking_failures,
+            "blocking_findings": self.findings,
+            "blocking_failures": self.failures,
+            "non_blocking_failures": self.warnings,
         }
         tallies(values)
         if self.total_findings != self.passed_findings + self.failed_findings:
             raise errors.InputError(
                 "total_findings must equal passed plus failed"
             )
-        if self.failed_findings != (
-            self.blocking_failures + self.non_blocking_failures
-        ):
+        if self.failed_findings != (self.failures + self.warnings):
             raise errors.InputError(
                 "failed_findings must equal blocking plus non-blocking failures"
             )
-        if self.blocking_failures > self.blocking_findings:
+        if self.failures > self.findings:
             raise errors.InputError(
                 "blocking_failures must not exceed blocking_findings"
             )
         expected_status = (
-            Readiness.BLOCKED if self.blocking_failures else Readiness.READY
+            Readiness.BLOCKED if self.failures else Readiness.READY
         )
         if self.status is not expected_status:
             raise errors.InputError("status does not match blocking_failures")
-        exhaustive(self.counts_by_kind)
+        exhaustive(self.kinds)
         object.__setattr__(
             self,
-            "counts_by_kind",
-            types.MappingProxyType(dict(self.counts_by_kind)),
+            "kinds",
+            types.MappingProxyType(dict(self.kinds)),
         )
         combined = Tally(
             total=self.total_findings,
             passed=self.passed_findings,
             failed=self.failed_findings,
-            blocking=self.blocking_findings,
-            blocking_failures=self.blocking_failures,
+            blocking=self.findings,
+            failures=self.failures,
         )
-        by_kind = list(self.counts_by_kind.values())
+        by_kind = list(self.kinds.values())
         if combined != Tally(
             total=sum(item.total for item in by_kind),
             passed=sum(item.passed for item in by_kind),
             failed=sum(item.failed for item in by_kind),
             blocking=sum(item.blocking for item in by_kind),
-            blocking_failures=sum(item.blocking_failures for item in by_kind),
+            failures=sum(item.failures for item in by_kind),
         ):
             raise errors.InputError(
                 "aggregate counts do not match counts_by_kind"
@@ -188,19 +186,19 @@ class Scorecard:
         """
         legacy = {
             "task": self.task,
-            "policy_schema_version": self.policy_schema_version,
+            "policy_schema_version": self.policy,
             "status": self.status.value,
             "total_findings": self.total_findings,
             "passed_findings": self.passed_findings,
             "failed_findings": self.failed_findings,
-            "blocking_findings": self.blocking_findings,
-            "blocking_failures": self.blocking_failures,
-            "non_blocking_failures": self.non_blocking_failures,
+            "blocking_findings": self.findings,
+            "blocking_failures": self.failures,
+            "non_blocking_failures": self.warnings,
             "counts_by_kind": {
                 kind: records.downgrade(
-                    Tally.migrations, self.counts_by_kind[kind].to_dict()
+                    Tally.migrations, self.kinds[kind].to_dict()
                 )
-                for kind in sorted(self.counts_by_kind)
+                for kind in sorted(self.kinds)
             },
         }
         return records.upgrade(self.migrations, legacy, records.ORIGIN)
@@ -227,14 +225,14 @@ class Verdict:
 
     Attributes:
         task: Task type the policy applies to.
-        policy_schema_version: Schema version of the evaluated policy.
+        policy: Schema version of the evaluated policy.
         passed: Whether no blocking finding failed.
         findings: Every finding, in the order produced.
-        blocking_reasons: The reasons of the failed blocking findings, in
+        reasons: The reasons of the failed blocking findings, in
             the order of `findings`.
         migrations: The written layout's version steps, oldest first;
-            version 2 writes `policy_schema_version` as `policy`,
-            `blocking_reasons` as `blockers` and the readiness summary at
+            version 2 writes `policy` as `policy`,
+            `reasons` as `blockers` and the readiness summary at
             its version 2.
     """
 
@@ -249,26 +247,26 @@ class Verdict:
     )
 
     task: str
-    policy_schema_version: int
+    policy: int
     passed: bool
     findings: tuple[Finding, ...]
-    blocking_reasons: tuple[str, ...]
+    reasons: tuple[str, ...]
 
     def __post_init__(self) -> None:
         """Ensures the aggregate outcome agrees with its findings.
 
         Raises:
             ValueError: If `task` is not a string or is blank,
-                `policy_schema_version` is negative, `blocking_reasons`
+                `policy` is negative, `reasons`
                 differs from the reasons of the failed blocking findings,
                 or `passed` disagrees with them.
             TypeError: If `passed` is not a bool, `findings` is not a tuple
-                of `Finding`, or `blocking_reasons` is not a tuple.
+                of `Finding`, or `reasons` is not a tuple.
         """
         task: object = self.task  # may be a non-string at runtime
         if not isinstance(task, str) or not task.strip():
             raise errors.InputError("task must not be empty")
-        if self.policy_schema_version < 0:
+        if self.policy < 0:
             raise errors.InputError(
                 "policy_schema_version must not be negative"
             )
@@ -278,14 +276,14 @@ class Verdict:
             raise errors.KindError("findings must be a tuple")
         if not all(isinstance(item, Finding) for item in self.findings):
             raise errors.KindError("findings must contain Finding values")
-        if not isinstance(self.blocking_reasons, tuple):
+        if not isinstance(self.reasons, tuple):
             raise errors.KindError("blocking_reasons must be a tuple")
         expected_reasons = tuple(
             item.reason
             for item in self.findings
             if not item.passed and item.blocking
         )
-        if self.blocking_reasons != expected_reasons:
+        if self.reasons != expected_reasons:
             raise errors.InputError("blocking_reasons do not match findings")
         if self.passed != (not expected_reasons):
             raise errors.InputError("passed does not match blocking findings")
@@ -306,10 +304,10 @@ class Verdict:
         readiness = self.tally()
         legacy = {
             "task": self.task,
-            "policy_schema_version": self.policy_schema_version,
+            "policy_schema_version": self.policy,
             "passed": self.passed,
             "blocked": self.blocked,
-            "blocking_reasons": list(self.blocking_reasons),
+            "blocking_reasons": list(self.reasons),
             "findings": [item.to_dict() for item in self.findings],
             "readiness": records.downgrade(
                 readiness.migrations, readiness.to_dict()
@@ -349,7 +347,7 @@ class Verdict:
                 passed=sum(item.passed for item in matching),
                 failed=sum(not item.passed for item in matching),
                 blocking=sum(item.blocking for item in matching),
-                blocking_failures=sum(
+                failures=sum(
                     not item.passed and item.blocking for item in matching
                 ),
             )
@@ -361,15 +359,15 @@ class Verdict:
         )
         return Scorecard(
             task=self.task,
-            policy_schema_version=self.policy_schema_version,
+            policy=self.policy,
             status=(
                 Readiness.BLOCKED if blocking_failures else Readiness.READY
             ),
             total_findings=len(self.findings),
             passed_findings=passed,
             failed_findings=failed,
-            blocking_findings=blocking,
-            blocking_failures=blocking_failures,
-            non_blocking_failures=failed - blocking_failures,
-            counts_by_kind=counts,
+            findings=blocking,
+            failures=blocking_failures,
+            warnings=failed - blocking_failures,
+            kinds=counts,
         )

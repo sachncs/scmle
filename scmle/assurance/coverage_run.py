@@ -4,7 +4,7 @@ A run that stores intervals or sets also says how often they held. After the
 final test rows are released for the evaluation, every interval method the
 bundle has (`residual`, `cv_plus` and `quantile` for regression, pooled and
 class-conditional sets for classification) is applied to those rows at each
-requested level, and `coverage.coverage_report` turns the hits into the exact
+requested level, and `coverage.report` turns the hits into the exact
 interval, the tier and, for sets, the coverage within each true class. The
 rows are read once, by the evaluation that already opened them; this module
 asks for nothing more of custody.
@@ -142,7 +142,7 @@ def regressions(
         slices: Slice labels by declared column, or None.
 
     Returns:
-        By method and level, a `coverage.coverage_report`. For each method
+        By method and level, a `coverage.report`. For each method
         the levels are tried in order and the first level the bundle cannot
         serve (`ArtifactError`) ends that method, so it and the later
         levels are omitted; a method with no served level is omitted.
@@ -165,9 +165,7 @@ def regressions(
                 values <= band["upper"].to_numpy()
             )
             widths = (band["upper"] - band["lower"]).to_numpy()
-            by_level[f"{level:g}"] = coverage.coverage_report(
-                inside, widths, level
-            )
+            by_level[f"{level:g}"] = coverage.report(inside, widths, level)
             if slices:
                 by_level[f"{level:g}"]["declared_slices"] = declare(
                     inside, widths, slices, level
@@ -195,7 +193,7 @@ def classwise(
 
     Returns:
         By `pooled` or `class_conditional` and level, a
-        `coverage.coverage_report` with the coverage within each class.
+        `coverage.report` with the coverage within each class.
     """
     truth = list(target)
     reports: dict[str, Any] = {}
@@ -210,7 +208,7 @@ def classwise(
                 ]
             )
             sizes = numpy.array([len(found) for found in sets], dtype=float)
-            by_level[f"{level:g}"] = coverage.coverage_report(
+            by_level[f"{level:g}"] = coverage.report(
                 inside, sizes, level, true_classes=[str(t) for t in truth]
             )
             if slices:

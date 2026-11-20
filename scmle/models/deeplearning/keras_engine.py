@@ -238,7 +238,7 @@ class Trainer(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships n
             network.set_weights(weights)
             self.network_ = network
 
-    def raw_outputs(self, features: Any) -> numpy.ndarray:
+    def emit(self, features: Any) -> numpy.ndarray:
         """Network outputs for new rows.
 
         Args:
@@ -297,7 +297,7 @@ class Classifier(base.ClassifierMixin, Trainer):  # type: ignore[misc]  # scikit
         Returns:
             Array of shape `(n_rows, n_classes)`; each row sums to one.
         """
-        scores = self.raw_outputs(features)
+        scores = self.emit(features)
         scores = scores - scores.max(axis=1, keepdims=True)
         exp = numpy.exp(scores)
         probabilities: numpy.ndarray = exp / exp.sum(axis=1, keepdims=True)
@@ -346,5 +346,5 @@ class Regressor(base.RegressorMixin, Trainer):  # type: ignore[misc]  # scikit-l
         Returns:
             Array of shape `(n_rows,)`.
         """
-        scaled = self.raw_outputs(features)[:, 0]
+        scaled = self.emit(features)[:, 0]
         return scaled * self.target_scale_ + self.target_mean_

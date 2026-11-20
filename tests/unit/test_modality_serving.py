@@ -18,7 +18,7 @@ from scmle.serving import modality
 import scmle.serving.modality
 
 
-class DocumentDecoder(modality.ModalitySampleDecoder):
+class DocumentDecoder(modality.Decoder):
     """Decode the deliberately small JSON document test contract."""
 
     def decode(self, payload: object) -> tuple[document.Sample, ...]:
@@ -109,10 +109,7 @@ def test_modality_http_serving_verifies_health_schema_and_predictions(
         scmle.serving.modality.ModalityHttpServing
         is modality.ModalityHttpServing
     )
-    assert (
-        scmle.serving.modality.ModalitySampleDecoder
-        is modality.ModalitySampleDecoder
-    )
+    assert scmle.serving.modality.Decoder is modality.Decoder
     reference = adapter()
     report = modality_lifecycle.Lifecycle().run(
         reference,
@@ -127,7 +124,7 @@ def test_modality_http_serving_verifies_health_schema_and_predictions(
     serving = modality.ModalityHttpServing(
         predictor,
         DocumentDecoder(),
-        max_samples=2,
+        batch=2,
     )
     serving.start()
     try:
@@ -226,14 +223,14 @@ def test_release_bound_serving_publishes_verified_lifecycle_identity(tmp_path):
     serving = modality.ModalityHttpServing(
         predictor,
         DocumentDecoder(),
-        require_lifecycle_report=True,
+        audited=True,
     )
 
     health = predictor.health()
 
     assert health["lifecycle_report_verified"] is True
     assert isinstance(health["lifecycle_report_digest"], str)
-    assert serving.require_lifecycle_report is True
+    assert serving.audited is True
 
 
 def test_release_bound_serving_rejects_unbound_predictor(tmp_path):
@@ -252,7 +249,7 @@ def test_release_bound_serving_rejects_unbound_predictor(tmp_path):
         modality.ModalityHttpServing(
             predictor,
             DocumentDecoder(),
-            require_lifecycle_report=True,
+            audited=True,
         )
 
 
@@ -285,7 +282,7 @@ def test_modality_http_serving_rejects_invalid_request_bounds():
         modality.ModalityHttpServing(
             predictor=cast("modality_lifecycle.Predictor", None),
             decoder=DocumentDecoder(),
-            max_request_bytes=0,
+            payload=0,
         )
 
 

@@ -12,7 +12,7 @@ from scipy import special
 from scmle.contracts import errors
 from scmle.evaluation.sequential.declaration import Config
 from scmle.evaluation.sequential.declaration import MATRIX_NDIM
-from scmle.evaluation.sequential.report import RegimeEstimate
+from scmle.evaluation.sequential.report import Estimate
 
 
 def regress(
@@ -48,7 +48,7 @@ def regress(
     coefficients = numpy.zeros(design.shape[1], dtype=float)
     ridge = 1e-8
     ridge_matrix = ridge * numpy.eye(design.shape[1])
-    for iteration in range(1, policy.max_iterations + 1):
+    for iteration in range(1, policy.iterations + 1):
         probabilities = special.expit(design @ coefficients)
         variance = numpy.maximum(probabilities * (1.0 - probabilities), 1e-12)
         gradient = design.T @ (probabilities - treatment) + ridge * coefficients
@@ -118,7 +118,7 @@ def average(
     outcome: numpy.ndarray,
     policy: Config,
     critical_value: float,
-) -> RegimeEstimate:
+) -> Estimate:
     """Builds a normalized weighted regime mean and influence standard error.
 
     Args:
@@ -159,7 +159,7 @@ def average(
     )
     influence = selected_weights * (selected_outcome - estimate) / weight_sum
     standard_error = math.sqrt(max(float(numpy.sum(influence**2)), 0.0))
-    return RegimeEstimate(
+    return Estimate(
         regime=regime,
         treatment=treatment,
         estimate=estimate,
@@ -169,8 +169,8 @@ def average(
             estimate + critical_value * standard_error,
         ),
         rows=len(selected_weights),
-        weight_sum=weight_sum,
-        effective_sample_size=ess,
+        weights=weight_sum,
+        ess=ess,
     )
 
 
@@ -179,8 +179,8 @@ def covary(
     comparator_mask: numpy.ndarray,
     weights: numpy.ndarray,
     outcome: numpy.ndarray,
-    target: RegimeEstimate,
-    comparator: RegimeEstimate,
+    target: Estimate,
+    comparator: Estimate,
 ) -> numpy.ndarray:
     """Estimates subject-level covariance of two normalized regime means.
 
@@ -203,12 +203,12 @@ def covary(
     target_influence[target_mask] = (
         weights[target_mask]
         * (outcome[target_mask] - target.estimate)
-        / target.weight_sum
+        / target.weights
     )
     comparator_influence[comparator_mask] = (
         weights[comparator_mask]
         * (outcome[comparator_mask] - comparator.estimate)
-        / comparator.weight_sum
+        / comparator.weights
     )
     return numpy.asarray(
         [
@@ -230,8 +230,8 @@ def referee(
     comparator_mask: numpy.ndarray,
     weights: numpy.ndarray,
     outcome: numpy.ndarray,
-    target: RegimeEstimate,
-    comparator: RegimeEstimate,
+    target: Estimate,
+    comparator: Estimate,
     tolerance: float,
 ) -> dict[str, Any]:
     """Recalculates normalized regime means through an independent path.

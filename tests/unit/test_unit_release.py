@@ -53,7 +53,7 @@ def test_the_kinds_and_readiness_values_are_stable():
     ],
 )
 def test_a_finite_real_reads_only_finite_non_bool_numbers(value, expected):
-    assert finding.finite_real(value) == expected
+    assert finding.parse(value) == expected
 
 
 def test_a_quantify_converts_numbers_and_keeps_text_and_none():
@@ -203,7 +203,7 @@ def test_an_inconsistent_tally_is_rejected(counts, error, message):
 
 
 def test_a_tally_accepts_the_boundary_counts():
-    assert finding.Tally(2, 0, 2, 2, 2).blocking_failures == 2
+    assert finding.Tally(2, 0, 2, 2, 2).failures == 2
     assert finding.Tally(0, 0, 0, 0, 0).total == 0
 
 
@@ -314,11 +314,11 @@ def test_a_tally_of_a_clean_verdict_is_ready():
     assert card.status is finding.Readiness.READY
     assert card.total_findings == 1
     assert card.passed_findings == 1
-    assert card.blocking_findings == 1
-    assert card.blocking_failures == 0
-    assert card.non_blocking_failures == 0
+    assert card.findings == 1
+    assert card.failures == 0
+    assert card.warnings == 0
     with pytest.raises(TypeError):
-        card.counts_by_kind["metric"] = None
+        card.kinds["metric"] = None
     assert not clean().blocked
 
 
@@ -363,15 +363,15 @@ def test_an_inconsistent_verdict_is_rejected(arguments, error, message):
 def scorecard(**changes):
     values = {
         "task": "t",
-        "policy_schema_version": 0,
+        "policy": 0,
         "status": finding.Readiness.READY,
         "total_findings": 0,
         "passed_findings": 0,
         "failed_findings": 0,
-        "blocking_findings": 0,
-        "blocking_failures": 0,
-        "non_blocking_failures": 0,
-        "counts_by_kind": every_kind(),
+        "findings": 0,
+        "failures": 0,
+        "warnings": 0,
+        "kinds": every_kind(),
     }
     values.update(changes)
     return verdict.Scorecard(**values)
@@ -382,12 +382,12 @@ def scorecard(**changes):
     [
         ({"task": ""}, errors.InputError, "task must not be empty"),
         (
-            {"policy_schema_version": True},
+            {"policy": True},
             errors.InputError,
             "policy_schema_version must be non-negative",
         ),
         (
-            {"policy_schema_version": -1},
+            {"policy": -1},
             errors.InputError,
             "policy_schema_version must be non-negative",
         ),
@@ -406,7 +406,7 @@ def scorecard(**changes):
             {
                 "total_findings": 1,
                 "failed_findings": 1,
-                "blocking_failures": 1,
+                "failures": 1,
                 "status": finding.Readiness.BLOCKED,
             },
             errors.InputError,
@@ -431,7 +431,7 @@ def test_an_inconsistent_scorecard_is_rejected(changes, error, message):
 
 def test_a_scorecard_requires_every_kind():
     with pytest.raises(errors.InputError, match=r"every finding kind"):
-        scorecard(counts_by_kind={})
+        scorecard(kinds={})
 
 
 def test_the_kinds_step_renames_each_kinds_counts_both_ways():
@@ -469,7 +469,7 @@ def test_a_fault_gate_blocks_incomplete_evidence(plan, observed):
     assert added.observed == observed
     assert added.expected == "execution_status=passed and release_blocked=false"
     assert added.evidence == ("fault_injection_plan.json",)
-    assert blocked.blocking_reasons == (
+    assert blocked.reasons == (
         "fault-injection recovery evidence is not complete; release blocked",
     )
     assert [f.kind for f in blocked.findings] == [
@@ -519,7 +519,7 @@ def test_a_certificate_gate_blocks_a_bad_signature(record, verified, observed):
     assert added.observed == observed
     assert added.expected == "verified hmac-sha256 attestation signature"
     assert added.evidence == ("release_attestation.json",)
-    assert blocked.blocking_reasons == (
+    assert blocked.reasons == (
         "release attestation is missing or invalid; release blocked",
     )
 
@@ -545,7 +545,7 @@ def test_a_countersign_gate_blocks_a_bad_index(index, verified, observed):
     assert added.observed == observed
     assert added.expected == "verified hmac-sha256 evidence index signature"
     assert added.evidence == ("release_evidence.json",)
-    assert blocked.policy_schema_version == 1
+    assert blocked.policy == 1
     assert blocked.task == "binary"
 
 

@@ -64,23 +64,23 @@ class Decomposition:
         kind: `squared_error` or `zero_one`.
         replicates: Bootstrap refits.
         rows: Rows predicted by enough out-of-bag refits.
-        bias_plus_noise: Mean distance of the consensus from the observed
+        confounded: Mean distance of the consensus from the observed
             values (squared and corrected for the finite number of refits
             for regression, 0-1 for classes); includes noise. It can be
             negative for regression.
         noise: Estimated irreducible error (None when it cannot be
             estimated).
-        bias: Reducible bias: `bias_plus_noise` minus `noise`, floored at 0
-            (equal to `bias_plus_noise`, without the floor, when noise is
+        bias: Reducible bias: `confounded` minus `noise`, floored at 0
+            (equal to `confounded`, without the floor, when noise is
             unknown).
         variance: Variance term.
         total: Mean error of the individual out-of-bag predictions.
-        variance_share: Variance as a share of bias plus variance.
+        share: Variance as a share of bias plus variance.
         verdict: `variance-dominated`, `bias-dominated` or `balanced`.
         advice: What the verdict suggests.
         migrations: The written layout's version steps, oldest first;
-            version 2 writes `bias_plus_noise` as `confounded` and
-            `variance_share` as `share`.
+            version 2 writes `confounded` as `confounded` and
+            `share` as `share`.
     """
 
     migrations: ClassVar[tuple[records.Migration, ...]] = (
@@ -92,12 +92,12 @@ class Decomposition:
     kind: str
     replicates: int
     rows: int
-    bias_plus_noise: float
+    confounded: float
     noise: float | None
     bias: float
     variance: float
     total: float
-    variance_share: float
+    share: float
     verdict: str
     advice: str
 
@@ -113,7 +113,7 @@ class Decomposition:
         )
 
 
-def noise_floor(
+def estimate(
     features: pandas.DataFrame, target: pandas.Series, classification: bool
 ) -> float | None:
     """Estimates the irreducible error from nearest neighbours.
@@ -293,7 +293,7 @@ def decompose(
         float(numpy.mean(bias)),
         float(numpy.mean(variance)),
     )
-    noise = noise_floor(features, target, classification)
+    noise = estimate(features, target, classification)
     mean_bias = raw_bias if noise is None else max(raw_bias - noise, 0.0)
     verdict = arbitrate(mean_variance, mean_bias)
     return Decomposition(

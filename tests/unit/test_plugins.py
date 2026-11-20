@@ -144,13 +144,13 @@ def test_the_shared_registry_holds_user_estimators():
     from scmle.models import custom
 
     try:
-        adapter = custom.register_estimator(
+        adapter = custom.register(
             "plugin_nb", classifier=naive_bayes.GaussianNB
         )
         found = plugins.REGISTRY.find(plugins.Kind.ESTIMATORS, "plugin_nb")
         assert found is adapter
     finally:
-        custom.unregister_estimator("plugin_nb")
+        custom.unregister("plugin_nb")
     assert "plugin_nb" not in plugins.REGISTRY.entries(plugins.Kind.ESTIMATORS)
 
 
@@ -171,7 +171,7 @@ def test_a_user_metric_is_enrolled_in_the_shared_registry():
     from scmle.evaluation import metrics
 
     try:
-        metric = metrics.register_metric(
+        metric = metrics.register(
             "plugin_metric", lambda truth, guess: 0.0, greater_is_better=True
         )
         assert plugins.REGISTRY.find(plugins.Kind.METRICS, "plugin_metric") is (

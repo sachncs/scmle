@@ -38,7 +38,7 @@ def test_uplift_at_k_compares_treated_and_control_in_the_top_share():
     d = experiment()
 
     top = uplift.lift(d.outcome, d.arm, d.effect, share=0.25)
-    overall = uplift.average_effect(d.outcome, d.arm)
+    overall = uplift.average(d.outcome, d.arm)
 
     assert top > overall + 0.1
 
@@ -46,9 +46,9 @@ def test_uplift_at_k_compares_treated_and_control_in_the_top_share():
 @pytest.mark.parametrize(
     "learner",
     [
-        estimators.TLearner,
-        estimators.SingleModelLearner,
-        estimators.CrossLearner,
+        estimators.Pair,
+        estimators.Pool,
+        estimators.Cross,
     ],
 )
 def test_meta_learners_recover_who_responds(learner):
@@ -107,8 +107,8 @@ def test_average_effect_is_nan_without_warning_when_an_arm_is_empty():
 
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        assert numpy.isnan(uplift.average_effect(numpy.ones(4), numpy.ones(4)))
-        assert numpy.isnan(uplift.average_effect(numpy.ones(4), numpy.zeros(4)))
+        assert numpy.isnan(uplift.average(numpy.ones(4), numpy.ones(4)))
+        assert numpy.isnan(uplift.average(numpy.ones(4), numpy.zeros(4)))
 
 
 class ClassStyleUplift(adapters.Uplift):
@@ -116,7 +116,7 @@ class ClassStyleUplift(adapters.Uplift):
 
     name = "class_style_uplift"
     capabilities = models.Capabilities(adapters.UPLIFT)
-    learner = estimators.SingleModelLearner
+    learner = estimators.Pool
 
 
 def test_configured_instances_and_class_style_subclasses_build_learners():
@@ -125,14 +125,12 @@ def test_configured_instances_and_class_style_subclasses_build_learners():
         for adapter in adapters.UPLIFT_ADAPTERS
     ]
     assert built == [
-        ("uplift_t_learner", estimators.TLearner),
-        ("uplift_s_learner", estimators.SingleModelLearner),
-        ("uplift_x_learner", estimators.CrossLearner),
-        ("uplift_linear_t_learner", estimators.TLearner),
+        ("uplift_t_learner", estimators.Pair),
+        ("uplift_s_learner", estimators.Pool),
+        ("uplift_x_learner", estimators.Cross),
+        ("uplift_linear_t_learner", estimators.Pair),
     ]
     legacy = ClassStyleUplift()
     assert (legacy.name, legacy.family) == ("class_style_uplift", "causal")
-    assert isinstance(
-        legacy.build(tasks.Task.UPLIFT, 0), estimators.SingleModelLearner
-    )
-    assert adapters.Uplift.learner is estimators.TLearner
+    assert isinstance(legacy.build(tasks.Task.UPLIFT, 0), estimators.Pool)
+    assert adapters.Uplift.learner is estimators.Pair

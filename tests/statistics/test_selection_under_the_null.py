@@ -65,7 +65,7 @@ def test_a_prespecified_comparison_of_equal_models_stays_within_its_level(
         verdict = comparison.pair(
             [-loss for loss in losses[0]], [-loss for loss in losses[1]]
         )
-        claims += verdict.probability_first_better >= CONFIDENCE
+        claims += verdict.superior >= CONFIDENCE
     support_statistics.assert_rate_at_most(
         claims / runs, LEVEL, runs, f"paired comparison, {folds} folds"
     )

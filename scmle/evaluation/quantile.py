@@ -105,17 +105,17 @@ class Band:
 
 
 @dataclasses.dataclass(frozen=True)
-class QuantileIntervals:
+class Intervals:
     """Fitted low and high quantile models plus their calibration.
 
     Attributes:
-        lower_model: Pipeline predicting the low conditional quantile.
-        upper_model: Pipeline predicting the high conditional quantile.
+        lower: Pipeline predicting the low conditional quantile.
+        upper: Pipeline predicting the high conditional quantile.
         band: Calibration misses.
     """
 
-    lower_model: Any
-    upper_model: Any
+    lower: Any
+    upper: Any
     band: Band
 
     def interval(
@@ -178,4 +178,4 @@ class QuantileIntervals:
         Returns:
             The lower and upper edges from `corridor`.
         """
-        return corridor(self.lower_model, self.upper_model, features)
+        return corridor(self.lower, self.upper, features)

@@ -10,7 +10,7 @@ the interval is flagged as optimistic.
 The winner of a search was picked because its mean score was the best of
 several, so its mean flatters it, and the more candidates were tried, the
 more it does. `selection_optimism` estimates that flattery from the fold
-scores already at hand, and `cv_interval` moves the interval by it.
+scores already at hand, and `bound` moves the interval by it.
 """
 
 import math
@@ -70,7 +70,7 @@ def selection_optimism(
     return max(apparent - float(numpy.mean(honest)), 0.0)
 
 
-def cv_interval(
+def bound(
     fold_scores: list[float],
     training_rows: float,
     validation_rows: float,

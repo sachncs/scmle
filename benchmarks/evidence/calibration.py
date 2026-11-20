@@ -188,17 +188,11 @@ NOT_MEASURED: tuple[tuple[str, str], ...] = (
         "the effect at bandwidth multiples",
     ),
     (
-        (
-            "scmle/evaluation/parameter_estimation/hierarchical.py:"
-            "fit_hierarchical_estimator"
-        ),
+        "scmle/evaluation/parameter_estimation/hierarchical.py:nest",
         "hierarchical coefficient intervals",
     ),
     (
-        (
-            "scmle/evaluation/parameter_estimation/continuous.py:"
-            "fit_continuous_estimator"
-        ),
+        "scmle/evaluation/parameter_estimation/continuous.py:reweight",
         "continuous-treatment effect intervals",
     ),
     (
@@ -646,7 +640,7 @@ def calibrate(
     coef = numpy.linalg.lstsq(x[:TRAIN], y[:TRAIN], rcond=None)[0]
     pred = x @ coef
     split = TRAIN + CALIBRATION
-    calibrator = conformal.ConformalCalibrator.for_regression(
+    calibrator = conformal.ConformalCalibrator.calibrate(
         y[TRAIN:split].tolist(), pred[TRAIN:split].tolist()
     )
     return calibrator, y[split:], pred[split:]
@@ -695,10 +689,8 @@ def reweight(rng: numpy.random.Generator) -> dict[str, float]:
     y = x + (0.5 + numpy.abs(x)) * rng.standard_normal(CALIBRATION)
     new = SHIFT + rng.standard_normal()
     outcome = new + (0.5 + abs(new)) * rng.standard_normal()
-    calibrator = conformal.ConformalCalibrator.for_regression(
-        y.tolist(), x.tolist()
-    )
-    low, high = calibrator.weighted_interval(
+    calibrator = conformal.ConformalCalibrator.calibrate(y.tolist(), x.tolist())
+    low, high = calibrator.reweight(
         [new],
         numpy.exp(SHIFT * x - SHIFT**2 / 2),
         [math.exp(SHIFT * new - SHIFT**2 / 2)],
@@ -728,7 +720,7 @@ def crossfit(rng: numpy.random.Generator) -> dict[str, float]:
         model.fit(frame.iloc[kept], y[kept])
         residuals[held] = numpy.abs(y[held] - model.predict(frame.iloc[held]))
         models.append(model)
-    ensemble = cv_plus.CvPlusEnsemble(tuple(models), fold, residuals)
+    ensemble = cv_plus.Ensemble(tuple(models), fold, residuals)
     low, high = ensemble.interval(
         frame.iloc[[TRAIN]], conformal.DEFAULT_COVERAGE
     )
@@ -746,7 +738,7 @@ def validate(rng: numpy.random.Generator) -> dict[str, float]:
         coef = numpy.linalg.lstsq(x[kept], y[kept], rcond=None)[0]
         scores.append(float(((y[held] - x[held] @ coef) ** 2).mean()))
     share = VALIDATION_ROWS / FOLDS
-    found = confidence.cv_interval(
+    found = confidence.bound(
         scores,
         VALIDATION_ROWS - share,
         share,
@@ -875,20 +867,20 @@ def weigh(
         outcome="y",
         population="simulated",
         likelihood="gaussian",
-        feature_names=("x", "t"),
+        features=("x", "t"),
         assumptions=("iid",),
     )
     policy = parameter_estimation.Config(
         estimator=estimator,
         covariance="iid",
-        treatment_position=1,
+        treatment=1,
         causal_assumptions=(
             "consistency",
             "conditional_exchangeability",
             "positivity",
         ),
     )
-    found = parameter_estimation.estimate_parameters(
+    found = parameter_estimation.infer(
         numpy.column_stack([x, t]), y, estimand, policy
     ).parameters[0]
     return {
@@ -917,15 +909,13 @@ def fit(
         outcome="y",
         population="simulated",
         likelihood=likelihood,
-        feature_names=("a", "b"),
+        features=("a", "b"),
         assumptions=("iid",),
     )
     policy = parameter_estimation.Config(estimator=estimator)
     found = {
         p.name: p
-        for p in parameter_estimation.estimate_parameters(
-            x, y, estimand, policy
-        ).parameters
+        for p in parameter_estimation.infer(x, y, estimand, policy).parameters
     }
     low, high = found["a"].interval
     return {
@@ -937,7 +927,7 @@ def fit(
 
 def sample(rng: numpy.random.Generator) -> dict[str, float]:
     """Coefficients drawn from the conjugate prior; the credible interval."""
-    prior = parameter_estimation.BayesianPrior(
+    prior = parameter_estimation.Prior(
         mean=(0.0, 0.0, 0.0),
         precision=((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)),
         shape=3.0,
@@ -953,13 +943,13 @@ def sample(rng: numpy.random.Generator) -> dict[str, float]:
         outcome="y",
         population="simulated",
         likelihood="gaussian",
-        feature_names=("a", "b"),
+        features=("a", "b"),
         assumptions=("iid",),
     )
     policy = parameter_estimation.Config(
         estimator="bayesian_linear", prior=prior, covariance="iid"
     )
-    found = parameter_estimation.estimate_parameters(x, y, estimand, policy)
+    found = parameter_estimation.infer(x, y, estimand, policy)
     low, high = found.parameters[1].interval
     return {"covered": float(low <= beta[1] <= high)}
 
@@ -1046,7 +1036,7 @@ def partition(rng: numpy.random.Generator, conformed: bool) -> dict[str, float]:
         first = rng.uniform(size=labels.size) < conformal.DEFAULT_COVERAGE
         second = rng.uniform(size=labels.size) < floor
     names = labels.tolist()
-    nominal = scmle.evaluation.coverage.slice_coverage(
+    nominal = scmle.evaluation.coverage.stratify(
         first, names, conformal.DEFAULT_COVERAGE
     )
     margin = scmle.evaluation.coverage.undercovered(
@@ -1183,7 +1173,7 @@ def donate(rng: numpy.random.Generator) -> dict[str, float]:
 
 EVALUATION = "scmle/evaluation/"
 CONFORMAL = EVALUATION + "conformal.py:ConformalCalibrator."
-ESTIMATION = EVALUATION + "parameter_estimation/estimate.py:estimate_parameters"
+ESTIMATION = EVALUATION + "parameter_estimation/estimate.py:infer"
 RD = "scmle/causal/identification/rd.py:estimate"
 SLICED = EVALUATION + "coverage.py:"
 IDENTIFICATION = "scmle/causal/identification/"
@@ -1249,19 +1239,19 @@ SCENARIOS: tuple[Scenario, ...] = (
     ),
     Scenario(
         "conformal.weighted",
-        CONFORMAL + "weighted_interval",
+        CONFORMAL + "reweight",
         reweight,
         (Rate("covered", conformal.DEFAULT_COVERAGE, -1),),
     ),
     Scenario(
         "conformal.cvplus",
-        EVALUATION + "cv_plus.py:CvPlusEnsemble.interval",
+        EVALUATION + "cv_plus.py:Ensemble.interval",
         crossfit,
         (Rate("covered", conformal.DEFAULT_COVERAGE, -1),),
     ),
     Scenario(
         "validation.interval",
-        EVALUATION + "confidence.py:cv_interval",
+        EVALUATION + "confidence.py:bound",
         validate,
         (Rate("covered", confidence.LEVEL, -1),),
     ),
@@ -1417,7 +1407,7 @@ SCENARIOS: tuple[Scenario, ...] = (
     *(
         Scenario(
             f"slices.{name}",
-            SLICED + "slice_coverage",
+            SLICED + "stratify",
             functools.partial(partition, conformed=name == "conformal"),
             (
                 Rate(

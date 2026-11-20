@@ -27,9 +27,9 @@ class Estimator:
     Attributes:
         config: Feature and estimator configuration.
         estimator: Fitted logistic regression, or None before fitting.
-        feature_names: Names of the flattened pixel features, empty before
+        names: Names of the flattened pixel features, empty before
             fitting.
-        curation_report: Curation report of the training images, or None
+        report: Curation report of the training images, or None
             before fitting.
     """
 
@@ -41,8 +41,8 @@ class Estimator:
         """
         self.config = config or Config()
         self.estimator: LogisticRegression | None = None
-        self.feature_names: tuple[str, ...] = ()
-        self.curation_report: curation.Curation | None = None
+        self.names: tuple[str, ...] = ()
+        self.report: curation.Curation | None = None
 
     @property
     def fitted(self) -> bool:
@@ -63,7 +63,7 @@ class Estimator:
         return tuple(estimator.classes_.tolist())
 
     @property
-    def model_digest(self) -> str:
+    def digest(self) -> str:
         """The SHA-256 digest of the configuration, classes and coefficients.
 
         The configuration is hashed in its version-1 layout, so renaming one
@@ -80,7 +80,7 @@ class Estimator:
             "config": records.downgrade(
                 self.config.migrations, self.config.to_dict()
             ),
-            "feature_names": self.feature_names,
+            "feature_names": self.names,
             "classes": estimator.classes_.tolist(),
             "coef": estimator.coef_.tolist(),
             "intercept": cast("numpy.ndarray", estimator.intercept_).tolist(),
@@ -130,7 +130,7 @@ class Estimator:
         if len(set(labels)) < MIN_CLASS_COUNT:
             raise errors.InputError("training images must contain two classes")
         features = training_data.flatten(
-            self.config.target_size,
+            self.config.size,
             self.config.mode,
             self.config.normalize,
         )
@@ -144,8 +144,8 @@ class Estimator:
         )
         estimator.fit(features, labels)
         self.estimator = estimator
-        self.feature_names = self.make_feature_names()
-        self.curation_report = report
+        self.names = self.label()
+        self.report = report
         return self
 
     def predict(self, dataset: image.Dataset) -> tuple[Any, ...]:
@@ -222,7 +222,7 @@ class Estimator:
         predicted = self.predict(dataset)
         probabilities = self.predict_proba(dataset)
         return Evaluation(
-            sample_count=len(dataset.samples),
+            samples=len(dataset.samples),
             accuracy=float(accuracy_score(actual, predicted)),
             macro_f1=float(f1_score(actual, predicted, average="macro")),
             log_loss=float(
@@ -242,19 +242,19 @@ class Estimator:
         """
         self.preflight()
         return dataset.flatten(
-            self.config.target_size,
+            self.config.size,
             self.config.mode,
             self.config.normalize,
         )
 
-    def make_feature_names(self) -> tuple[str, ...]:
+    def label(self) -> tuple[str, ...]:
         """Builds the names of the flattened pixel features.
 
         Returns:
             Names of the form "pixel[row,column,channel]", ordered by row,
             then column, then channel.
         """
-        width, height = self.config.target_size
+        width, height = self.config.size
         channels = 1 if self.config.mode == "L" else len(self.config.mode)
         names: list[str] = []
         for row in range(height):

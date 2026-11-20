@@ -25,7 +25,7 @@ class Stressor(abc.ABC):
     def corrupt(
         self,
         features: pandas.DataFrame,
-        inputs: diagnostics.DiagnosticInput,
+        inputs: diagnostics.Input,
         rng: numpy.random.Generator,
     ) -> pandas.DataFrame:
         """Returns a degraded copy of the features.
@@ -57,7 +57,7 @@ class Blanking(Stressor):
     def corrupt(
         self,
         features: pandas.DataFrame,
-        inputs: diagnostics.DiagnosticInput,
+        inputs: diagnostics.Input,
         rng: numpy.random.Generator,
     ) -> pandas.DataFrame:
         """Sets random cells of the input columns to missing.
@@ -72,12 +72,12 @@ class Blanking(Stressor):
             probability `rate`.
         """
         damaged = features.copy()
-        for column in inputs.feature_plan.sourced:
+        for column in inputs.plan.sourced:
             mask = rng.random(len(damaged)) < self.rate
             damaged[column] = (
                 damaged[column].astype(object).where(~mask, numpy.nan)
             )
-            if column in inputs.feature_plan.numeric:
+            if column in inputs.plan.numeric:
                 damaged[column] = pandas.to_numeric(damaged[column])
         return damaged
 
@@ -98,7 +98,7 @@ class Noise(Stressor):
     def corrupt(
         self,
         features: pandas.DataFrame,
-        inputs: diagnostics.DiagnosticInput,
+        inputs: diagnostics.Input,
         rng: numpy.random.Generator,
     ) -> pandas.DataFrame:
         """Perturbs the numeric columns.
@@ -115,8 +115,8 @@ class Noise(Stressor):
             derives itself (calendar parts, say) are not inputs.
         """
         damaged = features.copy()
-        sourced = inputs.feature_plan.sourced
-        for column in (c for c in inputs.feature_plan.numeric if c in sourced):
+        sourced = inputs.plan.sourced
+        for column in (c for c in inputs.plan.numeric if c in sourced):
             spread = float(pandas.to_numeric(damaged[column]).std())
             if not numpy.isfinite(spread):
                 spread = 0.0
@@ -126,7 +126,7 @@ class Noise(Stressor):
         return damaged
 
 
-class UnseenCategories(Stressor):
+class Novelty(Stressor):
     """Replaces a share of categorical values with a level never trained on."""
 
     def __init__(self, rate: float) -> None:
@@ -141,7 +141,7 @@ class UnseenCategories(Stressor):
     def corrupt(
         self,
         features: pandas.DataFrame,
-        inputs: diagnostics.DiagnosticInput,
+        inputs: diagnostics.Input,
         rng: numpy.random.Generator,
     ) -> pandas.DataFrame:
         """Overwrites random categorical cells with an unseen level.
@@ -156,7 +156,7 @@ class UnseenCategories(Stressor):
             `UNSEEN_TOKEN` with probability `rate`.
         """
         damaged = features.copy()
-        for column in inputs.feature_plan.categorical:
+        for column in inputs.plan.categorical:
             mask = rng.random(len(damaged)) < self.rate
             damaged[column] = (
                 damaged[column].astype(object).where(~mask, UNSEEN_TOKEN)
@@ -194,10 +194,10 @@ class Robustness(diagnostics.Diagnostic):
             Blanking(0.30),
             Noise(0.10),
             Noise(0.50),
-            UnseenCategories(0.20),
+            Novelty(0.20),
         )
 
-    def compute(self, inputs: diagnostics.DiagnosticInput) -> dict[str, Any]:
+    def compute(self, inputs: diagnostics.Input) -> dict[str, Any]:
         """Scores the model on each degraded copy of the evaluation data.
 
         Args:
@@ -225,7 +225,7 @@ class Robustness(diagnostics.Diagnostic):
             inputs.estimator,
             inputs.features,
             inputs.target,
-            inputs.positive_label,
+            inputs.positive,
         )
         longest = diagnostics.clock() - began
         rng = numpy.random.default_rng(inputs.seed)
@@ -241,7 +241,7 @@ class Robustness(diagnostics.Diagnostic):
                 inputs.estimator,
                 stressed,
                 inputs.target,
-                inputs.positive_label,
+                inputs.positive,
             )
             loss = (
                 (clean - score) if metric.greater_is_better else (score - clean)

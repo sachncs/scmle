@@ -140,7 +140,7 @@ def test_a_document_package_is_checked_before_its_payload_is_loaded(
         {
             "schema_version": 1,
             "model_path": "model.joblib",
-            "artifact_digest": documents.file_digest(model),
+            "artifact_digest": documents.digest(model),
         },
         KEY,
     )

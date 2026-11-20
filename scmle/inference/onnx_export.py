@@ -62,7 +62,7 @@ WRAPPERS = (
 )
 
 
-def load_converter() -> tuple[Any, Any]:
+def load() -> tuple[Any, Any]:
     """Imports the converter and runtime, or explains how to install them.
 
     Returns:
@@ -284,7 +284,7 @@ def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
             an inference-time calibrator is attached (the graph would not
             reproduce `predict_proba`), or when the extra is not installed.
     """
-    converter = load_converter()[0]
+    converter = load()[0]
     types = importlib.import_module("skl2onnx.common.data_types")
     task = bundle.schema.task
     if task not in {
@@ -457,7 +457,7 @@ def verify(
     """
     held = enough(frame)
     rows = len(held)
-    runtime = load_converter()[1]
+    runtime = load()[1]
     session = runtime.InferenceSession(str(path))
     outputs = session.run(None, feed(bundle, held))
     prepared = bundle.prepare(held)

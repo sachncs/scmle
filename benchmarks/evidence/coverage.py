@@ -177,13 +177,13 @@ def run(family: str, trial: int) -> dict[str, Any]:
     rows = GROUPS * GROUP_ROWS if family == "binary_groups" else TEST_ROWS
     features, target, entities = simulate(family, rng, rows)
     metric = metrics.CATALOG.resolve(None, task)
-    inputs = diagnostics.DiagnosticInput(
+    inputs = diagnostics.Input(
         model, features, target, task, metric, PLAN, trial, groups=entities
     )
     report = bootstrap.Uncertainty().compute(inputs)
     interval = report[f"ci_{bootstrap.Uncertainty.confidence}"]
     fresh, truth, _ = simulate(family, rng, FRESH_ROWS)
-    value = float(metric.score(model, fresh, truth, inputs.positive_label))
+    value = float(metric.score(model, fresh, truth, inputs.positive))
     hit = interval is not None and interval[0] <= value <= interval[1]
     return {"interval": interval, "truth": value, "hit": bool(hit)}
 

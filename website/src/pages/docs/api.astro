@@ -56,7 +56,7 @@ project = Project(
 )`}</code></pre>
 
   <h2>Run a non-tabular lifecycle explicitly</h2>
-  <p><code>ModalityProject</code> is the public entry point for typed experimental adapters. It accepts the built-in document, image, audio, video, graph, geospatial-vector, and raster families, or a caller-defined <code>Bespoke</code>, through the same fifteen-stage lifecycle. The adapter owns decoding and representation policy; the project owns signed packaging, evidence persistence, inference parity, monitoring, documentation, and recovery checks. <code>Predictor</code>, <code>ModalityHttpServing</code>, and <code>ModalitySampleDecoder</code> are also exported for verified library inference and explicit reference serving.</p>
+  <p><code>ModalityProject</code> is the public entry point for typed experimental adapters. It accepts the built-in document, image, audio, video, graph, geospatial-vector, and raster families, or a caller-defined <code>Bespoke</code>, through the same fifteen-stage lifecycle. The adapter owns decoding and representation policy; the project owns signed packaging, evidence persistence, inference parity, monitoring, documentation, and recovery checks. <code>Predictor</code>, <code>ModalityHttpServing</code>, and <code>Decoder</code> are also exported for verified library inference and explicit reference serving.</p>
   <pre><code class="language-python">from scmle.api.project import ModalityProject
 from scmle.data.modalities.document import Dataset, Sample
 from scmle.pipeline.modality_lifecycle import Plaintext
@@ -157,7 +157,7 @@ next_batch = connector.read_rows(batch.checkpoint, limit=10_000)`}</code></pre>
   <p>Curated media reports include duplicate-content label conflicts as blocking risk evidence. That is intentionally stricter than merely counting labels: two source files can be different files but the same underlying image, audio bytes, or video bytes. Image curation also blocks sensitive EXIF metadata until a privacy reviewer records a disposition.</p>
 
   <h2>What is safe to depend on</h2>
-  <p>The supported top-level exports are <code>Project</code>, <code>ModalityProject</code>, <code>Modeler</code>, <code>Predictor</code>, <code>Predictor</code>, <code>ModalityHttpServing</code>, <code>ModalitySampleDecoder</code>, <code>RunResult</code>, <code>Bundle</code>, <code>load_model</code>, <code>predict</code>, <code>register_estimator</code>, <code>unregister_estimator</code>, and <code>register_metric</code>. Internal modules under <code>scmle.pipeline</code>, <code>scmle.data</code>, and <code>scmle.models</code> may change until promoted into a documented contract.</p>
+  <p>The supported top-level exports are <code>Project</code>, <code>ModalityProject</code>, <code>Modeler</code>, <code>Predictor</code>, <code>Predictor</code>, <code>ModalityHttpServing</code>, <code>Decoder</code>, <code>RunResult</code>, <code>Bundle</code>, <code>load_model</code>, <code>predict</code>, <code>custom.register</code>, <code>custom.unregister</code>, and <code>metrics.register</code>. Internal modules under <code>scmle.pipeline</code>, <code>scmle.data</code>, and <code>scmle.models</code> may change until promoted into a documented contract.</p>
 
   <h2>Experimental document baseline</h2>
   <p>Documents have a deliberately bounded library path for exploration. It curates labelled samples before fitting, evaluates a TF-IDF/logistic baseline on a held-out split, exposes linear global/local term evidence and bounded raw-text term ablation, and writes an atomic package whose manifest verifies both the payload and model digests.</p>
@@ -485,6 +485,6 @@ print(projected.report.to_dict())`}</code></pre>
   <p>Dataset identity includes the canonical CRS and a sorted feature identity set. Reordering equivalent features therefore does not create a new snapshot, while changing the CRS always does.</p>
 
   <h2>Extending without forking</h2>
-  <p>Register an estimator or metric at application startup, give it a stable name, and cover the registration with a contract test. Keep extensions deterministic and record their package versions in the run evidence. Do not silently replace a metric used by an existing release. Estimators registered with <code>register_estimator</code> default to <code>cost=3</code>, and budgets under 300 s search only cheap models, so pass <code>cost=1</code> for a fast one or raise <code>time_budget</code>.</p>
+  <p>Register an estimator or metric at application startup, give it a stable name, and cover the registration with a contract test. Keep extensions deterministic and record their package versions in the run evidence. Do not silently replace a metric used by an existing release. Estimators registered with <code>custom.register</code> default to <code>cost=3</code>, and budgets under 300 s search only cheap models, so pass <code>cost=1</code> for a fast one or raise <code>time_budget</code>.</p>
   <div class="callout"><p><strong>Bundle compatibility:</strong> format 2 authenticates <code>schema.json</code>. Legacy format 1 bundles are refused by default and should only be migrated from a source you explicitly trust.</p></div>
 </DocsLayout>

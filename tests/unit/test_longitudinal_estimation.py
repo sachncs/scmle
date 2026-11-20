@@ -16,9 +16,9 @@ def make_estimand() -> Estimand:
     """Return the fully identified longitudinal declaration."""
     return Estimand(
         name="period_specific_treatment_effect",
-        subject_identity="subject_id",
-        time_column="time",
-        treatment_column="treatment",
+        subject="subject_id",
+        time="time",
+        treatment="treatment",
         outcome="outcome",
         covariates=("baseline_score",),
         population="eligible subjects observed at each declared period",
@@ -156,9 +156,9 @@ def test_required_assumptions_are_not_implicit() -> None:
     with pytest.raises(ValueError, match="required assumptions"):
         Estimand(
             name="period_specific_treatment_effect",
-            subject_identity="subject_id",
-            time_column="time",
-            treatment_column="treatment",
+            subject="subject_id",
+            time="time",
+            treatment="treatment",
             outcome="outcome",
             covariates=(),
             population="population",

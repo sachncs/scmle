@@ -10,7 +10,7 @@ from scmle.models.ranking import estimators
 def test_a_pointwise_adapter_wraps_a_seeded_boosting_regressor():
     adapter = adapters.Pointwise()
     built = adapter.build(tasks.Task.RANKING, 3, {"max_leaf_nodes": 9})
-    assert isinstance(built, estimators.PointwiseRanker)
+    assert isinstance(built, estimators.Scorer)
     assert isinstance(built.regressor, ensemble.HistGradientBoostingRegressor)
     assert built.regressor.random_state == 3
     assert built.regressor.max_leaf_nodes == 9
@@ -25,7 +25,7 @@ def test_a_library_ranker_keeps_its_library_and_seed():
     built = adapters.LIGHTGBM_RANKER.build(
         tasks.Task.RANKING, 5, {"learning_rate": 0.05}
     )
-    assert isinstance(built, estimators.LibraryRanker)
+    assert isinstance(built, estimators.Library)
     assert built.library == "lightgbm"
     assert built.random_state == 5
     assert built.learning_rate == 0.05

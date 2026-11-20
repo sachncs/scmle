@@ -174,11 +174,11 @@ class Estimand:
         outcome: Human-readable outcome variable name.
         population: Population and observation window represented by the data.
         likelihood: Declared likelihood, such as ``gaussian`` or ``bernoulli``.
-        feature_names: Names matching the columns supplied to the estimator.
+        features: Names matching the columns supplied to the estimator.
         assumptions: Explicit identification and sampling assumptions.
         description: Optional plain-language interpretation.
         migrations: The written layout's version steps, oldest first;
-            version 2 writes `feature_names` as `features`.
+            version 2 writes `features` as `features`.
     """
 
     migrations: ClassVar[tuple[records.Migration, ...]] = (
@@ -191,7 +191,7 @@ class Estimand:
     outcome: str
     population: str
     likelihood: str
-    feature_names: tuple[str, ...]
+    features: tuple[str, ...]
     assumptions: tuple[str, ...]
     description: str = ""
 
@@ -211,9 +211,9 @@ class Estimand:
             raise errors.InputError("estimand population must not be empty")
         if not self.likelihood.strip():
             raise errors.InputError("estimand likelihood must not be empty")
-        if not self.feature_names:
+        if not self.features:
             raise errors.InputError("estimand needs at least one feature")
-        if len(set(self.feature_names)) != len(self.feature_names):
+        if len(set(self.features)) != len(self.features):
             raise errors.InputError("estimand feature names must be unique")
         if not self.assumptions:
             raise errors.InputError("estimand needs explicit assumptions")
@@ -226,7 +226,7 @@ class Estimand:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class BayesianPrior:
+class Prior:
     """Conjugate normal-inverse-gamma prior for a Gaussian design.
 
     The coefficient order is ``("intercept", *estimand.feature_names)``.
@@ -295,7 +295,7 @@ class BayesianPrior:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ParameterEstimate:
+class Estimate:
     """One coefficient estimate and its declared uncertainty.
 
     Attributes:

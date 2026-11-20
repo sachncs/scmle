@@ -46,7 +46,7 @@ def test_the_pairwise_ranker_beats_a_constant_order_on_fresh_queries():
     learnt = ranking.mean_ndcg(truth, model.predict(fresh), labels)
     flat = ranking.mean_ndcg(
         truth,
-        scmle.models.ranking.estimators.ConstantRanker().predict(fresh),
+        scmle.models.ranking.estimators.Constant().predict(fresh),
         labels,
     )
 
@@ -126,7 +126,7 @@ def trial(rows=4000, seed=0):
 def test_a_linear_t_learner_recovers_a_linear_effect():
     x, arm, outcome, effect = trial()
 
-    model = scmle.models.uplift.estimators.TLearner(
+    model = scmle.models.uplift.estimators.Pair(
         classify=False, kind="linear"
     ).fit(x, outcome, arm)
 
@@ -137,7 +137,7 @@ def test_a_linear_t_learner_is_calibrated_on_fresh_rows():
     x, arm, outcome = trial(seed=0)[:3]
     fresh, fresh_arm, fresh_outcome = trial(seed=1)[:3]
 
-    model = scmle.models.uplift.estimators.TLearner(
+    model = scmle.models.uplift.estimators.Pair(
         classify=False, kind="linear"
     ).fit(x, outcome, arm)
     claim = calibration.uplift(
@@ -152,7 +152,7 @@ def test_a_linear_learner_with_one_class_in_an_arm_predicts_a_constant():
     arm = numpy.repeat([0, 1], 20)
     outcome = numpy.where(arm == 1, 1, numpy.arange(40) % 2)
 
-    model = scmle.models.uplift.estimators.TLearner(kind="linear").fit(
+    model = scmle.models.uplift.estimators.Pair(kind="linear").fit(
         x, outcome, arm
     )
     treated = scmle.models.uplift.estimators.expected(model.treated_, x, True)
@@ -162,7 +162,7 @@ def test_a_linear_learner_with_one_class_in_an_arm_predicts_a_constant():
 
 def test_an_unknown_outcome_family_is_a_config_error():
     with pytest.raises(errors.ConfigError, match="kind"):
-        scmle.models.uplift.estimators.TLearner(kind="forest").fit(
+        scmle.models.uplift.estimators.Pair(kind="forest").fit(
             numpy.ones((4, 1)), numpy.array([0, 1, 0, 1]), [0, 0, 1, 1]
         )
 
@@ -171,8 +171,8 @@ def test_every_learner_accepts_the_linear_family():
     x, arm, outcome, effect = trial(rows=2000)
 
     for learner in (
-        scmle.models.uplift.estimators.TLearner,
-        scmle.models.uplift.estimators.CrossLearner,
+        scmle.models.uplift.estimators.Pair,
+        scmle.models.uplift.estimators.Cross,
     ):
         model = learner(classify=False, kind="linear").fit(x, outcome, arm)
         assert numpy.abs(model.predict(x) - effect).mean() < 0.1
@@ -181,7 +181,7 @@ def test_every_learner_accepts_the_linear_family():
 def test_a_linear_s_learner_predicts_the_mean_effect_for_every_row():
     x, arm, outcome, effect = trial(rows=2000)
 
-    model = scmle.models.uplift.estimators.SingleModelLearner(
+    model = scmle.models.uplift.estimators.Pool(
         classify=False, kind="linear"
     ).fit(x, outcome, arm)
     predicted = model.predict(x)

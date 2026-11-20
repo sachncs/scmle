@@ -42,20 +42,20 @@ class ClassStyleBooster(boosters.Booster):
     family = "boosting"
     library = "not_installed_pkg"
     requires = ("not_installed_pkg",)
-    classifier_name = "Classifier"
-    regressor_name = "Regressor"
+    classifier = "Classifier"
+    regressor = "Regressor"
     capabilities = models.Capabilities(tasks.STANDARD_TASKS)
 
 
 def test_class_style_subclass_keeps_class_level_data():
     legacy = ClassStyleBooster()
     assert not legacy.is_available()
-    assert legacy.fixed_params == {} and not legacy.needs_integer_labels
-    assert legacy.stopping_rounds == early_stopping.DEFAULT_ROUNDS
-    assert boosters.CATBOOST.flatten_predictions
-    assert not boosters.XGBOOST.flatten_predictions
-    assert boosters.XGBOOST.needs_integer_labels
-    assert boosters.Booster.fixed_params == {}
+    assert legacy.fixed == {} and not legacy.relabel
+    assert legacy.rounds == early_stopping.DEFAULT_ROUNDS
+    assert boosters.CATBOOST.predictions
+    assert not boosters.XGBOOST.predictions
+    assert boosters.XGBOOST.relabel
+    assert boosters.Booster.fixed == {}
 
 
 def test_only_lightgbm_overrides_categorical_params():

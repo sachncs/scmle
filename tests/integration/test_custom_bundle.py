@@ -45,17 +45,17 @@ print(json.dumps({
 
 @pytest.fixture
 def registered():
-    scmle.models.custom.register_estimator(
+    scmle.models.custom.register(
         "centroid", classifier=support_components.Centroid
     )
-    metrics.register_metric(
+    metrics.register(
         "business_cost",
         metric_functions.business_cost,
         greater_is_better=False,
         task_types=(tasks.Task.BINARY,),
     )
     yield
-    scmle.models.custom.unregister_estimator("centroid")
+    scmle.models.custom.unregister("centroid")
     metrics.CATALOG.unregister("business_cost")
 
 
@@ -66,9 +66,7 @@ def test_custom_components_round_trip_through_a_saved_bundle(
         binary_frame,
         "y",
         metric="business_cost",
-        models=tasks.Candidates(
-            exclude_models=sorted(registry.builtin_names())
-        ),
+        models=tasks.Candidates(exclude_models=sorted(registry.inventory())),
         time_budget=300,
         output_dir=tmp_path / "runs",
     ).run()

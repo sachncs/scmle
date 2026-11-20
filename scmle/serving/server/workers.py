@@ -1,4 +1,4 @@
-"""The scoring workers of `HttpServing`, and what hung calls leave of them.
+"""The scoring workers of `Service`, and what hung calls leave of them.
 
 A scoring call cannot be cancelled in-process: one that hangs keeps its
 worker until it returns, which may be never. Two things follow, and this
@@ -174,9 +174,7 @@ class Capacity:
             ConfigError: If `patience` is not positive.
         """
         chosen = (
-            guard.STRIKES * admission.timeout_seconds
-            if patience is None
-            else patience
+            guard.STRIKES * admission.timeout if patience is None else patience
         )
         if chosen <= 0:
             raise errors.ConfigError("the patience must be positive")
@@ -194,7 +192,7 @@ class Capacity:
         """
         stuck = self.admission.state()["stuck"]
         reason = None
-        if stuck >= self.admission.max_concurrent:
+        if stuck >= self.admission.capacity:
             reason = f"{stuck} timed-out call(s) hold every worker"
         elif stuck and self.serial():
             reason = (

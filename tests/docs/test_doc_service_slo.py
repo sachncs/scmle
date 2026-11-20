@@ -77,7 +77,7 @@ def test_three_timeouts_in_a_row_wedge_livez_and_leave_history_alone(
 
     Also enforces website/src/pages/docs/service.astro:26.
     """
-    adapter = server.HttpServing(bundle, scoring_timeout_seconds=0.1)
+    adapter = server.Service(bundle, scoring_timeout_seconds=0.1)
     adapter.start()
     remembered = []
     gates = []

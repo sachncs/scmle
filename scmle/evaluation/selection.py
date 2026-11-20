@@ -147,7 +147,7 @@ class Averager(Selector):
             [sign * s for s in other.fold_scores],
             rope=self.rule.rope,
         )
-        return verdict.probability_first_better < self.rule.bayesian_confidence
+        return verdict.superior < self.rule.bayesian_confidence
 
     def rank(
         self,

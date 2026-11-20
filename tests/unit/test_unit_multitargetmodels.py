@@ -26,7 +26,7 @@ def test_the_distinct_value_floor_is_two():
 
 def test_a_per_target_fit_clones_one_model_per_column():
     x, y = labels()
-    model = estimators.PerTarget(
+    model = estimators.Panel(
         linear_model.LogisticRegression(), classify=True
     ).fit(x, y)
     assert len(model.estimators_) == 2
@@ -42,13 +42,13 @@ def test_a_per_target_fit_clones_one_model_per_column():
 def test_a_constant_label_becomes_a_prior_classifier():
     x, y = labels()
     y[:, 1] = 0
-    model = estimators.PerTarget(
+    model = estimators.Panel(
         linear_model.LogisticRegression(), classify=True
     ).fit(x, y)
     assert isinstance(model.estimators_[1], dummy.DummyClassifier)
     assert model.predict_proba(x)[:, 1].tolist() == [0.0] * 120
     y[:, 1] = 1
-    ones = estimators.PerTarget(
+    ones = estimators.Panel(
         linear_model.LogisticRegression(), classify=True
     ).fit(x, y)
     assert ones.predict_proba(x)[:, 1].tolist() == [1.0] * 120
@@ -57,7 +57,7 @@ def test_a_constant_label_becomes_a_prior_classifier():
 def test_a_constant_regression_target_keeps_the_estimator():
     x, ignored = labels()
     y = numpy.column_stack([x[:, 0] * 2, numpy.ones(120)])
-    model = estimators.PerTarget(linear_model.Ridge(alpha=1e-6)).fit(x, y)
+    model = estimators.Panel(linear_model.Ridge(alpha=1e-6)).fit(x, y)
     assert isinstance(model.estimators_[1], linear_model.Ridge)
     numpy.testing.assert_allclose(model.predict(x)[:, 1], 1.0)
     numpy.testing.assert_allclose(
@@ -106,7 +106,7 @@ def test_the_task_sets_are_fixed():
 
 def test_a_logistic_adapter_builds_one_seeded_regression_per_label():
     built = adapters.Logistic().build(tasks.Task.MULTILABEL, 4, {"C": 0.5})
-    assert isinstance(built, estimators.PerTarget)
+    assert isinstance(built, estimators.Panel)
     assert built.classify is True
     assert built.estimator.C == 0.5
     assert built.estimator.max_iter == 1000
@@ -116,15 +116,11 @@ def test_a_logistic_adapter_builds_one_seeded_regression_per_label():
 
 
 def test_a_ridge_adapter_builds_one_regression_per_quantity():
-    built = adapters.MultioutputRidge().build(
-        tasks.Task.MULTIOUTPUT, 4, {"alpha": 3.0}
-    )
+    built = adapters.Ridge().build(tasks.Task.MULTIOUTPUT, 4, {"alpha": 3.0})
     assert built.classify is False
     assert built.estimator.alpha == 3.0
-    assert (
-        adapters.MultioutputRidge.capabilities.tasks == adapters.REGRESSION_LIKE
-    )
-    assert adapters.MultioutputRidge.capabilities.cost == 1
+    assert adapters.Ridge.capabilities.tasks == adapters.REGRESSION_LIKE
+    assert adapters.Ridge.capabilities.cost == 1
 
 
 @pytest.mark.parametrize(
@@ -166,7 +162,7 @@ def test_a_forest_adapter_ignores_params_and_follows_the_task():
 def test_the_adapters_are_registered_in_order():
     assert [type(a) for a in adapters.MULTITARGET_ADAPTERS] == [
         adapters.Logistic,
-        adapters.MultioutputRidge,
+        adapters.Ridge,
         adapters.Multitarget,
         adapters.Forest,
     ]

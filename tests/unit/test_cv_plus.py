@@ -28,7 +28,7 @@ def test_interval_matches_the_bounds_function_on_the_same_inputs():
     models = (fitted(0.0), fitted(1.0), fitted(-1.0))
     fold_of_row = numpy.arange(30) % 3
     residuals = numpy.linspace(0.1, 3.0, 30)
-    ensemble = cv_plus.CvPlusEnsemble(models, fold_of_row, residuals)
+    ensemble = cv_plus.Ensemble(models, fold_of_row, residuals)
     frame = pandas.DataFrame({0: [1.5, 4.0]})
     lower, upper = ensemble.interval(frame, 0.8)
     predictions = numpy.column_stack(
@@ -42,15 +42,15 @@ def test_interval_matches_the_bounds_function_on_the_same_inputs():
 def test_too_few_rows_or_an_unknown_fold_is_refused():
     models = (fitted(0.0),)
     with pytest.raises(ValueError, match="at least"):
-        cv_plus.CvPlusEnsemble(models, numpy.zeros(5, int), numpy.ones(5))
+        cv_plus.Ensemble(models, numpy.zeros(5, int), numpy.ones(5))
     with pytest.raises(ValueError, match="without a model"):
-        cv_plus.CvPlusEnsemble(models, numpy.ones(30, int), numpy.ones(30))
+        cv_plus.Ensemble(models, numpy.ones(30, int), numpy.ones(30))
     with pytest.raises(ValueError, match="differ"):
-        cv_plus.CvPlusEnsemble(models, numpy.zeros(30, int), numpy.ones(29))
+        cv_plus.Ensemble(models, numpy.zeros(30, int), numpy.ones(29))
 
 
 def test_serialized_size_is_positive():
-    assert cv_plus.serialized_size([fitted(0.0)]) > 0
+    assert cv_plus.measure([fitted(0.0)]) > 0
 
 
 def test_from_a_thousand_rows_the_scores_are_pooled_out_of_fold():
@@ -83,7 +83,7 @@ def test_a_model_set_above_the_cap_is_not_kept_and_the_cap_is_a_parameter():
     # Enforces website/src/pages/docs/qualification.astro:72.
     held = [list(range(i, 200, 4)) for i in range(4)]
     models = [fitted(float(i)) for i in range(4)]
-    size = cv_plus.serialized_size(models)
+    size = cv_plus.measure(models)
 
     small = cv_plus.strategize(held, 200, 200, models, max_bytes=size - 1)
     large = cv_plus.strategize(held, 200, 200, models, max_bytes=size)

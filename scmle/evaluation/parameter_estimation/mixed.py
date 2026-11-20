@@ -29,7 +29,7 @@ def project(
     return symmetrized
 
 
-def hierarchical_random_slope_gls_system(
+def assemble(
     design: numpy.ndarray,
     values: numpy.ndarray,
     clusters: numpy.ndarray,
@@ -105,7 +105,7 @@ def precisions(
     return precision
 
 
-def hierarchical_random_slope_diagnostics(
+def diagnose(
     labels: tuple[Any, ...],
     random_slope_position: int,
     residual_variance: float,
@@ -417,7 +417,7 @@ def slope(
     """
     labels, random_slope_position, cluster_sizes = structure
     residual_variance, random_effect_covariance = components
-    information, right_hand_side = hierarchical_random_slope_gls_system(
+    information, right_hand_side = assemble(
         design,
         values,
         clusters,
@@ -433,7 +433,7 @@ def slope(
         if method == "two_stage_moment_gls"
         else "hierarchical REML GLS system is not identifiable",
     )
-    diagnostics = hierarchical_random_slope_diagnostics(
+    diagnostics = diagnose(
         labels,
         random_slope_position,
         residual_variance,

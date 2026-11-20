@@ -56,10 +56,10 @@ def test_load_reads_the_single_word_layout(tmp_path):
         outcome="outcome",
         population="the declared dataset",
         likelihood="gaussian",
-        feature_names=("signal",),
+        features=("signal",),
         assumptions=("the conditional mean is linear",),
     )
-    assert policy == Config(estimator="linear", confidence_level=0.9)
+    assert policy == Config(estimator="linear", confidence=0.9)
 
 
 def test_load_reads_the_version_one_layout(tmp_path):
@@ -84,8 +84,8 @@ def test_load_reads_the_version_one_layout(tmp_path):
 
     estimand, policy = estimation.load(path)
 
-    assert estimand.feature_names == ("signal",)
-    assert policy.confidence_level == 0.8
+    assert estimand.features == ("signal",)
+    assert policy.confidence == 0.8
 
 
 @pytest.mark.parametrize(

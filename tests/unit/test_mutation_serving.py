@@ -46,7 +46,7 @@ def call(url, payload=None, kind="application/json"):
 
 
 def failing(bundle, monkeypatch, error):
-    adapter = server.HttpServing(bundle)
+    adapter = server.Service(bundle)
 
     def respond(records):
         raise error
@@ -105,7 +105,7 @@ def test_an_unexpected_failure_is_internal(
 
 
 def test_a_body_that_is_not_json_is_refused_by_name(golden, bundle) -> None:
-    adapter = server.HttpServing(bundle)
+    adapter = server.Service(bundle)
     adapter.start()
     try:
         status, body = call(
@@ -128,7 +128,7 @@ def test_an_unready_service_refuses_with_a_retry_hint(golden, bundle) -> None:
         release.wait(20)
         return bundle
 
-    adapter = server.HttpServing(loader=loader)
+    adapter = server.Service(loader=loader)
     adapter.start()
     try:
         health = call(f"{adapter.address}/health")
@@ -142,17 +142,17 @@ def test_an_unready_service_refuses_with_a_retry_hint(golden, bundle) -> None:
 
 
 def test_identity_names_the_model_version(bundle) -> None:
-    adapter = server.HttpServing(bundle)
+    adapter = server.Service(bundle)
     assert adapter.identity() == {
         "model_version": "golden-1",
-        "artifact_digest": adapter.artifact_digest,
+        "artifact_digest": adapter.digest,
     }
 
 
 def test_a_warm_up_without_a_record_is_skipped_and_ready(
     bundle, monkeypatch
 ) -> None:
-    adapter = server.HttpServing(bundle)
+    adapter = server.Service(bundle)
     monkeypatch.setattr(adapter, "synthesise", lambda bundle=None: None)
     adapter.warm()
     found = adapter.readiness.snapshot()
@@ -167,7 +167,7 @@ def test_the_batch_manifest_names_its_schema_version(
 ) -> None:
     source = tmp_path / "records.csv"
     pandas.DataFrame(golden.records).to_csv(source, index=False)
-    server.Batcher(bundle).score_file(source, tmp_path / "scored.csv")
+    server.Batcher(bundle).score(source, tmp_path / "scored.csv")
     manifest = json.loads(
         (tmp_path / "scored.csv.manifest.json").read_text(encoding="utf-8")
     )

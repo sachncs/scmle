@@ -729,9 +729,7 @@ def test_g5_certifies_from_the_smallest_size_at_the_recall_floor(monkeypatch):
                 return {"flagged": [1] if len(calls) <= flagged_worlds else []}
             return {"flagged": ["0"]}
 
-        monkeypatch.setattr(
-            uncertainty_certify.coverage, "slice_coverage", fake
-        )
+        monkeypatch.setattr(uncertainty_certify.coverage, "stratify", fake)
         scripted_wilson(monkeypatch, [0.5, 0.5, 0.8, 0.9, 0.9])
         return uncertainty_certify.gate_g5(4, 10_000)
 
@@ -750,7 +748,7 @@ def test_g5_certifies_from_the_smallest_size_at_the_recall_floor(monkeypatch):
 def test_g5_without_a_certified_size_does_not_pass(monkeypatch):
     monkeypatch.setattr(
         uncertainty_certify.coverage,
-        "slice_coverage",
+        "stratify",
         lambda covered, labels, nominal=0.9: {"flagged": []},
     )
     monkeypatch.setattr(uncertainty_certify, "wilson_lower", lambda h, r: 0.1)
@@ -840,7 +838,7 @@ def test_g9_passes_on_a_negative_upper_limit_and_a_small_residual(
     def residual(value):
         monkeypatch.setattr(
             uncertainty_certify.reconcile,
-            "coherence_residual",
+            "measure",
             lambda matrix, summing: value,
         )
 

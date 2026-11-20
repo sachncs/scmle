@@ -22,7 +22,7 @@ SCALE_GRID = numpy.geomspace(0.05, 5.0, 40)
 EPSILON = 1e-12
 
 
-class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Threshold(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Ordinal classifier built from any regressor.
 
     Attributes:

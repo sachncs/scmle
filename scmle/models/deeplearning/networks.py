@@ -2,9 +2,9 @@
 
 `Network` holds the construction logic once; a network that only differs in
 its data (architecture, search space, capabilities) is a configured instance,
-such as `MLP`, not a subclass. `Jepa` and `KerasMlp` stay classes because
+such as `MLP`, not a subclass. `Jepa` and `Keras` stay classes because
 they override `build` (and `Jepa` also `objection` and `assemble`),
-and `TabPfn` builds different estimators.
+and `Tabpfn` builds different estimators.
 """
 
 from collections.abc import Mapping
@@ -44,13 +44,13 @@ class Network(models.Model):
 
     Attributes:
         architecture: Name in `architectures.ARCHITECTURES`.
-        family_contract: Modalities the family accepts.
+        contract: Modalities the family accepts.
     """
 
     family = "deep_learning"
     requires: tuple[str, ...] = ("torch",)
     architecture: str
-    family_contract: contracts.Boundary = contracts.TABULAR_TORCH_CONTRACT
+    contract: contracts.Boundary = contracts.TABULAR_TORCH_CONTRACT
     capabilities = models.Capabilities(
         tasks.STANDARD_TASKS,
         probabilities=True,
@@ -70,7 +70,7 @@ class Network(models.Model):
         search_space: search.Space | None = None,
         capabilities: models.Capabilities | None = None,
         capability_family: str | None = None,
-        family_contract: contracts.Boundary | None = None,
+        contract: contracts.Boundary | None = None,
         auto_candidate: bool | None = None,
     ) -> None:
         """Sets the declared data on this instance.
@@ -82,7 +82,7 @@ class Network(models.Model):
             capabilities: Declared capabilities.
             capability_family: Release-boundary identity, if stricter than
                 the family.
-            family_contract: Modalities the family accepts.
+            contract: Modalities the family accepts.
             auto_candidate: Whether the adapter enters automatic search.
         """
         given: dict[str, Any] = {
@@ -91,7 +91,7 @@ class Network(models.Model):
             "search_space": search_space,
             "capabilities": capabilities,
             "capability_family": capability_family,
-            "family_contract": family_contract,
+            "contract": contract,
             "auto_candidate": auto_candidate,
         }
         for attribute, value in given.items():
@@ -195,7 +195,7 @@ FT_TRANSFORMER = Network(
     name="torch_ft_transformer",
     architecture="ft_transformer",
     capability_family="transformer",
-    family_contract=contracts.TABULAR_TRANSFORMER_CONTRACT,
+    contract=contracts.TABULAR_TRANSFORMER_CONTRACT,
     auto_candidate=False,
     capabilities=dataclasses.replace(
         Network.capabilities, max_rows=100_000, cost=5, memory_factor=8.0
@@ -235,7 +235,7 @@ class Jepa(Network):
     name = "torch_jepa"
     family = "deep_learning"
     capability_family = "jepa"
-    family_contract = contracts.TABULAR_JEPA_CONTRACT
+    contract = contracts.TABULAR_JEPA_CONTRACT
     auto_candidate = False
     requires: tuple[str, ...] = ("torch",)
     capabilities = dataclasses.replace(
@@ -381,7 +381,7 @@ class Jepa(Network):
         )
 
 
-class KerasMlp(Network):
+class Keras(Network):
     """Keras dense network, run on the PyTorch backend in the same worker."""
 
     name = "keras_mlp"
@@ -427,7 +427,7 @@ class KerasMlp(Network):
         return estimators.KerasRegressor(**settings)
 
 
-class TabPfn(models.Model):
+class Tabpfn(models.Model):
     """Pretrained tabular foundation model (`tabpfn` extra, license required).
 
     Needs the `tabpfn` package and an accepted Prior Labs license for the
@@ -515,12 +515,12 @@ class TabPfn(models.Model):
 
 
 DEEP_LEARNING_ADAPTERS: tuple[models.Model, ...] = (
-    TabPfn(),
+    Tabpfn(),
     MLP,
     RESIDUAL_MLP,
     TABM,
     FT_TRANSFORMER,
     Jepa(),
     ROBUST_MLP,
-    KerasMlp(),
+    Keras(),
 )

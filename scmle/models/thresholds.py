@@ -82,7 +82,7 @@ class Accuracy(Objective):
         return float((actual == flagged).mean())
 
 
-class BalancedAccuracyObjective(Objective):
+class Balance(Objective):
     """Mean of sensitivity and specificity."""
 
     name = "balanced_accuracy"
@@ -110,12 +110,12 @@ class Costs(Objective):
     """Negative expected cost of errors (explicit operational costs).
 
     Attributes:
-        false_positive_cost: Cost of flagging a negative.
-        false_negative_cost: Cost of missing a positive.
+        alarm: Cost of flagging a negative.
+        miss: Cost of missing a positive.
     """
 
-    false_positive_cost: float = 1.0
-    false_negative_cost: float = 1.0
+    alarm: float = 1.0
+    miss: float = 1.0
     name: ClassVar[str] = "cost"
 
     def score(self, actual: numpy.ndarray, flagged: numpy.ndarray) -> float:
@@ -131,15 +131,15 @@ class Costs(Objective):
         """
         false_positives = float((~actual & flagged).sum())
         false_negatives = float((actual & ~flagged).sum())
-        total = self.false_positive_cost * false_positives
-        total += self.false_negative_cost * false_negatives
+        total = self.alarm * false_positives
+        total += self.miss * false_negatives
         return -total / max(len(actual), 1)
 
 
 OBJECTIVES: dict[str, Callable[..., Objective]] = {
     "f1": F1,
     "accuracy": Accuracy,
-    "balanced_accuracy": BalancedAccuracyObjective,
+    "balanced_accuracy": Balance,
     "cost": Costs,
 }
 

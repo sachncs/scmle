@@ -91,7 +91,7 @@ class Orchestrator:
         self.frame = frame
         if registry is None:
             registry = scmle.models.registry.Catalog.stock()
-            registry.load_plugins()
+            registry.load()
         self.registry = registry
         self.policy = policy or selection.Averager(spec.selection)
         self.stages = scmle.runtime.engine.order(
@@ -335,7 +335,7 @@ class Orchestrator:
             checkpoints=docket.trials(),
             started=docket.started,
         )
-        for name, failure in self.registry.plugin_failures.items():
+        for name, failure in self.registry.failures.items():
             board.journal.emit("plugin.rejected", f"{name}: {failure}")
         self.pipeline = engine.Pipeline(self.stages, docket)
         try:

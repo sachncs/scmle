@@ -205,8 +205,8 @@ class Admission:
         """
         if max_concurrent < 1 or timeout_seconds <= 0 or strikes < 1:
             raise errors.ConfigError("limits must be positive")
-        self.max_concurrent = max_concurrent
-        self.timeout_seconds = timeout_seconds
+        self.capacity = max_concurrent
+        self.timeout = timeout_seconds
         self.strikes = strikes
         self.slots = threading.BoundedSemaphore(max_concurrent)
         self.pool = concurrent.futures.ThreadPoolExecutor(
@@ -250,7 +250,7 @@ class Admission:
         """
         if not self.slots.acquire(blocking=False):
             raise OverloadedError(
-                f"more than {self.max_concurrent} requests in flight"
+                f"more than {self.capacity} requests in flight"
             )
         try:
             yield
@@ -287,17 +287,15 @@ class Admission:
                 CURRENT.abandoned = None
 
         with self.lock:
-            if self.busy >= self.max_concurrent:
-                raise OverloadedError(
-                    f"all {self.max_concurrent} workers are busy"
-                )
+            if self.busy >= self.capacity:
+                raise OverloadedError(f"all {self.capacity} workers are busy")
             self.busy += 1
         # The worker runs in the caller's context, so the request id bound
         # for logging and the current trace span follow the call.
         future = self.pool.submit(contextvars.copy_context().run, guarded)
         future.add_done_callback(functools.partial(self.release, flag))
         try:
-            result = future.result(timeout=self.timeout_seconds)
+            result = future.result(timeout=self.timeout)
         except concurrent.futures.TimeoutError as error:
             with self.lock:
                 if not future.done():
@@ -307,7 +305,7 @@ class Admission:
             if not flag.is_set():
                 return future.result()
             raise DeadlineError(
-                f"request exceeded {self.timeout_seconds} seconds"
+                f"request exceeded {self.timeout} seconds"
             ) from error
         with self.lock:
             self.misses = 0

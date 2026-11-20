@@ -134,9 +134,9 @@ def test_a_plugin_that_fails_conformance_is_not_registered(monkeypatch):
         plugins.metadata, "entry_points", lambda group: [Entry()]
     )
     catalog = registry.Catalog()
-    assert catalog.load_plugins() == ["doc_broken_plugin"]
+    assert catalog.load() == ["doc_broken_plugin"]
     assert "doc_broken_plugin" not in catalog.adapters
-    assert "doc_broken_plugin" in catalog.plugin_failures
+    assert "doc_broken_plugin" in catalog.failures
 
 
 def score(truth, predicted):
@@ -146,17 +146,17 @@ def score(truth, predicted):
 
 def test_readers_keep_their_snapshot_while_registrations_change():
     """Enforces docs/ARCHITECTURE.md:237."""
-    custom.register_estimator("doc_snapshot", classifier=naive_bayes.GaussianNB)
+    custom.register("doc_snapshot", classifier=naive_bayes.GaussianNB)
     try:
         before = registry.Catalog.stock()
-        custom.unregister_estimator("doc_snapshot")
+        custom.unregister("doc_snapshot")
         assert "doc_snapshot" in before.adapters
         assert "doc_snapshot" not in registry.Catalog.stock().adapters
     finally:
-        custom.unregister_estimator("doc_snapshot")
+        custom.unregister("doc_snapshot")
     catalog = metrics.Repertoire()
     table = catalog.metrics
-    names = catalog.report_names
+    names = catalog.reported
     held = dict(table)
     catalog.register(
         scmle.contracts.metrics.Formula(
@@ -200,9 +200,9 @@ def test_the_registry_lock_is_free_while_a_user_estimator_fits():
     """Enforces docs/ARCHITECTURE.md:267 (the registry half)."""
     SEEN.clear()
     try:
-        custom.register_estimator("doc_probing", classifier=Probing)
+        custom.register("doc_probing", classifier=Probing)
     finally:
-        custom.unregister_estimator("doc_probing")
+        custom.unregister("doc_probing")
     assert SEEN and all(SEEN)
 
 

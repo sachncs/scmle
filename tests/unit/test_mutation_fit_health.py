@@ -10,7 +10,7 @@ EDGE = fit_health.UNDERFIT_RELATIVE_GAIN * fit_health.TINY
 
 def test_a_validation_gain_of_exactly_tiny_has_infinite_noise() -> None:
     found = fit_health.assess([1.0, 1.0], [fit_health.TINY] * 2, 0.0)
-    assert found.noise_share == math.inf
+    assert found.noise == math.inf
 
 
 def test_a_validation_gain_on_the_underfit_edge_is_underfit() -> None:

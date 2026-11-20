@@ -26,11 +26,9 @@ def test_bigger_models_are_larger_and_slower():
     )[0]
     tiny = resources.measure(small, features)
     big = resources.measure(large, features)
-    assert big.model_mb > 10 * tiny.model_mb
-    assert big.p95_latency_ms > tiny.p95_latency_ms
-    assert (
-        tiny.rows_timed == resources.LATENCY_ROWS and "python" in tiny.machine
-    )
+    assert big.size > 10 * tiny.size
+    assert big.latency > tiny.latency
+    assert tiny.timed == resources.LATENCY_ROWS and "python" in tiny.machine
 
 
 def test_measurement_does_not_modify_the_model_or_data():
@@ -59,4 +57,4 @@ def test_usage_serializes():
         "timed": 30,
         "machine": "m",
     }
-    assert pytest.approx(usage.model_mb) == 1.5
+    assert pytest.approx(usage.size) == 1.5

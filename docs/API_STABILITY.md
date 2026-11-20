@@ -13,8 +13,8 @@ The pinned names, by module, are:
 * `scmle.api.clustering` (`Segmentation`, `cluster`, `evaluate`) for
   clustering, and `scmle.api.erasure` (`Forgetting`, `Retirement`,
   `Deletion`, `Subject`, `Receipt`, `RetiredError`) for erasure;
-* `register_estimator`, `unregister_estimator` and `register_metric` in the
-  modules that define them, for extension.
+* `register` and `unregister` in `scmle.models.custom` and `register` in
+  `scmle.evaluation.metrics`, for extension.
 
 `tests/fixtures/public_api.json` (schema version 2) lists every pinned name
 under its module with the digest of its signature, and
@@ -239,6 +239,21 @@ Phase 6 renamed the pinned data-store names to single words, with no alias:
 
 The fields of `processing.Processing` and `quality.Assessment` changed with
 them; [RENAMES](RENAMES.md) lists every renamed member.
+
+Phase 6 lane `models` renamed these pinned names, with no alias:
+
+| Old name | New name |
+|---|---|
+| `parameter_estimation.BayesianPrior` | `parameter_estimation.Prior` |
+| `parameter_estimation.ParameterEstimate` | `parameter_estimation.Estimate` |
+| `parameter_estimation.estimate_parameters` | `parameter_estimation.infer` |
+| `longitudinal.PeriodATE` | `longitudinal.Period` |
+| `sequential.PeriodDiagnostics` | `sequential.Diagnostics` |
+| `sequential.RegimeEstimate` | `sequential.Estimate` |
+| `metrics.register_metric` | `metrics.register` |
+| `custom.register_estimator` | `custom.register` |
+| `custom.unregister_estimator` | `custom.unregister` |
+| `modality.ModalitySampleDecoder` | `modality.Decoder` |
 
 ## Training runners
 

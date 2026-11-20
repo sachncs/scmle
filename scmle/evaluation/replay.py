@@ -67,7 +67,7 @@ class Replay(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn is untyp
         return self.probabilities
 
 
-class ClassifierPredictions(base.ClassifierMixin, Replay):  # type: ignore[misc]  # scikit-learn is untyped
+class Predictions(base.ClassifierMixin, Replay):  # type: ignore[misc]  # scikit-learn is untyped
     """Stored predictions that scikit-learn treats as a classifier."""
 
 

@@ -6,7 +6,7 @@ path that makes its curation, feature, evaluation, explanation, packaging,
 and drift boundaries explicit.
 """
 
-from scmle.models.images.archive import file_digest
+from scmle.models.images.archive import digest
 from scmle.models.images.classifier import Classifier
 from scmle.models.images.monitor import Monitor
 from scmle.models.images.records import Config
@@ -23,5 +23,5 @@ __all__ = [
     "Explanation",
     "Monitor",
     "Package",
-    "file_digest",
+    "digest",
 ]

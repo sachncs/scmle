@@ -66,10 +66,10 @@ def faults(outcome: Verdict, reliability_plan: Any) -> Verdict:
     )
     return Verdict(
         task=outcome.task,
-        policy_schema_version=outcome.policy_schema_version,
+        policy=outcome.policy,
         passed=False,
         findings=findings,
-        blocking_reasons=blocking_reasons,
+        reasons=blocking_reasons,
     )
 
 
@@ -139,10 +139,10 @@ def certify(
     )
     return Verdict(
         task=outcome.task,
-        policy_schema_version=outcome.policy_schema_version,
+        policy=outcome.policy,
         passed=False,
         findings=findings,
-        blocking_reasons=blocking_reasons,
+        reasons=blocking_reasons,
     )
 
 
@@ -205,8 +205,8 @@ def countersign(
     )
     return Verdict(
         task=outcome.task,
-        policy_schema_version=outcome.policy_schema_version,
+        policy=outcome.policy,
         passed=False,
         findings=findings,
-        blocking_reasons=blocking_reasons,
+        reasons=blocking_reasons,
     )

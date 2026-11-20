@@ -360,7 +360,7 @@ class ConformalCalibrator(Margins):
     conditional: tuple[tuple[float, ...], ...] = ()
 
     @classmethod
-    def for_regression(
+    def calibrate(
         cls, observed: Sequence[float], predicted: Sequence[float]
     ) -> Self:
         """Calibrates from out-of-sample predictions.
@@ -467,7 +467,7 @@ class ConformalCalibrator(Margins):
         margin = self.margin(coverage)
         return values - margin, values + margin
 
-    def weighted_interval(
+    def reweight(
         self,
         predictions: Sequence[float] | numpy.ndarray,
         calibration_weights: Sequence[float] | numpy.ndarray,

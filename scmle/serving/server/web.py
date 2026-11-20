@@ -27,7 +27,7 @@ LOGGER = logging.getLogger("scmle.serving")
 
 
 class Observer(Protocol):
-    """What `HttpServing` tells an operations monitor (duck-typed)."""
+    """What `Service` tells an operations monitor (duck-typed)."""
 
     def tally(self, at: float, route: str, status: int, seconds: float) -> None:
         """Records one finished request.
@@ -113,7 +113,7 @@ class Watch:
             LOGGER.exception("the signal monitor failed on a new bundle")
 
 
-class HttpServing(contract.Server, Watch):
+class Service(contract.Server, Watch):
     """JSON-over-HTTP serving on a background thread.
 
     Endpoints:
@@ -136,9 +136,9 @@ class HttpServing(contract.Server, Watch):
         bundle: scmle.artifacts.bundle.Bundle | None = None,
         host: str = "127.0.0.1",
         port: int = 0,
-        max_request_bytes: int = contract.MAX_REQUEST_BYTES,
-        max_records: int = contract.MAX_REQUEST_RECORDS,
-        request_timeout_seconds: float = 10.0,
+        payload: int = contract.MAX_REQUEST_BYTES,
+        batch: int = contract.MAX_REQUEST_RECORDS,
+        timeout: float = 10.0,
         *,
         loader: contract.Loader | None = None,
         max_concurrent: int = contract.MAX_CONCURRENT_REQUESTS,
@@ -148,7 +148,7 @@ class HttpServing(contract.Server, Watch):
         warmup_records: list[dict[str, Any]] | None = None,
         gateway: access.Gateway | None = None,
         monitor: Observer | None = None,
-        drain_seconds: float | None = None,
+        drain: float | None = None,
     ) -> None:
         """Initializes the HTTP adapter and its admission limits.
 
@@ -156,9 +156,9 @@ class HttpServing(contract.Server, Watch):
             bundle: Model to serve, verified and loaded by the caller.
             host: Interface to bind (loopback by default).
             port: Port; 0 picks a free one.
-            max_request_bytes: Maximum JSON request body size.
-            max_records: Maximum records accepted by one prediction request.
-            request_timeout_seconds: Maximum time allowed for request I/O.
+            payload: Maximum JSON request body size.
+            batch: Maximum records accepted by one prediction request.
+            timeout: Maximum time allowed for request I/O.
             loader: Instead of `bundle`: loads it in the background, driving
                 the `Readiness` it is given (`/readyz` is 503 meanwhile).
             max_concurrent: Requests allowed in flight.
@@ -171,7 +171,7 @@ class HttpServing(contract.Server, Watch):
                 may only bind a loopback address.
             monitor: Told every finished request, scored batch and bundle
                 served (see `Watch`, which never lets it fail serving).
-            drain_seconds: Time `stop` waits for requests in flight; see
+            drain: Time `stop` waits for requests in flight; see
                 `patience` for the default.
 
         Raises:
@@ -183,7 +183,7 @@ class HttpServing(contract.Server, Watch):
         """
         if (bundle is None) == (loader is None):
             raise errors.ConfigError("give exactly one of bundle and loader")
-        if min(max_request_bytes, max_records, request_timeout_seconds) <= 0:
+        if min(payload, batch, timeout) <= 0:
             raise errors.InputError(
                 "request bounds and timeouts must be positive"
             )
@@ -196,9 +196,9 @@ class HttpServing(contract.Server, Watch):
         self.loader = loader
         self.host = host
         self.port = port
-        self.max_request_bytes = max_request_bytes
-        self.max_records = max_records
-        self.request_timeout_seconds = request_timeout_seconds
+        self.payload = payload
+        self.batch = batch
+        self.timeout = timeout
         self.capacity = workers.enlist(
             max_concurrent, scoring_timeout_seconds, self.serial
         )
@@ -206,9 +206,7 @@ class HttpServing(contract.Server, Watch):
         self.httpd: Listener | None = None
         self.thread: threading.Thread | None = None
         self.loading: threading.Thread | None = None
-        self.drain_seconds = patience(
-            request_timeout_seconds, scoring_timeout_seconds, drain_seconds
-        )
+        self.drain = patience(timeout, scoring_timeout_seconds, drain)
         self.draining = False
         self.swap = threading.Lock()
 
@@ -243,13 +241,13 @@ class HttpServing(contract.Server, Watch):
             null and unseen-category policies.
         """
         return {
-            "max_request_bytes": self.max_request_bytes,
-            "max_records": self.max_records,
-            "max_concurrent": self.admission.max_concurrent,
-            "scoring_timeout_seconds": self.admission.timeout_seconds,
-            "request_timeout_seconds": self.request_timeout_seconds,
-            "on_null": self.on_null,
-            "on_unseen": self.on_unseen,
+            "max_request_bytes": self.payload,
+            "max_records": self.batch,
+            "max_concurrent": self.admission.capacity,
+            "scoring_timeout_seconds": self.admission.timeout,
+            "request_timeout_seconds": self.timeout,
+            "on_null": self.missing,
+            "on_unseen": self.unseen,
         }
 
     def boot(self) -> None:
@@ -283,7 +281,7 @@ class HttpServing(contract.Server, Watch):
         snapshot = self.readiness.snapshot()
         if snapshot["ready"]:
             gateway.audit.activation(
-                self.bundle.info.model_version, self.artifact_digest
+                self.bundle.info.model_version, self.digest
             )
         else:
             gateway.audit.record(
@@ -309,14 +307,14 @@ class HttpServing(contract.Server, Watch):
         """
         if (
             request.expected_schema_digest is not None
-            and request.expected_schema_digest != self.schema_digest
+            and request.expected_schema_digest != self.layout
         ):
             raise serving.MismatchError(
                 "the model's input schema differs from the one the caller "
                 "expects",
                 {
                     "expected": request.expected_schema_digest,
-                    "served": self.schema_digest,
+                    "served": self.layout,
                 },
             )
         response = self.respond(request.records)
@@ -360,10 +358,8 @@ class HttpServing(contract.Server, Watch):
             self.readiness = staged
             self.follow(fresh)
             self.announce()
-        LOGGER.info(
-            "reloaded the bundle: %s -> %s", before, self.artifact_digest
-        )
-        return self.artifact_digest
+        LOGGER.info("reloaded the bundle: %s -> %s", before, self.digest)
+        return self.digest
 
     def start(self) -> None:
         """Binds the socket and serves in a daemon thread.
@@ -399,12 +395,12 @@ class HttpServing(contract.Server, Watch):
         to their daemon threads and logged.
 
         Args:
-            grace: Seconds to wait for requests in flight; `drain_seconds`
+            grace: Seconds to wait for requests in flight; `drain`
                 by default.
         """
         if self.httpd is not None:
             self.draining = True
-            self.httpd.close(self.drain_seconds if grace is None else grace)
+            self.httpd.close(self.drain if grace is None else grace)
         if self.thread is not None:
             self.thread.join(timeout=5)
         self.admission.close()
@@ -432,7 +428,7 @@ def publish(error: Exception) -> str:
 
 
 def patience(request: float, scoring: float, chosen: float | None) -> float:
-    """The time `HttpServing.stop` gives the requests in flight.
+    """The time `Service.stop` gives the requests in flight.
 
     Args:
         request: The request I/O timeout, in seconds.
@@ -454,7 +450,7 @@ def patience(request: float, scoring: float, chosen: float | None) -> float:
 
 
 class Listener(server.ThreadingHTTPServer):
-    """The threaded HTTP server that backs `HttpServing`.
+    """The threaded HTTP server that backs `Service`.
 
     Attributes:
         flight: Connections accepted and not yet answered.

@@ -46,11 +46,11 @@ class Classifier(Archive):
             raise errors.OrderError("classifier is not fitted")
         strengths = numpy.mean(numpy.abs(estimator.coef_), axis=0)
         selected = sorted(
-            zip(self.feature_names, strengths, strict=True),
+            zip(self.names, strengths, strict=True),
             key=lambda item: (-float(item[1]), item[0]),
         )[:top_k]
         return Explanation(
-            model_digest=self.model_digest,
+            digest=self.digest,
             input_hash=None,
             method="linear_global_pixel_weight",
             terms=tuple((name, float(value)) for name, value in selected),
@@ -101,14 +101,14 @@ class Classifier(Archive):
             coefficients = estimator.coef_[class_index]
         contributions = sorted(
             zip(
-                self.feature_names,
+                self.names,
                 matrix[0] * coefficients,
                 strict=True,
             ),
             key=lambda item: (-abs(float(item[1])), item[0]),
         )[:top_k]
         return Explanation(
-            model_digest=self.model_digest,
+            digest=self.digest,
             input_hash=sample.content_hash,
             method="linear_local_pixel_contribution",
             terms=tuple((name, float(value)) for name, value in contributions),
@@ -155,7 +155,7 @@ class Classifier(Archive):
         self.preflight()
         features = self.transform(image.Dataset((sample,)))
         original_score = self.confidence(features)
-        width, height = self.config.target_size
+        width, height = self.config.size
         channels = 1 if self.config.mode == "L" else len(self.config.mode)
         patch_width, patch_height = patch_size
         terms: list[tuple[str, float]] = []
@@ -183,7 +183,7 @@ class Classifier(Archive):
             key=lambda item: (-abs(item[1]), item[0]),
         )[:top_k]
         return Explanation(
-            model_digest=self.model_digest,
+            digest=self.digest,
             input_hash=sample.content_hash,
             method="occlusion_pixel_region",
             terms=tuple(selected),

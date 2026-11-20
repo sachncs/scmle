@@ -1,6 +1,6 @@
 """Register any scikit-learn-compatible estimator as a model family.
 
-`register_estimator` builds an adapter around estimator classes, runs the
+`register` builds an adapter around estimator classes, runs the
 shared conformance suite on it, and adds it to the models every later project
 considers. The classes must be importable by reference (defined at module
 level), because trial processes receive the adapter by pickle.
@@ -28,22 +28,22 @@ class Registration:
         name: Registry name.
         classifier: Classifier class, if the model does classification.
         regressor: Regressor class, if the model does regression.
-        search_space: Tunable hyperparameters, if any.
+        space: Tunable hyperparameters, if any.
         family: Coarse family for reports.
-        needs_scaling: Benefits from standardized inputs.
-        handles_missing: Handles missing values natively.
-        sparse_input: Accepts sparse matrices.
+        scaling: Benefits from standardized inputs.
+        missing: Handles missing values natively.
+        sparse: Accepts sparse matrices.
         cost: Relative training cost from 1 to 5.
     """
 
     name: str
     classifier: type | None
     regressor: type | None
-    search_space: search.Space | None = None
+    space: search.Space | None = None
     family: str = "custom"
-    needs_scaling: bool = False
-    handles_missing: bool = False
-    sparse_input: bool = False
+    scaling: bool = False
+    missing: bool = False
+    sparse: bool = False
     cost: int = 3
 
 
@@ -71,13 +71,13 @@ def rebuild(spec: Registration) -> models.Model:
         "family": spec.family,
         "classifier": spec.classifier,
         "regressor": spec.regressor,
-        "search_space": spec.search_space,
+        "search_space": spec.space,
         "capabilities": models.Capabilities(
             supported,
             probabilities=probabilities,
-            needs_scaling=spec.needs_scaling,
-            handles_missing=spec.handles_missing,
-            sparse_input=spec.sparse_input,
+            needs_scaling=spec.scaling,
+            handles_missing=spec.missing,
+            sparse_input=spec.sparse,
             cost=spec.cost,
         ),
         "spec": spec,
@@ -88,7 +88,7 @@ def rebuild(spec: Registration) -> models.Model:
     return learner
 
 
-def register_estimator(
+def register(
     name: str,
     classifier: type[base.BaseEstimator] | None = None,
     regressor: type[base.BaseEstimator] | None = None,
@@ -129,7 +129,7 @@ def register_estimator(
         raise errors.ConfigError(
             f"{name}: give a classifier class, a regressor class, or both"
         )
-    if name in registry.builtin_names():
+    if name in registry.inventory():
         raise errors.ConfigError(f"'{name}' is a built-in model name")
     if name in plugins.REGISTRY.entries(plugins.Kind.ESTIMATORS) and not (
         replace
@@ -155,10 +155,10 @@ def register_estimator(
     return adapter
 
 
-def unregister_estimator(name: str) -> None:
+def unregister(name: str) -> None:
     """Removes a registered estimator (no-op if it is not registered).
 
     Args:
-        name: Public model name given to `register_estimator`.
+        name: Public model name given to `register`.
     """
     plugins.REGISTRY.withdraw(plugins.Kind.ESTIMATORS, name)

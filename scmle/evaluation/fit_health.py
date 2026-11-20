@@ -34,11 +34,11 @@ class Health:
         validation_gain: Mean validation-fold gain over the baseline.
         retained: Share of the training gain kept on validation (1 means
             none was lost).
-        noise_share: Validation fold-to-fold spread relative to the gain.
+        noise: Validation fold-to-fold spread relative to the gain.
         note: What the verdict means and what could be done.
         migrations: The written layout's version steps, oldest first;
             version 2 writes the two gains as `gains.{training, validation}`
-            and `noise_share` as `noise`.
+            and `noise` as `noise`.
     """
 
     migrations: ClassVar[tuple[records.Migration, ...]] = (
@@ -57,14 +57,14 @@ class Health:
     train_gain: float
     validation_gain: float
     retained: float
-    noise_share: float
+    noise: float
     note: str
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the assessment as a plain dictionary.
 
         Returns:
-            A mapping of every field of the assessment. `noise_share` is
+            A mapping of every field of the assessment. `noise` is
             infinity when the validation gain is about zero.
         """
         return records.upgrade(

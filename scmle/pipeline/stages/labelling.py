@@ -145,13 +145,13 @@ class Labelling(interface.Stage):
         metric = board.services.catalog.resolve(spec.primary_metric, task)
         unknown = sorted(
             set(spec.problem.success_criteria)
-            - set(board.services.catalog.report_names[task])
+            - set(board.services.catalog.reported[task])
         )
         if unknown:
             raise errors.ConfigError(
                 f"success criteria name unreported metrics {unknown}; "
                 "available: "
-                f"{sorted(board.services.catalog.report_names[task])}"
+                f"{sorted(board.services.catalog.reported[task])}"
             )
         return Resolution(task, metric, frame, unlabeled, labels, notes)
 

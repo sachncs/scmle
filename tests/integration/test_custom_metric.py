@@ -12,7 +12,7 @@ import scmle.evaluation.metrics
 
 @pytest.fixture
 def registered():
-    metric = scmle.evaluation.metrics.register_metric(
+    metric = scmle.evaluation.metrics.register(
         "business_cost",
         metric_functions.business_cost,
         greater_is_better=False,
@@ -45,10 +45,10 @@ def test_registering_twice_needs_replace_and_unknown_tasks_are_rejected(
     registered,
 ):
     with pytest.raises(errors.ConfigError, match="already exists"):
-        scmle.evaluation.metrics.register_metric(
+        scmle.evaluation.metrics.register(
             "business_cost", metric_functions.business_cost, False
         )
-    scmle.evaluation.metrics.register_metric(
+    scmle.evaluation.metrics.register(
         "business_cost",
         metric_functions.business_cost,
         False,
@@ -66,7 +66,7 @@ def test_a_regression_metric_can_be_user_defined(tmp_path):
     rng = numpy.random.default_rng(2)
     frame = pandas.DataFrame({"x": rng.uniform(1, 5, 400)})
     frame["y"] = 3 * frame.x + rng.normal(0, 0.3, 400)
-    scmle.evaluation.metrics.register_metric(
+    scmle.evaluation.metrics.register(
         "mape",
         metric_functions.mean_absolute_percentage,
         greater_is_better=False,

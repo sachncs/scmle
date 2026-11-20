@@ -74,7 +74,7 @@ HELD = Pictures(
 
 
 def config(**changes):
-    values = {"target_size": (2, 2)}
+    values = {"size": (2, 2)}
     values.update(changes)
     return records.Config(**values)
 
@@ -102,7 +102,7 @@ def test_the_record_constants_are_fixed():
     ("changes", "message"),
     [
         (
-            {"target_size": (0, 4)},
+            {"size": (0, 4)},
             "target_size must contain two positive integers",
         ),
         ({"mode": "CMYK"}, "mode must be one of"),
@@ -170,7 +170,7 @@ def test_a_drift_is_shifted_when_a_signal_passes_the_threshold(
 def test_an_unfitted_estimator_refuses_to_predict():
     model = estimator.Estimator()
     assert model.config == records.Config()
-    assert model.feature_names == ()
+    assert model.names == ()
     assert model.fitted is False
     with pytest.raises(
         errors.OrderError, match="image classifier has not been fitted"
@@ -179,8 +179,8 @@ def test_an_unfitted_estimator_refuses_to_predict():
 
 
 def test_feature_names_follow_row_column_channel_order():
-    model = estimator.Estimator(config(target_size=(2, 1), mode="RGB"))
-    assert model.make_feature_names() == (
+    model = estimator.Estimator(config(size=(2, 1), mode="RGB"))
+    assert model.label() == (
         "pixel[0,0,0]",
         "pixel[0,0,1]",
         "pixel[0,0,2]",
@@ -188,8 +188,8 @@ def test_feature_names_follow_row_column_channel_order():
         "pixel[0,1,1]",
         "pixel[0,1,2]",
     )
-    grey = estimator.Estimator(config(target_size=(1, 2), mode="L"))
-    assert grey.make_feature_names() == ("pixel[0,0,0]", "pixel[1,0,0]")
+    grey = estimator.Estimator(config(size=(1, 2), mode="L"))
+    assert grey.label() == ("pixel[0,0,0]", "pixel[1,0,0]")
 
 
 def test_a_fit_matches_a_logistic_regression_on_flattened_pixels(fitted):
@@ -199,7 +199,7 @@ def test_a_fit_matches_a_logistic_regression_on_flattened_pixels(fitted):
     )
     model.fit(features, [s.label for s in TRAINING.samples])
     numpy.testing.assert_allclose(fitted.estimator.coef_, model.coef_)
-    assert len(fitted.feature_names) == 12
+    assert len(fitted.names) == 12
     assert fitted.classes == ("blue", "red")
     assert fitted.predict(HELD) == ("red", "blue")
     numpy.testing.assert_allclose(
@@ -215,7 +215,7 @@ def test_a_model_digest_hashes_the_version_one_config(fitted):
         "config": scmle.contracts.records.downgrade(
             records.Config.migrations, config().to_dict()
         ),
-        "feature_names": list(fitted.feature_names),
+        "feature_names": list(fitted.names),
         "classes": fitted.estimator.classes_.tolist(),
         "coef": fitted.estimator.coef_.tolist(),
         "intercept": fitted.estimator.intercept_.tolist(),
@@ -223,7 +223,7 @@ def test_a_model_digest_hashes_the_version_one_config(fitted):
     encoded = json.dumps(
         state, ensure_ascii=True, sort_keys=True, separators=(",", ":")
     ).encode()
-    assert fitted.model_digest == hashlib.sha256(encoded).hexdigest()
+    assert fitted.digest == hashlib.sha256(encoded).hexdigest()
     assert "target_size" in state["config"]
 
 
@@ -282,7 +282,7 @@ def test_an_unfitted_estimator_refuses_its_properties():
     with pytest.raises(
         errors.OrderError, match="image classifier has not been fitted"
     ):
-        assert model.model_digest is None
+        assert model.digest is None
     with pytest.raises(
         errors.OrderError, match="image classifier has not been fitted"
     ):
@@ -290,13 +290,13 @@ def test_an_unfitted_estimator_refuses_its_properties():
 
 
 def test_a_fit_keeps_the_curation_report(fitted):
-    assert fitted.curation_report is TRAINING.report
+    assert fitted.report is TRAINING.report
     assert fitted.fitted is True
 
 
 def test_an_evaluation_scores_held_out_images(fitted):
     found = fitted.evaluate(HELD)
-    assert found.sample_count == 2
+    assert found.samples == 2
     assert found.accuracy == 1.0
     assert found.macro_f1 == 1.0
     assert found.labels == ("blue", "red")
@@ -330,7 +330,7 @@ def test_an_overview_ranks_mean_absolute_pixel_weights(fitted):
     found = fitted.overview(top_k=4)
     strengths = numpy.abs(fitted.estimator.coef_).mean(axis=0)
     expected = sorted(
-        zip(fitted.feature_names, strengths, strict=True),
+        zip(fitted.names, strengths, strict=True),
         key=lambda i: (-float(i[1]), i[0]),
     )[:4]
     assert found.terms == tuple((n, float(v)) for n, v in expected)
@@ -346,7 +346,7 @@ def test_a_spotlight_signs_pixels_toward_the_predicted_class(fitted, wrapped):
     features = fitted.transform(Pictures((target,)))[0]
     coefficients = -fitted.estimator.coef_[0]
     expected = sorted(
-        zip(fitted.feature_names, features * coefficients, strict=True),
+        zip(fitted.names, features * coefficients, strict=True),
         key=lambda i: (-abs(float(i[1])), i[0]),
     )[:5]
     assert found.terms == tuple((n, float(v)) for n, v in expected)
@@ -390,7 +390,7 @@ def test_an_occlusion_zeroes_each_patch_and_reports_the_drop(fitted, wrapped):
     )
     assert found.method == "occlusion_pixel_region"
     assert found.input_hash == target.content_hash
-    assert found.model_digest == fitted.model_digest
+    assert found.digest == fitted.digest
     whole = fitted.occlude(target, top_k=10, patch_size=(3, 3))
     assert [n for n, ignored in whole.terms] == ["region[0:2,0:2]"]
     assert whole.terms[0][1] == pytest.approx(
@@ -426,11 +426,11 @@ def test_a_package_round_trips_with_trust_and_writes_version_two(
 ):
     target = tmp_path / "model"
     package = fitted.save(target)
-    assert package.digest == archive.file_digest(target / "model.joblib")
+    assert package.digest == archive.digest(target / "model.joblib")
     manifest = json.loads((target / "manifest.json").read_text())
     assert manifest["schema_version"] == archive.MANIFEST == 2
     loaded = classifier.Classifier.load(target, trusted=True)
-    assert loaded.model_digest == fitted.model_digest
+    assert loaded.digest == fitted.digest
     path = target / "manifest.json"
     for version in (1, 2):
         path.write_text(json.dumps({**manifest, "schema_version": version}))
@@ -476,13 +476,13 @@ def test_a_monitor_measures_mean_pixel_distance():
     same = watcher.observe(
         Pictures(TRAINING.samples, Report([100.0, 50.0, 0.0]))
     )
-    assert same.mean_pixel_distance == 0.0
-    assert same.duplicate_rate == 0.0
+    assert same.pixels == 0.0
+    assert same.duplicates == 0.0
     assert same.shifted is False
     observed = Report([151.0, 50.0, 0.0], duplicates=1, count=4)
     drift = watcher.observe(Pictures(TRAINING.samples, observed))
-    assert drift.mean_pixel_distance == pytest.approx(51.0 / 3 / 255)
-    assert drift.duplicate_rate == 0.25
+    assert drift.pixels == pytest.approx(51.0 / 3 / 255)
+    assert drift.duplicates == 0.25
     assert drift.shifted is True
     assert drift.threshold == 0.1
     assert drift.reference_hash == reference.dataset_hash
@@ -492,7 +492,7 @@ def test_a_monitor_measures_mean_pixel_distance():
 def test_a_monitor_rates_an_empty_observation_without_dividing_by_zero():
     watcher = monitor.Monitor(Report([0.0]), 1.0)
     found = watcher.observe(Pictures((), Report([0.0], duplicates=0, count=0)))
-    assert found.duplicate_rate == 0.0
+    assert found.duplicates == 0.0
     assert found.shifted is False
 
 

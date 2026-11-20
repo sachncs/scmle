@@ -15,6 +15,7 @@ from scmle.evaluation.envelope import Counts
 from scmle.evaluation.envelope import Envelope
 from scmle.evaluation.envelope import fold
 from scmle.evaluation.envelope import lowercase
+from scmle.evaluation.envelope import rename
 from scmle.evaluation.envelope import unfold
 from scmle.evaluation.sequential.declaration import Config
 from scmle.evaluation.sequential.declaration import COVARIANCE_DIMENSION
@@ -43,23 +44,23 @@ NESTED = {
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class PeriodDiagnostics:
+class Diagnostics:
     """Auditable propensity and cumulative-weight evidence for one period.
 
     Attributes:
         period: Label of the period.
         rows: Number of subjects in the period.
-        treated_rows: Number of subjects treated in the period.
-        control_rows: Number of subjects not treated in the period.
+        treated: Number of subjects treated in the period.
+        control: Number of subjects not treated in the period.
         denominator_propensity_min: Smallest fitted denominator propensity.
         denominator_propensity_max: Largest fitted denominator propensity.
         numerator_propensity_min: Smallest fitted numerator propensity.
         numerator_propensity_max: Largest fitted numerator propensity.
-        fraction_weight_truncated: Share of subjects whose cumulative weight
+        truncated: Share of subjects whose cumulative weight
             exceeds the cap, in [0, 1].
-        maximum_untruncated_weight: Largest cumulative weight before the cap.
-        maximum_weight: Largest cumulative weight after the cap.
-        effective_sample_size: Kish effective sample size of the capped
+        untruncated: Largest cumulative weight before the cap.
+        weight: Largest cumulative weight after the cap.
+        ess: Kish effective sample size of the capped
             cumulative weights.
         migrations: The written layout's version steps, oldest first;
             version 2 writes `treated`, `control`,
@@ -94,16 +95,16 @@ class PeriodDiagnostics:
 
     period: str
     rows: int
-    treated_rows: int
-    control_rows: int
+    treated: int
+    control: int
     denominator_propensity_min: float
     denominator_propensity_max: float
     numerator_propensity_min: float
     numerator_propensity_max: float
-    fraction_weight_truncated: float
-    maximum_untruncated_weight: float
-    maximum_weight: float
-    effective_sample_size: float
+    truncated: float
+    untruncated: float
+    weight: float
+    ess: float
 
     def __post_init__(self) -> None:
         """Validates finite, reconcilable period diagnostics.
@@ -117,12 +118,12 @@ class PeriodDiagnostics:
         """
         if not self.period:
             raise errors.InputError("period label must not be empty")
-        if self.rows < 1 or self.treated_rows < 1 or self.control_rows < 1:
+        if self.rows < 1 or self.treated < 1 or self.control < 1:
             raise errors.InputError("period row counts must be positive")
-        if self.treated_rows + self.control_rows != self.rows:
+        if self.treated + self.control != self.rows:
             raise errors.InputError("period arm counts must reconcile to rows")
-        self.check_finite()
-        if not 0.0 <= self.fraction_weight_truncated <= 1.0:
+        self.check()
+        if not 0.0 <= self.truncated <= 1.0:
             raise errors.InputError(
                 "fraction_weight_truncated must lie between 0 and 1"
             )
@@ -136,12 +137,12 @@ class PeriodDiagnostics:
                 raise errors.InputError(
                     f"{name} must lie strictly between 0 and 1"
                 )
-        if self.maximum_untruncated_weight <= 0.0 or self.maximum_weight <= 0.0:
+        if self.untruncated <= 0.0 or self.weight <= 0.0:
             raise errors.InputError("weight bounds must be positive")
-        if self.effective_sample_size <= 0.0:
+        if self.ess <= 0.0:
             raise errors.InputError("effective_sample_size must be positive")
 
-    def check_finite(self) -> None:
+    def check(self) -> None:
         """Checks that every numeric field of the period is finite.
 
         Raises:
@@ -152,10 +153,10 @@ class PeriodDiagnostics:
             ("denominator_propensity_max", self.denominator_propensity_max),
             ("numerator_propensity_min", self.numerator_propensity_min),
             ("numerator_propensity_max", self.numerator_propensity_max),
-            ("fraction_weight_truncated", self.fraction_weight_truncated),
-            ("maximum_untruncated_weight", self.maximum_untruncated_weight),
-            ("maximum_weight", self.maximum_weight),
-            ("effective_sample_size", self.effective_sample_size),
+            ("fraction_weight_truncated", self.truncated),
+            ("maximum_untruncated_weight", self.untruncated),
+            ("maximum_weight", self.weight),
+            ("effective_sample_size", self.ess),
         ):
             if not math.isfinite(float(value)):
                 raise errors.InputError(f"{name} must be finite")
@@ -172,7 +173,7 @@ class PeriodDiagnostics:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class RegimeEstimate:
+class Estimate:
     """A weighted mean outcome for one sustained treatment regime.
 
     Attributes:
@@ -182,8 +183,8 @@ class RegimeEstimate:
         standard_error: Influence-function standard error of the estimate.
         interval: Lower and upper confidence limits of the estimate.
         rows: Number of subjects whose full history follows the regime.
-        weight_sum: Sum of the capped cumulative weights of those subjects.
-        effective_sample_size: Kish effective sample size of those weights.
+        weights: Sum of the capped cumulative weights of those subjects.
+        ess: Kish effective sample size of those weights.
         migrations: The written layout's version steps, oldest first;
             version 2 writes `se`, `weights` and `ess`.
     """
@@ -206,8 +207,8 @@ class RegimeEstimate:
     standard_error: float
     interval: tuple[float, float]
     rows: int
-    weight_sum: float
-    effective_sample_size: float
+    weights: float
+    ess: float
 
     def __post_init__(self) -> None:
         """Validates finite regime-level evidence.
@@ -222,9 +223,9 @@ class RegimeEstimate:
             raise errors.InputError("regime name must not be empty")
         if self.treatment not in (0, 1):
             raise errors.InputError("regime treatment must be 0 or 1")
-        if self.rows < 1 or self.weight_sum <= 0.0:
+        if self.rows < 1 or self.weights <= 0.0:
             raise errors.InputError("regime needs positive rows and weight sum")
-        if self.effective_sample_size <= 0.0:
+        if self.ess <= 0.0:
             raise errors.InputError(
                 "regime effective sample size must be positive"
             )
@@ -325,16 +326,16 @@ class Estimation(Envelope):
             parts={
                 "estimand": Estimand.migrations[0],
                 "policy": Config.migrations[0],
-                "periods": PeriodDiagnostics.migrations[0],
-                "regimes": RegimeEstimate.migrations[0],
+                "periods": Diagnostics.migrations[0],
+                "regimes": Estimate.migrations[0],
             },
         ),
     )
 
     estimand: Estimand
     policy: Config
-    periods: tuple[PeriodDiagnostics, ...]
-    regimes: tuple[RegimeEstimate, ...]
+    periods: tuple[Diagnostics, ...]
+    regimes: tuple[Estimate, ...]
     contrast: Contrast
     covariance: tuple[tuple[float, ...], ...]
     rows: Counts
@@ -440,10 +441,11 @@ class Estimation(Envelope):
             The result built from the record; field validation runs on
             construction.
         """
-        # The parts were written in single words at version 3; the fields
-        # keep their version-2 names.
+        # The parts were written in single words at version 3. They are read
+        # at version 2, where the nested groups are flat, and the keys whose
+        # fields took single words are renamed back to the fields.
         record = records.downgrade(cls.migrations[1:], dict(record))
-        estimand_values = dict(record["estimand"])
+        estimand_values = rename(Estimand, record["estimand"])
         estimand_values["baseline_covariates"] = tuple(
             estimand_values["baseline_covariates"]
         )
@@ -451,12 +453,13 @@ class Estimation(Envelope):
             estimand_values["time_varying_covariates"]
         )
         estimand_values["assumptions"] = tuple(estimand_values["assumptions"])
-        policy = Config(**dict(record["policy"]))
+        policy = Config(**rename(Config, record["policy"]))
         periods = tuple(
-            PeriodDiagnostics(**dict(item)) for item in record["periods"]
+            Diagnostics(**rename(Diagnostics, item))
+            for item in record["periods"]
         )
         regimes = tuple(
-            RegimeEstimate(
+            Estimate(
                 regime=str(item["regime"]),
                 treatment=int(item["treatment"]),
                 estimate=float(item["estimate"]),
@@ -466,8 +469,8 @@ class Estimation(Envelope):
                     float(item["interval"][1]),
                 ),
                 rows=int(item["rows"]),
-                weight_sum=float(item["weight_sum"]),
-                effective_sample_size=float(item["effective_sample_size"]),
+                weights=float(item["weight_sum"]),
+                ess=float(item["effective_sample_size"]),
             )
             for item in record["regimes"]
         )

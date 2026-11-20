@@ -103,15 +103,15 @@ class Settings:
             device: `auto`, `cpu` or `cuda`.
             random_state: Seed for initialisation, masking and shuffling.
         """
-        self.hidden_size = hidden_size
-        self.embedding_size = embedding_size
-        self.mask_probability = mask_probability
+        self.hidden = hidden_size
+        self.embedding = embedding_size
+        self.probability = mask_probability
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
         self.epochs = epochs
         self.batch_size = batch_size
-        self.ema_decay = ema_decay
-        self.variance_weight = variance_weight
+        self.decay = ema_decay
+        self.weight = variance_weight
         self.device = device
         self.random_state = random_state
 
@@ -158,8 +158,8 @@ class Settings:
                 batch size, the variance weight or the device name is
                 invalid.
         """
-        hidden_size: object = self.hidden_size
-        embedding_size: object = self.embedding_size
+        hidden_size: object = self.hidden
+        embedding_size: object = self.embedding
         epochs: object = self.epochs
         if (
             not isinstance(hidden_size, (int, numpy.integer))
@@ -173,14 +173,14 @@ class Settings:
                 "JEPA layer sizes must be positive integers"
             )
         if (
-            not numpy.isfinite(self.mask_probability)
-            or not 0.0 < self.mask_probability < 1.0
+            not numpy.isfinite(self.probability)
+            or not 0.0 < self.probability < 1.0
         ):
             raise errors.InputError(
                 "mask_probability must be finite and lie strictly between "
                 "0 and 1"
             )
-        if not numpy.isfinite(self.ema_decay) or not 0.0 < self.ema_decay < 1.0:
+        if not numpy.isfinite(self.decay) or not 0.0 < self.decay < 1.0:
             raise errors.InputError(
                 "ema_decay must be finite and lie strictly between 0 and 1"
             )
@@ -204,10 +204,7 @@ class Settings:
             raise errors.InputError(
                 "batch_size must be auto or a positive integer"
             )
-        if (
-            not numpy.isfinite(self.variance_weight)
-            or self.variance_weight < 0.0
-        ):
+        if not numpy.isfinite(self.weight) or self.weight < 0.0:
             raise errors.InputError(
                 "variance_weight must be finite and non-negative"
             )
@@ -250,10 +247,10 @@ class Settings:
             "epochs": self.epochs,
             "losses": losses,
             "final_loss": losses[-1],
-            "embedding_size": self.embedding_size,
-            "mask_probability": self.mask_probability,
-            "ema_decay": self.ema_decay,
-            "variance_regularization": self.variance_weight,
+            "embedding_size": self.embedding,
+            "mask_probability": self.probability,
+            "ema_decay": self.decay,
+            "variance_regularization": self.weight,
             "device": device,
         }
 
@@ -292,7 +289,7 @@ class Trainer(Settings):
         )
         alignment = (prediction - target_embedding).pow(2).mean()
         variance = torch.relu(1.0 - prediction.std(dim=0)).mean()
-        loss = alignment + self.variance_weight * variance
+        loss = alignment + self.weight * variance
         optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(network.parameters(), 5.0)
@@ -303,12 +300,10 @@ class Trainer(Settings):
                 network.module.context_encoder.parameters(),
                 strict=True,
             ):
-                target.mul_(self.ema_decay).add_(
-                    source, alpha=1.0 - self.ema_decay
-                )
+                target.mul_(self.decay).add_(source, alpha=1.0 - self.decay)
         return float(loss.detach().cpu())
 
-    def train_epoch(
+    def train(
         self,
         torch: Any,
         network: Network,
@@ -339,7 +334,7 @@ class Trainer(Settings):
             batch = tensor[order[start : start + batch_rows]]
             mask = (
                 torch.rand(batch.shape, generator=generator, device=device)
-                < self.mask_probability
+                < self.probability
             )
             epoch_losses.append(
                 self.learn(torch, network, optimizer, batch, mask)
@@ -381,9 +376,7 @@ class Trainer(Settings):
         torch.manual_seed(self.random_state)
         device = self.place(torch)
         self.input_width_ = matrix.shape[1]
-        network = Network(
-            torch, self.input_width_, self.hidden_size, self.embedding_size
-        )
+        network = Network(torch, self.input_width_, self.hidden, self.embedding)
         network.module.to(device)
         optimizer = torch.optim.AdamW(
             network.parameters(),
@@ -403,7 +396,7 @@ class Trainer(Settings):
             map(
                 operator.call,
                 itertools.repeat(
-                    lambda: self.train_epoch(
+                    lambda: self.train(
                         torch,
                         network,
                         optimizer,
@@ -528,8 +521,8 @@ class Trainer(Settings):
             network = Network(
                 torch,
                 self.input_width_,
-                self.hidden_size,
-                self.embedding_size,
+                self.hidden,
+                self.embedding,
             )
             network.load_state_dict(
                 {

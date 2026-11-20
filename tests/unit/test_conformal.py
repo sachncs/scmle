@@ -16,9 +16,7 @@ def noisy_regression(rows, rng):
 def test_regression_intervals_cover_at_the_requested_rate():
     rng = numpy.random.default_rng(0)
     predicted, observed = noisy_regression(2000, rng)
-    calibrator = conformal.ConformalCalibrator.for_regression(
-        observed, predicted
-    )
+    calibrator = conformal.ConformalCalibrator.calibrate(observed, predicted)
 
     new_predicted, new_observed = noisy_regression(20000, rng)
     low, high = calibrator.interval(new_predicted, coverage=0.9)
@@ -31,9 +29,7 @@ def test_regression_intervals_cover_at_the_requested_rate():
 def test_any_coverage_level_can_be_asked_for_later():
     rng = numpy.random.default_rng(6)
     predicted, observed = noisy_regression(3000, rng)
-    calibrator = conformal.ConformalCalibrator.for_regression(
-        observed, predicted
-    )
+    calibrator = conformal.ConformalCalibrator.calibrate(observed, predicted)
 
     assert calibrator.margin(0.5) < calibrator.margin(0.8)
     assert calibrator.margin(0.8) < calibrator.margin(0.95)
@@ -64,8 +60,8 @@ def test_classification_sets_cover_and_shrink_when_the_model_is_sure():
 def test_too_few_rows_or_bad_coverage_is_rejected():
     values = numpy.arange(10.0)
     with pytest.raises(ValueError, match="at least"):
-        conformal.ConformalCalibrator.for_regression(values, values + 1)
-    calibrator = conformal.ConformalCalibrator.for_regression(
+        conformal.ConformalCalibrator.calibrate(values, values + 1)
+    calibrator = conformal.ConformalCalibrator.calibrate(
         numpy.arange(50.0), numpy.arange(50.0) + 1
     )
     with pytest.raises(ValueError, match="strictly between"):
@@ -81,9 +77,7 @@ def test_demanding_coverage_with_few_rows_gives_an_infinite_margin():
 def test_round_trip_and_wrong_kind_errors():
     rng = numpy.random.default_rng(2)
     predicted, observed = noisy_regression(200, rng)
-    calibrator = conformal.ConformalCalibrator.for_regression(
-        observed, predicted
-    )
+    calibrator = conformal.ConformalCalibrator.calibrate(observed, predicted)
 
     restored = conformal.ConformalCalibrator.from_dict(calibrator.to_dict())
 

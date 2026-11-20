@@ -188,21 +188,21 @@ DEFAULT_METRICS = (
         tasks=frozenset({tasks.Task.MULTIOUTPUT}),
         kind="mae_scaled",
     ),
-    forecast.ForecastMetric(
+    forecast.Metric(
         "mase",
         "",
         greater_is_better=False,
         tasks=frozenset({tasks.Task.FORECAST}),
         kind="mase",
     ),
-    forecast.ForecastMetric(
+    forecast.Metric(
         "forecast_mae",
         "",
         greater_is_better=False,
         tasks=frozenset({tasks.Task.FORECAST}),
         kind="mae",
     ),
-    forecast.ForecastMetric(
+    forecast.Metric(
         "forecast_smape",
         "",
         greater_is_better=False,
@@ -223,35 +223,35 @@ DEFAULT_METRICS = (
         tasks=frozenset({tasks.Task.UPLIFT}),
         kind="uplift_at_30",
     ),
-    ranking.RankingMetric(
+    ranking.Metric(
         "ndcg",
         "",
         greater_is_better=True,
         tasks=frozenset({tasks.Task.RANKING}),
         kind="ndcg",
     ),
-    ranking.RankingMetric(
+    ranking.Metric(
         "map",
         "",
         greater_is_better=True,
         tasks=frozenset({tasks.Task.RANKING}),
         kind="map",
     ),
-    ranking.RankingMetric(
+    ranking.Metric(
         "mrr",
         "",
         greater_is_better=True,
         tasks=frozenset({tasks.Task.RANKING}),
         kind="mrr",
     ),
-    ranking.RankingMetric(
+    ranking.Metric(
         "precision_at_10",
         "",
         greater_is_better=True,
         tasks=frozenset({tasks.Task.RANKING}),
         kind="precision_at_10",
     ),
-    ranking.RankingMetric(
+    ranking.Metric(
         "recall_at_10",
         "",
         greater_is_better=True,
@@ -284,7 +284,7 @@ DEFAULT_METRICS = (
 class Repertoire:
     """Resolves metric names and applies the report protocol."""
 
-    default_metric = {
+    default = {
         tasks.Task.BINARY: "roc_auc",
         tasks.Task.MULTICLASS: "log_loss",
         tasks.Task.REGRESSION: "rmse",
@@ -296,7 +296,7 @@ class Repertoire:
         tasks.Task.FORECAST: "mase",
         tasks.Task.UPLIFT: "qini",
     }
-    report_names = {
+    reported = {
         tasks.Task.BINARY: (
             "roc_auc",
             "pr_auc",
@@ -347,9 +347,8 @@ class Repertoire:
         """
         self.lock = threading.RLock()
         self.metrics = {metric.name: metric for metric in metrics}
-        self.report_names = {
-            task: tuple(names)
-            for task, names in type(self).report_names.items()
+        self.reported = {
+            task: tuple(names) for task, names in type(self).reported.items()
         }
 
     def register(
@@ -373,13 +372,13 @@ class Repertoire:
                 raise errors.ConfigError(
                     f"metric '{metric.name}' already exists"
                 )
-            report_names = dict(self.report_names)
+            report_names = dict(self.reported)
             for task in metric.tasks:
                 names = report_names[task]
                 if metric.name not in names:
                     report_names[task] = (*names, metric.name)
             self.metrics = {**self.metrics, metric.name: metric}
-            self.report_names = report_names
+            self.reported = report_names
 
     def unregister(self, name: str) -> None:
         """Removes a metric by name (no-op if it is not registered).
@@ -396,9 +395,9 @@ class Repertoire:
             shelf = plugins.REGISTRY.entries(plugins.Kind.METRICS)
             if shelf.get(name) is self.metrics.get(name):
                 plugins.REGISTRY.withdraw(plugins.Kind.METRICS, name)
-            self.report_names = {
+            self.reported = {
                 task: tuple(n for n in names if n != name)
-                for task, names in self.report_names.items()
+                for task, names in self.reported.items()
             }
             self.metrics = {
                 key: value for key, value in self.metrics.items() if key != name
@@ -420,7 +419,7 @@ class Repertoire:
         Raises:
             ConfigError: If the name is unknown or invalid for the task.
         """
-        name = name or self.default_metric[task]
+        name = name or self.default[task]
         if name == "roc_auc" and task is tasks.Task.MULTICLASS:
             name = "roc_auc_ovr"
         metric = self.metrics.get(name)
@@ -467,7 +466,7 @@ class Repertoire:
             if task is tasks.Task.BINARY and classes is not None
             else None
         )
-        names = self.report_names[task]
+        names = self.reported[task]
         table = self.metrics  # One snapshot, immune to concurrent changes.
         for name in names:
             if name not in table:  # Unregistered since `names` was read.
@@ -485,7 +484,7 @@ class Repertoire:
 CATALOG = Repertoire()
 
 
-def register_metric(
+def register(
     name: str,
     score_function: Callable[..., float],
     greater_is_better: bool,

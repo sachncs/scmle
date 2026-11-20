@@ -27,7 +27,7 @@ import numpy
 DIAGONAL_FLOOR = 1e-12
 
 
-def bottom_up(
+def aggregate(
     bottom_forecasts: numpy.ndarray, summing: numpy.ndarray
 ) -> numpy.ndarray:
     """Coherent forecasts by summing the bottom-level forecasts.
@@ -108,9 +108,7 @@ def mint(
     return reconciled
 
 
-def coherence_residual(
-    forecasts: numpy.ndarray, summing: numpy.ndarray
-) -> float:
+def measure(forecasts: numpy.ndarray, summing: numpy.ndarray) -> float:
     """Largest gap between each series and the sum of its bottom series.
 
     The bottom series are taken to be the last `m` columns of `forecasts`

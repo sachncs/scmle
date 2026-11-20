@@ -24,20 +24,20 @@ class Comparison:
     """Posterior belief about which of two candidates is better.
 
     Attributes:
-        mean_difference: Mean of (first - second) over the folds.
-        probability_first_better: Posterior probability that the true
+        difference: Mean of (first - second) over the folds.
+        superior: Posterior probability that the true
             difference exceeds the ROPE in favour of the first candidate.
-        probability_equivalent: Posterior probability that the true
+        equivalent: Posterior probability that the true
             difference lies inside the ROPE.
-        probability_second_better: Posterior probability that the true
+        inferior: Posterior probability that the true
             difference exceeds the ROPE in favour of the second candidate.
         folds: Number of paired fold scores used.
     """
 
-    mean_difference: float
-    probability_first_better: float
-    probability_equivalent: float
-    probability_second_better: float
+    difference: float
+    superior: float
+    equivalent: float
+    inferior: float
     folds: int
 
 

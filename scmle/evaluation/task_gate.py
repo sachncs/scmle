@@ -45,7 +45,7 @@ def status(task: tasks.Task) -> str:
     return row["status"] if row else "no_referent"
 
 
-def tier_ceiling(task: tasks.Task, tier: str) -> str:
+def cap(task: tasks.Task, tier: str) -> str:
     """Caps a tier at `unverified` unless the task type passed its gate.
 
     Args:

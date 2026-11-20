@@ -16,9 +16,7 @@ def shifted_inputs(offset):
     reference = base.features.copy()
     moved = base.features.copy()
     moved["signal"] = moved["signal"] + offset
-    return dataclasses.replace(
-        base, features=moved, reference_features=reference
-    )
+    return dataclasses.replace(base, features=moved, reference=reference)
 
 
 def test_identical_distributions_are_indistinguishable():
@@ -29,9 +27,7 @@ def test_identical_distributions_are_indistinguishable():
     data = dataclasses.replace(
         base,
         features=base.features.iloc[order[:half]].reset_index(drop=True),
-        reference_features=base.features.iloc[order[half:]].reset_index(
-            drop=True
-        ),
+        reference=base.features.iloc[order[half:]].reset_index(drop=True),
     )
 
     report = shift.Adversary().compute(data)
@@ -50,9 +46,7 @@ def test_category_frequency_changes_are_ranked_too():
     base = test_diagnostics.make_inputs(tasks.Task.BINARY, rows=1200)
     moved = base.features.copy()
     moved["group"] = "a"
-    data = dataclasses.replace(
-        base, features=moved, reference_features=base.features
-    )
+    data = dataclasses.replace(base, features=moved, reference=base.features)
 
     report = shift.Adversary().compute(data)
 
@@ -109,9 +103,7 @@ def no_shift():
     data = dataclasses.replace(
         base,
         features=base.features.iloc[order[:half]].reset_index(drop=True),
-        reference_features=base.features.iloc[order[half:]].reset_index(
-            drop=True
-        ),
+        reference=base.features.iloc[order[half:]].reset_index(drop=True),
     )
     return shift.Adversary().compute(data)
 
@@ -151,11 +143,11 @@ def test_adversary_cost_grows_with_rows_and_columns():
     adversary = shift.Adversary()
     more = dataclasses.replace(
         small,
-        reference_features=pandas.concat([small.reference_features] * 2),
+        reference=pandas.concat([small.reference] * 2),
     )
     narrow = dataclasses.replace(
         small,
-        feature_plan=dataclasses.replace(small.feature_plan, categorical=()),
+        plan=dataclasses.replace(small.plan, categorical=()),
     )
 
     assert adversary.estimate(more) > adversary.estimate(small)

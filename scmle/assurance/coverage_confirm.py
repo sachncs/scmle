@@ -173,7 +173,7 @@ def decide(
 
 
 def capped(task: str, status: str) -> str:
-    """The status after the task type's gate (`task_gate.tier_ceiling`).
+    """The status after the task type's gate (`task_gate.cap`).
 
     A task type that has not passed its measured gate cannot carry a
     `confirmed` status; the cap never raises a status.
@@ -189,7 +189,7 @@ def capped(task: str, status: str) -> str:
     """
     if status != CONFIRMED:
         return status
-    return task_gate.tier_ceiling(tasks.Task(task), status)
+    return task_gate.cap(tasks.Task(task), status)
 
 
 def held(

@@ -68,7 +68,7 @@ def call(base, path, token=None, payload=None):
 def service(reference):
     clock = support_identity.Clock()
     gate = gateway(clock)
-    adapter = server.HttpServing(reference, gateway=gate)
+    adapter = server.Service(reference, gateway=gate)
     adapter.start()
     try:
         yield adapter, gate, clock
@@ -155,7 +155,7 @@ def test_before_it_is_ready_the_probe_gives_no_model_identity():
     def failing(readiness):
         raise errors.ArtifactError("bundle is tampered with")
 
-    adapter = server.HttpServing(
+    adapter = server.Service(
         loader=failing, gateway=gateway(support_identity.Clock())
     )
     adapter.start()
@@ -179,7 +179,7 @@ def test_refusals_use_three_fixed_messages(reference):
     clock = support_identity.Clock()
     ticks = support_identity.Clock(0.0)
     gate = gateway(clock, limiter=access.RateLimiter(1.0, 1, clock=ticks))
-    adapter = server.HttpServing(reference, gateway=gate)
+    adapter = server.Service(reference, gateway=gate)
     adapter.start()
     try:
         payload = {"records": records(reference)}
@@ -221,7 +221,7 @@ def test_audit_rows_carry_the_request_id_and_never_a_body(reference, tmp_path):
     clock = support_identity.Clock()
     path = tmp_path / "audit.jsonl"
     gate = gateway(clock, audit.Log.open(path, clock=clock))
-    adapter = server.HttpServing(reference, gateway=gate)
+    adapter = server.Service(reference, gateway=gate)
     adapter.start()
     token = bearer(clock)
     try:

@@ -96,9 +96,9 @@ class Batcher(contract.Server):
             "source": str(source.resolve()),
             "size": status.st_size,
             "modified": status.st_mtime_ns,
-            "artifact_digest": self.artifact_digest,
-            "on_null": self.on_null,
-            "on_unseen": self.on_unseen,
+            "artifact_digest": self.digest,
+            "on_null": self.missing,
+            "on_unseen": self.unseen,
         }
 
     def recall(
@@ -236,7 +236,7 @@ class Batcher(contract.Server):
                 gc.collect()
         return state, "sha256:" + digest.hexdigest()
 
-    def score_file(
+    def score(
         self,
         source: str | pathlib.Path,
         destination: str | pathlib.Path,
@@ -289,8 +289,8 @@ class Batcher(contract.Server):
         manifest = {
             "schema_version": serving.SCHEMA_VERSION,
             "model_version": self.bundle.info.model_version,
-            "artifact_digest": self.artifact_digest,
-            "schema_digest": self.schema_digest,
+            "artifact_digest": self.digest,
+            "schema_digest": self.layout,
             "rows": state.rows,
             "output_sha256": digest,
             **state.flagged,

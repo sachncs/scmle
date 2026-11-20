@@ -31,7 +31,7 @@ def world(rows=120, seed=0):
 @pytest.fixture(scope="module")
 def fitted():
     x, y = world()
-    return estimate.estimate_parameters(
+    return estimate.infer(
         x, y, estimand(), config.Config(estimator="linear", covariance="iid")
     )
 
@@ -51,7 +51,7 @@ def test_an_ingestion_keeps_rows_and_adds_an_intercept():
     assert values.tolist() == y[1:].tolist()
     assert design[:, 0].tolist() == [1.0] * 119
     assert clusters is None
-    assert digest == inputs.raw_input_fingerprint(x, y, None)
+    assert digest == inputs.imprint(x, y, None)
 
 
 def test_an_ingestion_rejects_a_two_dimensional_outcome():
@@ -104,13 +104,11 @@ def test_a_linear_estimation_reports_t_intervals(fitted):
 def test_a_clustered_estimation_adds_cluster_uncertainty():
     x, y = world()
     clusters = numpy.repeat(numpy.arange(12), 10)
-    found = estimate.estimate_parameters(
+    found = estimate.infer(
         x,
         y,
         estimand(),
-        config.Config(
-            estimator="linear", covariance="clustered", cluster_name="c"
-        ),
+        config.Config(estimator="linear", covariance="clustered", cluster="c"),
         clusters=clusters.tolist(),
     )
     assert found.diagnostics["cluster_uncertainty"]["cluster_count"] == 12
@@ -163,7 +161,7 @@ def test_a_clustered_summary_needs_labels():
         estimate.summarise(
             fit,
             config.Config(
-                estimator="linear", covariance="clustered", cluster_name="c"
+                estimator="linear", covariance="clustered", cluster="c"
             ),
             None,
         )
@@ -172,7 +170,7 @@ def test_a_clustered_summary_needs_labels():
 def test_a_logistic_estimation_rejects_non_binary_outcomes():
     x, y = world()
     with pytest.raises(errors.InputError, match="only 0 and 1"):
-        estimate.estimate_parameters(
+        estimate.infer(
             x,
             y,
             estimand(likelihood="bernoulli"),

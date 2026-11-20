@@ -33,7 +33,7 @@ class Readiness(enum.StrEnum):
     BLOCKED = "blocked"
 
 
-def finite_real(value: Any) -> float | None:
+def parse(value: Any) -> float | None:
     """Reads a finite real number.
 
     Args:
@@ -175,9 +175,9 @@ class Tally:
         passed: Number of passed findings.
         failed: Number of failed findings.
         blocking: Number of findings that are blocking gates.
-        blocking_failures: Number of failed blocking findings.
+        failures: Number of failed blocking findings.
         migrations: The written layout's version steps, oldest first;
-            version 2 writes `blocking_failures` as `blockers`.
+            version 2 writes `failures` as `blockers`.
     """
 
     migrations: ClassVar[tuple[records.Migration, ...]] = (
@@ -188,7 +188,7 @@ class Tally:
     passed: int
     failed: int
     blocking: int
-    blocking_failures: int
+    failures: int
 
     def __post_init__(self) -> None:
         """Validates count relationships before exposing the aggregate.
@@ -197,14 +197,14 @@ class Tally:
             TypeError: If a count is not an integer (bools are rejected).
             ValueError: If a count is negative, `total` differs from
                 `passed` plus `failed`, `blocking` exceeds `total`, or
-                `blocking_failures` exceeds `failed` or `blocking`.
+                `failures` exceeds `failed` or `blocking`.
         """
         values = {
             "total": self.total,
             "passed": self.passed,
             "failed": self.failed,
             "blocking": self.blocking,
-            "blocking_failures": self.blocking_failures,
+            "blocking_failures": self.failures,
         }
         for name, value in values.items():
             if isinstance(value, bool) or not isinstance(value, int):
@@ -217,9 +217,9 @@ class Tally:
             raise errors.InputError("total must equal passed plus failed")
         if self.blocking > self.total:
             raise errors.InputError("blocking must not exceed total")
-        if self.blocking_failures > self.failed:
+        if self.failures > self.failed:
             raise errors.InputError("blocking_failures must not exceed failed")
-        if self.blocking_failures > self.blocking:
+        if self.failures > self.blocking:
             raise errors.InputError(
                 "blocking_failures must not exceed blocking"
             )
@@ -238,7 +238,7 @@ class Tally:
                 "passed": self.passed,
                 "failed": self.failed,
                 "blocking": self.blocking,
-                "blocking_failures": self.blocking_failures,
+                "blocking_failures": self.failures,
             },
             records.ORIGIN,
         )

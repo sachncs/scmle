@@ -56,7 +56,7 @@ class Classifier(Archive):
             key=lambda item: (-item[1], item[0]),
         )[:top_k]
         return Explanation(
-            model_digest=self.model_digest,
+            digest=self.digest,
             input_hash=None,
             method="linear_global_term_weight",
             terms=tuple(selected),
@@ -115,7 +115,7 @@ class Classifier(Archive):
             key=lambda item: (-abs(item[1]), item[0]),
         )[:top_k]
         return Explanation(
-            model_digest=self.model_digest,
+            digest=self.digest,
             input_hash=sample.content_hash,
             method="linear_local_term_contribution",
             terms=tuple(contributions),
@@ -195,7 +195,7 @@ class Classifier(Archive):
             key=lambda item: (-abs(item[1]), item[0]),
         )[:top_k]
         return Explanation(
-            model_digest=self.model_digest,
+            digest=self.digest,
             input_hash=sample.content_hash,
             method="term_ablation",
             terms=tuple(selected),

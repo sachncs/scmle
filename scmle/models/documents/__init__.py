@@ -6,7 +6,7 @@ refuses to imply that a serialized model is safe to load without an explicit
 trust decision.
 """
 
-from scmle.models.documents.archive import file_digest
+from scmle.models.documents.archive import digest
 from scmle.models.documents.classifier import Classifier
 from scmle.models.documents.monitor import Monitor
 from scmle.models.documents.records import Config
@@ -23,5 +23,5 @@ __all__ = [
     "Explanation",
     "Monitor",
     "Package",
-    "file_digest",
+    "digest",
 ]

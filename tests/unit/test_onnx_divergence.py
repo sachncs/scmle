@@ -144,9 +144,7 @@ def test_too_few_held_out_rows_are_refused_before_the_converter_loads(
         "logistic_regression", tasks.Task.BINARY
     )[0]
     loads = []
-    monkeypatch.setattr(
-        onnx_export, "load_converter", lambda: loads.append(1) or ()
-    )
+    monkeypatch.setattr(onnx_export, "load", lambda: loads.append(1) or ())
 
     for rows in (None, held_out(onnx_export.ROWS - 1)):
         with pytest.raises(errors.BlockedError, match="at least"):

@@ -36,7 +36,7 @@ def test_corruptions_leave_the_input_untouched_and_apply_as_described():
     rng = numpy.random.default_rng(0)
 
     blanked = robustness.Blanking(0.3).corrupt(data.features, data, rng)
-    unseen = robustness.UnseenCategories(0.5).corrupt(data.features, data, rng)
+    unseen = robustness.Novelty(0.5).corrupt(data.features, data, rng)
 
     assert data.features.equals(original)
     assert 0.2 < blanked["signal"].isna().mean() < 0.4
@@ -44,9 +44,7 @@ def test_corruptions_leave_the_input_untouched_and_apply_as_described():
 
 
 def test_a_model_ignoring_the_noise_feature_is_not_fragile_to_it():
-    report = robustness.Robustness((robustness.UnseenCategories(0.2),)).compute(
-        inputs()
-    )
+    report = robustness.Robustness((robustness.Novelty(0.2),)).compute(inputs())
 
     assert report["fragile_under"] == []
 

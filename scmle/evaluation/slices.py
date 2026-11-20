@@ -35,7 +35,7 @@ class Slices(diagnostics.Diagnostic):
     passes = 5.9
     rowcost = 2.1e-5
 
-    def least(self, inputs: diagnostics.DiagnosticInput) -> float:
+    def least(self, inputs: diagnostics.Input) -> float:
         """Predicts the seconds of the overall score alone.
 
         Args:
@@ -46,7 +46,7 @@ class Slices(diagnostics.Diagnostic):
         """
         return diagnostics.MARGIN * (inputs.pace or 0.0)
 
-    def compute(self, inputs: diagnostics.DiagnosticInput) -> dict[str, Any]:
+    def compute(self, inputs: diagnostics.Input) -> dict[str, Any]:
         """Scores the model inside each slice.
 
         Args:
@@ -74,7 +74,7 @@ class Slices(diagnostics.Diagnostic):
             inputs.estimator,
             inputs.features,
             inputs.target,
-            inputs.positive_label,
+            inputs.positive,
         )
         longest = diagnostics.clock() - began
         scored: list[dict[str, Any]] = []
@@ -124,7 +124,7 @@ class Slices(diagnostics.Diagnostic):
         return report
 
     def assignments(
-        self, inputs: diagnostics.DiagnosticInput
+        self, inputs: diagnostics.Input
     ) -> list[tuple[str, pandas.Series]]:
         """Returns slice labels for each feature used to slice the data.
 
@@ -139,7 +139,7 @@ class Slices(diagnostics.Diagnostic):
             with more than `BANDS` distinct values. Numeric features are not
             used for rank-based metrics.
         """
-        plan = inputs.feature_plan
+        plan = inputs.plan
         found: list[tuple[str, pandas.Series]] = []
         for column in plan.categorical:
             values = inputs.features[column].astype(object)
@@ -158,7 +158,7 @@ class Slices(diagnostics.Diagnostic):
         return found[:MAX_FEATURES]
 
     def grade(
-        self, inputs: diagnostics.DiagnosticInput, rows: numpy.ndarray
+        self, inputs: diagnostics.Input, rows: numpy.ndarray
     ) -> float | None:
         """Scores one slice, or None when it cannot be scored reliably.
 
@@ -185,7 +185,7 @@ class Slices(diagnostics.Diagnostic):
                     inputs.estimator,
                     inputs.features[rows],
                     target,
-                    inputs.positive_label,
+                    inputs.positive,
                 )
             )
         except ValueError:

@@ -84,7 +84,7 @@ def nuisance(
     Returns:
         The nuisance predictions for every row and their fit records.
     """
-    if policy.cross_fitting_folds != 1:
+    if policy.folds != 1:
         return crossfit(design, treatment, values, policy)
     (
         propensity,
@@ -92,7 +92,7 @@ def nuisance(
         outcome_control,
         outcome_treated,
         nuisance_diagnostics,
-    ) = fit_aipw_nuisance_models(
+    ) = train(
         design,
         treatment,
         values,
@@ -134,11 +134,9 @@ def crossfit(
         The held-out nuisance predictions for every row and the per-fold
         records.  Fold assignment and support errors propagate.
     """
-    fold_count = policy.cross_fitting_folds
+    fold_count = policy.folds
     fold_assignments = interleave(len(values), fold_count)
-    support = validate_cross_fitting_support(
-        treatment, fold_assignments, fold_count
-    )
+    support = overlap(treatment, fold_assignments, fold_count)
     (
         propensity,
         raw_propensity,
@@ -213,7 +211,7 @@ def holdout(
     outcome_control = numpy.empty(len(values), dtype=float)
     outcome_treated = numpy.empty(len(values), dtype=float)
     fold_diagnostics = []
-    for fold in range(policy.cross_fitting_folds):
+    for fold in range(policy.folds):
         training = fold_assignments != fold
         validation = ~training
         (
@@ -222,7 +220,7 @@ def holdout(
             fold_outcome_control,
             fold_outcome_treated,
             fold_nuisance_diagnostics,
-        ) = fit_aipw_nuisance_models(
+        ) = train(
             design[training],
             treatment[training],
             values[training],
@@ -257,7 +255,7 @@ def holdout(
     )
 
 
-def fit_aipw_nuisance_models(
+def train(
     training_design: numpy.ndarray,
     training_treatment: numpy.ndarray,
     training_values: numpy.ndarray,
@@ -353,7 +351,7 @@ def interleave(rows: int, fold_count: int) -> numpy.ndarray:
     return numpy.arange(rows, dtype=int) % fold_count
 
 
-def validate_cross_fitting_support(
+def overlap(
     treatment: numpy.ndarray,
     fold_assignments: numpy.ndarray,
     fold_count: int,
@@ -454,12 +452,10 @@ def propensities(
     coefficients, probabilities, diagnostics = logit(
         training,
         treatment,
-        policy.max_iterations,
+        policy.iterations,
         policy.tolerance,
     )
     del probabilities
     raw = special.expit(evaluation @ coefficients)
-    clipped = numpy.clip(
-        raw, policy.propensity_clip, 1.0 - policy.propensity_clip
-    )
+    clipped = numpy.clip(raw, policy.clip, 1.0 - policy.clip)
     return clipped, raw, diagnostics

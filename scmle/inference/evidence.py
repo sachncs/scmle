@@ -22,7 +22,7 @@ class Link:
     """Identity of one inference event linked to an exact model bundle.
 
     Attributes:
-        event_id: Unique identifier of the inference event.
+        event: Unique identifier of the inference event.
         input_fingerprint: Fingerprint of the request input.
         output_fingerprint: Fingerprint of the produced output.
         bundle_digest: Digest of the model bundle that served the event.
@@ -47,7 +47,7 @@ class Link:
         },
     )
 
-    event_id: str
+    event: str
     input_fingerprint: str
     output_fingerprint: str
     bundle_digest: str
@@ -62,7 +62,7 @@ class Link:
                 is not ISO 8601, or the timestamp has no timezone.
         """
         for name in (
-            "event_id",
+            "event",
             "input_fingerprint",
             "output_fingerprint",
             "bundle_digest",
@@ -94,7 +94,7 @@ class Link:
             the version-1 ones so the digest of a stored event never changes.
         """
         payload = {
-            "event_id": self.event_id,
+            "event_id": self.event,
             "input_fingerprint": self.input_fingerprint,
             "output_fingerprint": self.output_fingerprint,
             "bundle_digest": self.bundle_digest,
@@ -109,7 +109,7 @@ class Link:
             ).encode("utf-8")
         ).hexdigest()
         return lineage.Node(
-            identifier=f"inference:{self.event_id}",
+            identifier=f"inference:{self.event}",
             kind=lineage.Kind.INFERENCE,
             digest=digest,
             attributes=dict(payload),
@@ -158,7 +158,7 @@ class Linker:
                 file fails the checks of `load`.
         """
         candidate = Link(
-            event_id=event_id,
+            event=event_id,
             input_fingerprint=input_fingerprint,
             output_fingerprint=output_fingerprint,
             bundle_digest=bundle_digest,
@@ -179,7 +179,7 @@ class Linker:
         graph.connect(lineage.Edge("bundle", node.identifier, "serves"))
         graph_record = graph.to_dict()
         graph_record["graph_digest"] = graph.digest()
-        self.write_atomically(path, graph_record)
+        self.write(path, graph_record)
         return dataclasses.replace(
             candidate, graph_digest=str(graph_record["graph_digest"])
         )
@@ -211,7 +211,7 @@ class Linker:
         return graph
 
     @staticmethod
-    def write_atomically(path: pathlib.Path, record: dict[str, Any]) -> None:
+    def write(path: pathlib.Path, record: dict[str, Any]) -> None:
         """Persists graph JSON with flushed contents and directory metadata.
 
         The record is written to a temporary file in the same directory,

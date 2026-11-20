@@ -56,7 +56,7 @@ class Monitor:
 @pytest.fixture
 def running(bundle):
     monitor = Monitor()
-    adapter = web.HttpServing(bundle, monitor=monitor, max_request_bytes=4096)
+    adapter = web.Service(bundle, monitor=monitor, payload=4096)
     adapter.start()
     yield adapter
     adapter.stop()
@@ -107,8 +107,8 @@ def test_a_server_with_a_bundle_has_verified_and_loaded(scorer):
     assert snapshot["ready"] is False
     assert snapshot["notes"]["verifying"] == "bundle provided by the caller"
     assert snapshot["notes"]["loading"] == "bundle provided by the caller"
-    assert scorer.on_null == "impute"
-    assert scorer.on_unseen == "report"
+    assert scorer.missing == "impute"
+    assert scorer.unseen == "report"
 
 
 def test_a_server_without_a_bundle_is_not_loaded():
@@ -119,11 +119,9 @@ def test_a_server_without_a_bundle_is_not_loaded():
 
 
 def test_digests_name_the_manifest_and_the_schema(scorer, bundle):
-    assert scorer.artifact_digest == provenance.manifest_digest(
-        bundle.info.to_dict()
-    )
-    assert scorer.schema_digest == serving.schema_digest(bundle.schema.anchor())
-    assert scorer.schema_digest.startswith("sha256:")
+    assert scorer.digest == provenance.manifest_digest(bundle.info.to_dict())
+    assert scorer.layout == serving.schema_digest(bundle.schema.anchor())
+    assert scorer.layout.startswith("sha256:")
 
 
 def test_synthesise_uses_zero_and_the_first_known_category(scorer):
@@ -173,8 +171,8 @@ def test_respond_scores_and_reports_each_row(scorer, bundle):
     response = scorer.respond([ROW, {**ROW, "plan": "gold", "age": None}])
     assert response["predictions"][0] == 1
     assert response["schema_version"] == serving.SCHEMA_VERSION
-    assert response["artifact_digest"] == scorer.artifact_digest
-    assert response["schema_digest"] == scorer.schema_digest
+    assert response["artifact_digest"] == scorer.digest
+    assert response["schema_digest"] == scorer.layout
     assert response["record_count"] == 2
     assert len(response["rows"]) == 2
     assert not response["rows"][0]["missing"]
@@ -216,7 +214,7 @@ def test_score_file_writes_predictions_and_a_manifest(scorer, tmp_path):
     rows = [ROW, {**ROW, "plan": "gold"}, {**ROW, "age": None}]
     pandas.DataFrame(rows).to_csv(source, index=False)
     target = tmp_path / "out.csv"
-    assert scorer.score_file(source, target, chunk_rows=2) == 3
+    assert scorer.score(source, target, chunk_rows=2) == 3
     output = pandas.read_csv(target)
     assert list(output.columns) == ["prediction", "proba_0", "proba_1"]
     assert len(output) == 3
@@ -225,8 +223,8 @@ def test_score_file_writes_predictions_and_a_manifest(scorer, tmp_path):
     assert manifest == {
         "schema_version": serving.SCHEMA_VERSION,
         "model_version": "golden-1",
-        "artifact_digest": scorer.artifact_digest,
-        "schema_digest": scorer.schema_digest,
+        "artifact_digest": scorer.digest,
+        "schema_digest": scorer.layout,
         "rows": 3,
         "output_sha256": provenance.sha256_digest(content),
         "rows_with_nulls": 1,
@@ -237,8 +235,8 @@ def test_score_file_writes_predictions_and_a_manifest(scorer, tmp_path):
 def test_chunking_does_not_change_the_scores(scorer, tmp_path):
     source = tmp_path / "in.csv"
     pandas.DataFrame(parity.goldens(GOLDEN).records).to_csv(source, index=False)
-    scorer.score_file(source, tmp_path / "one.csv", chunk_rows=1)
-    scorer.score_file(source, tmp_path / "all.csv")
+    scorer.score(source, tmp_path / "one.csv", chunk_rows=1)
+    scorer.score(source, tmp_path / "all.csv")
     assert (tmp_path / "one.csv").read_bytes() == (
         tmp_path / "all.csv"
     ).read_bytes()
@@ -246,9 +244,7 @@ def test_chunking_does_not_change_the_scores(scorer, tmp_path):
 
 def test_score_file_refuses_a_non_positive_chunk(scorer, tmp_path):
     with pytest.raises(errors.ConfigError, match="chunk_rows must be positive"):
-        scorer.score_file(
-            tmp_path / "in.csv", tmp_path / "out.csv", chunk_rows=0
-        )
+        scorer.score(tmp_path / "in.csv", tmp_path / "out.csv", chunk_rows=0)
 
 
 def test_a_batcher_starts_and_stops_without_effect(scorer):
@@ -261,32 +257,32 @@ def test_a_batcher_starts_and_stops_without_effect(scorer):
 
 def test_an_adapter_needs_exactly_one_of_bundle_and_loader(bundle):
     with pytest.raises(errors.ConfigError, match="exactly one"):
-        web.HttpServing()
+        web.Service()
     with pytest.raises(errors.ConfigError, match="exactly one"):
-        web.HttpServing(bundle, loader=lambda readiness: bundle)
+        web.Service(bundle, loader=lambda readiness: bundle)
 
 
 @pytest.mark.parametrize(
     "changes",
     [
-        {"max_request_bytes": 0},
-        {"max_records": 0},
-        {"request_timeout_seconds": 0},
+        {"payload": 0},
+        {"batch": 0},
+        {"timeout": 0},
     ],
 )
 def test_an_adapter_needs_positive_bounds(bundle, changes):
     with pytest.raises(errors.InputError, match="must be positive"):
-        web.HttpServing(bundle, **changes)
+        web.Service(bundle, **changes)
 
 
 def test_an_adapter_on_a_public_address_needs_a_gateway(bundle):
     with pytest.raises(errors.ConfigError):
-        web.HttpServing(bundle, host="0.0.0.0")
+        web.Service(bundle, host="0.0.0.0")
 
 
 def test_an_adapter_reports_its_limits_and_has_no_address_yet(bundle):
-    adapter = web.HttpServing(
-        bundle, max_records=5, max_concurrent=2, scoring_timeout_seconds=3.0
+    adapter = web.Service(
+        bundle, batch=5, max_concurrent=2, scoring_timeout_seconds=3.0
     )
     assert adapter.limits() == {
         "max_request_bytes": contract.MAX_REQUEST_BYTES,
@@ -304,13 +300,13 @@ def test_an_adapter_reports_its_limits_and_has_no_address_yet(bundle):
 
 
 def test_identity_is_empty_before_loading(bundle):
-    adapter = web.HttpServing(loader=lambda readiness: bundle)
+    adapter = web.Service(loader=lambda readiness: bundle)
     assert adapter.identity() == {}
     adapter.admission.close()
 
 
 def test_boot_without_a_loader_is_an_error(bundle):
-    adapter = web.HttpServing(bundle)
+    adapter = web.Service(bundle)
     with pytest.raises(errors.ScmleError, match="no loader to run"):
         adapter.boot()
     adapter.admission.close()
@@ -328,7 +324,7 @@ def test_a_failed_loader_keeps_only_a_safe_reason(error, reason):
     def loader(readiness):
         raise error
 
-    adapter = web.HttpServing(loader=loader)
+    adapter = web.Service(loader=loader)
     adapter.boot()
     snapshot = adapter.readiness.snapshot()
     assert snapshot["ready"] is False
@@ -344,7 +340,7 @@ def test_a_loader_that_succeeds_warms_up(bundle):
         readiness.complete(guard.Phase.LOADING, "ok")
         return bundle
 
-    adapter = web.HttpServing(loader=loader)
+    adapter = web.Service(loader=loader)
     adapter.boot()
     assert adapter.readiness.snapshot()["ready"] is True
     assert adapter.identity()["model_version"] == "golden-1"
@@ -352,23 +348,23 @@ def test_a_loader_that_succeeds_warms_up(bundle):
 
 
 def test_a_monitor_failure_never_escapes(bundle):
-    adapter = web.HttpServing(bundle, monitor=Monitor(broken=True))
+    adapter = web.Service(bundle, monitor=Monitor(broken=True))
     adapter.observe("/predict", 200, 0.1)
     adapter.feed([ROW])
-    web.HttpServing(bundle).feed([ROW])
+    web.Service(bundle).feed([ROW])
     adapter.admission.close()
 
 
 def test_score_refuses_an_unexpected_schema(bundle):
-    adapter = web.HttpServing(bundle)
+    adapter = web.Service(bundle)
     request = serving.parse(
         {"records": [ROW], "expected_schema_digest": "sha256:" + "0" * 64}, 10
     )
     with pytest.raises(serving.MismatchError) as caught:
         adapter.score(request)
-    assert caught.value.details["served"] == adapter.schema_digest
+    assert caught.value.details["served"] == adapter.layout
     exact = serving.parse(
-        {"records": [ROW], "expected_schema_digest": adapter.schema_digest}, 10
+        {"records": [ROW], "expected_schema_digest": adapter.layout}, 10
     )
     assert adapter.score(exact)["record_count"] == 1
     adapter.admission.close()
@@ -395,7 +391,7 @@ def test_a_running_server_answers_its_probes(running):
     )
     status, body, ignored = call(running, "GET", "/schema")
     assert status == 200
-    assert body["schema_digest"] == running.schema_digest
+    assert body["schema_digest"] == running.layout
     assert body["limits"]["max_request_bytes"] == 4096
     status, body, ignored = call(running, "GET", "/nowhere")
     assert (status, body["error"], body["category"]) == (
@@ -473,7 +469,7 @@ def test_a_server_answers_409_for_another_schema(running):
         {"records": [ROW], "expected_schema_digest": "sha256:" + "0" * 64},
     )
     assert status == 409
-    assert body["details"]["served"] == running.schema_digest
+    assert body["details"]["served"] == running.layout
 
 
 def test_a_post_to_an_unknown_path_is_not_found(running):
@@ -485,7 +481,7 @@ def test_a_server_that_is_not_ready_answers_503(bundle):
     def loader(readiness):
         raise errors.ConfigError("no")
 
-    adapter = web.HttpServing(loader=loader)
+    adapter = web.Service(loader=loader)
     adapter.start()
     adapter.loading.join(5)
     try:

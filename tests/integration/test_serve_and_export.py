@@ -56,7 +56,7 @@ def post(url, body):
 def test_the_server_rejects_schema_violations_with_422_and_a_reason(saved):
     root = saved[0]
     model = scmle.artifacts.bundle.Bundle.load(root / "bundle", trusted=True)
-    adapter = server.HttpServing(model)
+    adapter = server.Service(model)
     adapter.start()
     try:
         status, body = post(
@@ -72,7 +72,7 @@ def test_the_server_rejects_empty_prediction_requests(saved):
     model = scmle.artifacts.bundle.Bundle.load(
         saved[0] / "bundle", trusted=True
     )
-    adapter = server.HttpServing(model)
+    adapter = server.Service(model)
     adapter.start()
     try:
         status, body = post(f"{adapter.address}/predict", {"records": []})
@@ -101,7 +101,7 @@ def test_an_input_error_while_scoring_keeps_its_old_status(
     model = scmle.artifacts.bundle.Bundle.load(
         saved[0] / "bundle", trusted=True
     )
-    adapter = server.HttpServing(model)
+    adapter = server.Service(model)
 
     def score(request):
         raise raised
@@ -123,7 +123,7 @@ def test_the_server_refuses_oversized_bodies_with_413(saved):
     model = scmle.artifacts.bundle.Bundle.load(
         saved[0] / "bundle", trusted=True
     )
-    adapter = server.HttpServing(model, max_request_bytes=10)
+    adapter = server.Service(model, payload=10)
     adapter.start()
     try:
         status, body = post(
@@ -139,7 +139,7 @@ def test_the_server_accepts_instance_request_bounds(saved):
     model = scmle.artifacts.bundle.Bundle.load(
         saved[0] / "bundle", trusted=True
     )
-    adapter = server.HttpServing(model, max_request_bytes=10_000, max_records=1)
+    adapter = server.Service(model, payload=10_000, batch=1)
     adapter.start()
     try:
         status, body = post(
@@ -156,7 +156,7 @@ def test_the_server_refuses_too_many_records_with_413(saved):
     model = scmle.artifacts.bundle.Bundle.load(
         saved[0] / "bundle", trusted=True
     )
-    adapter = server.HttpServing(model, max_records=1)
+    adapter = server.Service(model, batch=1)
     adapter.start()
     try:
         status, body = post(
@@ -175,13 +175,13 @@ def test_the_server_rejects_invalid_request_bounds(saved):
     )
 
     with pytest.raises(ValueError, match="request bounds"):
-        server.HttpServing(model, max_request_bytes=0)
+        server.Service(model, payload=0)
 
     with pytest.raises(ValueError, match="request bounds"):
-        server.HttpServing(model, max_records=0)
+        server.Service(model, batch=0)
 
     with pytest.raises(ValueError, match="timeout"):
-        server.HttpServing(model, request_timeout_seconds=0)
+        server.Service(model, timeout=0)
 
 
 def test_the_server_classifies_malformed_and_internal_requests(
@@ -191,7 +191,7 @@ def test_the_server_classifies_malformed_and_internal_requests(
     model = scmle.artifacts.bundle.Bundle.load(
         saved[0] / "bundle", trusted=True
     )
-    adapter = server.HttpServing(model)
+    adapter = server.Service(model)
     adapter.start()
 
     def fail(records):
@@ -223,7 +223,7 @@ def test_the_server_classifies_malformed_and_internal_requests(
 def test_health_reports_the_model_version_and_checksum(saved):
     root = saved[0]
     model = scmle.artifacts.bundle.Bundle.load(root / "bundle", trusted=True)
-    adapter = server.HttpServing(model)
+    adapter = server.Service(model)
     adapter.start()
     try:
         with urllib.request.urlopen(f"{adapter.address}/health") as response:
@@ -248,7 +248,7 @@ def test_the_server_rejects_starting_twice(saved):
     model = scmle.artifacts.bundle.Bundle.load(
         saved[0] / "bundle", trusted=True
     )
-    adapter = server.HttpServing(model)
+    adapter = server.Service(model)
     adapter.start()
     try:
         with pytest.raises(errors.ScmleError, match="already running"):
@@ -271,7 +271,7 @@ def test_the_serve_command_starts_a_server_for_a_trusted_bundle(
 ):
     root = saved[0]
     seen = {}
-    real = server.HttpServing
+    real = server.Service
 
     def build(*args, **kwargs):
         adapter = real(*args, **kwargs)
@@ -286,7 +286,7 @@ def test_the_serve_command_starts_a_server_for_a_trusted_bundle(
         seen["address"] = seen["adapter"].address
         os.kill(os.getpid(), signal.SIGTERM)
 
-    monkeypatch.setattr(cli.delivery.server, "HttpServing", build)
+    monkeypatch.setattr(cli.delivery.server, "Service", build)
     driver = threading.Thread(target=drive)
     driver.start()
     code = cli.main(["serve", str(root / "bundle"), "--trusted", "--port", "0"])

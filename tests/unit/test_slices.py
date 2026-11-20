@@ -35,7 +35,7 @@ def make_inputs(rows=1200):
         PLAN, REGISTRY.get("logistic_regression"), tasks.Task.BINARY, 0
     ).fit(frame.iloc[:half], target.iloc[:half])
     metric = metrics.CATALOG.resolve(None, tasks.Task.BINARY)
-    return diagnostics.DiagnosticInput(
+    return diagnostics.Input(
         model,
         frame.iloc[half:].reset_index(drop=True),
         target.iloc[half:].reset_index(drop=True),

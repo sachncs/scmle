@@ -52,10 +52,7 @@ def admit(
         raise errors.InputError("clustered covariance needs cluster labels")
     if policy.estimator == "hierarchical_linear" and input_clusters is None:
         raise errors.InputError("hierarchical_linear requires cluster labels")
-    if (
-        policy.random_slope_position is not None
-        and policy.random_slope_position >= matrix.shape[1]
-    ):
+    if policy.slope is not None and policy.slope >= matrix.shape[1]:
         raise errors.InputError(
             "random_slope_position is outside the feature matrix"
         )
@@ -115,17 +112,17 @@ def screen(
             f"{policy.estimator} estimation does not accept clusters"
         )
     if policy.estimator in CAUSAL_ESTIMATORS:
-        if policy.treatment_position is None:
+        if policy.treatment is None:
             raise errors.InputError(
                 f"{policy.estimator} requires treatment_position"
             )
-        if not 0 <= policy.treatment_position < matrix.shape[1]:
+        if not 0 <= policy.treatment < matrix.shape[1]:
             raise errors.InputError(
                 "treatment_position is outside the feature matrix"
             )
 
 
-def raw_input_fingerprint(
+def imprint(
     features: Any,
     outcome: Any,
     clusters: Any | None = None,
@@ -203,7 +200,7 @@ def absorb(digest: Any, name: str, values: numpy.ndarray) -> None:
     digest.update(values_bytes)
 
 
-def validate_matrix(matrix: numpy.ndarray, columns: int, name: str) -> None:
+def check(matrix: numpy.ndarray, columns: int, name: str) -> None:
     """Validates a numeric two-dimensional matrix.
 
     Args:
@@ -221,9 +218,7 @@ def validate_matrix(matrix: numpy.ndarray, columns: int, name: str) -> None:
         raise errors.InputError("estimation needs more rows than parameters")
 
 
-def validate_clusters(
-    clusters: Sequence[Any] | None, rows: int
-) -> numpy.ndarray | None:
+def validate(clusters: Sequence[Any] | None, rows: int) -> numpy.ndarray | None:
     """Validates cluster-label shape before missingness processing.
 
     Args:

@@ -13,9 +13,9 @@ def test_a_floor_for_higher_is_better_and_a_ceiling_for_lower_is_better():
     )
 
     by_name = {r.metric: r for r in results}
-    assert by_name["roc_auc"].met and by_name["roc_auc"].higher_is_better
+    assert by_name["roc_auc"].met and by_name["roc_auc"].direction
     assert not by_name["log_loss"].met
-    assert not by_name["log_loss"].higher_is_better
+    assert not by_name["log_loss"].direction
 
 
 def test_meeting_a_threshold_exactly_counts_as_met():

@@ -55,10 +55,10 @@ def test_network_keeps_the_given_declaration() -> None:
     )
     assert (network.name, network.architecture) == ("custom", "mlp")
     assert network.capability_family == "transformer"
-    assert network.family_contract is networks.Network.family_contract
+    assert network.contract is networks.Network.contract
 
 
-@pytest.mark.parametrize("model", [networks.MLP, networks.TabPfn()])
+@pytest.mark.parametrize("model", [networks.MLP, networks.Tabpfn()])
 def test_accelerated_asks_the_worker_to_probe(probe, model) -> None:
     assert model.accelerated() is True
     assert probe.calls == [("probe", ())]
@@ -80,14 +80,14 @@ def test_jepa_refuses_too_few_rows(installed) -> None:
 
 
 def test_tabpfn_reports_the_base_reason_first(installed) -> None:
-    found = networks.TabPfn().objection(tasks.Task.BINARY, TOO_MANY)
+    found = networks.Tabpfn().objection(tasks.Task.BINARY, TOO_MANY)
     assert found is not None
     assert found.startswith("dataset too large")
 
 
 def test_tabpfn_is_extension_only(installed) -> None:
     # Enforces website/src/pages/docs/modeling.astro:51.
-    assert networks.TabPfn().objection(tasks.Task.BINARY, 10) == (
+    assert networks.Tabpfn().objection(tasks.Task.BINARY, 10) == (
         "foundation model is extension-only until accepted weight license, "
         "token custody, and complete release evidence exist"
     )
@@ -138,5 +138,5 @@ def test_jepa_assembles_the_front_end_first(installed) -> None:
 
 
 def test_keras_seeds_its_estimator(installed) -> None:
-    found = networks.KerasMlp().build(tasks.Task.REGRESSION, 5)
+    found = networks.Keras().build(tasks.Task.REGRESSION, 5)
     assert found.get_params()["random_state"] == 5

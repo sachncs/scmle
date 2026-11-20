@@ -39,7 +39,7 @@ class Uncertainty:
     """
 
     conformal: conformal.ConformalCalibrator | None
-    quantile: quantile.QuantileIntervals | None
+    quantile: quantile.Intervals | None
     curve: list[dict[str, float]] | None = None
     report: records.Layout | None = None
 
@@ -109,7 +109,7 @@ class Bracketing(diagnosis.Diagnosis):
             board, pending, pending.subject, runner
         )
 
-    def bracket(self, board: engine.Board) -> quantile.QuantileIntervals | None:
+    def bracket(self, board: engine.Board) -> quantile.Intervals | None:
         """Fits and calibrates the low and high quantile models (regression).
 
         Both models are boosted trees on the standard preprocessing. Each
@@ -168,7 +168,7 @@ class Bracketing(diagnosis.Diagnosis):
             highs.extend(high)
         if len(observed) < conformal.MIN_CALIBRATION_ROWS:
             return None
-        return quantile.QuantileIntervals(
+        return quantile.Intervals(
             build(quantile.LOWER_LEVEL).fit(split.features, split.target),
             build(quantile.UPPER_LEVEL).fit(split.features, split.target),
             quantile.Band.calibrate(observed, lows, highs),

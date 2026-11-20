@@ -202,7 +202,7 @@ class SelectStage(interface.Stage):
         ]
         chosen = min(
             near,
-            key=lambda r: (r.usage.p95_latency_ms, r.usage.model_mb),
+            key=lambda r: (r.usage.latency, r.usage.size),
         )
         trial = chosen.trial
         board.journal.enter(
@@ -210,7 +210,7 @@ class SelectStage(interface.Stage):
             experiments.Edict.INCLUDE,
             "fastest within "
             f"{board.services.spec.selection.pareto_tolerance} of the "
-            f"best score ({chosen.usage.p95_latency_ms:.1f} ms p95)",
+            f"best score ({chosen.usage.latency:.1f} ms p95)",
         )
         refits[trial.trial_id] = chosen.candidate
         self.announce(board, trial)
@@ -355,8 +355,8 @@ class SelectStage(interface.Stage):
         board.journal.enter(
             label,
             experiments.Edict.INCLUDE,
-            f"within serving limits ({usage.model_mb:.2f} MB, p95 "
-            f"{usage.p95_latency_ms:.1f} ms on {usage.machine})",
+            f"within serving limits ({usage.size:.2f} MB, p95 "
+            f"{usage.latency:.1f} ms on {usage.machine})",
         )
         return candidate
 
@@ -501,8 +501,8 @@ def frontier(
     points = [
         (
             sign * r.trial.score_mean,
-            r.usage.p95_latency_ms,
-            r.usage.model_mb,
+            r.usage.latency,
+            r.usage.size,
         )
         for r in rows
     ]
@@ -523,8 +523,8 @@ def frontier(
             "model": r.trial.model_name,
             "strategy": r.trial.strategy,
             "score": r.trial.score_mean,
-            "p95_latency_ms": r.usage.p95_latency_ms,
-            "model_mb": r.usage.model_mb,
+            "p95_latency_ms": r.usage.latency,
+            "model_mb": r.usage.size,
             "violations": list(r.broken),
             "dominated": dominated(index),
             "chosen": r is chosen,

@@ -566,7 +566,7 @@ def test_amend_replaces_the_profile_without_a_curation():
 
 
 def usage(latency, size):
-    return types.SimpleNamespace(p95_latency_ms=latency, model_mb=size)
+    return types.SimpleNamespace(latency=latency, size=size)
 
 
 def candidate(name, score, latency, size, broken=()):

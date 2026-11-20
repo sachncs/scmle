@@ -337,7 +337,7 @@ class Bundle(
         labels = numpy.asarray(target)
         before = self.pipeline.predict_proba(frame)
         if method == "dirichlet":
-            calibrator: Any = dirichlet.DirichletCalibrator(self.pipeline).fit(
+            calibrator: Any = dirichlet.Dirichlet(self.pipeline).fit(
                 frame, labels
             )
         else:

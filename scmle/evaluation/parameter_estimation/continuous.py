@@ -47,7 +47,7 @@ LIMITS = (
 )
 
 
-def fit_continuous_estimator(
+def reweight(
     matrix: numpy.ndarray,
     values: numpy.ndarray,
     policy: Config,
@@ -69,29 +69,29 @@ def fit_continuous_estimator(
     Raises:
         ValueError: If the policy has no treatment position.
     """
-    if policy.treatment_position is None:
+    if policy.treatment is None:
         raise errors.InputError(
             "continuous_ipw_ate requires treatment_position"
         )
     coefficients, covariance, diagnostics = dosage(
         matrix,
         values,
-        policy.treatment_position,
+        policy.treatment,
         policy,
         cluster_values,
     )
-    reference = reference_continuous_ipw_effect(
+    reference = recompute(
         matrix,
         values,
-        policy.treatment_position,
+        policy.treatment,
         policy,
         coefficients,
         cluster_values,
     )
-    treatment_name = estimand.feature_names[policy.treatment_position]
+    treatment_name = estimand.features[policy.treatment]
     names = ("intercept", f"{treatment_name}_dose_response_slope")
     likelihood = "gaussian"
-    pivot = stats.norm.ppf(0.5 + policy.confidence_level / 2.0)
+    pivot = stats.norm.ppf(0.5 + policy.confidence / 2.0)
     p_values = 2.0 * stats.norm.sf(
         numpy.abs(coefficients)
         / numpy.maximum(numpy.sqrt(numpy.diag(covariance)), 1e-15)
@@ -100,7 +100,7 @@ def fit_continuous_estimator(
         **diagnostics,
         "likelihood": likelihood,
         "treatment_name": treatment_name,
-        "treatment_position": policy.treatment_position,
+        "treatment_position": policy.treatment,
         "estimand_interpretation": (
             "the slope is the marginal outcome change for a one-unit "
             "increase in continuous treatment under the declared "
@@ -335,8 +335,8 @@ def cap(
         ValueError: If the capped weights leave fewer than two effective
             observations.
     """
-    weights = numpy.minimum(raw_weights, policy.continuous_weight_cap)
-    capped = raw_weights > policy.continuous_weight_cap
+    weights = numpy.minimum(raw_weights, policy.cap)
+    capped = raw_weights > policy.cap
     effective_sample_size = float(
         numpy.sum(weights) ** 2 / numpy.sum(weights**2)
     )
@@ -350,7 +350,7 @@ def cap(
         "raw_max": float(numpy.max(raw_weights)),
         "capped_min": float(numpy.min(weights)),
         "capped_max": float(numpy.max(weights)),
-        "cap": policy.continuous_weight_cap,
+        "cap": policy.cap,
         "fraction_capped": float(numpy.mean(capped)),
         "quantiles": [
             float(item)
@@ -411,7 +411,7 @@ def dose(
     return coefficients, covariance
 
 
-def reference_continuous_ipw_effect(
+def recompute(
     matrix: numpy.ndarray,
     values: numpy.ndarray,
     treatment_position: int,
@@ -464,7 +464,7 @@ def reference_continuous_ipw_effect(
     ) - stats.norm.logpdf(treatment, conditional_mean, conditional_scale)
     weights = numpy.minimum(
         numpy.exp(numpy.clip(log_weights, -745.0, 709.0)),
-        policy.continuous_weight_cap,
+        policy.cap,
     )
     dose_design = numpy.column_stack((numpy.ones(len(treatment)), treatment))
     information = dose_design.T @ (weights[:, None] * dose_design)
@@ -476,5 +476,5 @@ def reference_continuous_ipw_effect(
         "max_absolute_difference": difference,
         "reference_dose_response_slope": float(reference[1]),
         "clustered_reference": clusters is not None,
-        "passed": difference <= policy.reference_tolerance * 10,
+        "passed": difference <= policy.reference * 10,
     }

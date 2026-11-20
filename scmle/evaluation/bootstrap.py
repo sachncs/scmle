@@ -316,7 +316,7 @@ def expose(
 
 
 def align(
-    inputs: diagnostics.DiagnosticInput,
+    inputs: diagnostics.Input,
 ) -> tuple[Cache, pandas.DataFrame, pandas.Series, pandas.Series | None]:
     """The evaluation rows indexed from zero, with their cached predictions.
 
@@ -327,7 +327,7 @@ def align(
         The replay of the candidate's predictions, the sourced features,
         the target and the groups (None without groups).
     """
-    features = inputs.features[list(inputs.feature_plan.sourced)]
+    features = inputs.features[list(inputs.plan.sourced)]
     features = features.reset_index(drop=True)
     target = inputs.target.reset_index(drop=True)
     replay_class = (
@@ -343,7 +343,7 @@ def align(
 
 
 def pivot(
-    inputs: diagnostics.DiagnosticInput,
+    inputs: diagnostics.Input,
     cache: Cache,
     target: pandas.Series,
     groups: pandas.Series | None,
@@ -380,7 +380,7 @@ def pivot(
 
 
 def resample(
-    inputs: diagnostics.DiagnosticInput,
+    inputs: diagnostics.Input,
     rows: tuple[
         models.Estimator, pandas.DataFrame, pandas.Series, pandas.Series | None
     ],
@@ -409,7 +409,7 @@ def resample(
         one, and the number of resamples attempted.
     """
     replay, features, target, groups = rows
-    metric, positive = inputs.metric, inputs.positive_label
+    metric, positive = inputs.metric, inputs.positive
     scores: list[float] = []
     ratios: list[float] = []
     rng = numpy.random.default_rng(inputs.seed)
@@ -450,8 +450,8 @@ class Uncertainty(diagnostics.Diagnostic):
 
     name = "metric_uncertainty"
     resamples = 2000
-    minimum_resamples = 200
-    row_budget = 4_000_000
+    floor = 200
+    budget = 4_000_000
     confidence = 95
 
     def replicates(self, rows: int) -> int:
@@ -461,18 +461,18 @@ class Uncertainty(diagnostics.Diagnostic):
         narrow (a simulation of ROC AUC on 200 rows covered the true value in
         91 percent of 400 runs with 200 resamples and 92.8 percent with
         2,000), so small evaluation sets get `resamples` and large ones fewer,
-        so that the rows scored stay within `row_budget`.
+        so that the rows scored stay within `budget`.
 
         Args:
             rows: Number of evaluation rows.
 
         Returns:
-            A count between `minimum_resamples` and `resamples`.
+            A count between `floor` and `resamples`.
         """
-        affordable = self.row_budget // max(rows, 1)
-        return min(self.resamples, max(self.minimum_resamples, affordable))
+        affordable = self.budget // max(rows, 1)
+        return min(self.resamples, max(self.floor, affordable))
 
-    def cost(self, inputs: diagnostics.DiagnosticInput) -> float:
+    def cost(self, inputs: diagnostics.Input) -> float:
         """Predicts the seconds of one resample (upper envelope).
 
         Args:
@@ -497,7 +497,7 @@ class Uncertainty(diagnostics.Diagnostic):
             + RESAMPLE_CLASS_ROW_SECONDS * rows * max(classes - 2, 0)
         )
 
-    def estimate(self, inputs: diagnostics.DiagnosticInput) -> float:
+    def estimate(self, inputs: diagnostics.Input) -> float:
         """Predicts the seconds of the full bootstrap.
 
         Args:
@@ -511,20 +511,20 @@ class Uncertainty(diagnostics.Diagnostic):
             len(inputs.features)
         ) * self.cost(inputs)
 
-    def least(self, inputs: diagnostics.DiagnosticInput) -> float:
-        """Predicts the seconds of a bootstrap of `minimum_resamples`.
+    def least(self, inputs: diagnostics.Input) -> float:
+        """Predicts the seconds of a bootstrap of `floor`.
 
         Args:
             inputs: The evaluation data, with `pace` when it was timed.
 
         Returns:
-            Two predictions plus `minimum_resamples` resamples.
+            Two predictions plus `floor` resamples.
         """
         return diagnostics.MARGIN * 2 * (
             inputs.pace or 0.0
-        ) + self.minimum_resamples * self.cost(inputs)
+        ) + self.floor * self.cost(inputs)
 
-    def compute(self, inputs: diagnostics.DiagnosticInput) -> dict[str, Any]:
+    def compute(self, inputs: diagnostics.Input) -> dict[str, Any]:
         """Bootstraps the primary metric on the evaluation rows.
 
         ROC AUC (binary) and RMSE, resampled by rows or groups, get the
@@ -534,7 +534,7 @@ class Uncertainty(diagnostics.Diagnostic):
         blocks, get the percentile interval of the scorer's values.
 
         The number of resamples is `replicates`, cut to what `cost` says
-        fits before the deadline; below `minimum_resamples` (too few for an
+        fits before the deadline; below `floor` (too few for an
         interval that is not too narrow) the bootstrap is skipped, and the
         deadline is checked again before each resample.
 
@@ -550,12 +550,12 @@ class Uncertainty(diagnostics.Diagnostic):
             class, are skipped and counted in `dropped`), the number of
             evaluation rows and the number of independent units (groups,
             else rows). When the deadline left fewer than
-            `minimum_resamples`, the report is `skipped` with the reason.
+            `floor`, the report is `skipped` with the reason.
         """
         cache, features, target, groups = align(inputs)
         # Scorers only call predict and predict_proba on the replay.
         replay = cast("models.Estimator", cache)
-        metric, positive = inputs.metric, inputs.positive_label
+        metric, positive = inputs.metric, inputs.positive
         estimate = metric.score(replay, features, target, positive)
         unit = (
             "groups"
@@ -574,12 +574,10 @@ class Uncertainty(diagnostics.Diagnostic):
             (replay, features, target, groups),
             exposed,
             centre,
-            planned if planned >= self.minimum_resamples else 0,
+            planned if planned >= self.floor else 0,
         )
         interval = None
-        if attempted >= self.minimum_resamples and len(scores) >= (
-            attempted * KEPT
-        ):
+        if attempted >= self.floor and len(scores) >= (attempted * KEPT):
             interval = self.bound(scores, ratios, centre, metric.name)
         report = {
             "metric": metric.name,
@@ -594,12 +592,12 @@ class Uncertainty(diagnostics.Diagnostic):
             if groups is not None
             else len(target),
         }
-        if attempted < self.minimum_resamples:
+        if attempted < self.floor:
             return {
                 **report,
                 **diagnostics.skipped(
                     f"time for {attempted} of the minimum "
-                    f"{self.minimum_resamples} resamples (about {each:.4f} s "
+                    f"{self.floor} resamples (about {each:.4f} s "
                     f"each) before the deadline"
                 ),
             }

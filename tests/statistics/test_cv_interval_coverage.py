@@ -1,6 +1,6 @@
 """Coverage of the Nadeau-Bengio interval for a cross-validated score.
 
-`confidence.cv_interval` claims an interval for the mean cross-validation
+`confidence.bound` claims an interval for the mean cross-validation
 score that respects the dependence between folds. The truth is known in each
 simulation below, so the coverage is measured, not assumed:
 
@@ -51,7 +51,7 @@ def iid_coverage(rows, folds, features, seed):
     corrected = naive = 0
     for ignored in range(SIMULATIONS):
         scores, held = ols_fold_scores(rng, rows, folds, features)
-        report = confidence.cv_interval(scores, training, held, "random")
+        report = confidence.bound(scores, training, held, "random")
         low, high = report["interval"]
         corrected += low <= truth <= high
         low, high = naive_interval(report, folds)
@@ -96,7 +96,7 @@ def test_the_interval_covers_the_expected_score_with_grouped_rows():
     hits = 0
     for ignored in range(SIMULATIONS):
         scores = group_scores(rng, groups, per_group, folds)
-        report = confidence.cv_interval(
+        report = confidence.bound(
             scores,
             training_groups * per_group,
             (groups // folds) * per_group,
@@ -145,7 +145,7 @@ def test_the_interval_covers_the_long_run_score_with_time_ordered_rows():
     hits = 0
     for ignored in range(SIMULATIONS):
         scores, block = expanding_scores(autoregressive(rng, rows, rho), folds)
-        report = confidence.cv_interval(
+        report = confidence.bound(
             scores, block * (folds + 1) / 2.0, block, "temporal"
         )
         low, high = report["interval"]

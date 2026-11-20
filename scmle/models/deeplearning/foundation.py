@@ -28,7 +28,7 @@ class Learner:
         n_estimators: Members of TabPFN's internal ensemble.
     """
 
-    class_name = ""
+    estimator = ""
 
     def __init__(
         self,
@@ -51,10 +51,10 @@ class Learner:
         """Creates the TabPFN model from the installed package.
 
         Returns:
-            An unfitted TabPFN estimator of this engine's `class_name`.
+            An unfitted TabPFN estimator of this engine's `estimator`.
         """
         library = importlib.import_module("tabpfn")
-        return getattr(library, self.class_name)(
+        return getattr(library, self.estimator)(
             device="cuda" if self.device == "cuda" else self.device,
             random_state=self.random_state,
             n_estimators=self.n_estimators,
@@ -149,7 +149,7 @@ class Learner:
 class Classifier(Learner):
     """TabPFN classifier."""
 
-    class_name = "TabPFNClassifier"
+    estimator = "TabPFNClassifier"
 
     def surplus(self) -> dict[str, Any]:
         """The class labels.
@@ -185,7 +185,7 @@ class Classifier(Learner):
 class Regressor(Learner):
     """TabPFN regressor."""
 
-    class_name = "TabPFNRegressor"
+    estimator = "TabPFNRegressor"
 
     def predict(self, features: Any) -> numpy.ndarray:
         """Predicted values.

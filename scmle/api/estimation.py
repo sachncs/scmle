@@ -24,6 +24,7 @@ from scmle.contracts import records
 from scmle.data.readers import connectors
 from scmle.data.readers import tabular
 from scmle.evaluation import parameter_estimation
+from scmle.evaluation.envelope import rename
 from scmle.inference import evidence
 import scmle.pipeline.orchestrator
 
@@ -197,13 +198,13 @@ def rebuild(
         outcome=estimand_record["outcome"],
         population=estimand_record["population"],
         likelihood=estimand_record["likelihood"],
-        feature_names=tuple(estimand_record["feature_names"]),
+        features=tuple(estimand_record["feature_names"]),
         assumptions=tuple(estimand_record["assumptions"]),
         description=estimand_record.get("description", ""),
     )
     if "prior" in policy_values:
         prior_values = dict(policy_values["prior"])
-        policy_values["prior"] = parameter_estimation.BayesianPrior(
+        policy_values["prior"] = parameter_estimation.Prior(
             mean=tuple(prior_values["mean"]),
             precision=tuple(tuple(row) for row in prior_values["precision"]),
             shape=prior_values.get("shape", 2.0),
@@ -220,7 +221,9 @@ def rebuild(
         policy_values["reml_variance_bounds"] = tuple(
             policy_values["reml_variance_bounds"]
         )
-    return estimand, parameter_estimation.Config(**policy_values)
+    return estimand, parameter_estimation.Config(
+        **rename(parameter_estimation.Config, policy_values)
+    )
 
 
 def restore(
@@ -471,7 +474,7 @@ def bind(
     )
     record = updated.to_dict()
     record["graph_digest"] = updated.digest()
-    evidence.Linker.write_atomically(graph_path, record)
+    evidence.Linker.write(graph_path, record)
 
 
 def persist(
@@ -567,12 +570,12 @@ def locate(
         raise errors.ConfigError(
             f"{policy.estimator} parameter estimation requires treatment_column"
         )
-    if treatment_column not in estimand.feature_names:
+    if treatment_column not in estimand.features:
         raise errors.ConfigError(
             "treatment_column must be included in estimand feature_names"
         )
-    treatment_position = estimand.feature_names.index(treatment_column)
-    if policy.treatment_position != treatment_position:
+    treatment_position = estimand.features.index(treatment_column)
+    if policy.treatment != treatment_position:
         raise errors.ConfigError(
             "treatment_position must match treatment_column in "
             "estimand feature_names"
@@ -605,7 +608,7 @@ def screen(
         DataError: If a declared column is absent, or has missing values under
             the `reject` policy.
     """
-    declared = [*estimand.feature_names, estimand.outcome]
+    declared = [*estimand.features, estimand.outcome]
     treatment_column = None
     if policy.estimator in {
         "bayesian_ate",
@@ -615,8 +618,8 @@ def screen(
     }:
         treatment_column = locate(orchestrator, estimand, policy)
         declared.append(treatment_column)
-    if policy.cluster_name is not None:
-        declared.append(policy.cluster_name)
+    if policy.cluster is not None:
+        declared.append(policy.cluster)
     declared = list(dict.fromkeys(declared))
     missing = sorted(set(declared) - set(frame.columns))
     if missing:
@@ -685,7 +688,8 @@ def estimate(
         DataError: If a declared column is absent, or has missing values under
             the `reject` policy.
 
-    Invalid estimator inputs raise `ValueError` from `estimate_parameters`.
+    Invalid estimator inputs raise `ValueError` from
+    `parameter_estimation.infer`.
     """
     if orchestrator.spec.data.modality != "tabular":
         raise errors.ConfigError(
@@ -698,14 +702,14 @@ def estimate(
     declared, treatment_column, missing_values = screen(
         orchestrator, estimand, policy, frame
     )
-    features = frame.loc[:, list(estimand.feature_names)]
+    features = frame.loc[:, list(estimand.features)]
     outcome = frame.loc[:, estimand.outcome]
     cluster_values = (
         None
-        if policy.cluster_name is None
-        else frame.loc[:, policy.cluster_name].tolist()
+        if policy.cluster is None
+        else frame.loc[:, policy.cluster].tolist()
     )
-    estimation = parameter_estimation.estimate_parameters(
+    estimation = parameter_estimation.infer(
         features.to_numpy(),
         outcome.to_numpy(),
         estimand,
@@ -717,10 +721,10 @@ def estimate(
         diagnostics={
             **estimation.diagnostics,
             "data_columns": {
-                "features": list(estimand.feature_names),
+                "features": list(estimand.features),
                 "outcome": estimand.outcome,
                 "treatment": treatment_column,
-                "cluster": policy.cluster_name,
+                "cluster": policy.cluster,
             },
             "missingness": {
                 "policy": policy.missing,

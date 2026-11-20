@@ -31,9 +31,7 @@ def bundle(golden, tmp_path_factory):
 
 
 def test_a_body_sent_slowly_does_not_take_the_only_slot(golden, bundle):
-    adapter = server.HttpServing(
-        bundle, max_concurrent=1, request_timeout_seconds=1.0
-    )
+    adapter = server.Service(bundle, max_concurrent=1, timeout=1.0)
     adapter.start()
     host, port = adapter.httpd.server_address
     slow = socket.create_connection((host, port), timeout=10)
@@ -67,7 +65,7 @@ def test_a_body_cut_off_by_a_reset_is_logged_and_serving_goes_on(
 ):
     # A reset while the body was read escaped `predict`'s catch-all once the
     # body moved ahead of admission: no log line, no handling.
-    adapter = server.HttpServing(bundle, request_timeout_seconds=10.0)
+    adapter = server.Service(bundle, timeout=10.0)
     adapter.start()
     host, port = adapter.httpd.server_address
     cut = socket.create_connection((host, port), timeout=10)

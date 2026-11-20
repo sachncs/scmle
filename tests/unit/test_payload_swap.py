@@ -92,7 +92,7 @@ def test_a_package_payload_swapped_after_hashing_never_loads(
         {
             "schema_version": 1,
             "model_path": "model.joblib",
-            "artifact_digest": module.file_digest(model),
+            "artifact_digest": module.digest(model),
         },
         KEY,
     )

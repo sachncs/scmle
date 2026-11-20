@@ -17,7 +17,7 @@ def policy(estimator="ipw_ate", **changes):
     values = {
         "estimator": estimator,
         "covariance": "iid",
-        "treatment_position": 0,
+        "treatment": 0,
         "causal_assumptions": CAUSAL,
     }
     values.update(changes)
@@ -92,7 +92,7 @@ def test_an_aipw_reference_refits_the_nuisances():
 
 def test_a_cross_fitted_reference_records_each_fold():
     matrix, y = world()
-    chosen = policy("aipw_ate", cross_fitting_folds=3)
+    chosen = policy("aipw_ate", folds=3)
     ate, ignored, ignored, inputs = causal.dr(matrix, y, 0, chosen, None)
     found = references.reference_aipw_ate(inputs, y, ate, chosen, None)
     assert (
@@ -111,7 +111,7 @@ def test_a_cross_fitted_reference_records_each_fold():
 
 def test_a_cross_fitted_reference_rejects_misaligned_folds():
     matrix, y = world()
-    chosen = policy("aipw_ate", cross_fitting_folds=2)
+    chosen = policy("aipw_ate", folds=2)
     ate, ignored, ignored, inputs = causal.dr(matrix, y, 0, chosen, None)
     broken = {**inputs, "fold_assignments": inputs["fold_assignments"][:-1]}
     with pytest.raises(ValueError, match="fold assignments are invalid"):

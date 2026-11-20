@@ -60,8 +60,8 @@ class Archive(Estimator):
             manifest = {
                 "schema_version": MANIFEST,
                 "model_path": "model.joblib",
-                "artifact_digest": file_digest(model_path),
-                "model_digest": self.model_digest,
+                "artifact_digest": digest(model_path),
+                "model_digest": self.digest,
                 "config": self.config.to_dict(),
             }
             manifest = dict(envelope.sign(manifest, signing_key))
@@ -134,14 +134,14 @@ class Archive(Estimator):
         if not isinstance(loaded, cls):
             raise errors.KindError("package does not contain an Classifier")
         loaded.preflight()
-        if loaded.model_digest != manifest.get("model_digest"):
+        if loaded.digest != manifest.get("model_digest"):
             raise errors.InputError(
                 "image model digest does not match manifest"
             )
         return loaded
 
 
-def file_digest(path: pathlib.Path) -> str:
+def digest(path: pathlib.Path) -> str:
     """Computes a SHA-256 digest for a package artifact.
 
     Args:

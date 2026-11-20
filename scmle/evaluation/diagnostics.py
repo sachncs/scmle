@@ -54,7 +54,7 @@ MARGIN = 1.5
 
 
 @dataclasses.dataclass(frozen=True)
-class DiagnosticInput:
+class Input:
     """What diagnostics may look at.
 
     Attributes:
@@ -63,15 +63,15 @@ class DiagnosticInput:
         target: Evaluation labels / values.
         task: Resolved task type.
         metric: Primary metric.
-        feature_plan: Feature columns by kind.
+        plan: Feature columns by kind.
         seed: Random seed.
         groups: Entity labels of the evaluation rows, when the data has
             repeated entities (resampling then draws whole groups).
         temporal: Whether rows are chronologically ordered and serially
             dependent (resampling then draws contiguous blocks).
-        reference_features: Development rows the model was trained on, for
+        reference: Development rows the model was trained on, for
             diagnostics that compare them with the evaluation rows.
-        sensitive_columns: Columns whose groups outcomes are compared across.
+        sensitive: Columns whose groups outcomes are compared across.
         deadline: Monotonic time (on `clock`) by which the diagnostic must
             finish; diagnostics check it before each unit of work and
             reduce or skip what cannot fit, saying so (None = no limit).
@@ -84,12 +84,12 @@ class DiagnosticInput:
     target: pandas.Series
     task: tasks.Task
     metric: scmle.contracts.metrics.Metric
-    feature_plan: data.Blueprint
+    plan: data.Blueprint
     seed: int
     groups: pandas.Series | None = None
     temporal: bool = False
-    reference_features: pandas.DataFrame | None = None
-    sensitive_columns: tuple[str, ...] = ()
+    reference: pandas.DataFrame | None = None
+    sensitive: tuple[str, ...] = ()
     deadline: float | None = None
     pace: float | None = None
 
@@ -119,7 +119,7 @@ class DiagnosticInput:
         return self.deadline - clock()
 
     @property
-    def positive_label(self) -> Any:
+    def positive(self) -> Any:
         """The positive class of a binary target, else None.
 
         It is the second class of the fitted estimator.
@@ -164,13 +164,13 @@ class Diagnostic(abc.ABC):
     """
 
     name: ClassVar[str]
-    applies_to: ClassVar[frozenset[tasks.Task]] = EVERYTHING
+    tasks: ClassVar[frozenset[tasks.Task]] = EVERYTHING
     fixed: ClassVar[float] = 0.0
     passes: ClassVar[float] = 1.0
     rowcost: ClassVar[float] = 0.0
     units: ClassVar[int] = 1
 
-    def estimate(self, inputs: DiagnosticInput) -> float:
+    def estimate(self, inputs: Input) -> float:
         """Predicts the seconds of the full report.
 
         Args:
@@ -183,7 +183,7 @@ class Diagnostic(abc.ABC):
         rows = len(inputs.features)
         return MARGIN * (self.fixed + self.passes * pace + self.rowcost * rows)
 
-    def least(self, inputs: DiagnosticInput) -> float:
+    def least(self, inputs: Input) -> float:
         """Predicts the seconds of the smallest useful report.
 
         Args:
@@ -196,7 +196,7 @@ class Diagnostic(abc.ABC):
         return self.estimate(inputs) / self.units
 
     @abc.abstractmethod
-    def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
+    def compute(self, inputs: Input) -> dict[str, Any]:
         """Computes the report.
 
         Args:
@@ -211,11 +211,11 @@ class Contingency(Diagnostic):
     """Confusion matrix and per-class precision / recall / F-measure."""
 
     name = "classification_report"
-    applies_to = CLASSIFICATION
+    tasks = CLASSIFICATION
     # Fitted: 0.98 predictions plus 4.8 microseconds per row (21 runs).
     rowcost = 4.8e-6
 
-    def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
+    def compute(self, inputs: Input) -> dict[str, Any]:
         """Builds the confusion matrix and per-class scores.
 
         Args:
@@ -261,11 +261,11 @@ class Calibration(Diagnostic):
     """Reliability curve, Brier score and expected calibration error."""
 
     name = "calibration"
-    applies_to = BINARY_ONLY
+    tasks = BINARY_ONLY
     # Fitted: 0.99 predictions plus 0.34 microseconds per row (21 runs).
     rowcost = 3.4e-7
 
-    def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
+    def compute(self, inputs: Input) -> dict[str, Any]:
         """Bins predicted probabilities and compares them with outcomes.
 
         Args:
@@ -280,7 +280,7 @@ class Calibration(Diagnostic):
         if not inputs.affords(self.estimate(inputs)):
             return skipped("the deadline leaves no time for one prediction")
         probability = inputs.estimator.predict_proba(inputs.features)[:, 1]
-        observed = (inputs.target == inputs.positive_label).astype(float)
+        observed = (inputs.target == inputs.positive).astype(float)
         edges = numpy.linspace(0.0, 1.0, CALIBRATION_BINS + 1)
         bins = numpy.clip(
             numpy.digitize(probability, edges[1:-1]), 0, CALIBRATION_BINS - 1
@@ -312,11 +312,11 @@ class Reliability(Diagnostic):
     """Top-label reliability curve, Brier score and calibration error."""
 
     name = "calibration"
-    applies_to = frozenset({tasks.Task.MULTICLASS})
+    tasks = frozenset({tasks.Task.MULTICLASS})
     # Same fit as `Calibration` (the report shares its name and runs).
     rowcost = 3.4e-7
 
-    def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
+    def compute(self, inputs: Input) -> dict[str, Any]:
         """Compares confidence in the predicted class with its accuracy.
 
         Args:
@@ -353,9 +353,9 @@ class Sweep(Diagnostic):
     """Precision / recall / F-measure across decision thresholds."""
 
     name = "threshold_analysis"
-    applies_to = BINARY_ONLY
+    tasks = BINARY_ONLY
 
-    def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
+    def compute(self, inputs: Input) -> dict[str, Any]:
         """Scores the positive class at a grid of thresholds.
 
         Args:
@@ -367,7 +367,7 @@ class Sweep(Diagnostic):
             (a zero where nothing is flagged or the denominator is zero).
         """
         probability = inputs.estimator.predict_proba(inputs.features)[:, 1]
-        actual = (inputs.target == inputs.positive_label).to_numpy()
+        actual = (inputs.target == inputs.positive).to_numpy()
         rows = []
         for threshold in THRESHOLDS:
             flagged = probability >= threshold
@@ -390,11 +390,11 @@ class Residuals(Diagnostic):
     """Bias, spread and error by segment for regression."""
 
     name = "residuals"
-    applies_to = REGRESSION_ONLY
+    tasks = REGRESSION_ONLY
     # Fitted: 1.01 predictions plus 0.65 microseconds per row (10 runs).
     rowcost = 6.5e-7
 
-    def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
+    def compute(self, inputs: Input) -> dict[str, Any]:
         """Summarizes residuals and the worst-served segments.
 
         Args:
@@ -424,7 +424,7 @@ class Residuals(Diagnostic):
             "segments": {},
         }
         frame = inputs.features.assign(abs_error=absolute)
-        for column in inputs.feature_plan.categorical[:MAX_SEGMENT_FEATURES]:
+        for column in inputs.plan.categorical[:MAX_SEGMENT_FEATURES]:
             if frame[column].nunique() > MAX_SEGMENT_LEVELS:
                 continue
             grouped = frame.groupby(column, dropna=False)["abs_error"]
@@ -435,7 +435,7 @@ class Residuals(Diagnostic):
                 }
                 for level, group in grouped
             }
-        for column in inputs.feature_plan.numeric[:MAX_SEGMENT_FEATURES]:
+        for column in inputs.plan.numeric[:MAX_SEGMENT_FEATURES]:
             values = pandas.to_numeric(frame[column], errors="coerce")
             keys = (
                 values
@@ -487,12 +487,12 @@ class Errors(Diagnostic):
     """Identifies the highest-risk held-out rows without exposing features."""
 
     name = "error_analysis"
-    applies_to = CLASSIFICATION | REGRESSION_ONLY
+    tasks = CLASSIFICATION | REGRESSION_ONLY
     # Fitted: 2.06 predictions plus 0.94 microseconds per row (31 runs).
     passes = 2.1
     rowcost = 9.4e-7
 
-    def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
+    def compute(self, inputs: Input) -> dict[str, Any]:
         """Returns bounded row-level error evidence and its limitations.
 
         Args:

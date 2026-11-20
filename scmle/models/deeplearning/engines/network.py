@@ -21,20 +21,20 @@ class Plan:
     """How one training run cuts its epochs into optimizer updates.
 
     Attributes:
-        batch_rows: Rows per mini-batch.
-        second_order: Whether the optimizer takes full-batch L-BFGS steps.
+        rows: Rows per mini-batch.
+        order: Whether the optimizer takes full-batch L-BFGS steps.
         accumulate: Mini-batches whose gradients are summed per update.
-        updates_per_epoch: Optimizer updates in one epoch.
-        total_steps: Optimizer updates over all epochs.
-        warmup_steps: Optimizer updates of the learning-rate warm-up.
+        updates: Optimizer updates in one epoch.
+        steps: Optimizer updates over all epochs.
+        warmup: Optimizer updates of the learning-rate warm-up.
     """
 
-    batch_rows: int
-    second_order: bool
+    rows: int
+    order: bool
     accumulate: int
-    updates_per_epoch: int
-    total_steps: int
-    warmup_steps: int
+    updates: int
+    steps: int
+    warmup: int
 
 
 class Network(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-learn ships no type information
@@ -243,7 +243,7 @@ class Network(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
             )
             self.network_ = network.eval()
 
-    def weighted_loss(
+    def weigh(
         self, torch: Any, network: Any, tensors: dict[str, Any], rows: Any
     ) -> Any:
         """Weighted mean loss over the given row indices.

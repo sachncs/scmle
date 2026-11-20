@@ -92,7 +92,7 @@ class Summary(reporting.Reporting):
         custody = board.find(exploration.Custody)
         clustered = custody is not None and custody.column is not None
         reports = suite.run_suite(
-            diagnostics.DiagnosticInput(
+            diagnostics.Input(
                 pipeline,
                 features,
                 target,
@@ -107,8 +107,8 @@ class Summary(reporting.Reporting):
                     else None
                 ),
                 temporal=split.manifest.strategy == "temporal",
-                reference_features=split.features,
-                sensitive_columns=tuple(data.sensitive_columns),
+                reference=split.features,
+                sensitive=tuple(data.sensitive_columns),
             ),
             suite.lineup(),
             self.ration(board),
@@ -236,7 +236,7 @@ class Summary(reporting.Reporting):
             board: The run's board, holding the split, trials and selection.
 
         Returns:
-            The interval record of `confidence.cv_interval`.
+            The interval record of `confidence.bound`.
         """
         partition = board.get(profiling.Partition)
         split = partition.split
@@ -244,7 +244,7 @@ class Summary(reporting.Reporting):
             board.get(selecting.Choice).selected, "selected"
         )
         metric = partition.metric
-        return confidence.cv_interval(
+        return confidence.bound(
             selected.fold_scores,
             float(numpy.mean([len(fold[0]) for fold in split.manifest.folds])),
             float(numpy.mean([len(fold[1]) for fold in split.manifest.folds])),

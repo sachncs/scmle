@@ -155,7 +155,7 @@ def summarise(
     }
 
 
-def slice_coverage(
+def stratify(
     covered: numpy.ndarray,
     labels: Sequence[Any],
     nominal: float = 0.9,
@@ -230,7 +230,7 @@ def undercovered(
 ) -> dict[str, Any]:
     """Slices whose coverage is below nominal by more than a fixed margin.
 
-    `slice_coverage` compares each slice with the nominal level itself, but
+    `stratify` compares each slice with the nominal level itself, but
     the conformal quantile varies with the calibration sample, so the slice
     coverages move together and that test flags too often. Here each
     slice of at least `min_rows` rows is tested against `nominal - margin`
@@ -338,7 +338,7 @@ def grade(
     return ATTESTED if attested_exchangeable else UNVERIFIED
 
 
-def coverage_report(
+def report(
     covered: numpy.ndarray,
     widths: numpy.ndarray | None,
     nominal: float,
@@ -370,7 +370,7 @@ def coverage_report(
         "tier": grade(summary, attested_exchangeable, clean_holdout),
     }
     if labels is not None:
-        report["by_slice"] = slice_coverage(covered, labels, nominal)
+        report["by_slice"] = stratify(covered, labels, nominal)
     if true_classes is not None:
         report["by_class"] = classwise(covered, true_classes, nominal)
     return report

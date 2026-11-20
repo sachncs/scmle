@@ -14,10 +14,11 @@ from scmle.evaluation.envelope import Counts
 from scmle.evaluation.envelope import Envelope
 from scmle.evaluation.envelope import fold
 from scmle.evaluation.envelope import lowercase
+from scmle.evaluation.envelope import rename
 from scmle.evaluation.envelope import unfold
 from scmle.evaluation.longitudinal.declaration import Config
 from scmle.evaluation.longitudinal.declaration import Estimand
-from scmle.evaluation.longitudinal.declaration import PeriodATE
+from scmle.evaluation.longitudinal.declaration import Period
 
 NESTED = {
     "rows": {
@@ -61,14 +62,14 @@ class Estimation(Envelope):
             parts={
                 "estimand": Estimand.migrations[0],
                 "policy": Config.migrations[0],
-                "periods": PeriodATE.migrations[0],
+                "periods": Period.migrations[0],
             },
         ),
     )
 
     estimand: Estimand
     policy: Config
-    periods: tuple[PeriodATE, ...]
+    periods: tuple[Period, ...]
     covariance: tuple[tuple[float, ...], ...]
     rows: Counts
     diagnostics: Mapping[str, Any]
@@ -156,14 +157,15 @@ class Estimation(Envelope):
             The result built from the record; field validation runs on
             construction. A missing key raises `KeyError`.
         """
-        # The parts were written in single words at version 3; the fields
-        # keep their version-2 names.
+        # The parts were written in single words at version 3. They are read
+        # at version 2, where the nested groups are flat, and the keys whose
+        # fields took single words are renamed back to the fields.
         record = records.downgrade(cls.migrations[1:], dict(record))
-        estimand_values = dict(record["estimand"])
+        estimand_values = rename(Estimand, record["estimand"])
         estimand_values["covariates"] = tuple(estimand_values["covariates"])
         estimand_values["assumptions"] = tuple(estimand_values["assumptions"])
         periods = tuple(
-            PeriodATE(
+            Period(
                 period=str(item["period"]),
                 estimate=float(item["estimate"]),
                 standard_error=float(item["standard_error"]),
@@ -172,11 +174,11 @@ class Estimation(Envelope):
                     float(item["interval"][1]),
                 ),
                 rows=int(item["rows"]),
-                treated_rows=int(item["treated_rows"]),
-                control_rows=int(item["control_rows"]),
+                treated=int(item["treated_rows"]),
+                control=int(item["control_rows"]),
                 propensity_min=float(item["propensity_min"]),
                 propensity_max=float(item["propensity_max"]),
-                fraction_clipped=float(item["fraction_clipped"]),
+                clipped=float(item["fraction_clipped"]),
                 effective_sample_size_treated=float(
                     item["effective_sample_size_treated"]
                 ),
@@ -188,7 +190,7 @@ class Estimation(Envelope):
             )
             for item in record["periods"]
         )
-        policy = Config(**dict(record["policy"]))
+        policy = Config(**rename(Config, record["policy"]))
         return cls(
             Estimand(**estimand_values),
             policy,

@@ -54,7 +54,7 @@ class Settings(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships 
         accumulation_steps: Mini-batches summed per parameter update.
     """
 
-    engine_path = ""
+    engine = ""
 
     def __init__(
         self,
@@ -162,8 +162,7 @@ class Settings(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships 
         explanation = self.model_contract().explanation
         if explanation is None:
             raise errors.InputError(
-                f"{self.model_contract().model_family} has no explanation "
-                "contract"
+                f"{self.model_contract().family} has no explanation contract"
             )
         return explanation
 
@@ -184,7 +183,7 @@ class NetworkEstimator(Settings):
         return {
             "format": family.checkpoint.format,
             "schema_version": self.CHECKPOINT_SCHEMA_VERSION,
-            "model_family": family.model_family,
+            "model_family": family.family,
             "architecture": self.architecture,
             "modality": family.inference.modality.value,
             "input_width": self.state_["input_width_"],
@@ -221,7 +220,7 @@ class NetworkEstimator(Settings):
         state = worker.client().request(
             "fit",
             (
-                self.engine_path,
+                self.engine,
                 self.get_params(),
                 matrix,
                 numpy.asarray(target),
@@ -268,7 +267,7 @@ class NetworkEstimator(Settings):
         for state in (None, self.state_):
             reply = client.request(
                 "call",
-                (self.engine_path, self.state_id_, state, method, matrix),
+                (self.engine, self.state_id_, state, method, matrix),
             )
             if not (isinstance(reply, str) and reply == worker.NEED_STATE):
                 return numpy.asarray(reply)
@@ -294,7 +293,7 @@ class NetworkEstimator(Settings):
             values=values,
             method=self.explanation_contract().method,
             target="predicted_output",
-            feature_count=self.state_["input_width_"],
+            features=self.state_["input_width_"],
         )
 
     def stash(
@@ -392,7 +391,7 @@ class NetworkEstimator(Settings):
 class TorchClassifier(base.ClassifierMixin, NetworkEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Classifier: softmax over class scores, optional class balancing."""
 
-    engine_path = "scmle.models.deeplearning.engines.Classifier"
+    engine = "scmle.models.deeplearning.engines.Classifier"
 
     def __init__(
         self,
@@ -509,7 +508,7 @@ class TorchClassifier(base.ClassifierMixin, NetworkEstimator):  # type: ignore[m
 class TorchRegressor(base.RegressorMixin, NetworkEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Regressor trained on the standardized target with squared error."""
 
-    engine_path = "scmle.models.deeplearning.engines.Regressor"
+    engine = "scmle.models.deeplearning.engines.Regressor"
 
     def predict(self, features: Any) -> numpy.ndarray:
         """Predicted values in the original units.
@@ -523,7 +522,7 @@ class TorchRegressor(base.RegressorMixin, NetworkEstimator):  # type: ignore[mis
         return self.call("predict", features)
 
 
-class TabPfn(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Tabpfn(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Worker-backed TabPFN with the scikit-learn estimator interface.
 
     Attributes:
@@ -532,7 +531,7 @@ class TabPfn(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no
         n_estimators: Members of TabPFN's internal ensemble.
     """
 
-    engine_path = ""
+    engine = ""
 
     def __init__(
         self,
@@ -551,7 +550,7 @@ class TabPfn(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no
         self.random_state = random_state
         self.n_estimators = n_estimators
 
-    def fit(self, features: Any, target: Any) -> "TabPfn":
+    def fit(self, features: Any, target: Any) -> "Tabpfn":
         """Stores the rows in the worker's TabPFN model.
 
         Args:
@@ -565,7 +564,7 @@ class TabPfn(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no
         self.state_ = worker.client().request(
             "fit",
             (
-                self.engine_path,
+                self.engine,
                 self.get_params(),
                 matrix,
                 numpy.asarray(target),
@@ -605,17 +604,17 @@ class TabPfn(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no
         for state in (None, self.state_):
             reply = client.request(
                 "call",
-                (self.engine_path, self.state_id_, state, method, matrix),
+                (self.engine, self.state_id_, state, method, matrix),
             )
             if not (isinstance(reply, str) and reply == worker.NEED_STATE):
                 return numpy.asarray(reply)
         raise worker.WorkerError("the worker could not load the model state")
 
 
-class TabPfnClassifier(base.ClassifierMixin, TabPfn):  # type: ignore[misc]  # scikit-learn ships no type information
+class TabPfnClassifier(base.ClassifierMixin, Tabpfn):  # type: ignore[misc]  # scikit-learn ships no type information
     """TabPFN classifier."""
 
-    engine_path = "scmle.models.deeplearning.foundation.Classifier"
+    engine = "scmle.models.deeplearning.foundation.Classifier"
 
     def remember(self, state: dict[str, Any]) -> None:
         """Exposes `classes_` after fitting.
@@ -648,10 +647,10 @@ class TabPfnClassifier(base.ClassifierMixin, TabPfn):  # type: ignore[misc]  # s
         return self.call("predict", features)
 
 
-class TabPfnRegressor(base.RegressorMixin, TabPfn):  # type: ignore[misc]  # scikit-learn ships no type information
+class TabPfnRegressor(base.RegressorMixin, Tabpfn):  # type: ignore[misc]  # scikit-learn ships no type information
     """TabPFN regressor."""
 
-    engine_path = "scmle.models.deeplearning.foundation.Regressor"
+    engine = "scmle.models.deeplearning.foundation.Regressor"
 
     def predict(self, features: Any) -> numpy.ndarray:
         """Predicted values.
@@ -721,7 +720,7 @@ class Keras(NetworkEstimator):
 class KerasClassifier(base.ClassifierMixin, Keras):  # type: ignore[misc]  # scikit-learn ships no type information
     """Keras classifier."""
 
-    engine_path = "scmle.models.deeplearning.keras_engine.Classifier"
+    engine = "scmle.models.deeplearning.keras_engine.Classifier"
 
     def remember(self, state: dict[str, Any]) -> None:
         """Exposes `classes_` after fitting.
@@ -757,7 +756,7 @@ class KerasClassifier(base.ClassifierMixin, Keras):  # type: ignore[misc]  # sci
 class KerasRegressor(base.RegressorMixin, Keras):  # type: ignore[misc]  # scikit-learn ships no type information
     """Keras regressor."""
 
-    engine_path = "scmle.models.deeplearning.keras_engine.Regressor"
+    engine = "scmle.models.deeplearning.keras_engine.Regressor"
 
     def predict(self, features: Any) -> numpy.ndarray:
         """Predicted values.

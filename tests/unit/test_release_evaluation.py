@@ -142,7 +142,7 @@ def test_release_evaluation_passes_and_serializes_deterministically():
 
     assert first.passed
     assert not first.blocked
-    assert first.blocking_reasons == ()
+    assert first.reasons == ()
     assert first == second
     assert json.loads(first.canonize())["passed"] is True
 
@@ -189,13 +189,9 @@ def test_metric_failure_and_missing_evidence_block_release():
     )
 
     assert not result.passed
-    assert any("roc_auc" in reason for reason in result.blocking_reasons)
-    assert any(
-        "release.manifest" in reason for reason in result.blocking_reasons
-    )
-    assert any(
-        "diagnostic.metric" in reason for reason in result.blocking_reasons
-    )
+    assert any("roc_auc" in reason for reason in result.reasons)
+    assert any("release.manifest" in reason for reason in result.reasons)
+    assert any("diagnostic.metric" in reason for reason in result.reasons)
 
 
 def test_warning_diagnostic_failure_is_visible_but_not_blocking():
@@ -266,10 +262,8 @@ def test_unsupported_reports_and_unaccepted_evidence_block():
     )
 
     assert not result.passed
-    assert any(
-        "unsupported report" in reason for reason in result.blocking_reasons
-    )
-    assert any("not accepted" in reason for reason in result.blocking_reasons)
+    assert any("unsupported report" in reason for reason in result.reasons)
+    assert any("not accepted" in reason for reason in result.reasons)
 
 
 def test_explanation_quality_threshold_is_a_blocking_release_gate():
@@ -433,13 +427,13 @@ def test_readiness_summary_counts_findings_and_serializes_deterministically():
     assert summary.total_findings == 6
     assert summary.passed_findings == 5
     assert summary.failed_findings == 1
-    assert summary.blocking_findings == 5
-    assert summary.blocking_failures == 0
-    assert summary.non_blocking_failures == 1
-    assert summary.counts_by_kind["diagnostic"] == release.Tally(
-        total=2, passed=1, failed=1, blocking=1, blocking_failures=0
+    assert summary.findings == 5
+    assert summary.failures == 0
+    assert summary.warnings == 1
+    assert summary.kinds["diagnostic"] == release.Tally(
+        total=2, passed=1, failed=1, blocking=1, failures=0
     )
-    assert set(summary.counts_by_kind) == {kind.value for kind in release.Kind}
+    assert set(summary.kinds) == {kind.value for kind in release.Kind}
     assert json.loads(summary.canonize()) == summary.to_dict()
     assert summary.canonize() == result.tally().canonize()
     assert result.to_dict()["readiness"] == summary.to_dict()
@@ -469,8 +463,8 @@ def test_blocked_readiness_summary_distinguishes_blocking_failures():
             if item.kind is release.Kind.EVIDENCE and not item.passed
         ]
     )
-    assert summary.blocking_failures == summary.failed_findings
-    assert summary.counts_by_kind["metric"].blocking_failures == 1
+    assert summary.failures == summary.failed_findings
+    assert summary.kinds["metric"].failures == 1
 
 
 @pytest.mark.parametrize(
@@ -478,7 +472,7 @@ def test_blocked_readiness_summary_distinguishes_blocking_failures():
     [
         ("status", release.Readiness.READY, "status"),
         ("total_findings", 2, "total_findings"),
-        ("counts_by_kind", {}, "counts_by_kind"),
+        ("kinds", {}, "counts_by_kind"),
     ],
 )
 def test_readiness_summary_rejects_inconsistent_values(
@@ -487,21 +481,21 @@ def test_readiness_summary_rejects_inconsistent_values(
     """Summary construction fails closed when its counts are inconsistent."""
     values: dict[str, object] = {
         "task": "binary_classification",
-        "policy_schema_version": 1,
+        "policy": 1,
         "status": release.Readiness.BLOCKED,
         "total_findings": 1,
         "passed_findings": 0,
         "failed_findings": 1,
-        "blocking_findings": 1,
-        "blocking_failures": 1,
-        "non_blocking_failures": 0,
-        "counts_by_kind": {
+        "findings": 1,
+        "failures": 1,
+        "warnings": 0,
+        "kinds": {
             kind.value: release.Tally(
                 total=1 if kind is release.Kind.METRIC else 0,
                 passed=0,
                 failed=1 if kind is release.Kind.METRIC else 0,
                 blocking=1 if kind is release.Kind.METRIC else 0,
-                blocking_failures=(1 if kind is release.Kind.METRIC else 0),
+                failures=(1 if kind is release.Kind.METRIC else 0),
             )
             for kind in release.Kind
         },
@@ -520,10 +514,10 @@ def test_attestation_gate_requires_a_signed_release_record():
     """
     outcome = release.Verdict(
         task="classification",
-        policy_schema_version=1,
+        policy=1,
         passed=True,
         findings=(),
-        blocking_reasons=(),
+        reasons=(),
     )
 
     blocked = release.certify(outcome, {}, True)
@@ -556,10 +550,10 @@ def test_attestation_gate_rejects_a_tampered_signature():
     """
     outcome = release.Verdict(
         task="classification",
-        policy_schema_version=1,
+        policy=1,
         passed=True,
         findings=(),
-        blocking_reasons=(),
+        reasons=(),
     )
 
     blocked = release.certify(

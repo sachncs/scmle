@@ -25,7 +25,7 @@ class Embedder(base.TransformerMixin, estimators.NetworkEstimator):  # type: ign
     candidate in the default model search.
     """
 
-    engine_path = "scmle.models.deeplearning.jepa_engine.Trainer"
+    engine = "scmle.models.deeplearning.jepa_engine.Trainer"
     CHECKPOINT_FORMAT = "scmle.tabular-jepa.v2"
     CHECKPOINT_SCHEMA_VERSION = 1
 
@@ -149,7 +149,7 @@ class Embedder(base.TransformerMixin, estimators.NetworkEstimator):  # type: ign
             values=values,
             method=self.explanation_contract().method,
             target="embedding_energy",
-            feature_count=self.state_["input_width_"],
+            features=self.state_["input_width_"],
         )
 
     def inventory(self) -> dict[str, object]:
@@ -159,7 +159,7 @@ class Embedder(base.TransformerMixin, estimators.NetworkEstimator):  # type: ign
         return {
             "format": self.CHECKPOINT_FORMAT,
             "schema_version": self.CHECKPOINT_SCHEMA_VERSION,
-            "model_family": family.model_family,
+            "model_family": family.family,
             "scope": "tabular_numeric_representation",
             "input_width": self.state_["input_width_"],
             "embedding_size": self.embedding_size,

@@ -91,7 +91,7 @@ def deregister(name: str) -> None:
     plugins.REGISTRY.withdraw(plugins.Kind.ESTIMATORS, name)
 
 
-def builtin_names() -> frozenset[str]:
+def inventory() -> frozenset[str]:
     """Lists the built-in model names.
 
     Returns:
@@ -110,7 +110,7 @@ class Catalog:
             adapters: Adapters to register immediately.
         """
         self.adapters: dict[str, models.Model] = {}
-        self.plugin_failures: dict[str, str] = {}
+        self.failures: dict[str, str] = {}
         for adapter in adapters:
             self.register(adapter)
 
@@ -124,7 +124,7 @@ class Catalog:
         planning time when their library is not installed.
 
         Args:
-            include_user: Also add adapters from `register_estimator`
+            include_user: Also add adapters from `custom.register`
                 (a snapshot taken once, so later changes do not leak in).
 
         Returns:
@@ -179,15 +179,15 @@ class Catalog:
         """
         self.adapters.pop(name, None)
 
-    def load_plugins(self) -> list[str]:
+    def load(self) -> list[str]:
         """Registers adapters advertised through entry points.
 
         Discovery goes through the shared registry (`plugins.REGISTRY`), so
         a discovered adapter is also offered to later catalogs. Every plugin
         adapter must pass the shared conformance suite before it is
         registered, and may not take a built-in model's name (as
-        `custom.register_estimator` refuses too). Reasons for failures are
-        kept in `plugin_failures`.
+        `custom.register` refuses too). Reasons for failures are
+        kept in `failures`.
 
         Returns:
             Names of plugins that failed to load or conform (entry-point
@@ -197,14 +197,14 @@ class Catalog:
         found = plugins.REGISTRY.discover(
             plugins.Kind.ESTIMATORS, conformance.comply
         )
-        self.plugin_failures = dict(found.failures)
-        builtin = builtin_names()
+        self.failures = dict(found.failures)
+        builtin = inventory()
         for adapter in found.items:
             if adapter.name in builtin:
                 LOGGER.warning(
                     "model plugin %s shadows a built-in model", adapter.name
                 )
-                self.plugin_failures[adapter.name] = (
+                self.failures[adapter.name] = (
                     f"'{adapter.name}' is a built-in model name"
                 )
                 continue
@@ -212,7 +212,7 @@ class Catalog:
                 plugins.Kind.ESTIMATORS, adapter.name, adapter, replace=True
             )
             self.register(adapter, overwrite=True)
-        return list(self.plugin_failures)
+        return list(self.failures)
 
     def get(self, name: str) -> models.Model:
         """Returns the adapter called `name`.

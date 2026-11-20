@@ -42,7 +42,7 @@ def test_every_finished_request_is_recorded_with_route_status_and_time(
 ):
     bundle, golden = reference
     monitor = signals.SignalMonitor()
-    adapter = server.HttpServing(bundle, monitor=monitor)
+    adapter = server.Service(bundle, monitor=monitor)
     adapter.start()
     try:
         base = adapter.address
@@ -65,7 +65,7 @@ def test_every_finished_request_is_recorded_with_route_status_and_time(
 def test_scored_features_are_sampled_into_the_monitor(reference):
     bundle, golden = reference
     monitor = signals.SignalMonitor(signals.Window(sample_rate=1.0, seed=1))
-    adapter = server.HttpServing(bundle, monitor=monitor)
+    adapter = server.Service(bundle, monitor=monitor)
     adapter.start()
     try:
         base = adapter.address
@@ -85,7 +85,7 @@ def test_a_failing_monitor_never_breaks_serving(reference):
         def sense(self, *args):
             raise RuntimeError("monitor down")
 
-    adapter = server.HttpServing(bundle, monitor=Broken())
+    adapter = server.Service(bundle, monitor=Broken())
     adapter.start()
     try:
         base = adapter.address

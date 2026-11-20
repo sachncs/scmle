@@ -17,7 +17,7 @@ CAUSAL = ("consistency", "conditional_exchangeability", "positivity")
 
 
 def prior(size=3):
-    return declaration.BayesianPrior(
+    return declaration.Prior(
         (0.0,) * size,
         tuple(tuple(float(i == j) for j in range(size)) for i in range(size)),
     )
@@ -63,7 +63,7 @@ def test_a_reprior_of_a_causal_model_reports_the_treatment_change():
         estimator="bayesian_ate",
         covariance="iid",
         prior=prior(),
-        treatment_position=1,
+        treatment=1,
         causal_assumptions=(*CAUSAL, "linearity"),
     )
     found = sensitivity.reprior(prior(), design, y, base, policy)
@@ -104,7 +104,7 @@ def test_a_transport_rejects_bad_references():
 def test_a_sensitivity_report_without_extras_records_what_was_not_run():
     x, design, y = world()
     policy = config.Config(estimator="linear")
-    found = sensitivity.sensitivity_report(
+    found = sensitivity.perturb(
         x, y, policy, design, numpy.zeros(3), None, estimand(), None
     )
     assert found == {
@@ -120,8 +120,8 @@ def test_a_sensitivity_report_without_extras_records_what_was_not_run():
 
 def test_a_row_bootstrap_matches_its_seeded_draws():
     x, design, y = world()
-    policy = config.Config(estimator="linear", bootstrap_replicates=5, seed=7)
-    found = sensitivity.sensitivity_report(
+    policy = config.Config(estimator="linear", replicates=5, seed=7)
+    found = sensitivity.perturb(
         x, y, policy, design, numpy.zeros(3), x, estimand(), None
     )
     rng = numpy.random.default_rng(7)
@@ -143,8 +143,8 @@ def test_a_logistic_bootstrap_uses_the_logit():
     x = rng.normal(size=(150, 2))
     y = (rng.random(150) < special.expit(x[:, 0])).astype(float)
     design = numpy.column_stack([numpy.ones(150), x])
-    policy = config.Config(estimator="logistic", bootstrap_replicates=3)
-    found = sensitivity.sensitivity_report(
+    policy = config.Config(estimator="logistic", replicates=3)
+    found = sensitivity.perturb(
         x, y, policy, design, numpy.zeros(3), None, estimand(), None
     )
     assert len(found["sampling"]["bootstrap_intervals"]) == 2
@@ -156,8 +156,8 @@ def test_a_hierarchical_bootstrap_needs_clusters():
     policy = config.Config(
         estimator="hierarchical_linear",
         covariance="iid",
-        cluster_name="c",
-        bootstrap_replicates=2,
+        cluster="c",
+        replicates=2,
         hierarchical_assumptions=(
             "random_intercept",
             "cluster_independence",
@@ -188,14 +188,12 @@ def test_the_slope_limits_are_fixed():
 def test_a_sample_digest_hashes_little_endian_int64():
     indices = numpy.array([3, 1, 2])
     assert (
-        resampling.bootstrap_sample_digest(indices)
+        resampling.digest(indices)
         == hashlib.sha256(
             numpy.array([3, 1, 2], dtype="<i8").tobytes()
         ).hexdigest()
     )
-    assert resampling.bootstrap_sample_digest(
-        [1, 2, 3]
-    ) != resampling.bootstrap_sample_digest(indices)
+    assert resampling.digest([1, 2, 3]) != resampling.digest(indices)
 
 
 def test_intervals_are_per_parameter_percentiles():
@@ -217,8 +215,8 @@ def test_a_causal_row_draw_resamples_rows():
     rng = numpy.random.default_rng(0)
     matrix = numpy.arange(10.0).reshape(5, 2)
     values = numpy.arange(5.0)
-    sampled, outcome, clusters, record = (
-        resampling.draw_causal_bootstrap_sample(matrix, values, None, rng)
+    sampled, outcome, clusters, record = resampling.draw(
+        matrix, values, None, rng
     )
     indices = numpy.random.default_rng(0).integers(0, 5, size=5)
     assert outcome.tolist() == values[indices].tolist()
@@ -227,7 +225,7 @@ def test_a_causal_row_draw_resamples_rows():
     assert record == {
         "sampled_rows": 5,
         "source_unit_count": 5,
-        "sample_digest": resampling.bootstrap_sample_digest(indices),
+        "sample_digest": resampling.digest(indices),
     }
 
 
@@ -235,10 +233,8 @@ def test_a_clustered_draw_gives_fresh_identities():
     labels = numpy.array(["a", "a", "b", "c"], dtype=object)
     values = numpy.array([1.0, 2.0, 3.0, 4.0])
     matrix = values[:, None]
-    ignored, outcome, clusters, record = (
-        resampling.draw_causal_bootstrap_sample(
-            matrix, values, labels, numpy.random.default_rng(1)
-        )
+    ignored, outcome, clusters, record = resampling.draw(
+        matrix, values, labels, numpy.random.default_rng(1)
     )
     picks = numpy.random.default_rng(1).integers(0, 3, size=3)
     groups = {0: [1.0, 2.0], 1: [3.0], 2: [4.0]}
@@ -246,22 +242,20 @@ def test_a_clustered_draw_gives_fresh_identities():
     assert sorted(set(clusters.tolist())) == [0, 1, 2]
     assert record["sampled_units"] == 3
     assert record["source_unit_count"] == 3
-    assert record["sample_digest"] == resampling.bootstrap_sample_digest(picks)
+    assert record["sample_digest"] == resampling.digest(picks)
     ignored, ignored, ignored, cloned = resampling.clone(
         matrix, values, labels, numpy.random.default_rng(1)
     )
-    assert cloned[
-        "fresh_cluster_identity_digest"
-    ] == resampling.bootstrap_sample_digest(numpy.arange(3, dtype=numpy.int64))
+    assert cloned["fresh_cluster_identity_digest"] == resampling.digest(
+        numpy.arange(3, dtype=numpy.int64)
+    )
 
 
 def test_draws_need_two_hashable_clusters():
     rng = numpy.random.default_rng(0)
     values = numpy.zeros(2)
     with pytest.raises(errors.InputError, match="at least two source clusters"):
-        resampling.draw_causal_bootstrap_sample(
-            values[:, None], values, numpy.array([1, 1]), rng
-        )
+        resampling.draw(values[:, None], values, numpy.array([1, 1]), rng)
     with pytest.raises(
         errors.InputError,
         match="hierarchical bootstrap needs at least two source clusters",
@@ -272,9 +266,7 @@ def test_draws_need_two_hashable_clusters():
     with pytest.raises(
         errors.InputError, match="hashable for clustered bootstrap"
     ):
-        resampling.draw_causal_bootstrap_sample(
-            values[:, None], values, lists, rng
-        )
+        resampling.draw(values[:, None], values, lists, rng)
     with pytest.raises(
         errors.InputError, match="must be hashable for bootstrap"
     ):
@@ -294,9 +286,9 @@ def test_a_causal_bootstrap_accepts_reference_checked_replicates():
     policy = config.Config(
         estimator="ipw_ate",
         covariance="iid",
-        treatment_position=0,
+        treatment=0,
         causal_assumptions=CAUSAL,
-        bootstrap_replicates=4,
+        replicates=4,
         seed=3,
     )
     found = resampling.causal_bootstrap_sensitivity(
@@ -322,9 +314,9 @@ def test_a_replication_with_too_few_successes_raises():
     policy = config.Config(
         estimator="ipw_ate",
         covariance="iid",
-        treatment_position=0,
+        treatment=0,
         causal_assumptions=CAUSAL,
-        bootstrap_replicates=2,
+        replicates=2,
     )
 
     def bad_draw():
@@ -347,7 +339,7 @@ def test_a_rerun_rejects_a_shape_mismatch():
     policy = config.Config(
         estimator="ipw_ate",
         covariance="iid",
-        treatment_position=0,
+        treatment=0,
         causal_assumptions=CAUSAL,
     )
     estimate = resampling.rerun(

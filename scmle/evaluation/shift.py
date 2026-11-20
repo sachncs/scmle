@@ -38,7 +38,7 @@ class Adversary(diagnostics.Diagnostic):
 
     name = "adversarial_validation"
 
-    def estimate(self, inputs: diagnostics.DiagnosticInput) -> float:
+    def estimate(self, inputs: diagnostics.Input) -> float:
         """Predicts the seconds of the cross-validated separability.
 
         Args:
@@ -47,11 +47,11 @@ class Adversary(diagnostics.Diagnostic):
         Returns:
             The fitted cost on the capped sample, times the margin.
         """
-        reference = inputs.reference_features
+        reference = inputs.reference
         rows = min(len(inputs.features), MAX_ROWS) + (
             0 if reference is None else min(len(reference), MAX_ROWS)
         )
-        columns = len(inputs.feature_plan.sourced)
+        columns = len(inputs.plan.sourced)
         return diagnostics.MARGIN * (
             ADVERSARY_SECONDS + ADVERSARY_CELL_SECONDS * rows * columns
         )
@@ -80,7 +80,7 @@ class Adversary(diagnostics.Diagnostic):
         fitted.fit(encoded.iloc[train], labels[train])
         return numpy.asarray(fitted.predict_proba(encoded.iloc[test]))[:, 1]
 
-    def compute(self, inputs: diagnostics.DiagnosticInput) -> dict[str, Any]:
+    def compute(self, inputs: diagnostics.Input) -> dict[str, Any]:
         """Cross-validates a classifier that predicts which set a row is from.
 
         Args:
@@ -97,14 +97,14 @@ class Adversary(diagnostics.Diagnostic):
             leaves no time for the next fold (folds are checked one by one,
             each predicted to take as long as the longest so far).
         """
-        reference = inputs.reference_features
+        reference = inputs.reference
         if reference is None:
             return {"available": False, "reason": "no reference rows"}
         if not inputs.affords(self.estimate(inputs) / FOLDS):
             return diagnostics.skipped(
                 "the deadline leaves no time for the first fold"
             )
-        columns = list(inputs.feature_plan.sourced)
+        columns = list(inputs.plan.sourced)
         rng = numpy.random.default_rng(inputs.seed)
         old = self.sample(reference[columns], rng)
         new = self.sample(inputs.features[columns], rng)
@@ -224,7 +224,7 @@ class Adversary(diagnostics.Diagnostic):
 
     @staticmethod
     def encode(
-        frame: pandas.DataFrame, inputs: diagnostics.DiagnosticInput
+        frame: pandas.DataFrame, inputs: diagnostics.Input
     ) -> pandas.DataFrame:
         """Returns a numeric view: numbers as is, categories as codes.
 
@@ -240,11 +240,11 @@ class Adversary(diagnostics.Diagnostic):
             say) are not in `frame`; their source columns are.
         """
         encoded = frame.copy()
-        for column in inputs.feature_plan.categorical:
+        for column in inputs.plan.categorical:
             encoded[column] = encoded[column].astype("category").cat.codes
         for column in encoded.columns:
             dated = pandas.api.types.is_datetime64_any_dtype(encoded[column])
-            if dated or column in inputs.feature_plan.numeric:
+            if dated or column in inputs.plan.numeric:
                 encoded[column] = pandas.to_numeric(encoded[column])
         return encoded
 
@@ -269,7 +269,7 @@ class Adversary(diagnostics.Diagnostic):
     def rank(
         old: pandas.DataFrame,
         new: pandas.DataFrame,
-        inputs: diagnostics.DiagnosticInput,
+        inputs: diagnostics.Input,
     ) -> list[dict[str, Any]]:
         """Ranks features by how separable the two sets are on that feature.
 
@@ -291,8 +291,8 @@ class Adversary(diagnostics.Diagnostic):
             `distance`, largest distance first.
         """
         found = []
-        sourced = inputs.feature_plan.sourced
-        for column in (c for c in inputs.feature_plan.numeric if c in sourced):
+        sourced = inputs.plan.sourced
+        for column in (c for c in inputs.plan.numeric if c in sourced):
             values = pandas.concat(
                 [pandas.to_numeric(old[column]), pandas.to_numeric(new[column])]
             )
@@ -307,7 +307,7 @@ class Adversary(diagnostics.Diagnostic):
                 labels[present], values.to_numpy()[present]
             )
             found.append((column, abs(float(auc) - 0.5) * 2))
-        for column in inputs.feature_plan.categorical:
+        for column in inputs.plan.categorical:
             before = old[column].value_counts(normalize=True)
             after = new[column].value_counts(normalize=True)
             levels = before.index.union(after.index)

@@ -60,7 +60,7 @@ def test_the_parts_roughly_add_up_to_the_error_of_single_fits():
     )
 
     assert found.total == pytest.approx(
-        found.bias_plus_noise + found.variance, rel=0.15
+        found.confounded + found.variance, rel=0.15
     )
 
 

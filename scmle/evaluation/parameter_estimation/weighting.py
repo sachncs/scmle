@@ -13,7 +13,7 @@ from scmle.contracts import errors
 from scmle.evaluation.parameter_estimation.declaration import CovarianceKind
 from scmle.evaluation.parameter_estimation.declaration import MIN_CLUSTERS
 from scmle.evaluation.parameter_estimation.declaration import MIN_INFLUENCE_ROWS
-from scmle.evaluation.parameter_estimation.inputs import validate_clusters
+from scmle.evaluation.parameter_estimation.inputs import validate
 
 
 def center(influence: numpy.ndarray) -> numpy.ndarray:
@@ -124,9 +124,7 @@ def tally(
     """
     if clusters is None:
         raise errors.InputError("clustered covariance needs cluster labels")
-    cluster_values = validate_clusters(
-        clusters.tolist(), len(centered_influence)
-    )
+    cluster_values = validate(clusters.tolist(), len(centered_influence))
     if cluster_values is None:
         raise errors.InputError("clustered covariance needs cluster labels")
     try:

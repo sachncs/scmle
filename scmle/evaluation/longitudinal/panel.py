@@ -25,9 +25,9 @@ def conform(frame: pandas.DataFrame, estimand: Estimand) -> list[str]:
         ValueError: If a declared column is missing from the frame.
     """
     required = [
-        estimand.subject_identity,
-        estimand.time_column,
-        estimand.treatment_column,
+        estimand.subject,
+        estimand.time,
+        estimand.treatment,
         estimand.outcome,
         *estimand.covariates,
     ]
@@ -51,23 +51,21 @@ def situate(frame: pandas.DataFrame, estimand: Estimand) -> None:
             non-finite, subject-time pairs repeat, or the time values are not
             strictly increasing within a subject.
     """
-    if frame[estimand.subject_identity].isna().any():
+    if frame[estimand.subject].isna().any():
         raise errors.InputError("missing subject identities are not allowed")
-    subject_labels = frame[estimand.subject_identity].astype("string")
+    subject_labels = frame[estimand.subject].astype("string")
     if subject_labels.fillna("").str.strip().eq("").any():
         raise errors.InputError("missing subject identities are not allowed")
-    if frame[estimand.time_column].isna().any():
+    if frame[estimand.time].isna().any():
         raise errors.InputError("missing time values are not allowed")
-    for name in (estimand.subject_identity, estimand.time_column):
+    for name in (estimand.subject, estimand.time):
         if pandas.api.types.is_numeric_dtype(frame[name]):
             values = frame[name].to_numpy(dtype=float)
             if not numpy.isfinite(values).all():
                 raise errors.InputError(
                     f"column {name!r} contains non-finite values"
                 )
-    if frame.duplicated(
-        [estimand.subject_identity, estimand.time_column]
-    ).any():
+    if frame.duplicated([estimand.subject, estimand.time]).any():
         raise errors.InputError("duplicate subject-time rows are not allowed")
     chronologize(frame, estimand)
 
@@ -131,7 +129,7 @@ def prepare(
     situate(frame, estimand)
     prepared = frame[required].copy()
     value_columns = [
-        estimand.treatment_column,
+        estimand.treatment,
         estimand.outcome,
         *estimand.covariates,
     ]
@@ -144,9 +142,7 @@ def prepare(
     if rows_dropped:
         prepared = prepared.loc[~missing_mask].copy()
     numericize(prepared, value_columns)
-    treatment_values = set(
-        prepared[estimand.treatment_column].unique().tolist()
-    )
+    treatment_values = set(prepared[estimand.treatment].unique().tolist())
     if not treatment_values.issubset({0, 1}):
         raise errors.InputError("treatment must be binary with values 0 and 1")
     if prepared.empty:
@@ -191,8 +187,8 @@ def chronologize(frame: pandas.DataFrame, estimand: Estimand) -> None:
             increasing", which comparison errors do not; any other
             `TypeError` becomes `ValueError`.
     """
-    subject_name = estimand.subject_identity
-    time_name = estimand.time_column
+    subject_name = estimand.subject
+    time_name = estimand.time
     try:
         for subject_group in frame.groupby(
             subject_name, sort=False, dropna=False
@@ -217,7 +213,7 @@ def pretreat(frame: pandas.DataFrame, estimand: Estimand) -> None:
     """
     if not estimand.covariates:
         return
-    grouped = frame.groupby(estimand.subject_identity, sort=False, dropna=False)
+    grouped = frame.groupby(estimand.subject, sort=False, dropna=False)
     for name in estimand.covariates:
         if (grouped[name].nunique(dropna=False) > 1).any():  # noqa: PD101 -- per-subject distinct counts; Series.is_unique does not apply
             raise errors.InputError(

@@ -18,7 +18,7 @@ from sklearn import linear_model
 FLOOR = 1e-6
 
 
-class DirichletCalibrator(base.BaseEstimator, base.ClassifierMixin):  # type: ignore[misc]  # scikit-learn is untyped
+class Dirichlet(base.BaseEstimator, base.ClassifierMixin):  # type: ignore[misc]  # scikit-learn is untyped
     """A frozen classifier whose probabilities are Dirichlet-calibrated.
 
     Attributes:

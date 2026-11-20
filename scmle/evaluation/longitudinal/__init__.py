@@ -11,11 +11,11 @@ callers and tests are unchanged; its classes keep that module path as
 `__module__`, which the public API snapshot records in their signatures.
 """
 
-from scmle.evaluation.envelope import created_temporary
+from scmle.evaluation.envelope import require
 from scmle.evaluation.longitudinal.declaration import Config
 from scmle.evaluation.longitudinal.declaration import Estimand
 from scmle.evaluation.longitudinal.declaration import MATRIX_NDIM
-from scmle.evaluation.longitudinal.declaration import PeriodATE
+from scmle.evaluation.longitudinal.declaration import Period
 from scmle.evaluation.longitudinal.declaration import PROPENSITY_CLIP_CEILING
 from scmle.evaluation.longitudinal.declaration import REQUIRED_ASSUMPTIONS
 from scmle.evaluation.longitudinal.declaration import SHA256_HEX_LENGTH
@@ -45,10 +45,9 @@ __all__ = [
     "Estimand",
     "Estimation",
     "Estimator",
-    "PeriodATE",
+    "Period",
     "chronologize",
     "conform",
-    "created_temporary",
     "effective_sample_size",
     "imprint",
     "monotone",
@@ -59,6 +58,7 @@ __all__ = [
     "pretreat",
     "referee",
     "regress",
+    "require",
     "sandwich",
     "situate",
 ]

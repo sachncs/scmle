@@ -44,7 +44,7 @@ def make_inputs(biased=True, rows=1200):
     estimator = Rule()
     if not biased:
         estimator.predict = lambda f: (f["score"].to_numpy() > 0.5).astype(int)
-    return diagnostics.DiagnosticInput(
+    return diagnostics.Input(
         estimator,
         frame,
         target,
@@ -52,7 +52,7 @@ def make_inputs(biased=True, rows=1200):
         metrics.CATALOG.resolve("roc_auc", tasks.Task.BINARY),
         PLAN,
         0,
-        sensitive_columns=("group",),
+        sensitive=("group",),
     )
 
 
@@ -75,7 +75,7 @@ def test_group_blind_decisions_are_not_flagged():
 
 
 def test_without_sensitive_columns_the_report_says_so():
-    inputs = dataclasses.replace(make_inputs(), sensitive_columns=())
+    inputs = dataclasses.replace(make_inputs(), sensitive=())
 
     assert fairness.Fairness().compute(inputs) == {
         "available": False,
@@ -85,14 +85,12 @@ def test_without_sensitive_columns_the_report_says_so():
 
 def test_numeric_sensitive_columns_are_banded_and_small_groups_skipped():
     inputs = make_inputs()
-    inputs = dataclasses.replace(inputs, sensitive_columns=("score",))
+    inputs = dataclasses.replace(inputs, sensitive=("score",))
 
     report = fairness.Fairness().compute(inputs)
 
     assert len(report["columns"]["score"]["groups"]) == 4
-    tiny = dataclasses.replace(
-        make_inputs(rows=40), sensitive_columns=("group",)
-    )
+    tiny = dataclasses.replace(make_inputs(rows=40), sensitive=("group",))
     body = fairness.Fairness().compute(tiny)["columns"]["group"]
     assert all(
         g["rows"] >= fairness.MIN_GROUP_ROWS for g in body["groups"].values()
@@ -101,9 +99,7 @@ def test_numeric_sensitive_columns_are_banded_and_small_groups_skipped():
 
 
 def test_intersectional_groups_are_reported_and_bounded():
-    inputs = dataclasses.replace(
-        make_inputs(), sensitive_columns=("group", "score")
-    )
+    inputs = dataclasses.replace(make_inputs(), sensitive=("group", "score"))
 
     report = fairness.Fairness().compute(inputs)
 
@@ -131,7 +127,7 @@ def test_regression_reports_bias_per_group():
         def predict(self, features):
             return features["x"].to_numpy() * 2
 
-    inputs = diagnostics.DiagnosticInput(
+    inputs = diagnostics.Input(
         Ignorant(),
         frame,
         truth,
@@ -139,7 +135,7 @@ def test_regression_reports_bias_per_group():
         metrics.CATALOG.resolve("rmse", tasks.Task.REGRESSION),
         data.Blueprint(("x",), ("group",)),
         0,
-        sensitive_columns=("group",),
+        sensitive=("group",),
     )
 
     body = fairness.Fairness().compute(inputs)["columns"]["group"]
@@ -166,7 +162,7 @@ def test_regression_intersectional_groups_use_the_same_small_cell_guard():
         def predict(self, features):
             return features["x"].to_numpy() * 2
 
-    inputs = diagnostics.DiagnosticInput(
+    inputs = diagnostics.Input(
         Ignorant(),
         frame,
         truth,
@@ -174,7 +170,7 @@ def test_regression_intersectional_groups_use_the_same_small_cell_guard():
         metrics.CATALOG.resolve("rmse", tasks.Task.REGRESSION),
         data.Blueprint(("x",), ("group",)),
         0,
-        sensitive_columns=("group", "x"),
+        sensitive=("group", "x"),
     )
 
     body = fairness.Fairness().compute(inputs)["columns"]["intersectional"]

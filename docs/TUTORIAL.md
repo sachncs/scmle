@@ -388,7 +388,7 @@ project = scmle.api.project.Project(
     feature_delays={"monthly_spend": 4},
 )
 
-scmle.evaluation.metrics.register_metric(
+scmle.evaluation.metrics.register(
     "business_cost", cost, greater_is_better=False
 )
 project = scmle.api.project.Project(data, "churn", metric="business_cost")
@@ -521,9 +521,7 @@ from sklearn.naive_bayes import GaussianNB
 
 import scmle.models.custom
 
-scmle.models.custom.register_estimator(
-    "gaussian_nb", classifier=GaussianNB, cost=1
-)
+scmle.models.custom.register("gaussian_nb", classifier=GaussianNB, cost=1)
 ```
 
 ## 10. More runnable examples

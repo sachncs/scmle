@@ -289,7 +289,7 @@ FUNCTIONS = {
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class RankingMetric(scmle.contracts.metrics.Metric):
+class Metric(scmle.contracts.metrics.Metric):
     """A ranking metric read off a ranking estimator.
 
     Attributes:

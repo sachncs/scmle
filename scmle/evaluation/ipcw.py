@@ -35,17 +35,17 @@ class Censoring:
     Attributes:
         weights: `1 / max(G(T_i | x_i), floor)` per row.
         floor: The lower bound applied to `G`.
-        n_floored: Rows whose `G` was below the floor.
-        covariate_dependent: Whether the censoring model used covariates.
-        survival_of: `(time, rows) -> G(time | x_j)` for the given row
+        floored: Rows whose `G` was below the floor.
+        dependent: Whether the censoring model used covariates.
+        survival: `(time, rows) -> G(time | x_j)` for the given row
             positions, used for the pair weights of the concordance.
     """
 
     weights: numpy.ndarray
     floor: float
-    n_floored: int
-    covariate_dependent: bool
-    survival_of: Callable[[float, numpy.ndarray], numpy.ndarray] | None = None
+    floored: int
+    dependent: bool
+    survival: Callable[[float, numpy.ndarray], numpy.ndarray] | None = None
 
 
 def reweight(
@@ -154,11 +154,11 @@ def uno(
         later = numpy.flatnonzero(time > time[index])
         if later.size == 0:
             continue
-        if weights.survival_of is None:
+        if weights.survival is None:
             partner = numpy.full(later.size, 1.0 / weights.weights[index])
         else:
             partner = numpy.maximum(
-                weights.survival_of(float(time[index]), later), weights.floor
+                weights.survival(float(time[index]), later), weights.floor
             )
         pair = weights.weights[index] / partner
         ties = score[index] == score[later]

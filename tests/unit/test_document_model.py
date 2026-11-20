@@ -62,7 +62,7 @@ def test_document_classifier_fits_evaluates_and_explains(
     assert classifier.fitted
     assert set(classifier.predict(evaluation_samples)) == {"fruit", "water"}
     assert len(classifier.predict_proba(evaluation_samples)) == 4
-    assert evaluation.sample_count == 4
+    assert evaluation.samples == 4
     assert evaluation.accuracy >= 0.75
     assert evaluation.macro_f1 >= 0.75
     assert math.isfinite(evaluation.log_loss)
@@ -74,7 +74,7 @@ def test_document_classifier_fits_evaluates_and_explains(
     assert ablation.input_hash == evaluation_samples[0].content_hash
     assert len(ablation.terms) == 3
     assert all(math.isfinite(value) and term for term, value in ablation.terms)
-    assert classifier.model_digest == classifier.model_digest
+    assert classifier.digest == classifier.digest
 
 
 def test_document_explanations_preserve_source_citations():
@@ -137,7 +137,7 @@ def test_document_classifier_atomic_trusted_package_round_trip(
         Classifier.load(path)
 
     loaded = Classifier.load(path, trusted=True)
-    assert loaded.model_digest == classifier.model_digest
+    assert loaded.digest == classifier.digest
     assert loaded.predict(evaluation_samples) == classifier.predict(
         evaluation_samples
     )
@@ -208,5 +208,5 @@ def test_document_monitor_detects_profile_shift(training_samples):
 
     assert report.reference_hash == reference.dataset_hash
     assert report.observed_hash == observed.digest
-    assert report.language_distance > 0.1
+    assert report.language > 0.1
     assert report.shifted

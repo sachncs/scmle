@@ -129,7 +129,7 @@ class Intervals(core.Core):
         target_rows: pandas.DataFrame,
         columns: Sequence[str] | None = None,
         clip: float = shift_weights.DEFAULT_CLIP,
-    ) -> shift_weights.StoredShiftWeights:
+    ) -> shift_weights.Weights:
         """Estimates and stores likelihood ratios for weighted conformal.
 
         A discriminator is fitted between the calibration rows and the target
@@ -182,7 +182,7 @@ class Intervals(core.Core):
             target_rows[list(chosen)].to_numpy(float),
             clip,
         )
-        self.shift_weights = shift_weights.StoredShiftWeights(found, chosen)
+        self.shift_weights = shift_weights.Weights(found, chosen)
         return self.shift_weights
 
     def reweight(
@@ -212,10 +212,10 @@ class Intervals(core.Core):
             )
         frame = self.prepare(data, mapping)
         predictions = numpy.asarray(self.pipeline.predict(frame), dtype=float)
-        lower, upper = calibrator.weighted_interval(
+        lower, upper = calibrator.reweight(
             predictions,
             self.shift_weights.weights.calibration,
-            self.shift_weights.test_weights(frame),
+            self.shift_weights.test(frame),
             coverage,
         )
         return pandas.DataFrame(

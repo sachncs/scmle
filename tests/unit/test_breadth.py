@@ -166,7 +166,7 @@ def test_streaming_inference_is_not_declared_supported():
 
 
 def test_unsupported_algorithms_are_not_in_the_model_registry():
-    assert UNSUPPORTED_NAMES.isdisjoint(registry.builtin_names())
+    assert UNSUPPORTED_NAMES.isdisjoint(registry.inventory())
 
 
 def test_unsupervised_families_are_not_task_types():

@@ -7,6 +7,7 @@ import pytest
 
 from scmle.contracts import errors
 from scmle.contracts import records
+from scmle.evaluation.envelope import rename
 from scmle.evaluation.parameter_estimation import config
 from scmle.evaluation.parameter_estimation import declaration
 from scmle.evaluation.parameter_estimation import rules
@@ -28,7 +29,7 @@ HIERARCHICAL = (
 
 
 def prior(size=2):
-    return declaration.BayesianPrior(
+    return declaration.Prior(
         (0.0,) * size,
         tuple(
             tuple(1.0 if i == j else 0.0 for j in range(size))
@@ -43,7 +44,7 @@ def estimand(**changes):
         "outcome": "y",
         "population": "p",
         "likelihood": "gaussian",
-        "feature_names": ("a", "b"),
+        "features": ("a", "b"),
         "assumptions": ("x",),
     }
     values.update(changes)
@@ -102,8 +103,8 @@ def test_the_declaration_constants_are_fixed():
         ({"outcome": ""}, "estimand outcome must not be empty"),
         ({"population": ""}, "estimand population must not be empty"),
         ({"likelihood": " "}, "estimand likelihood must not be empty"),
-        ({"feature_names": ()}, "estimand needs at least one feature"),
-        ({"feature_names": ("a", "a")}, "feature names must be unique"),
+        ({"features": ()}, "estimand needs at least one feature"),
+        ({"features": ("a", "a")}, "feature names must be unique"),
         ({"assumptions": ()}, "estimand needs explicit assumptions"),
     ],
 )
@@ -135,7 +136,7 @@ def test_an_estimand_writes_features():
 )
 def test_an_invalid_prior_is_rejected(arguments, message):
     with pytest.raises(errors.InputError, match=message):
-        declaration.BayesianPrior(*arguments)
+        declaration.Prior(*arguments)
 
 
 def test_a_prior_defaults_and_serialises():
@@ -175,11 +176,11 @@ def test_a_prior_defaults_and_serialises():
 )
 def test_an_invalid_parameter_estimate_is_rejected(arguments, message):
     with pytest.raises(errors.InputError, match=message):
-        declaration.ParameterEstimate(*arguments)
+        declaration.Estimate(*arguments)
 
 
 def test_a_parameter_estimate_writes_se_and_accepts_bounds():
-    found = declaration.ParameterEstimate("b", 1.0, 0.0, (1.0, 1.0), 1.0)
+    found = declaration.Estimate("b", 1.0, 0.0, (1.0, 1.0), 1.0)
     assert found.to_dict() == {
         "name": "b",
         "estimate": 1.0,
@@ -187,10 +188,7 @@ def test_a_parameter_estimate_writes_se_and_accepts_bounds():
         "interval": (1.0, 1.0),
         "p_value": 1.0,
     }
-    assert (
-        declaration.ParameterEstimate("b", 1.0, 0.1, (0.0, 2.0), 0.0).p_value
-        == 0.0
-    )
+    assert declaration.Estimate("b", 1.0, 0.1, (0.0, 2.0), 0.0).p_value == 0.0
 
 
 # rules and config
@@ -207,64 +205,64 @@ def test_rules_hold_no_state():
         ({"estimator": "probit"}, "estimator must be linear, logistic"),
         ({"covariance": "hc1"}, "covariance must be iid, hc3, or clustered"),
         ({"missing": "impute"}, "missing must be reject or complete_case"),
-        ({"confidence_level": 0.0}, "confidence_level must lie strictly"),
-        ({"confidence_level": 1.0}, "confidence_level must lie strictly"),
+        ({"confidence": 0.0}, "confidence_level must lie strictly"),
+        ({"confidence": 1.0}, "confidence_level must lie strictly"),
         (
             {"covariance": "clustered"},
             "clustered covariance needs cluster_name",
         ),
         (
-            {"bootstrap_replicates": -1},
+            {"replicates": -1},
             "bootstrap_replicates must not be negative",
         ),
-        ({"max_iterations": 0}, "max_iterations must be positive"),
+        ({"iterations": 0}, "max_iterations must be positive"),
         ({"tolerance": 0.0}, "estimation tolerances must be positive"),
         (
-            {"reference_tolerance": 0.0},
+            {"reference": 0.0},
             "estimation tolerances must be positive",
         ),
-        ({"propensity_clip": 0.5}, "propensity_clip must lie strictly"),
-        ({"propensity_clip": 0.0}, "propensity_clip must lie strictly"),
+        ({"clip": 0.5}, "propensity_clip must lie strictly"),
+        ({"clip": 0.0}, "propensity_clip must lie strictly"),
         (
-            {"continuous_weight_cap": 1.0},
+            {"cap": 1.0},
             "continuous_weight_cap must be greater",
         ),
         (
-            {"continuous_weight_cap": math.nan},
+            {"cap": math.nan},
             "continuous_weight_cap must be greater",
         ),
-        ({"cross_fitting_folds": 0}, "cross_fitting_folds must be a positive"),
+        ({"folds": 0}, "cross_fitting_folds must be a positive"),
         (
-            {"cross_fitting_folds": True},
+            {"folds": True},
             "cross_fitting_folds must be a positive",
         ),
         (
-            {"hierarchical_method": "ml"},
+            {"hierarchy": "ml"},
             "hierarchical_method must be moment_gls",
         ),
         (
-            {"random_slope_position": -1},
+            {"slope": -1},
             "random_slope_position must be a non-negative",
         ),
         (
-            {"random_slope_position": False},
+            {"slope": False},
             "random_slope_position must be a non-negative",
         ),
-        ({"reml_variance_bounds": (1.0,)}, "reml_variance_bounds must contain"),
+        ({"bounds": (1.0,)}, "reml_variance_bounds must contain"),
         (
-            {"reml_variance_bounds": (0.0, 1.0)},
+            {"bounds": (0.0, 1.0)},
             "reml_variance_bounds must contain",
         ),
         (
-            {"reml_variance_bounds": (2.0, 1.0)},
+            {"bounds": (2.0, 1.0)},
             "reml_variance_bounds must contain",
         ),
         (
-            {"reml_variance_bounds": (1.0, math.inf)},
+            {"bounds": (1.0, math.inf)},
             "reml_variance_bounds must contain",
         ),
-        ({"treatment_position": 0}, "treatment_position is supported only"),
-        ({"propensity_clip": 0.02}, "propensity_clip is supported only"),
+        ({"treatment": 0}, "treatment_position is supported only"),
+        ({"clip": 0.02}, "propensity_clip is supported only"),
         (
             {"causal_assumptions": CAUSAL},
             "causal assumptions are supported only",
@@ -274,11 +272,11 @@ def test_rules_hold_no_state():
             "continuous treatment assumptions",
         ),
         (
-            {"continuous_weight_cap": 5.0},
+            {"cap": 5.0},
             "continuous_weight_cap is supported only",
         ),
         (
-            {"cross_fitting_folds": 2},
+            {"folds": 2},
             "cross_fitting_folds is supported only by aipw_ate",
         ),
         (
@@ -287,15 +285,15 @@ def test_rules_hold_no_state():
         ),
         ({"prior": prior()}, "a Bayesian prior is supported only"),
         (
-            {"random_slope_position": 0},
+            {"slope": 0},
             "random_slope_position is supported only",
         ),
         (
-            {"hierarchical_method": "reml"},
+            {"hierarchy": "reml"},
             "hierarchical_method is supported only",
         ),
         (
-            {"reml_variance_bounds": (1e-6, 1e6)},
+            {"bounds": (1e-6, 1e6)},
             "reml_variance_bounds is supported only",
         ),
     ],
@@ -321,7 +319,7 @@ def test_an_invalid_linear_policy_is_rejected(changes, message):
                 "estimator": "bayesian_linear",
                 "prior": prior(),
                 "covariance": "iid",
-                "bootstrap_replicates": 5,
+                "replicates": 5,
             },
             "bootstrap sensitivity is unsupported",
         ),
@@ -338,7 +336,7 @@ def test_an_invalid_linear_policy_is_rejected(changes, message):
                 "estimator": "bayesian_ate",
                 "prior": prior(),
                 "covariance": "iid",
-                "treatment_position": 0,
+                "treatment": 0,
                 "causal_assumptions": CAUSAL,
             },
             "requires consistency, conditional_exchangeability, positivity, and linearity",
@@ -348,7 +346,7 @@ def test_an_invalid_linear_policy_is_rejected(changes, message):
                 "estimator": "bayesian_ate",
                 "prior": prior(),
                 "covariance": "clustered",
-                "cluster_name": "c",
+                "cluster": "c",
             },
             "supports only iid covariance",
         ),
@@ -368,7 +366,7 @@ def test_an_invalid_linear_policy_is_rejected(changes, message):
             {
                 "estimator": "ipw_ate",
                 "covariance": "iid",
-                "treatment_position": 0,
+                "treatment": 0,
                 "causal_assumptions": (*CAUSAL, "positivity"),
             },
             "ipw_ate requires consistency",
@@ -377,7 +375,7 @@ def test_an_invalid_linear_policy_is_rejected(changes, message):
             {
                 "estimator": "continuous_ipw_ate",
                 "covariance": "iid",
-                "treatment_position": 0,
+                "treatment": 0,
                 "causal_assumptions": CAUSAL,
             },
             "continuous_ipw_ate requires continuous_treatment_assumptions",
@@ -386,7 +384,7 @@ def test_an_invalid_linear_policy_is_rejected(changes, message):
             {
                 "estimator": "continuous_ipw_ate",
                 "covariance": "iid",
-                "treatment_position": 0,
+                "treatment": 0,
                 "continuous_treatment_assumptions": CONTINUOUS[:4],
             },
             "continuous_ipw_ate requires consistency",
@@ -407,9 +405,9 @@ def test_an_invalid_linear_policy_is_rejected(changes, message):
             {
                 "estimator": "hierarchical_linear",
                 "covariance": "iid",
-                "cluster_name": "c",
+                "cluster": "c",
                 "hierarchical_assumptions": HIERARCHICAL,
-                "random_slope_position": 0,
+                "slope": 0,
             },
             "requires all assumptions",
         ),
@@ -428,9 +426,9 @@ def test_a_bayesian_ate_rejects_clustered_data_with_iid_covariance():
             estimator="bayesian_ate",
             prior=prior(),
             covariance="iid",
-            treatment_position=0,
+            treatment=0,
             causal_assumptions=(*CAUSAL, "linearity"),
-            cluster_name="c",
+            cluster="c",
         )
 
 
@@ -454,10 +452,10 @@ def test_a_causal_policy_writes_its_assumptions_and_clip():
     record = config.Config(
         estimator="aipw_ate",
         covariance="iid",
-        treatment_position=1,
+        treatment=1,
         causal_assumptions=CAUSAL,
-        cross_fitting_folds=3,
-        propensity_clip=0.05,
+        folds=3,
+        clip=0.05,
     ).to_dict()
     assert record["treatment"] == 1
     assert record["clip"] == 0.05
@@ -470,10 +468,10 @@ def test_a_hierarchical_policy_writes_its_method_and_bounds():
     policy = config.Config(
         estimator="hierarchical_linear",
         covariance="iid",
-        cluster_name="site",
+        cluster="site",
         hierarchical_assumptions=(*HIERARCHICAL, "random_slope"),
-        random_slope_position=0,
-        hierarchical_method="reml",
+        slope=0,
+        hierarchy="reml",
     )
     record = policy.to_dict()
     assert record["hierarchy"] == "reml"
@@ -496,9 +494,9 @@ def test_a_continuous_policy_writes_its_cap():
     record = config.Config(
         estimator="continuous_ipw_ate",
         covariance="iid",
-        treatment_position=0,
+        treatment=0,
         continuous_treatment_assumptions=CONTINUOUS,
-        continuous_weight_cap=8.0,
+        cap=8.0,
     ).to_dict()
     assert record["cap"] == 8.0
     assert record["assumptions"] == {"continuous": CONTINUOUS}
@@ -520,9 +518,9 @@ def test_a_config_round_trips_through_its_migration():
     policy = config.Config(
         estimator="ipw_ate",
         covariance="iid",
-        treatment_position=0,
+        treatment=0,
         causal_assumptions=CAUSAL,
     )
     fields = records.downgrade(config.Config.migrations, policy.to_dict())
-    assert config.Config(**fields) == policy
+    assert config.Config(**rename(config.Config, fields)) == policy
     assert dataclasses.replace(policy, seed=3).seed == 3

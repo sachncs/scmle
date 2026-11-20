@@ -96,14 +96,14 @@ class Bagger(Bagging):
     base = classical.DECISION_TREE
 
 
-class BaggedKnn(Bagging):
+class Neighbours(Bagging):
     """Bagged nearest neighbours."""
 
     name = "bagged_knn"
     base = classical.KNN
 
 
-class BaggedLogistic(Bagging):
+class Logit(Bagging):
     """Bagged logistic regression."""
 
     name = "bagged_logistic_regression"
@@ -112,6 +112,6 @@ class BaggedLogistic(Bagging):
 
 BAGGING_ADAPTERS: tuple[type[models.Model], ...] = (
     Bagger,
-    BaggedKnn,
-    BaggedLogistic,
+    Neighbours,
+    Logit,
 )

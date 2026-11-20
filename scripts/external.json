@@ -12,7 +12,6 @@
   "mean_absolute_error": "sklearn.metrics",
   "read_bytes": "importlib.metadata",
   "read_json": "pandas",
-  "serialized_size": "pyarrow.parquet",
   "to_dict": "pandas",
   "to_json": "opentelemetry.exporter.otlp.proto.http.trace_exporter",
   "write_text": "lightgbm"

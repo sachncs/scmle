@@ -130,7 +130,7 @@ def produce(task, folder):
         table(task), "y", output_dir=folder, models=models, **options
     )
     # The goldens record the built-in catalog. Estimators registered in this
-    # process (`register_estimator`, or a plugin enrolled by an earlier test's
+    # process (`custom.register`, or a plugin enrolled by an earlier test's
     # `load_plugins`) join every later stock catalog and would add trials.
     project.orchestrator.registry = registry.Catalog.stock(include_user=False)
     result = project.run()

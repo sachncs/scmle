@@ -117,7 +117,7 @@ def tally(
     outcomes = pandas.Series(arm.outcomes[rows])
     classification = task.is_classification
     stand_in = (
-        replay.ClassifierPredictions(
+        replay.Predictions(
             arm.predictions[rows],
             None if arm.probabilities is None else arm.probabilities[rows],
             arm.classes,

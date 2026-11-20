@@ -93,7 +93,7 @@
     "scmle.artifacts.bundle": {
       "Bundle": {
         "kind": "class",
-        "signature_sha256": "db252bb4a07bade7e111780b0423add08e49eea49124e0c2694c3f12e98a6c55"
+        "signature_sha256": "bb6682d05061fdcab77d3a8f8e727779e0b660663d40600cad12ea838523fbb8"
       }
     },
     "scmle.artifacts.results": {
@@ -533,53 +533,53 @@
     "scmle.evaluation.longitudinal": {
       "Config": {
         "kind": "class",
-        "signature_sha256": "3cf7969a4794b1f26979a69ee4f46b85c8422d91a34326afaaaa4300329c8a3d"
+        "signature_sha256": "4fd2a3e83ef536808f7045a3f0f0262d487892ec90669325c0cbe55edeea268e"
       },
       "Estimand": {
         "kind": "class",
-        "signature_sha256": "4e13ec6511c5cd99cf1afd8b7deeeb68b8c6b32a6a0c5277f4e7d6021e05f682"
+        "signature_sha256": "08adf4cdd54dbf689e8e9faa8d92abab313dac2ce894ef8df7b107c2c4e66950"
       },
       "Estimation": {
         "kind": "class",
-        "signature_sha256": "9cbd0f8f8ada3de54e3826b87101db1a9b8e6d39ae2824945d425337a562118c"
+        "signature_sha256": "11d0dcf5900a833c81652f5e588a997b9a0006ae7e5d29bd4522ad06250f54a9"
       },
       "Estimator": {
         "kind": "class",
         "signature_sha256": "9557a9ae9f8deaf3bd99715831e82b608353986f653daa3258d5a49bbf5058b5"
       },
-      "PeriodATE": {
+      "Period": {
         "kind": "class",
-        "signature_sha256": "57195beddae0ce18ffb71a1c4b1fe7cf58e6b0fa6124c0369b5f2f8da0be74d8"
+        "signature_sha256": "116558ba6b7054d9345bcce3853cfc412d971189c803f01e9754924077dc79b2"
       }
     },
     "scmle.evaluation.metrics": {
-      "register_metric": {
+      "register": {
         "kind": "callable",
         "signature_sha256": "96564cb3b0e8249e2f4102cefdd27c3d50a32b9f65b13255c1cd816282fa596d"
       }
     },
     "scmle.evaluation.parameter_estimation": {
-      "BayesianPrior": {
-        "kind": "class",
-        "signature_sha256": "52317b4cf7f1ac6ee768286f568e44426cb799e032457dbb32e5d8c018e29b04"
-      },
       "Config": {
         "kind": "class",
-        "signature_sha256": "937c7642fe1830cc0840e5123d4b5163143037f7a92d27dcfd9fe0b7f346626c"
+        "signature_sha256": "ad1298a6215217516305ec23f563aef14264d6fcbed80b4243f84fe3404f7c07"
       },
       "Estimand": {
         "kind": "class",
-        "signature_sha256": "5d68c4d372445ce9fbc41ad257b83fd47a79037a8985d7a1435b374d038a2642"
+        "signature_sha256": "9fc622e2cfb451de8fa2df0f8436c8c7e266189ce677d6cc0a3010a2c68cb91d"
       },
-      "Estimation": {
-        "kind": "class",
-        "signature_sha256": "3fcb9c05793fc0a590db32c81c0e904b0ba83858ef29a4b4e0b61f4b597d69cb"
-      },
-      "ParameterEstimate": {
+      "Estimate": {
         "kind": "class",
         "signature_sha256": "a096737a63512c4b7c8ddbcf3a5506b1c42b6177ee6f581b9d39ecf7073ab6ff"
       },
-      "estimate_parameters": {
+      "Estimation": {
+        "kind": "class",
+        "signature_sha256": "b62582863fb06b2cf0a0fdac9bd3f6f39e42eddb1aa2757eae4d01fea03348d0"
+      },
+      "Prior": {
+        "kind": "class",
+        "signature_sha256": "52317b4cf7f1ac6ee768286f568e44426cb799e032457dbb32e5d8c018e29b04"
+      },
+      "infer": {
         "kind": "callable",
         "signature_sha256": "805a205c39bd29e813863cef94d797ca8a17f9274af758a1658ed068beceadec"
       }
@@ -587,35 +587,35 @@
     "scmle.evaluation.sequential": {
       "Config": {
         "kind": "class",
-        "signature_sha256": "bb837d04136f242f3a868156fa642831c09889614d2ebaf938fc0cdf44cec289"
+        "signature_sha256": "9f67ed5e0f5ca3d71179bb70abe7b46e93708572a091cf9eea57e398d69be970"
+      },
+      "Diagnostics": {
+        "kind": "class",
+        "signature_sha256": "1dc062770f9b5ae7e203ce526dfbabd9e54fed385666d4b6fafe40703d06f1c2"
       },
       "Estimand": {
         "kind": "class",
-        "signature_sha256": "8f20902c045b7a51b47815b59db3c2e89a09d2b642fc4311b80779474f9a882f"
+        "signature_sha256": "0037c3f1d43e0b6d264c38223f8c9a90ddf40362ff7fe53b085874a19a6e1053"
+      },
+      "Estimate": {
+        "kind": "class",
+        "signature_sha256": "7600e8a02fc429db8e79c9c43bd257a4977e7d47a416e2aff95dc5c95c6145f2"
       },
       "Estimation": {
         "kind": "class",
-        "signature_sha256": "21d0bed9fa8927f9d525f10c31e4a9bda09843ef67483b959c970c058bd01393"
+        "signature_sha256": "8e686953df5eb6149f29657e2fed213e012adcfdcbf51595ad5b7c107dbdbf96"
       },
       "Estimator": {
         "kind": "class",
         "signature_sha256": "a09acc8f02c94aa4d560ffaa7ea54e9b4ca5bd2006b0268f43f5a33ab4ee0a96"
-      },
-      "PeriodDiagnostics": {
-        "kind": "class",
-        "signature_sha256": "524a7987810247f321f955fd47ed3929ef06b0926d8028aae3911fe37b02363b"
-      },
-      "RegimeEstimate": {
-        "kind": "class",
-        "signature_sha256": "b8f09ca8501c73d609c1370f4ff185ebd781e11a657af920427679c2402179f8"
       }
     },
     "scmle.models.custom": {
-      "register_estimator": {
+      "register": {
         "kind": "callable",
         "signature_sha256": "2a6cb15845dba3459a200a1e70878aa010b14b4f8ae5aaeee68971852cdd03d8"
       },
-      "unregister_estimator": {
+      "unregister": {
         "kind": "callable",
         "signature_sha256": "fe0fd9428b7396a18a2f9240650f0dc4c56f5371ac4b9f56163fae9135fe6b8e"
       }
@@ -1039,13 +1039,13 @@
       }
     },
     "scmle.serving.modality": {
-      "ModalityHttpServing": {
-        "kind": "class",
-        "signature_sha256": "530aa2774a91bf8a965f7ec0fe3c2247d2f30f6ee53256cbae3289cbb72c5d45"
-      },
-      "ModalitySampleDecoder": {
+      "Decoder": {
         "kind": "class",
         "signature_sha256": "9ec044f0a984a38ab0c4eda6249dd69a133b03645e371b9455e31c37e42a50d2"
+      },
+      "ModalityHttpServing": {
+        "kind": "class",
+        "signature_sha256": "9b07b2c4c05ec7e6e27639bc03c8501b9de682eb0beb169f446b39a556895a47"
       }
     },
     "scmle.storage.objectstore": {

@@ -41,9 +41,7 @@ def frame() -> tuple[Forecaster, pandas.DataFrame, pandas.Series]:
 
 def test_seasonal_naive_repeats_the_value_whole_seasons_back() -> None:
     values = pandas.DataFrame({"value": numpy.arange(10.0)})
-    found = backtest.seasonal_naive(
-        values, numpy.array([6, 7]), "value", None, 4, 3
-    )
+    found = backtest.repeat(values, numpy.array([6, 7]), "value", None, 4, 3)
     expected = numpy.array([[4.0, 5.0, 6.0, 4.0], [5.0, 6.0, 7.0, 5.0]])
     numpy.testing.assert_array_equal(found, expected)
 
@@ -52,7 +50,7 @@ def test_seasonal_naive_shifts_within_each_entity() -> None:
     values = pandas.DataFrame(
         {"entity": ["a", "b"] * 4, "value": numpy.arange(8.0)}
     )
-    found = backtest.seasonal_naive(
+    found = backtest.repeat(
         values, numpy.array([2, 7]), "value", "entity", 2, 2
     )
     expected = numpy.array([[0.0, 2.0], [5.0, 7.0]])
@@ -61,7 +59,7 @@ def test_seasonal_naive_shifts_within_each_entity() -> None:
 
 def test_seasonal_naive_is_nan_before_the_entity_starts() -> None:
     values = pandas.DataFrame({"entity": ["a", "b"], "value": [1.0, 2.0]})
-    found = backtest.seasonal_naive(
+    found = backtest.repeat(
         values, numpy.array([0, 1]), "value", "entity", 1, 2
     )
     assert numpy.isnan(found).all()
@@ -129,7 +127,5 @@ def test_origins_of_no_fold_is_empty() -> None:
 @pytest.mark.parametrize("period", [1, 2, 5])
 def test_seasonal_naive_has_one_column_per_step(period: int) -> None:
     values = pandas.DataFrame({"value": numpy.arange(12.0)})
-    found = backtest.seasonal_naive(
-        values, numpy.array([11]), "value", None, 3, period
-    )
+    found = backtest.repeat(values, numpy.array([11]), "value", None, 3, period)
     assert found.shape == (1, 3)

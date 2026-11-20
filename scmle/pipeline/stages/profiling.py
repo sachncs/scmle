@@ -244,7 +244,7 @@ class ProfileStage(impounding.Impounding):
         if task is tasks.Task.FORECAST and data.seasonal_period:
             # Computed now: under hard isolation the frame held afterwards has
             # no locked rows, but the seasonal baseline needs their history.
-            seasonal = backtest.seasonal_naive(
+            seasonal = backtest.repeat(
                 frame,
                 numpy.asarray(split.manifest.test),
                 data.value_column or "",

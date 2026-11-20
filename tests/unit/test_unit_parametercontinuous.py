@@ -23,9 +23,9 @@ def policy(cap=8.0, covariance="iid"):
     return config.Config(
         estimator="continuous_ipw_ate",
         covariance=covariance,
-        cluster_name="site" if covariance == "clustered" else None,
-        treatment_position=0,
-        continuous_weight_cap=cap,
+        cluster="site" if covariance == "clustered" else None,
+        treatment=0,
+        cap=cap,
         continuous_treatment_assumptions=ASSUMPTIONS,
     )
 
@@ -160,9 +160,7 @@ def test_a_continuous_fit_recovers_the_slope_and_agrees_with_its_reference():
     estimand = declaration.Estimand(
         "n", "y", "p", "gaussian", ("dose", "age"), ("x",)
     )
-    fit = continuous.fit_continuous_estimator(
-        matrix, y, policy(), estimand, None
-    )
+    fit = continuous.reweight(matrix, y, policy(), estimand, None)
     assert fit.names == ("intercept", "dose_dose_response_slope")
     assert 1.6 < fit.coefficients[1] < 1.95
     assert fit.reference["passed"] is True
@@ -189,13 +187,9 @@ def test_a_clustered_continuous_fit_reports_cluster_uncertainty():
         == "clustered_weighted_gaussian_regression"
     )
     assert diagnostics["cluster_uncertainty"]["cluster_count"] == 20
-    found = continuous.reference_continuous_ipw_effect(
-        matrix, y, 0, policy(), coefficients, clusters
-    )
+    found = continuous.recompute(matrix, y, 0, policy(), coefficients, clusters)
     assert found["clustered_reference"] is True
     assert found["passed"] is True
-    off = continuous.reference_continuous_ipw_effect(
-        matrix, y, 0, policy(), coefficients + 1.0, None
-    )
+    off = continuous.recompute(matrix, y, 0, policy(), coefficients + 1.0, None)
     assert off["passed"] is False
     assert off["max_absolute_difference"] == pytest.approx(1.0, abs=1e-6)

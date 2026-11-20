@@ -104,11 +104,11 @@ def test_a_default_config_has_the_documented_policy():
 @pytest.mark.parametrize(
     ("changes", "message"),
     [
-        ({"confidence_level": 1.0}, "confidence_level must lie strictly"),
-        ({"propensity_clip": 0.5}, "propensity_clip must lie strictly"),
-        ({"maximum_weight": 1.0}, "maximum_weight must be finite and greater"),
+        ({"confidence": 1.0}, "confidence_level must lie strictly"),
+        ({"clip": 0.5}, "propensity_clip must lie strictly"),
+        ({"weight": 1.0}, "maximum_weight must be finite and greater"),
         (
-            {"maximum_weight": math.inf},
+            {"weight": math.inf},
             "maximum_weight must be finite and greater",
         ),
         ({"missingness": "x"}, "missingness must be reject or complete_case"),
@@ -272,7 +272,7 @@ def test_a_regression_of_a_constant_treatment_does_not_converge():
         weighting.regress(
             numpy.zeros((10, 0)),
             numpy.ones(10),
-            declaration.Config(max_iterations=3),
+            declaration.Config(iterations=3),
         )
 
 
@@ -322,8 +322,8 @@ def test_an_average_is_the_weighted_mean_with_influence_error():
     assert found.standard_error == pytest.approx(se)
     assert found.interval == pytest.approx((mean - 2 * se, mean + 2 * se))
     assert found.rows == 3
-    assert found.weight_sum == 6.0
-    assert found.effective_sample_size == pytest.approx(36 / 14)
+    assert found.weights == 6.0
+    assert found.ess == pytest.approx(36 / 14)
     assert found.treatment == 1
     assert found.regime == "always_treated"
 
@@ -368,10 +368,10 @@ def test_an_average_rejects_thin_or_weak_support():
 
 
 def regimes():
-    target = report.RegimeEstimate(
+    target = report.Estimate(
         "always_treated", 1, 2.0, 0.1, (1.8, 2.2), 2, 3.0, 1.8
     )
-    comparator = report.RegimeEstimate(
+    comparator = report.Estimate(
         "always_control", 0, 1.0, 0.1, (0.8, 1.2), 2, 2.0, 2.0
     )
     target_mask = numpy.array([True, True, False, False])
@@ -403,7 +403,7 @@ def test_a_referee_recomputes_both_regimes():
     assert out["regimes"][0]["estimate"] == pytest.approx(2.0)
     assert out["regimes"][1]["rows"] == 2
     assert out["contrast"] == pytest.approx(1.0)
-    off = report.RegimeEstimate(
+    off = report.Estimate(
         "always_treated", 1, 2.5, 0.1, (1.8, 2.7), 2, 3.0, 1.8
     )
     failed = weighting.referee(tm, cm, w, y, off, comparator, 0.4)
@@ -474,7 +474,7 @@ def test_a_fit_summary_records_the_regime_history(fitted):
     }
     assert summary["weight_truncation"]["maximum_weight"] == 20.0
     assert summary["weight_truncation"]["fraction_truncated_final"] == (
-        fitted.periods[-1].fraction_weight_truncated
+        fitted.periods[-1].truncated
     )
     assert set(summary["fit_iterations_final_period"]) == {
         "numerator",
@@ -503,16 +503,16 @@ def test_a_record_truncates_and_checks_the_effective_size():
         numpy.array([0.4, 0.6]),
         numpy.array([0.2, 0.7]),
         cumulative,
-        policy(maximum_weight=20.0),
+        policy(weight=20.0),
     )
     assert found.period == "5"
-    assert found.fraction_weight_truncated == 0.25
-    assert found.maximum_untruncated_weight == 30.0
-    assert found.maximum_weight == 20.0
+    assert found.truncated == 0.25
+    assert found.untruncated == 30.0
+    assert found.weight == 20.0
     assert found.denominator_propensity_min == 0.2
     assert found.numerator_propensity_max == 0.6
     truncated = numpy.array([1.0, 20.0, 2.0, 1.0])
-    assert found.effective_sample_size == pytest.approx(
+    assert found.ess == pytest.approx(
         truncated.sum() ** 2 / (truncated**2).sum()
     )
     with pytest.raises(
@@ -568,30 +568,30 @@ def period(**changes):
     values = {
         "period": "0",
         "rows": 4,
-        "treated_rows": 2,
-        "control_rows": 2,
+        "treated": 2,
+        "control": 2,
         "denominator_propensity_min": 0.2,
         "denominator_propensity_max": 0.8,
         "numerator_propensity_min": 0.3,
         "numerator_propensity_max": 0.7,
-        "fraction_weight_truncated": 0.0,
-        "maximum_untruncated_weight": 2.0,
-        "maximum_weight": 2.0,
-        "effective_sample_size": 3.0,
+        "truncated": 0.0,
+        "untruncated": 2.0,
+        "weight": 2.0,
+        "ess": 3.0,
     }
     values.update(changes)
-    return report.PeriodDiagnostics(**values)
+    return report.Diagnostics(**values)
 
 
 @pytest.mark.parametrize(
     ("changes", "message"),
     [
         ({"period": ""}, "period label must not be empty"),
-        ({"control_rows": 0, "rows": 2}, "row counts must be positive"),
+        ({"control": 0, "rows": 2}, "row counts must be positive"),
         ({"rows": 5}, "reconcile to rows"),
-        ({"maximum_weight": math.inf}, "maximum_weight must be finite"),
+        ({"weight": math.inf}, "maximum_weight must be finite"),
         (
-            {"fraction_weight_truncated": 1.5},
+            {"truncated": 1.5},
             "fraction_weight_truncated must lie",
         ),
         (
@@ -602,9 +602,9 @@ def period(**changes):
             {"numerator_propensity_max": 1.0},
             "numerator_propensity_max must lie strictly",
         ),
-        ({"maximum_untruncated_weight": 0.0}, "weight bounds must be positive"),
+        ({"untruncated": 0.0}, "weight bounds must be positive"),
         (
-            {"effective_sample_size": 0.0},
+            {"ess": 0.0},
             "effective_sample_size must be positive",
         ),
     ],
@@ -653,7 +653,7 @@ def test_an_invalid_period_diagnostic_is_rejected(changes, message):
 )
 def test_an_invalid_regime_estimate_is_rejected(values, message):
     with pytest.raises(errors.InputError, match=message):
-        report.RegimeEstimate(*values)
+        report.Estimate(*values)
 
 
 def test_an_invalid_contrast_is_rejected():

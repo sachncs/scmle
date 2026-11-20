@@ -9,7 +9,7 @@ forecast on the training history (`scmle.evaluation.proper_scores.mase`) and
 is the only one comparable with published values. The same-rows score is
 kept under the explicit kind `mase_same_rows`; `mase` stays an alias of it so
 stored runs read the same. `mase_insample` takes the training-history scale
-from `ForecastMetric.scale`.
+from `Metric.scale`.
 """
 
 import dataclasses
@@ -44,7 +44,7 @@ def actuals(
     )
 
 
-def last_value(
+def persist(
     estimator: Any, features: pandas.DataFrame, steps: int
 ) -> numpy.ndarray:
     """The no-change forecast: the current value repeated `steps` times.
@@ -112,7 +112,7 @@ def smape(truth: numpy.ndarray, guess: numpy.ndarray) -> float:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ForecastMetric(metrics.Metric):
+class Metric(metrics.Metric):
     """A forecasting metric over all horizon steps.
 
     Attributes:
@@ -172,7 +172,7 @@ class ForecastMetric(metrics.Metric):
                     * mean_absolute_error(truth, guess)
                     / float(scale or 1.0)
                 )
-            naive = last_value(estimator, features, truth.shape[1])
+            naive = persist(estimator, features, truth.shape[1])
             return sign * mase(truth, guess, naive)
 
         return score

@@ -232,7 +232,7 @@ def test_load_run_digests_parameter_estimation(tmp_path):
     rng = numpy.random.default_rng(0)
     features = rng.normal(size=(60, 2))
     outcome = features @ numpy.array([1.0, -0.5]) + rng.normal(size=60) * 0.1
-    result = parameter_estimation.estimate_parameters(
+    result = parameter_estimation.infer(
         features,
         outcome,
         parameter_estimation.Estimand(
@@ -240,7 +240,7 @@ def test_load_run_digests_parameter_estimation(tmp_path):
             outcome="y",
             population="synthetic rows",
             likelihood="gaussian",
-            feature_names=("x1", "x2"),
+            features=("x1", "x2"),
             assumptions=("independent errors",),
         ),
         parameter_estimation.Config(estimator="linear"),

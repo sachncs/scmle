@@ -24,7 +24,7 @@ def test_an_ordinal_adapter_wraps_a_regressor_with_levels():
     built = adapters.ORDINAL_FOREST.build(
         tasks.Task.ORDINAL, 7, {"levels": 5, "n_estimators": 60}
     )
-    assert isinstance(built, estimators.CumulativeThresholdRegressor)
+    assert isinstance(built, estimators.Threshold)
     assert built.levels == 5
     assert built.random_state == 7
     assert isinstance(built.regressor, ensemble.RandomForestRegressor)

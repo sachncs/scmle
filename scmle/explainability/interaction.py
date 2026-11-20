@@ -44,9 +44,9 @@ class Pairwise(diagnostics.Diagnostic):
     """
 
     name = "pairwise_interaction"
-    applies_to = diagnostics.CLASSIFICATION | diagnostics.REGRESSION_ONLY
+    tasks = diagnostics.CLASSIFICATION | diagnostics.REGRESSION_ONLY
 
-    def compute(self, inputs: diagnostics.DiagnosticInput) -> dict[str, Any]:
+    def compute(self, inputs: diagnostics.Input) -> dict[str, Any]:
         """Returns deterministic interaction strengths for bounded pairs.
 
         Only the first `MAX_INTERACTION_FEATURES` numeric features and the
@@ -65,11 +65,9 @@ class Pairwise(diagnostics.Diagnostic):
             When fewer than two numeric features or no rows are available,
             `features` is empty and the limitations say so.
         """
-        columns = list(inputs.feature_plan.sourced)
+        columns = list(inputs.plan.sourced)
         numeric = [
-            column
-            for column in inputs.feature_plan.numeric
-            if column in columns
+            column for column in inputs.plan.numeric if column in columns
         ][:MAX_INTERACTION_FEATURES]
         sample = inputs.features[columns].head(MAX_INTERACTION_ROWS).copy()
         if len(numeric) < MIN_NUMERIC_FEATURES or sample.empty:
@@ -125,7 +123,7 @@ class Pairwise(diagnostics.Diagnostic):
 
     def interact(
         self,
-        inputs: diagnostics.DiagnosticInput,
+        inputs: diagnostics.Input,
         sample: pandas.DataFrame,
         medians: dict[str, float],
         pair: tuple[str, str],
@@ -161,7 +159,7 @@ class Pairwise(diagnostics.Diagnostic):
 
     @staticmethod
     def score(
-        inputs: diagnostics.DiagnosticInput, frame: pandas.DataFrame
+        inputs: diagnostics.Input, frame: pandas.DataFrame
     ) -> numpy.ndarray:
         """Returns one comparable model-output score per row.
 

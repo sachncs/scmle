@@ -10,12 +10,12 @@ from scipy import stats
 
 from scmle.contracts import errors
 from scmle.evaluation.parameter_estimation.config import Config
-from scmle.evaluation.parameter_estimation.declaration import BayesianPrior
 from scmle.evaluation.parameter_estimation.declaration import Estimand
 from scmle.evaluation.parameter_estimation.declaration import MIN_ROWS_PER_ARM
 from scmle.evaluation.parameter_estimation.declaration import (
     MIN_VARIANCE_DEGREES,
 )
+from scmle.evaluation.parameter_estimation.declaration import Prior
 from scmle.evaluation.parameter_estimation.report import Fit
 
 
@@ -34,7 +34,7 @@ def dichotomous(matrix: numpy.ndarray, policy: Config) -> tuple[int, int, int]:
         ValueError: If the treatment position is missing, the treatment is
             not 0 or 1, or an arm has fewer than two rows.
     """
-    treatment_position = policy.treatment_position
+    treatment_position = policy.treatment
     if treatment_position is None:
         raise errors.InputError("bayesian_ate requires treatment_position")
     treatment_position = int(treatment_position)
@@ -87,9 +87,7 @@ def bayes(
         treatment_position, treated_rows, control_rows = dichotomous(
             matrix, policy
         )
-    coefficients, covariance, diagnostics = fit_bayesian_linear(
-        design, values, policy.prior
-    )
+    coefficients, covariance, diagnostics = update(design, values, policy.prior)
     if policy.estimator == "bayesian_ate":
         reference = reference_bayesian_ate(
             design,
@@ -103,7 +101,7 @@ def bayes(
             "estimator_family": "causal_bayesian_gaussian",
             "method": "normal_inverse_gamma_outcome_regression",
             "treatment_position": treatment_position,
-            "treatment_name": estimand.feature_names[treatment_position],
+            "treatment_name": estimand.features[treatment_position],
             "treated_rows": treated_rows,
             "control_rows": control_rows,
             "identification": (
@@ -156,7 +154,7 @@ def credible(
     likelihood = "gaussian"
     posterior_scale = numpy.asarray(diagnostics["posterior_scale"])
     posterior_degrees = diagnostics["posterior_degrees_of_freedom"]
-    pivot = stats.t.ppf(0.5 + policy.confidence_level / 2.0, posterior_degrees)
+    pivot = stats.t.ppf(0.5 + policy.confidence / 2.0, posterior_degrees)
     p_values = 2.0 * stats.t.sf(
         numpy.abs(coefficients)
         / numpy.maximum(numpy.sqrt(numpy.diag(posterior_scale)), 1e-15),
@@ -173,7 +171,7 @@ def credible(
         "p_value_semantics": "two-sided posterior tail probability",
         "posterior_covariance": covariance.tolist(),
         "credible_interval": {
-            "level": policy.confidence_level,
+            "level": policy.confidence,
             "distribution": "student_t",
             "degrees_of_freedom": posterior_degrees,
             "scale_matrix": posterior_scale.tolist(),
@@ -193,10 +191,10 @@ def credible(
     )
 
 
-def fit_bayesian_linear(
+def update(
     design: numpy.ndarray,
     values: numpy.ndarray,
-    prior: BayesianPrior,
+    prior: Prior,
 ) -> tuple[numpy.ndarray, numpy.ndarray, dict[str, Any]]:
     """Computes a conjugate Gaussian posterior from an explicit prior.
 
@@ -271,7 +269,7 @@ def fit_bayesian_linear(
     )
 
 
-def conform(prior: BayesianPrior, dimension: int) -> None:
+def conform(prior: Prior, dimension: int) -> None:
     """Validates prior vector and matrix dimensions against a design.
 
     Args:
@@ -294,7 +292,7 @@ def conform(prior: BayesianPrior, dimension: int) -> None:
 def reference_bayesian_linear(
     design: numpy.ndarray,
     values: numpy.ndarray,
-    prior: BayesianPrior,
+    prior: Prior,
     coefficients: numpy.ndarray,
     policy: Config,
 ) -> dict[str, Any]:
@@ -324,14 +322,14 @@ def reference_bayesian_linear(
     return {
         "method": "scipy.linalg.solve:positive_definite",
         "max_absolute_difference": difference,
-        "passed": difference <= policy.reference_tolerance,
+        "passed": difference <= policy.reference,
     }
 
 
 def reference_bayesian_ate(
     design: numpy.ndarray,
     values: numpy.ndarray,
-    prior: BayesianPrior,
+    prior: Prior,
     coefficients: numpy.ndarray,
     policy: Config,
 ) -> dict[str, Any]:
@@ -364,7 +362,7 @@ def reference_bayesian_ate(
         assume_a="pos",
     )
     difference = float(numpy.max(numpy.abs(reference - coefficients)))
-    treatment_index = policy.treatment_position
+    treatment_index = policy.treatment
     if treatment_index is None:
         raise errors.InputError("bayesian_ate requires treatment_position")
     coefficient_index = treatment_index + 1
@@ -373,5 +371,5 @@ def reference_bayesian_ate(
         "max_absolute_difference": difference,
         "reference_treatment_coefficient": float(reference[coefficient_index]),
         "treatment_position": treatment_index,
-        "passed": difference <= policy.reference_tolerance,
+        "passed": difference <= policy.reference,
     }

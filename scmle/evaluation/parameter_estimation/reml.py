@@ -12,11 +12,9 @@ from scipy import optimize
 from scmle.contracts import errors
 from scmle.evaluation.parameter_estimation.config import Config
 from scmle.evaluation.parameter_estimation.declaration import INTERCEPT_LIMITS
+from scmle.evaluation.parameter_estimation.mixed import assemble
 from scmle.evaluation.parameter_estimation.mixed import columns
 from scmle.evaluation.parameter_estimation.mixed import gls
-from scmle.evaluation.parameter_estimation.mixed import (
-    hierarchical_random_slope_gls_system,
-)
 from scmle.evaluation.parameter_estimation.mixed import intercept
 from scmle.evaluation.parameter_estimation.mixed import marginal
 from scmle.evaluation.parameter_estimation.mixed import profile
@@ -64,18 +62,18 @@ def optimise(
 
     Raises:
         ValueError: If the optimizer result is rejected (see
-            `validate_reml_optimizer_result`), the GLS system is not
+            `vet`), the GLS system is not
             identifiable, or the objective rejects a covariance block that
             is not positive definite.
     """
-    lower_bound, upper_bound = policy.reml_variance_bounds
+    lower_bound, upper_bound = policy.bounds
     initial_parameters, log_bounds = begin(
         initial_residual_variance,
         initial_random_effect_covariance,
-        policy.reml_variance_bounds,
+        policy.bounds,
     )
     optimizer_result = search(
-        random_slope_reml_profile_objective,
+        score,
         initial_parameters,
         (design, values, clusters, labels, random_slope_position),
         log_bounds,
@@ -84,9 +82,7 @@ def optimise(
     point = numpy.asarray(optimizer_result.x, dtype=float)
     variance_components = numpy.exp(point[:3])
     residual_variance = float(variance_components[0])
-    random_effect_covariance = random_slope_covariance_from_reml_point(
-        variance_components, float(point[3])
-    )
+    random_effect_covariance = decode(variance_components, float(point[3]))
     return slope(
         design,
         values,
@@ -178,7 +174,7 @@ def search(
 
     Returns:
         The optimizer result.  A result that cannot support a release
-        artifact raises the ValueError of `validate_reml_optimizer_result`.
+        artifact raises the ValueError of `vet`.
     """
     optimizer_result = optimize.minimize(
         objective,
@@ -187,14 +183,12 @@ def search(
         method="L-BFGS-B",
         bounds=log_bounds,
         options={
-            "maxiter": policy.max_iterations,
+            "maxiter": policy.iterations,
             "ftol": policy.tolerance,
             "gtol": policy.tolerance,
         },
     )
-    validate_reml_optimizer_result(
-        optimizer_result, log_bounds, dimension=len(log_bounds)
-    )
+    vet(optimizer_result, log_bounds, dimension=len(log_bounds))
     return optimizer_result
 
 
@@ -226,7 +220,7 @@ def record(
     }
 
 
-def random_slope_covariance_from_reml_point(
+def decode(
     variance_components: numpy.ndarray,
     correlation_parameter: float,
 ) -> numpy.ndarray:
@@ -254,7 +248,7 @@ def random_slope_covariance_from_reml_point(
     )
 
 
-def random_slope_reml_profile_objective(
+def score(
     parameters: numpy.ndarray,
     design: numpy.ndarray,
     values: numpy.ndarray,
@@ -294,11 +288,9 @@ def random_slope_reml_profile_objective(
         variance_components <= 0.0
     ):
         return float("inf")
-    random_effect_covariance = random_slope_covariance_from_reml_point(
-        variance_components, float(point[3])
-    )
+    random_effect_covariance = decode(variance_components, float(point[3]))
     residual_variance = float(variance_components[0])
-    information, right_hand_side = hierarchical_random_slope_gls_system(
+    information, right_hand_side = assemble(
         design,
         values,
         clusters,
@@ -333,7 +325,7 @@ def random_slope_reml_profile_objective(
     )
 
 
-def fit_hierarchical_reml(
+def fit(
     design: numpy.ndarray,
     values: numpy.ndarray,
     clusters: numpy.ndarray,
@@ -370,10 +362,10 @@ def fit_hierarchical_reml(
 
     Raises:
         ValueError: If the optimizer result is rejected (see
-            `validate_reml_optimizer_result`) or the GLS system is not
+            `vet`) or the GLS system is not
             identifiable.
     """
-    lower_bound, upper_bound = policy.reml_variance_bounds
+    lower_bound, upper_bound = policy.bounds
     initial_variances = numpy.clip(
         numpy.asarray(
             [initial_residual_variance, initial_random_intercept_variance],
@@ -483,7 +475,7 @@ def deviance(
     )
 
 
-def validate_reml_optimizer_result(
+def vet(
     optimizer_result: optimize.OptimizeResult,
     log_bounds: tuple[tuple[float, float], ...],
     dimension: int = 2,

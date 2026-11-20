@@ -174,7 +174,7 @@ def compare(
         )
     batch = server.Batcher(direct)
     batch_path = workdir / "batch-predictions.csv"
-    batch.score_file(data / "fresh.csv", batch_path)
+    batch.score(data / "fresh.csv", batch_path)
     scored = pandas.read_csv(batch_path)
     batch_match = (
         scored["prediction"].tolist() == direct.predict(frame).tolist()
@@ -325,7 +325,7 @@ def drill(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
     original = bundle.Bundle.load(
         workdir / "export-v1", signing_key=fixture.DEMO_SIGNING_KEY
     )
-    adapter = server.HttpServing(restored)
+    adapter = server.Service(restored)
     adapter.start()
     try:
         status, body = client.post_json(

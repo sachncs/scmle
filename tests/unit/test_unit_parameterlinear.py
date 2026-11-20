@@ -146,9 +146,7 @@ def test_a_logistic_iid_covariance_is_the_inverse_information():
 
 def test_an_ols_fit_reports_t_intervals_and_the_reference():
     design, y = gaussian()
-    policy = config.Config(
-        estimator="linear", covariance="iid", confidence_level=0.9
-    )
+    policy = config.Config(estimator="linear", covariance="iid", confidence=0.9)
     fit = linear.ols(design, y, policy, None, ("intercept", "a", "b"))
     assert fit.names == ("intercept", "a", "b")
     assert fit.likelihood == "gaussian"

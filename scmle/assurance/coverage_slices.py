@@ -7,7 +7,7 @@ share covered with its Clopper-Pearson interval and the mean width (regression)
 or set size (classification).
 
 The per-slice flag (`coverage.undercovered`) replaces the Holm flag of
-`coverage.slice_coverage`, whose measured familywise false-flag rate was
+`coverage.stratify`, whose measured familywise false-flag rate was
 0.0755 against a bound of 0.0597: each slice is tested against the nominal
 level less a margin fixed in advance (0.05) and Holm is applied over the
 family. It gates only if the slice-flag entry of

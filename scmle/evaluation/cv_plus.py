@@ -2,7 +2,7 @@
 
 `conformal.cvplus` needs the K models that were each fit without one
 held-out fold, the fold of every calibration row and the absolute error of
-that row under the model that did not see it. `CvPlusEnsemble` keeps exactly
+that row under the model that did not see it. `Ensemble` keeps exactly
 that, so a served bundle can answer with the CV+ interval of Barber, Candes,
 Ramdas and Tibshirani (arXiv:1905.02928) instead of a margin pooled from
 scores of different refits.
@@ -120,14 +120,14 @@ def strategize(
             f"{observed} calibration rows; pooled margin is used "
             f"from {MIN_ROWS_FOR_SPLIT}"
         )
-    elif serialized_size(models) > max_bytes:
+    elif measure(models) > max_bytes:
         reason = f"fold models exceed {max_bytes} bytes"
     if reason is not None or folds is None:
         return Plan(POOLED, None, reason)
     return Plan(FOLD_MODELS, folds, None)
 
 
-def serialized_size(models: Sequence[Any]) -> int:
+def measure(models: Sequence[Any]) -> int:
     """Bytes the fold models take when written with joblib.
 
     Args:
@@ -142,28 +142,28 @@ def serialized_size(models: Sequence[Any]) -> int:
 
 
 @dataclasses.dataclass(frozen=True)
-class CvPlusEnsemble:
+class Ensemble:
     """The K fold models with the residuals and folds of the calibration rows.
 
     Attributes:
         models: One fitted model per fold, each trained without that fold.
-        fold_of_row: Fold index of each calibration row.
+        folds: Fold index of each calibration row.
         residuals: Absolute out-of-fold error of each calibration row.
     """
 
     models: tuple[Any, ...]
-    fold_of_row: numpy.ndarray
+    folds: numpy.ndarray
     residuals: numpy.ndarray
 
     def __post_init__(self) -> None:
         """Checks the array lengths, the row count and the fold references.
 
         Raises:
-            ValueError: If `fold_of_row` and `residuals` differ in length,
+            ValueError: If `folds` and `residuals` differ in length,
                 there are fewer than `conformal.MIN_CALIBRATION_ROWS`
                 calibration rows, or a row names a fold that has no model.
         """
-        if len(self.fold_of_row) != len(self.residuals):
+        if len(self.folds) != len(self.residuals):
             raise errors.InputError(
                 "fold_of_row and residuals differ in length"
             )
@@ -172,9 +172,8 @@ class CvPlusEnsemble:
                 f"need at least {conformal.MIN_CALIBRATION_ROWS} "
                 "calibration rows"
             )
-        if len(self.fold_of_row) and (
-            self.fold_of_row.min() < 0
-            or self.fold_of_row.max() >= len(self.models)
+        if len(self.folds) and (
+            self.folds.min() < 0 or self.folds.max() >= len(self.models)
         ):
             raise errors.InputError("fold_of_row names a fold without a model")
 
@@ -206,5 +205,5 @@ class CvPlusEnsemble:
             ]
         )
         return conformal.cvplus(
-            predictions, self.fold_of_row, self.residuals, coverage
+            predictions, self.folds, self.residuals, coverage
         )

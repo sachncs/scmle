@@ -22,7 +22,7 @@ class Config:
     """Bounded configuration for the deterministic pixel baseline.
 
     Attributes:
-        target_size: Width and height images are resized to.
+        size: Width and height images are resized to.
         mode: Pillow color mode of the pixels ("L", "RGB" or "RGBA").
         normalize: Whether pixel values are scaled to [0, 1].
         regularization: Inverse regularization strength of the logistic
@@ -30,7 +30,7 @@ class Config:
         max_iter: Maximum solver iterations; must be at least 1.
         random_state: Seed for the estimator.
         migrations: The written layout's version steps, oldest first;
-            version 2 writes `target_size` as `size`. The model digest is
+            version 2 writes `size` as `size`. The model digest is
             computed on the version-1 layout, so a fitted model keeps it.
     """
 
@@ -40,7 +40,7 @@ class Config:
 
     __module__ = "scmle.models.images"
 
-    target_size: tuple[int, int] = (16, 16)
+    size: tuple[int, int] = (16, 16)
     mode: str = "RGB"
     normalize: bool = True
     regularization: float = 1.0
@@ -51,10 +51,10 @@ class Config:
         """Validates feature and estimator bounds before fitting.
 
         Raises:
-            ValueError: If `target_size` or `mode` is unsupported,
+            ValueError: If `size` or `mode` is unsupported,
                 `regularization` is not positive, or `max_iter` is below 1.
         """
-        image.configure(self.target_size, self.mode)
+        image.configure(self.size, self.mode)
         if self.regularization <= 0:
             raise errors.InputError("regularization must be positive")
         if self.max_iter < 1:
@@ -67,7 +67,7 @@ class Config:
             Mapping of field name to value, with the size as a list.
         """
         return {
-            "size": list(self.target_size),
+            "size": list(self.size),
             "mode": self.mode,
             "normalize": self.normalize,
             "regularization": self.regularization,
@@ -81,21 +81,21 @@ class Evaluation:
     """Evaluation evidence for a held-out image dataset.
 
     Attributes:
-        sample_count: Number of images evaluated.
+        samples: Number of images evaluated.
         accuracy: Share of images classified correctly.
         macro_f1: Unweighted mean of the per-class harmonic mean of
             precision and recall.
         log_loss: Mean negative log probability of the true class.
         labels: Class labels, as text, in the classifier's class order.
         migrations: The written layout's version steps, oldest first;
-            version 2 writes `sample_count` as `samples`.
+            version 2 writes `samples` as `samples`.
     """
 
     migrations: ClassVar[tuple[records.Migration, ...]] = (
         records.Migration(renames={"sample_count": "samples"}),
     )
 
-    sample_count: int
+    samples: int
     accuracy: float
     macro_f1: float
     log_loss: float
@@ -117,7 +117,7 @@ class Explanation:
     """Global or local signed pixel-contribution evidence.
 
     Attributes:
-        model_digest: Digest of the model state that was explained.
+        digest: Digest of the model state that was explained.
         input_hash: Content hash of the explained image, or None for a
             global explanation.
         method: Name of the explanation method.
@@ -137,7 +137,7 @@ class Explanation:
         ),
     )
 
-    model_digest: str
+    digest: str
     input_hash: str | None
     method: str
     terms: tuple[tuple[str, float], ...]
@@ -151,7 +151,7 @@ class Explanation:
             and score.
         """
         return {
-            "digests": {"model": self.model_digest, "payload": self.input_hash},
+            "digests": {"model": self.digest, "payload": self.input_hash},
             "method": self.method,
             "terms": [list(term) for term in self.terms],
             "limitations": list(self.limitations),
@@ -188,9 +188,9 @@ class Drift:
     Attributes:
         reference_hash: Dataset hash of the reference images.
         observed_hash: Dataset hash of the observed images.
-        mean_pixel_distance: Mean absolute difference of the per-channel
+        pixels: Mean absolute difference of the per-channel
             mean pixel values, divided by 255.
-        duplicate_rate: Share of observed images that are duplicates.
+        duplicates: Share of observed images that are duplicates.
         threshold: Level above which a signal counts as shifted.
         migrations: The written layout's version steps, oldest first;
             version 2 writes `digests.{reference, observed}`, `pixels` (the
@@ -211,17 +211,14 @@ class Drift:
 
     reference_hash: str
     observed_hash: str
-    mean_pixel_distance: float
-    duplicate_rate: float
+    pixels: float
+    duplicates: float
     threshold: float
 
     @property
     def shifted(self) -> bool:
         """Whether the pixel distance or duplicate rate passes the threshold."""
-        return (
-            self.mean_pixel_distance > self.threshold
-            or self.duplicate_rate > self.threshold
-        )
+        return self.pixels > self.threshold or self.duplicates > self.threshold
 
     def to_dict(self) -> dict[str, Any]:
         """Converts the drift report to JSON-compatible values.

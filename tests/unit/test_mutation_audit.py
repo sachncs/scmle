@@ -19,10 +19,10 @@ def policy(slope=None):
     return config.Config(
         estimator="hierarchical_linear",
         covariance="iid",
-        cluster_name="site",
+        cluster="site",
         hierarchical_assumptions=(*ASSUMPTIONS, *extra),
-        hierarchical_method="reml",
-        random_slope_position=slope,
+        hierarchy="reml",
+        slope=slope,
     )
 
 
@@ -70,6 +70,6 @@ def test_the_reml_objective_must_agree_within_ten_tolerances():
             design, y, labels, 0.25, 0.64, beta, truth + offset, rules
         )
 
-    tolerance = rules.reference_tolerance
+    tolerance = rules.reference
     assert check(9.0 * tolerance)["passed"] is True
     assert check(10.5 * tolerance)["passed"] is False

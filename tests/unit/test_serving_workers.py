@@ -180,7 +180,7 @@ def test_enlist_puts_the_admission_on_a_crew():
     capacity = workers.enlist(3, 2.0, lambda: False)
     try:
         assert isinstance(capacity.admission.pool, workers.Crew)
-        assert capacity.admission.max_concurrent == 3
+        assert capacity.admission.capacity == 3
         assert capacity.admission.pool.size == 3
         assert capacity.patience == guard.STRIKES * 2.0
         assert capacity.admission.run(lambda: 4) == 4

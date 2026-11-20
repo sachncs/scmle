@@ -136,13 +136,13 @@ def test_the_catalog_registers_the_plugin_and_refuses_a_shadowed_builtin(
     catalog = registry.Catalog.stock()
     builtin = catalog.get("random_forest")
 
-    failures = catalog.load_plugins()
+    failures = catalog.load()
 
     assert catalog.get("tiny_bayes").family == "custom"
     assert "tiny_bayes" in plugins.REGISTRY.entries(plugins.Kind.ESTIMATORS)
     assert catalog.get("random_forest") is builtin
     assert "random_forest" in failures
-    assert "built-in" in catalog.plugin_failures["random_forest"]
+    assert "built-in" in catalog.failures["random_forest"]
     assert "random_forest" not in plugins.REGISTRY.entries(
         plugins.Kind.ESTIMATORS
     )

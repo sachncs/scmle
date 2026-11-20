@@ -153,7 +153,7 @@ def split(
     return flag, ~flag
 
 
-class TLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Pair(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """T-learner: one outcome model per arm; uplift is their difference.
 
     Attributes:
@@ -229,7 +229,7 @@ class TLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships 
         return effect
 
 
-class SingleModelLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Pool(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """S-learner: one outcome model with the treatment as a feature.
 
     With `kind="linear"` the treatment enters as one additive coefficient,
@@ -310,7 +310,7 @@ class SingleModelLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-le
         return effect
 
 
-class CrossLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Cross(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """X-learner: imputes each row's missing outcome, then models the gap.
 
     Outcome models per arm predict what each row would have had under the
@@ -366,7 +366,7 @@ class CrossLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn sh
         self.degenerate_ = not (treated.any() and control.any())
         if self.degenerate_:
             return self  # One arm only: no effect can be estimated.
-        first = TLearner(self.classify, self.random_state, self.kind).fit(
+        first = Pair(self.classify, self.random_state, self.kind).fit(
             matrix, values, treated.astype(int)
         )
         treated_gain = values[treated] - expected(

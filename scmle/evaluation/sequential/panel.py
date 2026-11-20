@@ -28,9 +28,9 @@ def conform(frame: pandas.DataFrame, estimand: Estimand) -> list[str]:
         ValueError: If a declared column is missing from the frame.
     """
     required = [
-        estimand.subject_identity,
-        estimand.time_column,
-        estimand.treatment_column,
+        estimand.subject,
+        estimand.time,
+        estimand.treatment,
         estimand.outcome,
         *estimand.baseline_covariates,
         *estimand.time_varying_covariates,
@@ -55,8 +55,8 @@ def situate(frame: pandas.DataFrame, estimand: Estimand) -> None:
             non-finite, subject-time pairs repeat, or the time values are
             invalid.
     """
-    subject_name = estimand.subject_identity
-    time_name = estimand.time_column
+    subject_name = estimand.subject
+    time_name = estimand.time
     if frame[subject_name].isna().any() or frame[time_name].isna().any():
         raise errors.InputError(
             "subject identities and time values must not be missing"
@@ -146,12 +146,12 @@ def prepare(
     if frame.empty:
         raise errors.InputError("sequential frame must not be empty")
     required = conform(frame, estimand)
-    subject_name = estimand.subject_identity
-    time_name = estimand.time_column
+    subject_name = estimand.subject
+    time_name = estimand.time
     situate(frame, estimand)
     subjects_input = int(frame[subject_name].nunique())
     value_columns = [
-        estimand.treatment_column,
+        estimand.treatment,
         estimand.outcome,
         *estimand.baseline_covariates,
         *estimand.time_varying_covariates,
@@ -173,9 +173,7 @@ def prepare(
     numericize(prepared, value_columns)
     if prepared.empty:
         raise errors.InputError("missingness policy left no subjects")
-    treatment_values = set(
-        prepared[estimand.treatment_column].unique().tolist()
-    )
+    treatment_values = set(prepared[estimand.treatment].unique().tolist())
     if not treatment_values.issubset({0, 1}):
         raise errors.InputError("treatment must be binary with values 0 and 1")
     period_values = order(prepared, time_name)
@@ -212,10 +210,8 @@ def chronologize(frame: pandas.DataFrame, estimand: Estimand) -> None:
             produce; every other `TypeError` becomes `ValueError`.
     """
     try:
-        for item in frame.groupby(
-            estimand.subject_identity, sort=False, dropna=False
-        ):
-            nonrepeating(item[1][estimand.time_column].tolist())
+        for item in frame.groupby(estimand.subject, sort=False, dropna=False):
+            nonrepeating(item[1][estimand.time].tolist())
     except (TypeError, ValueError) as error:
         if "strictly increasing" in str(error):
             raise
@@ -252,7 +248,7 @@ def pretreat(frame: pandas.DataFrame, estimand: Estimand) -> None:
         ValueError: If a baseline covariate takes more than one value
             (counting missing as a value) within a subject.
     """
-    grouped = frame.groupby(estimand.subject_identity, sort=False)
+    grouped = frame.groupby(estimand.subject, sort=False)
     for name in estimand.baseline_covariates:
         if (grouped[name].nunique(dropna=False) > 1).any():  # noqa: PD101 -- per-subject distinct counts; Series.is_unique does not apply
             raise errors.InputError(
@@ -284,9 +280,7 @@ def tabulate(
         ValueError: If a subject's first-period subject-time pair maps to
             more than one row.
     """
-    indexed = frame.set_index(
-        [estimand.subject_identity, estimand.time_column], drop=False
-    )
+    indexed = frame.set_index([estimand.subject, estimand.time], drop=False)
     treatment = numpy.empty(
         (len(subject_values), len(period_values)), dtype=float
     )
@@ -311,7 +305,7 @@ def tabulate(
         for period_index, period in enumerate(period_values):
             row = indexed.loc[(subject, period)]
             treatment[subject_index, period_index] = float(
-                row[estimand.treatment_column]
+                row[estimand.treatment]
             )
             outcome[subject_index, period_index] = float(row[estimand.outcome])
             time_varying[subject_index, period_index] = row[

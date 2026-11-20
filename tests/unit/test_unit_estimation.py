@@ -18,7 +18,7 @@ def estimand(features=("x", "t")):
         outcome="y",
         population="all rows",
         likelihood="gaussian",
-        feature_names=features,
+        features=features,
         assumptions=("iid",),
     )
 
@@ -31,7 +31,7 @@ def ate(estimator, **fields):
     return policy(
         estimator=estimator,
         covariance="iid",
-        treatment_position=1,
+        treatment=1,
         causal_assumptions=(
             "consistency",
             "conditional_exchangeability",
@@ -151,7 +151,7 @@ def test_restore_refuses_an_incomplete_or_invalid_declaration(tmp_path):
 
 
 def test_rebuild_restores_tuples_and_the_prior():
-    prior = parameter_estimation.BayesianPrior(
+    prior = parameter_estimation.Prior(
         mean=(0.0, 0.0), precision=((1.0, 0.0), (0.0, 1.0))
     )
     chosen = policy(
@@ -240,7 +240,7 @@ def test_screen_lists_the_declared_columns_and_their_gaps():
     frame = pandas.DataFrame(
         {"x": [1.0, None], "t": [0, 1], "y": [1.0, 2.0], "g": ["a", "b"]}
     )
-    complete = policy(missing="complete_case", cluster_name="g")
+    complete = policy(missing="complete_case", cluster="g")
     assert estimation.screen(orchestrator(), estimand(), complete, frame) == (
         ["x", "t", "y", "g"],
         None,

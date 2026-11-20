@@ -93,7 +93,7 @@ class Multitarget(models.Model):
         except TypeError:
             # handled: documented: random_state passed only when class takes it
             inner = kind(**settings)
-        return estimators.PerTarget(inner, classify=classify)
+        return estimators.Panel(inner, classify=classify)
 
 
 class Logistic(Multitarget):
@@ -122,7 +122,7 @@ class Logistic(Multitarget):
         Returns:
             An unfitted estimator with one logistic regression per label.
         """
-        return estimators.PerTarget(
+        return estimators.Panel(
             linear_model.LogisticRegression(
                 max_iter=1000, random_state=seed, **dict(params or {})
             ),
@@ -130,7 +130,7 @@ class Logistic(Multitarget):
         )
 
 
-class MultioutputRidge(Multitarget):
+class Ridge(Multitarget):
     """Ridge regression for every quantity."""
 
     name = "multioutput_ridge"
@@ -156,7 +156,7 @@ class MultioutputRidge(Multitarget):
         Returns:
             An unfitted estimator with one ridge regression per quantity.
         """
-        return estimators.PerTarget(
+        return estimators.Panel(
             linear_model.Ridge(**dict(params or {})), classify=False
         )
 
@@ -207,7 +207,7 @@ class Forest(models.Model):
 
 MULTITARGET_ADAPTERS: tuple[models.Model, ...] = (
     Logistic(),
-    MultioutputRidge(),
+    Ridge(),
     MULTI_BOOSTING,
     Forest(),
 )

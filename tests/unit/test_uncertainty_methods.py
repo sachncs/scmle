@@ -121,10 +121,10 @@ def test_class_scores_survive_a_round_trip_and_old_records_load() -> None:
 
 def test_weighted_interval_widens_where_weights_are_large() -> None:
     rng = numpy.random.default_rng(4)
-    calibrator = conformal.ConformalCalibrator.for_regression(
+    calibrator = conformal.ConformalCalibrator.calibrate(
         rng.standard_normal(200), numpy.zeros(200)
     )
-    lower, upper = calibrator.weighted_interval(
+    lower, upper = calibrator.reweight(
         numpy.zeros(2), numpy.ones(200), numpy.array([1.0, 1e6]), 0.9
     )
     assert math.isinf(upper[1]) and upper[0] < upper[1]
@@ -156,7 +156,7 @@ def test_slice_flag_names_the_undercovered_slice_only() -> None:
     covered = numpy.r_[
         rng.random(300) < 0.9, rng.random(300) < 0.6, numpy.zeros(5, dtype=bool)
     ]
-    report = coverage.slice_coverage(covered, labels, 0.9)
+    report = coverage.stratify(covered, labels, 0.9)
     assert report["flagged"] == ["b"]
     assert report["skipped"] == 1 and report["tests"] == 2
 
@@ -168,7 +168,7 @@ def test_coverage_tier_follows_the_measurement_not_the_attestation() -> None:
     assert coverage.grade(bad, attested_exchangeable=True) == "unverified"
     assert coverage.grade(good, True, clean_holdout=False) == coverage.ATTESTED
     assert coverage.grade(good, False, False) == "unverified"
-    report = coverage.coverage_report(
+    report = coverage.report(
         numpy.ones(100, dtype=bool),
         numpy.ones(100),
         0.9,
@@ -227,9 +227,7 @@ def test_same_rows_mase_differs_from_the_standard_one() -> None:
     guess = numpy.array([[11.0], [9.0]])
     naive = numpy.array([[12.0], [8.0]])
     assert forecast.mase(truth, guess, naive) == pytest.approx(0.5)
-    metric = forecast.ForecastMetric(
-        "x", "", False, frozenset(), kind="mase_insample"
-    )
+    metric = forecast.Metric("x", "", False, frozenset(), kind="mase_insample")
     with pytest.raises(ValueError):
         metric.scorer()
 
@@ -239,7 +237,7 @@ def test_uncensored_ipcw_concordance_equals_harrell() -> None:
     time = rng.exponential(size=150)
     risk = -time + rng.normal(size=150)
     weights = ipcw.reweight(time, numpy.ones(150))
-    assert weights.n_floored == 0
+    assert weights.floored == 0
     assert ipcw.uno(
         time, numpy.ones(150), risk, math.inf, weights
     ) == pytest.approx(harrell(time, numpy.ones(150), risk))
@@ -252,7 +250,7 @@ def test_floor_is_counted_and_covariates_change_the_weights() -> None:
     event = (rng.random(300) < 0.4).astype(float)
     marginal = ipcw.reweight(time, event, None, floor=0.5)
     covariate = ipcw.reweight(time, event, x)
-    assert marginal.n_floored > 0
+    assert marginal.floored > 0
     assert not numpy.allclose(marginal.weights, covariate.weights)
     with pytest.raises(ValueError):
         ipcw.reweight(time, event, None, floor=0.0)
@@ -265,10 +263,10 @@ def test_mint_is_coherent_and_equals_bottom_up_for_a_bottom_only_covariance() ->
     rng = numpy.random.default_rng(8)
     base = rng.standard_normal((6, 3))
     reconciled = reconcile.mint(base, summing, numpy.eye(3))
-    assert reconcile.coherence_residual(reconciled, summing) < 1e-12
+    assert reconcile.measure(reconciled, summing) < 1e-12
     huge = numpy.diag([1e9, 1.0, 1.0])
     near = reconcile.mint(base, summing, huge)
-    bottom = reconcile.bottom_up(base[:, 1:], summing)
+    bottom = reconcile.aggregate(base[:, 1:], summing)
     assert numpy.allclose(near, bottom, atol=1e-6)
     covariance = reconcile.shrunk_covariance(rng.standard_normal((50, 3)))
     assert numpy.all(numpy.linalg.eigvalsh(covariance) > 0)
@@ -289,7 +287,7 @@ def test_shift_weights_estimate_and_refuse() -> None:
     rng = numpy.random.default_rng(10)
     first = rng.standard_normal((600, 2))
     same = shift_weights.weigh(first, rng.standard_normal((600, 2)))
-    assert same.effective_size > 400
+    assert same.effective > 400
     assert same.ratio(first[:3]).shape == (3,)
     small = rng.standard_normal((60, 2))
     far = rng.standard_normal((600, 2)) + numpy.array([2.5, 0.0])
@@ -303,8 +301,5 @@ def test_every_task_type_has_a_gate_status() -> None:
     for task in tasks.Task:
         assert task_gate.status(task) in task_gate.STATUSES
         if task_gate.status(task) != task_gate.PASSED:
-            assert task_gate.tier_ceiling(task, "confirmed") == "unverified"
-    assert (
-        task_gate.tier_ceiling(tasks.Task.REGRESSION, "confirmed")
-        == "confirmed"
-    )
+            assert task_gate.cap(task, "confirmed") == "unverified"
+    assert task_gate.cap(tasks.Task.REGRESSION, "confirmed") == "confirmed"

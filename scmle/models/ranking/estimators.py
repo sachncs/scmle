@@ -25,7 +25,7 @@ coefficient error shrinks as `1 / sqrt(pairs)`, so 50,000 pairs leave about
 matrix stays under 100 MB at 120 features."""
 
 
-class ConstantRanker(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Constant(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Gives every row the same score: the order carries no information."""
 
     def fit(self, features: Any, target: Any, group: Any = None) -> Self:  # noqa: ARG002 -- fit signature of the ranking estimators
@@ -54,7 +54,7 @@ class ConstantRanker(base.RegressorMixin, base.BaseEstimator):  # type: ignore[m
         return numpy.zeros(features.shape[0])
 
 
-class PointwiseRanker(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Scorer(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Ranks by a regressor's prediction of the relevance grade.
 
     Attributes:
@@ -102,7 +102,7 @@ class PointwiseRanker(base.RegressorMixin, base.BaseEstimator):  # type: ignore[
         return numpy.asarray(self.regressor_.predict(features), dtype=float)
 
 
-class LibraryRanker(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Library(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """A boosted ranker from LightGBM or XGBoost that learns the ordering.
 
     Attributes:

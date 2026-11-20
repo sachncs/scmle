@@ -153,7 +153,7 @@ def packaged(module):
         manifest = {
             "schema_version": 1,
             "model_path": "model.joblib",
-            "artifact_digest": module.file_digest(payload),
+            "artifact_digest": module.digest(payload),
         }
         if key is not None:
             manifest = dict(envelope.sign(manifest, key))

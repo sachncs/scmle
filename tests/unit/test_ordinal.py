@@ -21,9 +21,9 @@ def ladder(rows=900, seed=0, levels=4):
 
 def test_probabilities_follow_the_level_order_and_sum_to_one():
     features, ranks = ladder()
-    model = estimators.CumulativeThresholdRegressor(
-        linear_model.Ridge(), levels=4
-    ).fit(features, ranks)
+    model = estimators.Threshold(linear_model.Ridge(), levels=4).fit(
+        features, ranks
+    )
 
     probabilities = model.predict_proba(features)
 
@@ -36,9 +36,9 @@ def test_probabilities_follow_the_level_order_and_sum_to_one():
 
 def test_predictions_are_valid_ranks_and_beat_a_constant_guess():
     features, ranks = ladder()
-    model = estimators.CumulativeThresholdRegressor(
-        linear_model.Ridge(), levels=4
-    ).fit(features[:600], ranks[:600])
+    model = estimators.Threshold(linear_model.Ridge(), levels=4).fit(
+        features[:600], ranks[:600]
+    )
 
     guess = model.predict(features[600:])
 
@@ -53,9 +53,9 @@ def test_a_missing_top_level_still_gives_a_full_probability_row():
     features, ranks = ladder()
     keep = ranks < 3
 
-    model = estimators.CumulativeThresholdRegressor(
-        linear_model.Ridge(), levels=4
-    ).fit(features[keep], ranks[keep])
+    model = estimators.Threshold(linear_model.Ridge(), levels=4).fit(
+        features[keep], ranks[keep]
+    )
 
     assert model.predict_proba(features.head(5)).shape == (5, 4)
 

@@ -84,7 +84,7 @@ def test_hist_gradient_boosting_stops_early_like_a_practitioner(task):
 def test_hist_gradient_boosting_adapter_pickles_for_the_trial_process():
     # Trials run in a separate process, which receives the adapter pickled.
     adapter = pickle.loads(pickle.dumps(classical.HIST_GRADIENT_BOOSTING))
-    assert adapter.fixed_params == classical.STOPPING
+    assert adapter.fixed == classical.STOPPING
 
 
 @pytest.mark.parametrize("rare", [1, 2])

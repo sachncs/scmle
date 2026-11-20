@@ -155,8 +155,8 @@ def test_batch_memory_follows_the_chunk_not_the_file(bundle, tmp_path):
     rows(5_000).to_csv(small, index=False)
     rows(20_000, seed=1).to_csv(large, index=False)
     adapter = server.Batcher(bundle)
-    first = peak(lambda: adapter.score_file(small, tmp_path / "a.csv", 500))
-    second = peak(lambda: adapter.score_file(large, tmp_path / "b.csv", 500))
+    first = peak(lambda: adapter.score(small, tmp_path / "a.csv", 500))
+    second = peak(lambda: adapter.score(large, tmp_path / "b.csv", 500))
     assert second < 1.5 * first
 
 
@@ -164,7 +164,7 @@ def test_streamed_output_matches_the_golden_scores(golden, bundle, tmp_path):
     source = tmp_path / "records.csv"
     pandas.DataFrame(golden.records).to_csv(source, index=False)
     target = tmp_path / "scored.csv"
-    count = server.Batcher(bundle).score_file(source, target, chunk_rows=2)
+    count = server.Batcher(bundle).score(source, target, chunk_rows=2)
     scored = pandas.read_csv(target)
     expected = parity.read_json(GOLDEN / "expected.json")
     report = parity.compare(
@@ -211,12 +211,12 @@ def test_an_interrupted_batch_resumes_after_its_last_chunk(
     source = tmp_path / "rows.csv"
     rows(23).to_csv(source, index=False)
     whole = tmp_path / "whole.csv"
-    server.Batcher(bundle).score_file(source, whole, chunk_rows=5)
+    server.Batcher(bundle).score(source, whole, chunk_rows=5)
     target = tmp_path / "resumed.csv"
     adapter = server.Batcher(bundle)
     interrupt_after(adapter, monkeypatch, 2)
     with pytest.raises(CrashError):
-        adapter.score_file(source, target, chunk_rows=5)
+        adapter.score(source, target, chunk_rows=5)
     assert not target.exists()
     journal = json.loads(
         (tmp_path / "resumed.csv.progress.json").read_text(encoding="utf-8")
@@ -228,7 +228,7 @@ def test_an_interrupted_batch_resumes_after_its_last_chunk(
     monkeypatch.undo()
     resumed = server.Batcher(bundle)
     scored = interrupt_after(resumed, monkeypatch, 99)
-    assert resumed.score_file(source, target, chunk_rows=4) == 23
+    assert resumed.score(source, target, chunk_rows=4) == 23
     assert scored == [2, 4, 4, 3]
     assert target.read_bytes() == whole.read_bytes()
     manifests = [
@@ -249,21 +249,21 @@ def test_a_journal_for_another_scoring_starts_over(
     adapter = server.Batcher(bundle)
     interrupt_after(adapter, monkeypatch, 1)
     with pytest.raises(CrashError):
-        adapter.score_file(source, target, chunk_rows=5)
+        adapter.score(source, target, chunk_rows=5)
     monkeypatch.undo()
     strict = server.Batcher(bundle, on_unseen="reject")
     scored = interrupt_after(strict, monkeypatch, 99)
-    strict.score_file(source, target, chunk_rows=5)
+    strict.score(source, target, chunk_rows=5)
     assert scored == [5, 5, 2]
     monkeypatch.undo()
     again = server.Batcher(bundle)
     interrupt_after(again, monkeypatch, 1)
     with pytest.raises(CrashError):
-        again.score_file(source, target, chunk_rows=5)
+        again.score(source, target, chunk_rows=5)
     monkeypatch.undo()
     fresh = server.Batcher(bundle)
     scored = interrupt_after(fresh, monkeypatch, 99)
-    fresh.score_file(source, target, chunk_rows=5, resume=False)
+    fresh.score(source, target, chunk_rows=5, resume=False)
     assert scored == [5, 5, 2]
 
 
@@ -273,10 +273,10 @@ def test_an_unreadable_journal_starts_over(bundle, tmp_path, caplog):
     target = tmp_path / "out.csv"
     (tmp_path / "out.csv.partial").write_bytes(b"x")
     (tmp_path / "out.csv.progress.json").write_text("{", encoding="utf-8")
-    assert server.Batcher(bundle).score_file(source, target, 3) == 4
+    assert server.Batcher(bundle).score(source, target, 3) == 4
     assert "unreadable batch journal" in caplog.text
     with pytest.raises(errors.DataError, match="dataset not found"):
-        server.Batcher(bundle).score_file(tmp_path / "absent.csv", target)
+        server.Batcher(bundle).score(tmp_path / "absent.csv", target)
 
 
 def test_the_batch_command_resumes_from_the_cli(

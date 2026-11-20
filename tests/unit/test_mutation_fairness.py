@@ -16,7 +16,7 @@ def labels(sizes: dict[str, int]) -> pandas.Series:
 def test_a_group_of_exactly_the_minimum_is_reported() -> None:
     least = fairness.MIN_GROUP_ROWS
     groups = labels({"a": least, "b": least - 1})
-    assert fairness.Fairness().small_groups(groups) == {"b": least - 1}
+    assert fairness.Fairness().exclude(groups) == {"b": least - 1}
     truth = numpy.zeros(len(groups))
     found = fairness.Fairness().numeric(groups, truth, truth)
     assert list(found["groups"]) == ["a"]
@@ -40,7 +40,7 @@ def test_binary_intersections_report_classification_rates() -> None:
     )
     found = fairness.Fairness().compute(
         dataclasses.replace(
-            inputs, features=frame, sensitive_columns=("group", "region")
+            inputs, features=frame, sensitive=("group", "region")
         )
     )
     cells = found["columns"]["intersectional"]["groups"]

@@ -29,9 +29,9 @@ class Fairness(diagnostics.Diagnostic):
     """Group-wise outcome and error rates for the sensitive columns."""
 
     name = "fairness"
-    applies_to = diagnostics.BINARY_ONLY | diagnostics.REGRESSION_ONLY
+    tasks = diagnostics.BINARY_ONLY | diagnostics.REGRESSION_ONLY
 
-    def compute(self, inputs: diagnostics.DiagnosticInput) -> dict[str, Any]:
+    def compute(self, inputs: diagnostics.Input) -> dict[str, Any]:
         """Compares decisions and errors across groups.
 
         Args:
@@ -46,26 +46,24 @@ class Fairness(diagnostics.Diagnostic):
             joined groups exist) and `flagged`, the sorted names in
             `columns` whose `flags` list is not empty.
         """
-        if not inputs.sensitive_columns:
+        if not inputs.sensitive:
             return {"available": False, "reason": "no sensitive columns"}
         predicted = numpy.asarray(inputs.estimator.predict(inputs.features))
         truth = numpy.asarray(inputs.target)
         report = {}
-        for column in inputs.sensitive_columns:
+        for column in inputs.sensitive:
             groups = self.groups(inputs.features[column])
             if inputs.task is tasks.Task.BINARY:
                 report[column] = self.binary(
-                    groups, truth, predicted, inputs.positive_label
+                    groups, truth, predicted, inputs.positive
                 )
             else:
                 report[column] = self.numeric(groups, truth, predicted)
-        intersections = self.intersectional(
-            inputs.features, inputs.sensitive_columns
-        )
+        intersections = self.intersectional(inputs.features, inputs.sensitive)
         if intersections is not None:
             if inputs.task is tasks.Task.BINARY:
                 report["intersectional"] = self.binary(
-                    intersections, truth, predicted, inputs.positive_label
+                    intersections, truth, predicted, inputs.positive
                 )
             else:
                 report["intersectional"] = self.numeric(
@@ -150,7 +148,7 @@ class Fairness(diagnostics.Diagnostic):
         actual = truth == positive
         chosen = predicted == positive
         stats = {}
-        excluded = self.small_groups(groups)
+        excluded = self.exclude(groups)
         for level in groups.dropna().unique():
             rows = (groups == level).to_numpy()
             if rows.sum() < MIN_GROUP_ROWS:
@@ -175,7 +173,7 @@ class Fairness(diagnostics.Diagnostic):
             }
         return self.summarise(stats, excluded)
 
-    def small_groups(self, groups: pandas.Series) -> dict[str, int]:
+    def exclude(self, groups: pandas.Series) -> dict[str, int]:
         """Returns groups excluded because their cell size is too small.
 
         Args:
@@ -283,7 +281,7 @@ class Fairness(diagnostics.Diagnostic):
         """
         error = predicted.astype(float) - truth.astype(float)
         stats = {}
-        excluded = self.small_groups(groups)
+        excluded = self.exclude(groups)
         for level in groups.dropna().unique():
             rows = (groups == level).to_numpy()
             if rows.sum() < MIN_GROUP_ROWS:

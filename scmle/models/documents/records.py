@@ -84,21 +84,21 @@ class Evaluation:
     """Evaluation evidence for a held-out document split.
 
     Attributes:
-        sample_count: Number of documents evaluated.
+        samples: Number of documents evaluated.
         accuracy: Share of documents classified correctly.
         macro_f1: Unweighted mean of the per-class harmonic mean of
             precision and recall.
         log_loss: Mean negative log probability of the true class.
         labels: Class labels, as text, in the classifier's class order.
         migrations: The written layout's version steps, oldest first;
-            version 2 writes `sample_count` as `samples`.
+            version 2 writes `samples` as `samples`.
     """
 
     migrations: ClassVar[tuple[records.Migration, ...]] = (
         records.Migration(renames={"sample_count": "samples"}),
     )
 
-    sample_count: int
+    samples: int
     accuracy: float
     macro_f1: float
     log_loss: float
@@ -120,7 +120,7 @@ class Explanation:
     """Global or local term-weight explanation evidence.
 
     Attributes:
-        model_digest: Digest of the model state that was explained.
+        digest: Digest of the model state that was explained.
         input_hash: Content hash of the explained document, or None for a
             global explanation.
         method: Name of the explanation method.
@@ -140,7 +140,7 @@ class Explanation:
         ),
     )
 
-    model_digest: str
+    digest: str
     input_hash: str | None
     method: str
     terms: tuple[tuple[str, float], ...]
@@ -155,7 +155,7 @@ class Explanation:
             and score and `citations` as dictionaries.
         """
         return {
-            "digests": {"model": self.model_digest, "payload": self.input_hash},
+            "digests": {"model": self.digest, "payload": self.input_hash},
             "method": self.method,
             "terms": [list(term) for term in self.terms],
             "limitations": list(self.limitations),
@@ -193,11 +193,11 @@ class Drift:
     Attributes:
         reference_hash: Dataset hash of the reference corpus.
         observed_hash: Dataset hash of the observed corpus.
-        language_distance: Total variation distance between the language
+        language: Total variation distance between the language
             shares of the two corpora.
-        mean_character_delta: Change in mean character count relative to the
+        characters: Change in mean character count relative to the
             reference mean.
-        duplicate_rate: Share of observed documents in duplicate groups.
+        duplicates: Share of observed documents in duplicate groups.
         threshold: Level above which a signal counts as shifted.
         migrations: The written layout's version steps, oldest first;
             version 2 writes `digests.{reference, observed}`, `language`,
@@ -222,18 +222,18 @@ class Drift:
 
     reference_hash: str
     observed_hash: str
-    language_distance: float
-    mean_character_delta: float
-    duplicate_rate: float
+    language: float
+    characters: float
+    duplicates: float
     threshold: float
 
     @property
     def shifted(self) -> bool:
         """Whether any monitored profile signal exceeds the threshold."""
         return (
-            self.language_distance > self.threshold
-            or abs(self.mean_character_delta) > self.threshold
-            or self.duplicate_rate > self.threshold
+            self.language > self.threshold
+            or abs(self.characters) > self.threshold
+            or self.duplicates > self.threshold
         )
 
     def to_dict(self) -> dict[str, Any]:

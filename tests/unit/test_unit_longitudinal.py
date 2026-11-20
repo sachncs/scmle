@@ -30,18 +30,18 @@ def period(**changes):
         "standard_error": 0.5,
         "interval": (0.0, 2.0),
         "rows": 10,
-        "treated_rows": 4,
-        "control_rows": 6,
+        "treated": 4,
+        "control": 6,
         "propensity_min": 0.1,
         "propensity_max": 0.9,
-        "fraction_clipped": 0.0,
+        "clipped": 0.0,
         "effective_sample_size_treated": 3.0,
         "effective_sample_size_control": 5.0,
         "converged": True,
         "iterations": 3,
     }
     values.update(changes)
-    return declaration.PeriodATE(**values)
+    return declaration.Period(**values)
 
 
 # declaration
@@ -112,10 +112,10 @@ def test_a_default_config_has_the_documented_policy():
 @pytest.mark.parametrize(
     ("changes", "message"),
     [
-        ({"confidence_level": 0.0}, "confidence_level must lie strictly"),
-        ({"confidence_level": 1.0}, "confidence_level must lie strictly"),
-        ({"propensity_clip": 0.0}, "propensity_clip must lie strictly"),
-        ({"propensity_clip": 0.5}, "propensity_clip must lie strictly"),
+        ({"confidence": 0.0}, "confidence_level must lie strictly"),
+        ({"confidence": 1.0}, "confidence_level must lie strictly"),
+        ({"clip": 0.0}, "propensity_clip must lie strictly"),
+        ({"clip": 0.5}, "propensity_clip must lie strictly"),
         (
             {"missingness": "impute"},
             "missingness must be reject or complete_case",
@@ -124,10 +124,10 @@ def test_a_default_config_has_the_documented_policy():
         ({"seed": True}, "seed must be a non-negative integer"),
         ({"tolerance": 0.0}, "tolerance must be positive and finite"),
         (
-            {"reference_tolerance": math.inf},
+            {"reference": math.inf},
             "reference_tolerance must be positive",
         ),
-        ({"max_iterations": 0}, "max_iterations must be a positive integer"),
+        ({"iterations": 0}, "max_iterations must be a positive integer"),
         (
             {"minimum_rows_per_arm": 1.5},
             "minimum_rows_per_arm must be a positive",
@@ -167,10 +167,10 @@ def test_a_config_accepts_its_boundaries():
     [
         ({"period": ""}, "period label must not be empty"),
         (
-            {"rows": 0, "treated_rows": 0, "control_rows": 0},
+            {"rows": 0, "treated": 0, "control": 0},
             "row counts must be positive",
         ),
-        ({"treated_rows": 0, "rows": 6}, "row counts must be positive"),
+        ({"treated": 0, "rows": 6}, "row counts must be positive"),
         ({"rows": 11}, "arm counts must reconcile to rows"),
         ({"iterations": 0}, "iterations must be positive"),
         ({"converged": False}, "must be converged"),
@@ -182,11 +182,11 @@ def test_a_config_accepts_its_boundaries():
         ({"standard_error": -0.1}, "standard_error must not be negative"),
         ({"interval": (2.0, 1.0)}, "period interval must be ordered"),
         (
-            {"fraction_clipped": 1.1},
+            {"clipped": 1.1},
             "fraction_clipped must lie between 0 and 1",
         ),
         (
-            {"fraction_clipped": -0.1},
+            {"clipped": -0.1},
             "fraction_clipped must lie between 0 and 1",
         ),
         ({"propensity_min": -0.1}, "propensities must lie between 0 and 1"),
@@ -202,7 +202,7 @@ def test_a_period_accepts_boundary_values_and_serialises_nested():
     edge = period(
         standard_error=0.0,
         interval=(1.0, 1.0),
-        fraction_clipped=1.0,
+        clipped=1.0,
         propensity_min=0.0,
         propensity_max=1.0,
         iterations=1,
@@ -416,7 +416,7 @@ def test_a_regression_rejects_a_vector_and_a_slow_fit():
     x = rng.normal(size=(50, 1))
     t = (x[:, 0] > 0).astype(float)
     with pytest.raises(errors.InputError, match="did not converge"):
-        weighting.regress(x, t, declaration.Config(max_iterations=2))
+        weighting.regress(x, t, declaration.Config(iterations=2))
 
 
 def test_an_effective_sample_size_is_kish():
@@ -629,9 +629,7 @@ def test_a_wave_rejects_thin_periods_and_arms():
 
 
 def test_a_wave_records_clipping_and_the_subjects():
-    fitter = estimator.Estimator(
-        make_estimand(), declaration.Config(propensity_clip=0.3)
-    )
+    fitter = estimator.Estimator(make_estimand(), declaration.Config(clip=0.3))
     rows = panel.prepare(make_frame(), make_estimand(), declaration.Config())[0]
     first = rows[rows.time == 0]
     found = fitter.wave(first, numpy.int64(0))

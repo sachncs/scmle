@@ -31,7 +31,7 @@ class Estimator:
         config: Feature and estimator configuration.
         vectorizer: Fitted TF-IDF vectorizer, or None before fitting.
         estimator: Fitted logistic regression, or None before fitting.
-        curation_report: Curation report of the training documents, or None
+        report: Curation report of the training documents, or None
             before fitting.
     """
 
@@ -45,7 +45,7 @@ class Estimator:
         self.config = config or Config()
         self.vectorizer: TfidfVectorizer | None = None
         self.estimator: LogisticRegression | None = None
-        self.curation_report: document.Curation | None = None
+        self.report: document.Curation | None = None
 
     @property
     def fitted(self) -> bool:
@@ -53,7 +53,7 @@ class Estimator:
         return self.vectorizer is not None and self.estimator is not None
 
     @property
-    def model_digest(self) -> str:
+    def digest(self) -> str:
         """The SHA-256 digest of the configuration, vocabulary and coefficients.
 
         Raises:
@@ -137,7 +137,7 @@ class Estimator:
         estimator.fit(matrix, labels)
         self.vectorizer = vectorizer
         self.estimator = estimator
-        self.curation_report = report
+        self.report = report
         return self
 
     def predict(
@@ -220,7 +220,7 @@ class Estimator:
         predicted = self.predict(values)
         probabilities = self.predict_proba(values)
         return Evaluation(
-            sample_count=len(values),
+            samples=len(values),
             accuracy=float(accuracy_score(actual, predicted)),
             macro_f1=float(f1_score(actual, predicted, average="macro")),
             log_loss=float(

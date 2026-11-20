@@ -408,7 +408,7 @@ def announce(found: parameter_estimation.Estimation) -> None:
     Args:
         found: The verified estimation report.
     """
-    level = found.policy.confidence_level
+    level = found.policy.confidence
     for item in found.parameters:
         LOGGER.info(
             "%s %s = %.6g, %g%% interval [%.6g, %.6g], p = %.3g",

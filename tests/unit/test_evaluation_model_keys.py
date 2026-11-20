@@ -337,13 +337,13 @@ def test_a_comparison_and_its_suite_write_single_words():
 def test_a_deep_learning_boundary_writes_single_words():
     boundary = contracts.TABULAR_TRANSFORMER_CONTRACT
     layout = boundary.to_dict()
-    assert layout["family"] == boundary.model_family
-    assert layout["extras"] == list(boundary.required_extras)
+    assert layout["family"] == boundary.family
+    assert layout["extras"] == list(boundary.extras)
     assert {"trusted", "atomic", "schema_version"} <= set(layout["checkpoint"])
     assert {"rank", "dtype"} <= set(layout["inference"])
     old = records.downgrade(contracts.Boundary.migrations, layout)
-    assert old["model_family"] == boundary.model_family
-    assert old["required_extras"] == list(boundary.required_extras)
+    assert old["model_family"] == boundary.family
+    assert old["required_extras"] == list(boundary.extras)
     assert old["checkpoint"]["trusted_local_storage"] is True
     assert old["inference"]["input_rank"] == 2
     assert records.upgrade(contracts.Boundary.migrations, old, 1) == layout
@@ -417,17 +417,17 @@ def test_an_image_drift_writes_digests_and_signals():
 
 def fitted():
     """An image classifier fitted by hand on two flattened 2 by 2 pixels."""
-    classifier = images.Classifier(images.Config(target_size=(2, 2)))
+    classifier = images.Classifier(images.Config(size=(2, 2)))
     features = numpy.array([[0.0] * 12, [1.0] * 12, [0.1] * 12, [0.9] * 12])
     classifier.estimator = LogisticRegression().fit(
         features, ["red", "blue", "red", "blue"]
     )
-    classifier.feature_names = tuple(f"p{index}" for index in range(12))
+    classifier.names = tuple(f"p{index}" for index in range(12))
     return classifier
 
 
 def test_an_image_config_writes_size_and_keeps_its_model_digest():
-    config = images.Config(target_size=(2, 2), max_iter=200)
+    config = images.Config(size=(2, 2), max_iter=200)
     assert config.to_dict()["size"] == [2, 2]
     old = records.downgrade(images.Config.migrations, config.to_dict())
     assert old["target_size"] == [2, 2] and "size" not in old
@@ -437,7 +437,7 @@ def test_an_image_config_writes_size_and_keeps_its_model_digest():
         "config": records.downgrade(
             images.Config.migrations, classifier.config.to_dict()
         ),
-        "feature_names": classifier.feature_names,
+        "feature_names": classifier.names,
         "classes": estimator.classes_.tolist(),
         "coef": estimator.coef_.tolist(),
         "intercept": estimator.intercept_.tolist(),
@@ -446,7 +446,7 @@ def test_an_image_config_writes_size_and_keeps_its_model_digest():
     encoded = json.dumps(
         state, ensure_ascii=True, sort_keys=True, separators=(",", ":")
     ).encode("utf-8")
-    assert classifier.model_digest == hashlib.sha256(encoded).hexdigest()
+    assert classifier.digest == hashlib.sha256(encoded).hexdigest()
 
 
 def test_an_image_package_writes_version_two_and_reads_version_one(tmp_path):
@@ -456,7 +456,7 @@ def test_an_image_package_writes_version_two_and_reads_version_one(tmp_path):
     assert manifest["schema_version"] == images.archive.MANIFEST == 2
     assert manifest["config"]["size"] == [2, 2]
     loaded = images.Classifier.load(tmp_path / "new", signing_key="k")
-    assert loaded.model_digest == classifier.model_digest
+    assert loaded.digest == classifier.digest
     older = tmp_path / "old"
     older.mkdir()
     (older / "model.joblib").write_bytes(
@@ -473,7 +473,7 @@ def test_an_image_package_writes_version_two_and_reads_version_one(tmp_path):
     )
     (older / "manifest.json").write_text(json.dumps(manifest))
     loaded = images.Classifier.load(older, trusted=True)
-    assert loaded.model_digest == classifier.model_digest
+    assert loaded.digest == classifier.digest
 
 
 LONGITUDINAL = {
@@ -497,14 +497,20 @@ def test_longitudinal_declarations_write_single_words():
     )
     old = records.downgrade(longitudinal.Estimand.migrations, layout)
     assert old["subject_identity"] == "id" and old["time_column"] == "t"
-    assert longitudinal.Estimand(**old) == estimand
+    assert (
+        longitudinal.Estimand(**envelope.rename(longitudinal.Estimand, old))
+        == estimand
+    )
     policy = longitudinal.Config().to_dict()
     assert policy["minimums"] == {"period": 8, "arm": 2, "ess": 2.0}
     assert (policy["confidence"], policy["clip"]) == (0.95, 0.01)
     assert (policy["iterations"], policy["reference"]) == (100, 1e-6)
     old = records.downgrade(longitudinal.Config.migrations, policy)
-    assert longitudinal.Config(**old) == longitudinal.Config()
-    period = longitudinal.PeriodATE(
+    assert (
+        longitudinal.Config(**envelope.rename(longitudinal.Config, old))
+        == longitudinal.Config()
+    )
+    period = longitudinal.Period(
         "1", 0.5, 0.1, (0.3, 0.7), 10, 4, 6, 0.2, 0.8, 0.0, 3.5, 5.5, True, 4
     )
     layout = period.to_dict()
@@ -512,8 +518,11 @@ def test_longitudinal_declarations_write_single_words():
     assert layout["propensity"] == {"low": 0.2, "high": 0.8}
     assert layout["ess"] == {"treated": 3.5, "control": 5.5}
     assert layout["clipped"] == 0.0
-    old = records.downgrade(longitudinal.PeriodATE.migrations, layout)
-    assert longitudinal.PeriodATE(**old) == period
+    old = records.downgrade(longitudinal.Period.migrations, layout)
+    assert (
+        longitudinal.Period(**envelope.rename(longitudinal.Period, old))
+        == period
+    )
 
 
 SEQUENTIAL = {
@@ -542,13 +551,19 @@ def test_sequential_declarations_write_single_words():
     assert layout["covariates"] == {"baseline": ("x",), "varying": ("z",)}
     assert layout["regimes"] == {"target": 1, "comparator": 0}
     old = records.downgrade(sequential.Estimand.migrations, layout)
-    assert sequential.Estimand(**old) == estimand
+    assert (
+        sequential.Estimand(**envelope.rename(sequential.Estimand, old))
+        == estimand
+    )
     policy = sequential.Config().to_dict()
     assert policy["minimums"] == {"subjects": 30, "arm": 2, "ess": 5.0}
     assert policy["weight"] == 20.0
     old = records.downgrade(sequential.Config.migrations, policy)
-    assert sequential.Config(**old) == sequential.Config()
-    period = sequential.PeriodDiagnostics(
+    assert (
+        sequential.Config(**envelope.rename(sequential.Config, old))
+        == sequential.Config()
+    )
+    period = sequential.Diagnostics(
         "1", 10, 4, 6, 0.2, 0.8, 0.3, 0.7, 0.1, 25.0, 20.0, 7.5
     )
     layout = period.to_dict()
@@ -556,15 +571,21 @@ def test_sequential_declarations_write_single_words():
     assert layout["numerator"] == {"low": 0.3, "high": 0.7}
     assert (layout["truncated"], layout["untruncated"]) == (0.1, 25.0)
     assert (layout["weight"], layout["ess"]) == (20.0, 7.5)
-    old = records.downgrade(sequential.PeriodDiagnostics.migrations, layout)
-    assert sequential.PeriodDiagnostics(**old) == period
-    regime = sequential.RegimeEstimate(
+    old = records.downgrade(sequential.Diagnostics.migrations, layout)
+    assert (
+        sequential.Diagnostics(**envelope.rename(sequential.Diagnostics, old))
+        == period
+    )
+    regime = sequential.Estimate(
         "always_treated", 1, 0.5, 0.1, (0.3, 0.7), 5, 6.0, 4.5
     )
     layout = regime.to_dict()
     assert (layout["se"], layout["weights"], layout["ess"]) == (0.1, 6.0, 4.5)
-    old = records.downgrade(sequential.RegimeEstimate.migrations, layout)
-    assert sequential.RegimeEstimate(**old) == regime
+    old = records.downgrade(sequential.Estimate.migrations, layout)
+    assert (
+        sequential.Estimate(**envelope.rename(sequential.Estimate, old))
+        == regime
+    )
 
 
 def test_parameter_declarations_write_single_words():
@@ -573,9 +594,7 @@ def test_parameter_declarations_write_single_words():
     )
     layout = estimand.to_dict()
     assert layout["features"] == ("x", "z") and "feature_names" not in layout
-    estimate = parameter_estimation.ParameterEstimate(
-        "x", 0.5, 0.1, (0.3, 0.7), 0.01
-    )
+    estimate = parameter_estimation.Estimate("x", 0.5, 0.1, (0.3, 0.7), 0.01)
     layout = estimate.to_dict()
     assert (layout["se"], layout["p_value"]) == (0.1, 0.01)
     policy = continuous_treatment_policy("clustered")
@@ -588,7 +607,12 @@ def test_parameter_declarations_write_single_words():
     assert layout["confidence"] == 0.95
     old = records.downgrade(parameter_estimation.Config.migrations, layout)
     assert old["continuous_weight_cap"] == 8.0 and "assumptions" not in old
-    assert parameter_estimation.Config(**old) == policy
+    assert (
+        parameter_estimation.Config(
+            **envelope.rename(parameter_estimation.Config, old)
+        )
+        == policy
+    )
     plain = parameter_estimation.Config(estimator="linear").to_dict()
     assert "assumptions" not in plain
 

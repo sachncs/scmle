@@ -37,7 +37,7 @@ def declared_estimand() -> Estimand:
         outcome="outcome",
         population="the declared project dataset",
         likelihood="gaussian",
-        feature_names=("signal",),
+        features=("signal",),
         assumptions=("the conditional mean is linear",),
     )
 
@@ -68,7 +68,7 @@ def test_project_run_persists_separate_estimation_evidence(tmp_path):
         time_budget=30,
         estimand=declared_estimand(),
         estimation_policy=Config(
-            estimator="linear", covariance="clustered", cluster_name="site"
+            estimator="linear", covariance="clustered", cluster="site"
         ),
         output_dir=tmp_path,
     )
@@ -129,10 +129,10 @@ def test_project_dispatches_and_serializes_bayesian_ate(tmp_path):
         outcome="outcome",
         population="the declared project dataset",
         likelihood="gaussian",
-        feature_names=("treatment", "signal"),
+        features=("treatment", "signal"),
         assumptions=("the declared causal assumptions hold",),
     )
-    prior = scmle.evaluation.parameter_estimation.BayesianPrior(
+    prior = scmle.evaluation.parameter_estimation.Prior(
         mean=(0.0, 0.0, 0.0),
         precision=((0.01, 0.0, 0.0), (0.0, 0.01, 0.0), (0.0, 0.0, 0.01)),
     )
@@ -140,7 +140,7 @@ def test_project_dispatches_and_serializes_bayesian_ate(tmp_path):
         estimator="bayesian_ate",
         covariance="iid",
         prior=prior,
-        treatment_position=0,
+        treatment=0,
         causal_assumptions=(
             "linearity",
             "consistency",
@@ -336,7 +336,7 @@ def test_incompatible_likelihood_fails_before_model_selection(tmp_path):
         outcome="outcome",
         population="the declared project dataset",
         likelihood="bernoulli",
-        feature_names=("signal",),
+        features=("signal",),
         assumptions=("the conditional mean is linear",),
     )
     project = scmle.api.project.Project(
@@ -363,13 +363,13 @@ def test_ipw_declaration_binds_the_project_treatment_column(tmp_path):
         outcome="outcome",
         population="the declared project dataset",
         likelihood="gaussian",
-        feature_names=("treatment", "signal"),
+        features=("treatment", "signal"),
         assumptions=("the declared causal assumptions hold",),
     )
     policy = Config(
         estimator="ipw_ate",
         covariance="iid",
-        treatment_position=0,
+        treatment=0,
         causal_assumptions=(
             "consistency",
             "conditional_exchangeability",
@@ -396,7 +396,7 @@ def test_project_rejects_missing_cluster_and_missingness_columns(tmp_path):
         "outcome",
         estimand=declared_estimand(),
         estimation_policy=Config(
-            estimator="linear", covariance="clustered", cluster_name="missing"
+            estimator="linear", covariance="clustered", cluster="missing"
         ),
         output_dir=tmp_path,
     )

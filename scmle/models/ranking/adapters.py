@@ -38,7 +38,7 @@ class Pointwise(models.Model):
         Returns:
             A pointwise ranker around a histogram gradient-boosting regressor.
         """
-        return estimators.PointwiseRanker(
+        return estimators.Scorer(
             ensemble.HistGradientBoostingRegressor(
                 random_state=seed, **dict(params or {})
             )
@@ -113,7 +113,7 @@ class Ranker(models.Model):
         Returns:
             A ranker built on the adapter's boosting library.
         """
-        return estimators.LibraryRanker(
+        return estimators.Library(
             self.library, random_state=seed, **dict(params or {})
         )
 

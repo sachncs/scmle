@@ -14,11 +14,12 @@ from scmle.evaluation.envelope import Counts
 from scmle.evaluation.envelope import Envelope
 from scmle.evaluation.envelope import fold
 from scmle.evaluation.envelope import lowercase
+from scmle.evaluation.envelope import rename
 from scmle.evaluation.envelope import unfold
 from scmle.evaluation.parameter_estimation.config import Config
-from scmle.evaluation.parameter_estimation.declaration import BayesianPrior
 from scmle.evaluation.parameter_estimation.declaration import Estimand
-from scmle.evaluation.parameter_estimation.declaration import ParameterEstimate
+from scmle.evaluation.parameter_estimation.declaration import Estimate
+from scmle.evaluation.parameter_estimation.declaration import Prior
 
 NESTED = {
     "rows": {
@@ -61,14 +62,14 @@ class Estimation(Envelope):
             parts={
                 "estimand": Estimand.migrations[0],
                 "policy": Config.migrations[0],
-                "parameters": ParameterEstimate.migrations[0],
+                "parameters": Estimate.migrations[0],
             },
         ),
     )
 
     estimand: Estimand
     policy: Config
-    parameters: tuple[ParameterEstimate, ...]
+    parameters: tuple[Estimate, ...]
     covariance: tuple[tuple[float, ...], ...]
     rows: Counts
     diagnostics: Mapping[str, Any]
@@ -162,13 +163,14 @@ class Estimation(Envelope):
             or a component that fails its own validation propagates the
             error of the lookup or of that component's constructor.
         """
-        # The parts were written in single words at version 3; the fields
-        # keep their version-2 names.
+        # The parts were written in single words at version 3. They are read
+        # at version 2, where the assumption groups are flat, and the keys
+        # whose fields took single words are renamed back to the fields.
         record = records.downgrade(cls.migrations[1:], dict(record))
         estimand_record = record["estimand"]
         policy_record = record["policy"]
         parameters = tuple(
-            ParameterEstimate(
+            Estimate(
                 item["name"],
                 float(item["estimate"]),
                 float(item["standard_error"]),
@@ -177,12 +179,10 @@ class Estimation(Envelope):
             )
             for item in record["parameters"]
         )
-        estimand_values = dict(estimand_record)
-        estimand_values["feature_names"] = tuple(
-            estimand_record["feature_names"]
-        )
+        estimand_values = rename(Estimand, estimand_record)
+        estimand_values["features"] = tuple(estimand_values["features"])
         estimand_values["assumptions"] = tuple(estimand_record["assumptions"])
-        policy_values = dict(policy_record)
+        policy_values = rename(Config, policy_record)
         for policy_field in (
             "causal_assumptions",
             "continuous_treatment_assumptions",
@@ -190,9 +190,9 @@ class Estimation(Envelope):
         ):
             if policy_field in policy_values:
                 policy_values[policy_field] = tuple(policy_values[policy_field])
-        if "reml_variance_bounds" in policy_values:
-            policy_values["reml_variance_bounds"] = tuple(
-                float(value) for value in policy_values["reml_variance_bounds"]
+        if "bounds" in policy_values:
+            policy_values["bounds"] = tuple(
+                float(value) for value in policy_values["bounds"]
             )
         if policy_values.get("prior") is not None:
             prior_values = dict(policy_values["prior"])
@@ -200,7 +200,7 @@ class Estimation(Envelope):
             prior_values["precision"] = tuple(
                 tuple(row) for row in prior_values["precision"]
             )
-            policy_values["prior"] = BayesianPrior(**prior_values)
+            policy_values["prior"] = Prior(**prior_values)
         return cls(
             Estimand(**estimand_values),
             Config(**policy_values),

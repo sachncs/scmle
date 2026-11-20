@@ -73,9 +73,7 @@ class Estimator:
         prepared, rows_dropped = prepare(frame, self.estimand, self.policy)
         fingerprint = imprint(frame)
         try:
-            period_series = prepared[
-                self.estimand.time_column
-            ].drop_duplicates()
+            period_series = prepared[self.estimand.time].drop_duplicates()
             period_values: list[Any] = period_series.sort_values().tolist()
         except (TypeError, ValueError) as error:
             raise errors.InputError(
@@ -83,19 +81,17 @@ class Estimator:
             ) from error
         fitted: list[dict[str, Any]] = []
         for value in period_values:
-            period_frame = prepared[
-                prepared[self.estimand.time_column] == value
-            ]
+            period_frame = prepared[prepared[self.estimand.time] == value]
             fitted.append(self.wave(period_frame, value))
         covariance = sandwich(fitted)
         critical_value = float(
-            stats.norm.ppf(0.5 + self.policy.confidence_level / 2.0)
+            stats.norm.ppf(0.5 + self.policy.confidence / 2.0)
         )
         periods = tuple(
             periodise(item, covariance[index, index], critical_value)
             for index, item in enumerate(fitted)
         )
-        reference = referee(fitted, self.policy.reference_tolerance)
+        reference = referee(fitted, self.policy.reference)
         return Estimation(
             estimand=self.estimand,
             policy=self.policy,
@@ -144,7 +140,7 @@ class Estimator:
                 f"period {period_value!r} has insufficient rows: "
                 f"{len(period_frame)} < {policy.minimum_rows_per_period}"
             )
-        treatment_name = self.estimand.treatment_column
+        treatment_name = self.estimand.treatment
         treatment = period_frame[treatment_name].to_numpy(dtype=float)
         treated_rows = int(numpy.sum(treatment == 1.0))
         control_rows = int(numpy.sum(treatment == 0.0))
@@ -160,7 +156,7 @@ class Estimator:
             dtype=float
         )
         propensity, iterations = regress(covariates, treatment, policy)
-        bound = policy.propensity_clip
+        bound = policy.clip
         clipped = numpy.clip(propensity, bound, 1.0 - bound)
         weighted = weigh(
             propensity, clipped, treatment, outcome, policy, period_value
@@ -186,7 +182,7 @@ class Estimator:
             "effective_sample_size_control": weighted[
                 "effective_sample_size_control"
             ],
-            "subjects": period_frame[self.estimand.subject_identity].tolist(),
+            "subjects": period_frame[self.estimand.subject].tolist(),
             "influence": weighted["influence"],
             "iterations": iterations,
             "reference_treated_mean": weighted["reference_treated_mean"],
@@ -215,7 +211,7 @@ def summarize(
         "method": "period_specific_covariate_adjusted_hajek_ipw",
         "propensity_model": "deterministic_newton_logistic_with_ridge",
         "period_count": periods,
-        "subject_count": int(prepared[estimand.subject_identity].nunique()),
+        "subject_count": int(prepared[estimand.subject].nunique()),
         "overlap": {
             item["period"]: {
                 "propensity_min": item["propensity_min"],

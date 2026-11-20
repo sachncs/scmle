@@ -103,7 +103,7 @@ def clean_registries():
     yield
     for name in list(scmle.models.registry.USER_ADAPTERS):
         if name.startswith("ts_"):
-            scmle.models.custom.unregister_estimator(name)
+            scmle.models.custom.unregister(name)
     for name in list(metrics.CATALOG.metrics):
         if name.startswith("ts_"):
             metrics.CATALOG.unregister(name)
@@ -115,9 +115,7 @@ def clean_registries():
 def test_concurrent_register_estimator_keeps_every_registration():
     def work(index):
         name = f"ts_nb_{index}"
-        scmle.models.custom.register_estimator(
-            name, classifier=naive_bayes.GaussianNB
-        )
+        scmle.models.custom.register(name, classifier=naive_bayes.GaussianNB)
         return name
 
     names, failures = run_together(THREADS, work)
@@ -129,12 +127,12 @@ def test_concurrent_register_estimator_keeps_every_registration():
 
 def test_register_same_estimator_name_has_exactly_one_winner():
     def work(index):
-        scmle.models.custom.register_estimator(
+        scmle.models.custom.register(
             "ts_same", classifier=naive_bayes.GaussianNB
         )
 
     for round_number in range(5):
-        scmle.models.custom.unregister_estimator("ts_same")
+        scmle.models.custom.unregister("ts_same")
         failures = failures_of(THREADS, work)
         winners = THREADS - len(failures)
         assert winners == 1, (round_number, winners)
@@ -142,7 +140,7 @@ def test_register_same_estimator_name_has_exactly_one_winner():
 
 
 def test_builtin_name_check_does_not_hide_registered_estimators():
-    scmle.models.custom.register_estimator(
+    scmle.models.custom.register(
         "ts_persist", classifier=naive_bayes.GaussianNB
     )
     stop = threading.Event()
@@ -150,7 +148,7 @@ def test_builtin_name_check_does_not_hide_registered_estimators():
     def churn(index):
         if index == 0:
             for round_number in range(40):  # noqa: B007
-                scmle.models.registry.builtin_names()
+                scmle.models.registry.inventory()
             stop.set()
             return True
         missing = 0
@@ -169,11 +167,11 @@ def test_register_unregister_and_lookup_never_raise():
     def work(index):
         name = f"ts_churn_{index}"
         for round_number in range(15):  # noqa: B007
-            scmle.models.custom.register_estimator(
+            scmle.models.custom.register(
                 name, classifier=naive_bayes.GaussianNB, replace=True
             )
             scmle.models.registry.Catalog.stock().get(name)
-            scmle.models.custom.unregister_estimator(name)
+            scmle.models.custom.unregister(name)
 
     failures = failures_of(4, work)
 
@@ -188,9 +186,7 @@ def score(truth, predicted):
 def test_concurrent_register_metric_and_lookup():
     def work(index):
         name = f"ts_metric_{index}"
-        scmle.evaluation.metrics.register_metric(
-            name, score, greater_is_better=True
-        )
+        scmle.evaluation.metrics.register(name, score, greater_is_better=True)
         for round_number in range(50):  # noqa: B007
             sorted(metrics.CATALOG.metrics)
             metrics.CATALOG.resolve(name, tasks.Task.BINARY)
@@ -200,12 +196,12 @@ def test_concurrent_register_metric_and_lookup():
 
     assert not failures
     for name in names:
-        assert name in metrics.CATALOG.report_names[tasks.Task.BINARY]
+        assert name in metrics.CATALOG.reported[tasks.Task.BINARY]
 
 
 def test_register_same_metric_name_has_exactly_one_winner():
     def work(index):
-        scmle.evaluation.metrics.register_metric(
+        scmle.evaluation.metrics.register(
             "ts_metric_same", score, greater_is_better=True
         )
 
@@ -219,15 +215,13 @@ def test_metric_unregister_during_report_names_update_is_consistent():
     def work(index):
         name = f"ts_metric_c{index}"
         for round_number in range(40):  # noqa: B007
-            scmle.evaluation.metrics.register_metric(
-                name, score, True, replace=True
-            )
+            scmle.evaluation.metrics.register(name, score, True, replace=True)
             metrics.CATALOG.unregister(name)
 
     failures = failures_of(THREADS, work)
 
     assert not failures
-    for names in metrics.CATALOG.report_names.values():
+    for names in metrics.CATALOG.reported.values():
         assert not [n for n in names if n.startswith("ts_metric_c")]
 
 

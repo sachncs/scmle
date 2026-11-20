@@ -63,7 +63,7 @@ def evaluation_data() -> image.Dataset:
 
 def make_classifier() -> Classifier:
     """Return a small deterministic image baseline."""
-    return Classifier(Config(target_size=(2, 2), max_iter=200))
+    return Classifier(Config(size=(2, 2), max_iter=200))
 
 
 @PILLOW_SKIP
@@ -156,7 +156,7 @@ def test_image_classifier_package_round_trip_and_tamper_rejection(
         Classifier.load(path)
 
     loaded = Classifier.load(path, trusted=True)
-    assert loaded.model_digest == classifier.model_digest
+    assert loaded.digest == classifier.digest
     assert loaded.predict(evaluation_data) == classifier.predict(
         evaluation_data
     )
@@ -179,5 +179,5 @@ def test_image_monitor_detects_mean_pixel_shift(training_data):
 
     assert report.reference_hash == reference.dataset_hash
     assert report.observed_hash == observed.curate().dataset_hash
-    assert report.mean_pixel_distance > 0.1
+    assert report.pixels > 0.1
     assert report.shifted

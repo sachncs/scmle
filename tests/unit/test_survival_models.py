@@ -49,7 +49,7 @@ def test_kaplan_meier_matches_a_hand_computation():
 
 @pytest.mark.parametrize(
     "model",
-    [estimators.Hazards(), estimators.DiscreteTimeBoosting()],
+    [estimators.Hazards(), estimators.Boosting()],
     ids=["cox", "discrete_time"],
 )
 def test_models_order_held_out_risk_and_give_falling_curves(model):

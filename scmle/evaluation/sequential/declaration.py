@@ -44,9 +44,9 @@ class Estimand:
 
     Attributes:
         name: Non-empty label of the estimand.
-        subject_identity: Column identifying each subject.
-        time_column: Column giving the period of each row.
-        treatment_column: Binary (0/1) treatment column.
+        subject: Column identifying each subject.
+        time: Column giving the period of each row.
+        treatment: Binary (0/1) treatment column.
         outcome: Outcome column; the value at the last period is analysed.
         baseline_covariates: Columns that must be constant within a subject.
         time_varying_covariates: Columns measured before treatment in each
@@ -87,9 +87,9 @@ class Estimand:
     __module__ = "scmle.evaluation.sequential"
 
     name: str
-    subject_identity: str
-    time_column: str
-    treatment_column: str
+    subject: str
+    time: str
+    treatment: str
     outcome: str
     baseline_covariates: tuple[str, ...]
     time_varying_covariates: tuple[str, ...]
@@ -112,9 +112,9 @@ class Estimand:
         if not isinstance(name, str) or not name.strip():
             raise errors.InputError("estimand name must not be empty")
         names: tuple[object, ...] = (
-            self.subject_identity,
-            self.time_column,
-            self.treatment_column,
+            self.subject,
+            self.time,
+            self.treatment,
             self.outcome,
             *self.baseline_covariates,
             *self.time_varying_covariates,
@@ -161,25 +161,25 @@ class Config:
     """Bounded numerical, support, and truncation policy.
 
     Attributes:
-        confidence_level: Two-sided confidence level of the intervals, in
+        confidence: Two-sided confidence level of the intervals, in
             (0, 1).
-        propensity_clip: Positivity bound in (0, 0.5); fitted denominator
+        clip: Positivity bound in (0, 0.5); fitted denominator
             propensities must lie within
             `[propensity_clip, 1 - propensity_clip]`.
-        maximum_weight: Finite cap, greater than 1, applied to the
+        weight: Finite cap, greater than 1, applied to the
             cumulative stabilized weight.
         missingness: Either "reject" (any missing value is an error) or
             "complete_case" (subjects with a missing value are dropped).
         seed: Non-negative integer recorded with the policy.
         tolerance: Convergence threshold on the largest absolute Newton step
             of the propensity fit.
-        max_iterations: Maximum Newton iterations per propensity fit.
+        iterations: Maximum Newton iterations per propensity fit.
         minimum_subjects: Minimum number of subjects in the analysed panel.
         minimum_arm_rows: Minimum number of subjects in each treatment arm
             per period and in each regime.
         minimum_effective_sample_size: Minimum Kish effective sample size of
             the truncated weights per period and per regime.
-        reference_tolerance: Largest absolute difference between a primary
+        reference: Largest absolute difference between a primary
             regime mean and its independent recomputation that still counts
             as agreement; a larger difference is recorded in the reference
             record and does not raise.
@@ -209,17 +209,17 @@ class Config:
 
     __module__ = "scmle.evaluation.sequential"
 
-    confidence_level: float = 0.95
-    propensity_clip: float = 0.01
-    maximum_weight: float = 20.0
+    confidence: float = 0.95
+    clip: float = 0.01
+    weight: float = 20.0
     missingness: str = "reject"
     seed: int = 0
     tolerance: float = 1e-8
-    max_iterations: int = 100
+    iterations: int = 100
     minimum_subjects: int = 30
     minimum_arm_rows: int = 2
     minimum_effective_sample_size: float = 5.0
-    reference_tolerance: float = 1e-6
+    reference: float = 1e-6
 
     def __post_init__(self) -> None:
         """Rejects an unbounded or ambiguous estimation policy.
@@ -228,15 +228,15 @@ class Config:
             ValueError: If a field lies outside the range given in the class
                 attributes, or `missingness` is not a recognised value.
         """
-        if not 0.0 < self.confidence_level < 1.0:
+        if not 0.0 < self.confidence < 1.0:
             raise errors.InputError(
                 "confidence_level must lie strictly between 0 and 1"
             )
-        if not 0.0 < self.propensity_clip < PROPENSITY_CLIP_CEILING:
+        if not 0.0 < self.clip < PROPENSITY_CLIP_CEILING:
             raise errors.InputError(
                 "propensity_clip must lie strictly between 0 and 0.5"
             )
-        if not math.isfinite(self.maximum_weight) or self.maximum_weight <= 1.0:
+        if not math.isfinite(self.weight) or self.weight <= 1.0:
             raise errors.InputError(
                 "maximum_weight must be finite and greater than 1"
             )
@@ -247,9 +247,9 @@ class Config:
         seed: object = self.seed  # may be a non-integer at runtime
         if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
             raise errors.InputError("seed must be a non-negative integer")
-        self.check_limits()
+        self.check()
 
-    def check_limits(self) -> None:
+    def check(self) -> None:
         """Checks the tolerances, counts and effective sample size minimum.
 
         Raises:
@@ -259,12 +259,12 @@ class Config:
         """
         for name, value in (
             ("tolerance", self.tolerance),
-            ("reference_tolerance", self.reference_tolerance),
+            ("reference_tolerance", self.reference),
         ):
             if not math.isfinite(float(value)) or value <= 0.0:
                 raise errors.InputError(f"{name} must be positive and finite")
         counts: tuple[tuple[str, object], ...] = (
-            ("max_iterations", self.max_iterations),
+            ("max_iterations", self.iterations),
             ("minimum_subjects", self.minimum_subjects),
             ("minimum_arm_rows", self.minimum_arm_rows),
         )

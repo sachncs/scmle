@@ -26,9 +26,9 @@ class Usage:
     """Measured serving cost of a fitted candidate.
 
     Attributes:
-        model_mb: Joblib-serialized size in megabytes (1024 * 1024 bytes).
-        p95_latency_ms: 95th percentile single-row prediction latency.
-        rows_timed: Number of single-row predictions timed.
+        size: Joblib-serialized size in megabytes (1024 * 1024 bytes).
+        latency: 95th percentile single-row prediction latency.
+        timed: Number of single-row predictions timed.
         machine: Architecture, operating system and Python version the
             numbers belong to.
         migrations: The written layout's version steps, oldest first;
@@ -46,9 +46,9 @@ class Usage:
         ),
     )
 
-    model_mb: float
-    p95_latency_ms: float
-    rows_timed: int
+    size: float
+    latency: float
+    timed: int
     machine: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -95,17 +95,17 @@ class Constraints:
             is compared after multiplying by `latency_safety_factor`.
         """
         broken = []
-        if self.max_model_mb is not None and usage.model_mb > self.max_model_mb:
+        if self.max_model_mb is not None and usage.size > self.max_model_mb:
             broken.append(
-                f"model size {usage.model_mb:.2f} MB > {self.max_model_mb} MB"
+                f"model size {usage.size:.2f} MB > {self.max_model_mb} MB"
             )
-        scaled = usage.p95_latency_ms * self.latency_safety_factor
+        scaled = usage.latency * self.latency_safety_factor
         if self.max_p95_latency_ms is not None and (
             scaled > self.max_p95_latency_ms
         ):
             broken.append(
                 f"p95 latency {scaled:.1f} ms (measured "
-                f"{usage.p95_latency_ms:.1f} ms x safety factor "
+                f"{usage.latency:.1f} ms x safety factor "
                 f"{self.latency_safety_factor:g}) > "
                 f"{self.max_p95_latency_ms} ms"
             )
@@ -137,9 +137,9 @@ def measure(
         estimator.predict(sample.iloc[[position]])
         timings.append((time.perf_counter() - started) * 1000.0)
     return Usage(
-        model_mb=buffer.getbuffer().nbytes / BYTES_PER_MB,
-        p95_latency_ms=float(numpy.percentile(timings, 95)),
-        rows_timed=len(timings),
+        size=buffer.getbuffer().nbytes / BYTES_PER_MB,
+        latency=float(numpy.percentile(timings, 95)),
+        timed=len(timings),
         machine=f"{platform.machine()} {platform.system()} "
         f"python {platform.python_version()}",
     )
