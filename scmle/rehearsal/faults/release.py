@@ -384,7 +384,7 @@ def withhold(
     return unready, before == after, still
 
 
-def release() -> recovery.Outcome:
+def restore() -> recovery.Outcome:
     """Promotes a wrong release, detects it from labels and rolls it back.
 
     A good and an inverted-coefficient version are promoted in turn. Noisy

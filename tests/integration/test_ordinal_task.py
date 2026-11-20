@@ -22,7 +22,7 @@ def frame(rows=1200, seed=0):
 
 
 def run(tmp_path, data, **kwargs):
-    kwargs.setdefault("ordinal_order", ORDER)
+    kwargs.setdefault("order", ORDER)
     return support.make_project(
         data,
         "level",

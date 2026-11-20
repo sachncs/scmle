@@ -45,7 +45,7 @@ def test_every_entry_point_defaults_to_the_warn_policy():
     parser = cli.build()
     run = parser.parse_args(["run", "data.csv", "--target", "y"])
 
-    assert signature.parameters["leakage_policy"].default == "warn"
+    assert signature.parameters["leakage"].default == "warn"
     assert tasks.Config.model_fields["leakage_policy"].default == "warn"
     assert run.leakage == "warn"
 

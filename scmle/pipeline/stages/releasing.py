@@ -208,9 +208,7 @@ class Releasing(interface.Stage):
             outcome.to_dict(),
             evidence_index.to_dict(),
         )
-        store.write(
-            "evaluation_policy.json", policy.model_dump(mode="json")
-        )
+        store.write("evaluation_policy.json", policy.model_dump(mode="json"))
         store.write("release_evidence.json", evidence_index.to_dict())
         store.write("release_evaluation.json", outcome.to_dict())
         return verdict

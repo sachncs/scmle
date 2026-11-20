@@ -74,7 +74,7 @@ def test_conformance_rejects_ignored_search_parameter():
         name = "ignoring"
         family = "x"
         capabilities = models.Capabilities(frozenset({tasks.Task.BINARY}))
-        search_space = search.Space((search.Real("alpha", 0.1, 1.0),))
+        space = search.Space((search.Real("alpha", 0.1, 1.0),))
 
         def build(self, task, seed, params=None):
             return dummy.DummyClassifier(strategy="prior")

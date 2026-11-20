@@ -80,8 +80,8 @@ def fake(ranked=(), pareto=False, unlabeled="none"):
             pareto_tolerance=0.0,
         ),
         data=types.SimpleNamespace(
-            baseline=None,
-            subject=None,
+            baseline_column=None,
+            baseline_subject=None,
             unlabeled=unlabeled,
         ),
         validation=types.SimpleNamespace(seed=0),
@@ -132,7 +132,7 @@ class Runner:
 
     def dispatch(self, jobs, first):
         return [
-            dataclasses.replace(trial(job.model), trial_id=job.trial)
+            dataclasses.replace(trial(job.model), identifier=job.trial)
             for job in jobs
         ]
 

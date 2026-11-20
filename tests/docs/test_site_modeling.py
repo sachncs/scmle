@@ -16,9 +16,7 @@ def situation(budget):
     )
     profile = types.SimpleNamespace(
         manifest=types.SimpleNamespace(rows=569),
-        plan=types.SimpleNamespace(
-            features=("a", "b"), high_cardinality=()
-        ),
+        plan=types.SimpleNamespace(features=("a", "b"), cardinal=()),
         summary={"n_classes": 2},
     )
     return rules.Situation(spec, profile, tasks.Task.BINARY)

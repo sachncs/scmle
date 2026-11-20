@@ -734,8 +734,8 @@ def test_the_engine_reference_records_hold_and_compare_by_field(
     reading = (
         "fields",
         "registry",
-        "runtime_environment",
-        "disk_gb",
+        "environment",
+        "disk",
     )
     assert {path for name in kept for path in base.fields.get(name, [])} <= {
         reading

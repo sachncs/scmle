@@ -39,7 +39,7 @@ def test_ignored_rows_are_reported_and_kept_out_of_the_split(tmp_path):
     )
     assert any(
         "300 row(s) without a target" in finding
-        for finding in result.profile.quality_findings
+        for finding in result.profile.quality
     )
     assert result.evaluation["unlabeled"] is None
 

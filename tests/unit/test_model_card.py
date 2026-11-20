@@ -38,9 +38,7 @@ def build(evaluation):
     plan = types.SimpleNamespace(features=("amount",), text=(), extras=())
     profile = types.SimpleNamespace(plan=plan)
     bundle = types.SimpleNamespace(
-        info=types.SimpleNamespace(
-            model="m", version="v1", metric="roc_auc"
-        ),
+        info=types.SimpleNamespace(model="m", version="v1", metric="roc_auc"),
         schema=types.SimpleNamespace(task="binary_classification"),
     )
     return model_card.Card.assemble(

@@ -166,8 +166,8 @@ def fast_project(
         ),
     )
     kwargs.setdefault("enforcement", "cooperative")
-    kwargs.setdefault("time_budget", 120)
-    kwargs.setdefault("leakage_policy", "warn")  # the checks set it themselves
+    kwargs.setdefault("budget", 120)
+    kwargs.setdefault("leakage", "warn")  # the checks set it themselves
     return scmle.api.project.Project(
         data, target, directory=directory, **kwargs
     )
@@ -341,9 +341,7 @@ def check_leak_detection(directory: pathlib.Path) -> CheckRecord:
         and any("'leak'" in item for item in result.profile.risk_findings)
     )
     try:
-        fast_project(
-            leaky, "y", directory / "block", leakage="block"
-        ).run()
+        fast_project(leaky, "y", directory / "block", leakage="block").run()
         blocked = False
     except errors.BlockedError:
         blocked = True

@@ -17,7 +17,7 @@ SCENARIOS: dict[str, Callable[[], recovery.Outcome]] = {
     "dependency_outage": outages.blackout,
     "corrupted_bundle": service.bundle,
     "incompatible_schema": service.incompatible_schema,
-    "bad_release": release.release,
+    "bad_release": release.restore,
     "job_interruption": crashes.resume,
     "audit_log_continuity": crashes.resilience,
     "secret_rotation_recovery": service.rekey,

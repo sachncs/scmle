@@ -523,7 +523,7 @@
 "scmle.rehearsal.faults.crashes.process_kill" = "process"
 "scmle.rehearsal.faults.harness.export_service" = "export"
 "scmle.rehearsal.faults.outages.object_store_loss" = "disconnect"
-"scmle.rehearsal.faults.release.bad_release" = "release"
+"scmle.rehearsal.faults.release.bad_release" = "restore"
 "scmle.rehearsal.faults.service.Client.longest_gap" = "gap"
 "scmle.rehearsal.faults.service.Client.stop_flag" = "halt"
 "scmle.rehearsal.faults.service.corrupted_bundle" = "bundle"

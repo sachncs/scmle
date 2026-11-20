@@ -1298,7 +1298,6 @@
    {
     "coverage": 0.702666667,
     "delta": 0.1,
-    "r_star": 0.05,
     "risk": 0.042694497,
     "steps": [
      {
@@ -1813,6 +1812,7 @@
       "tau": 0.28
      }
     ],
+    "target": 0.05,
     "tau": 0.29,
     "weighted": false
    }
@@ -9325,8 +9325,8 @@
  },
  "replies": {
   "extra": [
-   "AttestationRequired",
-   "AttestationRequired",
+   "UnattestedError",
+   "UnattestedError",
    {
     "decision": "approve",
     "safe_default_applies": false,
@@ -9338,7 +9338,7 @@
     "tier": "unverified"
    },
    "moved",
-   "AttestationRequired",
+   "UnattestedError",
    {
     "alarm": 0.05,
     "budget": 200,
@@ -9370,7 +9370,7 @@
     "timeout": 3,
     "tolerance": 0.05
    },
-   "AttestationRequired"
+   "UnattestedError"
   ],
   "files": {
    "label_mechanism.json": {

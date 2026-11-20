@@ -191,7 +191,7 @@ def test_observe_needs_the_capability_observation(preview):
 
 def situation(spec=None, rows=10, width=2, wide=()):
     plan = types.SimpleNamespace(
-        features=tuple(f"f{i}" for i in range(width)), high_cardinality=wide
+        features=tuple(f"f{i}" for i in range(width)), cardinal=wide
     )
     profile = types.SimpleNamespace(
         manifest=types.SimpleNamespace(rows=rows),
@@ -203,12 +203,12 @@ def situation(spec=None, rows=10, width=2, wide=()):
 
 def adapter(name, family="linear", **capabilities):
     defaults = {
-        "memory_factor": 1.0,
+        "factor": 1.0,
         "cost": 1,
         "incremental": False,
-        "stream_only": False,
+        "streaming": False,
         "serializable": True,
-        "native_categorical": False,
+        "categorical": False,
     }
     return types.SimpleNamespace(
         name=name,
@@ -222,8 +222,8 @@ def test_memory_rejects_a_model_over_the_limit():
     rows = 1024**3 // 8
     context = situation(rows=rows, width=1)
     decisions = []
-    small = adapter("small", memory_factor=8.0)
-    large = adapter("large", memory_factor=8.5)
+    small = adapter("small", factor=8.0)
+    large = adapter("large", factor=8.5)
     kept = rules.Memory().apply(context, [small, large], decisions)
     assert kept == [small]
     assert decisions == [
@@ -237,10 +237,7 @@ def test_memory_rejects_a_model_over_the_limit():
 
 def test_memory_counts_at_least_one_feature():
     context = situation(rows=1024**3 // 8, width=0)
-    assert (
-        rules.Memory().apply(context, [adapter("a", memory_factor=9.0)], [])
-        == []
-    )
+    assert rules.Memory().apply(context, [adapter("a", factor=9.0)], []) == []
 
 
 def test_budget_keeps_everything_on_a_generous_budget():
@@ -287,7 +284,7 @@ def test_budget_runs_the_boosted_learner_right_after_the_baseline():
 def test_streaming_rules_depend_on_the_training_mode():
     batch = adapter("batch")
     online = adapter("online", incremental=True)
-    only = adapter("only", stream_only=True, incremental=True)
+    only = adapter("only", streaming=True, incremental=True)
     dummy = adapter("dummy", family="baseline")
     decisions = []
     assert rules.Streaming().apply(
@@ -327,7 +324,7 @@ def test_persistence_rejects_models_that_cannot_be_saved():
 
 
 def test_cardinality_leaves_narrow_data_alone():
-    candidates = [adapter("a"), adapter("b", native_categorical=True)]
+    candidates = [adapter("a"), adapter("b", categorical=True)]
     decisions = []
     assert rules.Cardinality().apply(situation(), candidates, decisions) == (
         candidates
@@ -336,9 +333,9 @@ def test_cardinality_leaves_narrow_data_alone():
 
 
 def test_cardinality_searches_native_models_first():
-    base = adapter("dummy", family="baseline", native_categorical=True)
+    base = adapter("dummy", family="baseline", categorical=True)
     plain = adapter("plain")
-    native = adapter("native", native_categorical=True)
+    native = adapter("native", categorical=True)
     decisions = []
     kept = rules.Cardinality().apply(
         situation(wide=("city", "zip")), [plain, native, base], decisions
@@ -359,7 +356,7 @@ def test_cardinality_searches_native_models_first():
 
 
 def test_cardinality_defers_without_a_native_model():
-    picky = adapter("picky", native_categorical=True)
+    picky = adapter("picky", categorical=True)
     picky.nominals = lambda columns: []
     decisions = []
     kept = rules.Cardinality().apply(
@@ -566,9 +563,7 @@ class Stacking(ensemble_search.Stacker):
                 transcribe=self.recorded.append,
             ),
         )
-        self.metric = types.SimpleNamespace(
-            maximize=greater, name="accuracy"
-        )
+        self.metric = types.SimpleNamespace(maximize=greater, name="accuracy")
         self.runner = types.SimpleNamespace(
             run=lambda trial_id, combiner, params: trial(
                 trial_id, combiner, 0.9

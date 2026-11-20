@@ -8,7 +8,6 @@
    "level": 0.95,
    "low": 1.935746361,
    "n": 800,
-   "n_input": 800,
    "nuisance_digest": "2a0de879fd257e18a25c1f256e66d8e45d003cffda7455f5880d9eea4ac01aac",
    "overlap": {
     "eps": 0.05,
@@ -23,6 +22,7 @@
     "share_outside": 0.0
    },
    "population": "the full population of the rows",
+   "received": 800,
    "se": 0.080338715
   },
   "linear_ATT": {
@@ -32,7 +32,6 @@
    "level": 0.95,
    "low": 1.869844176,
    "n": 800,
-   "n_input": 800,
    "nuisance_digest": "2a0de879fd257e18a25c1f256e66d8e45d003cffda7455f5880d9eea4ac01aac",
    "overlap": {
     "eps": 0.05,
@@ -47,6 +46,7 @@
     "share_outside": 0.0
    },
    "population": "the full population of the rows",
+   "received": 800,
    "se": 0.09131523
   },
   "naive": {
@@ -107,12 +107,12 @@
    "tests": []
   },
   "replicate": {
+   "agreeing": true,
    "alpha": 0.05,
-   "p_heterogeneity": 0.586813023,
+   "heterogeneity": 0.586813023,
    "passed": true,
-   "pooled_sign": 1,
    "q": 1.066098081,
-   "same_sign": true,
+   "sign": 1,
    "strata": {
     "x": [
      1.0,
@@ -160,12 +160,12 @@
    ]
   },
   "split": {
+   "agreeing": false,
    "alpha": 0.1,
-   "p_heterogeneity": 1e-09,
+   "heterogeneity": 1e-09,
    "passed": false,
-   "pooled_sign": 1,
    "q": 37.230769231,
-   "same_sign": false,
+   "sign": 1,
    "strata": {
     "x": [
      1.0,
@@ -224,6 +224,7 @@
      0.012216033
     ]
    ],
+   "drift": 0.141106381,
    "estimate": 1.41468089,
    "events": [
     -3,
@@ -236,12 +237,10 @@
     "3.0": 150
    },
    "high": 1.600099651,
+   "horizon": 2.0,
    "level": 0.95,
    "low": 1.22926213,
-   "max_pre_change": 0.141106381,
-   "mean_horizon": 2.0,
-   "n_never": 150,
-   "pretrend_p": 0.489767809,
+   "pretrend": 0.489767809,
    "se": 0.094603147,
    "ses": [
     0.11608603,
@@ -249,7 +248,8 @@
     0.112234124,
     0.12109581,
     0.110526166
-   ]
+   ],
+   "untreated": 150
   },
   "second": {
    "coefficients": [
@@ -310,6 +310,7 @@
      0.012650782
     ]
    ],
+   "drift": 0.177366668,
    "estimate": 1.638513958,
    "events": [
     -4,
@@ -324,12 +325,10 @@
     "4.0": 150
    },
    "high": 1.777027587,
+   "horizon": 1.8,
    "level": 0.95,
    "low": 1.500000329,
-   "max_pre_change": 0.177366668,
-   "mean_horizon": 1.8,
-   "n_never": 150,
-   "pretrend_p": 0.001322776,
+   "pretrend": 0.001322776,
    "se": 0.070671517,
    "ses": [
     0.115528858,
@@ -338,7 +337,8 @@
     0.072620898,
     0.082414992,
     0.112475696
-   ]
+   ],
+   "untreated": 150
   },
   "wide": "t          0         1         2         3\nid                                        \n0   0.251954  2.633588  3.743480  4.124065\n1  -1.629587 -0.077950  1.278754  4.510502\n2  -0.021055  0.328885  1.858154  1.887181\n3  -0.053439 -0.257789  2.379630  1.869338\n4   1.106334  0.705833  0.270599  0.796272"
  },
@@ -349,14 +349,14 @@
    "ar_kind": "bounded",
    "ar_low": 2.077238903,
    "estimate": 2.229705603,
-   "f_stat": 296.610895425,
-   "first_stage": 1.006435401,
+   "fstat": 296.610895425,
    "headline": "wald",
    "high": 2.372748507,
    "level": 0.95,
    "low": 2.0866627,
    "n": 600,
    "se": 0.072982414,
+   "stage": 1.006435401,
    "wald_high": 2.372748507,
    "wald_low": 2.0866627,
    "weak": false
@@ -366,14 +366,14 @@
    "ar_kind": "bounded",
    "ar_low": 1.729458275,
    "estimate": 1.903602548,
-   "f_stat": 239.935643976,
-   "first_stage": 0.976475753,
+   "fstat": 239.935643976,
    "headline": "wald",
    "high": 2.06258319,
    "level": 0.95,
    "low": 1.744621906,
    "n": 600,
    "se": 0.081114063,
+   "stage": 0.976475753,
    "wald_high": 2.06258319,
    "wald_low": 1.744621906,
    "weak": false
@@ -383,14 +383,14 @@
    "ar_kind": "whole_line",
    "ar_low": "-inf",
    "estimate": 3.772676123,
-   "f_stat": 0.19703757,
-   "first_stage": 0.034436339,
+   "fstat": 0.19703757,
    "headline": "anderson_rubin",
    "high": "inf",
    "level": 0.95,
    "low": "-inf",
    "n": 300,
    "se": 3.158935582,
+   "stage": 0.034436339,
    "wald_high": 9.964076094,
    "wald_low": -2.418723847,
    "weak": true
@@ -410,8 +410,8 @@
     }
    },
    "bandwidth": 0.5,
-   "bias_corrected": 1.131786052,
-   "density_p": 0.492703865,
+   "corrected": 1.131786052,
+   "density": 0.492703865,
    "estimate": 1.11352047,
    "high": 1.336616804,
    "level": 0.9,
@@ -483,8 +483,8 @@
   "plain": {
    "balance": {},
    "bandwidth": 0.472553616,
-   "bias_corrected": 1.238765925,
-   "density_p": 0.164607362,
+   "corrected": 1.238765925,
+   "density": 0.164607362,
    "estimate": 1.135423873,
    "high": 1.524178603,
    "level": 0.95,
@@ -556,8 +556,8 @@
   "sorted": {
    "balance": {},
    "bandwidth": 0.562166524,
-   "bias_corrected": 0.52660601,
-   "density_p": 1.16e-07,
+   "corrected": 0.52660601,
+   "density": 1.16e-07,
    "estimate": 0.808274298,
    "high": 0.906944103,
    "level": 0.95,
@@ -639,7 +639,7 @@
    "r2dz": 0.488128957,
    "r2yz": 0.975756686,
    "rv": 0.698368937,
-   "rv_alpha": 0.683467373
+   "rvalpha": 0.683467373
   },
   "assess_fixed": {
    "benchmark": "fixed partial R2 0.01 with treatment and outcome",
@@ -652,7 +652,7 @@
    "r2dz": 0.01,
    "r2yz": 0.01,
    "rv": 0.698368937,
-   "rv_alpha": 0.683467373
+   "rvalpha": 0.683467373
   },
   "bench": [
    0.451704399,
@@ -727,15 +727,15 @@
    "alpha": 0.05,
    "donors": 24,
    "effect": 2.974298877,
+   "floor": 0.04,
    "gaps": [
     3.141091596,
     2.792538529,
     3.027640346,
     2.935925038
    ],
-   "min_p": 0.04,
    "p_value": 0.04,
-   "placebo_ratios": {
+   "placebos": {
     "1": 1.027685994,
     "10": 1.356319213,
     "11": 2.831499202,

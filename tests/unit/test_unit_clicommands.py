@@ -438,7 +438,7 @@ def test_deploy_verify_record_reports_validity(monkeypatch, tmp_path, capsys):
         verify=lambda key: key == "k", digest=lambda: "d"
     )
     monkeypatch.setattr(
-        rollout.scmle.deploy.record, "read_record", lambda path: record
+        rollout.scmle.deploy.record, "read", lambda path: record
     )
     args = parse(
         rollout.Deployment,
@@ -463,7 +463,7 @@ def test_deploy_gate_blocks_a_refusal_and_writes_an_allowed_record(
     monkeypatch.setattr(rollout.gate, "certify", lambda c, key: decision)
     monkeypatch.setattr(
         rollout.scmle.deploy.record,
-        "write_record",
+        "write",
         lambda output, record: written.append((output, record)),
     )
     argv = ["gate", "admit", "m.json", "--key-file", str(tmp_path / "key")]
@@ -694,7 +694,7 @@ class Loop:
             escalation=None,
         )
 
-    def pending_escalations(self):
+    def survey(self):
         return [
             types.SimpleNamespace(
                 id="e1",
@@ -770,14 +770,12 @@ def test_loop_verify_maps_a_broken_ledger(monkeypatch, capsys):
     def broken(path):
         raise deployment_ledger.MisuseError("bad chain")
 
-    monkeypatch.setattr(
-        governance.deployment_ledger.DeploymentLedger, "load", broken
-    )
+    monkeypatch.setattr(governance.deployment_ledger.Ledger, "load", broken)
     with pytest.raises(errors.ArtifactError) as caught:
         governance.Loop().execute(parse(governance.Loop, ["verify", "dep"]))
     assert str(caught.value) == "ledger verification failed: bad chain"
     monkeypatch.setattr(
-        governance.deployment_ledger.DeploymentLedger,
+        governance.deployment_ledger.Ledger,
         "load",
         lambda path: types.SimpleNamespace(rows=[1, 2], head="h"),
     )

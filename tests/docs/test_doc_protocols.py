@@ -452,7 +452,7 @@ def test_identical_rows_may_cross_but_copies_of_an_entity_never_do():
     assert free["refused"] == "" and free["splits"] > 1
     assert free["duplicate"] > 0
     assert not reading.crossed(free)
-    grouped = reading.hygiene(frame, "y", {"group_column": "entity"})
+    grouped = reading.hygiene(frame, "y", {"group": "entity"})
     assert grouped["refused"] == "" and grouped["splits"] > 1
     assert (grouped["entity"], grouped["copy"]) == (0, 0)
     # A copy of one declared entity crossing is a violation, except where a

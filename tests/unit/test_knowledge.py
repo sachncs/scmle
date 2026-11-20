@@ -65,7 +65,7 @@ def test_fingerprint_has_a_defined_missing_rate_without_features():
     empty_plan = dataclasses.replace(
         profile.plan, numeric=(), categorical=(), text=()
     )
-    profile = dataclasses.replace(profile, feature_plan=empty_plan)
+    profile = dataclasses.replace(profile, plan=empty_plan)
 
     result = knowledge.fingerprint(profile, tasks.Task.BINARY)
 

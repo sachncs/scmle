@@ -71,7 +71,7 @@ def rebuild(spec: Registration) -> models.Model:
         "family": spec.family,
         "classifier": spec.classifier,
         "regressor": spec.regressor,
-        "search_space": spec.space,
+        "space": spec.space,
         "capabilities": models.Capabilities(
             supported,
             probabilities=probabilities,

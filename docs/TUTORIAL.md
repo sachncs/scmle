@@ -270,19 +270,19 @@ if __name__ == "__main__":
     ).run()
     fresh_labeled_rows = data[400:]  # outcomes that arrived later
 
-    store = registry.ModelRegistryStore("registry")
+    store = registry.Registry("registry")
     manager = lifecycle.Maintainer(store, "churn", "work")
     record = manager.enlist(result)  # registers a staged version
     approval_key = "loaded-from-your-release-secret"
     approval = registry.Sanction(
         model="churn",
         version=record.version,
-        content_id=record.content_id,
+        content=record.content_id,
         reviewer="reviewer@example.com",
         decision=registry.Verdict.APPROVED,
         reason="reviewed evaluation, limitations, and recovery evidence",
         evidence=("evidence/release-review.json",),
-        approved_at="2026-10-20T00:00:00+00:00",
+        approved="2026-10-20T00:00:00+00:00",
     ).sign(approval_key)
     store.promote(
         "churn", record.version, approval=approval, signing_key=approval_key
@@ -295,12 +295,12 @@ if __name__ == "__main__":
         candidate_approval = registry.Sanction(
             model="churn",
             version=candidate.version,
-            content_id=candidate.content_id,
+            content=candidate.content_id,
             reviewer="reviewer@example.com",
             decision=registry.Verdict.APPROVED,
             reason="reviewed challenger evidence independently",
             evidence=("evidence/challenger-review.json",),
-            approved_at="2026-10-20T00:00:00+00:00",
+            approved="2026-10-20T00:00:00+00:00",
         ).sign(approval_key)
         manager.elevate(candidate_approval, signing_key=approval_key)
 ```

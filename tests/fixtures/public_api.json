@@ -77,7 +77,7 @@
       },
       "Modality": {
         "kind": "class",
-        "signature_sha256": "2c94af38453fc29f60a15f5ae2753c1b1dd218acf17aea63781d97c63ea4b6d4"
+        "signature_sha256": "e117bc465692875520e8fa69962b42dadd305afd285eda5bbf3321de21c8047d"
       },
       "Project": {
         "kind": "class",
@@ -1023,7 +1023,7 @@
       },
       "Revocations": {
         "kind": "class",
-        "signature_sha256": "80881ed4663a732f54faa21d7d49bd9dc69fc265184e2356ba29f990a40121d1"
+        "signature_sha256": "d5bb693474ad3246e01cca3aecf47897bb9cf939f8d8b47ca4f2fdfaf0533626"
       },
       "TokenError": {
         "kind": "class",

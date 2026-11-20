@@ -88,11 +88,11 @@ class Network(models.Model):
         given: dict[str, Any] = {
             "name": name,
             "architecture": architecture,
-            "search_space": search_space,
+            "space": search_space,
             "capabilities": capabilities,
-            "capability_family": capability_family,
+            "boundary": capability_family,
             "contract": contract,
-            "auto_candidate": auto_candidate,
+            "candidate": auto_candidate,
         }
         for attribute, value in given.items():
             if value is not None:

@@ -109,7 +109,7 @@ def test_classes_are_represented_in_confirmation():
 def test_temporal_carve_uses_blocks_with_an_embargo():
     n = 600
     times = numpy.arange(n)
-    result = run(n=n, times=times, rows=6)
+    result = run(n=n, times=times, embargo_rows=6)
     c = numpy.sort(result.confirmation)
     x = result.exploration
     assert len(c) > 0
@@ -126,7 +126,7 @@ def test_temporal_carve_uses_blocks_with_an_embargo():
 def test_temporal_carve_with_groups_never_shares_a_group():
     n = 600
     groups = numpy.arange(n) // 6
-    result = run(n=n, times=numpy.arange(n), rows=2, groups=groups)
+    result = run(n=n, times=numpy.arange(n), embargo_rows=2, groups=groups)
     assert set(groups[result.exploration]).isdisjoint(
         groups[result.confirmation]
     )

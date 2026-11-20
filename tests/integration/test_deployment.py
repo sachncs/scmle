@@ -59,7 +59,7 @@ def sanction(record):
     return registry.Sanction(
         model=record.model,
         version=record.version,
-        content=record.content,
+        content=record.content_id,
         reviewer="integration-reviewer",
         decision=registry.Verdict.APPROVED,
         reason="verified integration fixture",
@@ -86,7 +86,7 @@ def test_registry_versions_aliases_and_audit(trained, tmp_path):
         "churn", bundle_dir, {"roc_auc": 0.9}, run_id="r1", trusted=True
     )
     newer = copy.copy(trained.bundle)
-    newer.info = dataclasses.replace(trained.bundle.info, model_version="v2")
+    newer.info = dataclasses.replace(trained.bundle.info, version="v2")
     changed = newer.save(tmp_path / "export2")
     second = store.register(
         "churn", changed, {"roc_auc": 0.91}, run_id="r2", trusted=True
@@ -154,7 +154,7 @@ def test_champion_promotion_requires_matching_independent_approval(
             "m",
             record.version,
             approval=dataclasses.replace(
-                sanction(record), content_id="wrong-content"
+                sanction(record), content="wrong-content"
             ),
             signing_key=APPROVAL_KEY,
         )
@@ -303,7 +303,7 @@ def test_lifecycle_retrains_and_promotes_after_concept_drift(trained, tmp_path):
         drifted,
         "y",
         configure={
-            "time_budget": 300,
+            "budget": 300,
             "search": support.NO_TUNING,
             "strategies": support.NO_STRATEGIES,
             "ensemble": support.NO_ENSEMBLE,
@@ -394,7 +394,7 @@ def count_trainings(monkeypatch):
 
 
 FAST_OPTIONS = {
-    "time_budget": 300,
+    "budget": 300,
     "search": support.NO_TUNING,
     "strategies": support.NO_STRATEGIES,
     "ensemble": support.NO_ENSEMBLE,

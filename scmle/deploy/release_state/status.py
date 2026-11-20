@@ -98,7 +98,7 @@ def halt(percent: int, reasons: Sequence[str]) -> NoReturn:
         reasons: What the health check reported.
 
     Raises:
-        RuntimeUnconfirmed: Always.
+        UnconfirmedError: Always.
     """
     raise control.UnconfirmedError(
         f"health stopped the rollout at {percent}%: " + "; ".join(reasons)

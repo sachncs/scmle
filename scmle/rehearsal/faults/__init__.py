@@ -7,7 +7,7 @@ way the fault says and measures recovery with a monotonic clock. Everything
 the scenarios start is owned by a `Fleet`, which stops it in ``close`` and
 counts anything still alive afterwards.
 
-These are local processes and emulators. The control plane in ``release``
+These are local processes and emulators. The control plane in ``restore``
 runs revisions as processes. None of this is a cloud, a container
 orchestrator, a network partition or a machine crash; the catalogue
 (`scmle.operations.recovery`) says so per fault.
@@ -58,7 +58,7 @@ from scmle.rehearsal.faults.outages import disconnect
 from scmle.rehearsal.faults.release import degradation
 from scmle.rehearsal.faults.release import Processes
 from scmle.rehearsal.faults.release import register
-from scmle.rehearsal.faults.release import release
+from scmle.rehearsal.faults.release import restore
 from scmle.rehearsal.faults.service import bundle
 from scmle.rehearsal.faults.service import Client
 from scmle.rehearsal.faults.service import DRAIN_REQUESTS
@@ -111,9 +111,9 @@ __all__ = [
     "register",
     "rehearse",
     "rekey",
-    "release",
     "resilience",
     "restart",
+    "restore",
     "resume",
     "specify",
     "stress",

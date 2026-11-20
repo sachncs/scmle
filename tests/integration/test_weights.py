@@ -56,9 +56,7 @@ def test_weighted_test_metrics_are_reported_beside_the_plain_ones(tmp_path):
     frame = conflicting_frame()
     frame["w"] = numpy.where(frame["first"], 1.0, 0.01)
 
-    weighted = run(
-        frame, tmp_path / "w", weight="w", excluded=["first"]
-    )
+    weighted = run(frame, tmp_path / "w", weight="w", excluded=["first"])
     plain = run(frame, tmp_path / "p", excluded=["first", "w"])
 
     assert set(weighted.evaluation["weighted"]) == set(
@@ -80,9 +78,7 @@ def weights_frame(rows=700, seed=3):
 def test_validation_scores_are_weighted_and_say_so(tmp_path):
     result = run(weights_frame(), tmp_path, weight="w")
 
-    configs = [
-        t.evaluation for t in result.trials if t.evaluation
-    ]
+    configs = [t.evaluation for t in result.trials if t.evaluation]
     assert configs and all(c["weighted"] for c in configs)
 
 
@@ -95,9 +91,7 @@ def test_unit_weights_give_exactly_the_unweighted_scores(tmp_path):
 
     def scores(result):
         return {
-            (t.model, t.strategy): t.folds
-            for t in result.trials
-            if t.folds
+            (t.model, t.strategy): t.folds for t in result.trials if t.folds
         }
 
     left, right = scores(weighted), scores(plain)
@@ -120,7 +114,5 @@ def test_selection_can_opt_out_of_weighted_scores(tmp_path):
         selection=tasks.Selection(weighted=False),
     )
 
-    configs = [
-        t.evaluation for t in result.trials if t.evaluation
-    ]
+    configs = [t.evaluation for t in result.trials if t.evaluation]
     assert configs and not any(c["weighted"] for c in configs)

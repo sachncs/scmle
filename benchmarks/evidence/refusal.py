@@ -579,7 +579,7 @@ def table(
                 frame[name] = text.isin(["TRUE", "1"]).astype(int)
         settings = {"task": task, **options}
         if task == "ordinal":
-            settings["ordinal_order"] = sorted(
+            settings["order"] = sorted(
                 frame[target].unique().tolist(), key=float
             )
         return frame, target, settings

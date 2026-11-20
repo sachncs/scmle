@@ -156,7 +156,7 @@ def test_the_process_runner_needs_a_store_the_job_can_open(tmp_path):
     memory = objectstore.Retrier(
         objectstore.Disk(tmp_path / "s"), retry.Retries()
     )
-    with pytest.raises(errors.ConfigError, match="needs a LocalObjectStore"):
+    with pytest.raises(errors.ConfigError, match="needs a Disk"):
         local.Process(memory, identity=SERVE)
     with pytest.raises(errors.ConfigError, match="module:function"):
         local.Process(
@@ -321,7 +321,7 @@ def test_a_tenancy_over_a_store_the_job_cannot_open_is_refused(tmp_path):
     remote = objectstore.Retrier(
         objectstore.Disk(tmp_path / "s"), retry.Retries()
     )
-    with pytest.raises(errors.ConfigError, match="needs a LocalObjectStore"):
+    with pytest.raises(errors.ConfigError, match="needs a Disk"):
         local.Process(tenancy.Tenancy(remote, "acme"), identity=SERVE)
 
 

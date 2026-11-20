@@ -734,9 +734,7 @@ class Modality:
         self.manifest = manifest
         self.independent = independent
         self.checkpoint = (
-            pathlib.Path(checkpoint)
-            if checkpoint is not None
-            else None
+            pathlib.Path(checkpoint) if checkpoint is not None else None
         )
         self.resume = resume
         self.cancellation = cancellation or modality_lifecycle.Cancellation()

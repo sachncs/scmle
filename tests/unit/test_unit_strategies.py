@@ -27,7 +27,7 @@ def plan(numeric=(), categorical=(), high=(), monotonic=None, informative=None):
     return types.SimpleNamespace(
         numeric=list(numeric),
         categorical=list(categorical),
-        high_cardinality=list(high),
+        cardinal=list(high),
         monotonic=monotonic or {},
         informative_missing=informative,
     )

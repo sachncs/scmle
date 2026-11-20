@@ -98,8 +98,7 @@ def test_a_feedback_loop_is_recorded_escalated_and_survives_reopening(
     assert record["feedback"] == "loop_detected"
     assert record["feedback_test"]["n_bypass"] == 300
     assert any(
-        e.question["action"] == "feedback_loop_detected"
-        for e in loop.survey()
+        e.question["action"] == "feedback_loop_detected" for e in loop.survey()
     )
     again = test_loop.open_loop(tmp_path, test_loop.make_policy(bypass=0.3))
     assert not again.halted
@@ -147,7 +146,7 @@ def sanction(record):
     return scmle.governance.registry.Sanction(
         model=record.model,
         version=record.version,
-        content=record.content,
+        content=record.content_id,
         reviewer="unit-reviewer",
         decision=scmle.governance.registry.Verdict.APPROVED,
         reason="verified unit fixture",

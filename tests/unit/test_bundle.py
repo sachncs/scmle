@@ -139,7 +139,7 @@ def test_invalid_bundles(tmp_path, trained):
 def test_a_bundle_from_before_the_class_renames_is_refused_with_a_reason(
     tmp_path, trained
 ):
-    # Enforces docs/API_STABILITY.md:337.
+    # Enforces docs/API_STABILITY.md:384.
     directory = trained[0].save(tmp_path / "earlier")
     path = directory / scmle.artifacts.bundle.MANIFEST_FILE
     manifest = json.loads(path.read_text())
@@ -156,7 +156,7 @@ def test_a_bundle_from_before_the_class_renames_is_refused_with_a_reason(
 
 
 def test_a_member_naming_a_missing_module_is_refused(tmp_path, trained):
-    # Enforces docs/API_STABILITY.md:342.
+    # Enforces docs/API_STABILITY.md:389.
     vanished = types.ModuleType("vanished")
     vanished.Thing = type("Thing", (), {"__module__": "vanished"})
     sys.modules["vanished"] = vanished
@@ -176,7 +176,7 @@ def test_a_member_naming_a_missing_module_is_refused(tmp_path, trained):
 
 
 def test_legacy_bundle_requires_opt_in_and_can_be_migrated(tmp_path, trained):
-    # Enforces docs/API_STABILITY.md:337.
+    # Enforces docs/API_STABILITY.md:384.
     # Enforces website/src/pages/docs/api-stability.astro:83.
     # Enforces website/src/pages/docs/api.astro:489.
     directory = trained[0].save(tmp_path / "legacy")

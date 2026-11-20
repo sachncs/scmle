@@ -149,9 +149,7 @@ def degraded(tmp_path, **kwargs):
 def winning_challenger(tmp_path):
     loop, ev, stream, ignored = degraded(tmp_path)
     decision = ev.review(loss_signals(0.4))
-    target = next(
-        e for e in loop.survey() if e.id == decision.escalation
-    )
+    target = next(e for e in loop.survey() if e.id == decision.escalation)
     loop.reply(target.id, reply_to(target))
     ev.execute(target.id)
     stream.run(60, 0.40, challengers={"challenger-1": 0.05})

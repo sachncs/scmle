@@ -773,7 +773,7 @@ def leak(policy: str, part: str = "simulated") -> str | None:
     else:
         frame, target, options = clean("regression", part)
         refusal.spoil(frame, target, "leak")
-    options["leakage_policy"] = policy
+    options["leakage"] = policy
     with listening() as heard:
         launch(frame, target, **options)
     found = [t for t in heard.texts if "leak" in t.lower()]
@@ -848,7 +848,7 @@ def admissibility(attest: bool) -> str | None:
             screening.Screen: types.SimpleNamespace(ingest=None),
             surveying.Portrait: types.SimpleNamespace(
                 profile=types.SimpleNamespace(
-                    feature_plan=data.Blueprint(("copy",), ())
+                    plan=data.Blueprint(("copy",), ())
                 )
             ),
         }
@@ -1612,9 +1612,7 @@ def rolling(horizon: int, part: str = "simulated") -> str | None:
         frame, target, options = refusal.simulate("forecast", 200, SEED)
     else:
         frame, target, options = clean("forecast", part)
-    run = launch(
-        frame, target, validation="rolling", span=horizon, **options
-    )
+    run = launch(frame, target, validation="rolling", span=horizon, **options)
     saved = configured(run)["validation"]["rolling"]["horizon"]
     return f"config.json: validation.rolling.horizon {saved}"
 
@@ -1685,9 +1683,7 @@ def dated(fault: str, entities: str = "known") -> Any:
         kept = sorted(frame["zipcode"].unique())[:3]
         frame = frame[frame["zipcode"].isin(kept)].reset_index(drop=True)
         options = {"group": "zipcode", "entities": entities}
-    run = launch(
-        frame, "price", task="regression", timestamp="date", **options
-    )
+    run = launch(frame, "price", task="regression", timestamp="date", **options)
     if fault == "few" and entities == "known":
         saved = configured(run)["validation"]["entities"]
         return f"config.json: validation.entities {saved}"
@@ -1894,7 +1890,7 @@ def ambiguous(task: str, part: str = "simulated") -> str | None:
         frame[target] = pandas.qcut(label, 5, labels=False).astype(int)
     else:
         frame[target] = pandas.to_numeric(label).astype(int)
-        options = {k: v for k, v in options.items() if k != "ordinal_order"}
+        options = {k: v for k, v in options.items() if k != "order"}
     options["task"] = task
     run = launch(frame, target, **options)
     return f"config.json: task {configured(run)['task']}"
@@ -1912,7 +1908,7 @@ def ordinal(complete: bool, part: str = "simulated") -> Any:
     """
     frame, target, options = clean("ordinal", part)
     if not complete:
-        options["ordinal_order"] = list(options["ordinal_order"])[:-1]
+        options["order"] = list(options["order"])[:-1]
     return launch(frame, target, **options)
 
 
@@ -2269,8 +2265,7 @@ def bind(
 INJECTIONS: dict[str, Injection] = {
     "export.onnx.divergence": Injection(
         "site",
-        "Bundle.export with no held-out rows (verification is the "
-        "default)",
+        "Bundle.export with no held-out rows (verification is the default)",
         bind(exported, "unchecked"),
         bind(exported, "checked"),
         override=bind(exported, "unverified"),

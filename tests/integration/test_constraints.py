@@ -34,12 +34,14 @@ def test_size_limit_forces_a_smaller_model(binary_frame, tmp_path):
     constrained = run(binary_frame, tmp_path / "limited", limit)
     assert constrained.evaluation["resources"]["size"] <= 0.05
     log = json.loads(
-        (constrained.directory / "diagnostics" / "decision_log.json").read_text()
+        (
+            constrained.directory / "diagnostics" / "decision_log.json"
+        ).read_text()
     )
     assert any("within serving limits" in o["reason"] for o in log["outcomes"])
     if free.evaluation["resources"]["size"] > 0.05:
         rejected = [o for o in log["outcomes"] if "MB >" in o["reason"]]
-        assert rejected and constrained.selected_model != free.selected_model
+        assert rejected and constrained.model != free.model
 
 
 def test_latency_limit_is_enforced_and_reported(binary_frame, tmp_path):
@@ -62,4 +64,4 @@ def test_impossible_constraints_block_the_run(binary_frame, tmp_path):
 def test_selection_is_unchanged_without_constraints(binary_frame, tmp_path):
     first = run(binary_frame, tmp_path / "a")
     second = run(binary_frame, tmp_path / "b", tasks.Selection())
-    assert first.selected_model == second.selected_model
+    assert first.model == second.model

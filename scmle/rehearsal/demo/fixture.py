@@ -35,7 +35,7 @@ FAST_OPTIONS: dict[str, Any] = {
         exclude_families=["bagging", "deep_learning", "foundation"]
     ),
     "enforcement": "cooperative",
-    "time_budget": 300,
+    "budget": 300,
     "seed": 7,
 }
 

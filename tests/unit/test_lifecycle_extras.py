@@ -44,7 +44,7 @@ def sanction(record):
     return scmle.governance.registry.Sanction(
         model=record.model,
         version=record.version,
-        content=record.content,
+        content=record.content_id,
         reviewer="unit-reviewer",
         decision=scmle.governance.registry.Verdict.APPROVED,
         reason="verified unit fixture",

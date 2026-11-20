@@ -54,7 +54,7 @@ def test_the_constants_and_decisions_are_the_documented_ones():
 
 
 @pytest.mark.parametrize(
-    "name", ["model", "content_id", "reviewer", "reason", "approved_at"]
+    "name", ["model", "content", "reviewer", "reason", "approved"]
 )
 def test_a_blank_or_non_text_field_names_itself(name):
     for bad in ("", "   ", None, 5):
@@ -145,12 +145,12 @@ def test_each_signed_field_is_covered_by_the_signature():
     for change in (
         {"model": "n"},
         {"version": 2},
-        {"content_id": "d" * 64},
+        {"content": "d" * 64},
         {"reviewer": "s"},
         {"decision": registry.Verdict.REJECTED},
         {"reason": "no"},
         {"evidence": ("e1",)},
-        {"approved_at": "2027-01-01T00:00:00+00:00"},
+        {"approved": "2027-01-01T00:00:00+00:00"},
         {"independent": False},
     ):
         assert dataclasses.replace(signed, **change).verify(KEY) is False
@@ -418,9 +418,7 @@ def test_check_promotion_returns_the_entry_and_reads_the_index_when_not_given(
     index = {"models": {"churn": {"versions": {}, "aliases": {}}}}
     with pytest.raises(errors.ArtifactError):
         store.vet("churn", 1, "challenger", None, None, index)
-    good = store.vet(
-        "churn", 2, "champion", sanction(2), KEY, store.read()
-    )
+    good = store.vet("churn", 2, "champion", sanction(2), KEY, store.read())
     assert "2" in good["versions"]
 
 

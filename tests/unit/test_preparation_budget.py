@@ -137,8 +137,7 @@ def test_the_profiler_gives_ml_difficulty_its_share_of_the_budget():
     stats = small.overview["ml_difficulty"]
     assert stats["available"] is False and stats["skipped"] is True
     assert any(
-        note.startswith("ml_difficulty skipped")
-        for note in small.quality_findings
+        note.startswith("ml_difficulty skipped") for note in small.quality
     )
     large = portrait(frame)[1]
     assert large.overview["ml_difficulty"]["available"]

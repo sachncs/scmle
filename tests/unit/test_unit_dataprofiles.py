@@ -259,16 +259,12 @@ def test_blocking_findings_without_a_safe_disposition_hold_release():
     # Enforces website/src/pages/docs/extensions.astro:211.
     # Enforces website/src/pages/docs/modalities.astro:41.
     report = curation()
-    assert [f.identifier for f in report.blockers] == [
-        "q.a"
-    ]
+    assert [f.identifier for f in report.blockers] == ["q.a"]
     assert report.release is False
     for safe in ("resolved", "waived", "false_positive"):
         cleared = curation(quality=(finding("q.a", disposition=safe),))
         assert cleared.release is True
-    accepted = curation(
-        quality=(finding("q.a", disposition="accepted"),)
-    )
+    accepted = curation(quality=(finding("q.a", disposition="accepted"),))
     assert accepted.release is False
 
 
@@ -337,15 +333,15 @@ def test_a_datasheet_dumps_single_words():
 @pytest.mark.parametrize(
     ("changes", "message"),
     [
-        ({"dataset_id": " "}, "dataset_id must not be empty"),
+        ({"dataset": " "}, "dataset_id must not be empty"),
         ({"modality": ""}, "modality must not be empty"),
-        ({"intended_use": " "}, "intended_use must not be empty"),
+        ({"use": " "}, "intended_use must not be empty"),
         ({"owner": ""}, "owner must not be empty"),
-        ({"review_status": " "}, "review_status must not be empty"),
-        ({"generated_at": ""}, "generated_at must not be empty"),
+        ({"status": " "}, "review_status must not be empty"),
+        ({"generated": ""}, "generated_at must not be empty"),
         ({"schema_version": 0}, "schema_version must be positive"),
         ({"composition": {"rows": -1}}, "must not be negative"),
-        ({"out_of_scope": ()}, "out_of_scope must not be empty"),
+        ({"excluded": ()}, "out_of_scope must not be empty"),
         ({"limitations": ()}, "limitations must not be empty"),
     ],
 )

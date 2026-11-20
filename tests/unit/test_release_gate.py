@@ -271,7 +271,7 @@ MODEL_FAILURES = {
 def test_a_bad_model_is_refused_at_every_step(name, environment):
     changes, expected = MODEL_FAILURES[name]
     staging = (
-        {"staging_record": support_release.staging_record()}
+        {"record": support_release.staging_record()}
         if environment == "production"
         else {}
     )
@@ -302,9 +302,9 @@ SCAN_FAILURES = {
     ),
     "no approver": ({"approver": ""}, "no approver"),
     "self approval": ({"approver": "author"}, "requested the release"),
-    "short commit": ({"source_commit": "abc"}, "full commit hash"),
+    "short commit": ({"commit": "abc"}, "full commit hash"),
     "unknown environment": ({"environment": "prod"}, "unknown environment"),
-    "bad model digest": ({"model_digest": "latest"}, "model_digest"),
+    "bad model digest": ({"reported": "latest"}, "model_digest"),
 }
 
 

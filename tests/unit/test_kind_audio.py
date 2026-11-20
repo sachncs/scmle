@@ -419,7 +419,7 @@ def outcome(run):
     coverage = json.loads(
         (run.directory / "coverage_report.json").read_text(encoding="utf-8")
     )
-    custody = run.directory.parent / "custody" / f"{run.run_id}.jsonl"
+    custody = run.directory.parent / "custody" / f"{run.identifier}.jsonl"
     return {
         "artifacts": sorted(
             path.name for path in run.directory.iterdir() if path.name in KEPT

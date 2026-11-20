@@ -189,9 +189,9 @@ def project(
     Returns:
         The configured, not yet run, project.
     """
-    kw.setdefault("time_budget", BUDGET)
+    kw.setdefault("budget", BUDGET)
     kw.setdefault("workers", 2)
-    kw.setdefault("leakage_policy", "warn")  # public tables, see run_benchmarks
+    kw.setdefault("leakage", "warn")  # public tables, see run_benchmarks
     return scmle.api.project.Project(frame, target, directory=root, **kw)
 
 
@@ -278,9 +278,7 @@ def survival_case(
     Returns:
         The row, scored by concordance index on the run's locked rows.
     """
-    result = project(
-        frame, duration, root, task="survival", event=event
-    ).run()
+    result = project(frame, duration, root, task="survival", event=event).run()
     train, test = split_ids(result)
     features = frame.drop(columns=[duration, event])
     matrix = encode(features)
@@ -326,9 +324,7 @@ def ordinal_case(
         The row, scored by quadratic weighted kappa on the locked rows.
     """
     order = sorted(frame[target].unique(), key=float)
-    result = project(
-        frame, target, root, task="ordinal", order=order
-    ).run()
+    result = project(frame, target, root, task="ordinal", order=order).run()
     train, test = split_ids(result)
     ranks = frame[target].map({v: i for i, v in enumerate(order)}).to_numpy()
     features = encode(frame.drop(columns=[target]))

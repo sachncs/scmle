@@ -124,7 +124,7 @@ def confirm(
         The confirming observation.
 
     Raises:
-        RuntimeUnconfirmed: If the last read still differs, with its reasons.
+        UnconfirmedError: If the last read still differs, with its reasons.
     """
     policy = policy or Polling()
     reasons: list[str] = []
@@ -134,7 +134,7 @@ def confirm(
         try:
             seen = plane.observe()
         except errors.ArtifactError as error:
-            # handled: kept as reason; RuntimeUnconfirmed raised after attempts
+            # handled: kept as reason; UnconfirmedError raised after attempts
             reasons = [f"the platform's state cannot be read yet: {error}"]
             continue
         reasons = check(seen)

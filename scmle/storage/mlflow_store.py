@@ -48,7 +48,7 @@ class Mlflow(stores.Store):
             from mlflow import tracking  # noqa: PLC0415 -- optional dependency  # pyright: ignore[reportMissingImports]  # optional extra, imported lazily and guarded; not installed in the type-check environment
         except ImportError as error:
             raise errors.ConfigError(
-                "MlflowExperimentStore needs the 'tracking' extra (mlflow)"
+                "Mlflow needs the 'tracking' extra (mlflow)"
             ) from error
         if tracking_uri:
             mlflow.set_tracking_uri(tracking_uri)

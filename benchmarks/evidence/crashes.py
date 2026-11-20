@@ -201,6 +201,10 @@ FENCE = "fence"
 # of a stage product's canonical form (the product's own rule,
 # `products.TIMING`, drops only `seconds`).
 TIMINGS = ("seconds", "elapsed", "timestamp", "generated", "captured")
+# Attribute names of a measured time that carry none of `TIMINGS`, left
+# out of a pickled stage product like a timing attribute: a trial's fitting
+# time (`experiments.Trial.fit`, in seconds).
+DURATIONS = ("fit",)
 # Uninterrupted runs compared with the reference to find what varies
 # between runs. A field that differs from the reference in a share q of
 # runs agrees in all k controls with probability (1 - q) ** k; k = 3 keeps
@@ -664,7 +668,8 @@ def plain(value: Any, seen: frozenset[int] = frozenset()) -> Any:
 
     Enums become their value, numbers Python numbers (a float that is not
     finite its text), other objects what they hold (`members`), with
-    mapping keys and attributes ending in one of `TIMINGS` left out;
+    mapping keys and attributes ending in one of `TIMINGS` or named in
+    `DURATIONS` left out;
     what holds nothing JSON can carry is its `repr`.
 
     Args:
@@ -694,7 +699,7 @@ def plain(value: Any, seen: frozenset[int] = frozenset()) -> Any:
         return {
             str(k): plain(v, seen)
             for k, v in held.items()
-            if not str(k).endswith(TIMINGS)
+            if not str(k).endswith(TIMINGS) and str(k) not in DURATIONS
         }
     if isinstance(held, list):
         return [plain(v, seen) for v in held]

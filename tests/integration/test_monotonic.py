@@ -47,7 +47,7 @@ def test_constrained_predictions_never_fall_as_the_feature_rises(tmp_path):
     curve = sweep(result)
 
     assert numpy.all(numpy.diff(curve) >= -1e-9)
-    assert result.selected_model in {
+    assert result.model in {
         "hist_gradient_boosting",
         "lightgbm",
         "xgboost",
@@ -88,9 +88,7 @@ def test_constraints_on_unusable_columns_or_multiclass_tasks_are_refused(
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:171.
     # Enforces website/src/learn/when-things-go-wrong.html:87.
     with pytest.raises(errors.BlockedError, match="numeric feature"):
-        support.make_project(
-            noisy_frame(), "y", constraints={"nope": 1}
-        ).plan()
+        support.make_project(noisy_frame(), "y", constraints={"nope": 1}).plan()
     with pytest.raises(ValueError, match=r"\+1 or -1"):
         tasks.Config(
             data=tasks.Dataset(

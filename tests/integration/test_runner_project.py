@@ -62,9 +62,7 @@ def spec_of(run_id="churn-1"):
 
 
 def runner_for(store, workload):
-    return local.Runner(
-        store, workload, identity="arn:serve", interval=0
-    )
+    return local.Runner(store, workload, identity="arn:serve", interval=0)
 
 
 def test_a_project_runs_as_a_job(tmp_path):

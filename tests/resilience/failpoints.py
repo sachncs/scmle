@@ -260,9 +260,7 @@ class FailpointStore(objectstore.Depot):
         return self.around("head", key, lambda: self.inner.head(key))
 
     def catalog(self, prefix=""):
-        return self.around(
-            "list", prefix, lambda: self.inner.catalog(prefix)
-        )
+        return self.around("list", prefix, lambda: self.inner.catalog(prefix))
 
     def delete(self, key, *, if_version=None):
         return self.around(

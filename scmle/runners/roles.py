@@ -144,7 +144,7 @@ class Store(objectstore.Depot):
             key: Object key or prefix.
 
         Raises:
-            RoleDeniedError: If the role may not read it.
+            DeniedError: If the role may not read it.
         """
         if not self.role.read(key):
             raise DeniedError(f"role {self.role.name} may not read {key}")
@@ -156,7 +156,7 @@ class Store(objectstore.Depot):
             key: Object key.
 
         Raises:
-            RoleDeniedError: If the role may not write it.
+            DeniedError: If the role may not write it.
         """
         if not self.role.permits(key):
             raise DeniedError(f"role {self.role.name} may not write {key}")
@@ -212,7 +212,7 @@ class Store(objectstore.Depot):
     def catalog(self, prefix: str = "") -> list[objectstore.Metadata]:
         """Lists objects if the role may read the prefix (see `Depot`).
 
-        A prefix the role may not read raises RoleDeniedError from
+        A prefix the role may not read raises DeniedError from
         `read`.
 
         Args:

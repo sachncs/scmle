@@ -198,7 +198,7 @@ def test_production_serves_only_a_signed_verified_folder(boosted):
     try:
         status, body = wait_for_state(port, process, {"ready", "failed"})
         assert status == 200, body
-        assert body["model_version"] == bundle.info.model_version
+        assert body["model_version"] == bundle.info.version
         assert body["artifact_digest"].startswith("sha256:")
         assert "provenance=True" in body["notes"]["verifying"]
     finally:

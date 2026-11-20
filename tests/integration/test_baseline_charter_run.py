@@ -188,7 +188,7 @@ def test_the_selected_model_is_the_subject_of_the_claim(tmp_path):
     assert len(report["endpoints"]) == 2
     subject = report["rule"]
     assert subject["kind"] == "selected_model"
-    assert subject["model"] == result.selected_model
+    assert subject["model"] == result.model
     assert report["reference_rule"]["kind"] == "standardised_logistic"
     order = kinds(result)
     assert order.index("selection.frozen") < order.index("ledger.completed")

@@ -29,8 +29,8 @@ def test_runs_store_fingerprints_and_winning_strategies(tmp_path):
     assert len(history) == 1
     record = history[0]
     assert (
-        record.run_id == result.run_id
-        and record.selected_model == result.selected_model
+        record.run_id == result.identifier
+        and record.selected_model == result.model
     )
     assert set(record.fingerprint) >= {"log_rows", "log_imbalance"}
     assert record.task == "binary_classification"

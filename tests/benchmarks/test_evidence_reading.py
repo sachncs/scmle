@@ -205,7 +205,7 @@ def test_the_relational_tables_are_split_declared_known_and_unseen():
     for declared in ("unseen", "unseen_rolling"):
         options = reading.declare(dataset, declared)
         assert options["entities"] == "unseen"
-        assert options["group_column"] and options["time_column"]
+        assert options["group"] and options["timestamp"]
     assert reading.declare(dataset, "unseen_rolling")["validation"] == "rolling"
 
 
@@ -228,14 +228,12 @@ def test_hygiene_counts_what_crosses_a_product_split():
     assert plain["duplicate"] > 0
     assert plain["entity"] == plain["time"] == plain["copy"] == 0
     assert not reading.crossed(plain)  # identical rows are independent
-    grouped = reading.hygiene(frame, "y", {"group_column": "who"})
+    grouped = reading.hygiene(frame, "y", {"group": "who"})
     assert grouped["strategy"] == "group" and grouped["entity"] == 0
     assert grouped["copy"] == 0  # a group split keeps every entity apart
-    timed = reading.hygiene(frame, "y", {"time_column": "when"})
+    timed = reading.hygiene(frame, "y", {"timestamp": "when"})
     assert timed["strategy"] == "temporal" and timed["time"] == 0
-    both = reading.hygiene(
-        frame, "y", {"time_column": "when", "group_column": "who"}
-    )
+    both = reading.hygiene(frame, "y", {"timestamp": "when", "group": "who"})
     assert both["entity"] > 0  # an entity's past and future straddle
     # 3 feature values over 30 entities: one entity's copies straddle too.
     assert both["copy"] > 0 and both["entities"] == "known" and both["grouped"]
@@ -244,12 +242,12 @@ def test_hygiene_counts_what_crosses_a_product_split():
     unseen = reading.hygiene(
         frame,
         "y",
-        {"time_column": "when", "group_column": "who", "entities": "unseen"},
+        {"timestamp": "when", "group": "who", "entities": "unseen"},
     )
     assert unseen["entities"] == "unseen" and unseen["entity"] == 0
     assert unseen["strategy"] == "temporal" and unseen["splits"] > 1
     refused = reading.hygiene(
-        frame.assign(when="x"), "y", {"time_column": "when"}
+        frame.assign(when="x"), "y", {"timestamp": "when"}
     )
     assert refused["refused"] and refused["splits"] == 0
 

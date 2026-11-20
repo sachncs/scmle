@@ -218,7 +218,7 @@ def test_refuse_records_the_reason_and_removes_an_old_report(tmp_path):
 def orchestrator(treatment=None):
     return types.SimpleNamespace(
         spec=types.SimpleNamespace(
-            data=types.SimpleNamespace(treatment=treatment)
+            data=types.SimpleNamespace(treatment_column=treatment)
         )
     )
 

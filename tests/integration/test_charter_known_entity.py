@@ -45,8 +45,8 @@ def charter_file(tmp_path, **overrides):
 
 
 def run(tmp_path, charter, **kwargs):
-    kwargs.setdefault("group_column", "entity")
-    kwargs.setdefault("time_column", "t")
+    kwargs.setdefault("group", "entity")
+    kwargs.setdefault("timestamp", "t")
     return support.make_project(
         panel(),
         "y",

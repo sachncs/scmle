@@ -69,9 +69,7 @@ def test_searchable_builds_with_seed_zero() -> None:
     recorder = Recorder()
     adapter = types.SimpleNamespace(
         name="recorder",
-        space=search.Space(
-            (search.Choice("strategy", ("mean", "median")),)
-        ),
+        space=search.Space((search.Choice("strategy", ("mean", "median")),)),
         build=recorder.build,
     )
     features, target = conformance.toy(tasks.Task.REGRESSION)

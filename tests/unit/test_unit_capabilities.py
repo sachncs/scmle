@@ -82,17 +82,17 @@ def test_resources_are_stored_in_single_words():
 @pytest.mark.parametrize(
     ("changes", "error", "message"),
     [
-        ({"cpu_cores": 1.5}, errors.KindError, "cpu_cores must be an integer"),
-        ({"cpu_cores": 0}, errors.InputError, "cpu_cores must be at least 1"),
+        ({"cores": 1.5}, errors.KindError, "cpu_cores must be an integer"),
+        ({"cores": 0}, errors.InputError, "cpu_cores must be at least 1"),
         (
-            {"memory_gb": 0.0},
+            {"memory": 0.0},
             errors.InputError,
             "memory_gb must be greater than 0",
         ),
-        ({"memory_gb": float("inf")}, errors.InputError, "memory_gb must be"),
-        ({"disk_gb": -0.1}, errors.InputError, "disk_gb must not be negative"),
-        ({"disk_gb": float("nan")}, errors.InputError, "disk_gb must not be"),
-        ({"max_rows": 0}, errors.InputError, "max_rows must be at least 1"),
+        ({"memory": float("inf")}, errors.InputError, "memory_gb must be"),
+        ({"disk": -0.1}, errors.InputError, "disk_gb must not be negative"),
+        ({"disk": float("nan")}, errors.InputError, "disk_gb must not be"),
+        ({"rows": 0}, errors.InputError, "max_rows must be at least 1"),
         (
             {"notes": (" ",)},
             errors.InputError,
@@ -138,13 +138,13 @@ def test_a_coordinate_dumps_every_dimension():
             "inference must be Inference",
         ),
         (
-            {"model_family": 3},
+            {"family": 3},
             errors.KindError,
             "model_family must be a string",
         ),
-        ({"model_family": ""}, errors.InputError, "must not be empty"),
-        ({"model_family": "Tree"}, errors.InputError, "must be lowercase"),
-        ({"model_family": " tree"}, errors.InputError, "must be lowercase"),
+        ({"family": ""}, errors.InputError, "must not be empty"),
+        ({"family": "Tree"}, errors.InputError, "must be lowercase"),
+        ({"family": " tree"}, errors.InputError, "must be lowercase"),
     ],
 )
 def test_a_coordinate_refuses_loose_values(changes, error, message):
@@ -184,18 +184,18 @@ def test_a_family_declaration_canonicalizes_its_lists():
     ("changes", "error", "message"),
     [
         (
-            {"model_family": 1},
+            {"family": 1},
             errors.KindError,
             "model_family must be a string",
         ),
-        ({"model_family": ""}, errors.InputError, "must be lowercase"),
-        ({"model_family": "Tree"}, errors.InputError, "must be lowercase"),
+        ({"family": ""}, errors.InputError, "must be lowercase"),
+        ({"family": "Tree"}, errors.InputError, "must be lowercase"),
         ({"status": "experimental"}, errors.KindError, "status must be Status"),
         ({"resources": {}}, errors.KindError, "resources must be Resources"),
         ({"modalities": ()}, errors.InputError, "at least one value"),
         ({"modalities": ("tabular",)}, errors.KindError, "Modality values"),
         (
-            {"failure_modes": ("",)},
+            {"modes": ("",)},
             errors.InputError,
             "failure_modes must contain",
         ),
@@ -249,14 +249,14 @@ def test_a_capability_keeps_its_declaration_order_and_dumps():
         ({"key": {}}, errors.KindError, "key must be Coordinate"),
         ({"status": "supported"}, errors.KindError, "status must be Status"),
         ({"resources": None}, errors.KindError, "resources must be Resources"),
-        ({"failure_modes": ()}, errors.InputError, "at least one value"),
+        ({"modes": ()}, errors.InputError, "at least one value"),
         (
-            {"required_extras": (" ",)},
+            {"extras": (" ",)},
             errors.InputError,
             "required_extras must",
         ),
         (
-            {"evidence_links": ()},
+            {"links": ()},
             errors.InputError,
             "must declare evidence_links",
         ),

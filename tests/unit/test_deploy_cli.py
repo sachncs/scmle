@@ -247,7 +247,7 @@ def test_live_writes_results_and_fails_when_a_check_fails(
     document = support_release.recorded(digest)
     monkeypatch.setattr(
         livetests,
-        "http_fetch",
+        "fetch",
         lambda url, timeout: support_release.fetch_from(document),
     )
     base = [

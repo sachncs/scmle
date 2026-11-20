@@ -179,27 +179,27 @@ def test_a_hurdle_needs_a_finite_threshold():
             "cannot be required when method is none",
         ),
         (
-            {"method": "conformal", "confidence_level": 1.0},
+            {"method": "conformal", "confidence": 1.0},
             "confidence_level must be",
         ),
         (
-            {"method": "conformal", "coverage_target": 0.0},
+            {"method": "conformal", "coverage": 0.0},
             "coverage_target must be",
         ),
         (
-            {"method": "conformal", "minimum_rows": 0},
+            {"method": "conformal", "rows": 0},
             "minimum_rows must be at least 1",
         ),
         ({"method": "conformal", "required": True}, "needs confidence_level"),
         (
-            {"method": "conformal", "required": True, "confidence_level": 0.9},
+            {"method": "conformal", "required": True, "confidence": 0.9},
             "needs coverage_target",
         ),
         (
             {
                 "method": "prediction_interval",
                 "required": True,
-                "confidence_level": 0.9,
+                "confidence": 0.9,
             },
             "needs coverage_target",
         ),
@@ -207,7 +207,7 @@ def test_a_hurdle_needs_a_finite_threshold():
             {
                 "method": "survival_curve",
                 "required": True,
-                "confidence_level": 0.9,
+                "confidence": 0.9,
             },
             "needs coverage_target",
         ),
@@ -235,9 +235,9 @@ def test_complete_uncertainty_promises_are_accepted():
     ("values", "message"),
     [
         ({"method": "none", "required": True}, "need a calibration method"),
-        ({"method": "none", "maximum_error": 0.1}, "need a calibration method"),
+        ({"method": "none", "error": 0.1}, "need a calibration method"),
         ({"method": "platt", "required": True}, "needs maximum_error"),
-        ({"method": "platt", "maximum_error": -0.1}, "must not be negative"),
+        ({"method": "platt", "error": -0.1}, "must not be negative"),
     ],
 )
 def test_calibration_requirements_are_complete(values, message):
@@ -255,16 +255,16 @@ def test_a_zero_calibration_error_is_allowed():
             {"method": "none", "metrics": ("m",)},
             "must be empty when method is none",
         ),
-        ({"method": "none", "sensitive_columns": ("s",)}, "must be empty"),
+        ({"method": "none", "sensitive": ("s",)}, "must be empty"),
         ({"method": "group_report"}, "requires sensitive_columns"),
         (
-            {"method": "group_report", "sensitive_columns": ("s",)},
+            {"method": "group_report", "sensitive": ("s",)},
             "requires metrics",
         ),
         (
             {
                 "method": "group_report",
-                "sensitive_columns": ("s", "s"),
+                "sensitive": ("s", "s"),
                 "metrics": ("m",),
             },
             "fairness.sensitive_columns must not contain duplicates",
@@ -278,18 +278,18 @@ def test_fairness_declarations_are_complete(values, message):
 @pytest.mark.parametrize(
     ("values", "message"),
     [
-        ({"metric": "m", "required_evidence": ("e",)}, "exactly one bound"),
+        ({"metric": "m", "evidence": ("e",)}, "exactly one bound"),
         (
             {
                 "metric": "m",
                 "maximum": 1.0,
                 "minimum": 0.0,
-                "required_evidence": ("e",),
+                "evidence": ("e",),
             },
             "exactly one bound",
         ),
         (
-            {"metric": "m", "maximum": -0.1, "required_evidence": ("e",)},
+            {"metric": "m", "maximum": -0.1, "evidence": ("e",)},
             "must not be negative",
         ),
         ({"metric": "m", "minimum": 0.8}, "fairness gates require evidence"),
@@ -307,10 +307,10 @@ def test_a_fairness_gate_with_a_zero_maximum_is_allowed():
 @pytest.mark.parametrize(
     ("values", "message"),
     [
-        ({"warning_threshold": 0}, "warning_threshold must be at least 1"),
-        ({"warning_threshold": 10, "blocking_threshold": 0}, "between one and"),
+        ({"warning": 0}, "warning_threshold must be at least 1"),
+        ({"warning": 10, "blocking": 0}, "between one and"),
         (
-            {"warning_threshold": 10, "blocking_threshold": 11},
+            {"warning": 10, "blocking": 11},
             "between one and",
         ),
     ],
@@ -330,7 +330,7 @@ def test_subgroup_thresholds_on_their_edges_are_allowed():
         (
             {
                 "availability": "global",
-                "required_methods": ("x",),
+                "methods": ("x",),
                 "stability_threshold": 0.5,
             },
             "stability_threshold requires require_stability",
@@ -338,7 +338,7 @@ def test_subgroup_thresholds_on_their_edges_are_allowed():
         (
             {
                 "availability": "global",
-                "required_methods": ("x",),
+                "methods": ("x",),
                 "require_fidelity": True,
                 "fidelity_threshold": 1.5,
             },
@@ -347,7 +347,7 @@ def test_subgroup_thresholds_on_their_edges_are_allowed():
         (
             {
                 "availability": "global",
-                "required_methods": ("x",),
+                "methods": ("x",),
                 "require_stability": True,
             },
             "require_stability needs stability_threshold",
@@ -355,17 +355,17 @@ def test_subgroup_thresholds_on_their_edges_are_allowed():
         (
             {
                 "availability": "global",
-                "required_methods": ("x",),
+                "methods": ("x",),
                 "require_fidelity": True,
             },
             "require_fidelity needs fidelity_threshold",
         ),
         (
-            {"availability": "none", "required_methods": ("x",)},
+            {"availability": "none", "methods": ("x",)},
             "need an availability",
         ),
         (
-            {"availability": "none", "required_evidence": ("e",)},
+            {"availability": "none", "evidence": ("e",)},
             "need an availability",
         ),
         ({"availability": "local"}, "requires required_methods"),
@@ -394,14 +394,14 @@ def test_a_diagnostic_gate_needs_evidence():
         parts.Requirement,
         name="d",
         action="block",
-        required_evidence=(),
+        evidence=(),
     )
     invalid(
         "diagnostic_gate.name",
         parts.Requirement,
         name="",
         action="warn",
-        required_evidence=("e",),
+        evidence=("e",),
     )
     assert (
         parts.Requirement(name="d", action="warn", evidence=("e",)).decisive
@@ -412,12 +412,12 @@ def test_a_diagnostic_gate_needs_evidence():
 @pytest.mark.parametrize(
     ("changes", "message"),
     [
-        ({"metric_gates": ()}, "requires metric_gates"),
-        ({"diagnostic_gates": ()}, "requires diagnostic_gates"),
-        ({"required_evidence": ()}, "release policy requires evidence"),
+        ({"metrics": ()}, "requires metric_gates"),
+        ({"diagnostics": ()}, "requires diagnostic_gates"),
+        ({"evidence": ()}, "release policy requires evidence"),
         (
             {
-                "diagnostic_gates": (
+                "diagnostics": (
                     parts.Requirement(name="d", action="warn", evidence=("e",)),
                 )
             },
@@ -425,7 +425,7 @@ def test_a_diagnostic_gate_needs_evidence():
         ),
         (
             {
-                "metric_gates": (
+                "metrics": (
                     parts.Hurdle(
                         metric="m",
                         direction=support.Orientation.MAXIMIZE,
@@ -442,7 +442,7 @@ def test_a_diagnostic_gate_needs_evidence():
         ),
         (
             {
-                "diagnostic_gates": (
+                "diagnostics": (
                     parts.Requirement(
                         name="d", action="block", evidence=("e",)
                     ),
@@ -453,7 +453,7 @@ def test_a_diagnostic_gate_needs_evidence():
         ),
         (
             {
-                "fairness_gates": (
+                "fairness": (
                     parts.Equity(metric="f", maximum=0.1, evidence=("e",)),
                     parts.Equity(metric="f", maximum=0.2, evidence=("e",)),
                 )
@@ -480,7 +480,7 @@ def test_a_complete_policy_is_accepted_and_stored_in_single_words():
 @pytest.mark.parametrize(
     ("changes", "message"),
     [
-        ({"primary_metric": ""}, "policy.primary_metric must not be empty"),
+        ({"metric": ""}, "policy.primary_metric must not be empty"),
         ({"metrics": ()}, "evaluation policy requires metrics"),
         (
             {
@@ -495,7 +495,7 @@ def test_a_complete_policy_is_accepted_and_stored_in_single_words():
             },
             "evaluation metrics must be unique",
         ),
-        ({"primary_metric": "f1"}, "primary_metric must be one of metrics"),
+        ({"metric": "f1"}, "primary_metric must be one of metrics"),
         (
             {
                 "metrics": (

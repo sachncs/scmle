@@ -165,7 +165,7 @@ def test_a_pytorch_model_family_trains_packages_and_predicts(
 
     result = project.run(only_torch)
 
-    assert result.selected_model == "torch_residual"
+    assert result.model == "torch_residual"
     features = binary_frame.drop(columns="y").head(20)
     result.save(tmp_path / "net")
     reloaded = scmle.api.predict.load(tmp_path / "net", trusted=True)
@@ -191,7 +191,7 @@ def test_serving_limits_are_checked_for_a_pytorch_candidate(
 
     result = project.run(only_torch)
 
-    assert result.selected_model == "torch_mlp"
+    assert result.model == "torch_mlp"
     log = (result.directory / "diagnostics" / "decision_log.json").read_text()
     assert "within serving limits" in log
 

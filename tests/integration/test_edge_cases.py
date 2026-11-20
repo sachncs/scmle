@@ -98,7 +98,7 @@ def test_infinite_values_are_treated_as_missing(tmp_path):
     frame.loc[::23, "b"] = -numpy.inf
     result = run(frame, tmp_path)
     infer(result, frame)
-    notes = [q for q in result.profile.quality_findings if "infinite" in q]
+    notes = [q for q in result.profile.quality if "infinite" in q]
     assert len(notes) == 2 and "treated as missing" in notes[0]
     assert numpy.isfinite(result.predict_proba(frame.drop(columns="y"))).all()
 
@@ -107,7 +107,7 @@ def test_duplicate_rows_and_conflicting_labels(tmp_path):
     frame = pandas.concat([base(120), base(120)], ignore_index=True)
     frame.loc[:20, "y"] = 1 - frame.loc[:20, "y"]
     result = run(frame, tmp_path)
-    assert any("duplicate" in q for q in result.profile.quality_findings)
+    assert any("duplicate" in q for q in result.profile.quality)
 
 
 def test_wide_dataset_with_few_rows(tmp_path):

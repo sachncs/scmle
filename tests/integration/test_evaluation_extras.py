@@ -48,8 +48,7 @@ def test_perfectly_equal_classes_get_a_down_sampling_warning(tmp_path):
     ).run()
 
     assert any(
-        "exactly 160 rows" in finding
-        for finding in result.profile.quality_findings
+        "exactly 160 rows" in finding for finding in result.profile.quality
     )
 
 

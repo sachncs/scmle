@@ -114,7 +114,9 @@ def test_a_record_writes_its_new_keys_and_downgrades_to_version_one(name):
     written = record.to_dict()
     assert gained <= set(written)
     assert not lost & set(written)
-    assert record.KEYS.downgrade(written) == dataclasses.asdict(record)
+    older = record.KEYS.downgrade(written)
+    assert lost <= set(older)
+    assert record.KEYS.upgrade(older) == written
 
 
 def test_nested_keys_hold_the_old_values():

@@ -19,7 +19,7 @@ def test_a_saved_bundle_predicts_without_the_project(binary_frame, tmp_path):
 
     numpy.testing.assert_array_equal(labels, result.predict(rows))
     model = scmle.api.predict.load(tmp_path / "model", trusted=True)
-    assert model.info.version == result.bundle.info.model_version
+    assert model.info.version == result.bundle.info.version
 
 
 def test_loading_an_unsigned_bundle_needs_trust(binary_frame, tmp_path):

@@ -36,7 +36,9 @@ def test_tuning_adds_pruned_and_completed_trials(binary_frame, tmp_path):
     assert all(len(t.folds) > 1 for t in completed)
     trial_ids = [t.identifier for t in result.trials]
     assert len(trial_ids) == len(set(trial_ids))
-    assert (result.directory / "trials" / f"{tuned[0].identifier}.json").exists()
+    assert (
+        result.directory / "trials" / f"{tuned[0].identifier}.json"
+    ).exists()
 
 
 def test_selection_can_pick_a_tuned_configuration(regression_frame, tmp_path):

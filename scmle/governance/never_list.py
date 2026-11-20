@@ -223,7 +223,7 @@ class Guard:
             The valid attestation.
 
         Raises:
-            AttestationRequired: If there is no valid attestation; an
+            UnattestedError: If there is no valid attestation; an
                 `escalation` row has been written (once per pending
                 question).
         """

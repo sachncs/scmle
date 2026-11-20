@@ -66,10 +66,8 @@ def test_the_record_holds_every_field_under_its_name() -> None:
 
 def test_a_blank_field_and_no_limitations_are_refused_word_for_word() -> None:
     card = build({"test_metrics": {}})
-    with pytest.raises(
-        errors.InputError, match=r"^model_name must not be empty$"
-    ):
-        dataclasses.replace(card, model_name=" ")
+    with pytest.raises(errors.InputError, match=r"^model must not be empty$"):
+        dataclasses.replace(card, model=" ")
     with pytest.raises(
         errors.InputError, match=r"^limitations must not be empty$"
     ):

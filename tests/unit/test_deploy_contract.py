@@ -188,11 +188,11 @@ def test_an_adapter_that_drifts_is_refused_with_every_reason():
     spec = make_spec()
     drifted = FakeAdapter(
         {
-            "image_digest": "sha256:" + "c" * 64,
+            "image": "sha256:" + "c" * 64,
             "ready": False,
-            "secret_names": ("EXTRA",),
-            "run_as_non_root": False,
-            "memory_limit_mb": 4096,
+            "secrets": ("EXTRA",),
+            "unprivileged": False,
+            "memory": 4096,
         }
     )
     with pytest.raises(errors.ArtifactError) as raised:

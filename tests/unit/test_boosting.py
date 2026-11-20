@@ -153,9 +153,7 @@ def test_catboost_handles_string_labels_natively(multiclass_frame, tmp_path):
     plan = project.plan()
     assert "catboost" in plan.candidates
     result = project.run()
-    assert {"catboost"} <= {
-        t.model for t in result.trials if t.status == "ok"
-    }
+    assert {"catboost"} <= {t.model for t in result.trials if t.status == "ok"}
     assert set(result.predict(multiclass_frame.drop(columns="y"))) <= {
         "lo",
         "mid",

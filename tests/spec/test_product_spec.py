@@ -159,7 +159,9 @@ def test_l23_to_l39_decision_table(run):
         result.evaluation["digests"]["split"]
         and (result.directory / "environment.lock").read_text()
     )  # reproducibility: config, data fingerprints, seeds, env
-    assert (result.directory / "events.jsonl").exists()  # event-driven telemetry
+    assert (
+        result.directory / "events.jsonl"
+    ).exists()  # event-driven telemetry
     assert "content_id" in {
         f.name
         for f in dataclasses.fields(
@@ -512,7 +514,7 @@ def test_l268_l276_states_blocked_and_transition_events(run):
     transition = next(
         e for e in events_of(result) if e["kind"] == "state.TRAINING"
     )
-    assert transition["run_id"] == result.run_id  # run ID
+    assert transition["run_id"] == result.identifier  # run ID
     assert transition["timestamp"]  # timestamp
     assert (
         transition["config_hash"] == project.spec.config_hash()
@@ -533,9 +535,7 @@ def test_l278_l288_orchestrator_support(frame, tmp_path):
     """Retries, cancellation, budget, checkpointing, restart, failures, ordering, parallelism, isolation."""
     from scmle.pipeline import orchestrator
 
-    project = support.make_project(
-        frame, "y", budget=300, directory=tmp_path
-    )
+    project = support.make_project(frame, "y", budget=300, directory=tmp_path)
     first = project.run()
     resumed = scmle.api.project.Project.resume(
         support.interrupt(project), data=frame
@@ -678,12 +678,12 @@ def test_l358_adapter_capability_declarations():
     declared = {f.name for f in dataclasses.fields(models.Capabilities)}
     assert {
         "tasks",
-        "sparse_input",
+        "sparse",
         "probabilities",
-        "native_categorical",
-        "handles_missing",
+        "categorical",
+        "missing",
         "early_stopping",
-        "memory_factor",
+        "factor",
         "serializable",
     } <= declared
     for adapter in scmle.models.registry.Catalog.stock().adapters.values():

@@ -192,7 +192,9 @@ def test_a_run_without_a_charter_has_no_ledger(binary_frame, tmp_path):
     result = run(binary_frame, tmp_path)
     folder = pathlib.Path(result.directory)
     assert not (folder / "hypothesis_ledger.jsonl").exists()
-    assert all(e["kind"] != "ledger.completed" for e in events(result.directory))
+    assert all(
+        e["kind"] != "ledger.completed" for e in events(result.directory)
+    )
 
 
 def leaky_frame(binary_frame):

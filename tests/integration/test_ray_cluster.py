@@ -115,13 +115,11 @@ def test_a_multi_node_run_reproduces_the_single_node_trials(
 
     def scores(result):
         return {
-            (t.model, t.strategy): t.folds
-            for t in result.trials
-            if t.folds
+            (t.model, t.strategy): t.folds for t in result.trials if t.folds
         }
 
     assert scores(local) == pytest.approx(scores(spread))
-    assert local.selected_model == spread.selected_model
+    assert local.model == spread.model
     assert local.evaluation["backend"] == "sequential"
     assert spread.evaluation["backend"] == "ray"
 
@@ -154,4 +152,4 @@ def test_a_trial_past_the_memory_limit_is_killed_on_a_ray_worker(
     hungry = [t for t in result.trials if t.model == "hungry"]
     assert hungry and hungry[0].status == "failed"
     assert "memory limit" in hungry[0].error
-    assert result.state == "COMPLETED" and result.selected_model == "dummy"
+    assert result.state == "COMPLETED" and result.model == "dummy"

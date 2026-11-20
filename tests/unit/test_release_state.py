@@ -120,12 +120,12 @@ def test_approval_needs_a_signed_bundle_and_a_valid_independent_review(
     bad = {
         "rejected": support_runtime.sanction(1, decision="rejected"),
         "not independent": support_runtime.sanction(1, independent=False),
-        "another bundle": support_release.approval(
-            version=1, content="8" * 64
-        ),
+        "another bundle": support_release.approval(version=1, content="8" * 64),
         "unsigned approval": support_runtime.sanction(1).__class__(
             **{
-                **support_runtime.sanction(1).preimage(),
+                **support_runtime.sanction(1).KEYS.upgrade(
+                    support_runtime.sanction(1).preimage()
+                ),
                 "decision": "approved",
                 "evidence": ("t",),
             }

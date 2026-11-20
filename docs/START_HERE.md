@@ -803,17 +803,17 @@ def sanction(record, why):
     return registry.Sanction(
         model="titanic",
         version=record.version,
-        content_id=record.content_id,
+        content=record.content_id,
         reviewer="you@example.com",
         decision=registry.Verdict.APPROVED,
         reason=why,
         evidence=("runs/report.html",),
-        approved_at="2026-11-05T00:00:00+00:00",
+        approved="2026-11-05T00:00:00+00:00",
     ).sign(KEY)
 
 
 def main():
-    store = registry.ModelRegistryStore("registry")
+    store = registry.Registry("registry")
     v1 = store.register("titanic", "artifacts/titanic", signing_key=KEY)
     v2 = store.register("titanic", "artifacts/titanic_v2", signing_key=KEY)
     print("versions:", [record.version for record in store.versions("titanic")])

@@ -173,7 +173,7 @@ def test_tracking_database_records_runs_trials_and_lineage(
     store = stores.Sqlite(tmp_path / "experiments.sqlite")
     runs = store.runs()
     assert len(runs) == 2 and {r["state"] for r in runs} == {"COMPLETED"}
-    row = next(r for r in runs if r["run_id"] == first.run_id)
+    row = next(r for r in runs if r["run_id"] == first.identifier)
     assert row["dataset_id"] == first.profile.manifest.identifier
     assert row["data_hash"] == first.profile.manifest.digests["data"]
     assert row["split_fingerprint"] == first.evaluation["digests"]["split"]
@@ -181,8 +181,10 @@ def test_tracking_database_records_runs_trials_and_lineage(
     assert json.loads(row["test_metrics"])["roc_auc"] == pytest.approx(
         first.evaluation["metrics"]["roc_auc"]
     )
-    assert len(store.trials(first.run_id)) == len(first.trials)
-    assert {t["strategy"] for t in store.trials(first.run_id)} >= {"default"}
+    assert len(store.trials(first.identifier)) == len(first.trials)
+    assert {t["strategy"] for t in store.trials(first.identifier)} >= {
+        "default"
+    }
     config = json.loads(row["config_json"])
     assert (
         config["data"]["target"] == "y" and config["validation"]["seed"] == 42

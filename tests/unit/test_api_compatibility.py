@@ -29,7 +29,7 @@ def test_compatibility_gate_reports_removed_and_changed_exports():
     changed = json.loads(json.dumps(expected))
     api = changed["surfaces"]["scmle.api.predict"]
     api["predict"]["signature_sha256"] = "changed"
-    api.pop("load_model")
+    api.pop("load")
 
     differences = check_api_compatibility.differences(expected, changed)
 

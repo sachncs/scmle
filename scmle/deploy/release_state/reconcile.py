@@ -30,7 +30,7 @@ class Registry(promotion.Promotion, rollback.Rollback):
             The version recorded for the environment.
 
         Raises:
-            RuntimeDisagrees: If the registry records no deployment or any
+            DisagreementError: If the registry records no deployment or any
                 finding of `reconcile` applies.
         """
         report = self.reconcile(model, environment, seen)

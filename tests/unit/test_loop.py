@@ -463,8 +463,7 @@ def test_selective_risk_above_target_halts_and_coverage_goes_to_zero(tmp_path):
     after = loop.observe(batch_frame(stream, 0), numpy.zeros(50), ["a"] * 50)
     assert after.routing.coverage == 0.0
     assert any(
-        e.question["action"] == "halt_selective_risk"
-        for e in loop.survey()
+        e.question["action"] == "halt_selective_risk" for e in loop.survey()
     )
 
 
@@ -844,8 +843,7 @@ def test_an_uncertified_alarm_escalates_instead_of_retraining(tmp_path):
         and not calls
     )
     assert any(
-        e.question["action"] == "l1_alarm_investigate"
-        for e in loop.survey()
+        e.question["action"] == "l1_alarm_investigate" for e in loop.survey()
     )
 
 

@@ -196,7 +196,7 @@ def handler(name):
         return {"step": name}
     return run
 
-store = objectstore.LocalObjectStore(root)
+store = objectstore.Disk(root)
 runner = executor.Executor(
     flow,
     store,

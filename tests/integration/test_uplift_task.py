@@ -64,9 +64,7 @@ def test_the_report_states_the_assumption_and_the_balance_check(result):
     assert "unmeasured confounding" in report["assumption"]
     assert report["propensity"]["randomized"]
     assert report["qini_curve"]["rows"]
-    assert any(
-        "treatment assignment" in f for f in result.profile.quality_findings
-    )
+    assert any("treatment assignment" in f for f in result.profile.quality)
 
 
 def test_confounded_assignment_is_flagged(tmp_path):
@@ -75,7 +73,7 @@ def test_confounded_assignment_is_flagged(tmp_path):
     result = run(tmp_path, frame)
 
     assert not result.evaluation["uplift"]["propensity"]["randomized"]
-    assert any("not random" in f for f in result.profile.quality_findings)
+    assert any("not random" in f for f in result.profile.quality)
 
 
 def test_a_non_binary_treatment_is_refused(tmp_path):
@@ -89,9 +87,7 @@ def test_a_non_binary_treatment_is_refused(tmp_path):
 def test_uplift_needs_a_treatment_column_and_others_forbid_one(tmp_path):
     frame = trial(200)[0]
     with pytest.raises(ValueError, match="treatment_column"):
-        support.make_project(
-            frame, "bought", task="uplift", directory=tmp_path
-        )
+        support.make_project(frame, "bought", task="uplift", directory=tmp_path)
     with pytest.raises(ValueError, match="treatment_column"):
         support.make_project(
             frame,

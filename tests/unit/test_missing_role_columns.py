@@ -23,9 +23,9 @@ def frame():
 @pytest.mark.parametrize(
     ("role", "option"),
     [
-        ("group", "group_column"),
-        ("time", "time_column"),
-        ("weight", "weight_column"),
+        ("group", "group"),
+        ("time", "timestamp"),
+        ("weight", "weight"),
     ],
 )
 def test_a_missing_role_column_names_the_role(tmp_path, role, option):

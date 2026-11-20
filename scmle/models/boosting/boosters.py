@@ -103,8 +103,8 @@ class Booster(models.Model):
             "fixed": fixed,
             "fitting": fitting,
             "rounds": rounds,
-            "search_space": search_space,
-            "monotonic_param": monotonic_param,
+            "space": search_space,
+            "param": monotonic_param,
         }
         for attribute, value in given.items():
             if value is not None:

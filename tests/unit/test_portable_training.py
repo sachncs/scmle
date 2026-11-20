@@ -172,9 +172,7 @@ def test_the_budget_accumulates_across_attempts(store):
 
 def test_a_timeout_is_final(store):
     clock = support_runners.FakeClock()
-    manifest = local_runner(store, clock).run(
-        spec_for("slow", timeout=100.0)
-    )
+    manifest = local_runner(store, clock).run(spec_for("slow", timeout=100.0))
     assert manifest.state == "timed_out" and len(manifest.attempts) == 1
 
 
@@ -260,7 +258,7 @@ def test_specialised_compute_needs_a_declared_reason_and_specs_are_validated():
     for bad in (
         {"run_id": "has space"},
         {"run_id": ""},
-        {"timeout_seconds": 0},
+        {"timeout": 0},
         {"environment": {"API_TOKEN": "x"}},
         {"environment": {"NOTE": "-----BEGIN PRIVATE"}},
     ):

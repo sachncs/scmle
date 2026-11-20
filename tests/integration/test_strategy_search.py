@@ -56,9 +56,7 @@ def test_every_strategy_is_compared_on_the_original_validation_folds(
     imbalanced_frame, tmp_path
 ):
     result = run(imbalanced_frame, tmp_path)
-    fold_counts = {
-        len(t.folds) for t in result.trials if t.status == "ok"
-    }
+    fold_counts = {len(t.folds) for t in result.trials if t.status == "ok"}
     assert fold_counts == {5}
     default = next(
         t
@@ -68,8 +66,7 @@ def test_every_strategy_is_compared_on_the_original_validation_folds(
     weighted = next(
         t
         for t in result.trials
-        if t.model == "logistic_regression"
-        and t.strategy == "class_weight"
+        if t.model == "logistic_regression" and t.strategy == "class_weight"
     )
     assert default.folds != weighted.folds
 
@@ -120,9 +117,7 @@ def test_strategies_can_be_forced_to_win_and_are_then_used(
     best_default = max(
         t.score
         for t in result.trials
-        if t.strategy == "default"
-        and t.model != "dummy"
-        and t.status == "ok"
+        if t.strategy == "default" and t.model != "dummy" and t.status == "ok"
     )
     assert (
         best_under > best_default
@@ -161,14 +156,10 @@ def test_feature_strategies_apply_to_skewed_linear_models(
 ):
     result = run(imbalanced_frame, tmp_path)
     linear = {
-        t.strategy
-        for t in result.trials
-        if t.model == "logistic_regression"
+        t.strategy for t in result.trials if t.model == "logistic_regression"
     }
     assert {"log_skewed", "interactions"} <= linear
-    trees = {
-        t.strategy for t in result.trials if t.model == "random_forest"
-    }
+    trees = {t.strategy for t in result.trials if t.model == "random_forest"}
     assert not trees & {"log_skewed", "interactions"}
 
 
@@ -253,9 +244,7 @@ def test_smote_variants_are_evaluated_on_the_original_folds_when_installed(
     )
     tried = {t.strategy for t in result.trials if t.strategy != "default"}
     assert tried == {"smote", "borderline_smote", "adasyn"}
-    assert {len(t.folds) for t in result.trials if t.status == "ok"} == {
-        5
-    }
+    assert {len(t.folds) for t in result.trials if t.status == "ok"} == {5}
     features = numeric_imbalanced().drop(columns="y")
     assert len(result.predict(features)) == len(features)
 

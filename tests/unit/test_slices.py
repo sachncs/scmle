@@ -95,7 +95,7 @@ def test_slices_that_cannot_fit_are_counted_not_scored(monkeypatch):
 
     class Ticking:
         name = data.metric.name
-        greater_is_better = True
+        maximize = True
 
         def score(self, *args):
             clock.now += 10.0

@@ -316,7 +316,7 @@ class Process(base.Runner):
         inner = store.inner if isinstance(store, tenancy.Tenancy) else store
         if not isinstance(inner, objectstore.Disk):
             raise errors.ConfigError(
-                f"the {self.kind} runner needs a LocalObjectStore the job "
+                f"the {self.kind} runner needs a Disk the job "
                 f"can open by URI, not {type(inner).__name__}"
             )
         if ":" not in workload or grace < 0:

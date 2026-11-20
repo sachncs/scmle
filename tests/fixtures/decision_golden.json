@@ -273,44 +273,44 @@
   },
   "demographic_parity": {
    "fit": {
+    "benefit": 0.267385965,
     "constrained": false,
     "cuts": {
      "0": 0.05,
      "1": 0.05
     },
-    "development_gap": 0.003190435,
-    "net_benefit": 0.267385965,
-    "target_rate": null
+    "gap": 0.003190435,
+    "target": null
    },
    "test": {
     "alpha": 0.05,
     "criterion": "demographic_parity",
-    "max_gap": 0.05,
-    "point_gap": 0.053500462,
-    "small_groups": [],
+    "estimate": 0.053500462,
+    "gap": 0.05,
+    "small": [],
     "status": "not_satisfied",
-    "upper_bound": 0.087979595
+    "upper": 0.087979595
    }
   },
   "equal_opportunity": {
    "fit": {
+    "benefit": 0.267385965,
     "constrained": false,
     "cuts": {
      "0": 0.05,
      "1": 0.05
     },
-    "development_gap": 0.0,
-    "net_benefit": 0.267385965,
-    "target_rate": null
+    "gap": 0.0,
+    "target": null
    },
    "test": {
     "alpha": 0.05,
     "criterion": "equal_opportunity",
-    "max_gap": 0.05,
-    "point_gap": 0.184996686,
-    "small_groups": [],
+    "estimate": 0.184996686,
+    "gap": 0.05,
+    "small": [],
     "status": "not_satisfied",
-    "upper_bound": 0.242054241
+    "upper": 0.242054241
    }
   },
   "feasible": {
@@ -482,6 +482,29 @@
      0.061490196
     ]
    ],
+   "everyone": [
+    0.125170068,
+    0.119328882,
+    0.113409169,
+    0.107409335,
+    0.101327743,
+    0.095162709,
+    0.088912504,
+    0.082575352,
+    0.076149425,
+    0.069632845,
+    0.063023679,
+    0.056319941,
+    0.049519586,
+    0.04262051,
+    0.035620547,
+    0.028517469,
+    0.02130898,
+    0.013992716,
+    0.006566242,
+    -0.000972952,
+    -0.008627451
+   ],
    "incumbent": null,
    "lower": [
     [
@@ -579,30 +602,7 @@
     0.1435,
     0.15
    ],
-   "treat_all": [
-    0.125170068,
-    0.119328882,
-    0.113409169,
-    0.107409335,
-    0.101327743,
-    0.095162709,
-    0.088912504,
-    0.082575352,
-    0.076149425,
-    0.069632845,
-    0.063023679,
-    0.056319941,
-    0.049519586,
-    0.04262051,
-    0.035620547,
-    0.028517469,
-    0.02130898,
-    0.013992716,
-    0.006566242,
-    -0.000972952,
-    -0.008627451
-   ],
-   "useful_range": [
+   "useful": [
     0.0525,
     0.15
    ]
@@ -687,6 +687,29 @@
      -0.00019965,
      -0.002235294
     ]
+   ],
+   "everyone": [
+    0.125170068,
+    0.119328882,
+    0.113409169,
+    0.107409335,
+    0.101327743,
+    0.095162709,
+    0.088912504,
+    0.082575352,
+    0.076149425,
+    0.069632845,
+    0.063023679,
+    0.056319941,
+    0.049519586,
+    0.04262051,
+    0.035620547,
+    0.028517469,
+    0.02130898,
+    0.013992716,
+    0.006566242,
+    -0.000972952,
+    -0.008627451
    ],
    "incumbent": [
     0.08537415,
@@ -830,30 +853,7 @@
     0.1435,
     0.15
    ],
-   "treat_all": [
-    0.125170068,
-    0.119328882,
-    0.113409169,
-    0.107409335,
-    0.101327743,
-    0.095162709,
-    0.088912504,
-    0.082575352,
-    0.076149425,
-    0.069632845,
-    0.063023679,
-    0.056319941,
-    0.049519586,
-    0.04262051,
-    0.035620547,
-    0.028517469,
-    0.02130898,
-    0.013992716,
-    0.006566242,
-    -0.000972952,
-    -0.008627451
-   ],
-   "useful_range": [
+   "useful": [
     0.0525,
     0.111
    ]
@@ -872,8 +872,7 @@
  "ope": {
   "diff": {
    "clipped": false,
-   "clipped_share": 0.0,
-   "ess_ratio": 0.424510639,
+   "ess": 0.424510639,
    "estimator": "dr",
    "interval": [
     0.036934417,
@@ -882,12 +881,12 @@
    "reasons": [],
    "status": "issued",
    "tier": "confirmed",
+   "truncation": 0.0,
    "value": 0.071920927
   },
   "dr": {
    "clipped": false,
-   "clipped_share": 0.0,
-   "ess_ratio": 0.651151118,
+   "ess": 0.651151118,
    "estimator": "dr",
    "interval": [
     0.349054966,
@@ -896,12 +895,12 @@
    "reasons": [],
    "status": "issued",
    "tier": "confirmed",
+   "truncation": 0.0,
    "value": 0.380544443
   },
   "dr_clip": {
    "clipped": true,
-   "clipped_share": 0.0,
-   "ess_ratio": 0.651151118,
+   "ess": 0.651151118,
    "estimator": "dr",
    "interval": [
     0.349054966,
@@ -912,12 +911,12 @@
    ],
    "status": "issued",
    "tier": "confirmed",
+   "truncation": 0.0,
    "value": 0.380544443
   },
   "ipw": {
    "clipped": false,
-   "clipped_share": 0.0,
-   "ess_ratio": 0.651151118,
+   "ess": 0.651151118,
    "estimator": "ipw",
    "interval": [
     0.36497398,
@@ -926,12 +925,12 @@
    "reasons": [],
    "status": "issued",
    "tier": "confirmed",
+   "truncation": 0.0,
    "value": 0.39969351
   },
   "ipw_clip": {
    "clipped": true,
-   "clipped_share": 0.0,
-   "ess_ratio": 0.651151118,
+   "ess": 0.651151118,
    "estimator": "ipw",
    "interval": [
     0.36497398,
@@ -942,6 +941,7 @@
    ],
    "status": "issued",
    "tier": "confirmed",
+   "truncation": 0.0,
    "value": 0.39969351
   },
   "mean": [
@@ -966,8 +966,7 @@
   },
   "snips": {
    "clipped": false,
-   "clipped_share": 0.0,
-   "ess_ratio": 0.651151118,
+   "ess": 0.651151118,
    "estimator": "snips",
    "interval": [
     0.355043322,
@@ -976,12 +975,12 @@
    "reasons": [],
    "status": "issued",
    "tier": "confirmed",
+   "truncation": 0.0,
    "value": 0.385521414
   },
   "snips_clip": {
    "clipped": true,
-   "clipped_share": 0.0,
-   "ess_ratio": 0.651151118,
+   "ess": 0.651151118,
    "estimator": "snips",
    "interval": [
     0.355043322,
@@ -992,6 +991,7 @@
    ],
    "status": "issued",
    "tier": "confirmed",
+   "truncation": 0.0,
    "value": 0.385521414
   },
   "support": 0,
@@ -4015,13 +4015,13 @@
      "stationary effect over the window (else the running average)",
      "missing outcomes handled by a declared rule (none applied here)"
     ],
-    "challenger_units": 1007,
-    "level": 0.02,
-    "log_e": {
+    "challenger": 1007,
+    "evalues": {
      "bounce": 1.4087191,
      "conversion": 0.248263437
     },
-    "lower_bound": -0.018485615,
+    "level": 0.02,
+    "lower": -0.018485615,
     "status": "hold",
     "tier": "unverified",
     "units": 2000
@@ -4033,13 +4033,13 @@
      "stationary effect over the window (else the running average)",
      "missing outcomes handled by a declared rule (none applied here)"
     ],
-    "challenger_units": 3038,
-    "level": 0.02,
-    "log_e": {
+    "challenger": 3038,
+    "evalues": {
      "bounce": 7.237456447,
      "conversion": 1.86950375
     },
-    "lower_bound": 0.003187374,
+    "level": 0.02,
+    "lower": 0.003187374,
     "status": "hold_final",
     "tier": "unverified",
     "units": 6000
@@ -4052,13 +4052,13 @@
     "stationary effect over the window (else the running average)",
     "missing outcomes handled by a declared rule (none applied here)"
    ],
-   "challenger_units": 3007,
-   "level": 0.02,
-   "log_e": {
+   "challenger": 3007,
+   "evalues": {
     "bounce": -0.713116375,
     "conversion": 8.144074498
    },
-   "lower_bound": 0.019218023,
+   "level": 0.02,
+   "lower": 0.019218023,
    "status": "hold_final",
    "tier": "unverified",
    "units": 6000
@@ -4107,18 +4107,18 @@
     "p_value": 0.311004088,
     "statistic": 11.624061686
    },
-   "cost_interval": [
+   "cost": 3.3625,
+   "interval": [
     3.148875,
     3.6688125
    ],
-   "expected_cost": 3.3625,
    "recheck": null,
    "rule": {
     "path": "bayes",
     "recalibrator": null,
     "threshold": 0.047619048
    },
-   "stable_range": [
+   "stable": [
     0.02,
     0.15
    ],
@@ -4132,11 +4132,11 @@
     "p_value": 0.0,
     "statistic": 387.433249862
    },
-   "cost_interval": [
+   "cost": 3.4375,
+   "interval": [
     3.224,
     3.7065
    ],
-   "expected_cost": 3.4375,
    "recheck": {
     "calibrated": true,
     "degrees": 10,
@@ -4152,7 +4152,7 @@
     },
     "threshold": 0.047619048
    },
-   "stable_range": [
+   "stable": [
     0.02,
     0.15
    ],

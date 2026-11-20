@@ -526,14 +526,14 @@ def test_select_adds_the_rows_set_aside_as_unseen(monkeypatch):
 
 def test_attested_loads_nothing_unless_named():
     assert (
-        admission.attested(types.SimpleNamespace(attestations=None))
+        admission.attested(types.SimpleNamespace(leakage_attestations=None))
         == ()
     )
 
 
 def test_attested_explains_an_invalid_file(tmp_path):
     (tmp_path / "a.json").write_text("{", encoding="utf-8")
-    spec = types.SimpleNamespace(attestations=str(tmp_path / "a.json"))
+    spec = types.SimpleNamespace(leakage_attestations=str(tmp_path / "a.json"))
     with pytest.raises(
         errors.ConfigError, match="invalid leakage attestations"
     ):
@@ -542,7 +542,7 @@ def test_attested_explains_an_invalid_file(tmp_path):
 
 @dataclasses.dataclass(frozen=True)
 class Profile:
-    feature_plan: object
+    plan: object
 
     def to_dict(self):
         return {"plan": self.plan.numeric}

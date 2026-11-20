@@ -166,9 +166,7 @@ def test_champion_counts_every_dropped_resample(monkeypatch):
             raise ValueError("a resample missing a class")
         return 0.5
 
-    metric = types.SimpleNamespace(
-        name="rmse", maximize=False, score=score
-    )
+    metric = types.SimpleNamespace(name="rmse", maximize=False, score=score)
     monkeypatch.setattr(metrics.CATALOG, "resolve", lambda name, task: metric)
     model = types.SimpleNamespace(
         schema=types.SimpleNamespace(task="regression", group=None, time=None),

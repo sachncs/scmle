@@ -332,7 +332,7 @@ def test_history_keeps_completed_fingerprinted_runs(library):
     assert record.selected_strategy == "default"
     assert record.cv_score == 0.7
     assert record.task == "binary"
-    assert record.dataset == ""
+    assert record.dataset_id == ""
     store.revise("a", cv_score=None)
     store.client.runs[store.parents["a"]].data.metrics.clear()
     assert store.history()[0].cv_score != store.history()[0].cv_score

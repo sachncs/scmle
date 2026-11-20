@@ -96,11 +96,11 @@ class Declaration:
             "modalities",
             tuple(sorted(set(self.modalities), key=lambda item: item.value)),
         )
-        for name, values in (
-            ("extras", self.extras),
-            ("modes", self.modes),
-            ("links", self.links),
-            ("limitations", self.limitations),
+        for label, name, values in (
+            ("required_extras", "extras", self.extras),
+            ("failure_modes", "modes", self.modes),
+            ("evidence_links", "links", self.links),
+            ("limitations", "limitations", self.limitations),
         ):
             entries: Iterable[object] = (
                 values  # may hold non-strings at runtime
@@ -110,7 +110,7 @@ class Declaration:
                 for value in entries
             ):
                 raise errors.InputError(
-                    f"{name} must contain non-empty strings"
+                    f"{label} must contain non-empty strings"
                 )
             object.__setattr__(self, name, tuple(sorted(set(values))))
 

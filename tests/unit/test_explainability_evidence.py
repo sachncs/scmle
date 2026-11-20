@@ -146,9 +146,9 @@ def test_builder_rejects_missing_top_level_identity():
         substantiate(bundle_digest="")
     with pytest.raises(pydantic.ValidationError, match="input_fingerprint"):
         substantiate(input_fingerprint="")
-    with pytest.raises(pydantic.ValidationError, match="dataset_snapshot"):
+    with pytest.raises(pydantic.ValidationError, match="snapshot"):
         substantiate(dataset_snapshot=None)
-    with pytest.raises(pydantic.ValidationError, match="feature_graph"):
+    with pytest.raises(pydantic.ValidationError, match="lineage"):
         substantiate(feature_graph=None)
 
 

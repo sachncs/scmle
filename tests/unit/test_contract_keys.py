@@ -377,7 +377,7 @@ def test_a_policy_writes_the_new_keys_at_every_depth():
 
 def test_a_policy_keeps_its_field_names_in_code():
     loaded = policy()
-    assert loaded.primary_metric == loaded.model_dump()["metric"]
+    assert loaded.metric == loaded.model_dump()["metric"]
     assert loaded.small.warning >= 1
     assert loaded.release.metrics
 

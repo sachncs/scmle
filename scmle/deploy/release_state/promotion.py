@@ -55,7 +55,7 @@ class Promotion(approval.Approval, rollout.Rollout):
             revision restored, where there is one (see `Outcome.restored`).
 
         Raises:
-            RuntimeUnconfirmed: Raised inside the rollout when a health check
+            UnconfirmedError: Raised inside the rollout when a health check
                 stops it. It is caught and reported as ``done=False``, so it
                 does not reach the caller; neither do the platform's other
                 confirmation or support errors.

@@ -464,7 +464,7 @@ def test_admit_refuses_another_format(binary, tmp_path):
     info, legacy = archive.admit(document, False, False)
     assert legacy is False
     assert info.model == "lr"
-    for value in (5, 7, None):
+    for value in (6, 8, None):
         with pytest.raises(errors.ArtifactError, match=f"format {value}"):
             archive.admit({**document, "format": value}, True, True)
 

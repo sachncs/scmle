@@ -130,7 +130,7 @@ def triage(
             else vuln_gate.DEFAULT_POLICY,
         )
     except vuln_gate.GateError:
-        # handled: unparseable report becomes failed ImageScan, documented
+        # handled: unparseable report becomes failed Scan, documented
         return gate.Scan(
             digest=container_digest,
             passed=False,

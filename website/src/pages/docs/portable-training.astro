@@ -3,7 +3,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import DocTable from "../../components/DocTable.astro";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const adapters = [
-  ["<code>Runner</code>", "the workload, in this process", "the training role of <code>RoleStore</code>", "injected, or <code>PreemptedError</code>"],
+  ["<code>Runner</code>", "the workload, in this process", "the training role of <code>Store</code>", "injected, or <code>PreemptedError</code>"],
   ["<code>Process</code>", "the runner entrypoint, a child process", "the training role, in the child", "SIGTERM, then SIGKILL after the grace period"],
   ["<code>Container</code>", "the same entrypoint in an image, through the Docker CLI", "the training role, as uid 10001 on a read-only root", "<code>docker stop</code>: SIGTERM, then SIGKILL"],
 ];
@@ -15,7 +15,7 @@ const adapters = [
   <p class="lead">A <code>Job</code> and a <code>Runner</code> interface. The package ships three runners on this machine (inline, child process and container); a runner for any other place is written by the user against the same interface.</p>
 
   <h2>The spec and the run</h2>
-  <p>A <code>Job</code> names a durable <code>run_id</code> (the idempotency key), the project specification (opaque JSON), the training identity, resources, a timeout, a <code>Retries</code>, an optional <code>CostBudget</code> and a non-secret environment. A GPU needs a stated <code>gpu_reason</code>: specialised compute only behind a declared need. <code>Runner.run(spec)</code> behaves the same on every runner:</p>
+  <p>A <code>Job</code> names a durable <code>run_id</code> (the idempotency key), the project specification (opaque JSON), the training identity, resources, a timeout, a <code>Retries</code>, an optional <code>Budget</code> and a non-secret environment. A GPU needs a stated <code>gpu_reason</code>: specialised compute only behind a declared need. <code>Runner.run(spec)</code> behaves the same on every runner:</p>
   <ul>
     <li>The spec is stored at <code>runs/&lt;id&gt;/spec.json</code>. The same id with a different spec is a <code>ConflictError</code>; a finished id returns its recorded manifest and starts nothing.</li>
     <li><code>runs/&lt;id&gt;/manifest.json</code> is rewritten atomically at every transition: attempts with state, seconds, cost and reason; checkpoint digests; result digest; evidence list; final state.</li>
@@ -26,7 +26,7 @@ const adapters = [
   <p>Workloads save progress with <code>context.step(n, state)</code> and read it back with <code>context.resume()</code>. Each checkpoint carries its own digest; a damaged newest one is skipped and the one before it is used.</p>
 
   <h2>Roles</h2>
-  <p>Training and serving are different identities with different permissions. Training reads <code>data/</code>, <code>runs/</code> and <code>artifacts/</code> and writes <code>runs/</code>, <code>artifacts/</code> and <code>evidence/</code>. Serving reads <code>bundles/</code> and <code>artifacts/</code> and writes <code>audit/</code>. A separation check refuses overlapping write prefixes, a training role that can write <code>bundles/</code> and a serving role that can write <code>runs/</code>. Workloads receive a <code>RoleStore</code> that enforces the training role, and a job spec naming the serving identity is refused by every runner. Releasing a bundle is a third act, with an approval, outside both.</p>
+  <p>Training and serving are different identities with different permissions. Training reads <code>data/</code>, <code>runs/</code> and <code>artifacts/</code> and writes <code>runs/</code>, <code>artifacts/</code> and <code>evidence/</code>. Serving reads <code>bundles/</code> and <code>artifacts/</code> and writes <code>audit/</code>. A separation check refuses overlapping write prefixes, a training role that can write <code>bundles/</code> and a serving role that can write <code>runs/</code>. Workloads receive a <code>Store</code> that enforces the training role, and a job spec naming the serving identity is refused by every runner. Releasing a bundle is a third act, with an approval, outside both.</p>
 
   <h2>Runners</h2>
   <DocTable label="Runners" head={["Runner", "Runs the attempt as", "Identity", "Interruption"]} rows={adapters} />

@@ -192,7 +192,7 @@ adapter = Extension(
 )
 Curator(adapter, key="load-this-from-your-secret-manager", directory="runs/curation").run()`}</code></pre>
   <p>This is the honest starting point for data curation: make the raw snapshot understandable first. Do not implement modelling methods merely to satisfy a curation-only workflow.</p>
-  <p>Move to <code>ModalityProject</code> only after labels, a task, a split policy, a bounded representation, and a modelling decision are justified by the curation evidence. A failed or incomplete curation decision should stop the hand-off.</p>
+  <p>Move to <code>Modality</code> only after labels, a task, a split policy, a bounded representation, and a modelling decision are justified by the curation evidence. A failed or incomplete curation decision should stop the hand-off.</p>
 
   <h2>What the lifecycle proves</h2>
   <ol>

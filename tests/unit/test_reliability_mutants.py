@@ -132,7 +132,7 @@ def test_plan_enum_fields_are_type_checked_under_their_own_names():
     }
     for name, expected in (
         ("scenario", "Contingency"),
-        ("outcome", "SafeOutcome"),
+        ("outcome", "Expectation"),
         ("recoverability", "Recoverability"),
         ("verification", "Verification"),
     ):

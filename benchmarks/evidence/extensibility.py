@@ -504,7 +504,7 @@ def fit(folder, plan, model, **declared):
     planned = made.plan()
     plan(planned)
     run = made.run(dataclasses.replace(planned, candidates=(model,)))
-    assert run.selected_model == model, run.selected_model
+    assert run.model == model, run.model
     return run
 
 
@@ -524,7 +524,7 @@ class Centroid(classical.Learner):
 
     name = "centroid"
     family = "centroid"
-    capability_family = "custom"
+    boundary = "custom"
     capabilities = models.Capabilities(classical.CLASSIFICATION, cost=1)
     classifier = neighbors.NearestCentroid
 

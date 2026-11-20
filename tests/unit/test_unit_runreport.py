@@ -15,7 +15,7 @@ def run(evaluation=None, diagnostics=None, warning=None, importance=None):
     )
     plan = types.SimpleNamespace(summary=lambda: "line one\nline <two>")
     return types.SimpleNamespace(
-        run_id="run_<1>",
+        identifier="run_<1>",
         evaluation={"metrics": {"accuracy": 0.91234, "f1": 0.5}}
         | (evaluation or {}),
         diagnostics=diagnostics or {},
@@ -63,12 +63,12 @@ def test_the_screening_warning_comes_first_and_bold():
 
 def test_a_lone_warning_replaces_the_none_item():
     result = run(warning="only")
-    result.profile.quality_findings = ("only",)
+    result.profile.quality = ("only",)
     result.profile.risk_findings = ()
     page = report.Renderer().render(result, LEADERBOARD)
     assert "<ul><li><b>WARNING only</b></li></ul>" in page
     result.profile.admonition = None
-    result.profile.quality_findings = ()
+    result.profile.quality = ()
     page = report.Renderer().render(result, LEADERBOARD)
     assert "<h2>Findings</h2><ul><li>none</li></ul>" in page
 

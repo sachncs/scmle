@@ -297,7 +297,7 @@ def test_a_handler_failure_is_reported_as_a_runtime_error(tmp_path):
     class Broken(executor.Executor):
         __slots__ = ()
 
-        def run_timeout(self):
+        def expire(self):
             raise OSError("boom")
 
     with pytest.raises(
@@ -310,7 +310,7 @@ def test_evidence_other_than_the_plan_is_refused(tmp_path):
     class Short(executor.Executor):
         __slots__ = ()
 
-        def run_timeout(self):
+        def expire(self):
             return super().expire()[:2]
 
     with pytest.raises(ValueError, match="scenario timeout returned evidence"):
@@ -321,7 +321,7 @@ def test_repeated_evidence_is_refused(tmp_path):
     class Twice(executor.Executor):
         __slots__ = ()
 
-        def run_timeout(self):
+        def expire(self):
             found = super().expire()
             return (*found, found[0])
 

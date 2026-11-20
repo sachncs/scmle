@@ -176,9 +176,7 @@ def test_certificate_rates_and_round_trip():
 def test_certificate_wilson_lower_bound_matches_a_known_value():
     # Wilson 95% interval for 8 successes in 10 trials: (0.4902, 0.9433).
     certificate = make_certificate(planted=10, detected=8)
-    assert certificate.bound(0.95) == pytest.approx(
-        0.4902, abs=1e-3
-    )
+    assert certificate.bound(0.95) == pytest.approx(0.4902, abs=1e-3)
 
 
 def test_certificate_lower_bound_is_below_the_point_estimate():

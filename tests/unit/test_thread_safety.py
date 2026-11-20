@@ -419,7 +419,7 @@ def two_bundles(trained, tmp_path_factory):
     for index in range(4):
         changed = copy.copy(trained.bundle)
         changed.info = dataclasses.replace(
-            trained.bundle.info, model_version=f"v{index}"
+            trained.bundle.info, version=f"v{index}"
         )
         paths.append(changed.save(root / f"b{index}"))
     return paths

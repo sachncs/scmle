@@ -286,7 +286,7 @@ def test_structure_columns_are_not_candidates():
         classification=True,
         seed=0,
         structure=("g",),
-        group="g",
+        group_column="g",
     )
 
     assert found.table is not None

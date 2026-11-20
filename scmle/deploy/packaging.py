@@ -333,9 +333,7 @@ def furnish(root: pathlib.Path, info: Any, image: str) -> None:
     build = root / "build.sh"
     write(
         build,
-        BUILD_SCRIPT.format(
-            name=info.model, version=info.version, image=image
-        ),
+        BUILD_SCRIPT.format(name=info.model, version=info.version, image=image),
     )
     build.chmod(build.stat().st_mode | stat.S_IXUSR)
     write(

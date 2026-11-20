@@ -125,9 +125,7 @@ def test_diagnostics_gathers_the_four_reports_in_record_order(monkeypatch):
 
 
 def test_uncertainty_without_test_rows_measures_nothing():
-    bundle = types.SimpleNamespace(
-        conformal=None, quantile=None, report=None
-    )
+    bundle = types.SimpleNamespace(conformal=None, quantile=None, report=None)
     exam = types.SimpleNamespace(rows=None)
     found = packaging.Packaging().gauge(blank({assessment.Exam: exam}), bundle)
     assert found == bracketing.Uncertainty(None, None)

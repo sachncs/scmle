@@ -13,7 +13,7 @@ class Store:
     def __init__(self):
         self.files = {}
 
-    def write_json(self, name, document):
+    def write(self, name, document):
         self.files[name] = document
 
 

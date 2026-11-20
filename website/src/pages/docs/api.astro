@@ -56,7 +56,7 @@ project = Project(
 )`}</code></pre>
 
   <h2>Run a non-tabular lifecycle explicitly</h2>
-  <p><code>ModalityProject</code> is the public entry point for typed experimental adapters. It accepts the built-in document, image, audio, video, graph, geospatial-vector, and raster families, or a caller-defined <code>Bespoke</code>, through the same fifteen-stage lifecycle. The adapter owns decoding and representation policy; the project owns signed packaging, evidence persistence, inference parity, monitoring, documentation, and recovery checks. <code>Predictor</code>, <code>ModalityHttpServing</code>, and <code>Decoder</code> are also exported for verified library inference and explicit reference serving.</p>
+  <p><code>Modality</code> is the public entry point for typed experimental adapters. It accepts the built-in document, image, audio, video, graph, geospatial-vector, and raster families, or a caller-defined <code>Bespoke</code>, through the same fifteen-stage lifecycle. The adapter owns decoding and representation policy; the project owns signed packaging, evidence persistence, inference parity, monitoring, documentation, and recovery checks. <code>Predictor</code>, <code>ModalityHttpServing</code>, and <code>Decoder</code> are also exported for verified library inference and explicit reference serving.</p>
   <pre><code class="language-python">from scmle.api.project import Modality
 from scmle.data.modalities.document import Dataset, Sample
 from scmle.pipeline.modality_lifecycle import Plaintext
@@ -106,7 +106,7 @@ result = project.run()
 assert result.health()["support_status"] == "experimental"
 print(result.capability.representation)
 print(result.predict(adapter.samples[:2]))`}</code></pre>
-  <p>The explicit opt-in is required because these are bounded, production-oriented artifacts—not supported production capabilities. The result verifies the signed lifecycle report and package, preserves the exact feature schema and dataset identity, and exposes prediction health. Custom adapter subclasses and curation-only extension adapters fail before fitting; use <code>ModalityProject</code> for broader experimental extension work.</p>
+  <p>The explicit opt-in is required because these are bounded, production-oriented artifacts—not supported production capabilities. The result verifies the signed lifecycle report and package, preserves the exact feature schema and dataset identity, and exposes prediction health. Custom adapter subclasses and curation-only extension adapters fail before fitting; use <code>Modality</code> for broader experimental extension work.</p>
 
   <h2>Bring a new dataset family</h2>
   <p>Use <code>Bespoke</code> when your dataset does not fit a built-in identity. It gives the family a stable serialized name and keeps the declaration <code>extension-only</code> even when all fifteen local stages have evidence. For raw records that are not ready for modelling, <code>Extension</code> supplies only source identity, sample ownership, and a caller-owned curation callback; it does not force unused split or feature methods. Read the <a href={`${base}/docs/extensions/`}>extension contract guide</a> for the raw-fixture, curation, adapter, and promotion requirements.</p>
@@ -123,7 +123,7 @@ report = Modality(
     key="load-this-from-your-secret-manager",
 ).run()
 assert report.documentation["status"] == "extension-only"`}</code></pre>
-  <p>For raw or unlabeled data, start with <code>Curator</code>. It produces signed curation and dataset-card evidence without forcing a modelling stage; use <code>ModalityProject</code> only when the curation decision supports a supervised lifecycle.</p>
+  <p>For raw or unlabeled data, start with <code>Curator</code>. It produces signed curation and dataset-card evidence without forcing a modelling stage; use <code>Modality</code> only when the curation decision supports a supervised lifecycle.</p>
 
   <h2>Connect a warehouse without hiding its boundary</h2>
   <p><code>Lakehouse</code> is a transport-neutral contract for a caller-owned warehouse or lakehouse engine. Inject callbacks for schema and bounded batches; the connector records the query in source identity, validates row shape, retries engine failures, and returns a resumable checkpoint. It does not pretend that a callback is a broker, a distributed transaction, or an exactly-once guarantee.</p>
@@ -157,7 +157,7 @@ next_batch = connector.read_rows(batch.checkpoint, limit=10_000)`}</code></pre>
   <p>Curated media reports include duplicate-content label conflicts as blocking risk evidence. That is intentionally stricter than merely counting labels: two source files can be different files but the same underlying image, audio bytes, or video bytes. Image curation also blocks sensitive EXIF metadata until a privacy reviewer records a disposition.</p>
 
   <h2>What is safe to depend on</h2>
-  <p>The supported top-level exports are <code>Project</code>, <code>ModalityProject</code>, <code>Modeler</code>, <code>Predictor</code>, <code>Predictor</code>, <code>ModalityHttpServing</code>, <code>Decoder</code>, <code>RunResult</code>, <code>Bundle</code>, <code>load_model</code>, <code>predict</code>, <code>custom.register</code>, <code>custom.unregister</code>, and <code>metrics.register</code>. Internal modules under <code>scmle.pipeline</code>, <code>scmle.data</code>, and <code>scmle.models</code> may change until promoted into a documented contract.</p>
+  <p>The supported top-level exports are <code>Project</code>, <code>Modality</code>, <code>Modeler</code>, <code>Predictor</code>, <code>Predictor</code>, <code>ModalityHttpServing</code>, <code>Decoder</code>, <code>RunResult</code>, <code>Bundle</code>, <code>load_model</code>, <code>predict</code>, <code>custom.register</code>, <code>custom.unregister</code>, and <code>metrics.register</code>. Internal modules under <code>scmle.pipeline</code>, <code>scmle.data</code>, and <code>scmle.models</code> may change until promoted into a documented contract.</p>
 
   <h2>Experimental document baseline</h2>
   <p>Documents have a deliberately bounded library path for exploration. It curates labelled samples before fitting, evaluates a TF-IDF/logistic baseline on a held-out split, exposes linear global/local term evidence and bounded raw-text term ablation, and writes an atomic package whose manifest verifies both the payload and model digests.</p>

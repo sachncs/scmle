@@ -51,16 +51,16 @@ def test_not_identified_has_no_tier_and_refuses():
 @pytest.mark.parametrize(
     ("changes", "reason"),
     [
-        ({"negative_control_declared": False}, "no negative control"),
-        ({"battery_ran": False}, "no negative control"),
-        ({"replication_passed": None}, "fewer than two strata"),
-        ({"replication_passed": False}, "disagree"),
-        ({"sensitivity_holds": None}, "no sensitivity"),
-        ({"sensitivity_holds": False}, "sensitivity gate failed"),
-        ({"single_unit": True}, "nothing to hold out"),
-        ({"weak_instrument": True}, "weak instrument"),
-        ({"adjustment_checked": False}, "unchecked attestation"),
-        ({"estimated_on_c": False}, "did not use C"),
+        ({"negative": False}, "no negative control"),
+        ({"ran": False}, "no negative control"),
+        ({"replicated": None}, "fewer than two strata"),
+        ({"replicated": False}, "disagree"),
+        ({"holds": None}, "no sensitivity"),
+        ({"holds": False}, "sensitivity gate failed"),
+        ({"unit": True}, "nothing to hold out"),
+        ({"instrument": True}, "weak instrument"),
+        ({"checked": False}, "unchecked attestation"),
+        ({"confirmatory": False}, "did not use C"),
         ({"certified": GATES - {"overlap"}}, "design gate"),
         ({"certified": GATES - {"coverage_aipw"}}, "design gate"),
         ({"certified": GATES - {"battery_nco"}}, "battery has no passing"),
@@ -82,8 +82,8 @@ def test_each_missing_condition_caps_the_tier_at_attested(changes, reason):
     [
         {"attestors": {"positivity": "A"}},
         {"attestors": {"positivity": " ", "no_interference": "B"}},
-        {"design_passed": False},
-        {"battery_passed": False},
+        {"sound": False},
+        {"passed": False},
     ],
 )
 def test_missing_attestation_failed_design_or_rejection_is_unverified(changes):

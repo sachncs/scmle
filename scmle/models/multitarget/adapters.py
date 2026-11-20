@@ -61,7 +61,7 @@ class Multitarget(models.Model):
             "capabilities": capabilities,
             "classifier": classifier,
             "regressor": regressor,
-            "search_space": search_space,
+            "space": search_space,
         }
         for attribute, value in given.items():
             if value is not None:

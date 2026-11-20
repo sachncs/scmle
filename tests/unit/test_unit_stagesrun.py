@@ -203,7 +203,9 @@ def test_the_reserve_event_reports_the_seconds_held(run):
 
 def test_each_trial_is_written_once(run):
     result = run[0]
-    written = sorted(p.stem for p in (result.directory / "trials").glob("*.json"))
+    written = sorted(
+        p.stem for p in (result.directory / "trials").glob("*.json")
+    )
     assert written == sorted(t.identifier for t in result.trials)
     assert len(set(written)) == len(written)
 

@@ -252,9 +252,7 @@ def test_predict_with_explicit_renames(binary_frame, tmp_path, monkeypatch):
         writes.append((path, content))
         return real_write(path, content)
 
-    monkeypatch.setattr(
-        cli.delivery.durability, "write", record_write
-    )
+    monkeypatch.setattr(cli.delivery.durability, "write", record_write)
     code = cli.main([*base, "--rename", "A_value=a", "--case-insensitive"])
     assert code == 0 and len(pandas.read_csv(output)) == len(binary_frame)
     assert writes and writes[0][0] == output

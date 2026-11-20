@@ -97,9 +97,7 @@ def test_the_decision_files_are_written_with_a_randomized_log(tmp_path):
     # Enforces website/src/pages/docs/api-stability.astro:47.
     # Enforces website/src/pages/docs/artifacts.astro:35.
     # Enforces website/src/pages/docs/cli.astro:35.
-    result = run(
-        tmp_path, action="treat", propensity="prop"
-    )
+    result = run(tmp_path, action="treat", propensity="prop")
     folder = pathlib.Path(result.directory)
 
     value = read(result, "policy_value.json")
@@ -135,9 +133,7 @@ def test_the_four_decision_files_are_registered_and_verified(tmp_path):
     # Enforces website/src/pages/docs/artifacts.astro:34.
     from scmle.artifacts import claims_audit
 
-    result = run(
-        tmp_path, action="treat", propensity="prop"
-    )
+    result = run(tmp_path, action="treat", propensity="prop")
     folder = pathlib.Path(result.directory)
 
     assert read(result, "decision_threshold.json")["threshold"] is not None

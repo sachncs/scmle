@@ -183,9 +183,7 @@ def test_guessing_credentials_is_slowed(reference):
     # Enforces website/src/pages/docs/threat-model.astro:21.
     clock = support_identity.Clock()
     ticks = support_identity.Clock(0.0)
-    gateway = make_gateway(
-        clock, failure_limiter=access.Limiter(1.0, 3, clock=ticks)
-    )
+    gateway = make_gateway(clock, throttle=access.Limiter(1.0, 3, clock=ticks))
     adapter = server.Service(reference, gateway=gateway)
     adapter.start()
     try:

@@ -20,7 +20,7 @@ from scmle.storage import objectstore
 def spec(**fields):
     return job.Job(
         **{
-            "run_id": "run-1",
+            "identifier": "run-1",
             "name": "train",
             "project": {"b": 1, "a": 2},
             "identity": "trainer",
@@ -54,14 +54,14 @@ def test_a_cost_budget_must_be_positive():
 
 
 def test_the_run_id_must_be_short_and_safe():
-    assert spec(identifier="a" * 64).run_id == "a" * 64
+    assert spec(identifier="a" * 64).identifier == "a" * 64
     for bad in ("", "a" * 65, "a/b", "a b", "ä"):
         with pytest.raises(errors.ConfigError, match="run_id must be 1-64"):
             spec(identifier=bad)
 
 
 def test_a_job_needs_a_timeout_and_an_identity():
-    for bad in ({"timeout_seconds": 0}, {"identity": ""}):
+    for bad in ({"timeout": 0}, {"identity": ""}):
         with pytest.raises(errors.ConfigError, match="timeout and an identity"):
             spec(**bad)
 
@@ -187,7 +187,7 @@ class Scripted(runner.Runner):
     def submit(self, spec, attempt):
         self.submitted.append(attempt)
         if self.result:
-            self.store.put(self.result_key(spec.run_id), b"{}")
+            self.store.put(self.result_key(spec.identifier), b"{}")
         return job.Ticket(f"job-{attempt}", attempt)
 
     def poll(self, handle):
@@ -262,7 +262,7 @@ def test_a_timeout_cancels_the_attempt_and_confirms_it(store):
         job.Status(job.State.CANCELLED, "stopped")
     ]
     made = Scripted(store, statuses)
-    manifest = made.run(quick(timeout_seconds=1.5))
+    manifest = made.run(quick(timeout=1.5))
     assert manifest.state == job.Progress.TIMED_OUT.value
     assert made.cancelled == [("job-1", "timed_out")]
     assert manifest.attempts[0].state == "cancelled"

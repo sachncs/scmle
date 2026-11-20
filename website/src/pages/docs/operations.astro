@@ -224,12 +224,12 @@ candidate = registry.resolve("customers", "challenger")
 approval = Sanction(
     model="customers",
     version=candidate.version,
-    content_id=candidate.content_id,
+    content=candidate.content_id,
     reviewer="reviewer@example.com",
     decision=Verdict.APPROVED,
     reason="held-out, slice, explanation, and recovery evidence reviewed",
     evidence=("evidence/release-2026-10-20.json",),
-    approved_at="2026-10-20T00:00:00+00:00",
+    approved="2026-10-20T00:00:00+00:00",
 ).sign("release-key")
 manager.elevate(approval, signing_key="release-key")
 print(registry.resolve("customers").version)`}</code></pre>

@@ -142,17 +142,13 @@ def test_no_model_that_can_enforce_the_monotonic_rule_blocks():
     """
     context = types.SimpleNamespace(
         spec=types.SimpleNamespace(
-            data=types.SimpleNamespace(constraints={"a": 1})
+            data=types.SimpleNamespace(monotonic_constraints={"a": 1})
         ),
         task=tasks.Task.BINARY,
     )
     candidates = [
-        types.SimpleNamespace(
-            name="forest", family="tree", param=None
-        ),
-        types.SimpleNamespace(
-            name="prior", family="baseline", param=None
-        ),
+        types.SimpleNamespace(name="forest", family="tree", param=None),
+        types.SimpleNamespace(name="prior", family="baseline", param=None),
     ]
     with pytest.raises(errors.BlockedError, match="no available model"):
         planner.Monotonicity().apply(context, candidates, [])

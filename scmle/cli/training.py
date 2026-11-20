@@ -195,7 +195,7 @@ def declarations(args: argparse.Namespace) -> Mapping[str, Any]:
     if args.estimation is None:
         return fairness
     estimand, policy = estimation.load(args.estimation)
-    return {**fairness, "estimand": estimand, "estimation_policy": policy}
+    return {**fairness, "estimand": estimand, "policy": policy}
 
 
 class ProjectCommand(command.Command):

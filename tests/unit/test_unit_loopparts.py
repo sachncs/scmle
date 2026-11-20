@@ -596,9 +596,9 @@ def test_turning_on_the_coverage_test_is_amended_or_gated(tmp_path):
 
 ACTION_FIRST = (
     "silence",
-    "act_on_unverified",
+    "act",
     "delete_or_send",
-    "change_label_policy",
+    "relabel",
 )
 
 
@@ -607,10 +607,10 @@ ACTION_FIRST = (
     [
         ("silence", "alert-1", "suppress_own_alert"),
         ("rewrite", {"row": 3}, "edit_ledger_or_register_late"),
-        ("reopen_sealed", {"set": "C"}, "reopen_sealed_set"),
-        ("act_on_unverified", "retrain", "act_on_unverified_stream"),
+        ("reopen", {"set": "C"}, "reopen_sealed_set"),
+        ("act", "retrain", "act_on_unverified_stream"),
         ("delete_or_send", "model", "delete_or_send_external"),
-        ("change_label_policy", {"rate": 0.2}, "change_labelling_policy"),
+        ("relabel", {"rate": 0.2}, "change_labelling_policy"),
         ("revert", {"to": 1}, "move_champion_or_roll_back"),
     ],
 )

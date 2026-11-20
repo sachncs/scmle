@@ -87,7 +87,7 @@ def directory(root: str | pathlib.Path, tenant: str) -> pathlib.Path:
         TenantError: If the tenant name is invalid.
         EscapeError: If an existing part of the path is a symbolic link.
     """
-    base = pathlib.Path(os.path.abspath(root))  # noqa: PTH100 -- lexical, see LocalObjectStore.locate
+    base = pathlib.Path(os.path.abspath(root))  # noqa: PTH100 -- lexical, see Disk.locate
     target = base / ROOT / qualify(tenant)
     real = pathlib.Path(os.path.realpath(base), ROOT, tenant)
     if os.path.normcase(os.path.realpath(target)) != os.path.normcase(real):

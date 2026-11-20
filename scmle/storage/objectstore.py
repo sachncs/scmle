@@ -254,7 +254,7 @@ class Depot(abc.ABC):
             ExistsError: With `if_absent` and an existing object.
             ConflictError: With `if_version` and a missing object or another
                 version.
-            TransientStoreError: On a retryable service failure.
+            TransientError: On a retryable service failure.
         """
 
     @abc.abstractmethod

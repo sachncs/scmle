@@ -194,7 +194,7 @@ def test_imbalance_and_duplicates(classification_frame):
     assert any("imbalance" in r for r in result.risk_findings)
     duplicated = pandas.concat([frame, frame.head(5)])
     result = profile(duplicated)[1]
-    assert any("duplicate" in q for q in result.quality_findings)
+    assert any("duplicate" in q for q in result.quality)
 
 
 def test_regression_target_summary():
@@ -226,10 +226,7 @@ def test_outcome_dependent_recording_is_reported_as_possible_leakage():
         "'discharge_code'" in finding and "recorded" in finding
         for finding in result.risk_findings
     )
-    assert (
-        result.statistics["discharge_code"]["missingness_association"]
-        >= 0.9
-    )
+    assert result.statistics["discharge_code"]["missingness_association"] >= 0.9
     assert result.statistics["signal"]["missingness_association"] == 0.0
 
 

@@ -50,7 +50,7 @@ def test_informative_gaps_are_reported_and_the_flags_are_not_ruled_out(
     assert result.profile.plan.informative_missing == ("gappy",)
     assert any(
         "missingness of 'gappy'" in finding
-        for finding in result.profile.quality_findings
+        for finding in result.profile.quality
     )
     assert not any("associated" in o.get("reason", "") for o in outcomes)
 

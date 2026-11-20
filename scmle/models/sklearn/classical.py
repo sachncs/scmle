@@ -120,8 +120,8 @@ class Learner(models.Model):
             "classifier": classifier,
             "regressor": regressor,
             "fixed": fixed,
-            "search_space": search_space,
-            "monotonic_param": monotonic_param,
+            "space": search_space,
+            "param": monotonic_param,
         }
         for attribute, value in given.items():
             if value is not None:

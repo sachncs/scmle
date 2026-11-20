@@ -181,8 +181,8 @@ class Trial:
             for the fit-health check (a bounded sample of those rows).
         migrations: Version steps of the stored trial. Version 2 writes
             single-word keys (`identifier`, `model`, `score`, `deviation`,
-            `folds`, `fit` in seconds, `access`, `evaluation`, `training`);
-            the fields keep their names. A trial carries no version key, so
+            `folds`, `fit` in seconds, `access`, `evaluation`, `training`),
+            the names of the fields. A trial carries no version key, so
             `load` reads either layout.
     """
 
@@ -251,7 +251,7 @@ class Trial:
         """
         layout = records.load(cls.__name__, cls.migrations, record)
         layout.pop(records.KEY)
-        fields = records.downgrade(cls.migrations, layout)
+        fields = dict(layout)
         failure = fields.get("failure") or {}
         fields["failure"] = (
             json.loads(failure) if isinstance(failure, str) else failure

@@ -553,9 +553,7 @@ def leak(form: str) -> Callable[[Lab], Callable[[], dict[str, Any]]]:
 
     def prepare(lab: Lab) -> Callable[[], dict[str, Any]]:
         frame = leaked(form)
-        return lambda: trained(
-            project(lab, frame, leakage="block").run()
-        )
+        return lambda: trained(project(lab, frame, leakage="block").run())
 
     return prepare
 

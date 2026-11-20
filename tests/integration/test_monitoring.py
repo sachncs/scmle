@@ -99,7 +99,7 @@ def test_prediction_log_joins_late_outcomes(trained, tmp_path):
     logged = log.chronicle(trained.bundle, frame.drop(columns="y"))
     assert (
         len(logged) == 60
-        and logged[0].version == trained.bundle.info.version
+        and logged[0].model_version == trained.bundle.info.version
     )
     assert logged[0].probability is not None
     truth = {

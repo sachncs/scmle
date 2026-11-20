@@ -375,7 +375,7 @@ def entitle(
 
     Raises:
         TypeError: If ``adapter`` is not a ``Preparer``.
-        UnsupportedNonTabularModelError: If its exact type is not allowlisted.
+        UnsupportedError: If its exact type is not allowlisted.
     """
     if not isinstance(adapter, modality_lifecycle.Preparer):
         raise errors.KindError("adapter must be a Preparer")
@@ -413,7 +413,7 @@ def conform(
         capability: The capability of the reference adapter.
 
     Raises:
-        UnsupportedNonTabularModelError: If the observed adapter has another
+        UnsupportedError: If the observed adapter has another
             capability or, for video and raster adapters, another decoder
             object.
     """
@@ -485,7 +485,7 @@ def consent(experimental_opt_in: bool, capability: Scope) -> None:
 
     Raises:
         TypeError: If the acknowledgement is not a bool.
-        UnsupportedNonTabularModelError: If it is not given.
+        UnsupportedError: If it is not given.
     """
     if not isinstance(experimental_opt_in, bool):
         raise errors.KindError("experimental_opt_in must be bool")
@@ -565,7 +565,7 @@ class Modeler:
             resume: Whether to resume from the checkpoint.
 
         Raises:
-            UnsupportedNonTabularModelError: If opt-in is absent, the adapter is
+            UnsupportedError: If opt-in is absent, the adapter is
                 outside the exact built-in boundary, or the observed adapter
                 differs in capability or decoder.
             TypeError: If an adapter is not a `Preparer`, or a flag, the

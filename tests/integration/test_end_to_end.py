@@ -138,10 +138,7 @@ def test_group_and_temporal_runs(binary_frame, tmp_path):
         g=numpy.arange(len(binary_frame)) % 50,
         t=numpy.arange(len(binary_frame)),
     )
-    assert (
-        run(frame, tmp_path, group="g").evaluation["validation"]
-        == "group"
-    )
+    assert run(frame, tmp_path, group="g").evaluation["validation"] == "group"
     assert (
         run(frame, tmp_path, timestamp="t").evaluation["validation"]
         == "temporal"
@@ -270,9 +267,7 @@ def test_time_series_contracts_end_to_end(binary_frame, tmp_path):
     )
     result = project.run()
     assert "outcome_code" not in result.bundle.features
-    assert (
-        "not available" in result.profile.plan.dropped["outcome_code"]
-    )
+    assert "not available" in result.profile.plan.dropped["outcome_code"]
     assert result.evaluation["validation"] == "temporal"
 
 

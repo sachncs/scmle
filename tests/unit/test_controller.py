@@ -57,9 +57,7 @@ def test_a_malformed_file_is_rejected_once_and_escalated(world):
     assert result.rejected == ("b0000.csv",)
     assert result.observed == 1
     assert not controller.loop.halted
-    questions = [
-        e.question["action"] for e in controller.loop.survey()
-    ]
+    questions = [e.question["action"] for e in controller.loop.survey()]
     assert questions.count("controller_input_rejected") == 1
     again = world.controller().tick(world.inbox)
     assert again.rejected == () and again.observed == 0
@@ -82,9 +80,7 @@ def test_no_new_data_opens_one_escalation(world):
     assert not controller.loop.survey()
     controller.tick(world.inbox)
     controller.tick(world.inbox)
-    actions = [
-        e.question["action"] for e in controller.loop.survey()
-    ]
+    actions = [e.question["action"] for e in controller.loop.survey()]
     assert actions == ["controller_no_new_data"]
 
 
@@ -94,9 +90,7 @@ def test_labels_that_never_arrive_open_one_escalation(world):
     for index in range(4):
         world.deliver(index, labels=False)
         controller.tick(world.inbox)
-    actions = [
-        e.question["action"] for e in controller.loop.survey()
-    ]
+    actions = [e.question["action"] for e in controller.loop.survey()]
     assert actions == ["controller_labels_not_arriving"]
 
 

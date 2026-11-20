@@ -31,9 +31,7 @@ def table(rows=240, seed=0, leak=False):
 
 
 def build(tmp_path, policy, frame):
-    return support.make_project(
-        frame, "y", directory=tmp_path, leakage=policy
-    )
+    return support.make_project(frame, "y", directory=tmp_path, leakage=policy)
 
 
 def test_block_stops_a_flagged_column_even_with_a_stale_certificate(

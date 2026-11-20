@@ -213,7 +213,7 @@ def test_a_metrics_outage_spools_and_drains_every_sample():
 
 def test_the_catalogue_maps_every_local_fault_to_its_scenario():
     assert catalogue.SCENARIOS["process_kill"] is crashes.process
-    assert catalogue.SCENARIOS["bad_release"] is release.release
+    assert catalogue.SCENARIOS["bad_release"] is release.restore
     assert catalogue.SCENARIOS["dependency_outage"] is outages.blackout
     assert catalogue.SCENARIOS["secret_rotation_recovery"] is service.rekey
     assert set(catalogue.SCENARIOS) == {

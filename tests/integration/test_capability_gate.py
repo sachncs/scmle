@@ -159,7 +159,7 @@ def test_capability_family_is_used_before_training():
 
         name = "experimental_transformer"
         family = "deep_learning"
-        capability_family = "transformer"
+        boundary = "transformer"
 
     board = profiled(
         model_registry=scmle.models.registry.Catalog(

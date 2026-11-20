@@ -190,9 +190,7 @@ def test_search_is_invariant_to_test_labels_and_test_features(
     )
     assert [
         (t.identifier, t.model, t.strategy, t.params) for t in second.trials
-    ] == [
-        (t.identifier, t.model, t.strategy, t.params) for t in first.trials
-    ]
+    ] == [(t.identifier, t.model, t.strategy, t.params) for t in first.trials]
     for a, b in zip(first.trials, second.trials, strict=True):
         assert a.folds == pytest.approx(b.folds)
     assert second.model == first.model
@@ -235,9 +233,7 @@ def test_profile_and_feature_plan_never_see_the_locked_test_rows(
     before, after = base.profile, other.profile
     assert before.statistics == after.statistics
     assert before.plan == after.plan
-    assert without_timings(before.overview) == without_timings(
-        after.overview
-    )
+    assert without_timings(before.overview) == without_timings(after.overview)
     rows = before.overview["shape"]
     assert rows["rows"] == len(split.manifest.training)
     assert rows["total_rows"] == len(binary_frame)

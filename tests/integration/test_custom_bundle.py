@@ -34,7 +34,7 @@ bundle = scmle.artifacts.bundle.Bundle.load(sys.argv[1], trusted=True)
 rows = pandas.read_csv(sys.argv[2])
 numpy.save(sys.argv[3], bundle.predict_proba(rows))
 print(json.dumps({
-    "model": bundle.info.model_name,
+    "model": bundle.info.model,
     "metric": bundle.info.metric,
     "registered": "centroid" in registry.Catalog.stock().adapters
     or "business_cost" in metrics.CATALOG.metrics,

@@ -74,7 +74,7 @@ def test_a_plane_deploys_and_observes_real_revisions(tmp_path):
 
 
 def test_a_bad_release_is_detected_and_rolled_back():
-    result = release.release()
+    result = release.restore()
     assert result.checks, result
     assert all(result.checks.values()), result.checks
     assert result.fault == "bad_release"

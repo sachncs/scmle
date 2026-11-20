@@ -109,7 +109,7 @@ def test_ledger_checks_what_trials_actually_received(binary_frame, tmp_path):
     ]
     forged = dataclasses.replace(
         observed[0],
-        observed_access=[
+        access=[
             {
                 **observed[0].access[0],
                 "fit": {"rows": 1, "digest": "x"},

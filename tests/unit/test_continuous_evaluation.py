@@ -92,9 +92,7 @@ def test_a_recommendation_reaches_a_person_and_trains_only_after_approval(
 def test_a_rejecting_reply_does_not_start_a_retrain(tmp_path):
     loop, ev, ignored, called = degraded(tmp_path)
     decision = ev.review(loss_signals(0.4))
-    target = next(
-        e for e in loop.survey() if e.id == decision.escalation
-    )
+    target = next(e for e in loop.survey() if e.id == decision.escalation)
     loop.reply(target.id, reply_to(target, "reject"))
     with pytest.raises(ValueError):
         ev.execute(decision.escalation)

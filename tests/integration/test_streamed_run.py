@@ -58,9 +58,7 @@ def test_every_locked_row_is_scored_by_streaming_the_file(sampled):
 
 
 def test_the_profile_says_the_file_was_streamed(sampled):
-    assert any(
-        "streamed" in finding for finding in sampled.profile.quality_findings
-    )
+    assert any("streamed" in finding for finding in sampled.profile.quality)
     assert sampled.evaluation["validation"] == "preset"
 
 

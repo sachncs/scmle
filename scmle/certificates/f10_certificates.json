@@ -3,7 +3,7 @@
   "gates": {
     "battery_nco": {
       "alpha_falsify": 0.01,
-      "code_hash": "13dba60e9b89780f3c9e869825d7b04d38fc00a973fd89d6119e5469669eb5ed",
+      "code_hash": "322c8be3371fe5062e357654c3e81cbe31ae0f492ab7f14965b6809755aeb28f",
       "curve": {
         "0.0": {
           "exact": [
@@ -71,7 +71,7 @@
         "rate": 0.01
       },
       "false_alarm_ceiling": 0.0169,
-      "method_hash": "f1a5ca03d6af9190c738c0b603b64bd5e6608f3f493b62899658f8df12bd9639",
+      "method_hash": "6591c88b7a399285b097d156070c4b23731a8eab1d10b5916ed4d34499aae895",
       "passed": true,
       "seeds": [
         0,
@@ -80,7 +80,7 @@
     },
     "battery_pretrend": {
       "alpha_falsify": 0.01,
-      "code_hash": "dba12d97b86d999c7a889adccf496816c6746fde7533522cb355b3ee3c56da27",
+      "code_hash": "90b90b11783fadacbd01cad004666d21d2a67d55ba5958cd513d7be07ee8bc72",
       "curve": {
         "0.0": {
           "exact": [
@@ -148,7 +148,7 @@
         "rate": 0.0105
       },
       "false_alarm_ceiling": 0.0169,
-      "method_hash": "2b0b5285e6d70b97196370c818faa06814c90c37072e8e443e4fff7fd5860852",
+      "method_hash": "c3165326d734b66a6ba12723e6adfe70dc7148892614b18e249ccb981d109ca4",
       "passed": true,
       "seeds": [
         0,
@@ -157,7 +157,7 @@
     },
     "battery_rd": {
       "alpha_falsify": 0.01,
-      "code_hash": "a8a6188dde10d5b24a15f725833e621a527b15527582ec0b8a010256d39ee0c0",
+      "code_hash": "b27c3fed8ad2652fe1c2d103c21e6dc14ea80d74254d3ccf221bad429abb9f61",
       "curve": {
         "0.0": {
           "exact": [
@@ -225,7 +225,7 @@
         "rate": 0.0085
       },
       "false_alarm_ceiling": 0.0169,
-      "method_hash": "b011a7506f18c5eb8ad70ed175753732fa5972252703408364efadb51342822b",
+      "method_hash": "3e6d360fff9f459b0322b59f973a8d193f9c8f217ec5b6226ae35b85c916c6b5",
       "passed": true,
       "seeds": [
         0,
@@ -233,8 +233,8 @@
       ]
     },
     "coverage_aipw": {
-      "code_hash": "3b77cf208a4cb4418b742b6038d80fb97ed5cf1f5422ef5cf44d6d90b109d6f9",
-      "method_hash": "beb55981586861870f5dae44245cdd06ae801a7bdb2e416287c8754006f2a612",
+      "code_hash": "76e735ec5b068a8f74c0a0ee030244c1205618daa1008817231929ba2be41b06",
+      "method_hash": "865f9b8714071ddcbc7cd9aad773dce3bc5fbd6d4bb0f115183cc082401c1544",
       "passed": false,
       "seeds": [
         0,
@@ -280,8 +280,8 @@
       }
     },
     "coverage_did": {
-      "code_hash": "acd1cc6bf4e1cfa9c6207973a07fbed599a52b80092c06a576004afaa36438cf",
-      "method_hash": "5d557daac22c41a56ddc0f130abb1fedd8a5588187636b2ced978238c36c3ee7",
+      "code_hash": "7f732ef260e479a0187bdc8bf269b723d3cf29340e161ed8c5e1d0b52c595ff7",
+      "method_hash": "d89f5bd4bfc8c2cae3f73377279eec775b83139bc8acf416ad99b65632ebb201",
       "passed": true,
       "seeds": [
         0,
@@ -315,7 +315,7 @@
       }
     },
     "coverage_iv": {
-      "code_hash": "204b4c9346053cacd1dd583658431380b6d04b29bed434b4d74d1b92d3f12d08",
+      "code_hash": "17869900a862671628ef3933cab5e659dacb532b8843e129bf7c62f3a4af9b64",
       "coverage": {
         "exact": [
           0.9487742291849405,
@@ -326,7 +326,7 @@
         "n": 2000,
         "rate": 0.957
       },
-      "method_hash": "bb14bb8eb1c75578445c893ce8f9fa3112774628fc6b0a8996bec8f026f7f88c",
+      "method_hash": "bc7b3524bb703571f99a689c34fb7dea2ac5899c85749e1730535a70f164f558",
       "passed": true,
       "seeds": [
         0,
@@ -335,7 +335,7 @@
       "weak_flags": 0
     },
     "coverage_randomized": {
-      "code_hash": "ce453b900214e9a65008ca9e3b355fe5cef2d70153415b6dc9d4e5625d2e6cf3",
+      "code_hash": "0d0a3ab8f2836aeec657421e5cbd2f83b4136351ed99475ab0506bc7d82a27d7",
       "coverage": {
         "exact": [
           0.9364029871620545,
@@ -346,7 +346,7 @@
         "n": 2000,
         "rate": 0.9455
       },
-      "method_hash": "1ede287d5086124d0e6af9f8b66eb301152211d4fb65ff721fa88493442c250d",
+      "method_hash": "b2bf724d749df69f21484fb07be2229aa503957881b15a509796d1e3803b9f9a",
       "passed": true,
       "seeds": [
         0,
@@ -354,7 +354,7 @@
       ]
     },
     "coverage_rd": {
-      "code_hash": "65b7f24956215e705069913d24820d10113524703dfb78680d6be169df5e867f",
+      "code_hash": "02608b9f258a99b8afba5498e1651c8e6d28869f70429e8b2298c460b968bd2c",
       "coverage": {
         "exact": [
           0.9482336992011465,
@@ -367,7 +367,7 @@
         "rate": 0.9565,
         "z_within_0.1": true
       },
-      "method_hash": "69ff92a12b16ddbdb1b78acb7f96d65af0b068c1924b3754561e4d7bde1b7981",
+      "method_hash": "fa87d48e845a130167dca2fe21f00e4d5f35587f60ff16d39753101b43c34412",
       "passed": true,
       "seeds": [
         0,
@@ -376,7 +376,7 @@
     },
     "density_rd": {
       "alpha_falsify": 0.01,
-      "code_hash": "7ef6649737070aedc97a146c9b541afcf87d108c613f8aabfb9d37853ea43429",
+      "code_hash": "af1682d1d5d64ca39144e12a38855c0ce73d3e614b983ac51a8a72427e87fd63",
       "curve": {
         "0.0": {
           "exact": [
@@ -444,7 +444,7 @@
         "rate": 0.01
       },
       "false_alarm_ceiling": 0.0169,
-      "method_hash": "6ef30211a8e27ebcc228e7a0a2c394372b9771f743f02e7580abe9d175388dcb",
+      "method_hash": "c358f48d2daabe2acbeb7082db556b3c926df9778e5f6f36ecdd9c08fae65e17",
       "passed": true,
       "seeds": [
         0,
@@ -452,8 +452,8 @@
       ]
     },
     "false_confirm": {
-      "code_hash": "848bd87fd5ab4e412a7f245f9e7a27d4546803b0d3a27dcb35204210de9bcfd1",
-      "method_hash": "759cfc335fa1df9db0de425a44b90aac6048023e4619a6048faa8a6931c4dace",
+      "code_hash": "75a6ff17267c67dca16b8f07f217d9d2ab8b6afb4b31ef62888bb1676f56a688",
+      "method_hash": "c4cd1f1c9a37d0af1a2b8f8e1866dcabaf2da640f9ae501fd1e2dd3de1f0e114",
       "note": "all other gates were marked certified for this run; the unshared-confounder row is the known blind spot",
       "passed": true,
       "replicates": 300,
@@ -525,8 +525,8 @@
       }
     },
     "iv_strength": {
-      "code_hash": "5019ea9278c8a15d80a99836710c45bf0126fe8004348cd50b0ab679d15b8a3a",
-      "method_hash": "70ae3a372beaab6b4aad87cf48e596edcde3335ee1ebe0706378de6dd217216d",
+      "code_hash": "1b0232df5419d5e38a9b767e13e3ee3568f0132a05232802a4b308e9a6a197e7",
+      "method_hash": "fab48de580ef8d607438cc261368ba0811d0847b1674cf3d6dc8cd55907ceece",
       "passed": true,
       "seeds": [
         0,
@@ -675,8 +675,8 @@
         "n": 200,
         "rate": 1.0
       },
-      "code_hash": "b4b503c27859fa61ba9e204f73d32701edbf5e8d9d09ce5756657c22d86ecac0",
-      "method_hash": "2fb64659e309ba534af01a849a140b3d8c94bd00390c2c8be4d4939d74e92215",
+      "code_hash": "ce877847940e70d9f62b3f76d51d23f4f1ec7c5f8457ebd9f7ce99fc7e438303",
+      "method_hash": "8d69c6bb1027d254c3306da10e6f5b25386f2172f93cc30e06f7cacbaf513a42",
       "passed": true,
       "refuses_when_none_eligible": {
         "exact": [
@@ -694,8 +694,8 @@
       ]
     },
     "sensitivity_bound": {
-      "code_hash": "e8546d3e2442b607af6bd6b496be9cc5ff3b351a69b50b0c2d3dc9a19b7777c6",
-      "method_hash": "3786b78ac258ef05093d30bcd998f730fadd59535f75ec5605bf7587ffb1a58b",
+      "code_hash": "841f05375b7d89ad7e24122e5f1b3c056907d9bb1b6e607f3233e74419127bb6",
+      "method_hash": "be411551b581be899639b45d5dfe88ac4bdc1f2e7ab64117d1ed729577f33dba",
       "passed": true,
       "replicates": 1000,
       "seeds": [
@@ -766,7 +766,7 @@
       }
     },
     "sensitivity_did": {
-      "code_hash": "df72921d578a27183fbc0874f9df7159a4de27e5c6b785bc71eee93855e08dbd",
+      "code_hash": "11585010050e8564ad93f38290bfc39a62ca4880502b139c59131ad3379a0f03",
       "drift_per_period": 0.1,
       "m0_coverage": {
         "exact": [
@@ -787,7 +787,7 @@
         "n": 500,
         "rate": 0.96
       },
-      "method_hash": "42931936499549e883062a8ea460d69618a9c042b30e868d39f8f87173bb1bcf",
+      "method_hash": "1340daf22c64cfdd5f4b8d6b02142c4eccddf6cdf1a85ac93633cf500efe990a",
       "passed": true,
       "replicates": 500,
       "seeds": [
@@ -796,8 +796,8 @@
       ]
     },
     "size_synth": {
-      "code_hash": "ea7c625bc04c902086a40cf71369cb9f3c9a320465f48d523364c529592f6ff5",
-      "method_hash": "bd372dfe3ee52e4dd85a86132a954093f53cdd807c059eb81e4c5149e7657cc4",
+      "code_hash": "0fb7f9f91ceb9179ee287be7c48cfe9b087c578d308ae447b12b5896eab5c227",
+      "method_hash": "bc79e0c2d6a1ed3594d0de1ad80024a5b120b2dd305b6679218ca0f4d8c73b15",
       "passed": true,
       "power_at_effect_3": {
         "exact": [

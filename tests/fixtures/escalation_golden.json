@@ -291,7 +291,6 @@
   "grid": {
    "coverage": 0.700666667,
    "delta": 0.05,
-   "r_star": 0.1,
    "risk": 0.060894386,
    "steps": [
     {
@@ -323,6 +322,7 @@
      "tau": 0.3
     }
    ],
+   "target": 0.1,
    "tau": 0.3,
    "weighted": false
   },
@@ -334,7 +334,6 @@
   "plain": {
    "coverage": 0.539333333,
    "delta": 0.1,
-   "r_star": 0.05,
    "risk": 0.039555006,
    "steps": [
     {
@@ -730,13 +729,13 @@
      "tau": 0.45
     }
    ],
+   "target": 0.05,
    "tau": 0.46,
    "weighted": false
   },
   "small": {
    "coverage": 0.0,
    "delta": 0.1,
-   "r_star": 0.05,
    "risk": "nan",
    "steps": [
     {
@@ -1447,13 +1446,13 @@
      "tau": 0.0
     }
    ],
+   "target": 0.05,
    "tau": "inf",
    "weighted": false
   },
   "weighted": {
    "coverage": 0.539333333,
    "delta": 0.1,
-   "r_star": 0.05,
    "risk": 0.039555006,
    "steps": [
     {
@@ -1849,6 +1848,7 @@
      "tau": 0.45
     }
    ],
+   "target": 0.05,
    "tau": 0.46,
    "weighted": true
   }
