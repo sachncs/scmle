@@ -165,9 +165,7 @@ def test_error_analysis_ranks_regression_residuals():
 
 def test_suite_selects_by_task_and_isolates_failures():
     suite = scmle.pipeline.suite.lineup()
-    binary = scmle.pipeline.suite.run_suite(
-        make_inputs(tasks.Task.BINARY), suite
-    )
+    binary = scmle.pipeline.suite.run(make_inputs(tasks.Task.BINARY), suite)
     assert set(binary) == {
         "classification_report",
         "calibration",
@@ -182,7 +180,7 @@ def test_suite_selects_by_task_and_isolates_failures():
         "robustness",
         "adversarial_validation",
     }
-    regression = scmle.pipeline.suite.run_suite(
+    regression = scmle.pipeline.suite.run(
         make_inputs(tasks.Task.REGRESSION), suite
     )
     assert set(regression) == {
@@ -204,7 +202,7 @@ def test_suite_selects_by_task_and_isolates_failures():
         def compute(self, inputs):
             raise RuntimeError("boom")
 
-    reports = scmle.pipeline.suite.run_suite(
+    reports = scmle.pipeline.suite.run(
         make_inputs(tasks.Task.BINARY),
         (Broken(), diagnostics.Calibration()),
     )
@@ -404,7 +402,7 @@ def test_run_suite_ends_by_the_run_deadline_not_its_own_allowance():
             return {}
 
     finish = diagnostics.clock() + 5.0
-    scmle.pipeline.suite.run_suite(
+    scmle.pipeline.suite.run(
         make_inputs(tasks.Task.BINARY), (Probe(),), 100.0, deadline=finish
     )
 
@@ -412,7 +410,7 @@ def test_run_suite_ends_by_the_run_deadline_not_its_own_allowance():
 
 
 def test_run_suite_records_every_diagnostic_skipped_after_the_deadline():
-    reports = scmle.pipeline.suite.run_suite(
+    reports = scmle.pipeline.suite.run(
         make_inputs(tasks.Task.BINARY),
         scmle.pipeline.suite.lineup(),
         deadline=diagnostics.clock() - 1.0,
@@ -432,7 +430,7 @@ def test_run_suite_skips_what_cannot_fit_and_runs_what_can():
         def compute(self, inputs):
             raise AssertionError("must not start")
 
-    reports = scmle.pipeline.suite.run_suite(
+    reports = scmle.pipeline.suite.run(
         make_inputs(tasks.Task.BINARY),
         (Slow(), diagnostics.Calibration()),
         deadline=diagnostics.clock() + 30.0,

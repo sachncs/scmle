@@ -124,7 +124,7 @@ class Tuner(hyperband.Hyperband):
         )
         remaining = search.configs_per_model
         while remaining > 0:
-            reason = board.services.governor.skip_reason(first=False)
+            reason = board.services.governor.skip(first=False)
             if reason:
                 board.journal.forgo(
                     f"tuning {name}: {remaining} configurations", reason
@@ -133,9 +133,9 @@ class Tuner(hyperband.Hyperband):
             board.services.check()
             size = min(batch_size, remaining)
             remaining -= size
-            self.run_batch(name, strategy, optimizer, size)
+            self.batch(name, strategy, optimizer, size)
 
-    def run_batch(
+    def batch(
         self,
         name: str,
         strategy: str,
@@ -159,7 +159,7 @@ class Tuner(hyperband.Hyperband):
             map(operator.call, itertools.repeat(optimizer.ask, size))
         )
         ids = self.board.journal.allocate(len(proposals))
-        first_rung = self.runner.run_many(
+        first_rung = self.runner.dispatch(
             [
                 trials.Job(trial_id, name, params, rung_folds, strategy)
                 for trial_id, params in zip(ids, proposals, strict=True)
@@ -171,7 +171,7 @@ class Tuner(hyperband.Hyperband):
             winners = [t for t in first_rung if t.trial_id in survivors]
             finished = {
                 t.trial_id: t
-                for t in self.runner.run_many(
+                for t in self.runner.dispatch(
                     [
                         trials.Job(
                             t.trial_id, t.model_name, t.params, None, t.strategy

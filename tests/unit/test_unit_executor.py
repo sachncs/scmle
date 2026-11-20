@@ -44,20 +44,18 @@ def quick(attempts=3):
 
 
 def task(name, *needs, **changes):
-    values = {"retries": quick(), "timeout_seconds": 50.0}
+    values = {"retries": quick(), "timeout": 50.0}
     values.update(changes)
-    return definition.Step(
-        name, definition.StepKind.TRAIN, tuple(needs), **values
-    )
+    return definition.Step(name, definition.Kind.TRAIN, tuple(needs), **values)
 
 
 def gate(name, *needs, expires=100.0):
     return definition.Step(
         name,
-        definition.StepKind.APPROVAL,
+        definition.Kind.APPROVAL,
         tuple(needs),
         approvers=("boss", "peer"),
-        expires_seconds=expires,
+        expiry=expires,
     )
 
 
@@ -80,7 +78,7 @@ def build(store, clock, workflow, handlers=None, **options):
         handlers = {
             s.name: (lambda c, n=s.name: {"made": n})
             for s in workflow.steps
-            if s.kind is not definition.StepKind.APPROVAL
+            if s.kind is not definition.Kind.APPROVAL
         }
     executor = runs.Executor(
         workflow,
@@ -99,9 +97,9 @@ def build(store, clock, workflow, handlers=None, **options):
 
 
 def frame(store, clock, step=None, **changes):
-    return context.StepContext(
+    return context.Context(
         "run",
-        step or task("a", cost_budget=10.0),
+        step or task("a", budget=10.0),
         1,
         "key",
         {},
@@ -128,15 +126,15 @@ def test_a_context_spend_accumulates_and_allows_exactly_the_step_budget(
     current.spend(4.0)
     current.spend(6.0)
     assert current.spent == 10.0
-    with pytest.raises(failures.StepBudgetError, match=r"a cost passed 10\.0"):
+    with pytest.raises(failures.BudgetError, match=r"a cost passed 10\.0"):
         current.spend(0.5)
     assert current.spent == 10.5
 
 
 def test_a_context_spend_checks_the_run_budget_with_earlier_cost(store, clock):
-    current = frame(store, clock, task("a"), run_spent=7.0, run_budget=10.0)
+    current = frame(store, clock, task("a"), accrued=7.0, budget=10.0)
     current.spend(3.0)
-    with pytest.raises(failures.StepBudgetError, match="run's cost budget"):
+    with pytest.raises(failures.BudgetError, match="run's cost budget"):
         current.spend(0.01)
 
 
@@ -177,30 +175,30 @@ def test_a_distill_is_the_sha256_of_sorted_json():
 
 def test_a_run_id_is_the_name_and_sixteen_digest_characters():
     workflow = flow(task("a"))
-    run = records.run_id_for(workflow, "slot-1")
+    run = records.identify(workflow, "slot-1")
     digest = records.distill(["flow", "1", "slot-1"])
     assert run == f"flow-{digest[:16]}"
-    assert records.run_id_for(workflow, "slot-1") == run
-    assert records.run_id_for(workflow, "slot-2") != run
+    assert records.identify(workflow, "slot-1") == run
+    assert records.identify(workflow, "slot-2") != run
 
 
 def test_a_run_id_of_a_long_name_is_cut_to_sixty_four_characters():
     workflow = definition.Workflow("w" * 60, "1", (task("a"),))
-    assert len(records.run_id_for(workflow, "x")) == 64
+    assert len(records.identify(workflow, "x")) == 64
 
 
 def test_records_read_keys_under_the_run_prefix(store, clock):
     executor = build(store, clock, flow(task("a")))
     assert executor.base("r1") == "workflows/flow/runs/r1/"
-    assert executor.run_record("r1") is None
-    assert executor.step_record("r1", "a") is None
+    assert executor.record("r1") is None
+    assert executor.step("r1", "a") is None
     store.put("workflows/flow/runs/r1/run.json", b'{"state": "x"}')
     store.put("workflows/flow/runs/r1/steps/a.json", b'{"state": "y"}')
-    assert executor.run_record("r1") == {"state": "x"}
-    assert executor.step_record("r1", "a") == {"state": "y"}
+    assert executor.record("r1") == {"state": "x"}
+    assert executor.step("r1", "a") == {"state": "y"}
     store.put("workflows/flow/runs/r1/run.json", b"[]")
     with pytest.raises(errors.ArtifactError):
-        executor.run_record("r1")
+        executor.record("r1")
 
 
 # ---- leases ----------------------------------------------------------------
@@ -273,10 +271,10 @@ def test_renewing_a_lease_moves_its_expiry_and_never_back(store, clock):
     executor = build(store, clock, flow(task("a")), lease_seconds=60.0)
     executor.acquire("r1")
     clock.now += 30.0
-    executor.renew_lease("r1")
+    executor.renew("r1")
     assert lock(store)["expires"] == 1090.0
     clock.now = 0.0
-    executor.renew_lease("r1")
+    executor.renew("r1")
     assert lock(store)["expires"] == 1090.0
 
 
@@ -361,13 +359,13 @@ def test_an_idempotency_key_hashes_run_step_parameters_and_upstream(
 ):
     executor = build(store, clock, flow(task("a")))
     step = task("a", parameters={"p": 1})
-    key = executor.idempotency_key("r1", step, {"b": {"x": 1}})
+    key = executor.key("r1", step, {"b": {"x": 1}})
     expected = records.distill(
         ["r1", "a", {"p": 1}, {"b": records.distill({"x": 1})}]
     )
     assert key == expected
-    assert executor.idempotency_key("r2", step, {"b": {"x": 1}}) != key
-    assert executor.idempotency_key("r1", step, {"b": {"x": 2}}) != key
+    assert executor.key("r2", step, {"b": {"x": 1}}) != key
+    assert executor.key("r1", step, {"b": {"x": 2}}) != key
 
 
 def test_note_cuts_a_plain_failure_to_three_hundred_characters(store, clock):
@@ -395,12 +393,12 @@ def test_note_keeps_a_framework_or_retryable_failure_whole(store, clock):
 def test_begin_builds_a_context_timed_from_now(store, clock):
     executor = build(store, clock, flow(task("a")))
     current = executor.begin("r1", task("a"), 2, "k", {"u": {}}, 3.5)
-    assert current.run_id == "r1"
+    assert current.run == "r1"
     assert current.attempt == 2
-    assert current.idempotency_key == "k"
+    assert current.key == "k"
     assert current.started == 1000.0
-    assert current.run_spent == 3.5
-    assert current.run_budget is None
+    assert current.accrued == 3.5
+    assert current.budget is None
 
 
 def test_a_transient_failure_is_retried_after_the_policy_delay(store, clock):
@@ -415,11 +413,11 @@ def test_a_transient_failure_is_retried_after_the_policy_delay(store, clock):
 
     executor = build(store, clock, flow(task("a")), {"a": flaky})
     executor.acquire("r1")
-    state, outputs, cost = executor.run_step("r1", task("a"), {}, 0.0)
+    state, outputs, cost = executor.process("r1", task("a"), {}, 0.0)
     assert (state, outputs, cost) == ("succeeded", {"ok": True}, 3.0)
     assert calls == [1, 2, 3]
     assert clock.sleeps == [2.0, 6.0]
-    saved = executor.step_record("r1", "a")
+    saved = executor.step("r1", "a")
     assert saved["state"] == "succeeded"
     assert saved["cost"] == 3.0
     assert [a["state"] for a in saved["attempts"]] == [
@@ -437,10 +435,10 @@ def test_a_step_that_keeps_failing_transiently_fails_after_its_attempts(
 
     executor = build(store, clock, flow(task("a")), {"a": always})
     executor.acquire("r1")
-    state, outputs, cost = executor.run_step("r1", task("a"), {}, 0.0)
+    state, outputs, cost = executor.process("r1", task("a"), {}, 0.0)
     assert (state, outputs, cost) == ("failed", {}, 0.0)
     assert clock.sleeps == [2.0, 6.0]
-    saved = executor.step_record("r1", "a")
+    saved = executor.step("r1", "a")
     assert saved["state"] == "failed"
     assert len(saved["attempts"]) == 3
     assert "down" in saved["error"]
@@ -453,10 +451,10 @@ def test_a_plain_error_fails_the_step_without_a_retry(store, clock):
 
     executor = build(store, clock, flow(task("a")), {"a": broken})
     executor.acquire("r1")
-    state, outputs, cost = executor.run_step("r1", task("a"), {}, 0.0)
+    state, outputs, cost = executor.process("r1", task("a"), {}, 0.0)
     assert (state, outputs, cost) == ("failed", {}, 2.0)
     assert clock.sleeps == []
-    saved = executor.step_record("r1", "a")
+    saved = executor.step("r1", "a")
     assert saved["cost"] == 2.0
     assert len(saved["attempts"]) == 1
 
@@ -468,7 +466,7 @@ def test_a_step_past_its_timeout_fails(store, clock):
 
     executor = build(store, clock, flow(task("a")), {"a": slow})
     executor.acquire("r1")
-    assert executor.run_step("r1", task("a"), {}, 0.0)[0] == "failed"
+    assert executor.process("r1", task("a"), {}, 0.0)[0] == "failed"
 
 
 def test_a_step_that_succeeded_with_the_same_key_is_not_run_again(store, clock):
@@ -480,19 +478,19 @@ def test_a_step_that_succeeded_with_the_same_key_is_not_run_again(store, clock):
 
     executor = build(store, clock, flow(task("a")), {"a": once})
     executor.acquire("r1")
-    first = executor.run_step("r1", task("a"), {}, 0.0)
-    second = executor.run_step("r1", task("a"), {}, 0.0)
+    first = executor.process("r1", task("a"), {}, 0.0)
+    second = executor.process("r1", task("a"), {}, 0.0)
     assert first == ("succeeded", {"n": 1}, 0.0)
     assert second == ("succeeded", {"n": 1}, 0.0)
     assert calls == [1]
-    third = executor.run_step("r1", task("a"), {"b": {"new": 1}}, 0.0)
+    third = executor.process("r1", task("a"), {"b": {"new": 1}}, 0.0)
     assert third[1] == {"n": 2}
 
 
 def test_a_handler_returning_none_succeeds_with_no_outputs(store, clock):
     executor = build(store, clock, flow(task("a")), {"a": lambda c: None})
     executor.acquire("r1")
-    assert executor.run_step("r1", task("a"), {}, 0.0) == ("succeeded", {}, 0.0)
+    assert executor.process("r1", task("a"), {}, 0.0) == ("succeeded", {}, 0.0)
 
 
 # ---- approvals -------------------------------------------------------------
@@ -505,8 +503,8 @@ def gated():
 def test_admit_needs_succeeded_parents_and_room_in_the_group(store, clock):
     workflow = flow(
         task("a"),
-        task("b", "a", concurrency_group="g"),
-        group_limits={"g": 2},
+        task("b", "a", concurrency="g"),
+        limits={"g": 2},
     )
     executor = build(store, clock, workflow)
     step = workflow.step("b")
@@ -554,7 +552,7 @@ def test_an_approval_run_waits_then_finishes_once_approved(store, clock):
         executor.ratify(signed)
     done = executor.resume(record["run_id"])
     assert done["state"] == "succeeded"
-    assert executor.step_record(record["run_id"], "ok")["outputs"] == {
+    assert executor.step(record["run_id"], "ok")["outputs"] == {
         "approver": "boss"
     }
 
@@ -568,13 +566,13 @@ def test_a_rejected_approval_ends_the_run_rejected(store, clock):
     done = executor.resume(record["run_id"])
     assert done["state"] == "rejected"
     assert done["steps"]["b"] == "skipped"
-    assert executor.step_record(record["run_id"], "ok")["approver"] == "peer"
+    assert executor.step(record["run_id"], "ok")["approver"] == "peer"
 
 
 def test_an_approval_expires_only_after_its_window(store, clock):
     executor = build(store, clock, gated())
     record = executor.start("t1", requested_by="dev")
-    since = executor.step_record(record["run_id"], "ok")["waiting_since"]
+    since = executor.step(record["run_id"], "ok")["waiting_since"]
     assert since == 1000.0
     clock.now += 100.0
     assert executor.resume(record["run_id"])["state"] == "waiting_approval"
@@ -683,7 +681,7 @@ def test_a_failed_step_skips_its_dependents_but_not_independent_steps(
         "c": "skipped",
         "d": "succeeded",
     }
-    assert executor.step_record(record["run_id"], "b")["reason"] == "upstream"
+    assert executor.step(record["run_id"], "b")["reason"] == "upstream"
     assert record["ended_at"] == 1000.0
 
 
@@ -713,12 +711,12 @@ def test_a_run_over_its_budget_stops_the_remaining_steps(store, clock):
         current.spend(4.0)
         return {}
 
-    workflow = flow(task("a"), task("b", "a"), cost_budget=3.0)
+    workflow = flow(task("a"), task("b", "a"), budget=3.0)
     executor = build(store, clock, workflow, {"a": costly, "b": costly})
     record = executor.start("t1")
     assert record["state"] == "budget_stopped"
     assert record["steps"]["b"] == "pending"
-    assert executor.step_record(record["run_id"], "b")["reason"] == "run budget"
+    assert executor.step(record["run_id"], "b")["reason"] == "run budget"
 
 
 def test_a_failed_run_resumes_from_its_failed_steps(store, clock):
@@ -761,9 +759,9 @@ def test_an_executor_needs_a_handler_for_every_working_step(store, clock):
 
 def test_an_executor_keeps_its_settings(store, clock):
     executor = runs.Executor(flow(task("a")), store, {"a": lambda c: {}})
-    assert executor.lease_seconds == 300.0
+    assert executor.tenure == 300.0
     assert executor.owner == "executor"
-    assert executor.approver_keys == {}
+    assert executor.approvers == {}
     assert executor.fences == {}
 
 
@@ -812,18 +810,18 @@ def test_concurrent_runs_beyond_the_limit_are_refused(store, clock):
     holder = build(store, clock, flow(task("a")), owner="other")
     holder.acquire("someone")
     with pytest.raises(
-        failures.ConcurrencyLimitError, match="1 runs of flow are in flight"
+        failures.CapacityError, match="1 runs of flow are in flight"
     ):
         executor.start("t1")
-    roomy = build(store, clock, flow(task("a"), max_concurrent_runs=2))
+    roomy = build(store, clock, flow(task("a"), concurrency=2))
     assert roomy.start("t1")["state"] == "succeeded"
 
 
 def test_a_run_held_by_another_executor_is_busy(store, clock):
-    workflow = flow(task("a"), max_concurrent_runs=2)
+    workflow = flow(task("a"), concurrency=2)
     executor = build(store, clock, workflow)
     holder = build(store, clock, workflow, owner="other")
-    run = records.run_id_for(workflow, "t1")
+    run = records.identify(workflow, "t1")
     holder.acquire(run)
     with pytest.raises(failures.BusyError, match="held by other"):
         executor.start("t1")
@@ -873,7 +871,7 @@ def test_a_bucket_keeps_a_runs_records_under_its_prefix(store, clock):
     kept = bucket.record(
         0, "a", status.Phase.SUCCEEDED, 1.5, {"v": 1}, None, cost=2.0
     )
-    stored = executor.step_record("r1", "a")
+    stored = executor.step("r1", "a")
     assert stored == {
         "step": "a",
         "state": "succeeded",
@@ -889,7 +887,7 @@ def test_a_bucket_keeps_a_runs_records_under_its_prefix(store, clock):
     assert failed["product"] is None
     assert bucket.restore(1, "b", None, {}) is None
     bucket.keep("run.json", {"state": "running"})
-    assert executor.run_record("r1") == {"state": "running"}
+    assert executor.record("r1") == {"state": "running"}
     before = sorted(meta.key for meta in store.list_objects("workflows/"))
     bucket.finish()
     assert sorted(m.key for m in store.list_objects("workflows/")) == before
@@ -899,9 +897,9 @@ def test_a_bucket_writes_through_the_runs_fenced_write(store, clock):
     executor = build(store, clock, flow(task("a")))
     executor.acquire("r1")
     executor.bucket("r1").record(0, "a", status.Phase.RUNNING, 0.0)
-    assert executor.step_record("r1", "a")["fence"] == 1
+    assert executor.step("r1", "a")["fence"] == 1
     holder = build(store, clock, flow(task("a")), owner="other")
-    clock.now += executor.lease_seconds + 1
+    clock.now += executor.tenure + 1
     holder.acquire("r1")
     with pytest.raises(failures.EvictionError):
         executor.bucket("r1").record(0, "a", status.Phase.FAILED, 0.0)

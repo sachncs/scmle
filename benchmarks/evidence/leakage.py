@@ -4,7 +4,7 @@ Each case runs the product exactly as a run does up to its leakage gate:
 `scmle.api.project.Project(..., leakage_policy="block").plan()` ingests the
 table, splits it, profiles the development rows (where
 `Profiler.leakage_screen` runs the permutation screen) and applies
-`ProfileStage.enforce_leakage_policy`. A case is *blocked by the screen*
+`Profiling.enforce_leakage_policy`. A case is *blocked by the screen*
 when that raises `BlockedError` carrying the screen's `leakage` evidence.
 
 Two corpora, both of real public tables (scikit-learn's bundled sets and
@@ -777,7 +777,7 @@ def digest() -> str:
         scmle.assurance.admissibility.screen.report,
         scmle.assurance.admissibility.screen.settings,
         profiler.Profiler.leakage_screen,
-        stages.ProfileStage.enforce_leakage_policy,
+        stages.Profiling.enforce_leakage_policy,
         refusal.fetch,
         Table,
         Case,

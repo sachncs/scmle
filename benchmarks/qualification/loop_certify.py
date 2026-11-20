@@ -394,7 +394,7 @@ def eprocess_paths(gaps: numpy.ndarray) -> numpy.ndarray:
     paths = numpy.empty((count, batches))
     for step in range(batches):
         test.update((gaps[:, step] + 1.0) / 2.0)
-        paths[:, step] = test.log_capital
+        paths[:, step] = test.capital
     return paths
 
 
@@ -408,7 +408,7 @@ def elond_decisions(paths: numpy.ndarray, horizon: int) -> numpy.ndarray:
     Returns:
         A boolean array, True for each promoted challenger.
     """
-    sequence = sequential_tests.PromotionSequence("1/20")
+    sequence = sequential_tests.Sequence("1/20")
     rejected = numpy.zeros(paths.shape[0], dtype=bool)
     pointer = 0
     for index in range(paths.shape[0]):
@@ -938,7 +938,7 @@ def sources() -> dict[str, list[Any]]:
         "H3": [sequential_tests.Mixture, streams.simulate, gate_h3],
         "H4": [
             sequential_tests.Mixture,
-            sequential_tests.PromotionSequence,
+            sequential_tests.Sequence,
             sequence_gaps,
             eprocess_paths,
             elond_decisions,

@@ -112,7 +112,7 @@ def test_strategy_registry_entries_are_self_describing():
 
 
 def test_the_stages_cover_the_lifecycle_states_in_order():
-    states = [stage.state for stage in stages.default_stages()]
+    states = [stage.state for stage in stages.sequence()]
     assert len(set(states)) == 7
     assert states == sorted(states, key=list(state.Progress).index)
 
@@ -183,9 +183,9 @@ def test_the_workflow_is_a_compiled_dag_of_declared_dependencies():
     from scmle.contracts import errors
     from scmle.runtime import engine
 
-    default = stages.default_stages()
+    default = stages.sequence()
     kinds = [type(s) for s in default]
-    assert kinds[0] is stages.IngestStage and kinds[-1] is stages.PackageStage
+    assert kinds[0] is stages.Ingest and kinds[-1] is stages.Packaging
     shuffled = list(reversed(default))
     assert [type(s) for s in engine.order(shuffled)] == kinds
     with pytest.raises(errors.ConfigError, match="requires"):
@@ -207,12 +207,12 @@ def test_the_workflow_is_a_compiled_dag_of_declared_dependencies():
 def test_a_replacement_stage_subclass_satisfies_dependencies():
     from scmle.runtime import engine
 
-    class Custom(stages.TrainStage):
+    class Custom(stages.Training):
         pass
 
     swapped = [
-        Custom() if isinstance(s, stages.TrainStage) else s
-        for s in stages.default_stages()
+        Custom() if isinstance(s, stages.Training) else s
+        for s in stages.sequence()
     ]
     ordered = engine.order(swapped)
     assert [type(s) for s in ordered].count(Custom) == 1

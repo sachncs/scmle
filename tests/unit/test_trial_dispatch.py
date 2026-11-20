@@ -28,12 +28,12 @@ class Backend:
     def map(self, function, items, on_failure=None):
         outputs = []
         for item in items:
-            self.ceilings.append(item.ceiling_seconds)
+            self.ceilings.append(item.ceiling)
             self.clock.now += 10.0
             outputs.append(
                 experiments.Trial(
-                    item.job.trial_id,
-                    item.job.model_name,
+                    item.job.trial,
+                    item.job.model,
                     experiments.Termination.OK,
                     "accuracy",
                     0.5,
@@ -48,7 +48,7 @@ def runner(monkeypatch, budget, reserve):
     clock = Clock()
     monkeypatch.setattr(limits.time, "monotonic", clock)
     governor = limits.Governor(
-        tasks.Resources(time_budget_seconds=budget), started_at=clock.now
+        tasks.Resources(time_budget_seconds=budget), started=clock.now
     )
     governor.reserve.parts = {"refit": reserve}
     backend = Backend(clock)
@@ -67,9 +67,7 @@ def runner(monkeypatch, budget, reserve):
     monkeypatch.setattr(
         trials.Runner,
         "payload",
-        lambda self, job: SimpleNamespace(
-            job=job, ceiling_seconds=governor.deadline()
-        ),
+        lambda self, job: SimpleNamespace(job=job, ceiling=governor.deadline()),
     )
     return built, backend
 
@@ -80,7 +78,7 @@ def test_each_job_gets_the_window_left_when_it_is_dispatched(monkeypatch):
         trials.Job(f"t{index}", "dummy", {}, None, "smote")
         for index in range(5)
     ]
-    results = built.run_many(jobs)
+    results = built.dispatch(jobs)
     assert backend.ceilings == [35.0, 25.0, 15.0, 5.0]
     assert [r.status for r in results][:4] == [experiments.Termination.OK] * 4
     skipped = results[4]
@@ -93,7 +91,7 @@ def test_a_strategy_search_the_window_cannot_hold_is_skipped_on_record():
     from scmle.pipeline import strategy_search
 
     governor = limits.Governor(
-        tasks.Resources(time_budget_seconds=10), started_at=0.0
+        tasks.Resources(time_budget_seconds=10), started=0.0
     )
     recorded = []
     board = SimpleNamespace(

@@ -10,14 +10,14 @@ def target() -> slo.Slo:
     """Build a target with an explicit operational response path."""
     return slo.Slo(
         name="prediction-latency",
-        metric_name="p95_latency_ms",
+        metric="p95_latency_ms",
         kind=observability.Indicator.LATENCY,
         maximum=250.0,
-        window_days=7,
-        minimum_samples=2,
+        window=7,
+        samples=2,
         owner="ml-on-call",
         runbook="https://runbooks.example/prediction-latency",
-        alert_route="on-call",
+        route="on-call",
     )
 
 
@@ -44,8 +44,8 @@ def test_slo_passes_and_records_owner_runbook_and_budget():
     )
 
     assert result.status is slo.Status.PASS
-    assert result.incident_required is False
-    assert result.error_budget_remaining == pytest.approx(0.2)
+    assert result.required is False
+    assert result.remaining == pytest.approx(0.2)
     assert result.to_dict()["owner"] == "ml-on-call"
 
 
@@ -65,9 +65,9 @@ def test_slo_breach_preserves_incident_path_and_uses_worst_sample():
     )
 
     assert result.status is slo.Status.BREACHED
-    assert result.incident_required
+    assert result.required
     assert result.target.runbook.endswith("prediction-latency")
-    assert result.observed_maximum == 400.0
+    assert result.maximum == 400.0
 
 
 def test_slo_is_not_green_when_data_is_missing_or_future():
@@ -90,9 +90,9 @@ def test_slo_is_not_green_when_data_is_missing_or_future():
     )
 
     assert missing.status is slo.Status.INSUFFICIENT_DATA
-    assert missing.incident_required
+    assert missing.required
     assert future.status is slo.Status.INVALID
-    assert future.incident_required
+    assert future.required
 
 
 def test_slo_rejects_missing_operational_metadata_and_invalid_limits():
@@ -100,24 +100,24 @@ def test_slo_rejects_missing_operational_metadata_and_invalid_limits():
     with pytest.raises(ValueError, match="owner"):
         slo.Slo(
             name="latency",
-            metric_name="p95_latency_ms",
+            metric="p95_latency_ms",
             kind=observability.Indicator.LATENCY,
             maximum=250.0,
-            window_days=7,
-            minimum_samples=1,
+            window=7,
+            samples=1,
             owner="",
             runbook="runbook",
-            alert_route="on-call",
+            route="on-call",
         )
     with pytest.raises(ValueError, match="maximum"):
         slo.Slo(
             name="latency",
-            metric_name="p95_latency_ms",
+            metric="p95_latency_ms",
             kind=observability.Indicator.LATENCY,
             maximum=-1.0,
-            window_days=7,
-            minimum_samples=1,
+            window=7,
+            samples=1,
             owner="owner",
             runbook="runbook",
-            alert_route="on-call",
+            route="on-call",
         )

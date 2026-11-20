@@ -23,7 +23,7 @@ override = "none; the unit check runs only when the ingest plan sets unit, and r
 variables = ["unit", "target_table", "tolerances.key", "tolerances.null", "tolerances.link", "queries", "scanned", "seconds", "features", "reconcile", "reconciliation", "store", "cardinality"]
 
 [policy.checkpoints]
-site = "scmle.pipeline.orchestrator:Orchestrator.consult_checkpoints"
+site = "scmle.pipeline.orchestrator:Orchestrator.consult"
 error = "BlockedError"
 claim = "C8"
 passes = "Every checkpoint registered for the completed stage's state approves its review."
@@ -41,7 +41,7 @@ override = "Set leakage_policy to 'warn' (the default), which logs warnings inst
 variables = ["leakage"]
 
 [admissibility.quarantine_all]
-site = "scmle.pipeline.stages.admission:Admission.qualify_exploration"
+site = "scmle.pipeline.stages.admission:Admission.qualify"
 error = "BlockedError"
 claim = "C2"
 passes = "At least one feature of the feature plan is not quarantined by admissibility."
@@ -52,7 +52,7 @@ certificate = "detector_certificates.json: F5 detectors (the leakage screen gate
 
 
 [data.unlabeled]
-site = "scmle.pipeline.stages.labelling:Labelling.set_aside_unlabeled"
+site = "scmle.pipeline.stages.labelling:Labelling.sideline"
 error = "BlockedError"
 claim = "C5"
 passes = "data.unlabeled is ignore or pseudo_label, so rows with a missing target are set aside."
@@ -61,7 +61,7 @@ override = "Set data.unlabeled to 'ignore' or 'pseudo_label'."
 variables = ["data.unlabeled", "data.target"]
 
 [select.serving_limits]
-site = "scmle.pipeline.stages.selecting:SelectStage.choose"
+site = "scmle.pipeline.stages.selecting:Selection.choose"
 error = "BlockedError"
 claim = "C1"
 passes = "No serving limit is set and pareto is off, or one of the top max_candidates_checked trials, refit and measured, is within every limit."
@@ -70,7 +70,7 @@ override = "Relax selection.max_model_mb or selection.max_p95_latency_ms, or rai
 variables = ["selection.size", "selection.latency", "selection.headroom", "selection.depth", "selection.pareto"]
 
 [select.pareto_front]
-site = "scmle.pipeline.stages.selecting:SelectStage.select_on_front"
+site = "scmle.pipeline.stages.selecting:Selection.balance"
 error = "BlockedError"
 claim = "C1"
 passes = "At least one checked candidate, refit and measured, meets the serving limits."
@@ -115,7 +115,7 @@ override = "none"
 variables = []
 
 [profile.monotonic_columns]
-site = "scmle.pipeline.profiler:Profiler.monotonic_features"
+site = "scmle.pipeline.profiler:Profiler.constrain"
 error = "BlockedError"
 claim = "C1"
 passes = "Every column in data.monotonic_constraints is a numeric feature."
@@ -430,7 +430,7 @@ override = "none"
 variables = []
 
 [plan.gpu_required]
-site = "scmle.pipeline.planner:GpuFilter.apply"
+site = "scmle.pipeline.planner:Gpu.apply"
 error = "BlockedError"
 claim = "C1"
 passes = "resources.gpu is not required, or at least one candidate can use a GPU."
@@ -439,7 +439,7 @@ override = "Set resources.gpu to 'auto' (or install a GPU-capable adapter), as t
 variables = ["resources.gpu"]
 
 [plan.monotonic]
-site = "scmle.pipeline.planner:MonotonicFilter.apply"
+site = "scmle.pipeline.planner:Monotonicity.apply"
 error = "BlockedError"
 claim = "C1"
 passes = "No monotonic constraint is set, or the task is not multiclass and a candidate can enforce the constraints."
@@ -457,7 +457,7 @@ override = "none; raise resources.budget (time_budget, --budget) to at least the
 variables = ["resources.budget", "START_SECONDS", "CHEAPEST_RATE", "REFIT_SHARE", "EXPLAIN_SHARE", "PACKAGE_SHARE", "OTHER_DIAGNOSTIC_SECONDS"]
 
 [train.first_trial]
-site = "scmle.pipeline.stages.training:TrainStage.execute"
+site = "scmle.pipeline.stages.training:Training.execute"
 error = "BlockedError"
 claim = "C7, C1"
 passes = "At least one trial of the first chunk of candidates starts: preparation left START_SECONDS or more of the trial window (the budget minus the reserve, counted from the run's start); the memory limit never holds back the first trial."

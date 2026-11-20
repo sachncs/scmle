@@ -241,7 +241,7 @@ def crossfit(p: ArrayLike, y: ArrayLike, seed: int) -> NDArray[numpy.float64]:
     `pair`.
     """
     risk, labels = pair(p, y)
-    rng = randomness.component_rng(seed, "decision.threshold.folds", 0)
+    rng = randomness.spawn(seed, "decision.threshold.folds", 0)
     fold = rng.permutation(len(risk)) % FOLDS
     out = numpy.empty_like(risk)
     for k in range(FOLDS):
@@ -399,7 +399,7 @@ def cost_interval(
         numpy.where(y == 1.0, model.c_01, model.c_00),
     )
     groups = netbenefit.factorize(clusters)
-    rng = randomness.component_rng(seed, "decision.threshold.cost", 0)
+    rng = randomness.spawn(seed, "decision.threshold.cost", 0)
     if groups is None:
         draws = rng.integers(0, len(cell), size=(replicates, len(cell)))
         means = cell[draws].mean(axis=1)

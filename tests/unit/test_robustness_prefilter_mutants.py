@@ -42,9 +42,9 @@ def test_feature_checks_put_rejected_columns_first_and_keep_their_seed_index():
         qualification.Decision.PASS,
     ]
     assert [c.seeds for c in checks] == [
-        randomness.seed_path(7, prefilter.FEATURE_SHIFT_ID, 1),
-        randomness.seed_path(7, prefilter.FEATURE_SHIFT_ID, 0),
-        randomness.seed_path(7, prefilter.FEATURE_SHIFT_ID, 2),
+        randomness.seed(7, prefilter.FEATURE_SHIFT_ID, 1),
+        randomness.seed(7, prefilter.FEATURE_SHIFT_ID, 0),
+        randomness.seed(7, prefilter.FEATURE_SHIFT_ID, 2),
     ]
     assert all(
         c.n == 40 and c.subset is qualification.Subset.EXPLORATION

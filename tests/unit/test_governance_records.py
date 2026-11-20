@@ -95,32 +95,32 @@ def card() -> model_card.Card:
 def target() -> slo.Slo:
     return slo.Slo(
         name="latency",
-        metric_name="p95_latency_ms",
+        metric="p95_latency_ms",
         kind=observability.Indicator.LATENCY,
         maximum=200.0,
-        window_days=7,
-        minimum_samples=2,
+        window=7,
+        samples=2,
         owner="ml-on-call",
         runbook="https://runbooks.example/latency",
-        alert_route="on-call",
+        route="on-call",
     )
 
 
 def assessment() -> slo.Assessment:
     return slo.Assessment(
         target=target(),
-        observed_at=NOW,
+        observed=NOW,
         status=slo.Status.BREACHED,
-        sample_count=3,
-        in_window_count=2,
-        observed_maximum=300.0,
-        error_budget_remaining=0.0,
+        samples=3,
+        windowed=2,
+        maximum=300.0,
+        remaining=0.0,
         reason="over",
     )
 
 
 def alert() -> alerts.Alert:
-    return alerts.Alert.from_evidence(
+    return alerts.Alert.assemble(
         route="ops",
         severity="high",
         title="breach",
@@ -135,9 +135,9 @@ def delivery() -> notify.Delivery:
         kind="pager",
         delivered=True,
         attempts=1,
-        http_status=202,
+        code=202,
         reason="delivered",
-        idempotency_key="k-1",
+        idempotency="k-1",
     )
 
 
@@ -223,7 +223,7 @@ CASES = {
         },
     ),
     "retrain": (
-        policies.RetrainDecision("none", (), "cooldown", "e-1", None, False),
+        policies.Decision("none", (), "cooldown", "e-1", None, False),
         {"withheld", "escalation", "retrain"},
         {"held_back", "escalation_id", "alarm_gates_retrain"},
     ),
@@ -259,7 +259,7 @@ CASES = {
         {"run_id", "timeout_seconds", "project_digest"},
     ),
     "step": (
-        definition.standard_workflow().step("train"),
+        definition.scaffold().step("train"),
         {"needs", "timeout", "budget", "concurrency", "expiry"},
         {
             "depends_on",
@@ -270,7 +270,7 @@ CASES = {
         },
     ),
     "workflow": (
-        definition.standard_workflow(),
+        definition.scaffold(),
         {"concurrency", "budget", "limits", "parallel"},
         {"max_concurrent_runs", "cost_budget", "group_limits", "max_parallel"},
     ),
@@ -297,7 +297,7 @@ def test_the_assessment_names_the_incident_path_and_route_once():
 
 
 def test_the_workflow_steps_are_written_with_the_step_keys():
-    written = definition.standard_workflow().to_dict()
+    written = definition.scaffold().to_dict()
     train = next(s for s in written["steps"] if s["name"] == "train")
     assert train["needs"] == ["ingest"] and train["concurrency"] == "train"
     restored = definition.Workflow.KEYS.downgrade(written)
@@ -305,9 +305,9 @@ def test_the_workflow_steps_are_written_with_the_step_keys():
 
 
 def test_the_digests_and_the_alert_id_hash_the_version_one_layout():
-    assert definition.standard_workflow().digest() == WORKFLOW_DIGEST
+    assert definition.scaffold().digest() == WORKFLOW_DIGEST
     assert job().digest() == JOB_DIGEST
-    assert alert().alert_id == ALERT_ID
+    assert alert().identifier == ALERT_ID
     anchored = job().anchor()
     text = json.dumps(anchored, sort_keys=True)
     assert hashlib.sha256(text.encode()).hexdigest() == JOB_DIGEST

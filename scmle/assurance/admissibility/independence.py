@@ -437,7 +437,7 @@ def falsify(
                 else qualification.Decision.PASS
             ),
             subset=set_id,
-            seeds=randomness.seed_path(run_seed, COMPONENT, index),
+            seeds=randomness.seed(run_seed, COMPONENT, index),
             tier=qualification.Tier.UNVERIFIED,
         )
         verdict = Verdict.FALSIFIED if falsified else Verdict.NOT_FALSIFIED

@@ -282,7 +282,7 @@ def band(
         lower band and the critical value.
     """
     alpha, replicates, seed = settings
-    rng = randomness.component_rng(seed, "decision.netbenefit", 0)
+    rng = randomness.spawn(seed, "decision.netbenefit", 0)
     point = diffs(stats.mean(axis=0, keepdims=True), weights, incumbent)[0]
     boot = diffs(redraw(stats, groups, replicates, rng), weights, incumbent)
     sd = numpy.maximum(boot.std(axis=0, ddof=1), MIN_SD)

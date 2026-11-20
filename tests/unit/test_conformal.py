@@ -102,7 +102,7 @@ def test_a_skipped_calibration_is_recorded_as_an_event():
 
     context = RecordingContext()
 
-    stages.PackageStage().waive(context, "time budget spent")
+    stages.Packaging().waive(context, "time budget spent")
 
     kind, reason, data = context.events[0]
     assert kind == "conformal.skipped"
@@ -144,6 +144,6 @@ def test_sensitivity_below_the_minimum_rows_is_skipped_not_raised():
     )
     selected = SimpleNamespace(fit_seconds=0.0, fold_scores=[])
 
-    record = stages.PackageStage().sensitivity(context, selected)
+    record = stages.Packaging().sensitivity(context, selected)
 
     assert "skipped" in record

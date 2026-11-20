@@ -56,11 +56,11 @@ class Resolution(products.Derived):
 class Labelling(interface.Stage):
     """The unlabelled rows set aside, the task inferred, the target vetted.
 
-    Part of `ProfileStage`, which inherits these methods unchanged;
+    Part of `Profiling`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 
-    def set_aside_unlabeled(
+    def sideline(
         self, board: engine.Board, frame: pandas.DataFrame
     ) -> tuple[pandas.DataFrame, pandas.DataFrame]:
         """Applies the `unlabeled` policy to rows with a missing target.
@@ -108,10 +108,10 @@ class Labelling(interface.Stage):
                 reported.
         """
         spec = board.services.spec
-        notes = list(board.get(ingestion.Intake).cleaning_notes)
+        notes = list(board.get(ingestion.Intake).notes)
         unlabeled = None
         if frame[spec.data.target].isna().any():
-            frame, unlabeled = self.set_aside_unlabeled(board, frame)
+            frame, unlabeled = self.sideline(board, frame)
             notes.append(
                 f"{len(unlabeled)} row(s) without a target were set aside "
                 f"(policy '{spec.data.unlabeled}')"
@@ -127,7 +127,7 @@ class Labelling(interface.Stage):
             raise errors.ConfigError(
                 "unlabeled='pseudo_label' supports classification only"
             )
-        approved = board.services.approved_plan
+        approved = board.services.plan
         if approved is not None and approved.task != task.value:
             raise errors.ConfigError(
                 f"the approved plan is for {approved.task} but the data "

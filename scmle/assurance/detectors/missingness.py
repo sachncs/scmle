@@ -510,7 +510,7 @@ def predict(
     spread = block.std(axis=0)
     block = (block - block.mean(axis=0)) / numpy.where(spread > 0, spread, 1.0)
     design = numpy.column_stack([numpy.ones(len(block)), block])
-    rng = randomness.component_rng(seed, f"detectors.indicator.{column}", 0)
+    rng = randomness.spawn(seed, f"detectors.indicator.{column}", 0)
     order = rng.permutation(len(flag))
     parts = [numpy.sort(part) for part in numpy.array_split(order, folds)]
     target = flag.astype(float)
@@ -562,7 +562,7 @@ def investigate(
     skipped: list[str] = []
     input_rows = len(frame)
     if input_rows > MAX_ROWS:
-        rng = randomness.component_rng(seed, "detectors.missingness.cap", 0)
+        rng = randomness.spawn(seed, "detectors.missingness.cap", 0)
         keep = numpy.sort(rng.choice(input_rows, MAX_ROWS, replace=False))
         frame = frame.iloc[keep]
         skipped.append(f"rows sampled to {MAX_ROWS} of {input_rows}")
@@ -716,7 +716,7 @@ def imputers(
     splitter = model_selection.KFold(
         folds,
         shuffle=True,
-        random_state=randomness.derive_int_seed(seed, "detectors.folds", 0),
+        random_state=randomness.narrow(seed, "detectors.folds", 0),
     )
     return [
         (train, held, fit(values, strategy, train))
@@ -777,9 +777,7 @@ def benchmark(
             block = values[held].copy()
             # Hide each observed cell with probability `share`; the fold
             # index varies the draw.
-            rng = randomness.component_rng(
-                seed, "detectors.imputation.holdout", index
-            )
+            rng = randomness.spawn(seed, "detectors.imputation.holdout", index)
             rows, cols = numpy.nonzero(~numpy.isnan(block))
             chosen = rng.random(len(rows)) < share
             rows, cols = rows[chosen], cols[chosen]

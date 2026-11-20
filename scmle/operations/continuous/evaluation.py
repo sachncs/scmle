@@ -50,7 +50,7 @@ class Replacement:
         }
 
 
-class ContinuousEvaluation(retraining.Retraining):
+class Evaluation(retraining.Retraining):
     """Feeds the loop, applies the retraining policy and guards replacement."""
 
     __module__ = "scmle.operations.continuous"
@@ -59,7 +59,7 @@ class ContinuousEvaluation(retraining.Retraining):
         self,
         loop: scmle.governance.loop.Loop,
         directory: str | pathlib.Path,
-        policy: policies.RetrainPolicy = policies.RetrainPolicy(),  # noqa: B008
+        policy: policies.Policy = policies.Policy(),  # noqa: B008
         retrain: Callable[[], str | None] | None = None,
         clock: Callable[[], float] = time.time,
     ) -> None:
@@ -79,14 +79,12 @@ class ContinuousEvaluation(retraining.Retraining):
         self.policy = policy
         self.retrain = retrain
         self.clock = clock
-        self.history = records.TrainingHistory(
-            self.directory / records.HISTORY_FILE
-        )
-        self.seen_alarms = sum(
+        self.history = records.History(self.directory / records.HISTORY_FILE)
+        self.alarms = sum(
             1 for r in loop.ledger.rows if r["kind"] == deployment_ledger.ALARM
         )
         proposals = self.history.select("retrain_decision")
-        self.last_proposal_batch: int | None = (
+        self.proposed: int | None = (
             proposals[-1]["facts"].get("batch") if proposals else None
         )
 
@@ -171,17 +169,17 @@ class ContinuousEvaluation(retraining.Retraining):
         after: Mapping[str, Sequence[float]],
         **options: Any,
     ) -> dict[str, Any]:
-        """Runs `post_promotion_check` and records the result.
+        """Runs `reassess` and records the result.
 
         Args:
             specs: The metrics to judge.
             before: Observations of each metric in the earlier period.
             after: Observations of each metric in the later period.
-            **options: Further options of `post_promotion_check`.
+            **options: Further options of `reassess`.
 
         Returns:
-            The result of `post_promotion_check`.
+            The result of `reassess`.
         """
-        result = promotion.post_promotion_check(specs, before, after, **options)
+        result = promotion.reassess(specs, before, after, **options)
         self.history.record("post_promotion_check", self.clock(), **result)
         return result

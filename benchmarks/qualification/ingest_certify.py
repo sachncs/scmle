@@ -213,7 +213,7 @@ def torn_certificate(
         sum(noisy),
         TORN_RUNS,
         sum(quiet),
-        randomness.seed_path(offset, "ingest.certify.torn", 0),
+        randomness.seed(offset, "ingest.certify.torn", 0),
     )
     cert = certificates.certify(
         TORN_ID,
@@ -304,7 +304,7 @@ def reconcile_certificate(
                 sum(flagged),
                 RECONCILE_RUNS,
                 sum(clean),
-                randomness.seed_path(offset, "ingest.certify.reconcile", 0),
+                randomness.seed(offset, "ingest.certify.reconcile", 0),
             )
         )
     cert = certificates.certify(
@@ -665,7 +665,7 @@ def budget_run(seed: int, directory: Path) -> tuple[bool, list[dict[str, str]]]:
         Whether queries and rows scanned stayed within the budget, and the
         stop boundaries recorded by the meter.
     """
-    rng = randomness.component_rng(seed, "ingest.certify.budget", 0)
+    rng = randomness.spawn(seed, "ingest.certify.budget", 0)
     limit = budget.Budget(
         queries=int(rng.integers(0, 800)),
         scanned=int(rng.integers(0, 150_000)),

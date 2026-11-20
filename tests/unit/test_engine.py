@@ -27,7 +27,7 @@ class Board:
         self.ran = []
         self.regulator = Regulator()
 
-    def check_cancelled(self):
+    def check(self):
         if self.cancelled:
             raise errors.CancelledError("cancelled")
 
@@ -180,7 +180,7 @@ class Step:
 
     def __init__(self, name, depends_on=()):
         self.name = name
-        self.depends_on = depends_on
+        self.needs = depends_on
 
 
 def test_steps_are_matched_by_name_and_ordered_by_name():

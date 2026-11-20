@@ -196,12 +196,12 @@ class Runner(abc.ABC):
             return manifest
         meter = job.Meter(spec, manifest.cost)
         policy = spec.retries
-        while len(manifest.attempts) < policy.max_attempts:
+        while len(manifest.attempts) < policy.attempts:
             number = len(manifest.attempts) + 1
             ended = self.attempt(spec, manifest, meter, number)
             if ended is not None:
                 return self.finish(spec, manifest, ended)
-            if len(manifest.attempts) < policy.max_attempts:
+            if len(manifest.attempts) < policy.attempts:
                 self.clock.sleep(policy.delay(number))
         return self.finish(spec, manifest, job.Progress.RETRIES_EXHAUSTED)
 

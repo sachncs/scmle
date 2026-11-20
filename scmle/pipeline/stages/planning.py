@@ -32,10 +32,10 @@ def observe(board: engine.Board) -> None:
         ScmleError: If the services carry no resource observation.
     """
     observation = products.require(
-        board.services.capability_observation, "capability_observation"
+        board.services.observation, "capability_observation"
     )
     path = "evidence/capability_resources.json"
-    board.journal.write_json(path, observation.to_dict())
+    board.journal.write(path, observation.to_dict())
     board.journal.emit(
         "capability.environment.observed",
         "runtime facts captured for the capability gate",
@@ -54,7 +54,7 @@ def devise(
     candidate in the resulting plan must have a supported capability
     declaration (an experimental one only if the candidate is listed in
     `models.experimental_models`) before the execution plan can reach
-    ``TrainStage``. Candidates of the `custom` and `test` families without one
+    ``Training``. Candidates of the `custom` and `test` families without one
     are registered as extension-only instead.
 
     Args:
@@ -68,7 +68,7 @@ def devise(
             accepted capability declaration, or the requested fairness
             mitigation is not implemented for the task.
     """
-    approved = board.services.approved_plan
+    approved = board.services.plan
     planner = scmle.pipeline.planner.Planner(
         board.services.registry, board.services.catalog
     )
@@ -98,7 +98,7 @@ def devise(
             else None
         )
         try:
-            board.services.capability_registry.require(
+            board.services.capabilities.require(
                 key,
                 allowed_statuses=allowed_statuses,
                 row_count=manifest.rows,
@@ -112,11 +112,9 @@ def devise(
                 model_family,
                 error,
             )
-            if board.services.capability_registry.records.get(key) is None:
-                board.services.capability_registry.register(
-                    roster.extension_capability(key)
-                )
-            board.services.capability_registry.require(
+            if board.services.capabilities.records.get(key) is None:
+                board.services.capabilities.register(roster.describe(key))
+            board.services.capabilities.require(
                 key,
                 allowed_statuses={capabilities.Status.EXTENSION_ONLY},
                 row_count=manifest.rows,
@@ -185,7 +183,7 @@ def requisition(
         board.services.spec.fairness.mitigation == "group_thresholds"
         and task is not tasks.Task.BINARY
     ):
-        board.services.capability_registry.refuse(
+        board.services.capabilities.refuse(
             key,
             "group-threshold mitigation is implemented for binary tasks "
             "only; reweighing mitigates multiclass and regression tasks",
@@ -217,13 +215,13 @@ class Blueprint(products.Kept):
     Attributes:
         plan: The execution plan.
         recommendations: The advice derived from the profile.
-        capability_registry: The capabilities, with the refusals planning
+        registry: The capabilities, with the refusals planning
             recorded.
     """
 
     plan: experiments.Plan | None
     recommendations: tuple[recommendations.Recommendation, ...]
-    capability_registry: capabilities.Registry
+    registry: capabilities.Registry
 
     def apply(self, board: object) -> None:
         """Sets the capabilities on the run's services and holds the plan.
@@ -237,7 +235,7 @@ class Blueprint(products.Kept):
         if not isinstance(board, engine.Board):
             raise errors.KindError("a blueprint applies to a run's board")
         board.services = dataclasses.replace(
-            board.services, capability_registry=self.capability_registry
+            board.services, capabilities=self.registry
         )
         super().apply(board)
 
@@ -245,7 +243,7 @@ class Blueprint(products.Kept):
 class Planning(interface.Stage):
     """Builds the experiment plan from the development-set profile."""
 
-    requires: ClassVar[tuple[type, ...]] = (profiling.ProfileStage,)
+    requires: ClassVar[tuple[type, ...]] = (profiling.Profiling,)
     makes: ClassVar[type[products.Product] | None] = Blueprint
     state: ClassVar[scmle.runtime.state.Progress] = (
         scmle.runtime.state.Progress.PLANNING
@@ -283,15 +281,15 @@ class Planning(interface.Stage):
         """
         observe(board)
         plan = devise(board)
-        registry = board.services.capability_registry
-        board.journal.write_json("execution_plan.json", plan.to_dict())
-        board.journal.write_json("capability_registry.json", registry.to_dict())
-        board.journal.write_json(
+        registry = board.services.capabilities
+        board.journal.write("execution_plan.json", plan.to_dict())
+        board.journal.write("capability_registry.json", registry.to_dict())
+        board.journal.write(
             "diagnostics/decision_log.json",
             {"plan": [d.to_dict() for d in plan.decisions], "outcomes": []},
         )
         advice = advise(board)
-        board.journal.write_json(
+        board.journal.write(
             "diagnostics/recommendations.json",
             [item.to_dict() for item in advice],
         )

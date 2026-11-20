@@ -41,7 +41,7 @@ def failing(monkeypatch, share):
 
 def test_every_dropped_resample_is_counted(monkeypatch):
     failing(monkeypatch, 0.0)
-    clean = abtest.compare_arms(
+    clean = abtest.compare(
         tasks.Task.REGRESSION, "rmse", arm(1), arm(2), bootstraps=100
     )
     assert clean.dropped == 0
@@ -49,7 +49,7 @@ def test_every_dropped_resample_is_counted(monkeypatch):
 
 def test_too_few_kept_resamples_give_no_interval_and_no_decision(monkeypatch):
     failing(monkeypatch, 0.9)
-    thin = abtest.compare_arms(
+    thin = abtest.compare(
         tasks.Task.REGRESSION,
         "rmse",
         arm(1),
@@ -92,13 +92,13 @@ def fingerprints(log, monkeypatch):
     def capture(bundle, request_id, started, outcome, **fields):
         seen.append(fields.get("input_fingerprint"))
 
-    monkeypatch.setattr(log, "log_observability", capture)
+    monkeypatch.setattr(log, "log", capture)
     return seen
 
 
 def test_a_fallback_fingerprint_names_its_scheme(tmp_path, monkeypatch):
     frame = pandas.DataFrame({"a": [1.0, 2.0]})
-    log = events.PredictionLog(tmp_path / "log.jsonl")
+    log = events.Journal(tmp_path / "log.jsonl")
     seen = fingerprints(log, monkeypatch)
     log.chronicle(Bundle(), frame, ["r1", "r2"])
     assert seen and not seen[0].startswith("json:")
@@ -198,9 +198,7 @@ def test_a_failed_attestation_check_keeps_its_reason(monkeypatch, caplog):
         sign=lambda key: None, verify=lambda key: False, to_dict=dict
     )
     monkeypatch.setattr(policies, "derive", lambda *args: policy)
-    monkeypatch.setattr(
-        stages.PackageStage, "evidence_index", lambda *args: index
-    )
+    monkeypatch.setattr(stages.Packaging, "index", lambda *args: index)
     verdict = types.SimpleNamespace(to_dict=dict)
     monkeypatch.setattr(release, "assess", lambda *args: verdict)
     monkeypatch.setattr(release, "faults", lambda outcome, plan: outcome)
@@ -225,7 +223,7 @@ def test_a_failed_attestation_check_keeps_its_reason(monkeypatch, caplog):
     store = types.SimpleNamespace(write_json=lambda name, document: None)
     evaluation = {"test_metrics": {}}
     with caplog.at_level("WARNING", logger=stages.__name__):
-        stages.PackageStage().release_evaluation(context, store, evaluation)
+        stages.Packaging().release(context, store, evaluation)
     assert any(
         "release attestation" in r.getMessage()
         and "release_attestation" in r.getMessage()

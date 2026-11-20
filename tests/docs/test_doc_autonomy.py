@@ -121,7 +121,7 @@ def test_a_controller_halt_opens_an_escalation(world):
 def test_a_rejected_file_and_silence_each_open_an_escalation(world):
     """Enforces docs/AUTONOMY.md:53 (a rejected file, silence)."""
     world.deliver(0, corrupt=True)
-    limits = scmle.operations.controller.Limits(max_idle_ticks=2)
+    limits = scmle.operations.controller.Limits(idle=2)
     controller = world.controller(policy=limits)
     controller.tick(world.inbox)
     assert pending(controller) == ["controller_input_rejected"]

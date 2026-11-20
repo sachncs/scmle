@@ -62,7 +62,7 @@ def done(
 class Steps(leases.Leases):
     """Runs one step with its retries and records what it did."""
 
-    def idempotency_key(
+    def key(
         self,
         run_id: str,
         step: definition.Step,
@@ -159,7 +159,7 @@ class Steps(leases.Leases):
         key: str,
         upstream: Mapping[str, Mapping[str, Any]],
         run_spent: float,
-    ) -> context.StepContext:
+    ) -> context.Context:
         """Builds what the handler sees for one attempt, timed from now.
 
         Args:
@@ -173,7 +173,7 @@ class Steps(leases.Leases):
         Returns:
             The context of the attempt.
         """
-        return context.StepContext(
+        return context.Context(
             run_id,
             step,
             attempt,
@@ -182,8 +182,8 @@ class Steps(leases.Leases):
             self.store,
             self.timer(),
             self.timer,
-            run_spent=run_spent,
-            run_budget=self.workflow.cost_budget,
+            accrued=run_spent,
+            budget=self.workflow.budget,
         )
 
     def keep(
@@ -224,7 +224,7 @@ class Steps(leases.Leases):
         )
         retry.call(save, WRITES, sleep=self.sleep)
 
-    def run_step(
+    def process(
         self,
         run_id: str,
         step: definition.Step,
@@ -248,15 +248,15 @@ class Steps(leases.Leases):
             and the cost this call incurred (the record keeps every attempt's
             spend, `ledger`).
         """
-        key = self.idempotency_key(run_id, step, upstream)
-        saved = self.step_record(run_id, step.name)
+        key = self.key(run_id, step, upstream)
+        saved = self.step(run_id, step.name)
         if done(saved, key):
             return status.Phase.SUCCEEDED.value, saved["outputs"], 0.0
         handler = self.handlers[step.name]
         attempts: list[Mapping[str, Any]] = []
         earlier = len(spend := ledger(saved))
         last_error = ""
-        for attempt in range(1, step.retries.max_attempts + 1):
+        for attempt in range(1, step.retries.attempts + 1):
             spent = run_spent + sum(spend[earlier:])
             current = self.begin(run_id, step, attempt, key, upstream, spent)
             self.stash(
@@ -276,7 +276,7 @@ class Steps(leases.Leases):
                 # step record
                 spend.append(round(current.spent, 6))
                 last_error = self.note(attempts, attempt, error, "retryable")
-                if attempt < step.retries.max_attempts:
+                if attempt < step.retries.attempts:
                     self.sleep(step.retries.delay(attempt))
             except Exception as error:  # noqa: BLE001 -- handler boundary
                 # handled: handler exception saved in attempts; step recorded

@@ -85,7 +85,7 @@ class Readings(Part):
 
     Attributes:
         scores: The model's scores or predicted classes on the released
-            rows (`scoring.reference_scores`), the drift reference the
+            rows (`scoring.anchor`), the drift reference the
             bundle keeps; None before the rows are opened.
         diagnostics: The post-selection diagnostic reports by name.
     """
@@ -117,7 +117,7 @@ class Decision(Part):
 class Examination(interface.Stage):
     """Diagnostics, streamed scoring and evidence on the released rows.
 
-    Part of `FinalEvaluationStage`, which inherits these methods unchanged;
+    Part of `Assessment`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 
@@ -230,7 +230,7 @@ class Examination(interface.Stage):
             "metrics": metrics,
         }
 
-    def uplift_report(
+    def report(
         self,
         board: engine.Board,
         fitted: Any,

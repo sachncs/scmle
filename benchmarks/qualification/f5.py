@@ -273,7 +273,7 @@ def certify_missingness(
             detected=rejected[mechanism],
             clean=len(seeds),
             alarms=rejected["mcar"],
-            seeds=randomness.seed_path(seeds[0], "certify.f5-missingness", 0),
+            seeds=randomness.seed(seeds[0], "certify.f5-missingness", 0),
         )
         for mechanism in ("mar", "mnar")
     ]

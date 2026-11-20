@@ -513,8 +513,8 @@ class Instrumentation:
                 gauge so a scrape shows which bundle answered.
         """
         self.registry = registry
-        self.model_version = model_version
-        self.artifact_digest = artifact_digest
+        self.version = model_version
+        self.digest = artifact_digest
         registry.set(
             "scmle_model_info",
             1.0,
@@ -543,7 +543,7 @@ class Instrumentation:
         labels = {
             "route": route,
             "status": str(status),
-            "model_version": self.model_version,
+            "model_version": self.version,
         }
         self.registry.increment(
             self.REQUESTS, labels, 1.0, "HTTP requests by route and status."
@@ -551,13 +551,13 @@ class Instrumentation:
         self.registry.observe(
             self.DURATION,
             seconds,
-            {"route": route, "model_version": self.model_version},
+            {"route": route, "model_version": self.version},
             "Request duration in seconds.",
         )
 
     def poll(self) -> None:
         """Samples memory and CPU of this process into gauges."""
-        labels = {"model_version": self.model_version}
+        labels = {"model_version": self.version}
         self.registry.set(
             self.MEMORY,
             float(residency()),

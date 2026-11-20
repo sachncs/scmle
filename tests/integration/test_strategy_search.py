@@ -199,10 +199,10 @@ def test_strategy_run_resumes_without_recomputation(
         )
     )
     calls = []
-    real = trials.evaluate_payload
+    real = trials.evaluate
     monkeypatch.setattr(
         trials,
-        "evaluate_payload",
+        "evaluate",
         lambda p: calls.append(p.job.trial_id) or real(p),
     )
     resumed = scmle.api.project.Project.resume(directory, data=imbalanced_frame)

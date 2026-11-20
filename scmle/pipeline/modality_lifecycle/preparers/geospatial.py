@@ -53,7 +53,7 @@ LIMITATIONS = (
 )
 
 
-class GeospatialPreparer(curators.Preparer):
+class Geospatial(curators.Preparer):
     """Adapter for CRS-declared vector feature classification.
 
     Attributes:
@@ -197,7 +197,7 @@ class GeospatialPreparer(curators.Preparer):
             prepared.materialize(),
         )
 
-    def sample_id(self, sample: geospatial.Placemark) -> str:
+    def sample(self, sample: geospatial.Placemark) -> str:
         """Gives a feature identity.
 
         Args:
@@ -294,9 +294,9 @@ class GeospatialPreparer(curators.Preparer):
             the bounds differ.
 
         Raises:
-            TypeError: If `observed` is not a `GeospatialPreparer`.
+            TypeError: If `observed` is not a `Geospatial`.
         """
-        if not isinstance(observed, GeospatialPreparer):
+        if not isinstance(observed, Geospatial):
             raise errors.KindError(
                 "observed adapter must be a GeospatialPreparer"
             )
@@ -319,7 +319,7 @@ class GeospatialPreparer(curators.Preparer):
 
 
 def axes(
-    preparer: GeospatialPreparer,
+    preparer: Geospatial,
     sample: geospatial.Placemark,
     model: LogisticRegression,
     anchored: tuple[int, float],

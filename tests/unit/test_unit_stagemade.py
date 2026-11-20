@@ -81,7 +81,7 @@ def start(frame=None, spec=None):
         metrics.CATALOG,
         selection.Averager(spec.selection),
         limits.Governor(spec.resources, 0.0),
-        input_frame=rows() if frame is None else frame,
+        frame=rows() if frame is None else frame,
         clock=Fixed(0.5),
     )
     return engine.Board.start(given)
@@ -99,24 +99,22 @@ def digest(summary):
 
 def test_ingestion_returns_the_intake_and_applies_it():
     board = start()
-    made = ingestion.IngestStage().execute(board)
+    made = ingestion.Ingest().execute(board)
     assert isinstance(made, ingestion.Intake)
     with pytest.raises(dataclasses.FrozenInstanceError):
-        made.read_seconds = 0.0
-    assert made.read_seconds == 0.5
+        made.read = 0.0
+    assert made.read == 0.5
     assert made.stream is None
-    assert made.cleaning_notes == [
-        "column 'b': 1 infinite value(s) treated as missing"
-    ]
+    assert made.notes == ["column 'b': 1 infinite value(s) treated as missing"]
     assert board.get(ingestion.Intake) is made
 
 
 def test_the_intake_digest_is_that_of_its_old_summary():
-    made = ingestion.IngestStage().execute(start())
+    made = ingestion.Ingest().execute(start())
     assert made.save(None) == digest(
         {
             "digests": dict(made.manifest.digests),
-            "notes": list(made.cleaning_notes),
+            "notes": list(made.notes),
             "streamed": False,
         }
     )
@@ -126,15 +124,15 @@ def test_a_file_backed_modality_without_an_adapter_is_refused():
     board = start(spec=config(modality="text"))
     board = dataclasses.replace(
         board,
-        services=dataclasses.replace(board.services, input_frame=None),
+        services=dataclasses.replace(board.services, frame=None),
     )
     with pytest.raises(errors.ScmleError, match="ingestion adapter"):
-        ingestion.IngestStage().execute(board)
+        ingestion.Ingest().execute(board)
 
 
 def test_the_reservation_returns_the_reserve_with_its_old_digest():
     board = start()
-    ingestion.IngestStage().execute(board)
+    ingestion.Ingest().execute(board)
     made = reservation.Reservation().execute(board)
     assert reservation.Reservation.makes is reservation.Reserve
     assert isinstance(made, reservation.Reserve)
@@ -149,9 +147,9 @@ def test_the_reservation_returns_the_reserve_with_its_old_digest():
 def test_labelling_resolves_without_touching_the_intake_notes():
     frame = rows(missing=4)
     board = start(frame, config(unlabeled="ignore"))
-    intake = ingestion.IngestStage().execute(board)
-    before = list(intake.cleaning_notes)
-    stage = profiling.ProfileStage()
+    intake = ingestion.Ingest().execute(board)
+    before = list(intake.notes)
+    stage = profiling.Profiling()
     made = stage.infer(board, intake.frame)
     assert isinstance(made, labelling.Resolution)
     assert made.task is tasks.Task.BINARY
@@ -164,7 +162,7 @@ def test_labelling_resolves_without_touching_the_intake_notes():
         *before,
         "4 row(s) without a target were set aside (policy 'ignore')",
     ]
-    assert intake.cleaning_notes == before
+    assert intake.notes == before
     assert made.labels is None
     made.apply(board)
     assert board.get(labelling.Resolution) is made
@@ -172,9 +170,9 @@ def test_labelling_resolves_without_touching_the_intake_notes():
 
 def test_the_unlabeled_gate_blocks_by_default():
     board = start(rows(missing=2))
-    intake = ingestion.IngestStage().execute(board)
+    intake = ingestion.Ingest().execute(board)
     with pytest.raises(errors.BlockedError, match="2 missing"):
-        profiling.ProfileStage().infer(board, intake.frame)
+        profiling.Profiling().infer(board, intake.frame)
 
 
 def test_an_ordinal_target_is_resolved_to_ranks():
@@ -190,8 +188,8 @@ def test_an_ordinal_target_is_resolved_to_ranks():
         resources=tasks.Resources(time_budget_seconds=600),
     )
     board = start(frame, spec)
-    intake = ingestion.IngestStage().execute(board)
-    made = profiling.ProfileStage().infer(board, intake.frame)
+    intake = ingestion.Ingest().execute(board)
+    made = profiling.Profiling().infer(board, intake.frame)
     assert made.task is tasks.Task.ORDINAL
     assert made.labels == LEVELS
     assert set(made.frame["y"]) == {0, 1, 2}
@@ -199,8 +197,8 @@ def test_an_ordinal_target_is_resolved_to_ranks():
 
 def test_screening_without_a_plan_keeps_the_frame():
     board = start()
-    intake = ingestion.IngestStage().execute(board)
-    made = profiling.ProfileStage().synthesize(board, intake.frame)
+    intake = ingestion.Ingest().execute(board)
+    made = profiling.Profiling().synthesize(board, intake.frame)
     assert isinstance(made, screening.Screen)
     assert made.frame is intake.frame
     assert made.ingest is None
@@ -208,8 +206,8 @@ def test_screening_without_a_plan_keeps_the_frame():
 
 def test_the_profile_stage_returns_the_partition_and_its_parts():
     board = start()
-    ingestion.IngestStage().execute(board)
-    made = profiling.ProfileStage().execute(board)
+    ingestion.Ingest().execute(board)
+    made = profiling.Profiling().execute(board)
     try:
         assert isinstance(made, profiling.Partition)
         assert made.task is tasks.Task.BINARY
@@ -233,8 +231,8 @@ def test_the_profile_stage_returns_the_partition_and_its_parts():
 
 def test_surveying_curates_into_a_portrait():
     board = start()
-    ingestion.IngestStage().execute(board)
-    stage = profiling.ProfileStage()
+    ingestion.Ingest().execute(board)
+    stage = profiling.Profiling()
     made = stage.execute(board)
     try:
         development = made.split.features.assign(y=made.split.target)
@@ -249,8 +247,8 @@ def test_surveying_curates_into_a_portrait():
 def test_a_failure_after_the_split_closes_the_locked_rows(monkeypatch):
     closed = []
     board = start()
-    ingestion.IngestStage().execute(board)
-    stage = profiling.ProfileStage()
+    ingestion.Ingest().execute(board)
+    stage = profiling.Profiling()
     divide = stage.divide
     originals = []
 
@@ -278,8 +276,8 @@ def test_a_failure_after_the_split_closes_the_locked_rows(monkeypatch):
 def test_closing_the_board_closes_the_partitions_locked_rows(monkeypatch):
     closed = []
     board = start()
-    ingestion.IngestStage().execute(board)
-    made = profiling.ProfileStage().execute(board)
+    ingestion.Ingest().execute(board)
+    made = profiling.Profiling().execute(board)
     original = type(made.split.test).close
 
     def shut(box):
@@ -308,8 +306,8 @@ def test_a_resolution_is_held_by_type_with_its_own_field_names():
 
 def test_amend_applies_the_amended_portrait():
     board = start()
-    ingestion.IngestStage().execute(board)
-    made = profiling.ProfileStage().execute(board)
+    ingestion.Ingest().execute(board)
+    made = profiling.Profiling().execute(board)
     try:
         plan = dataclasses.replace(
             made.profile.feature_plan, numeric=("a",), dropped={"b": "gone"}

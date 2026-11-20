@@ -155,7 +155,7 @@ def test_no_model_that_can_enforce_the_monotonic_rule_blocks():
         ),
     ]
     with pytest.raises(errors.BlockedError, match="no available model"):
-        planner.MonotonicFilter().apply(context, candidates, [])
+        planner.Monotonicity().apply(context, candidates, [])
 
 
 def test_an_unverified_feature_is_admitted_not_kept_out():

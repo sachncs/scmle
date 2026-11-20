@@ -1,9 +1,9 @@
 """Pager and ticket webhooks: signed payloads, bounded retry, injected send.
 
-A `WebhookSender` posts one JSON document. The body is signed with
+A `Sender` posts one JSON document. The body is signed with
 HMAC-SHA256 over ``"<timestamp>.<body>"`` and sent as
 ``X-Scmle-Signature: sha256=<hex>`` beside ``X-Scmle-Timestamp``, so a
-receiver can reject a forged or replayed payload (`verify_signature`). One
+receiver can reject a forged or replayed payload (`verify`). One
 idempotency key is used for every attempt of a notification, so a retry after
 a timeout does not page twice.
 
@@ -62,12 +62,12 @@ class Delivery:
         kind: ``pager`` or ``ticket``.
         delivered: Whether a 2xx answer was received.
         attempts: Sends made.
-        http_status: Last status (None if the last attempt raised).
+        code: Last status (None if the last attempt raised).
         reason: Short text for the outcome (``delivered``, ``HTTP <status>``,
             the name of the transport error, or that no sender was
             configured), with the attempt count added after a final failure
             that used every attempt; never a credential.
-        idempotency_key: The key sent on every attempt; empty if no sender
+        idempotency: The key sent on every attempt; empty if no sender
             was configured.
         KEYS: Version-1 keys to the written ones (`code`, `idempotency`);
             `downgrade` restores version 1. The HTTP header keeps its name,
@@ -81,9 +81,9 @@ class Delivery:
     kind: str
     delivered: bool
     attempts: int
-    http_status: int | None
+    code: int | None
     reason: str
-    idempotency_key: str
+    idempotency: str
 
     def to_dict(self) -> dict[str, Any]:
         """A JSON-ready record.
@@ -116,7 +116,7 @@ def sign(secret: str | bytes, timestamp: str, body: bytes) -> str:
     return "sha256=" + mac.hexdigest()
 
 
-def verify_signature(
+def verify(
     secret: str | bytes,
     headers: Mapping[str, str],
     body: bytes,
@@ -189,7 +189,7 @@ def courier(timeout_seconds: float = 5.0) -> Transport:
     return send
 
 
-class WebhookSender:
+class Sender:
     """Sends signed notifications of one kind to one endpoint."""
 
     def __init__(
@@ -199,8 +199,8 @@ class WebhookSender:
         secret: str | bytes,
         transport: Transport | None = None,
         *,
-        max_attempts: int = 3,
-        backoff_seconds: float = 0.5,
+        attempts: int = 3,
+        backoff: float = 0.5,
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], float] = time.time,
     ) -> None:
@@ -211,8 +211,8 @@ class WebhookSender:
             url: HTTPS endpoint (the default transport refuses others).
             secret: HMAC key shared with the receiver.
             transport: Sends a `Request`; default is HTTPS.
-            max_attempts: Total sends allowed, at least one.
-            backoff_seconds: First wait; doubled after each failure.
+            attempts: Total sends allowed, at least one.
+            backoff: First wait; doubled after each failure.
             sleep: Waits between attempts.
             clock: Epoch seconds, for the timestamp header.
 
@@ -223,16 +223,14 @@ class WebhookSender:
             raise errors.InputError(f"kind must be one of {KINDS}")
         if not secret:
             raise errors.InputError("a signing secret is required")
-        if max_attempts < 1 or backoff_seconds < 0:
-            raise errors.InputError(
-                "max_attempts >= 1 and backoff >= 0 required"
-            )
+        if attempts < 1 or backoff < 0:
+            raise errors.InputError("attempts >= 1 and backoff >= 0 required")
         self.kind = kind
         self.url = url
         self.secret = secret
         self.transport = transport or courier()
-        self.max_attempts = max_attempts
-        self.backoff_seconds = backoff_seconds
+        self.attempts = attempts
+        self.backoff = backoff
         self.sleep = sleep
         self.clock = clock
 
@@ -291,7 +289,7 @@ class WebhookSender:
         """Posts the notification, retrying what is worth retrying.
 
         Retries 5xx, 408, 425 and 429 statuses and transport errors up to
-        ``max_attempts`` sends in all, waiting ``backoff_seconds`` doubled
+        ``attempts`` sends in all, waiting ``backoff`` doubled
         after each failure between sends. Any other non-2xx status ends the
         attempts at once. Each attempt is stamped and signed afresh; the
         idempotency key is a digest of the kind and body, so it is the same
@@ -314,7 +312,7 @@ class WebhookSender:
         key = hashlib.sha256(self.kind.encode() + b"|" + body).hexdigest()[:32]
         status: int | None = None
         reason = "not sent"
-        for attempt in range(1, self.max_attempts + 1):
+        for attempt in range(1, self.attempts + 1):
             try:
                 status = self.transport(self.seal(body, key))
             except OSError as error:
@@ -331,9 +329,9 @@ class WebhookSender:
                         self.kind,
                         delivered=True,
                         attempts=attempt,
-                        http_status=status,
+                        code=status,
                         reason="delivered",
-                        idempotency_key=key,
+                        idempotency=key,
                     )
                 reason = f"HTTP {status}"
                 final = (
@@ -345,19 +343,19 @@ class WebhookSender:
                         self.kind,
                         delivered=False,
                         attempts=attempt,
-                        http_status=status,
+                        code=status,
                         reason=reason,
-                        idempotency_key=key,
+                        idempotency=key,
                     )
-            if attempt < self.max_attempts:
-                self.sleep(self.backoff_seconds * 2 ** (attempt - 1))
+            if attempt < self.attempts:
+                self.sleep(self.backoff * 2 ** (attempt - 1))
         return Delivery(
             self.kind,
             delivered=False,
-            attempts=self.max_attempts,
-            http_status=status,
-            reason=f"{reason} after {self.max_attempts} attempts",
-            idempotency_key=key,
+            attempts=self.attempts,
+            code=status,
+            reason=f"{reason} after {self.attempts} attempts",
+            idempotency=key,
         )
 
 
@@ -366,8 +364,8 @@ class Notifier:
 
     def __init__(
         self,
-        pager: WebhookSender | None = None,
-        ticket: WebhookSender | None = None,
+        pager: Sender | None = None,
+        ticket: Sender | None = None,
     ) -> None:
         """Takes the two senders; either may be absent.
 
@@ -409,9 +407,9 @@ class Notifier:
                         kind,
                         delivered=False,
                         attempts=0,
-                        http_status=None,
+                        code=None,
                         reason="no sender configured",
-                        idempotency_key="",
+                        idempotency="",
                     )
                 )
             else:

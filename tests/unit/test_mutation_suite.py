@@ -61,7 +61,7 @@ def test_the_gauge_scales_the_probe_to_every_row(clock) -> None:
 
 def test_the_suite_times_the_model_while_time_is_left(clock) -> None:
     seen = []
-    scmle.pipeline.suite.run_suite(
+    scmle.pipeline.suite.run(
         inputs(clock), (probe("a", 0.0, seen),), deadline=clock.now + 100.0
     )
     assert seen[0][1] == pytest.approx(STEP * 2)
@@ -69,7 +69,7 @@ def test_the_suite_times_the_model_while_time_is_left(clock) -> None:
 
 def test_the_suite_does_not_time_the_model_at_the_deadline(clock) -> None:
     seen = []
-    scmle.pipeline.suite.run_suite(
+    scmle.pipeline.suite.run(
         inputs(clock), (probe("a", 0.0, seen),), deadline=clock.now
     )
     assert seen == [("a", None, clock.now)]
@@ -79,7 +79,7 @@ def test_each_diagnostic_gets_its_share_of_the_time_left(clock) -> None:
     seen = []
     start = clock.now
     left = 100.0 + STEP
-    scmle.pipeline.suite.run_suite(
+    scmle.pipeline.suite.run(
         inputs(clock),
         (probe("a", 1.0, seen), probe("b", 3.0, seen)),
         deadline=start + left,

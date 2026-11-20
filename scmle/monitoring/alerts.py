@@ -30,17 +30,17 @@ class Alert:
     """One operator-facing alert bound to evidence.
 
     Attributes:
-        alert_id: Deterministic identity of the alert.
+        identifier: Deterministic identity of the alert.
         route: Name of the route (sink) it goes to.
         severity: Severity label.
         title: Short title.
         details: Further JSON-compatible facts.
-        evidence_digest: Digest of the evidence the alert is bound to.
-        created_at: ISO-8601 creation time.
+        digest: Digest of the evidence the alert is bound to.
+        created: ISO-8601 creation time.
         KEYS: Version-1 keys to the written ones (`identifier`,
             `digests.evidence`, `created`); `downgrade` restores version 1.
             The id is the digest of a fixed version-1 literal
-            (`from_evidence`), so renaming keys leaves every id unchanged.
+            (`assemble`), so renaming keys leaves every id unchanged.
     """
 
     KEYS: ClassVar[records.Migration] = records.nest(
@@ -48,37 +48,37 @@ class Alert:
         groups={"digests": {"evidence_digest": "evidence"}},
     )
 
-    alert_id: str
+    identifier: str
     route: str
     severity: str
     title: str
     details: Mapping[str, Any]
-    evidence_digest: str
-    created_at: str
+    digest: str
+    created: str
 
     def __post_init__(self) -> None:
         """Validates identity, route, and timestamp fields.
 
         Raises:
-            ValueError: If a text field is blank or `created_at` is not
+            ValueError: If a text field is blank or `created` is not
                 ISO-8601.
             TypeError: If `details` is not a mapping.
         """
         for name in (
-            "alert_id",
+            "identifier",
             "route",
             "severity",
             "title",
-            "evidence_digest",
-            "created_at",
+            "digest",
+            "created",
         ):
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
                 raise errors.InputError(f"{name} must not be empty")
         try:
-            datetime.datetime.fromisoformat(self.created_at)
+            datetime.datetime.fromisoformat(self.created)
         except ValueError as error:
-            raise errors.InputError("created_at must be ISO-8601") from error
+            raise errors.InputError("created must be ISO-8601") from error
         if not isinstance(self.details, Mapping):
             raise errors.KindError("details must be a mapping")
         object.__setattr__(self, "details", dict(self.details))
@@ -91,18 +91,18 @@ class Alert:
         """
         return self.KEYS.upgrade(
             {
-                "alert_id": self.alert_id,
+                "alert_id": self.identifier,
                 "route": self.route,
                 "severity": self.severity,
                 "title": self.title,
                 "details": dict(self.details),
-                "evidence_digest": self.evidence_digest,
-                "created_at": self.created_at,
+                "evidence_digest": self.digest,
+                "created_at": self.created,
             }
         )
 
     @classmethod
-    def from_evidence(
+    def assemble(
         cls,
         route: str,
         severity: str,
@@ -144,13 +144,13 @@ class Alert:
         ).encode("utf-8")
         alert_id = hashlib.sha256(identity).hexdigest()
         return cls(
-            alert_id=alert_id,
+            identifier=alert_id,
             route=route,
             severity=severity,
             title=title,
             details=details,
-            evidence_digest=evidence_digest,
-            created_at=created_at,
+            digest=evidence_digest,
+            created=created_at,
         )
 
 
@@ -159,12 +159,12 @@ class Delivery:
     """Auditable outcome of one sink delivery attempt.
 
     Attributes:
-        alert_id: The alert delivered.
+        alert: The alert delivered.
         route: Its route.
         status: `delivered`, `failed` or `deduplicated`.
         attempts: Delivery attempts made.
         reason: One sentence explaining the status.
-        observed_at: ISO-8601 time of the outcome.
+        observed: ISO-8601 time of the outcome.
         KEYS: Version-1 keys to the written ones (`alert`, `observed`);
             `downgrade` restores version 1.
     """
@@ -173,12 +173,12 @@ class Delivery:
         renames={"alert_id": "alert", "observed_at": "observed"}
     )
 
-    alert_id: str
+    alert: str
     route: str
     status: str
     attempts: int
     reason: str
-    observed_at: str
+    observed: str
 
     def __post_init__(self) -> None:
         """Validates delivery state.
@@ -256,7 +256,7 @@ class Jsonl(Sink):
                 os.fsync(stream.fileno())
             durability.sync_directory(self.path.parent)
         return Delivery(
-            alert.alert_id,
+            alert.identifier,
             alert.route,
             "delivered",
             1,
@@ -271,9 +271,9 @@ class Pager(Sink):
     Attributes:
         url: Webhook URL.
         token: Bearer token sent with each request, if any.
-        timeout_seconds: Seconds to wait for each request.
-        max_attempts: Most delivery attempts.
-        backoff_seconds: Base delay between attempts.
+        timeout: Seconds to wait for each request.
+        attempts: Most delivery attempts.
+        backoff: Base delay between attempts.
     """
 
     def __init__(
@@ -281,9 +281,9 @@ class Pager(Sink):
         url: str,
         *,
         token: str | None = None,
-        timeout_seconds: float = 5.0,
-        max_attempts: int = 3,
-        backoff_seconds: float = 0.1,
+        timeout: float = 5.0,
+        attempts: int = 3,
+        backoff: float = 0.1,
         allow_insecure_localhost: bool = False,
     ) -> None:
         """Validates the bounded webhook delivery policy.
@@ -291,15 +291,15 @@ class Pager(Sink):
         Args:
             url: Webhook URL; must be HTTPS.
             token: Bearer token to send, or None.
-            timeout_seconds: Seconds to wait for each request.
-            max_attempts: Most delivery attempts.
-            backoff_seconds: Base delay between attempts; the wait grows with
+            timeout: Seconds to wait for each request.
+            attempts: Most delivery attempts.
+            backoff: Base delay between attempts; the wait grows with
                 the attempt number and is capped at one second.
             allow_insecure_localhost: Allow plain HTTP to a loopback host.
 
         Raises:
             ValueError: If the URL is not HTTPS (or allowed loopback HTTP), the
-                timeout is not positive, `max_attempts` is below 1 or the
+                timeout is not positive, `attempts` is below 1 or the
                 backoff is negative.
         """
         parsed = parse.urlparse(url)
@@ -309,15 +309,15 @@ class Pager(Sink):
                 allow_insecure_localhost and parsed.scheme == "http" and local
             ):
                 raise errors.InputError("webhook URL must use HTTPS")
-        if timeout_seconds <= 0 or max_attempts < 1 or backoff_seconds < 0:
+        if timeout <= 0 or attempts < 1 or backoff < 0:
             raise errors.InputError(
                 "webhook retry and timeout bounds are invalid"
             )
         self.url = url
         self.token = token
-        self.timeout_seconds = timeout_seconds
-        self.max_attempts = max_attempts
-        self.backoff_seconds = backoff_seconds
+        self.timeout = timeout
+        self.attempts = attempts
+        self.backoff = backoff
 
     def deliver(self, alert: Alert) -> Delivery:
         """POST an alert with bounded retries and no false success.
@@ -329,21 +329,21 @@ class Pager(Sink):
             A `delivered` outcome if some attempt gets an HTTP 2xx answer.
 
         Raises:
-            DeliveryError: If no attempt succeeds within `max_attempts`.
+            DeliveryError: If no attempt succeeds within `attempts`.
         """
         body = json.dumps(alert.to_dict(), sort_keys=True).encode("utf-8")
         headers = {"Content-Type": "application/json"}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
         last_reason = "webhook did not respond"
-        for attempt in range(1, self.max_attempts + 1):
+        for attempt in range(1, self.attempts + 1):
             request = urllib.request.Request(  # noqa: S310 -- the scheme is validated in the constructor
                 self.url, data=body, headers=headers, method="POST"
             )
             try:
                 with urllib.request.urlopen(  # noqa: S310 -- the scheme is validated in the constructor
                     request,
-                    timeout=self.timeout_seconds,  # nosec B310 - URL scheme is validated in the constructor.
+                    timeout=self.timeout,  # nosec B310 - URL scheme is validated in the constructor.
                 ) as response:
                     status = int(response.status)
                     if (
@@ -352,7 +352,7 @@ class Pager(Sink):
                         < http.HTTPStatus.MULTIPLE_CHOICES
                     ):
                         return Delivery(
-                            alert.alert_id,
+                            alert.identifier,
                             alert.route,
                             "delivered",
                             attempt,
@@ -368,11 +368,11 @@ class Pager(Sink):
                 # handled: failure kept as last_reason; DeliveryError after
                 # retries
                 last_reason = f"webhook delivery failed: {type(error).__name__}"
-            if attempt < self.max_attempts and self.backoff_seconds:
-                time.sleep(min(self.backoff_seconds * attempt, 1.0))
+            if attempt < self.attempts and self.backoff:
+                time.sleep(min(self.backoff * attempt, 1.0))
         raise DeliveryError(
-            f"alert {alert.alert_id} was not delivered after "
-            f"{self.max_attempts} attempts: {last_reason}"
+            f"alert {alert.identifier} was not delivered after "
+            f"{self.attempts} attempts: {last_reason}"
         )
 
 
@@ -433,9 +433,9 @@ class Dispatcher:
             the alert was deduplicated.
         """
         previous = self.delivered()
-        if alert.alert_id in previous:
+        if alert.identifier in previous:
             return Delivery(
-                alert.alert_id,
+                alert.identifier,
                 alert.route,
                 "deduplicated",
                 0,
@@ -445,7 +445,7 @@ class Dispatcher:
         sink = self.sinks.get(alert.route)
         if sink is None:
             delivery = Delivery(
-                alert.alert_id,
+                alert.identifier,
                 alert.route,
                 "failed",
                 0,
@@ -459,7 +459,7 @@ class Dispatcher:
                 # handled: delivery error becomes journaled 'failed'
                 # Delivery
                 delivery = Delivery(
-                    alert.alert_id,
+                    alert.identifier,
                     alert.route,
                     "failed",
                     0,

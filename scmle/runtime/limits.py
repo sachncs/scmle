@@ -130,7 +130,7 @@ def preforked() -> Generator[None, None, None]:
                     os.environ[ACCELERATE_THREADS] = previous
 
 
-def peak_memory_gb() -> float:
+def watermark() -> float:
     """Peak resident memory of this process and its finished children.
 
     Windows does not report finished children, so only this process counts.
@@ -300,12 +300,12 @@ class Supervisor:
     """Runs one call in a separate process under hard limits.
 
     Attributes:
-        ceiling_seconds: Wall-clock limit (None = unlimited).
-        memory_gb: Resident-memory limit in gigabytes (None = unlimited).
+        ceiling: Wall-clock limit (None = unlimited).
+        memory: Resident-memory limit in gigabytes (None = unlimited).
     """
 
-    ceiling_seconds: float | None = None
-    memory_gb: float | None = None
+    ceiling: float | None = None
+    memory: float | None = None
 
     def run(self, function: Callable[[Any], Any], argument: Any) -> Any:
         """Calls `function(argument)` in a child process and returns its value.
@@ -403,17 +403,17 @@ class Supervisor:
             A message naming the exceeded limit (hard time ceiling or memory),
             or None if the trial is within its limits.
         """
-        if self.ceiling_seconds is not None and elapsed > self.ceiling_seconds:
+        if self.ceiling is not None and elapsed > self.ceiling:
             return (
-                f"trial exceeded its {self.ceiling_seconds:.1f}s hard time "
+                f"trial exceeded its {self.ceiling:.1f}s hard time "
                 "ceiling and was killed"
             )
-        if self.memory_gb is not None and process.pid is not None:
+        if self.memory is not None and process.pid is not None:
             used = residency(process.pid) / BYTES_PER_GB
-            if used > self.memory_gb:
+            if used > self.memory:
                 return (
                     f"trial used {used:.2f} GB, above the "
-                    f"{self.memory_gb:.2f} GB memory limit, and was killed"
+                    f"{self.memory:.2f} GB memory limit, and was killed"
                 )
         return None
 
@@ -424,13 +424,13 @@ class Governor:
 
     Attributes:
         spec: The resource specification.
-        started_at: Monotonic start time of the run.
+        started: Monotonic start time of the run.
         reserve: Seconds of the budget held back for post-training work
             (`budget.Reserve`); empty until its `provision`.
     """
 
     spec: tasks.Resources
-    started_at: float = dataclasses.field(default_factory=time.monotonic)
+    started: float = dataclasses.field(default_factory=time.monotonic)
     reserve: budget.Reserve = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
@@ -455,7 +455,7 @@ class Governor:
             raise errors.InputError(
                 f"unknown phase {phase!r}; expected one of {PHASES}"
             )
-        finish = self.started_at + self.spec.time_budget_seconds
+        finish = self.started + self.spec.time_budget_seconds
         return finish - self.reserve.total if phase == "trials" else finish
 
     def left(self, phase: str) -> float:
@@ -527,7 +527,7 @@ class Governor:
             True if the larger of this process's and its finished children's
             peak resident memory exceeds `memory_limit_gb`.
         """
-        return peak_memory_gb() > self.spec.memory_limit_gb
+        return watermark() > self.spec.memory_limit_gb
 
     @property
     def hard(self) -> bool:
@@ -560,7 +560,7 @@ class Governor:
         """
         return max(self.left("trials"), 0.0)
 
-    def skip_reason(self, first: bool) -> str | None:
+    def skip(self, first: bool) -> str | None:
         """Why the next trial must not start, or None.
 
         Args:
@@ -594,8 +594,8 @@ class Governor:
             count, threads per worker and enforcement; `gpu` gives the mode
             and enforcement.
         """
-        elapsed = time.monotonic() - self.started_at
-        peak = peak_memory_gb()
+        elapsed = time.monotonic() - self.started
+        peak = watermark()
         return {
             "time_budget": {
                 "limit_seconds": self.spec.time_budget_seconds,

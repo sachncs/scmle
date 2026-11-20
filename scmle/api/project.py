@@ -432,7 +432,7 @@ class Project(Definition):
         self.orchestrator = scmle.pipeline.orchestrator.Orchestrator(
             self.spec, frame, checkpoints=self.checkpoints
         )
-        self.orchestrator.tracking_path = self.output_dir / "experiments.sqlite"
+        self.orchestrator.tracking = self.output_dir / "experiments.sqlite"
         self.profile: scmle.contracts.data.Portrait | None = None
 
     def plan(self) -> experiments.Plan:
@@ -748,7 +748,7 @@ class ModalityProject:
     def run(self) -> modality_lifecycle.Record:
         """Runs the full lifecycle and writes its package and signed report.
 
-        A cancelled run raises `LifecycleCancelledError`; other lifecycle
+        A cancelled run raises `AbortedError`; other lifecycle
         failures propagate unchanged.
 
         Returns:

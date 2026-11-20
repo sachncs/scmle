@@ -64,7 +64,7 @@ def distill(value: Any) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
-def run_id_for(workflow: definition.Workflow, trigger_key: str) -> str:
+def identify(workflow: definition.Workflow, trigger_key: str) -> str:
     """Derives the durable run id of a trigger.
 
     Args:
@@ -193,12 +193,12 @@ class Records:
         workflow: The definition.
         store: Durable state.
         handlers: Step name to handler.
-        approver_keys: Approver identity to the key their decisions are signed
+        approvers: Approver identity to the key their decisions are signed
             with.
         clock: Returns epoch seconds.
         timer: Returns monotonic seconds, for how long a step has run.
         sleep: Waits between retries.
-        lease_seconds: Validity of a run lease.
+        tenure: Validity of a run lease.
         owner: Name written into the lease.
         guard: Serializes writes of step records.
         fences: The fencing token of each run this executor leases.
@@ -207,11 +207,11 @@ class Records:
     workflow: definition.Workflow
     store: objectstore.Depot
     handlers: dict[str, context.Handler]
-    approver_keys: dict[str, str]
+    approvers: dict[str, str]
     clock: Callable[[], float]
     timer: Callable[[], float]
     sleep: Callable[[float], None]
-    lease_seconds: float
+    tenure: float
     owner: str
     guard: threading.Lock
     fences: dict[str, int]
@@ -267,7 +267,7 @@ class Records:
         """
         return Bucket(self.base(run_id), self.read, self.write)
 
-    def run_record(self, run_id: str) -> records.Layout | None:
+    def record(self, run_id: str) -> records.Layout | None:
         """Reads the stored run record.
 
         Args:
@@ -278,7 +278,7 @@ class Records:
         """
         return self.bucket(run_id).fetch("run.json")
 
-    def step_record(self, run_id: str, name: str) -> records.Layout | None:
+    def step(self, run_id: str, name: str) -> records.Layout | None:
         """Reads the stored record of one step.
 
         Args:

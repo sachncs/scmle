@@ -54,7 +54,7 @@ class Robustness(products.Derived):
 class Qualification(screening.Screening):
     """Robustness and stability qualification of the exploration.
 
-    Part of `ProfileStage`, which inherits these methods unchanged;
+    Part of `Profiling`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 
@@ -96,7 +96,7 @@ class Qualification(screening.Screening):
                 ],
             }
         for name, document in documents.items():
-            board.journal.write_json(name, document)
+            board.journal.write(name, document)
         board.journal.emit(
             "claims.registered",
             "registered claims were evaluated on the one opening of C",
@@ -165,7 +165,7 @@ class Qualification(screening.Screening):
         drift = periods.assess(view.features, data.time_column, candidates)
         return dataclasses.replace(found, drift=drift)
 
-    def assess_robustness(
+    def assess(
         self,
         board: engine.Board,
         stage: prefilter.Prefilter,
@@ -197,8 +197,8 @@ class Qualification(screening.Screening):
         shift_document = scmle.assurance.robustness.report.report(found)
         scmle.assurance.robustness.report.conform(stability_document)
         scmle.assurance.robustness.report.validate(shift_document)
-        board.journal.write_json("stability_report.json", stability_document)
-        board.journal.write_json("shift_report.json", shift_document)
+        board.journal.write("stability_report.json", stability_document)
+        board.journal.write("shift_report.json", shift_document)
         board.journal.write_text(
             "eda_report.html",
             html_report.render(stability_document, shift_document),

@@ -60,7 +60,7 @@ def derive(component: str) -> tuple[int, ...]:
     )
 
 
-def component_seed_sequence(
+def sequence(
     run_seed: int, component: str, index: int = 0
 ) -> numpy.random.SeedSequence:
     """Returns the seed sequence for one component of one run.
@@ -79,7 +79,7 @@ def component_seed_sequence(
     )
 
 
-def component_rng(
+def spawn(
     run_seed: int, component: str, index: int = 0
 ) -> numpy.random.Generator:
     """Returns the random generator for one component of one run.
@@ -92,12 +92,10 @@ def component_rng(
     Returns:
         A NumPy generator that depends only on the three arguments.
     """
-    return numpy.random.default_rng(
-        component_seed_sequence(run_seed, component, index)
-    )
+    return numpy.random.default_rng(sequence(run_seed, component, index))
 
 
-def derive_int_seed(run_seed: int, component: str, index: int = 0) -> int:
+def narrow(run_seed: int, component: str, index: int = 0) -> int:
     """Returns a 32-bit integer seed for libraries that take `random_state`.
 
     Args:
@@ -109,13 +107,11 @@ def derive_int_seed(run_seed: int, component: str, index: int = 0) -> int:
         An integer derived from the component's seed sequence, the same for
         the same three arguments.
     """
-    state = component_seed_sequence(run_seed, component, index).generate_state(
-        1
-    )
+    state = sequence(run_seed, component, index).generate_state(1)
     return int(state[0])
 
 
-def seed_path(
+def seed(
     run_seed: int, component: str, index: int = 0
 ) -> qualification.SeedPath:
     """Returns the key to record on a `Check` or `Certificate`.

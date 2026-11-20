@@ -122,7 +122,7 @@ def test_importance_is_unavailable_when_the_metric_is_undefined():
 def test_a_suite_shares_its_time_allowance_among_diagnostics():
     inputs = test_diagnostics.make_inputs(tasks.Task.BINARY)
 
-    reports = suite.run_suite(inputs, suite.lineup(), total_seconds=0.0)
+    reports = suite.run(inputs, suite.lineup(), total_seconds=0.0)
 
     # No time at all: the diagnostic is not started and says why.
     assert reports["permutation_importance"]["skipped"] is True

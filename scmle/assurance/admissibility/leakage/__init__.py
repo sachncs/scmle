@@ -203,7 +203,7 @@ def probe(
         lambda rng: (x, y[permute(y, rng, group_values, block_size)]),
     )
     p_value = significance(skill, null)
-    rng = randomness.component_rng(cfg.seed, path, 2)
+    rng = randomness.spawn(cfg.seed, path, 2)
     bound = hedge(pred, y, task, cfg, group_values, rng)
     powered = sufficient(y, task, cfg)
     suspect = powered and p_value <= cfg.alpha and bound > cfg.skill
@@ -287,7 +287,7 @@ def condition(
             else qualification.Decision.PASS
         ),
         subset=set_id,
-        seeds=randomness.seed_path(cfg.seed, path, 1),
+        seeds=randomness.seed(cfg.seed, path, 1),
         tier=qualification.Tier.UNVERIFIED,
     )
     return Conditional(

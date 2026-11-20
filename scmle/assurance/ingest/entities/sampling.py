@@ -146,7 +146,7 @@ def appraise(
         Precision and recall, each as (point, lower, upper) with a 95
         percent interval, the per-band sample and the reviewer.
     """
-    rng = randomness.component_rng(seed, "ingest.entities.clerical", 0)
+    rng = randomness.spawn(seed, "ingest.entities.clerical", 0)
     order = numpy.argsort(weights, kind="stable")
     cuts = stratify(order, bands)
     sizes, hits, taken, above = [], [], [], []

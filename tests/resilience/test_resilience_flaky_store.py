@@ -15,7 +15,7 @@ from scmle.data.store import processing
 from scmle.runtime import retry
 from scmle.storage import objectstore
 
-POLICY = retry.Retries(max_attempts=4, base_delay_seconds=0.5, factor=2.0)
+POLICY = retry.Retries(attempts=4, base_delay_seconds=0.5, factor=2.0)
 KEYS = failpoints.input_keys()
 REAL = [key for key in KEYS if key != failpoints.copy_key()]
 
@@ -109,13 +109,13 @@ def test_a_transient_transform_failure_within_the_budget_is_retried(
 def test_failures_past_the_budget_stop_at_that_object_and_resume_cleanly(
     store, reference, after_two, target
 ):
-    faulty, run = flaky_processor(store, POLICY.max_attempts, target)
+    faulty, run = flaky_processor(store, POLICY.attempts, target)
     result = run.run()
     assert result.failed == "input/o2.csv"
     assert result.error.startswith("RetryError")
     assert result.processed == ("input/o0.csv", "input/o1.csv")
     assert result.retries == tuple(POLICY.delays())
-    assert faulty.matching == TARGETS[target]["skip"] + POLICY.max_attempts
+    assert faulty.matching == TARGETS[target]["skip"] + POLICY.attempts
     assert store.get(failpoints.STATE_KEY)[0] == after_two
     assert store.exists("output/o2.csv") is (target == "checkpoint")
     assert not store.exists("output/o3.csv")
@@ -135,11 +135,11 @@ def test_a_listing_that_keeps_failing_raises_and_changes_nothing(
 ):
     failpoints.processor(store).run(max_objects=2)
     before = failpoints.files_of(store)
-    faulty, run = flaky_processor(store, POLICY.max_attempts, "listing")
+    faulty, run = flaky_processor(store, POLICY.attempts, "listing")
     with pytest.raises(retry.RetryError) as raised:
         run.run()
-    assert raised.value.attempts == POLICY.max_attempts
-    assert faulty.matching == POLICY.max_attempts
+    assert raised.value.attempts == POLICY.attempts
+    assert faulty.matching == POLICY.attempts
     assert store.get(failpoints.STATE_KEY)[0] == after_two
     assert failpoints.files_of(store) == before
     assert not store.exists(failpoints.LOCK_KEY)
@@ -241,14 +241,14 @@ def test_a_lock_that_cannot_be_taken_within_budget_stops_before_any_work(
 ):
     waits = []
     faulty = faulty_store.FaultyStore(
-        store, POLICY.max_attempts, **GUARDED["lock_acquire"]
+        store, POLICY.attempts, **GUARDED["lock_acquire"]
     )
     guarded = objectstore.RetryingStore(faulty, POLICY, sleep=waits.append)
     with pytest.raises(retry.RetryError) as raised:
         failpoints.processor(guarded).run()
-    assert raised.value.attempts == POLICY.max_attempts
+    assert raised.value.attempts == POLICY.attempts
     assert waits == POLICY.delays()
-    assert faulty.matching == POLICY.max_attempts
+    assert faulty.matching == POLICY.attempts
     assert failpoints.files_of(store) == {}
     assert not store.exists(failpoints.STATE_KEY)
     assert not store.exists(failpoints.LOCK_KEY)
@@ -258,7 +258,7 @@ def test_a_lock_release_that_fails_past_budget_leaves_finished_work_intact(
     store, reference
 ):
     faulty = faulty_store.FaultyStore(
-        store, POLICY.max_attempts, **GUARDED["lock_release"]
+        store, POLICY.attempts, **GUARDED["lock_release"]
     )
     guarded = objectstore.RetryingStore(
         faulty, POLICY, sleep=lambda seconds: None
@@ -282,14 +282,14 @@ def test_the_retrying_store_makes_exactly_the_budgeted_attempts(
     waits = []
     faulty = faulty_store.FaultyStore(store, failures, operations=("get",))
     guarded = objectstore.RetryingStore(faulty, POLICY, sleep=waits.append)
-    if failures < POLICY.max_attempts:
+    if failures < POLICY.attempts:
         assert guarded.get("input/o0.csv")[0] == failpoints.object_bytes(0)
         assert faulty.matching == failures + 1
         assert waits == POLICY.delays()[:failures]
     else:
         with pytest.raises(retry.RetryError) as raised:
             guarded.get("input/o0.csv")
-        assert raised.value.attempts == faulty.matching == POLICY.max_attempts
+        assert raised.value.attempts == faulty.matching == POLICY.attempts
         assert waits == POLICY.delays()
 
 

@@ -43,19 +43,19 @@ class Predictor:
         adapter: Adapter that turns new samples into features.
         model: Verified classifier loaded from the package.
         package: Identity of the package the model came from.
-        feature_names: Feature names the package was trained on.
-        training_dataset_hash: Hash of the training dataset recorded in the
+        names: Feature names the package was trained on.
+        dataset: Hash of the training dataset recorded in the
             package.
-        lifecycle_report_digest: Digest of the verified lifecycle report, or
+        report: Digest of the verified lifecycle report, or
             None if no report was checked.
     """
 
     adapter: Preparer
     model: LogisticRegression = dataclasses.field(repr=False)
     package: Package
-    feature_names: tuple[str, ...]
-    training_dataset_hash: str
-    lifecycle_report_digest: str | None = None
+    names: tuple[str, ...]
+    dataset: str
+    report: str | None = None
 
     @staticmethod
     def identify(
@@ -98,7 +98,7 @@ class Predictor:
             )
 
     @classmethod
-    def from_package(
+    def load(
         cls,
         adapter: curators.Preparer,
         package_path: str | Path,
@@ -129,14 +129,12 @@ class Predictor:
                 are invalid or mismatch the adapter or the model, or the
                 lifecycle report does not identify this package.
         """
-        model = verification.load_package(package_path, signing_key)
+        model = verification.load(package_path, signing_key)
         feature_names, identity = declared(Path(package_path), adapter, model)
         dataset_hash, model_digest, signature_value = identity
         report_digest: str | None = None
         if lifecycle_report_path is not None:
-            report = reporting.Record.read_verified(
-                lifecycle_report_path, signing_key
-            )
+            report = reporting.Record.load(lifecycle_report_path, signing_key)
             cls.identify(report, adapter, Path(package_path), identity)
             report_digest = attestation.checksum(report.preimage())
         package = containers.Package(
@@ -148,12 +146,12 @@ class Predictor:
             adapter=adapter,
             model=model,
             package=package,
-            feature_names=feature_names,
-            training_dataset_hash=dataset_hash,
-            lifecycle_report_digest=report_digest,
+            names=feature_names,
+            dataset=dataset_hash,
+            report=report_digest,
         )
 
-    def features_for(self, samples: Sequence[Any]) -> containers.Batch:
+    def featurize(self, samples: Sequence[Any]) -> containers.Batch:
         """Prepares and validates features for new modality samples.
 
         Args:
@@ -170,7 +168,7 @@ class Predictor:
         if not values:
             raise errors.InputError("samples must not be empty")
         batch = self.adapter.features(values)
-        if batch.feature_names != self.feature_names:
+        if batch.feature_names != self.names:
             raise errors.InputError(
                 "new sample feature schema does not match package"
             )
@@ -187,7 +185,7 @@ class Predictor:
         """
         return cast(
             "numpy.ndarray",
-            self.model.predict(self.features_for(samples).values),
+            self.model.predict(self.featurize(samples).values),
         )
 
     def predict_proba(self, samples: Sequence[Any]) -> numpy.ndarray:
@@ -201,7 +199,7 @@ class Predictor:
             model's class order.
         """
         probabilities: numpy.ndarray = self.model.predict_proba(
-            self.features_for(samples).values
+            self.featurize(samples).values
         )
         return probabilities
 
@@ -216,15 +214,15 @@ class Predictor:
         health: dict[str, object] = {
             "package_verified": True,
             "modality": modalities.serialise(self.adapter.modality),
-            "training_dataset_hash": self.training_dataset_hash,
-            "feature_names": list(self.feature_names),
+            "training_dataset_hash": self.dataset,
+            "feature_names": list(self.names),
             "model_sha256": self.package.model_sha256,
         }
-        if self.lifecycle_report_digest is not None:
+        if self.report is not None:
             health.update(
                 {
                     "lifecycle_report_verified": True,
-                    "lifecycle_report_digest": self.lifecycle_report_digest,
+                    "lifecycle_report_digest": self.report,
                 }
             )
         return health

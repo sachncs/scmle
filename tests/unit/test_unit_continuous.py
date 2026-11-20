@@ -43,32 +43,32 @@ def test_serialize_sorts_columns_and_drops_the_index():
 def test_a_dataset_version_is_the_sha256_of_its_canonical_csv():
     frame = pandas.DataFrame({"b": [1], "a": [2]})
     expected = hashlib.sha256(b"a,b\n2,1\n").hexdigest()
-    assert records.dataset_version(frame) == "sha256:" + expected
-    assert records.dataset_version(frame[["a", "b"]]) == "sha256:" + expected
+    assert records.stamp(frame) == "sha256:" + expected
+    assert records.stamp(frame[["a", "b"]]) == "sha256:" + expected
 
 
 def test_load_dataset_reads_a_preserved_copy_and_checks_it(tmp_path):
     frame = pandas.DataFrame({"a": [0.1, 2.5], "b": ["x", "y"]})
-    version = records.dataset_version(frame)
+    version = records.stamp(frame)
     folder = tmp_path / "datasets"
     folder.mkdir()
     path = folder / (version.replace(":", "-") + ".csv")
     path.write_bytes(records.serialize(frame))
-    loaded = records.load_dataset(tmp_path, version)
-    assert records.dataset_version(loaded) == version
+    loaded = records.load(tmp_path, version)
+    assert records.stamp(loaded) == version
     path.write_text("a,b\n0.1,x\n2.5,z\n")
     with pytest.raises(errors.InputError, match=f"stored copy of {version}"):
-        records.load_dataset(tmp_path, version)
+        records.load(tmp_path, version)
 
 
 def test_a_new_history_is_empty(tmp_path):
-    history = records.TrainingHistory(tmp_path / "h.jsonl")
+    history = records.History(tmp_path / "h.jsonl")
     assert history.rows() == []
     assert history.select("training") == []
 
 
 def test_history_rows_chain_from_a_zero_hash(tmp_path):
-    history = records.TrainingHistory(tmp_path / "h.jsonl")
+    history = records.History(tmp_path / "h.jsonl")
     first = history.record("training", 12.34567, model="m", when=object)
     second = history.record("review", 13.0)
     assert first["seq"] == 0
@@ -98,7 +98,7 @@ def test_history_rows_chain_from_a_zero_hash(tmp_path):
     ],
 )
 def test_an_edited_history_is_broken(tmp_path, edit):
-    history = records.TrainingHistory(tmp_path / "h.jsonl")
+    history = records.History(tmp_path / "h.jsonl")
     history.record("a", 1.0)
     history.record("b", 2.0)
     rows = history.rows()
@@ -194,17 +194,17 @@ def test_judge_reads_the_interval_against_the_margin(
 def test_post_promotion_check_splits_alpha_and_ranks_the_verdicts():
     specs = [spec("a"), spec("b", primary=False)]
     before = {"a": [0.0] * 30, "b": [0.0] * 30}
-    result = promotion.post_promotion_check(
+    result = promotion.reassess(
         specs, before, {"a": [1.0] * 30, "b": [0.0] * 30}, resamples=50
     )
     assert result["overall"] == "helped"
     assert [m["confidence"] for m in result["metrics"]] == [0.975, 0.975]
     assert "joint confidence 95% over 2 metrics" in result["statement"]
-    harmed = promotion.post_promotion_check(
+    harmed = promotion.reassess(
         specs, before, {"a": [1.0] * 30, "b": [-1.0] * 30}, resamples=50
     )
     assert harmed["overall"] == "harmed"
-    no_primary = promotion.post_promotion_check(
+    no_primary = promotion.reassess(
         [spec("b", primary=False)], before, {"b": [1.0] * 30}, resamples=50
     )
     assert no_primary["overall"] == "inconclusive"
@@ -212,9 +212,9 @@ def test_post_promotion_check_splits_alpha_and_ranks_the_verdicts():
 
 def test_post_promotion_check_needs_metrics_and_values():
     with pytest.raises(errors.InputError, match="name at least one metric"):
-        promotion.post_promotion_check([], {}, {})
+        promotion.reassess([], {}, {})
     with pytest.raises(errors.InputError, match="no values for m in both"):
-        promotion.post_promotion_check([spec()], {"m": [1.0]}, {})
+        promotion.reassess([spec()], {"m": [1.0]}, {})
 
 
 def test_reserve_is_a_stable_keyed_hash():
@@ -267,7 +267,7 @@ def test_attribute_says_whether_the_split_matched():
 
 def test_holdback_check_caps_a_mismatched_split():
     specs = [spec("a")]
-    result = promotion.holdback_check(
+    result = promotion.check(
         specs,
         {"a": [0.0] * 30},
         {"a": [1.0] * 30},
@@ -277,7 +277,7 @@ def test_holdback_check_caps_a_mismatched_split():
     assert result["overall"] == "helped"
     assert result["design"] == "concurrent_holdback"
     assert result["ratio_check"]["flag"] is False
-    capped = promotion.holdback_check(
+    capped = promotion.check(
         specs,
         {"a": [0.0] * 30},
         {"a": [1.0] * 300},
@@ -287,7 +287,7 @@ def test_holdback_check_caps_a_mismatched_split():
     assert capped["overall"] == "inconclusive"
     assert capped["metrics"][0]["verdict"] == "improved"
     with pytest.raises(errors.InputError, match="expected_fraction must lie"):
-        promotion.holdback_check(specs, {}, {}, expected_fraction=1.0)
+        promotion.check(specs, {}, {}, expected_fraction=1.0)
 
 
 # ---- feeding ---------------------------------------------------------------
@@ -328,8 +328,8 @@ def test_absorbed_labels_match_pending_cases(tmp_path):
 def test_record_training_preserves_the_dataset_once(tmp_path):
     ignored, ev = build(tmp_path)
     frame = pandas.DataFrame({"b": [1.5, 2.5], "a": ["x", "y"]})
-    row = ev.record_training("m", frame, {"auc": 0.9}, "first")
-    version = records.dataset_version(frame)
+    row = ev.record("m", frame, {"auc": 0.9}, "first")
+    version = records.stamp(frame)
     assert row["kind"] == "training"
     assert row["facts"] == {
         "model": "m",
@@ -342,9 +342,9 @@ def test_record_training_preserves_the_dataset_once(tmp_path):
     }
     saved = tmp_path / "ops" / "datasets" / (version.replace(":", "-") + ".csv")
     assert saved.read_bytes() == records.serialize(frame)
-    ev.record_training("m", frame, {}, "again")
+    ev.record("m", frame, {}, "again")
     assert len(list(saved.parent.iterdir())) == 1
-    other = ev.record_training("m", frame.head(1), {}, "x", preserve=False)
+    other = ev.record("m", frame.head(1), {}, "x", preserve=False)
     assert other["facts"]["preserved"] is False
     assert len(list(saved.parent.iterdir())) == 1
 
@@ -362,7 +362,7 @@ def test_a_quiet_window_is_reviewed_without_a_proposal(tmp_path):
     loop, ev = build(tmp_path)
     decision = ev.review(support_continuous.loss_signals(0.05))
     assert decision.action == "none"
-    assert decision.escalation_id is None
+    assert decision.escalation is None
     assert decision.challenger is None
     rows = ev.history.select("retrain_review")
     assert len(rows) == 1
@@ -374,13 +374,13 @@ def test_a_breached_window_recommends_and_is_found_pending(tmp_path):
     loop, ev = build(tmp_path)
     decision = ev.review(support_continuous.loss_signals(0.4))
     assert decision.action == "recommend"
-    assert decision.escalation_id == ev.find()
-    assert ev.last_proposal_batch == loop.batch
+    assert decision.escalation == ev.find()
+    assert ev.proposed == loop.batch
     assert ev.history.select("retrain_decision")[0]["facts"]["action"] == (
         "recommend"
     )
     again = support_continuous.evaluation(tmp_path, loop)
-    assert again.last_proposal_batch == loop.batch
+    assert again.proposed == loop.batch
 
 
 def test_train_needs_a_hook_and_an_empty_queue(tmp_path):
@@ -410,12 +410,12 @@ def test_a_hook_that_starts_nothing_trains_nothing(tmp_path):
 def test_an_unanswered_retrain_cannot_run(tmp_path):
     ignored, ev = build(tmp_path, retrain=lambda: "c1")
     with pytest.raises(errors.InputError, match="esc-9 has no approving reply"):
-        ev.run_approved_retrain("esc-9")
+        ev.execute("esc-9")
 
 
 def test_retraining_builds_on_feeding():
     assert issubclass(retraining.Retraining, feeding.Feeding)
-    assert issubclass(evaluation.ContinuousEvaluation, retraining.Retraining)
+    assert issubclass(evaluation.Evaluation, retraining.Retraining)
     assert policies.TRIGGER == "trigger"
 
 

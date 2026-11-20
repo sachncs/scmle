@@ -260,7 +260,7 @@ def bound(
     """
     count = len(matrix)
     point = float(spread(matrix.sum(axis=0)))
-    rng = randomness.component_rng(seed, "decision.constraints.cluster", 0)
+    rng = randomness.spawn(seed, "decision.constraints.cluster", 0)
     weights = rng.multinomial(
         count, numpy.full(count, 1.0 / count), size=draws
     ).astype(float)

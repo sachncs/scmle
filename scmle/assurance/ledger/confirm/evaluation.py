@@ -317,9 +317,7 @@ def examine(
             else qualification.Decision.PASS
         ),
         subset=qualification.Subset.CONFIRMATION,
-        seeds=randomness.seed_path(
-            ledger.seed, f"confirm.{spec.statistic}", index
-        ),
+        seeds=randomness.seed(ledger.seed, f"confirm.{spec.statistic}", index),
         tier=(
             qualification.Tier.CONFIRMED
             if passed

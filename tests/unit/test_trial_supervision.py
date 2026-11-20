@@ -66,7 +66,7 @@ def test_no_trial_gets_more_than_the_trial_window():
         tasks.Resources(time_budget_seconds=10), time.monotonic() - 100
     )
     assert late.deadline() == 0.0
-    assert late.skip_reason(first=True) is not None
+    assert late.skip(first=True) is not None
 
 
 def test_a_trial_is_killed_within_the_slack_of_its_ceiling():

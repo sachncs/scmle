@@ -17,12 +17,12 @@ EARLIER = "2026-10-19T12:00:00+00:00"
 def assessment(**changes) -> slo.Assessment:
     values = {
         "target": target(),
-        "observed_at": NOW,
+        "observed": NOW,
         "status": slo.Status.PASS,
-        "sample_count": 2,
-        "in_window_count": 2,
-        "observed_maximum": 100.0,
-        "error_budget_remaining": 0.5,
+        "samples": 2,
+        "windowed": 2,
+        "maximum": 100.0,
+        "remaining": 0.5,
         "reason": "fine",
     }
     values.update(changes)
@@ -32,8 +32,8 @@ def assessment(**changes) -> slo.Assessment:
 def test_require_text_refuses_a_non_string_and_a_blank() -> None:
     for value in (5, "  "):
         with pytest.raises(errors.InputError, match=r"^x must not be empty$"):
-            slo.require_text(value, "x")
-    assert slo.require_text(" y ", "x") == "y"
+            slo.require(value, "x")
+    assert slo.require(" y ", "x") == "y"
 
 
 def test_a_target_reads_its_kind_from_text_and_records_every_field() -> None:
@@ -74,8 +74,8 @@ def test_the_window_ignores_samples_of_another_kind() -> None:
         observed_at=NOW,
     )
     assert found.status is slo.Status.PASS
-    assert found.sample_count == 2
-    assert found.observed_maximum == 200.0
+    assert found.samples == 2
+    assert found.maximum == 200.0
 
 
 def test_a_window_above_the_maximum_is_breached() -> None:
@@ -85,15 +85,15 @@ def test_a_window_above_the_maximum_is_breached() -> None:
         observed_at=NOW,
     )
     assert found.status is slo.Status.BREACHED
-    assert found.error_budget_remaining == 0.0
+    assert found.remaining == 0.0
     assert found.reason == "maximum 300 exceeds 250"
 
 
 def test_too_few_samples_keep_the_evaluation_time() -> None:
     found = slo.evaluate(target(), (metric(100.0, NOW),), observed_at=NOW)
     assert found.status is slo.Status.INSUFFICIENT_DATA
-    assert found.observed_at == NOW
-    assert (found.sample_count, found.in_window_count) == (1, 1)
+    assert found.observed == NOW
+    assert (found.samples, found.windowed) == (1, 1)
 
 
 def test_a_future_sample_invalidates_the_window() -> None:
@@ -104,8 +104,8 @@ def test_a_future_sample_invalidates_the_window() -> None:
         observed_at=NOW,
     )
     assert found.status is slo.Status.INVALID
-    assert found.observed_maximum is None
-    assert (found.sample_count, found.in_window_count) == (2, 1)
+    assert found.maximum is None
+    assert (found.samples, found.windowed) == (2, 1)
 
 
 def test_an_assessment_reads_its_status_from_text() -> None:
@@ -123,22 +123,22 @@ def test_an_assessment_record_names_its_observed_maximum() -> None:
     [
         ({"target": "slo"}, errors.KindError, r"^target must be Slo$"),
         (
-            {"sample_count": -1},
+            {"samples": -1},
             errors.InputError,
             r"^sample counts must not be negative$",
         ),
         (
-            {"in_window_count": 3},
+            {"windowed": 3},
             errors.InputError,
             r"^in_window_count cannot exceed sample_count$",
         ),
         (
-            {"observed_maximum": -1.0},
+            {"maximum": -1.0},
             errors.InputError,
             r"^observed_maximum must be finite and non-negative$",
         ),
         (
-            {"error_budget_remaining": 1.5},
+            {"remaining": 1.5},
             errors.InputError,
             r"^error_budget_remaining must be between 0 and 1$",
         ),
@@ -154,8 +154,8 @@ def test_a_text_that_is_not_a_timestamp_is_refused_by_name() -> None:
     with pytest.raises(
         errors.InputError, match=r"^observed_at must be ISO-8601$"
     ):
-        slo.parse_timestamp("yesterday", "observed_at")
+        slo.parse("yesterday", "observed_at")
 
 
 def test_an_untouched_error_budget_of_exactly_one_is_kept() -> None:
-    assert assessment(error_budget_remaining=1.0).error_budget_remaining == 1.0
+    assert assessment(remaining=1.0).remaining == 1.0

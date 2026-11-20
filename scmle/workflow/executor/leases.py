@@ -94,7 +94,7 @@ class Leases(records.Records):
         return json.dumps(
             {
                 "owner": self.owner,
-                "expires": max(self.clock() + self.lease_seconds, floor),
+                "expires": max(self.clock() + self.tenure, floor),
                 "fence": fence,
             }
         ).encode()
@@ -187,7 +187,7 @@ class Leases(records.Records):
             )
         return held, meta
 
-    def renew_lease(self, run_id: str) -> None:
+    def renew(self, run_id: str) -> None:
         """Extends the lease, only if this executor still holds it.
 
         Args:
@@ -259,9 +259,9 @@ class Leases(records.Records):
             run_id: The run.
             stop: Set when the run's steps are done.
         """
-        while not stop.wait(self.lease_seconds / 3):
+        while not stop.wait(self.tenure / 3):
             try:
-                self.renew_lease(run_id)
+                self.renew(run_id)
             except failures.EvictionError:
                 LOGGER.warning("WARNING run %s: the lease was lost", run_id)
                 return

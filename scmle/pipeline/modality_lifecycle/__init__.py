@@ -28,21 +28,19 @@ from scmle.pipeline.modality_lifecycle.constants import PACKAGE_SCHEMA_VERSION
 from scmle.pipeline.modality_lifecycle.constants import REPORT_SCHEMA_VERSION
 from scmle.pipeline.modality_lifecycle.constants import RGB_CHANNEL_COUNT
 from scmle.pipeline.modality_lifecycle.constants import SHA256_LENGTH
+from scmle.pipeline.modality_lifecycle.containers import AbortedError
 from scmle.pipeline.modality_lifecycle.containers import Batch
 from scmle.pipeline.modality_lifecycle.containers import Cancellation
 from scmle.pipeline.modality_lifecycle.containers import hashlike
-from scmle.pipeline.modality_lifecycle.containers import LifecycleCancelledError
 from scmle.pipeline.modality_lifecycle.containers import normalise
 from scmle.pipeline.modality_lifecycle.containers import Package
 from scmle.pipeline.modality_lifecycle.containers import Partitions
 from scmle.pipeline.modality_lifecycle.curators import Curation
 from scmle.pipeline.modality_lifecycle.curators import Curator
-from scmle.pipeline.modality_lifecycle.curators import ExtensionCurator
+from scmle.pipeline.modality_lifecycle.curators import Extension
 from scmle.pipeline.modality_lifecycle.curators import Preparer
 from scmle.pipeline.modality_lifecycle.explanation import ablate
-from scmle.pipeline.modality_lifecycle.explanation import (
-    ModelExplainabilityStage,
-)
+from scmle.pipeline.modality_lifecycle.explanation import Explainability
 from scmle.pipeline.modality_lifecycle.explanation import perturb
 from scmle.pipeline.modality_lifecycle.explanation import replicate
 from scmle.pipeline.modality_lifecycle.explanation import sensitivities
@@ -52,16 +50,12 @@ from scmle.pipeline.modality_lifecycle.plans import coherent
 from scmle.pipeline.modality_lifecycle.plans import Plan
 from scmle.pipeline.modality_lifecycle.plans import typecheck
 from scmle.pipeline.modality_lifecycle.predictors import Predictor
-from scmle.pipeline.modality_lifecycle.preparers.audio import AudioPreparer
-from scmle.pipeline.modality_lifecycle.preparers.document import (
-    DocumentPreparer,
-)
+from scmle.pipeline.modality_lifecycle.preparers.audio import Audio
+from scmle.pipeline.modality_lifecycle.preparers.document import Document
 from scmle.pipeline.modality_lifecycle.preparers.document import Plaintext
-from scmle.pipeline.modality_lifecycle.preparers.geospatial import (
-    GeospatialPreparer,
-)
-from scmle.pipeline.modality_lifecycle.preparers.graph import GraphPreparer
-from scmle.pipeline.modality_lifecycle.preparers.image import ImagePreparer
+from scmle.pipeline.modality_lifecycle.preparers.geospatial import Geospatial
+from scmle.pipeline.modality_lifecycle.preparers.graph import Graph
+from scmle.pipeline.modality_lifecycle.preparers.image import Image
 from scmle.pipeline.modality_lifecycle.preparers.raster import Imagery
 from scmle.pipeline.modality_lifecycle.preparers.video import Footage
 from scmle.pipeline.modality_lifecycle.reporting import Record
@@ -86,12 +80,10 @@ from scmle.pipeline.modality_lifecycle.steps import Recovery
 from scmle.pipeline.modality_lifecycle.steps import Splitting
 from scmle.pipeline.modality_lifecycle.steps import Validation
 from scmle.pipeline.modality_lifecycle.verification import authenticate
-from scmle.pipeline.modality_lifecycle.verification import file_digest
-from scmle.pipeline.modality_lifecycle.verification import load_package
-from scmle.pipeline.modality_lifecycle.verification import require_feature_names
-from scmle.pipeline.modality_lifecycle.verification import (
-    verify_package_manifest,
-)
+from scmle.pipeline.modality_lifecycle.verification import digest
+from scmle.pipeline.modality_lifecycle.verification import inspect
+from scmle.pipeline.modality_lifecycle.verification import load
+from scmle.pipeline.modality_lifecycle.verification import validate
 from scmle.pipeline.modality_lifecycle.verification import vet
 
 __all__ = [
@@ -110,7 +102,8 @@ __all__ = [
     "REPORT_SCHEMA_VERSION",
     "RGB_CHANNEL_COUNT",
     "SHA256_LENGTH",
-    "AudioPreparer",
+    "AbortedError",
+    "Audio",
     "Batch",
     "Board",
     "Cancellation",
@@ -119,20 +112,19 @@ __all__ = [
     "Curating",
     "Curation",
     "Curator",
-    "DocumentPreparer",
+    "Document",
     "Documentation",
     "Evaluation",
-    "ExtensionCurator",
+    "Explainability",
+    "Extension",
     "Footage",
-    "GeospatialPreparer",
-    "GraphPreparer",
-    "ImagePreparer",
+    "Geospatial",
+    "Graph",
+    "Image",
     "Imagery",
     "Inference",
     "Ingestion",
     "Lifecycle",
-    "LifecycleCancelledError",
-    "ModelExplainabilityStage",
     "Modelling",
     "Monitoring",
     "Package",
@@ -153,19 +145,19 @@ __all__ = [
     "ablate",
     "authenticate",
     "coherent",
-    "file_digest",
+    "digest",
     "hashlike",
-    "load_package",
+    "inspect",
+    "load",
     "normalise",
     "perturb",
     "rehydrate",
     "replicate",
     "require",
-    "require_feature_names",
     "sensitivities",
     "typecheck",
     "unpack",
     "unseal",
-    "verify_package_manifest",
+    "validate",
     "vet",
 ]

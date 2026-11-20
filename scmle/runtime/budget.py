@@ -75,7 +75,7 @@ OTHER_DIAGNOSTIC_SECONDS = 2.0
 EXPLAIN_SHARE = 0.1
 # Final refit, decision threshold and serving measurement took 1.0-3.9 s,
 # at most 6.5 % of 60 s; the share is about 1.5 times that. Selection
-# falls back to a cheaper candidate whose refit fits (stages.SelectStage).
+# falls back to a cheaper candidate whose refit fits (stages.Selection).
 REFIT_SHARE = 0.1
 # Packaging (learning curve, conformal fold fits) took 0.3-0.6 s when no
 # fold fit ran late (4.7 and 6.3 s when one did); each fit now checks the

@@ -42,7 +42,7 @@ class Search(ensemble_search.Stacker):
                 spec=types.SimpleNamespace(
                     ensemble=types.SimpleNamespace(size=3)
                 ),
-                governor=types.SimpleNamespace(skip_reason=lambda first: None),
+                governor=types.SimpleNamespace(skip=lambda first: None),
                 check=lambda: None,
             ),
             journal=types.SimpleNamespace(

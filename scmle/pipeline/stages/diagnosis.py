@@ -90,7 +90,7 @@ class Diagnostics:
 class Diagnosis(calibration.Calibration):
     """Post-selection diagnostics of the selected model.
 
-    Part of `PackageStage`, which inherits these methods unchanged;
+    Part of `Packaging`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 
@@ -109,13 +109,13 @@ class Diagnosis(calibration.Calibration):
             The learning curve, nested CV, bias-variance and sensitivity.
         """
         return Diagnostics(
-            self.learning_curve(board, selected),
-            self.nested_validation(board, selected),
-            self.bias_variance(board, selected),
+            self.chart(board, selected),
+            self.revalidate(board, selected),
+            self.decompose(board, selected),
             self.sensitivity(board, selected),
         )
 
-    def learning_curve(
+    def chart(
         self,
         board: engine.Board,
         selected: experiments.Trial,
@@ -154,7 +154,7 @@ class Diagnosis(calibration.Calibration):
         )
         return None if curve is None else curve.to_dict()
 
-    def bias_variance(
+    def decompose(
         self,
         board: engine.Board,
         selected: experiments.Trial,
@@ -247,7 +247,7 @@ class Diagnosis(calibration.Calibration):
         )
         return {**report.to_dict(), "dominant": report.dominant()}
 
-    def nested_validation(
+    def revalidate(
         self,
         board: engine.Board,
         selected: experiments.Trial,
@@ -302,7 +302,7 @@ class Diagnosis(calibration.Calibration):
         record["optimism_natural"] = sign * result.optimism
         return record
 
-    def forecast_backtest(
+    def forecast(
         self,
         board: engine.Board,
         selected: experiments.Trial,
@@ -346,10 +346,10 @@ class Diagnosis(calibration.Calibration):
             )
         headline = None
         exam = board.get(assessment.Exam)
-        if exam.test_rows is not None:
-            features, target = exam.test_rows
+        if exam.rows is not None:
+            features, target = exam.rows
             headline = backtest.report(
-                exam.final_pipeline,
+                exam.pipeline,
                 features,
                 target,
                 partition.seasonal,

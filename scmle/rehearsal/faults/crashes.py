@@ -178,9 +178,9 @@ flow = definition.Workflow(
     "recovery-job",
     "1",
     (
-        definition.Step("ingest", definition.StepKind.INGEST),
-        definition.Step("train", definition.StepKind.TRAIN, ("ingest",)),
-        definition.Step("evaluate", definition.StepKind.EVALUATE, ("train",)),
+        definition.Step("ingest", definition.Kind.INGEST),
+        definition.Step("train", definition.Kind.TRAIN, ("ingest",)),
+        definition.Step("evaluate", definition.Kind.EVALUATE, ("train",)),
     ),
 )
 

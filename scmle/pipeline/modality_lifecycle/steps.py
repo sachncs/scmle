@@ -42,7 +42,7 @@ class Ingestion(state.Stage):
 
     stage = modalities.Phase.INGESTION
     makes = state.Intake
-    performance_operation = performance.Operation.INGEST
+    operation = performance.Operation.INGEST
 
     def samples(self, board: state.Board) -> int:
         """How many samples ingestion read.
@@ -259,7 +259,7 @@ class Modelling(state.Stage):
     stage = modalities.Phase.MODELLING
     requires = (Splitting, Preparation)
     makes = state.Fit
-    performance_operation = performance.Operation.FIT
+    operation = performance.Operation.FIT
 
     def execute(self, board: state.Board) -> state.Fit:
         """Fits only on the training partition.
@@ -377,7 +377,7 @@ class Composition(state.Stage):
                 "sample_ids": list(batch.sample_ids),
                 "sample_lineage": [
                     {
-                        "sample_id": adapter.sample_id(sample),
+                        "sample_id": adapter.sample(sample),
                         "partition": partition,
                     }
                     for partition, samples in partition_samples.items()
@@ -420,7 +420,7 @@ class Packaging(state.Stage):
     stage = modalities.Phase.PACKAGING
     requires = (Preparation, Modelling, Evaluation)
     makes = state.Bundle
-    performance_operation = performance.Operation.PACKAGE
+    operation = performance.Operation.PACKAGE
 
     @staticmethod
     def replay(
@@ -440,16 +440,16 @@ class Packaging(state.Stage):
                 or model differs from the replayed run's.
         """
         plan = board.plan
-        predictor = predictors.Predictor.from_package(
-            plan.adapter, plan.package_target, plan.signing_key
+        predictor = predictors.Predictor.load(
+            plan.adapter, plan.package_target, plan.key
         )
         expected = board.get(state.Features).batches["train"].feature_names
-        if predictor.training_dataset_hash != plan.adapter.digest:
+        if predictor.dataset != plan.adapter.digest:
             raise errors.InputError(
                 "checkpoint package dataset identity does not match "
                 "the resumed adapter"
             )
-        if predictor.feature_names != expected:
+        if predictor.names != expected:
             raise errors.InputError(
                 "checkpoint package feature schema does not match "
                 "the resumed adapter"
@@ -493,7 +493,7 @@ class Packaging(state.Stage):
                 "feature_names": list(
                     board.get(state.Features).batches["train"].feature_names
                 ),
-                "model_sha256": verification.file_digest(model_path),
+                "model_sha256": verification.digest(model_path),
                 "evaluation": {
                     key: value
                     for key, value in board.get(state.Score).evidence.items()
@@ -504,7 +504,7 @@ class Packaging(state.Stage):
                 **unsigned,
                 "signature": {
                     "algorithm": signing.SIGNATURE_ALGORITHM,
-                    "value": signing.mac(unsigned, plan.signing_key),
+                    "value": signing.mac(unsigned, plan.key),
                 },
             }
             manifest_path = temporary / "manifest.json"
@@ -585,19 +585,19 @@ class Inference(state.Stage):
         batch = board.get(state.Features).batches["test"]
         count = len(batch.sample_ids)
         started = time.perf_counter()
-        loaded = verification.load_package(
-            board.get(state.Bundle).package.path, board.plan.signing_key
+        loaded = verification.load(
+            board.get(state.Bundle).package.path, board.plan.key
         )
         load = state.observe(
             performance.Operation.LOAD,
-            engine.Lap(time.perf_counter() - started, limits.peak_memory_gb()),
+            engine.Lap(time.perf_counter() - started, limits.watermark()),
             count,
         )
         started = time.perf_counter()
         predictions = loaded.predict(batch.values)
         inference = state.observe(
             performance.Operation.INFERENCE,
-            engine.Lap(time.perf_counter() - started, limits.peak_memory_gb()),
+            engine.Lap(time.perf_counter() - started, limits.watermark()),
             count,
         )
         actual = [str(value) for value in predictions]
@@ -712,7 +712,7 @@ class Recovery(state.Stage):
             )
             rejected = False
             try:
-                verification.load_package(tampered, board.plan.signing_key)
+                verification.load(tampered, board.plan.key)
             except (TypeError, ValueError):  # handled: expected rejection
                 rejected = True
             if not rejected:

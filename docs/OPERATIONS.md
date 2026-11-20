@@ -23,10 +23,10 @@ locally.
 *Availability* is the share of requests that were not 5xx or 429; a 4xx the
 caller caused is available. Latency quantiles are estimated from histogram
 buckets, as Prometheus does, so they are exact only at bucket edges.
-`SignalMonitor` looks at a sliding window and reports, per signal, `ok`,
+`Monitor` looks at a sliding window and reports, per signal, `ok`,
 `breached` or `insufficient_data`.
 A window with too few samples is never reported healthy.
-Feature rows are sampled at `sample_rate`; requests and outcomes are never
+Feature rows are sampled at `sampling`; requests and outcomes are never
 sampled. Drift is the noise-adjusted PSI of
 `scmle.data.reference`, so the thresholds are the ones the batch
 monitor already uses (`Thresholds`).
@@ -52,7 +52,7 @@ cause". Critical severity pages and files a ticket; warning files a ticket.
 
 Each webhook body is signed `sha256=HMAC(secret, timestamp + "." + body)` in
 `X-Scmle-Signature`, with `X-Scmle-Timestamp` and an idempotency key that is
-the same on every retry. A receiver calls `notify.verify_signature`. 5xx, 429
+the same on every retry. A receiver calls `notify.verify`. 5xx, 429
 and transport errors retry with exponential backoff; other 4xx are final. A
 failed page is returned and written to the audit row, never dropped.
 
@@ -66,11 +66,11 @@ same cases. Raw labels and outcomes are kept in `retained_outcomes.jsonl`.
 The loop's own alarm still does **not** gate retraining. The policy's `retrain`
 stays False because the loop's detection-delay gates (H2, H10) missed their
 floors; the alarm records a row and opens an `l1_alarm_investigate`
-escalation, and trains nothing. Retraining comes from `RetrainPolicy`:
+escalation, and trains nothing. Retraining comes from `continuous.Policy`:
 
 * `recommend` (the default) opens a `retrain_recommendation` escalation with
   `no_retrain` as the proposed default. A challenger is trained only after a
-  person's signed, allowing reply (`run_approved_retrain`).
+  person's signed, allowing reply (`Retraining.execute`).
 * `trigger` also trains a challenger at once and registers it with the loop.
   A challenger serves nothing until it wins.
 
@@ -81,7 +81,7 @@ open, and during a cooldown.
 
 A challenger is judged by the loop's e-process and e-LOND (online false
 discovery control over challengers); a win is a `promotion_proposal` row.
-`ContinuousEvaluation.replace` then refuses unless the loop proposed the
+`Evaluation.replace` then refuses unless the loop proposed the
 challenger, the promotion gate admits the build (signed bundle, independent
 approval, passed scan, approver other than the requester, a signed staging
 record for production), an offline comparison, if given, says promote, and the
@@ -89,7 +89,7 @@ release registry confirms the runtime. Dataset versions (content digest, with
 a preserved copy), training runs, proposals, replacements and checks are in a
 hash-chained `training_history.jsonl`.
 
-`post_promotion_check` compares chosen operational and business metrics
+`reassess` compares chosen operational and business metrics
 before and after with bootstrap intervals, split over the metrics so they hold
 together. A metric is `improved` or `worse` only when its whole interval is
 beyond the declared margin. The answer is `helped`, `harmed` or

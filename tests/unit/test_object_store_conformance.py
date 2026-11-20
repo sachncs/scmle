@@ -109,7 +109,7 @@ def test_transient_failures_are_retried_with_the_declared_backoff(tmp_path):
     )
     store = objectstore.RetryingStore(
         inner,
-        retry.Retries(max_attempts=4, base_delay_seconds=1, factor=2),
+        retry.Retries(attempts=4, base_delay_seconds=1, factor=2),
         sleep=waits.append,
     )
     store.put("k", b"x")
@@ -125,7 +125,7 @@ def test_retries_stop_at_the_budget_and_never_retry_a_permanent_error(
     inner = Flaky(tmp_path / "r", [transient] * 3)
     store = objectstore.RetryingStore(
         inner,
-        retry.Retries(max_attempts=3, base_delay_seconds=0.1),
+        retry.Retries(attempts=3, base_delay_seconds=0.1),
         sleep=waits.append,
     )
     with pytest.raises(retry.RetryError) as raised:
@@ -142,7 +142,7 @@ def test_retry_policy_is_validated_and_deterministic():
     policy = retry.Retries(5, 0.5, 2.0, 3.0)
     assert policy.delays() == [0.5, 1.0, 2.0, 3.0]
     for bad in (
-        {"max_attempts": 0},
+        {"attempts": 0},
         {"factor": 0.5},
         {"base_delay_seconds": -1},
         {"max_delay_seconds": float("inf")},

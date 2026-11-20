@@ -320,9 +320,7 @@ def estimate(
     if not math.isfinite(effect):
         return out
     out["effect"] = effect
-    rng = randomness.component_rng(
-        seed, f"f6.stability.{finding}.{spec.sha256}", 0
-    )
+    rng = randomness.spawn(seed, f"f6.stability.{finding}.{spec.sha256}", 0)
     picks = list(
         map(
             operator.call,

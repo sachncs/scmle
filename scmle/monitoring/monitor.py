@@ -100,7 +100,7 @@ class Drift:
     output_raw_psi: float = 0.0
 
     @property
-    def high_share(self) -> float:
+    def share(self) -> float:
         """The share of features with large drift."""
         flagged = sum(1 for f in self.features if f.status == HIGH)
         return flagged / max(len(self.features), 1)
@@ -221,7 +221,7 @@ class Degradation(Advisor):
         return None
 
 
-class FeatureDriftAdvisor(Advisor):
+class Inputs(Advisor):
     """Retrain on widespread large drift; investigate localized drift."""
 
     def evaluate(
@@ -242,7 +242,7 @@ class FeatureDriftAdvisor(Advisor):
             reaches `high_drift_feature_share`; an `investigate` verdict for the
             worst feature that is not stable; otherwise None.
         """
-        if drift.high_share >= thresholds.high_drift_feature_share:
+        if drift.share >= thresholds.high_drift_feature_share:
             names = ", ".join(
                 f"'{f.feature}' (PSI {f.psi:.2f})"
                 for f in drift.features
@@ -250,7 +250,7 @@ class FeatureDriftAdvisor(Advisor):
             )
             return (
                 "retrain",
-                f"{drift.high_share:.0%} of features drifted strongly: {names}",
+                f"{drift.share:.0%} of features drifted strongly: {names}",
             )
         worst = [f for f in drift.features if f.status != STABLE]
         if worst:
@@ -262,7 +262,7 @@ class FeatureDriftAdvisor(Advisor):
         return None
 
 
-class OutputDriftAdvisor(Advisor):
+class Outputs(Advisor):
     """Investigate shifts in the model's own output distribution."""
 
     def evaluate(
@@ -330,8 +330,8 @@ class Novelty(Advisor):
 
 DEFAULT_RULES: tuple[Advisor, ...] = (
     Degradation(),
-    FeatureDriftAdvisor(),
-    OutputDriftAdvisor(),
+    Inputs(),
+    Outputs(),
     Novelty(),
 )
 

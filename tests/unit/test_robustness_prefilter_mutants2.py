@@ -98,7 +98,7 @@ def test_a_feature_check_records_the_row_and_the_context():
     assert check.effect == 0.75
     assert check.n == 33
     assert check.tier is qualification.Tier.UNVERIFIED
-    assert check.seeds == randomness.seed_path(9, "f6-shift-feature", 0)
+    assert check.seeds == randomness.seed(9, "f6-shift-feature", 0)
 
 
 def test_the_cap_keeps_the_first_rejected_columns():
@@ -281,7 +281,7 @@ def test_a_gating_requested_stage_withdraws_the_fragile_survivors():
     assert len(result.diagnostics) == 2
     feature = result.diagnostics[1][1]
     assert feature.n == 12
-    assert feature.seeds == randomness.seed_path(5, "f6-shift-feature", 0)
+    assert feature.seeds == randomness.seed(5, "f6-shift-feature", 0)
 
 
 def test_survivors_without_a_column_are_not_assessed():

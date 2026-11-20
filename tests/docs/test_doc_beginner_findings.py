@@ -23,7 +23,7 @@ def test_a_warn_run_logs_its_unsettled_suspects_while_profiling(caplog):
         leakage={"suspects": ["body", "boat"], "probe": {}},
     )
     with caplog.at_level(logging.WARNING, logger=stages.__name__):
-        stages.ProfileStage().enforce_leakage_policy(spec, profile)
+        stages.Profiling().enforce_leakage_policy(spec, profile)
     lines = [r.getMessage() for r in caplog.records]
     assert any(
         "leakage suspect(s) boat, body" in line and "provisional" in line

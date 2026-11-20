@@ -249,9 +249,9 @@ def audit_rows(store, action):
 
 def test_binding_a_hook_makes_the_bootstrap_rules_descriptive(tmp_path):
     ignored, manager = broken_champion(tmp_path)
-    assert manager.rollout_decides is False
+    assert manager.decides is False
     rollout_hook.Hook(manager, make_plan(), ledger_for())
-    assert manager.rollout_decides is True
+    assert manager.decides is True
 
 
 def test_the_bootstrap_rollback_check_never_moves_the_alias_once_a_hook_is_bound(

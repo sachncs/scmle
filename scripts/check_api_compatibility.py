@@ -220,17 +220,17 @@ EXTENSION_SURFACES = {
     "scmle.workflow.definition": (
         definition,
         (
-            "CatchUp",
+            "Backfill",
+            "Kind",
             "Schedule",
             "Step",
-            "StepKind",
             "Workflow",
-            "standard_workflow",
+            "scaffold",
         ),
     ),
     "scmle.workflow.executor": (
         executor,
-        ("ApprovalError", "Executor", "Progress", "StepContext"),
+        ("ApprovalError", "Context", "Executor", "Progress"),
     ),
     "scmle.workflow.schedule": (schedule, ("Scheduler", "Tick")),
     "scmle.pipeline.kinds": (kinds, ("Kind", "Tabular", "pick")),
@@ -252,10 +252,10 @@ EXTENSION_SURFACES = {
         signals,
         (
             "Category",
+            "Monitor",
             "Signal",
-            "SignalMonitor",
-            "SignalThresholds",
             "Status",
+            "Thresholds",
             "Window",
         ),
     ),
@@ -266,13 +266,13 @@ EXTENSION_SURFACES = {
     "scmle.operations.continuous": (
         continuous,
         (
-            "ContinuousEvaluation",
+            "Decision",
+            "Evaluation",
+            "History",
             "Indicator",
+            "Policy",
             "Replacement",
-            "RetrainDecision",
-            "RetrainPolicy",
-            "TrainingHistory",
-            "post_promotion_check",
+            "reassess",
         ),
     ),
     "scmle.operations.recovery": (
@@ -281,7 +281,7 @@ EXTENSION_SURFACES = {
     ),
     "scmle.operations.spool": (
         spool,
-        ("Flush", "MetricsSpool"),
+        ("Flush", "Spool"),
     ),
     "scmle.trail.builder": (scmle.trail.builder, ("build",)),
     "scmle.trail.chain": (
@@ -296,9 +296,9 @@ EXTENSION_SURFACES = {
             "Delivery",
             "Notifier",
             "Request",
-            "WebhookSender",
+            "Sender",
             "sign",
-            "verify_signature",
+            "verify",
         ),
     ),
 }
@@ -421,12 +421,12 @@ ROOT_SURFACES = {
         "unregister",
     ),
     "scmle.pipeline.modality_lifecycle": (
+        "AbortedError",
         "Cancellation",
         "Checkpoint",
         "Curation",
         "Curator",
-        "ExtensionCurator",
-        "LifecycleCancelledError",
+        "Extension",
         "Predictor",
     ),
 }

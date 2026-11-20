@@ -23,7 +23,7 @@ from scmle.pipeline.stages import ingestion
 class Impounding(exploration.Exploration):
     """The locked test rows sealed, reweighed and impounded.
 
-    Part of `ProfileStage`, which inherits these methods unchanged;
+    Part of `Profiling`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 
@@ -121,7 +121,7 @@ class Impounding(exploration.Exploration):
         configured) before any row is partitioned, and a charter that fails
         verification is refused. The custody's split holds exploration rows
         only, so the profiler and every trial that follows read nothing from
-        the confirmation set. The checks of `check_known_entity` also apply.
+        the confirmation set. The checks of `recognize` also apply.
         If the carving or its records fail, or the run is interrupted, the
         vault is closed before the error leaves: nothing else holds it yet.
 
@@ -155,7 +155,7 @@ class Impounding(exploration.Exploration):
                 "data.group_column so that entities are split and calibrated "
                 "as units"
             )
-        column = self.check_known_entity(board, charter, split)
+        column = self.recognize(board, charter, split)
         log = scmle.assurance.custody.sealed.Journal(
             board.services.store.directory / "custody_log.jsonl"
             if board.services.store is not None
@@ -202,18 +202,14 @@ class Impounding(exploration.Exploration):
             verified: The verified charter and whether it is signed.
             outcome: The custody outcome of the sealing.
         """
-        board.journal.write_json(
+        board.journal.write(
             "analysis_charter.json", contracts.deserialize(path)
         )
-        board.journal.write_json(
+        board.journal.write(
             "error_budget.json", verified.charter.budget.to_dict()
         )
-        board.journal.write_json(
-            "feasibility.json", outcome.feasibility.to_dict()
-        )
-        board.journal.write_json(
-            "split_manifest.json", outcome.manifest.to_dict()
-        )
+        board.journal.write("feasibility.json", outcome.feasibility.to_dict())
+        board.journal.write("split_manifest.json", outcome.manifest.to_dict())
         board.journal.emit(
             "custody.sealed",
             outcome.feasibility.reason,
@@ -235,7 +231,7 @@ class Impounding(exploration.Exploration):
             },
         )
 
-    def check_known_entity(
+    def recognize(
         self,
         board: engine.Board,
         charter: contracts.Charter,

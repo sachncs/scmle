@@ -54,7 +54,7 @@ def metadata_video_adapter() -> modality_lifecycle.Footage:
     return modality_lifecycle.Footage(video.Dataset(samples))
 
 
-def image_adapter() -> modality_lifecycle.ImagePreparer:
+def image_adapter() -> modality_lifecycle.Image:
     """Build one decoded image representation."""
     image_library = pytest.importorskip("PIL.Image")
     output = io.BytesIO()
@@ -62,10 +62,10 @@ def image_adapter() -> modality_lifecycle.ImagePreparer:
     sample = image.Sample.parse(
         output.getvalue(), source="image.png", label="alpha", group_id="one"
     )
-    return modality_lifecycle.ImagePreparer(image.Dataset((sample,)))
+    return modality_lifecycle.Image(image.Dataset((sample,)))
 
 
-def audio_adapter() -> modality_lifecycle.AudioPreparer:
+def audio_adapter() -> modality_lifecycle.Audio:
     """Build one WAV signal representation."""
     output = io.BytesIO()
     with wave.open(output, "wb") as opened:
@@ -78,20 +78,20 @@ def audio_adapter() -> modality_lifecycle.AudioPreparer:
     sample = audio.Sample.decode(
         output.getvalue(), source="audio.wav", label="alpha", group_id="one"
     )
-    return modality_lifecycle.AudioPreparer(audio.Dataset((sample,)))
+    return modality_lifecycle.Audio(audio.Dataset((sample,)))
 
 
-def graph_adapter() -> modality_lifecycle.GraphPreparer:
+def graph_adapter() -> modality_lifecycle.Graph:
     """Build one declared node-feature representation."""
     dataset = graph.Dataset(
         nodes=(graph.Node("node-1", (1.0, 2.0), "alpha"),),
         edges=(),
         features=("x", "y"),
     )
-    return modality_lifecycle.GraphPreparer(dataset)
+    return modality_lifecycle.Graph(dataset)
 
 
-def geospatial_adapter() -> modality_lifecycle.GeospatialPreparer:
+def geospatial_adapter() -> modality_lifecycle.Geospatial:
     """Build one CRS-bound geometry representation."""
     dataset = geospatial.Dataset(
         features=(
@@ -104,7 +104,7 @@ def geospatial_adapter() -> modality_lifecycle.GeospatialPreparer:
         crs="EPSG:4326",
         source="memory://fixture.geojson",
     )
-    return modality_lifecycle.GeospatialPreparer(dataset)
+    return modality_lifecycle.Geospatial(dataset)
 
 
 def raster_adapter() -> modality_lifecycle.Imagery:

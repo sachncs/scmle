@@ -34,10 +34,10 @@ __all__ = [
     "Cardinality",
     "Ensemble",
     "Exclusion",
-    "GpuFilter",
+    "Gpu",
     "History",
     "Memory",
-    "MonotonicFilter",
+    "Monotonicity",
     "Persistence",
     "Planner",
     "Refiner",
@@ -52,7 +52,7 @@ MIN_ENSEMBLE_SIZE = 2
 MIN_DISTINCT_MODELS = 2
 
 
-class GpuFilter(Refiner):
+class Gpu(Refiner):
     """Honours the GPU policy: `required` keeps only GPU-capable models."""
 
     def apply(
@@ -96,7 +96,7 @@ class GpuFilter(Refiner):
         return capable
 
 
-class MonotonicFilter(Refiner):
+class Monotonicity(Refiner):
     """Keeps only models that can enforce the requested monotonic signs."""
 
     def apply(
@@ -172,7 +172,7 @@ class Approval(Refiner):
         Raises:
             ConfigError: If an approved model is not among the candidates.
         """
-        approved = context.approved_models
+        approved = context.models
         if approved is None:
             return candidates
         unknown = set(approved) - {a.name for a in candidates}
@@ -410,8 +410,8 @@ def ruleset() -> tuple[Refiner, ...]:
     """
     return (
         Exclusion(),
-        MonotonicFilter(),
-        GpuFilter(),
+        Monotonicity(),
+        Gpu(),
         Memory(),
         Persistence(),
         Streaming(),

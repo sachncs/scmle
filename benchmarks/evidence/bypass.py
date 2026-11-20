@@ -1769,9 +1769,9 @@ REGISTER = (
     "forgets them (the module's stated limit)"
 )
 PLUGIN = (
-    "scmle/pipeline/stages/defaults.py: default_stages runs enrolled stages "
+    "scmle/pipeline/stages/defaults.py: sequence runs enrolled stages "
     "with the board, whose profiling.Partition holds the raw locked test set "
-    "(split.test); only assessment.py FinalEvaluationStage.execute "
+    "(split.test); only assessment.py Assessment.execute "
     "wraps it in journal.Custodian, so an earlier bind and open is neither "
     "refused nor journaled"
 )

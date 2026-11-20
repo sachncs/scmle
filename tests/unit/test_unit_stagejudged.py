@@ -130,9 +130,9 @@ class Runner:
         self.partition = partition
         self.featurise = featurise
 
-    def run_many(self, jobs, first):
+    def dispatch(self, jobs, first):
         return [
-            dataclasses.replace(trial(job.model_name), trial_id=job.trial_id)
+            dataclasses.replace(trial(job.model), trial_id=job.trial)
             for job in jobs
         ]
 
@@ -167,7 +167,7 @@ def searched(monkeypatch):
             ingestion.Intake: types.SimpleNamespace(kind=kinds.TABULAR),
         },
     )
-    return held, training.TrainStage().execute(held)
+    return held, training.Training().execute(held)
 
 
 def test_the_search_is_a_copy_of_the_journal_after_training(searched):
@@ -180,7 +180,7 @@ def test_the_search_is_a_copy_of_the_journal_after_training(searched):
     ]
     assert made.trials == held.journal.trials
     assert made.trials is not held.journal.trials
-    assert made.trial_counter == held.journal.trial_counter == 3
+    assert made.counter == held.journal.counter == 3
     assert made.outcomes == [] and made.skipped == []
     held.journal.forgo("tuning", "late")
     assert made.skipped == []
@@ -188,7 +188,7 @@ def test_the_search_is_a_copy_of_the_journal_after_training(searched):
 
 def test_the_search_is_frozen(searched):
     with pytest.raises(dataclasses.FrozenInstanceError):
-        searched[1].trial_counter = 0
+        searched[1].counter = 0
 
 
 def test_the_selection_returns_its_choice_and_sets_nothing():
@@ -201,14 +201,14 @@ def test_the_selection_returns_its_choice_and_sets_nothing():
         },
     )
     before = dict(held.made)
-    made = selecting.SelectStage().execute(held)
+    made = selecting.Selection().execute(held)
     assert made == selecting.Choice(ranked[0], {}, None, None, [], [])
     assert held.made == before
 
 
 @dataclasses.dataclass(frozen=True)
 class Escrow:
-    holds_for_coverage: bool
+    sealed: bool
     subject: object = None
 
 
@@ -216,7 +216,7 @@ class Escrow:
 def test_a_pending_confirmation_waits_or_concludes(monkeypatch, coverage):
     concluded = []
     monkeypatch.setattr(
-        profiling.ProfileStage,
+        profiling.Profiling,
         "conclude",
         lambda self, board, pending, subject: concluded.append(pending),
     )
@@ -226,12 +226,12 @@ def test_a_pending_confirmation_waits_or_concludes(monkeypatch, coverage):
         fake([trial("best")]),
         {profiling.Partition: partition(), exploration.Claims: claims},
     )
-    made = selecting.SelectStage().execute(held)
+    made = selecting.Selection().execute(held)
     if coverage:
-        assert made.pending_ledger == Escrow(True, None)
+        assert made.ledger == Escrow(True, None)
         assert concluded == []
     else:
-        assert made.pending_ledger is None
+        assert made.ledger is None
         assert concluded == [pending]
     assert held.get(exploration.Claims).pending is pending
 
@@ -327,7 +327,7 @@ def test_corroborating_returns_a_new_remedy_with_the_released_rows():
     remedy = examination.Remedy(record)
     features = pandas.DataFrame({"g": ["x", "x", "y", "y"]})
     target = pandas.Series([1, 0, 1, 0])
-    stage = assessment.FinalEvaluationStage()
+    stage = assessment.Assessment()
     made = stage.corroborate(
         remedy, Segmented(0), Segmented(1), features, target
     )
@@ -344,7 +344,7 @@ def test_corroborating_returns_a_new_remedy_with_the_released_rows():
 def test_no_pseudolabels_are_judged_unless_asked():
     resolution = types.SimpleNamespace(unlabeled=pandas.DataFrame())
     held = board(fake(unlabeled="none"), {labelling.Resolution: resolution})
-    stage = assessment.FinalEvaluationStage()
+    stage = assessment.Assessment()
     made = stage.pseudolabel(held, trial("m"), "fitted")
     assert made == ("fitted", examination.Pseudolabels())
 
@@ -423,4 +423,4 @@ def test_the_journal_copy_holds_the_lock():
     release.set()
     worker.join()
     reader.join(5)
-    assert copied[0].trial_counter == 0
+    assert copied[0].counter == 0

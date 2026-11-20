@@ -62,14 +62,14 @@ class Limits:
     """When the controller asks a person because nothing is happening.
 
     Attributes:
-        max_idle_ticks: Consecutive ticks without a new batch before the
+        idle: Consecutive ticks without a new batch before the
             escalation ``controller_no_new_data``.
-        max_unlabelled_ticks: Consecutive ticks whose loop status was
+        unlabelled: Consecutive ticks whose loop status was
             ``insufficient_labels`` before ``controller_labels_not_arriving``.
     """
 
-    max_idle_ticks: int = 3
-    max_unlabelled_ticks: int = 5
+    idle: int = 3
+    unlabelled: int = 5
 
     def __post_init__(self) -> None:
         """Both counts are at least one.
@@ -77,7 +77,7 @@ class Limits:
         Raises:
             ValueError: If a tick limit is below one.
         """
-        if self.max_idle_ticks < 1 or self.max_unlabelled_ticks < 1:
+        if self.idle < 1 or self.unlabelled < 1:
             raise errors.InputError("tick limits must be at least 1")
 
 
@@ -119,7 +119,7 @@ class Tick:
         }
 
 
-def file_digest(path: pathlib.Path) -> str:
+def checksum(path: pathlib.Path) -> str:
     """SHA-256 of a file's bytes.
 
     Args:
@@ -212,7 +212,7 @@ class Intake:
             raise errors.InputError("the file has no rows")
         return frame
 
-    def run_batch(self, path: pathlib.Path) -> None:
+    def batch(self, path: pathlib.Path) -> None:
         """Gives the loop one batch file.
 
         Args:
@@ -223,7 +223,7 @@ class Intake:
             frame, frame["prediction"].tolist(), frame["decision"].tolist()
         )
 
-    def run_labels(self, path: pathlib.Path) -> int:
+    def label(self, path: pathlib.Path) -> int:
         """Gives the loop one labels file; returns the cases it matched.
 
         Columns: ``case_id`` and ``loss``; optionally ``covered`` and one
@@ -271,9 +271,9 @@ class Intake:
             The number of cases matched for a labels file; 0 for a batch file.
         """
         if what == BATCHES:
-            self.run_batch(path)
+            self.batch(path)
             return 0
-        return self.run_labels(path)
+        return self.label(path)
 
     def apply(self, what: str, path: pathlib.Path, digest: str) -> int:
         """Applies one file once: intent row, loop call, applied row.
@@ -358,7 +358,7 @@ class Intake:
                     self.stop("controller_state_unclear", intent["file"])
                     return False
             path = inbox / what / intent["file"]
-            if not path.is_file() or file_digest(path) != digest:
+            if not path.is_file() or checksum(path) != digest:
                 self.stop("controller_input_changed", intent["file"])
                 return False
             self.run(what, path)
@@ -392,7 +392,7 @@ class Intake:
         ledger = self.loop.ledger
         found = []
         for path in sorted((inbox / folder).glob("*.csv")):
-            digest = file_digest(path)
+            digest = checksum(path)
             if digest not in ledger.consumed and digest not in ledger.rejected:
                 found.append((path, digest))
         return found
@@ -555,27 +555,27 @@ class Controller(Intake):
                 "status": step.status,
             }
         )
-        self.dead_man()
+        self.escalate()
         return self.result(
             step.status, observed, matured, rejected, step.events
         )
 
-    def dead_man(self) -> None:
+    def escalate(self) -> None:
         """Opens an escalation when data or labels have stopped arriving."""
         idle = self.trailing(lambda body: body["observed"] == 0)
-        if idle >= self.policy.max_idle_ticks:
+        if idle >= self.policy.idle:
             self.loop.escalate(
-                "controller_no_new_data", {"ticks": self.policy.max_idle_ticks}
+                "controller_no_new_data", {"ticks": self.policy.idle}
             )
         starved = self.trailing(
             lambda body: (
                 body["status"] == scmle.governance.loop.INSUFFICIENT_LABELS
             )
         )
-        if starved >= self.policy.max_unlabelled_ticks:
+        if starved >= self.policy.unlabelled:
             self.loop.escalate(
                 "controller_labels_not_arriving",
-                {"ticks": self.policy.max_unlabelled_ticks},
+                {"ticks": self.policy.unlabelled},
             )
         self.loop.save_state()
 

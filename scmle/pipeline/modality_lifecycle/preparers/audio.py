@@ -77,7 +77,7 @@ class Span(TypedDict):
     score_delta_from_full: float
 
 
-class AudioPreparer(curators.Preparer):
+class Audio(curators.Preparer):
     """Adapter for WAV-capable audio samples and explicit codec probes.
 
     Attributes:
@@ -141,7 +141,7 @@ class AudioPreparer(curators.Preparer):
             tuple(prepared.sources), prepared.names, prepared.materialize()
         )
 
-    def sample_id(self, sample: audio.Sample) -> str:
+    def sample(self, sample: audio.Sample) -> str:
         """Gives the audio source identity.
 
         Args:
@@ -174,9 +174,9 @@ class AudioPreparer(curators.Preparer):
             minus reference) and, per profile key, whether its value differs.
 
         Raises:
-            TypeError: If `observed` is not an `AudioPreparer`.
+            TypeError: If `observed` is not an `Audio`.
         """
-        if not isinstance(observed, AudioPreparer):
+        if not isinstance(observed, Audio):
             raise errors.KindError("observed adapter must be an AudioPreparer")
         current = observed.dataset.curate()
         reference = self.dataset.curate()
@@ -225,9 +225,7 @@ class AudioPreparer(curators.Preparer):
             sample, model, self.features((sample,)).values[0]
         )
         raw_windows = self.silence(sample, model, full_score, window_frames)
-        noise_robustness = self.background_noise_robustness(
-            sample, model, full_score
-        )
+        noise_robustness = self.perturb(sample, model, full_score)
         return {
             "status": "available",
             "method": "time_local_wav_window_score",
@@ -239,7 +237,7 @@ class AudioPreparer(curators.Preparer):
             "limitations": list(WINDOW_LIMITATIONS),
         }
 
-    def background_noise_robustness(
+    def perturb(
         self,
         sample: audio.Sample,
         model: LogisticRegression,
@@ -430,7 +428,7 @@ def timeline(
 
 
 def scenario(
-    preparer: AudioPreparer,
+    preparer: Audio,
     sample: audio.Sample,
     model: LogisticRegression,
     signal: tuple[Any, numpy.ndarray, float],

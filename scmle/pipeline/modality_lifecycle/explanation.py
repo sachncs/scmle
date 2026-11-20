@@ -48,19 +48,19 @@ class Stability:
         stabilities: Ranking stability of every evaluated row.
         reports: Contribution report of every evaluated row.
         coefficients: Coefficients that explain the first row.
-        perturbation_reports: Contribution reports of the first row followed
+        perturbed: Contribution reports of the first row followed
             by those of its perturbed copies.
-        perturbation_stability: Ranking stability of the first row.
-        zero_ablation_consistency: Share of first-row zero-ablations whose
+        stability: Ranking stability of the first row.
+        consistency: Share of first-row zero-ablations whose
             decision change has the sign the linear model predicts.
     """
 
     stabilities: list[float]
     reports: list[dict[str, object]]
     coefficients: numpy.ndarray
-    perturbation_reports: list[dict[str, object]]
-    perturbation_stability: float
-    zero_ablation_consistency: float
+    perturbed: list[dict[str, object]]
+    stability: float
+    consistency: float
 
 
 def ablate(
@@ -215,9 +215,9 @@ def perturb(
         stabilities=stabilities,
         reports=explanation_reports,
         coefficients=first[0],
-        perturbation_reports=first[1],
-        perturbation_stability=first[2],
-        zero_ablation_consistency=first[3],
+        perturbed=first[1],
+        stability=first[2],
+        consistency=first[3],
     )
 
 
@@ -258,7 +258,7 @@ def replicate(model: LogisticRegression, batch: containers.Batch) -> float:
     )
 
 
-class ModelExplainabilityStage(state.Stage):
+class Explainability(state.Stage):
     """Explain linear weights and test feature-space stability."""
 
     stage = modalities.Phase.MODEL_EXPLAINABILITY
@@ -296,7 +296,7 @@ class ModelExplainabilityStage(state.Stage):
         """
         references = []
         for sample_index in range(evaluated_sample_count):
-            ground_truth = board.plan.adapter.explanation_ground_truth(
+            ground_truth = board.plan.adapter.corroborate(
                 partitions.test[sample_index], batch.feature_names
             )
             if ground_truth is not None:
@@ -318,7 +318,7 @@ class ModelExplainabilityStage(state.Stage):
                 "Raw-modality ground truth remains caller-owned evidence.",
             ],
         }
-        if board.plan.require_independent_ground_truth and (
+        if board.plan.independent and (
             ground_truth_evidence["status"] != "available"
             or ground_truth_evidence["passed"] is not True
         ):
@@ -429,14 +429,12 @@ class ModelExplainabilityStage(state.Stage):
                 "global_terms": global_terms,
                 "local": {
                     "sample_id": batch.sample_ids[0],
-                    "terms": repeated.perturbation_reports[0]["terms"],
+                    "terms": repeated.perturbed[0]["terms"],
                 },
-                "zero_ablation_direction_consistency": (
-                    repeated.zero_ablation_consistency
-                ),
+                "zero_ablation_direction_consistency": (repeated.consistency),
                 "perturbation_stability": {
-                    "score": repeated.perturbation_stability,
-                    "report_count": len(repeated.perturbation_reports),
+                    "score": repeated.stability,
+                    "report_count": len(repeated.perturbed),
                     "relative_step": 1e-6,
                     "feature_space_only": True,
                 },

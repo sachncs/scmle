@@ -162,7 +162,7 @@ def test_healthy_traffic_and_data_breach_nothing():
     watch = support_ops.monitor()
     support_ops.healthy_traffic(watch)
     watch.sense(support_ops.START, support_ops.frame(300, seed=1))
-    watch.observe_outcomes(support_ops.START, [0.0] * 90 + [1.0] * 10)
+    watch.observe(support_ops.START, [0.0] * 90 + [1.0] * 10)
     rows = watch.evaluate(support_ops.START + 20)
     assert not [r for r in rows if r.breached], [r.to_dict() for r in rows]
     assert classify.classify(rows).verdict is classify.Verdict.NONE
@@ -227,12 +227,12 @@ def test_a_feature_missing_from_the_batch_counts_as_missing():
 
 def test_delayed_label_loss_breaches_above_reference_plus_tolerance():
     watch = support_ops.monitor()
-    watch.observe_outcomes(support_ops.START, [1.0] * 40 + [0.0] * 60)
+    watch.observe(support_ops.START, [1.0] * 40 + [0.0] * 60)
     row = named(watch.evaluate(support_ops.START + 1), "windowed_loss")
     assert row.breached and row.value == pytest.approx(0.4)
     assert row.threshold == pytest.approx(0.15)
     with pytest.raises(ValueError):
-        watch.observe_outcomes(support_ops.START, [1.5])
+        watch.observe(support_ops.START, [1.5])
     assert list(signals.misses([1, 0, 1], [1, 1, 1])) == [0, 1, 0]
     with pytest.raises(ValueError):
         signals.misses([1], [1, 2])
@@ -241,8 +241,8 @@ def test_delayed_label_loss_breaches_above_reference_plus_tolerance():
 def test_sampling_keeps_a_share_and_is_deterministic():
     kept = []
     for ignored in range(2):
-        watch = signals.SignalMonitor(
-            signals.Window(sample_rate=0.25, seed=7),
+        watch = signals.Monitor(
+            signals.Window(sampling=0.25, seed=7),
             profile=support_ops.profile(),
         )
         kept.append(
@@ -250,15 +250,15 @@ def test_sampling_keeps_a_share_and_is_deterministic():
         )
     assert kept[0] == kept[1] and 800 < kept[0] < 1200
     with pytest.raises(ValueError):
-        signals.Window(sample_rate=0.0)
+        signals.Window(sampling=0.0)
     with pytest.raises(ValueError):
-        signals.Window(window_seconds=0)
+        signals.Window(window=0)
 
 
 def test_signals_become_metric_samples_for_export():
     watch = support_ops.monitor()
     support_ops.healthy_traffic(watch)
-    samples = signals.as_metric_samples(
+    samples = signals.convert(
         watch.evaluate(support_ops.START + 20), STAMP, {"model_version": "v1"}
     )
     names = {s.name for s in samples}
@@ -310,12 +310,12 @@ def sender(script, kind="pager", attempts=3, **kwargs):
             raise step
         return step
 
-    made = notify.WebhookSender(
+    made = notify.Sender(
         kind,
         "https://hooks.example.test/x",
         "shared-secret",
         transport,
-        max_attempts=attempts,
+        attempts=attempts,
         sleep=waits.append,
         clock=lambda: 1000.0,
         **kwargs,
@@ -328,21 +328,15 @@ def test_a_delivery_is_signed_and_the_receiver_can_verify_it():
     result = made.send(NOTE)
     assert result.delivered and result.attempts == 1 and not waits
     request = seen[0]
-    assert notify.verify_signature(
-        "shared-secret", request.headers, request.body, 1000.0
-    )
-    assert not notify.verify_signature(
-        "other", request.headers, request.body, 1000.0
-    )
-    assert not notify.verify_signature(
+    assert notify.verify("shared-secret", request.headers, request.body, 1000.0)
+    assert not notify.verify("other", request.headers, request.body, 1000.0)
+    assert not notify.verify(
         "shared-secret", request.headers, request.body + b" ", 1000.0
     )
-    assert not notify.verify_signature(
+    assert not notify.verify(
         "shared-secret", request.headers, request.body, 5000.0
     )
-    assert not notify.verify_signature(
-        "shared-secret", {}, request.body, 1000.0
-    )
+    assert not notify.verify("shared-secret", {}, request.body, 1000.0)
     assert json.loads(request.body)["kind"] == "pager"
     assert "shared-secret" not in json.dumps(result.to_dict())
 
@@ -353,35 +347,31 @@ def test_server_errors_and_timeouts_are_retried_with_one_idempotency_key():
     assert result.delivered and result.attempts == 3
     assert waits == [0.5, 1.0]
     keys = {r.headers[notify.IDEMPOTENCY_HEADER] for r in seen}
-    assert keys == {result.idempotency_key}
+    assert keys == {result.idempotency}
 
 
 def test_client_errors_are_final_and_exhausted_retries_are_reported():
     made, ignored, ignored = sender([400])
     result = made.send(NOTE)
-    assert (
-        not result.delivered
-        and result.attempts == 1
-        and result.http_status == 400
-    )
+    assert not result.delivered and result.attempts == 1 and result.code == 400
     made, ignored, ignored = sender([500])
     result = made.send(NOTE)
     assert not result.delivered and result.attempts == 3
     assert "after 3 attempts" in result.reason
     made, ignored, ignored = sender([ConnectionError("down")])
     result = made.send(NOTE)
-    assert not result.delivered and result.http_status is None
+    assert not result.delivered and result.code is None
     made, ignored, ignored = sender([429, 200])
     assert made.send(NOTE).delivered
 
 
 def test_the_sender_rejects_bad_configuration_and_notifications():
     with pytest.raises(ValueError):
-        notify.WebhookSender("sms", "https://x", "k")
+        notify.Sender("sms", "https://x", "k")
     with pytest.raises(ValueError):
-        notify.WebhookSender("pager", "https://x", "")
+        notify.Sender("pager", "https://x", "")
     with pytest.raises(ValueError):
-        notify.WebhookSender("pager", "https://x", "k", max_attempts=0)
+        notify.Sender("pager", "https://x", "k", attempts=0)
     made, ignored, ignored = sender([200])
     with pytest.raises(ValueError):
         made.send({"severity": "apocalyptic"})
@@ -601,7 +591,7 @@ def make_desk(tmp_path, script=(200,)):
 def test_a_breach_is_classified_notified_retained_and_audited(tmp_path):
     desk, log = make_desk(tmp_path)
     result = desk.handle(window(availability="breach"))
-    assert result.incident_id.startswith("inc-")
+    assert result.incident.startswith("inc-")
     assert result.classification.verdict is classify.Verdict.INFRASTRUCTURE
     assert [d.kind for d in result.deliveries] == ["pager", "ticket"]
     assert all(d.delivered for d in result.deliveries)
@@ -609,10 +599,10 @@ def test_a_breach_is_classified_notified_retained_and_audited(tmp_path):
     assert len(kept) == 1 and kept[0]["model_version"] == "v1"
     opened = log.rows("admin")[0]["body"]
     assert opened["action"] == "incident_opened"
-    assert opened["incident_id"] == result.incident_id
-    assert opened["telemetry_digest"] == result.telemetry_digest
-    desk.act(result.incident_id, "oncall-1", "acknowledged", "restarting")
-    desk.act(result.incident_id, "oncall-1", "resolved", "rolled back")
+    assert opened["incident_id"] == result.incident
+    assert opened["telemetry_digest"] == result.digest
+    desk.act(result.incident, "oncall-1", "acknowledged", "restarting")
+    desk.act(result.incident, "oncall-1", "resolved", "rolled back")
     actions = [r["body"]["action"] for r in log.rows("admin")]
     assert actions == [
         "incident_opened",
@@ -625,7 +615,7 @@ def test_a_breach_is_classified_notified_retained_and_audited(tmp_path):
 def test_a_healthy_window_is_retained_but_opens_nothing(tmp_path):
     desk, log = make_desk(tmp_path)
     result = desk.handle(window())
-    assert result.incident_id is None and not result.deliveries
+    assert result.incident is None and not result.deliveries
     assert len(desk.retained()) == 1 and log.rows("admin") == []
 
 
@@ -645,7 +635,7 @@ def test_operator_actions_need_a_known_incident_and_a_known_action(tmp_path):
         desk.act("inc-nope", "oncall", "resolved", "x")
     result = desk.handle(window(availability="breach"))
     with pytest.raises(ValueError):
-        desk.act(result.incident_id, "oncall", "ignored", "x")
+        desk.act(result.incident, "oncall", "ignored", "x")
 
 
 def test_retained_telemetry_can_expire(tmp_path):
@@ -671,9 +661,9 @@ def test_verification_rejects_a_nan_timestamp_and_non_ascii_signatures():
         notify.TIMESTAMP_HEADER: nan_stamp,
         notify.SIGNATURE_HEADER: notify.sign("shared-secret", nan_stamp, body),
     }
-    assert not notify.verify_signature("shared-secret", forged, body, 1000.0)
+    assert not notify.verify("shared-secret", forged, body, 1000.0)
     garbled = {**request.headers, notify.SIGNATURE_HEADER: "sha256=é"}
-    assert not notify.verify_signature("shared-secret", garbled, body, 1000.0)
+    assert not notify.verify("shared-secret", garbled, body, 1000.0)
 
 
 def test_signing_with_an_empty_secret_is_refused():

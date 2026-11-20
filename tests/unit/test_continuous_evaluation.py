@@ -67,18 +67,16 @@ def test_a_recommendation_reaches_a_person_and_trains_only_after_approval(
 ):
     loop, ev, ignored, called = degraded(tmp_path)
     decision = ev.review(loss_signals(0.4))
-    assert decision.action == "recommend" and decision.escalation_id
-    assert decision.alarm_gates_retrain is False and not called
+    assert decision.action == "recommend" and decision.escalation
+    assert decision.retrain is False and not called
     pending = {e.id: e for e in loop.pending_escalations()}
-    question = pending[decision.escalation_id].question
+    question = pending[decision.escalation].question
     assert question["action"] == continuous.RETRAIN_QUESTION
-    assert pending[decision.escalation_id].proposed_default == "no_retrain"
+    assert pending[decision.escalation].proposed_default == "no_retrain"
     with pytest.raises(ValueError, match="no approving reply"):
-        ev.run_approved_retrain(decision.escalation_id)
-    loop.reply(
-        decision.escalation_id, reply_to(pending[decision.escalation_id])
-    )
-    assert ev.run_approved_retrain(decision.escalation_id) == "challenger-1"
+        ev.execute(decision.escalation)
+    loop.reply(decision.escalation, reply_to(pending[decision.escalation]))
+    assert ev.execute(decision.escalation) == "challenger-1"
     assert called == [1]
     registered = [
         r
@@ -95,23 +93,23 @@ def test_a_rejecting_reply_does_not_start_a_retrain(tmp_path):
     loop, ev, ignored, called = degraded(tmp_path)
     decision = ev.review(loss_signals(0.4))
     target = next(
-        e for e in loop.pending_escalations() if e.id == decision.escalation_id
+        e for e in loop.pending_escalations() if e.id == decision.escalation
     )
     loop.reply(target.id, reply_to(target, "reject"))
     with pytest.raises(ValueError):
-        ev.run_approved_retrain(decision.escalation_id)
+        ev.execute(decision.escalation)
     assert not called
 
 
 def test_trigger_mode_trains_a_challenger_at_once_and_still_escalates(tmp_path):
     loop, ev, ignored, called = degraded(
-        tmp_path, policy=continuous.RetrainPolicy(mode="trigger")
+        tmp_path, policy=continuous.Policy(mode="trigger")
     )
     decision = ev.review(loss_signals(0.4))
     assert (
         decision.action == "trigger" and decision.challenger == "challenger-1"
     )
-    assert called == [1] and decision.escalation_id
+    assert called == [1] and decision.escalation
     assert (
         kinds(loop, deployment_ledger.RETRAIN)[0]["body"]["mode"] == "trigger"
     )
@@ -124,7 +122,7 @@ def test_a_proposal_is_not_repeated_during_the_cooldown(tmp_path):
     first = ev.review(loss_signals(0.4))
     again = ev.review(loss_signals(0.4))
     assert first.action == "recommend" and again.action == "none"
-    assert "cooldown" in again.held_back
+    assert "cooldown" in again.withheld
     assert [e.question["action"] for e in loop.pending_escalations()].count(
         continuous.RETRAIN_QUESTION
     ) == 1
@@ -135,7 +133,7 @@ def test_a_proposal_is_not_repeated_during_the_cooldown(tmp_path):
 
 def judge(rows, **options):
     return continuous.decide(
-        continuous.RetrainPolicy(**options.pop("policy", {})),
+        continuous.Policy(**options.pop("policy", {})),
         rows,
         options.pop("alarm", False),
         options.pop("age", None),
@@ -185,18 +183,18 @@ def test_a_held_back_reason_is_recorded_and_nothing_is_escalated(tmp_path):
         named("availability", signals.Category.INFRASTRUCTURE, True),
     ]
     decision = ev.review(rows)
-    assert decision.action == "none" and "infrastructure" in decision.held_back
+    assert decision.action == "none" and "infrastructure" in decision.withheld
     assert not loop.pending_escalations()
     assert ev.history.select("retrain_review")
 
 
 def test_policy_and_spec_validation():
     with pytest.raises(ValueError):
-        continuous.RetrainPolicy(mode="auto")
+        continuous.Policy(mode="auto")
     with pytest.raises(ValueError):
-        continuous.RetrainPolicy(min_outcomes=0)
+        continuous.Policy(min_outcomes=0)
     with pytest.raises(ValueError):
-        continuous.RetrainPolicy(max_age_days=0)
+        continuous.Policy(max_age_days=0)
     with pytest.raises(ValueError):
         continuous.Indicator("x", "finance", "higher")
     with pytest.raises(ValueError):
@@ -237,33 +235,29 @@ def test_business_outcomes_become_bounded_losses_and_are_kept(tmp_path):
 def test_datasets_are_versioned_by_content_and_preserved(tmp_path):
     ev = evaluation(tmp_path, make_loop(tmp_path))
     frame = support_ops.frame(50, seed=1)
-    first = ev.record_training("m1", frame, {"auc": 0.9}, "initial")
-    again = ev.record_training("m1b", frame.copy(), {"auc": 0.9}, "same data")
-    other = ev.record_training(
-        "m2", support_ops.frame(50, seed=2), {"auc": 0.8}, "new"
-    )
+    first = ev.record("m1", frame, {"auc": 0.9}, "initial")
+    again = ev.record("m1b", frame.copy(), {"auc": 0.9}, "same data")
+    other = ev.record("m2", support_ops.frame(50, seed=2), {"auc": 0.8}, "new")
     version = first["facts"]["dataset_version"]
     assert version == again["facts"]["dataset_version"]
     assert version != other["facts"]["dataset_version"]
     saved = tmp_path / "ops" / continuous.DATASET_DIRECTORY
     assert len(list(saved.iterdir())) == 2
-    reloaded = continuous.load_dataset(tmp_path / "ops", version)
-    assert continuous.dataset_version(reloaded) == version
+    reloaded = continuous.load(tmp_path / "ops", version)
+    assert continuous.stamp(reloaded) == version
     path = saved / (version.replace(":", "-") + ".csv")
     path.write_text(path.read_text().replace("basic", "other", 1))
     with pytest.raises(ValueError, match="has changed"):
-        continuous.load_dataset(tmp_path / "ops", version)
+        continuous.load(tmp_path / "ops", version)
     shuffled = frame.sample(frac=1.0, random_state=1)[list(frame.columns)[::-1]]
-    assert (
-        continuous.dataset_version(shuffled.reset_index(drop=True)) != version
-    )
+    assert continuous.stamp(shuffled.reset_index(drop=True)) != version
     assert len(ev.history.rows()) == 3
 
 
 def test_the_history_chain_detects_edits(tmp_path):
     ev = evaluation(tmp_path, make_loop(tmp_path))
-    ev.record_training("m", support_ops.frame(20), {}, "r", preserve=False)
-    ev.record_training("n", support_ops.frame(21), {}, "r", preserve=False)
+    ev.record("m", support_ops.frame(20), {}, "r", preserve=False)
+    ev.record("n", support_ops.frame(21), {}, "r", preserve=False)
     path = ev.history.path
     text = path.read_text()
     path.write_text(text.replace('"rows": 20', '"rows": 99'))
@@ -414,7 +408,7 @@ def periods(seed=0, n=300, shift_conv=0.0, shift_latency=0.0):
 
 def test_a_clear_gain_is_reported_with_its_interval_not_a_point():
     before, after = periods(shift_conv=0.12)
-    result = continuous.post_promotion_check(SPECS, before, after)
+    result = continuous.reassess(SPECS, before, after)
     assert result["overall"] == "helped"
     conversion = result["metrics"][0]
     low, high = conversion["interval"]
@@ -425,32 +419,30 @@ def test_a_clear_gain_is_reported_with_its_interval_not_a_point():
 
 def test_a_regression_in_any_selected_metric_is_harm():
     before, after = periods(shift_conv=0.12, shift_latency=40.0)
-    result = continuous.post_promotion_check(SPECS, before, after)
+    result = continuous.reassess(SPECS, before, after)
     assert result["overall"] == "harmed"
     assert result["metrics"][1]["verdict"] == "worse"
 
 
 def test_no_change_and_small_samples_are_inconclusive_not_helped():
     before, after = periods(seed=5)
-    assert continuous.post_promotion_check(SPECS, before, after)["overall"] == (
+    assert continuous.reassess(SPECS, before, after)["overall"] == (
         "inconclusive"
     )
     before, after = periods(n=10, shift_conv=0.5)
-    small = continuous.post_promotion_check(SPECS, before, after)
+    small = continuous.reassess(SPECS, before, after)
     assert small["overall"] == "inconclusive"
     assert small["metrics"][0]["interval"] is None
 
 
 def test_the_check_is_deterministic_and_validates_inputs(tmp_path):
     before, after = periods(shift_conv=0.1)
-    first = continuous.post_promotion_check(SPECS, before, after, seed=4)
-    assert first == continuous.post_promotion_check(
-        SPECS, before, after, seed=4
-    )
+    first = continuous.reassess(SPECS, before, after, seed=4)
+    assert first == continuous.reassess(SPECS, before, after, seed=4)
     with pytest.raises(ValueError):
-        continuous.post_promotion_check([], before, after)
+        continuous.reassess([], before, after)
     with pytest.raises(ValueError):
-        continuous.post_promotion_check(SPECS, {"conversion": [1.0]}, after)
+        continuous.reassess(SPECS, {"conversion": [1.0]}, after)
     ev = evaluation(tmp_path, make_loop(tmp_path))
     recorded = ev.followup(SPECS, before, after)
     assert (
@@ -489,9 +481,7 @@ def test_a_concurrent_holdback_attributes_the_change_to_the_model():
         "conversion": rng.binomial(1, 0.25, 3600).astype(float),
         "latency_ms": rng.normal(120, 20, 3600),
     }
-    result = continuous.holdback_check(
-        SPECS, holdback, promoted, expected_fraction=0.1
-    )
+    result = continuous.check(SPECS, holdback, promoted, expected_fraction=0.1)
     assert result["overall"] == "helped"
     assert result["design"] == "concurrent_holdback"
     assert "attributable" in result["statement"]
@@ -510,9 +500,7 @@ def test_a_holdback_of_the_wrong_size_is_flagged_and_blocks_a_helped_verdict():
         "conversion": rng.binomial(1, 0.30, 3900).astype(float),
         "latency_ms": rng.normal(120, 20, 3900),
     }
-    result = continuous.holdback_check(
-        SPECS, holdback, promoted, expected_fraction=0.2
-    )
+    result = continuous.check(SPECS, holdback, promoted, expected_fraction=0.2)
     assert result["ratio_check"]["flag"] is True
     assert result["overall"] == "inconclusive"
     assert "assignment" in result["statement"]

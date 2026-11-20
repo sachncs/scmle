@@ -160,8 +160,8 @@ class Journal:
         if (path is None) == (sink is None):
             raise errors.InputError("give exactly one of path and sink")
         self.service = service
-        self.model_version = model_version
-        self.artifact_digest = artifact_digest
+        self.version = model_version
+        self.digest = artifact_digest
         self.path = None if path is None else pathlib.Path(path)
         self.sink = sink
         self.clock = clock
@@ -199,8 +199,8 @@ class Journal:
             "message": message,
             "service": self.service,
             "trace_id": trace_id or traceid(),
-            "model_version": self.model_version,
-            "artifact_digest": self.artifact_digest,
+            "model_version": self.version,
+            "artifact_digest": self.digest,
             **scrub(fields),
         }
         line = json.dumps(record, sort_keys=True, default=str)

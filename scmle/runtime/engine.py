@@ -51,21 +51,37 @@ class Dependency(Generic[ItemT]):
     title: Callable[[Any], str]
 
 
+def recorded(kind: type) -> str:
+    """The name a stage class goes by in run records, events and messages.
+
+    A class may declare `recorded` in its own body: the stages renamed in
+    phase 6 keep the names their records were written under, so a run
+    directory keeps its layout (`stages/00-ingeststage.json`). A subclass
+    that does not declare its own goes by its class name.
+
+    Args:
+        kind: The stage class.
+
+    Returns:
+        The declared name, or the class name.
+    """
+    return str(kind.__dict__.get("recorded", kind.__name__))
+
+
 CLASSES: Dependency[Any] = Dependency(
     needs=lambda stage: stage.requires,
     meets=lambda done, need: isinstance(need, type) and isinstance(done, need),
     rank=lambda stage: (LIFECYCLE.index(stage.state), ""),
-    title=lambda item: (
-        item.__name__ if isinstance(item, type) else type(item).__name__
-    ),
+    title=lambda item: recorded(item if isinstance(item, type) else type(item)),
 )
 """Tabular stages: a need is a stage class, met by an instance of it or of a
 subclass (so a replacement stage satisfies its predecessor's dependents);
 earlier lifecycle states run first, so the state machine only moves forward.
+A stage is named by `recorded`.
 """
 
 NAMES: Dependency[Any] = Dependency(
-    needs=lambda step: step.depends_on,
+    needs=lambda step: step.needs,
     meets=lambda done, need: done.name == need,
     rank=lambda step: (0, step.name),
     title=lambda item: item if isinstance(item, str) else item.name,

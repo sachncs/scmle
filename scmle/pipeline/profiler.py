@@ -181,7 +181,7 @@ class Profiler(inspection.Inspection):
         self.spec = spec
         self.texts = texts
 
-    def monotonic_features(self, numeric: list[str]) -> dict[str, int]:
+    def constrain(self, numeric: list[str]) -> dict[str, int]:
         """Validates the monotonic constraints against the numeric features.
 
         Args:
@@ -289,14 +289,14 @@ class Profiler(inspection.Inspection):
 
         Raises:
             BlockedError: If a monotonic constraint names a column that is
-                not a numeric feature (`monotonic_features`).
+                not a numeric feature (`constrain`).
         """
         data = self.spec.data
         return scmle.contracts.data.Blueprint(
             numeric=tuple(features["numeric"]),
             categorical=tuple(features["categorical"]),
             text=tuple(features["text"]),
-            monotonic=self.monotonic_features(features["numeric"]),
+            monotonic=self.constrain(features["numeric"]),
             dropped=dropped,
             group_column=data.group_column,
             time_column=data.time_column,
@@ -422,7 +422,7 @@ class Profiler(inspection.Inspection):
             task,
             base_plan,
             statistics,
-            self.duplicate_count(frame),
+            self.count(frame),
             read_seconds,
             len(risks),
             total_rows,

@@ -197,7 +197,7 @@ class Curation:
         """The deterministic digest of the unsigned evidence at version 1."""
         return attestation.checksum(self.layout(records.ORIGIN))
 
-    def verify_signature(self, signing_key: str | bytes) -> bool:
+    def verify(self, signing_key: str | bytes) -> bool:
         """Checks the persisted curation signature.
 
         An empty string key raises ValueError from the signing helper.
@@ -336,7 +336,7 @@ class Curation:
         return cls.from_dict(record)
 
     @classmethod
-    def read_verified(cls, path: str | Path, signing_key: str | bytes) -> Self:
+    def load(cls, path: str | Path, signing_key: str | bytes) -> Self:
         """Reads curation evidence and requires a valid content signature.
 
         Args:
@@ -350,7 +350,7 @@ class Curation:
             ValueError: If the signature does not verify.
         """
         result = cls.read(path)
-        if not result.verify_signature(signing_key):
+        if not result.verify(signing_key):
             raise errors.InputError(
                 "modality curation signature does not verify"
             )
@@ -396,7 +396,7 @@ class Curator(abc.ABC):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ExtensionCurator(Curator):
+class Extension(Curator):
     """Adapts arbitrary caller-owned records to the curation-only contract.
 
     The callback owns domain-specific profiling and validation. This adapter
@@ -406,16 +406,16 @@ class ExtensionCurator(Curator):
 
     Attributes:
         extension: Namespaced extension modality identity.
-        sample_values: Caller-owned records in canonical order.
-        dataset_hash_value: Caller-owned immutable dataset identity.
-        curation_callback: Callable that returns the curation report.
+        records: Caller-owned records in canonical order.
+        identity: Caller-owned immutable dataset identity.
+        callback: Callable that returns the curation report.
         limitations: Non-empty statements of the dataset's boundaries.
     """
 
     extension: modalities.Bespoke
-    sample_values: tuple[Any, ...]
-    dataset_hash_value: str
-    curation_callback: Callable[[], curation.Curation]
+    records: tuple[Any, ...]
+    identity: str
+    callback: Callable[[], curation.Curation]
     limitations: tuple[str, ...]
 
     def __post_init__(self) -> None:
@@ -430,17 +430,15 @@ class ExtensionCurator(Curator):
         """
         if not isinstance(self.extension, modalities.Bespoke):
             raise errors.KindError("extension must be Bespoke")
-        if not containers.hashlike(self.dataset_hash_value):
-            raise errors.InputError(
-                "dataset_hash_value must be a SHA-256 hex digest"
-            )
-        if not callable(self.curation_callback):
-            raise errors.KindError("curation_callback must be callable")
+        if not containers.hashlike(self.identity):
+            raise errors.InputError("identity must be a SHA-256 hex digest")
+        if not callable(self.callback):
+            raise errors.KindError("callback must be callable")
         if not self.limitations or any(
             not value.strip() for value in self.limitations
         ):
             raise errors.InputError("limitations must contain non-empty values")
-        object.__setattr__(self, "sample_values", tuple(self.sample_values))
+        object.__setattr__(self, "records", tuple(self.records))
         object.__setattr__(self, "limitations", tuple(self.limitations))
 
     @property
@@ -451,12 +449,12 @@ class ExtensionCurator(Curator):
     @property
     def digest(self) -> str:
         """The caller-owned immutable dataset identity."""
-        return self.dataset_hash_value
+        return self.identity
 
     @property
     def samples(self) -> tuple[Any, ...]:
         """The records in caller-defined canonical order."""
-        return self.sample_values
+        return self.records
 
     def curate(
         self,
@@ -471,7 +469,7 @@ class ExtensionCurator(Curator):
             ValueError: If the report's modality, dataset hash or sample count
                 does not match the extension.
         """
-        report = self.curation_callback()
+        report = self.callback()
         if not isinstance(report, curation.Curation):
             raise errors.KindError(
                 "curation_callback must return a curation report"
@@ -481,11 +479,11 @@ class ExtensionCurator(Curator):
             raise errors.InputError(
                 "curation report modality does not match extension"
             )
-        if report.dataset_hash != self.dataset_hash_value:
+        if report.dataset_hash != self.identity:
             raise errors.InputError(
                 "curation report hash does not match extension"
             )
-        if report.samples != len(self.sample_values):
+        if report.samples != len(self.records):
             raise errors.InputError(
                 "curation report count does not match extension"
             )
@@ -528,7 +526,7 @@ class Preparer(Curator):
         """
 
     @abc.abstractmethod
-    def sample_id(self, sample: Any) -> str:
+    def sample(self, sample: Any) -> str:
         """Gives the stable identity of one sample.
 
         Args:
@@ -594,7 +592,7 @@ class Preparer(Curator):
             ],
         }
 
-    def explanation_ground_truth(
+    def corroborate(
         self,
         sample: Any,
         feature_names: Sequence[str],
@@ -637,7 +635,7 @@ class Preparer(Curator):
         Returns:
             The sample identifier of each sample, in order.
         """
-        return tuple(self.sample_id(sample) for sample in samples)
+        return tuple(self.sample(sample) for sample in samples)
 
 
 def drift(

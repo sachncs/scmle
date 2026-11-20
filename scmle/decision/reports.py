@@ -1,7 +1,7 @@
 """The decision layer's report files for a charter run.
 
 Built once from the locked test set after the frozen rule exists, inside
-`FinalEvaluationStage`:
+`Assessment`:
 
 * `policy_value.json`: off-policy value of the frozen rule from a randomized
   log in the test rows (`data.logged_action_column` holds the logged 0/1

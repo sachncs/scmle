@@ -70,7 +70,7 @@ def subsample(
     """
     if n <= MAX_ROWS:
         return numpy.arange(n), block_size
-    rng = randomness.component_rng(seed, "leakage.screen.rows", 0)
+    rng = randomness.spawn(seed, "leakage.screen.rows", 0)
     if groups is not None:
         labels = pandas.unique(groups)
         chosen: list[numpy.ndarray] = []

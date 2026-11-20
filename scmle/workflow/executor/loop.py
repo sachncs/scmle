@@ -48,12 +48,12 @@ class Loop(approvals.Approvals):
         with (
             self.pulse(run_id),
             concurrent.futures.ThreadPoolExecutor(
-                max_workers=self.workflow.max_parallel
+                max_workers=self.workflow.parallel
             ) as pool,
         ):
             while True:
-                self.renew_lease(run_id)
-                budget = self.workflow.cost_budget
+                self.renew(run_id)
+                budget = self.workflow.budget
                 if budget is not None and record["cost"] > budget:
                     budget_hit = True
                 changed = self.dispatch(
@@ -130,26 +130,26 @@ class Loop(approvals.Approvals):
         for step in engine.ready(succeeded, pending, engine.NAMES):
             if not self.admit(step, states, group_use):
                 continue
-            if step.kind is definition.StepKind.APPROVAL:
+            if step.kind is definition.Kind.APPROVAL:
                 changed = (
                     self.adjudicate(run_id, step, states, outputs) or changed
                 )
                 continue
-            if len(in_flight) >= self.workflow.max_parallel:
+            if len(in_flight) >= self.workflow.parallel:
                 continue
             states[step.name] = status.Phase.RUNNING.value
-            group = step.concurrency_group
+            group = step.concurrency
             if group is not None:
                 group_use[group] = group_use.get(group, 0) + 1
             # STG-12: a step sees the spend so far plus the declared cost
             # of the steps still running, so steps started together cannot
             # pass the run's budget between them.
-            reserved = sum(s.cost_budget or 0.0 for s in in_flight.values())
+            reserved = sum(s.budget or 0.0 for s in in_flight.values())
             future = pool.submit(
-                self.run_step,
+                self.process,
                 run_id,
                 step,
-                {d: outputs[d] for d in step.depends_on},
+                {d: outputs[d] for d in step.needs},
                 record["cost"] + reserved,
             )
             in_flight[future] = step
@@ -185,8 +185,8 @@ class Loop(approvals.Approvals):
             record["cost"] = round(record["cost"] + cost, 6)
             if state == status.Phase.SUCCEEDED.value:
                 outputs[step.name] = result
-            if step.concurrency_group is not None:
-                group_use[step.concurrency_group] -= 1
+            if step.concurrency is not None:
+                group_use[step.concurrency] -= 1
 
     def close(
         self,
@@ -210,8 +210,8 @@ class Loop(approvals.Approvals):
             The run record with its final state, step states and end time.
         """
         if budget_hit or (
-            self.workflow.cost_budget is not None
-            and record["cost"] > self.workflow.cost_budget
+            self.workflow.budget is not None
+            and record["cost"] > self.workflow.budget
         ):
             for name, state in states.items():
                 if state == status.Phase.PENDING.value:
@@ -290,7 +290,7 @@ class Loop(approvals.Approvals):
         Returns:
             True when the step was skipped.
         """
-        if not any(states[d] in status.UNMET for d in step.depends_on):
+        if not any(states[d] in status.UNMET for d in step.needs):
             return False
         states[step.name] = status.Phase.SKIPPED.value
         self.stash(run_id, step, status.Phase.SKIPPED, reason="upstream")
@@ -308,5 +308,5 @@ class Loop(approvals.Approvals):
         Returns:
             The total cost, rounded to six decimals.
         """
-        found = (self.step_record(run_id, s.name) for s in self.workflow.steps)
+        found = (self.step(run_id, s.name) for s in self.workflow.steps)
         return round(sum(float(r.get("cost", 0.0)) for r in found if r), 6)

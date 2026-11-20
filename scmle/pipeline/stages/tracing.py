@@ -16,7 +16,7 @@ from scmle.pipeline.stages import selecting
 class Tracing(bracketing.Bracketing):
     """The content-linked graph and the artifact checksums.
 
-    Part of `PackageStage`, which inherits these methods unchanged;
+    Part of `Packaging`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 

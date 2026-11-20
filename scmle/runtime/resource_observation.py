@@ -31,10 +31,10 @@ class Observation:
     """A bounded, serializable snapshot of facts used at a capability gate."""
 
     __slots__ = (
-        "captured_at",
-        "disk_path",
+        "captured",
+        "disk",
         "environment",
-        "extra_observations",
+        "observations",
         "sources",
     )
 
@@ -42,18 +42,18 @@ class Observation:
         self,
         environment: capabilities.Environment,
         *,
-        captured_at: str,
-        disk_path: str,
-        extra_observations: dict[str, bool | None],
+        captured: str,
+        disk: str,
+        observations: dict[str, bool | None],
         sources: dict[str, str],
     ) -> None:
         """Initializes an observation holding only plain values.
 
         Args:
             environment: The observed capability environment.
-            captured_at: ISO 8601 timestamp of the observation.
-            disk_path: Path whose filesystem free space was measured.
-            extra_observations: For each project extra, whether it was found
+            captured: ISO 8601 timestamp of the observation.
+            disk: Path whose filesystem free space was measured.
+            observations: For each project extra, whether it was found
                 installed (None if unknown).
             sources: For each observed fact, how it was obtained.
 
@@ -63,9 +63,9 @@ class Observation:
         if not isinstance(environment, capabilities.Environment):
             raise errors.KindError("environment must be Environment")
         self.environment = environment
-        self.captured_at = captured_at
-        self.disk_path = disk_path
-        self.extra_observations = dict(sorted(extra_observations.items()))
+        self.captured = captured
+        self.disk = disk
+        self.observations = dict(sorted(observations.items()))
         self.sources = dict(sorted(sources.items()))
 
     def to_dict(self) -> dict[str, Any]:
@@ -80,8 +80,8 @@ class Observation:
         }
         return {
             "schema_version": OBSERVATION_SCHEMA_VERSION,
-            "captured_at": self.captured_at,
-            "disk_path": self.disk_path,
+            "captured_at": self.captured,
+            "disk_path": self.disk,
             "environment": {
                 **values,
                 "available_extras": sorted(environment.available_extras),
@@ -98,12 +98,12 @@ class Observation:
                     "available": available,
                     "source": self.sources.get(f"extra:{name}", "unknown"),
                 }
-                for name, available in self.extra_observations.items()
+                for name, available in self.observations.items()
             },
         }
 
 
-def observe_runtime_resources(
+def observe(
     disk_path: str | pathlib.Path | None = None,
 ) -> Observation:
     """Captures only the bounded host facts that capability declarations need.
@@ -138,9 +138,9 @@ def observe_runtime_resources(
     )
     return Observation(
         environment,
-        captured_at=datetime.datetime.now(datetime.UTC).isoformat(),
-        disk_path=str(selected_path),
-        extra_observations=extra_observations,
+        captured=datetime.datetime.now(datetime.UTC).isoformat(),
+        disk=str(selected_path),
+        observations=extra_observations,
         sources={
             "cpu_cores": cpu_source,
             "memory_gb": memory_source,
@@ -240,7 +240,7 @@ def optionals() -> tuple[
     core_available = True
     observations: dict[str, bool | None] = {CORE_EXTRA: core_available}
     sources = {"extra:core": "running scmle package"}
-    requirements = project_extra_requirements()
+    requirements = inventory()
     for extra, packages in requirements.items():
         observations[extra] = all(present(package) for package in packages)
         sources[f"extra:{extra}"] = "importlib.metadata"
@@ -250,7 +250,7 @@ def optionals() -> tuple[
     return available, observations, sources
 
 
-def project_extra_requirements() -> dict[str, tuple[str, ...]]:
+def inventory() -> dict[str, tuple[str, ...]]:
     """Reads the installed distribution metadata without importing extras.
 
     Returns:

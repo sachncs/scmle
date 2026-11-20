@@ -153,7 +153,7 @@ def planted_world(
         full[name] = qualification.finite(value, f"effect of '{name}'")
     if not any(full.values()):
         raise ValueError("an alternative world needs a nonzero effect")
-    rng = randomness.component_rng(seed, "simulate.planted", index)
+    rng = randomness.spawn(seed, "simulate.planted", index)
     z = standardize(features)
     linear = z.to_numpy() @ numpy.array(list(full.values()))
     if task == "regression":
@@ -166,7 +166,7 @@ def planted_world(
         outcome=pandas.Series(values, index=features.index, name="y"),
         kind="alternative",
         effects=full,
-        seed_path=randomness.seed_path(seed, "simulate.planted", index),
+        seed_path=randomness.seed(seed, "simulate.planted", index),
     )
 
 
@@ -200,7 +200,7 @@ def random_effects(
     magnitude = qualification.finite(size, "size")
     if magnitude <= 0.0:
         raise ValueError("size must be positive")
-    rng = randomness.component_rng(seed, "simulate.effects", index)
+    rng = randomness.spawn(seed, "simulate.effects", index)
     chosen = numpy.sort(rng.choice(len(names), n_signal, replace=False))
     signs = rng.choice([-1.0, 1.0], size=n_signal)
     return {
@@ -325,14 +325,14 @@ def build_null(
     if len(outcome) != len(features):
         raise ValueError("outcome needs one value per feature row")
     check_permutation_scope(len(features), groups, block_size)
-    rng = randomness.component_rng(seed, "simulate.null", index)
+    rng = randomness.spawn(seed, "simulate.null", index)
     values = permuted(outcome.to_numpy(), rng, groups, block_size)
     return World(
         features=features,
         outcome=pandas.Series(values, index=features.index, name=outcome.name),
         kind="null",
         effects=dict.fromkeys(features.columns, 0.0),
-        seed_path=randomness.seed_path(seed, "simulate.null", index),
+        seed_path=randomness.seed(seed, "simulate.null", index),
     )
 
 

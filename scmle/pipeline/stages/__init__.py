@@ -9,7 +9,7 @@ preview.
 
 import logging
 
-from scmle.pipeline.stages.assessment import FinalEvaluationStage
+from scmle.pipeline.stages.assessment import Assessment
 from scmle.pipeline.stages.cost import affordable
 from scmle.pipeline.stages.cost import dimensions
 from scmle.pipeline.stages.cost import FIT_MARGIN
@@ -19,35 +19,35 @@ from scmle.pipeline.stages.cost import late
 from scmle.pipeline.stages.cost import meter
 from scmle.pipeline.stages.cost import refitcost
 from scmle.pipeline.stages.cost import TAIL_SECONDS
-from scmle.pipeline.stages.defaults import default_stages
+from scmle.pipeline.stages.defaults import sequence
 from scmle.pipeline.stages.examination import DIAGNOSTIC_BUDGET_SHARE
 from scmle.pipeline.stages.examination import DIAGNOSTIC_MIN_SECONDS
 from scmle.pipeline.stages.exploration import coverage_on_confirmation
 from scmle.pipeline.stages.exploration import Escrow
 from scmle.pipeline.stages.exploration import governing
-from scmle.pipeline.stages.ingestion import IngestStage
+from scmle.pipeline.stages.ingestion import Ingest
 from scmle.pipeline.stages.interface import Stage
-from scmle.pipeline.stages.packaging import PackageStage
+from scmle.pipeline.stages.packaging import Packaging
 from scmle.pipeline.stages.packaging import PARITY_ROWS
 from scmle.pipeline.stages.planning import advise
 from scmle.pipeline.stages.planning import devise
 from scmle.pipeline.stages.planning import Planning
 from scmle.pipeline.stages.planning import requisition
-from scmle.pipeline.stages.profiling import ProfileStage
+from scmle.pipeline.stages.profiling import Profiling
+from scmle.pipeline.stages.scoring import anchor
 from scmle.pipeline.stages.scoring import appraise
-from scmle.pipeline.stages.scoring import choose_decision_threshold
+from scmle.pipeline.stages.scoring import choose
 from scmle.pipeline.stages.scoring import COVERAGE_LEVELS
 from scmle.pipeline.stages.scoring import decisional
 from scmle.pipeline.stages.scoring import MATRIX_DIMENSIONS
 from scmle.pipeline.stages.scoring import pin
-from scmle.pipeline.stages.scoring import reference_scores
 from scmle.pipeline.stages.scoring import slicers
 from scmle.pipeline.stages.selecting import Candidate
 from scmle.pipeline.stages.selecting import frontier
-from scmle.pipeline.stages.selecting import SelectStage
+from scmle.pipeline.stages.selecting import Selection
 from scmle.pipeline.stages.summary import BASELINE
 from scmle.pipeline.stages.surveying import graft
-from scmle.pipeline.stages.training import TrainStage
+from scmle.pipeline.stages.training import Training
 
 __all__ = [
     "BASELINE",
@@ -59,23 +59,23 @@ __all__ = [
     "MATRIX_DIMENSIONS",
     "PARITY_ROWS",
     "TAIL_SECONDS",
+    "Assessment",
     "Candidate",
     "Escrow",
-    "FinalEvaluationStage",
-    "IngestStage",
-    "PackageStage",
+    "Ingest",
+    "Packaging",
     "Planning",
-    "ProfileStage",
-    "SelectStage",
+    "Profiling",
+    "Selection",
     "Stage",
-    "TrainStage",
+    "Training",
     "advise",
     "affordable",
+    "anchor",
     "appraise",
-    "choose_decision_threshold",
+    "choose",
     "coverage_on_confirmation",
     "decisional",
-    "default_stages",
     "devise",
     "dimensions",
     "foldcost",
@@ -86,9 +86,9 @@ __all__ = [
     "late",
     "meter",
     "pin",
-    "reference_scores",
     "refitcost",
     "requisition",
+    "sequence",
     "slicers",
 ]
 

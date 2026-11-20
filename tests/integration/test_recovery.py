@@ -113,7 +113,7 @@ def test_a_budget_below_the_minimum_run_is_refused_before_work(
 
 
 def test_custom_stage_sequence_is_polymorphic(binary_frame, tmp_path):
-    class Recording(scmle.pipeline.stages.PackageStage):
+    class Recording(scmle.pipeline.stages.Packaging):
         calls = []
 
         def execute(self, board):
@@ -121,7 +121,7 @@ def test_custom_stage_sequence_is_polymorphic(binary_frame, tmp_path):
             Recording.calls.append(choice.selected.model_name)
             return super().execute(board)
 
-    stages = (*scmle.pipeline.stages.default_stages()[:-1], Recording())
+    stages = (*scmle.pipeline.stages.sequence()[:-1], Recording())
     spec = support.make_project(binary_frame, "y").spec
     result = orchestrator.Orchestrator(spec, binary_frame, stages=stages).run(
         tmp_path

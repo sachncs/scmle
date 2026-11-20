@@ -275,10 +275,10 @@ def c2st(
     side: numpy.ndarray = numpy.r_[
         numpy.zeros(len(sample)), numpy.ones(len(reference))
     ]
-    rng = randomness.component_rng(seed, C2ST_ID, 0)
+    rng = randomness.spawn(seed, C2ST_ID, 0)
     train, test = holdout(side, rng)
     model = ensemble.HistGradientBoostingClassifier(
-        random_state=randomness.derive_int_seed(seed, C2ST_ID, 1)
+        random_state=randomness.narrow(seed, C2ST_ID, 1)
     )
     model.fit(both.iloc[train], side[train])
     scores = model.predict_proba(both.iloc[test])[:, 1]
@@ -300,7 +300,7 @@ def c2st(
         n=len(test),
         decision=decide(fires, on_shift, gate),
         subset=qualification.Subset.EXPLORATION,
-        seeds=randomness.seed_path(seed, C2ST_ID, 0),
+        seeds=randomness.seed(seed, C2ST_ID, 0),
         tier=qualification.Tier.UNVERIFIED,
     )
 
@@ -489,7 +489,7 @@ def distinguish(
         `align`).
     """
     align(sample, reference)
-    rng = randomness.component_rng(seed, MMD_ID, 0)
+    rng = randomness.spawn(seed, MMD_ID, 0)
     first = numpy.sort(
         rng.choice(len(sample), min(len(sample), MAX_MMD_ROWS), replace=False)
     )
@@ -526,7 +526,7 @@ def distinguish(
         n=len(both),
         decision=decide(p_value <= alpha, on_shift, gate),
         subset=qualification.Subset.EXPLORATION,
-        seeds=randomness.seed_path(seed, MMD_ID, 0),
+        seeds=randomness.seed(seed, MMD_ID, 0),
         tier=qualification.Tier.UNVERIFIED,
     )
 

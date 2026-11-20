@@ -44,7 +44,7 @@ class Estimand(products.Derived):
 class Identification(qualification.Qualification):
     """The causal claim grounded, stated and identified.
 
-    Part of `ProfileStage`, which inherits these methods unchanged;
+    Part of `Profiling`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 
@@ -70,7 +70,7 @@ class Identification(qualification.Qualification):
         data = board.services.spec.data
         columns = [*view.features.columns, data.target]
         document = draft.linkage(charter, columns)
-        board.journal.write_json("framing_link.json", document)
+        board.journal.write("framing_link.json", document)
         board.journal.emit(
             "framing.completed",
             "the charter's target, moment and unit were matched to columns",
@@ -182,7 +182,7 @@ class Identification(qualification.Qualification):
             dag_checks=found.dag,
         )
         for name, document in outcome.documents.items():
-            board.journal.write_json(name, document)
+            board.journal.write(name, document)
         claims = outcome.documents["causal_claims.json"]
         board.journal.emit(
             "identification.completed",

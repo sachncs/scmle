@@ -31,16 +31,16 @@ class Choice(products.Kept):
     Attributes:
         selected: The winning trial.
         refits: Candidates refit on the development data, by trial id.
-        pareto_front: The measured front, when the Pareto option is on.
-        pending_ledger: A charter run's confirmation still to open, if any.
+        front: The measured front, when the Pareto option is on.
+        ledger: A charter run's confirmation still to open, if any.
         outcomes: The evidence-based decisions so far.
         skipped: The work reduced or skipped for the budget so far.
     """
 
     selected: experiments.Trial | None
     refits: dict[str, models.Estimator]
-    pareto_front: list[records.Layout] | None
-    pending_ledger: "exploration.Escrow | None"
+    front: list[records.Layout] | None
+    ledger: "exploration.Escrow | None"
     outcomes: list[experiments.Decision]
     skipped: list[dict[str, str]]
 
@@ -74,10 +74,11 @@ class Pick:
     front: list[records.Layout] | None = None
 
 
-class SelectStage(interface.Stage):
+class Selection(interface.Stage):
     """Applies the selection policy and the serving constraints."""
 
-    requires: ClassVar[tuple[type, ...]] = (training.TrainStage,)
+    recorded: ClassVar[str] = "SelectStage"
+    requires: ClassVar[tuple[type, ...]] = (training.Training,)
     makes: ClassVar[type[products.Product] | None] = Choice
     state: ClassVar[scmle.runtime.state.Progress] = (
         scmle.runtime.state.Progress.SELECTING
@@ -136,7 +137,7 @@ class SelectStage(interface.Stage):
             spec.latency_safety_factor,
         )
 
-    def select_on_front(
+    def balance(
         self,
         board: engine.Board,
         checked: list[experiments.Trial],
@@ -243,10 +244,10 @@ class SelectStage(interface.Stage):
                 and data.baseline_subject == "selected_model"
             ):
                 subject = codify(board, pending, pick.trial, split, refits)
-            if pending.holds_for_coverage:
+            if pending.sealed:
                 pending = dataclasses.replace(pending, subject=subject)
             else:
-                profiling.ProfileStage().conclude(board, pending, subject)
+                profiling.Profiling().conclude(board, pending, subject)
                 pending = None
         with board.journal.lock:
             return Choice(
@@ -270,7 +271,7 @@ class SelectStage(interface.Stage):
         whose refit ends in time is taken unmeasured (`affordable`).
         Candidates whose refit cannot end in time are not measured; if none
         can, the choice falls back to `affordable`. With the Pareto option
-        the choice is made on the front (`select_on_front`). Otherwise the
+        the choice is made on the front (`balance`). Otherwise the
         first `max_candidates_checked` in policy order are refit and measured
         on this machine, and the first one within every limit wins.
 
@@ -295,7 +296,7 @@ class SelectStage(interface.Stage):
             return self.announce(board, cost.affordable(board, ranked))
         checked = ranked[: spec.max_candidates_checked]
         if spec.pareto:
-            return self.select_on_front(board, checked, limits, refits)
+            return self.balance(board, checked, limits, refits)
         measured = 0
         for trial in checked:
             if cost.late(board, trial):

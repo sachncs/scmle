@@ -123,7 +123,7 @@ class Strategist:
             : spec.top_models
         ]
         for leader in leaders:
-            reason = self.board.services.governor.skip_reason(first=False)
+            reason = self.board.services.governor.skip(first=False)
             if reason:
                 self.board.journal.forgo(
                     f"strategy search for {leader.model_name}", reason
@@ -138,7 +138,7 @@ class Strategist:
         Inapplicable strategies are rejected with the reason; the others are
         evaluated as trials and judged against the leader. Each trial gets
         its ceiling when it is dispatched, and one that must not start is
-        recorded as skipped (`trials.Runner.run_many`).
+        recorded as skipped (`trials.Runner.dispatch`).
 
         Args:
             leader: The model's default-pipeline trial.
@@ -162,7 +162,7 @@ class Strategist:
             trials.Job(trial_id, leader.model_name, {}, None, name)
             for trial_id, name in zip(ids, chosen, strict=True)
         ]
-        for outcome in self.runner.run_many(jobs):
+        for outcome in self.runner.dispatch(jobs):
             self.board.journal.transcribe(outcome)
             self.judge(leader, outcome)
 

@@ -52,7 +52,7 @@ a (key, event time, recorded time) value stops the run before anything is
 synthesized (`scmle.data.relational.schema`).
 
 Entity resolution (charter format 8) runs on the run table itself:
-`resolve_entities` compares the declared fields, groups records linked above
+`resolve` compares the declared fields, groups records linked above
 the lower threshold, and the caller makes the result the split's group column,
 so duplicates of one real-world entity under different keys never straddle
 development and test. With a `reconcile` block the extracted views are
@@ -304,7 +304,7 @@ def decode(record: dict[str, Any], spec: ingest.Ingestion) -> asof_view.Timing:
     )
 
 
-def read_frame(entry: dict[str, Any], factory: Any) -> pandas.DataFrame:
+def read(entry: dict[str, Any], factory: Any) -> pandas.DataFrame:
     """One table, read once with a snapshot check.
 
     A read that sees the table change on every attempt fails with the
@@ -350,7 +350,7 @@ def load(
     """
     table = identifier(entry["table"], "table")
     if frame is None:
-        frame = read_frame(entry, factory)
+        frame = read(entry, factory)
     return asof_view.View(
         frame,
         entry["key"],
@@ -708,7 +708,7 @@ def synthesis(
             {"questions": list(verdict.questions)},
         )
     entries = [*plan_document["views"], *plan_document.get("nests", [])]
-    extracts = [read_frame(entry, factory) for entry in entries]
+    extracts = [read(entry, factory) for entry in entries]
     hold(entries, extracts)
     report = None
     if spec.reconcile is not None:
@@ -736,7 +736,7 @@ def synthesis(
     return deliver(found, table, report, {**summary, "engine": checks})
 
 
-def resolve_entities(
+def resolve(
     frame: pandas.DataFrame, spec: ingest.Entity
 ) -> tuple[pandas.Series, dict[str, Any]]:
     """Group id per row of the run table, from the charter's entity block.

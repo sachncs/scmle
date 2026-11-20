@@ -103,7 +103,7 @@ def test_the_core_leaves_a_new_family_semantics_to_its_adapter():
         "modality",
         "monitor",
         "remarks",
-        "sample_id",
+        "sample",
         "samples",
         "split",
     }

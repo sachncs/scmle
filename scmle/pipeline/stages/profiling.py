@@ -68,7 +68,7 @@ class Partition(products.Derived):
         self.split.test.close()
 
 
-class ProfileStage(impounding.Impounding):
+class Profiling(impounding.Impounding):
     """Resolves the task, splits the data, and profiles the development rows.
 
     Only the target is looked at to resolve the task and to split (class
@@ -79,7 +79,8 @@ class ProfileStage(impounding.Impounding):
     them.
     """
 
-    requires: ClassVar[tuple[type, ...]] = (ingestion.IngestStage,)
+    recorded: ClassVar[str] = "ProfileStage"
+    requires: ClassVar[tuple[type, ...]] = (ingestion.Ingest,)
     makes: ClassVar[type[products.Product] | None] = Partition
     state: ClassVar[scmle.runtime.state.Progress] = (
         scmle.runtime.state.Progress.PROFILING
@@ -267,7 +268,7 @@ class ProfileStage(impounding.Impounding):
                 **{board.services.spec.data.target: split.target}
             )
             isolation = "separate vault process"
-        board.journal.write_json(
+        board.journal.write(
             "validation_manifest.json", split.manifest.to_dict()
         )
         board.journal.track(split_fingerprint=split.manifest.fingerprint)

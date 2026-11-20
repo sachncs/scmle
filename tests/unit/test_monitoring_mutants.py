@@ -24,21 +24,21 @@ OBS = [0.3, 0.9, 0.1, 0.7, 0.5, 0.8, 0.2, 0.6, 0.95, 0.4, 0.85, 0.15]
 @pytest.mark.parametrize("bad", [-0.01, 1.01, numpy.nan, numpy.inf])
 def test_validate_unit_names_the_argument_and_the_range(bad):
     with pytest.raises(ValueError, match="x must be finite and within"):
-        sequential_tests.validate_unit(bad, "x")
-    assert sequential_tests.validate_unit([0.0, 1.0], "x").tolist() == [
+        sequential_tests.validate(bad, "x")
+    assert sequential_tests.validate([0.0, 1.0], "x").tolist() == [
         0.0,
         1.0,
     ]
-    assert sequential_tests.validate_unit(0.5, "x").dtype == numpy.float64
+    assert sequential_tests.validate(0.5, "x").dtype == numpy.float64
 
 
 def test_validate_unit_checks_each_side_of_the_range_on_its_own():
     with pytest.raises(ValueError):
-        sequential_tests.validate_unit([0.5, -0.1], "x")
+        sequential_tests.validate([0.5, -0.1], "x")
     with pytest.raises(ValueError):
-        sequential_tests.validate_unit([0.5, 1.1], "x")
+        sequential_tests.validate([0.5, 1.1], "x")
     with pytest.raises(ValueError):
-        sequential_tests.validate_unit([0.5, numpy.nan], "x")
+        sequential_tests.validate([0.5, numpy.nan], "x")
 
 
 @pytest.mark.parametrize(
@@ -78,17 +78,17 @@ def test_betting_test_update_names_the_observation():
 
 def test_array_tests_start_at_zero_capital_and_peak():
     test = sequential_tests.Betting([0.2, 0.5], "less", 0.1)
-    assert test.log_capital.tolist() == [0.0, 0.0]
+    assert test.capital.tolist() == [0.0, 0.0]
     assert test.peak.tolist() == [0.0, 0.0]
-    assert test.log_capital.shape == (2,) == test.peak.shape
+    assert test.capital.shape == (2,) == test.peak.shape
 
 
 def test_a_mixture_over_an_array_null_keeps_array_state():
     test = sequential_tests.Mixture([0.2, 0.5], "greater", 0.1)
-    assert test.peak.shape == (2,) and test.log_capital.shape == (2,)
+    assert test.peak.shape == (2,) and test.capital.shape == (2,)
     test.update(0.9)
-    assert test.log_capital.shape == (2,)
-    assert numpy.all(test.log_capital <= test.peak + 1e-15)
+    assert test.capital.shape == (2,)
+    assert numpy.all(test.capital <= test.peak + 1e-15)
 
 
 # ---------------------------------------------------------------- golden
@@ -232,11 +232,11 @@ def test_the_confidence_grid_sits_strictly_inside_the_unit_interval():
     assert sequence.grid.tolist() == pytest.approx(
         [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     )
-    assert sequence.upper_tests.alpha == pytest.approx(0.05)
-    assert sequence.lower_tests.alpha == pytest.approx(0.05)
-    assert sequence.upper_tests.direction == "greater"
-    assert sequence.lower_tests.direction == "less"
-    assert sequence.upper_tests.null_mean.shape == (9,)
+    assert sequence.upper.alpha == pytest.approx(0.05)
+    assert sequence.lower.alpha == pytest.approx(0.05)
+    assert sequence.upper.direction == "greater"
+    assert sequence.lower.direction == "less"
+    assert sequence.upper.null.shape == (9,)
 
 
 def test_the_confidence_interval_tightens_and_never_widens():
@@ -274,8 +274,8 @@ def test_a_risk_alarm_clips_and_scales_each_mean_loss():
     for value in [0.3, 0.1, 1.9, 0.5, 2.5, -1.0]:
         alarm.update(value)
     assert alarm.test.count == 6
-    assert alarm.test.log_capital == pytest.approx(2.358465318891925, rel=1e-12)
-    assert alarm.test.null_mean == pytest.approx(0.075)
+    assert alarm.test.capital == pytest.approx(2.358465318891925, rel=1e-12)
+    assert alarm.test.null == pytest.approx(0.075)
 
 
 def test_a_risk_alarm_round_trips_with_its_scale_and_null():
@@ -285,7 +285,7 @@ def test_a_risk_alarm_round_trips_with_its_scale_and_null():
     again = sequential_tests.Tripwire.from_dict(alarm.to_dict())
     assert again.to_dict() == alarm.to_dict()
     assert again.scale == 2.0
-    assert again.test.null_mean == pytest.approx(0.075)
+    assert again.test.null == pytest.approx(0.075)
     again.update(1.0)
     alarm.update(1.0)
     assert again.to_dict() == alarm.to_dict()
@@ -312,7 +312,7 @@ def test_a_paired_process_needs_a_margin_inside_the_scale():
 
 def test_a_paired_process_maps_gaps_to_unit_bets_through_the_scale():
     process = sequential_tests.Comparison(0.1, 0.05, scale=2.0)
-    assert process.test.null_mean == pytest.approx(0.525)
+    assert process.test.null == pytest.approx(0.525)
     for gap in [0.5, -1.0, 2.0, 0.1]:
         process.ingest(gap)
     assert process.e_value == pytest.approx(0.5870451355145232, rel=1e-12)
@@ -373,7 +373,7 @@ def test_a_paired_process_round_trips_with_scale_and_level():
 
 
 def test_the_promotion_sequence_orders_and_refuses_repeats():
-    sequence = sequential_tests.PromotionSequence("1/20")
+    sequence = sequential_tests.Sequence("1/20")
     assert [sequence.register(name) for name in "abc"] == [1, 2, 3]
     with pytest.raises(ValueError, match="'a' is already registered"):
         sequence.register("a")
@@ -395,8 +395,8 @@ def test_the_promotion_sequence_orders_and_refuses_repeats():
 
 def test_the_promotion_sequence_accepts_fractions_and_floats():
     assert (
-        sequential_tests.PromotionSequence(0.05).config.alpha
-        == sequential_tests.PromotionSequence("1/20").config.alpha
+        sequential_tests.Sequence(0.05).config.alpha
+        == sequential_tests.Sequence("1/20").config.alpha
     )
 
 
@@ -619,8 +619,8 @@ def test_array_mixtures_equal_the_scalar_mixtures_entry_by_entry():
         joint.update(value)
         for single in singles:
             single.update(value)
-    assert joint.log_capital.tolist() == pytest.approx(
-        [float(single.log_capital) for single in singles], rel=1e-12
+    assert joint.capital.tolist() == pytest.approx(
+        [float(single.capital) for single in singles], rel=1e-12
     )
     assert joint.peak.tolist() == pytest.approx(
         [float(single.peak) for single in singles], rel=1e-12
@@ -791,17 +791,17 @@ def test_every_error_message_is_exact():
     )
     raises_exactly(
         "x must be finite and within [0, 1]",
-        lambda: sequential_tests.validate_unit(2, "x"),
+        lambda: sequential_tests.validate(2, "x"),
     )
 
 
 def test_inputs_are_converted_to_floats_and_masks_to_booleans():
-    assert sequential_tests.validate_unit([0, 1], "x").dtype == numpy.float64
+    assert sequential_tests.validate([0, 1], "x").dtype == numpy.float64
     test = sequential_tests.Betting(Fraction(2, 5), "greater", 0.1)
-    assert test.null_mean.dtype == numpy.float64
+    assert test.null.dtype == numpy.float64
     assert sequential_tests.Mixture(
         Fraction(2, 5), "greater", 0.1
-    ).null_mean.dtype == (numpy.float64)
+    ).null.dtype == (numpy.float64)
     estimate = labels.weigh(
         numpy.array([1.0, 0.0, 0.5]), [1, 1, 1], None, None, 0.0
     )

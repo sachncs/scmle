@@ -57,7 +57,7 @@ class ExplodingDecoder(DocumentDecoder):
         raise RuntimeError("decoder failed")
 
 
-def adapter() -> modality_lifecycle.DocumentPreparer:
+def adapter() -> modality_lifecycle.Document:
     """Build a small, labelled document fixture."""
     samples = tuple(
         document.Sample(
@@ -67,7 +67,7 @@ def adapter() -> modality_lifecycle.DocumentPreparer:
         )
         for index in range(12)
     )
-    return modality_lifecycle.DocumentPreparer(document.Dataset(samples))
+    return modality_lifecycle.Document(document.Dataset(samples))
 
 
 def request(
@@ -116,7 +116,7 @@ def test_modality_http_serving_verifies_health_schema_and_predictions(
         tmp_path / "package",
         signing_key="serving-key",
     )
-    predictor = modality_lifecycle.Predictor.from_package(
+    predictor = modality_lifecycle.Predictor.load(
         reference,
         report.package.path,
         "serving-key",
@@ -214,7 +214,7 @@ def test_release_bound_serving_publishes_verified_lifecycle_identity(tmp_path):
         signing_key="serving-key",
         report_path=report_path,
     )
-    predictor = modality_lifecycle.Predictor.from_package(
+    predictor = modality_lifecycle.Predictor.load(
         reference,
         report.package.path,
         "serving-key",
@@ -241,7 +241,7 @@ def test_release_bound_serving_rejects_unbound_predictor(tmp_path):
         tmp_path / "package",
         signing_key="serving-key",
     )
-    predictor = modality_lifecycle.Predictor.from_package(
+    predictor = modality_lifecycle.Predictor.load(
         reference, report.package.path, "serving-key"
     )
 
@@ -268,7 +268,7 @@ def test_report_binding_rejects_tampered_lifecycle_evidence(tmp_path):
     report_path.write_text(json.dumps(record), encoding="utf-8")
 
     with pytest.raises(ValueError, match="signature does not verify"):
-        modality_lifecycle.Predictor.from_package(
+        modality_lifecycle.Predictor.load(
             reference,
             report.package.path,
             "serving-key",
@@ -294,7 +294,7 @@ def test_modality_http_serving_classifies_unexpected_decoder_errors(tmp_path):
         tmp_path / "package",
         signing_key="serving-key",
     )
-    predictor = modality_lifecycle.Predictor.from_package(
+    predictor = modality_lifecycle.Predictor.load(
         reference,
         report.package.path,
         "serving-key",
@@ -327,7 +327,7 @@ def test_modality_http_serving_echoes_valid_request_identity(tmp_path):
         tmp_path / "package",
         signing_key="serving-key",
     )
-    predictor = modality_lifecycle.Predictor.from_package(
+    predictor = modality_lifecycle.Predictor.load(
         reference,
         report.package.path,
         "serving-key",
@@ -358,7 +358,7 @@ def test_modality_http_serving_rejects_unsafe_request_identity(
         tmp_path / "package",
         signing_key="serving-key",
     )
-    predictor = modality_lifecycle.Predictor.from_package(
+    predictor = modality_lifecycle.Predictor.load(
         reference,
         report.package.path,
         "serving-key",
@@ -388,7 +388,7 @@ def started_modality_service(tmp_path, limits=None):
     report = modality_lifecycle.Lifecycle().run(
         reference, tmp_path / "package", signing_key="serving-key"
     )
-    predictor = modality_lifecycle.Predictor.from_package(
+    predictor = modality_lifecycle.Predictor.load(
         reference, report.package.path, "serving-key"
     )
     service = modality.ModalityHttpServing(predictor, DocumentDecoder())

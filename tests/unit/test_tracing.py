@@ -110,7 +110,7 @@ def test_pipeline_stages_and_batch_files_are_spans(
     class Board:
         regulator = type("R", (), {"cap": contextlib.nullcontext})()
 
-        def check_cancelled(self):
+        def check(self):
             """Never cancelled."""
 
     class Load:

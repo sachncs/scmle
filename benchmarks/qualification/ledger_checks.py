@@ -241,7 +241,7 @@ def iid_null(seed: int, rows: int = 200, columns: int = 20) -> FdrWorld:
             The tester over the features, the outcome and an all-False
             planted mask.
         """
-        rng = randomness.component_rng(seed, "ledger_checks.iid_null", run)
+        rng = randomness.spawn(seed, "ledger_checks.iid_null", run)
         x = rng.normal(size=(rows, columns))
         return RankTester(x), rng.normal(size=rows), numpy.zeros(columns, bool)
 
@@ -273,7 +273,7 @@ def diabetes_null(seed: int) -> FdrWorld:
             The fixed tester, a permutation of the outcome and an all-False
             planted mask.
         """
-        rng = randomness.component_rng(seed, "ledger_checks.diabetes", run)
+        rng = randomness.spawn(seed, "ledger_checks.diabetes", run)
         return tester, rng.permutation(outcome), planted
 
     return FdrWorld(
@@ -321,14 +321,14 @@ def mixed_world(
             The tester over the shuffled columns, the outcome and the planted
             mask.
         """
-        rng = randomness.component_rng(seed, "ledger_checks.mixed", run)
+        rng = randomness.spawn(seed, "ledger_checks.mixed", run)
         if correlated:
             null_block = equicorrelated(rng, rows, nulls, 0.5)
         else:
             null_block = rng.normal(size=(rows, nulls))
         signal_block = rng.normal(size=(rows, signals))
         x = numpy.concatenate([null_block, signal_block], axis=1)
-        order = randomness.component_rng(seed, "ledger_checks.order", 0)
+        order = randomness.spawn(seed, "ledger_checks.order", 0)
         position = order.permutation(columns)
         x = x[:, position]
         planted = (numpy.arange(columns) >= nulls)[position]
@@ -467,7 +467,7 @@ def check_power(runs: int, seed: int) -> list[Finding]:
     beta = EFFECT_RHO / math.sqrt(1.0 - EFFECT_RHO**2)
     hits = 0
     for run in range(runs):
-        rng = randomness.component_rng(seed, "ledger_checks.power", run)
+        rng = randomness.spawn(seed, "ledger_checks.power", run)
         x = rng.normal(size=(rows, columns))
         y = beta * x[:, 0] + rng.normal(size=rows)
         config = online_fdr.Settings(online_fdr.ELOND, FRACTION_ALPHA)
@@ -510,7 +510,7 @@ def check_uniformity(seed: int) -> list[Finding]:
     Returns:
         One finding; it holds when the KS p-value exceeds `KS_FLOOR`.
     """
-    rng = randomness.component_rng(seed, "ledger_checks.uniform", 0)
+    rng = randomness.spawn(seed, "ledger_checks.uniform", 0)
     draws = [
         bivariate.spearman(rng.normal(size=60), rng.normal(size=60)).p
         for _ in range(KS_DRAWS)
@@ -605,7 +605,7 @@ def control_exceed_rate(
     exceeded = 0
     observed_total = 0
     for repeat in range(repeats):
-        rng = randomness.component_rng(seed, f"ledger_checks.{scope}", repeat)
+        rng = randomness.spawn(seed, f"ledger_checks.{scope}", repeat)
         x, y, labels = make(rng)
         tester = RankTester(x)
 

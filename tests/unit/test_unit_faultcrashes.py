@@ -56,7 +56,7 @@ def test_stress_loses_no_acknowledged_atomic_write(tmp_path):
 def test_a_killed_job_resumes_without_repeating_finished_steps():
     result = crashes.job_interruption()
     passed(result)
-    assert result.fault_id == "job_interruption"
+    assert result.fault == "job_interruption"
     assert result.detail["handler_calls"] == [
         "ingest",
         "train",
@@ -67,14 +67,14 @@ def test_a_killed_job_resumes_without_repeating_finished_steps():
     assert result.detail["state_objects"] > 0
     measured = result.measurements[0]
     assert measured.component == "job_state"
-    assert measured.rpo_lost == 0
-    assert measured.rto_seconds >= 1.5
+    assert measured.lost == 0
+    assert measured.rto >= 1.5
 
 
 def test_a_killed_audit_writer_reopens_with_a_verified_chain():
     result = crashes.resilience()
     passed(result)
-    assert result.fault_id == "audit_log_continuity"
+    assert result.fault == "audit_log_continuity"
     assert result.detail == {
         "trials": 5,
         "torn_or_broken": 0,
@@ -82,18 +82,18 @@ def test_a_killed_audit_writer_reopens_with_a_verified_chain():
     }
     measured = result.measurements[0]
     assert measured.component == "ledger"
-    assert measured.rpo_lost == 0
+    assert measured.lost == 0
 
 
 def test_a_killed_service_restarts_with_the_same_answers():
     result = crashes.process_kill()
     passed(result)
-    assert result.fault_id == "process_kill"
+    assert result.fault == "process_kill"
     assert len(result.detail["service_rto_seconds_per_trial"]) == 3
     assert result.detail["state_trials"]["trials"] == 10
     service, state = result.measurements
-    assert (service.component, service.rpo_lost) == ("service", 0)
-    assert (state.component, state.rpo_lost) == ("registry_state", 0)
-    assert round(service.rto_seconds, 3) == max(
+    assert (service.component, service.lost) == ("service", 0)
+    assert (state.component, state.lost) == ("registry_state", 0)
+    assert round(service.rto, 3) == max(
         result.detail["service_rto_seconds_per_trial"]
     )

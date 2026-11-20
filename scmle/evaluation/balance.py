@@ -131,7 +131,7 @@ def randomisation(
             "balanced": None,
         }
     standard = (matrix[:, keep] - matrix[:, keep].mean(0)) / spread[keep]
-    rng = randomness.component_rng(seed, COMPONENT, 0)
+    rng = randomness.spawn(seed, COMPONENT, 0)
     observed = float(contrast(arm.astype(float)[None, :], standard)[0])
     draws = numpy.stack(
         list(

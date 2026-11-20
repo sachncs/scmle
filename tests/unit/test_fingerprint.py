@@ -180,7 +180,7 @@ def test_ml_difficulty_fails_closed_when_scores_are_all_undefined(
         .feature_plan
     )
 
-    result = fingerprint.ml_difficulty(frame, spec, task, plan)
+    result = fingerprint.gauge(frame, spec, task, plan)
 
     assert result == {
         "available": False,

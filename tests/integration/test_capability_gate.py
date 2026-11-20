@@ -52,8 +52,8 @@ def profiled(
         project_spec, binary_frame(), registry=models
     )
     board = project.start()
-    stages.IngestStage().execute(board)
-    stages.ProfileStage().execute(board)
+    stages.Ingest().execute(board)
+    stages.Profiling().execute(board)
     return board
 
 
@@ -64,7 +64,7 @@ def test_tabular_beta_plan_has_an_explicit_library_capability_path():
     plan = stages.devise(board)
 
     assert set(plan.candidates) == {"dummy", "logistic_regression"}
-    declarations = board.services.capability_registry.catalogue()
+    declarations = board.services.capabilities.catalogue()
     assert declarations
     assert {
         declaration.key.modality
@@ -79,7 +79,7 @@ def test_tabular_beta_plan_has_an_explicit_library_capability_path():
     assert {declaration.key.inference for declaration in declarations} == {
         capabilities.Inference.LIBRARY
     }
-    family = board.services.capability_registry.find(
+    family = board.services.capabilities.find(
         capabilities.ModelFamily.JEPA.value
     )
     assert family is not None
@@ -227,7 +227,7 @@ def test_empty_override_fails_before_model_fitting():
     """An empty injected registry cannot silently fall back to defaults."""
     board = profiled()
     board.services = dataclasses.replace(
-        board.services, capability_registry=capabilities.Registry()
+        board.services, capabilities=capabilities.Registry()
     )
 
     with pytest.raises(
@@ -282,7 +282,7 @@ def test_file_backed_non_tabular_modality_fails_before_tabular_reader(
         capabilities.UnsupportedError,
         match="file-backed modality has no registered ingestion adapter",
     ) as failure:
-        stages.IngestStage().execute(project.start())
+        stages.Ingest().execute(project.start())
 
     assert failure.value.details == {
         "status": "unsupported",
@@ -330,8 +330,8 @@ def test_group_thresholds_reject_non_binary_tasks_before_fitting():
         registry=scmle.models.registry.Catalog((classical.Dummy(),)),
     )
     board = project.start()
-    stages.IngestStage().execute(board)
-    stages.ProfileStage().execute(board)
+    stages.Ingest().execute(board)
+    stages.Profiling().execute(board)
 
     with pytest.raises(
         capabilities.UnsupportedError,

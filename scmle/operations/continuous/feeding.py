@@ -26,18 +26,18 @@ class Feeding:
         retrain: Hook that trains and stages a challenger.
         clock: Returns the current time in epoch seconds.
         history: The hash-chained training history.
-        seen_alarms: The loop alarms already acted on.
-        last_proposal_batch: The batch of the last retrain proposal, if any.
+        alarms: The loop alarms already acted on.
+        proposed: The batch of the last retrain proposal, if any.
     """
 
     loop: scmle.governance.loop.Loop
     directory: pathlib.Path
-    policy: policies.RetrainPolicy
+    policy: policies.Policy
     retrain: Callable[[], str | None] | None
     clock: Callable[[], float]
-    history: records.TrainingHistory
-    seen_alarms: int
-    last_proposal_batch: int | None
+    history: records.History
+    alarms: int
+    proposed: int | None
 
     def retain(self, kind: str, values: Mapping[str, Any]) -> None:
         """Keeps raw labels or outcomes with the batch they arrived at.
@@ -144,7 +144,7 @@ class Feeding:
                 )
         return result
 
-    def record_training(
+    def record(
         self,
         name: str,
         frame: pandas.DataFrame,
@@ -166,7 +166,7 @@ class Feeding:
         Returns:
             The history row.
         """
-        version = records.dataset_version(frame)
+        version = records.stamp(frame)
         if preserve:
             path = (
                 self.directory

@@ -6,17 +6,17 @@ durable state.
 
 ## The definition
 
-A `Workflow` is named, versioned `Step`s with explicit `depends_on`. A step
+A `Workflow` is named, versioned `Step`s with explicit `needs`. A step
 has a kind (`ingest`, `train`, `evaluate`, `monitor`, `batch_predict`,
 `approval`), a timeout, a `Retries` (attempts, first delay, factor,
 ceiling), an optional cost budget and an optional concurrency group. The
-workflow adds an optional `Schedule`, `max_concurrent_runs`, a run cost budget,
-group limits and `max_parallel`. Dependency cycles, unknown dependencies and
+workflow adds an optional `Schedule`, `concurrency`, a run cost budget,
+group limits and `parallel`. Dependency cycles, unknown dependencies and
 duplicate names are refused when the object is built.
 
 **Automatic versus approved.** A step with `effect="approved"` may only
 exist behind an `approval` step it depends on; the definition refuses
-otherwise. `standard_workflow()` is ingest, train, evaluate, then monitor and
+otherwise. `scaffold()` is ingest, train, evaluate, then monitor and
 an approval in parallel, then batch prediction (approved).
 
 ## The local executor
@@ -33,7 +33,7 @@ State lives in a `Depot` under `workflows/<name>/runs/<run id>/`.
 | Crashed executor | its lease expires (`lease_seconds`); another executor takes the run over and re-runs the step that was in flight |
 | Timeouts | cooperative: handlers call `context.check()` |
 | Cost | `context.spend` raises past the step's or the run's budget; a run over budget stops its remaining steps (`budget_stopped`) |
-| Concurrency | `max_concurrent_runs` by leases, `max_parallel` and per-group limits for steps |
+| Concurrency | `concurrency` by leases, `parallel` and per-group limits for steps |
 | Approval | the approval step waits (`waiting_approval`); a decision is an HMAC-signed record from a listed approver who is not the requester; a rejection or an expiry ends the run and the approved step never runs |
 
 `Scheduler` turns the schedule into slots and applies the declared catch-up

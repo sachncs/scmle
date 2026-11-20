@@ -106,7 +106,7 @@ FRAME = pandas.DataFrame({"a": [1, 2, 3, 4], "y": [0, 1, 0, 1]})
 
 def impound(board, split):
     """Sequesters as the profiling stage does: applies the custody."""
-    made = profiling.ProfileStage().sequester(
+    made = profiling.Profiling().sequester(
         board, tasks.Task.BINARY, FRAME, split
     )
     made.apply(board)
@@ -115,7 +115,7 @@ def impound(board, split):
 
 def test_sequester_returns_the_custody_and_leaves_the_context(custody):
     board = start()
-    made = profiling.ProfileStage().sequester(
+    made = profiling.Profiling().sequester(
         board, tasks.Task.BINARY, FRAME, "split"
     )
     assert isinstance(made, exploration.Custody)
@@ -207,7 +207,7 @@ def test_a_known_entity_charter_names_the_cluster_column(custody, monkeypatch):
     split = types.SimpleNamespace(
         manifest=types.SimpleNamespace(strategy="temporal")
     )
-    made = profiling.ProfileStage().sequester(
+    made = profiling.Profiling().sequester(
         board, tasks.Task.BINARY, FRAME, split
     )
     assert made.column == "g"
@@ -240,7 +240,7 @@ def escrow(coverage):
         signed=True,
         baseline=None,
         causal=None,
-        holds_for_coverage=coverage,
+        sealed=coverage,
     )
 
 
@@ -261,7 +261,7 @@ def test_claims_hold_the_pending_ledger_and_digest_their_charter():
 
 def test_without_custody_the_ledger_leaves_nothing_pending():
     board = start()
-    made = profiling.ProfileStage().ledger(board, tasks.Task.BINARY)
+    made = profiling.Profiling().ledger(board, tasks.Task.BINARY)
     assert made == exploration.Claims()
     made.apply(board)
     assert board.get(exploration.Claims).pending is None
@@ -270,14 +270,14 @@ def test_without_custody_the_ledger_leaves_nothing_pending():
 def test_a_task_outside_the_ledger_is_skipped_with_nothing_pending():
     board = start()
     exploration.Custody(outcome(), Vault(None)).apply(board)
-    made = profiling.ProfileStage().ledger(board, tasks.Task.SURVIVAL)
+    made = profiling.Profiling().ledger(board, tasks.Task.SURVIVAL)
     assert made.pending is None
     board.close()
 
 
 def test_defer_keeps_the_ledger_off_the_context():
     board = start()
-    stage = profiling.ProfileStage()
+    stage = profiling.Profiling()
     assert stage.defer(board, escrow(coverage=True))
     assert not stage.defer(board, escrow(coverage=False))
     assert board.find(exploration.Claims) is None
@@ -310,7 +310,7 @@ def test_assess_robustness_returns_the_verdicts(monkeypatch):
     )
     stage = types.SimpleNamespace(found=found(), note="kept", requested=True)
     board = start()
-    made = profiling.ProfileStage().assess_robustness(board, stage)
+    made = profiling.Profiling().assess(board, stage)
     assert made == qualification.Robustness(
         "stable", "unverifiable", "certified", "pass", ("b",)
     )
@@ -335,7 +335,7 @@ def test_identify_returns_the_claim_estimated_on_the_opening():
         )
     )
     board = start()
-    made = profiling.ProfileStage().identify(
+    made = profiling.Profiling().identify(
         board, charter, "view", run, None, "found"
     )
     assert made == identification.Estimand("supported", "B", estimated=True)
@@ -345,7 +345,7 @@ def test_identify_returns_the_claim_estimated_on_the_opening():
 
 def test_a_predictive_charter_identifies_nothing():
     charter = types.SimpleNamespace(estimand=types.SimpleNamespace(causal=None))
-    made = profiling.ProfileStage().identify(
+    made = profiling.Profiling().identify(
         start(), charter, "view", "run", None, "found"
     )
     assert made is None
@@ -361,11 +361,11 @@ def test_planning_returns_the_blueprint_without_applying_it(monkeypatch):
     made = planning.Planning().execute(board)
     assert made.plan is plan
     assert made.recommendations == advice
-    assert made.capability_registry is board.services.capability_registry
+    assert made.registry is board.services.capabilities
     assert board.find(planning.Blueprint) is None
     returned = planning.Planning().execute(board)
     assert returned.plan is plan
     assert board.find(planning.Blueprint) is None
     returned.apply(board)
     assert board.get(planning.Blueprint) is returned
-    assert board.services.capability_registry is returned.capability_registry
+    assert board.services.capabilities is returned.registry

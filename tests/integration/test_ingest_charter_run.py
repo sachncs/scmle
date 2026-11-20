@@ -328,13 +328,13 @@ def test_a_total_the_extract_does_not_reproduce_stops_the_run(tmp_path):
 def run_with_corrupted_extract(tmp_path, monkeypatch, damage):
     from scmle.pipeline import ingest_stage
 
-    real = ingest_stage.read_frame
+    real = ingest_stage.read
 
     def corrupted(entry, factory):
         frame = real(entry, factory)
         return damage(frame) if entry["table"] == "orders" else frame
 
-    monkeypatch.setattr(ingest_stage, "read_frame", corrupted)
+    monkeypatch.setattr(ingest_stage, "read", corrupted)
     return run_reconciled(tmp_path, 0)
 
 

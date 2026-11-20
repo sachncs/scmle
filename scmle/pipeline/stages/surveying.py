@@ -47,7 +47,7 @@ class Portrait(products.Derived):
 class Surveying(labelling.Labelling):
     """The development rows profiled, curated and annotated.
 
-    Part of `ProfileStage`, which inherits these methods unchanged;
+    Part of `Profiling`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 
@@ -89,7 +89,7 @@ class Surveying(labelling.Labelling):
             development,
             intake.manifest,
             task,
-            intake.read_seconds,
+            intake.read,
             len(frame),
         )
         profile = graft(spec, profile)
@@ -147,7 +147,7 @@ class Surveying(labelling.Labelling):
             manifest=intake.manifest,
             source_rows=source_rows,
             profiled_rows=len(development),
-            read_seconds=intake.read_seconds,
+            read_seconds=intake.read,
             streamed=intake.stream is not None,
             cleaning_notes=tuple(board.get(labelling.Resolution).notes),
             quality_findings=tuple(
@@ -166,9 +166,9 @@ class Surveying(labelling.Labelling):
             dropped_columns=profile.feature_plan.dropped,
         )
         card = scmle.contracts.data.Datasheet.distill(curation)
-        board.journal.write_json("dataset_profile.json", profile.to_dict())
-        board.journal.write_json("curation_report.json", curation.to_dict())
-        board.journal.write_json("dataset_card.json", card.to_dict())
+        board.journal.write("dataset_profile.json", profile.to_dict())
+        board.journal.write("curation_report.json", curation.to_dict())
+        board.journal.write("dataset_card.json", card.to_dict())
         board.journal.emit(
             "curation.completed",
             "dataset curation findings and feature decisions recorded",

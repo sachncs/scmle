@@ -149,10 +149,7 @@ def test_l23_to_l39_decision_table(run):
     assert hasattr(project, "plan") and hasattr(
         project, "run"
     )  # declarative API
-    assert (
-        next(s.state for s in stages.default_stages())
-        is state.Progress.VALIDATING
-    )
+    assert next(s.state for s in stages.sequence()) is state.Progress.VALIDATING
     assert {"sequential", "process", "ray"} <= {
         scheduler.Serial.name,
         scheduler.Pool.name,
@@ -461,7 +458,7 @@ def test_l226_plugins_are_conformance_tested():
 
 def test_l232_executable_dag_of_ordered_dependent_stages():
     """The request compiles into an executable dependency-ordered graph."""
-    states = [stage.state for stage in stages.default_stages()]
+    states = [stage.state for stage in stages.sequence()]
     order = state.FORWARD_ORDER
     assert [order.index(s) for s in states] == sorted(
         order.index(s) for s in states

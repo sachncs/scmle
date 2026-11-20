@@ -23,7 +23,7 @@ from scmle.pipeline.stages import scoring
 class Reporting(relabelling.Relabelling):
     """The coverage claim pledged and the decision files written.
 
-    Part of `FinalEvaluationStage`, which inherits these methods unchanged;
+    Part of `Assessment`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 
@@ -59,7 +59,7 @@ class Reporting(relabelling.Relabelling):
         if claim is None:
             return None
         sha = scmle.assurance.ledger.ledger.digest(claim)
-        board.journal.write_json(coverage_run.CLAIM_FILE, claim)
+        board.journal.write(coverage_run.CLAIM_FILE, claim)
         custody = board.find(exploration.Custody)
         if custody is not None:
             custody.vault.log.append(
@@ -157,7 +157,7 @@ class Reporting(relabelling.Relabelling):
         written = self.deposit(
             board, value, decision.threshold, decision.benefit, built
         )
-        board.journal.write_json("decision_report.json", report)
+        board.journal.write("decision_report.json", report)
         self.notarize(board)
         board.journal.emit(
             "decision.reported",
@@ -205,17 +205,17 @@ class Reporting(relabelling.Relabelling):
             The decision files, with `decision_report.json` (written later)
             first.
         """
-        board.journal.write_json(reports.POLICY_FILE, value)
+        board.journal.write(reports.POLICY_FILE, value)
         written = ["decision_report.json", reports.POLICY_FILE]
         if decision is not None:
-            board.journal.write_json(reports.THRESHOLD_FILE, decision)
+            board.journal.write(reports.THRESHOLD_FILE, decision)
             written.append(reports.THRESHOLD_FILE)
         if net_benefit is not None:
-            board.journal.write_json(reports.NET_BENEFIT_FILE, net_benefit)
+            board.journal.write(reports.NET_BENEFIT_FILE, net_benefit)
             written.append(reports.NET_BENEFIT_FILE)
         if built is not None:
             design, log = built
-            board.journal.write_json("rollout_design.json", design)
+            board.journal.write("rollout_design.json", design)
             if board.services.store is not None:
                 log.write(
                     board.services.store.directory / "rollout_decisions.jsonl"

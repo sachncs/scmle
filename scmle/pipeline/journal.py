@@ -35,7 +35,7 @@ class Journal:
         trials: Trial results.
         outcomes: Evidence-based decisions made while running (which
             strategies helped), appended to the planner's decision log.
-        trial_counter: Number of trial identifiers handed out so far.
+        counter: Number of trial identifiers handed out so far.
         skipped: Work reduced or skipped to keep the time budget, each as
             `{"work": ..., "reason": ...}`; also in the events and the
             evaluation.
@@ -50,13 +50,13 @@ class Journal:
     outcomes: list[experiments.Decision] = dataclasses.field(
         default_factory=list
     )
-    trial_counter: int = 0
+    counter: int = 0
     skipped: list[dict[str, str]] = dataclasses.field(default_factory=list)
     lock: threading.RLock = dataclasses.field(
         default_factory=threading.RLock, repr=False, compare=False
     )
 
-    def write_json(self, relative: str, payload: Any) -> None:
+    def write(self, relative: str, payload: Any) -> None:
         """Writes a JSON artifact if the run is persisted.
 
         Args:
@@ -133,8 +133,8 @@ class Journal:
             already allocated.
         """
         with self.lock:
-            start = self.trial_counter
-            self.trial_counter += count
+            start = self.counter
+            self.counter += count
         return [f"trial_{start + offset + 1:03d}" for offset in range(count)]
 
     def enter(
@@ -173,7 +173,7 @@ class Journal:
                 )
             self.trials.append(outcome)
             path = f"trials/{outcome.trial_id}.json"
-            self.write_json(path, outcome.to_dict())
+            self.write(path, outcome.to_dict())
             self.emit(f"trial.{outcome.status}", outcome.model_name, (path,))
             if self.store is not None:
                 self.tracker.transcribe(self.store.run_id, outcome)

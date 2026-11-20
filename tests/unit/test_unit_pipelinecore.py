@@ -89,12 +89,12 @@ def test_allocate_hands_out_padded_sequential_identifiers():
     assert board.allocate(2) == ["trial_001", "trial_002"]
     assert board.allocate(1) == ["trial_003"]
     assert board.allocate(0) == []
-    assert board.trial_counter == 3
+    assert board.counter == 3
 
 
 def test_a_preview_journal_writes_nothing(tmp_path):
     board = Board()
-    board.write_json("a.json", {"a": 1})
+    board.write("a.json", {"a": 1})
     board.write_text("a.txt", "x")
     board.emit("x")
     board.track(state="done")
@@ -134,7 +134,7 @@ def test_transcribe_persists_announces_and_tracks_a_trial(tmp_path):
 
 def test_write_and_track_reach_the_store(tmp_path):
     board = Board(tmp_path / "run")
-    board.write_json("a/b.json", {"k": 1})
+    board.write("a/b.json", {"k": 1})
     board.write_text("c.txt", "hello")
     board.track(state="done")
     assert json.loads((tmp_path / "run" / "a" / "b.json").read_text()) == {
@@ -162,9 +162,7 @@ def preview():
 
 def test_a_preview_board_has_no_store_and_a_budget_deadline(preview):
     assert preview.services.directory == ""
-    assert (
-        preview.services.deadline == preview.services.governor.started_at + 1800
-    )
+    assert preview.services.deadline == preview.services.governor.started + 1800
     with pytest.raises(errors.ScmleError, match="'store' is unavailable"):
         assert preview.services.workspace is None
     assert preview.regulator is preview.services.governor
@@ -172,18 +170,18 @@ def test_a_preview_board_has_no_store_and_a_budget_deadline(preview):
 
 def test_cancellation_raises_with_the_run_directory(preview):
     preview.services.check()
-    preview.services.cancel_event.set()
+    preview.services.event.set()
     try:
         with pytest.raises(errors.CancelledError) as caught:
             preview.services.check()
         assert caught.value.details == {"run_dir": ""}
     finally:
-        preview.services.cancel_event.clear()
+        preview.services.event.clear()
 
 
 def test_observe_needs_the_capability_observation(preview):
     saved = preview.services
-    preview.services = dataclasses.replace(saved, capability_observation=None)
+    preview.services = dataclasses.replace(saved, observation=None)
     try:
         with pytest.raises(errors.ScmleError, match="capability_observation"):
             planning.observe(preview)
@@ -423,13 +421,13 @@ class Runner:
         self.failing = set(failing)
         self.calls = []
 
-    def run_many(self, jobs):
-        self.calls.append([(job.trial_id, job.fold_count) for job in jobs])
+    def dispatch(self, jobs):
+        self.calls.append([(job.trial, job.folds) for job in jobs])
         made = []
         for job in jobs:
             outcome = trial(
-                job.trial_id,
-                job.model_name,
+                job.trial,
+                job.model,
                 float(job.params["n"]),
                 experiments.Termination.FAILED
                 if job.params["n"] in self.failing
@@ -448,7 +446,7 @@ class Tuner(hyperband.Hyperband):
         self.recorded = []
         self.board = types.SimpleNamespace(
             services=types.SimpleNamespace(
-                governor=types.SimpleNamespace(skip_reason=lambda first: skip),
+                governor=types.SimpleNamespace(skip=lambda first: skip),
                 check=lambda: None,
             ),
             journal=types.SimpleNamespace(
@@ -559,7 +557,7 @@ class Stacking(ensemble_search.Stacker):
                 spec=types.SimpleNamespace(
                     ensemble=types.SimpleNamespace(size=size)
                 ),
-                governor=types.SimpleNamespace(skip_reason=lambda first: skip),
+                governor=types.SimpleNamespace(skip=lambda first: skip),
                 check=lambda: None,
             ),
             journal=types.SimpleNamespace(

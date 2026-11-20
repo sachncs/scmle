@@ -84,7 +84,7 @@ def shifts(
                     else qualification.Decision.PASS
                 ),
                 subset=qualification.Subset.EXPLORATION,
-                seeds=randomness.seed_path(seed, FEATURE_SHIFT_ID, index),
+                seeds=randomness.seed(seed, FEATURE_SHIFT_ID, index),
                 tier=qualification.Tier.UNVERIFIED,
             )
         )

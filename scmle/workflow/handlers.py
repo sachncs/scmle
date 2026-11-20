@@ -11,7 +11,7 @@ from scmle.workflow import executor
 
 def delegate(
     runner: base.Runner,
-    make_spec: Callable[[executor.StepContext], base.Job],
+    make_spec: Callable[[executor.Context], base.Job],
 ) -> executor.Handler:
     """A handler that runs a training job through a `Runner`.
 
@@ -31,7 +31,7 @@ def delegate(
         `ScmleError`.
     """
 
-    def handler(context: executor.StepContext) -> Mapping[str, Any]:
+    def handler(context: executor.Context) -> Mapping[str, Any]:
         """Runs the training job built for this step execution.
 
         Args:

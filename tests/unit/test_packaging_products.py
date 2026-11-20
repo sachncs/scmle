@@ -1,7 +1,7 @@
 """The frozen products of the packaging stage and of the parts it inherits.
 
 Each part returns what it made (`Uncertainty`, `Diagnostics`, `Verdict`),
-and `PackageStage` returns one `Package`, whose `apply` holds it on the
+and `Packaging` returns one `Package`, whose `apply` holds it on the
 run's board by type. The board and its services are fakes.
 """
 
@@ -24,10 +24,13 @@ from scmle.pipeline.stages import selecting
 
 
 class Journal:
-    """A fake run journal that keeps what is written."""
+    """A fake run journal (or run store) that keeps what is written."""
 
     def __init__(self):
         self.files = {}
+
+    def write(self, name, document):
+        self.files[name] = document
 
     def write_json(self, name, document):
         self.files[name] = document
@@ -66,7 +69,7 @@ def graph():
 def test_a_verdict_is_returned_without_touching_the_evaluation():
     store = Journal()
     evaluation = {"test_metrics": {"roc_auc": 0.99}}
-    verdict = packaging.PackageStage().judge(undeclared(), store, evaluation)
+    verdict = packaging.Packaging().judge(undeclared(), store, evaluation)
     assert evaluation == {"test_metrics": {"roc_auc": 0.99}}
     assert verdict.policy is None
     assert verdict.outcome["status"] == "policy_not_declared"
@@ -83,9 +86,7 @@ def test_a_verdict_is_returned_without_touching_the_evaluation():
 
 def test_recording_a_verdict_adds_its_entries_in_order():
     evaluation = {"test_metrics": {}}
-    packaging.PackageStage().release_evaluation(
-        undeclared(), Journal(), evaluation
-    )
+    packaging.Packaging().release(undeclared(), Journal(), evaluation)
     assert list(evaluation) == [
         "test_metrics",
         "release_policy",
@@ -95,16 +96,20 @@ def test_recording_a_verdict_adds_its_entries_in_order():
 
 
 def test_diagnostics_gathers_the_four_reports_in_record_order(monkeypatch):
-    for name in ("learning_curve", "nested_validation", "bias_variance"):
+    for method, name in (
+        ("chart", "learning_curve"),
+        ("revalidate", "nested_validation"),
+        ("decompose", "bias_variance"),
+    ):
         monkeypatch.setattr(
             diagnosis.Diagnosis,
-            name,
+            method,
             lambda self, context, selected, name=name: {"part": name},
         )
     monkeypatch.setattr(
         diagnosis.Diagnosis, "sensitivity", lambda self, context, selected: None
     )
-    found = packaging.PackageStage().probe(blank(), object())
+    found = packaging.Packaging().probe(blank(), object())
     assert found == diagnosis.Diagnostics(
         {"part": "learning_curve"},
         {"part": "nested_validation"},
@@ -123,10 +128,8 @@ def test_uncertainty_without_test_rows_measures_nothing():
     bundle = types.SimpleNamespace(
         conformal=None, quantile=None, coverage_report=None
     )
-    exam = types.SimpleNamespace(test_rows=None)
-    found = packaging.PackageStage().gauge(
-        blank({assessment.Exam: exam}), bundle
-    )
+    exam = types.SimpleNamespace(rows=None)
+    found = packaging.Packaging().gauge(blank({assessment.Exam: exam}), bundle)
     assert found == bracketing.Uncertainty(None, None)
     assert found.entries() == {}
     found.equip(bundle)
@@ -148,7 +151,7 @@ def test_uncertainty_equips_the_bundle_with_its_report():
 def test_settling_opens_the_pending_ledger_without_assigning_it(monkeypatch):
     concluded = []
     monkeypatch.setattr(
-        profiling.ProfileStage,
+        profiling.Profiling,
         "conclude",
         lambda self, context, pending, subject, runner: concluded.append(
             (pending, subject, runner)
@@ -157,20 +160,20 @@ def test_settling_opens_the_pending_ledger_without_assigning_it(monkeypatch):
     pending = types.SimpleNamespace(subject="charter")
     board = blank(
         {
-            selecting.Choice: types.SimpleNamespace(pending_ledger=pending),
+            selecting.Choice: types.SimpleNamespace(ledger=pending),
             profiling.Partition: types.SimpleNamespace(task=tasks.Task.BINARY),
             examination.Decision: examination.Decision(),
         }
     )
-    packaging.PackageStage().settle(board, object())
+    packaging.Packaging().settle(board, object())
     assert concluded == [(pending, "charter", None)]
     assert list(board.journal.files) == [coverage_confirm.DOCUMENT]
 
 
 def test_settling_without_a_pending_ledger_does_nothing():
-    choice = types.SimpleNamespace(pending_ledger=None)
+    choice = types.SimpleNamespace(ledger=None)
     board = blank({selecting.Choice: choice})
-    packaging.PackageStage().settle(board, object())
+    packaging.Packaging().settle(board, object())
     assert board.journal.files == {}
 
 
@@ -178,13 +181,13 @@ def test_a_package_is_held_by_type():
     made = packaging.Package(
         bundle=None,
         result=None,
-        evidence_graph=graph(),
+        graph=graph(),
         evaluation={"run_id": "r"},
     )
     board = types.SimpleNamespace(made={})
     made.apply(board)
     assert board.made == {packaging.Package: made}
-    assert made.summary() == made.evidence_graph.digest()
+    assert made.summary() == made.graph.digest()
     with pytest.raises(dataclasses.FrozenInstanceError):
         made.bundle = None  # type: ignore[misc]
 
@@ -199,4 +202,4 @@ def test_each_part_names_its_product():
     assert releasing.Verdict.__dataclass_params__.frozen
     assert diagnosis.Diagnostics.__dataclass_params__.frozen
     assert bracketing.Uncertainty.__dataclass_params__.frozen
-    assert packaging.PackageStage.makes is packaging.Package
+    assert packaging.Packaging.makes is packaging.Package

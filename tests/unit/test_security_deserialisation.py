@@ -236,7 +236,7 @@ def test_every_site_in_the_package_is_authenticated():
         "scmle.models.deeplearning.jepa:Embedder.restore": "authenticated",
         "scmle.models.documents.archive:Archive.load": "authenticated",
         "scmle.models.images.archive:Archive.load": "authenticated",
-        "scmle.pipeline.modality_lifecycle.verification:load_package": (
+        "scmle.pipeline.modality_lifecycle.verification:load": (
             "authenticated"
         ),
         "scmle.pipeline.products:Kept.load": "authenticated",

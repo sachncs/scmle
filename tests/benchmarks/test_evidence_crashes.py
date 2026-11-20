@@ -733,7 +733,7 @@ def test_the_engine_reference_records_hold_and_compare_by_field(
     # it may differ between two uninterrupted runs; nothing else may.
     reading = (
         "fields",
-        "capability_registry",
+        "registry",
         "runtime_environment",
         "disk_gb",
     )

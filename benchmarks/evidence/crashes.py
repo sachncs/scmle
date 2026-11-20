@@ -85,7 +85,7 @@ run); otherwise "fail". Stale or missing measurements are "not measured".
 NOT measured: a kill inside a single `write` system call (a torn write;
 the product's atomic writes and synced appends are trusted), machine crash
 or power loss (the page cache survives SIGKILL), the lease heartbeat
-thread's renewals (they share `renew_lease` with the run loop's, which are
+thread's renewals (they share `renew` with the run loop's, which are
 measured), other stores than the local object store, and the modality
 lifecycle's checkpoints.
 
@@ -1136,10 +1136,10 @@ class Executor(Subject):
         from scmle.workflow import executor
 
         kinds = (
-            definition.StepKind.INGEST,
-            definition.StepKind.TRAIN,
-            definition.StepKind.EVALUATE,
-            definition.StepKind.BATCH_PREDICT,
+            definition.Kind.INGEST,
+            definition.Kind.TRAIN,
+            definition.Kind.EVALUATE,
+            definition.Kind.BATCH_PREDICT,
         )
         steps = tuple(
             definition.Step(
@@ -1149,7 +1149,7 @@ class Executor(Subject):
                 zip(self.STEPS, kinds, strict=True)
             )
         )
-        flow = definition.Workflow("crashes", "1", steps, max_parallel=1)
+        flow = definition.Workflow("crashes", "1", steps, parallel=1)
         calls = folder / "calls.txt"
         return executor.Executor(
             flow,

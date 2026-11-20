@@ -632,7 +632,7 @@ def floor(
     if h.bound is not None:
         return h.bound
     path = f"leakage.screen.{h.mechanism}.{h.feature}"
-    rng = randomness.component_rng(cfg.seed, path, 0)
+    rng = randomness.spawn(cfg.seed, path, 0)
     if h.mechanism == SKILL and h.data is not None:
         return temper(problem, h.data, cfg, groups, rng)
     if h.mechanism == ECHO and h.data is not None:

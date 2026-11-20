@@ -374,14 +374,14 @@ def evaluation():
     """The breached evaluation that opened the fixture incident."""
     target = slo.Slo(
         name="latency",
-        metric_name="p95_latency_ms",
+        metric="p95_latency_ms",
         kind=observability.Indicator.LATENCY,
         maximum=250.0,
-        window_days=7,
-        minimum_samples=1,
+        window=7,
+        samples=1,
         owner="ml-on-call",
         runbook="https://runbooks.example/latency",
-        alert_route="on-call",
+        route="on-call",
     )
     sample = observability.Sample(
         name="p95_latency_ms",
@@ -418,7 +418,7 @@ def test_a_version_one_journal_verifies_and_continues_at_version_two(
         resolution="rolled back",
         evidence_digest="sha256:fix",
     )
-    events = flow.read_events()
+    events = flow.read()
     assert [e["incident"].get(records.KEY) for e in events] == [None, None, 2]
     assert flow.records() == (resolved,)
     assert (

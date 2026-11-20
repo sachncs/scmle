@@ -149,10 +149,10 @@ class Imagery(curators.Preparer):
 
     Attributes:
         dataset: Raster samples, in the order given.
-        labels_by_source: Caller-owned label of each raster, keyed by source.
+        annotations: Caller-owned label of each raster, keyed by source.
         decoder: Caller-owned pixel decoder, or None for metadata only.
-        decoder_name: Stripped name and version of the decoder, or None.
-        max_pixels: Maximum number of pixels decoded per raster.
+        codec: Stripped name and version of the decoder, or None.
+        pixels: Maximum number of pixels decoded per raster.
     """
 
     modality = modalities.Modality.RASTER
@@ -162,8 +162,8 @@ class Imagery(curators.Preparer):
         samples: Sequence[geospatial.Tile],
         labels: Mapping[str, object],
         decoder: geospatial.RasterDecoder | None = None,
-        decoder_name: str | None = None,
-        max_pixels: int = 4_000_000,
+        codec: str | None = None,
+        pixels: int = 4_000_000,
     ) -> None:
         """Binds raster identities and caller-owned labels.
 
@@ -177,21 +177,21 @@ class Imagery(curators.Preparer):
             labels: Label of each raster, keyed by its source.
             decoder: Callable that decodes a raster payload to pixels, or None
                 to use metadata only.
-            decoder_name: Name and version that identify the decoder; required
+            codec: Name and version that identify the decoder; required
                 with a decoder and not allowed without one.
-            max_pixels: Maximum number of pixels decoded per raster.
+            pixels: Maximum number of pixels decoded per raster.
 
         Raises:
             ValueError: If there are no samples, sources repeat, a source has no
-                label, `max_pixels` is below 1, or the decoder and its name are
+                label, `pixels` is below 1, or the decoder and its name are
                 not given together.
             TypeError: If `decoder` is not callable.
         """
-        self.dataset = admit(samples, labels, decoder, decoder_name, max_pixels)
-        self.labels_by_source = dict(labels)
+        self.dataset = admit(samples, labels, decoder, codec, pixels)
+        self.annotations = dict(labels)
         self.decoder = decoder
-        self.decoder_name = decoder_name.strip() if decoder_name else None
-        self.max_pixels = max_pixels
+        self.codec = codec.strip() if codec else None
+        self.pixels = pixels
 
     @property
     def digest(self) -> str:
@@ -199,9 +199,9 @@ class Imagery(curators.Preparer):
         identities = (
             f"{sample.source}\0{sample.digest}\0"
             f"{sample.sentinel}\0{sample.nodata}\0"
-            f"{self.labels_by_source[sample.source]}\0"
-            f"decoder={self.decoder_name or 'metadata-only'}\0"
-            f"max_pixels={self.max_pixels}"
+            f"{self.annotations[sample.source]}\0"
+            f"decoder={self.codec or 'metadata-only'}\0"
+            f"max_pixels={self.pixels}"
             for sample in self.dataset
         )
         return curation.digest(identities)
@@ -271,7 +271,7 @@ class Imagery(curators.Preparer):
         names = self.headers(band_count)
         rows = []
         for sample in samples:
-            pixels = sample.decode(self.decoder, max_pixels=self.max_pixels)
+            pixels = sample.decode(self.decoder, max_pixels=self.pixels)
             rows.append(self.summarise(pixels, band_count))
         return containers.Batch(
             tuple(sample.source for sample in samples),
@@ -303,7 +303,7 @@ class Imagery(curators.Preparer):
 
     summarise = staticmethod(summary)
 
-    def sample_id(self, sample: geospatial.Tile) -> str:
+    def sample(self, sample: geospatial.Tile) -> str:
         """Gives the canonical raster source identity.
 
         Args:
@@ -323,7 +323,7 @@ class Imagery(curators.Preparer):
         Returns:
             The label recorded for the raster's source.
         """
-        return self.labels_by_source[sample.source]
+        return self.annotations[sample.source]
 
     def elucidate(
         self,
@@ -361,7 +361,7 @@ class Imagery(curators.Preparer):
                 "reason": "an explicit named raster decoder is required",
                 "limitations": list(METADATA_LIMITATIONS),
             }
-        pixels = sample.decode(self.decoder, max_pixels=self.max_pixels)
+        pixels = sample.decode(self.decoder, max_pixels=self.pixels)
         original_values = numpy.asarray(
             self.summarise(pixels, sample.bands), dtype=numpy.float64
         )
@@ -380,7 +380,7 @@ class Imagery(curators.Preparer):
             "status": "available",
             "method": "decoded_pixel_region_occlusion",
             "source": sample.source,
-            "decoder": self.decoder_name,
+            "decoder": self.codec,
             "decoded_dimensions": [int(width), int(height), int(sample.bands)],
             "crs": sample.crs,
             "window_count": len(terms),
@@ -529,7 +529,7 @@ def survey(preparer: Imagery) -> Survey:
         ),
         "total_bytes": sum(sample.size for sample in preparer.dataset),
         "nodata": nodata_profile,
-        "label_counts": curation.tally(preparer.labels_by_source.values()),
+        "label_counts": curation.tally(preparer.annotations.values()),
         "pixels": decoding(preparer),
     }
 
@@ -552,13 +552,13 @@ def decoding(preparer: Imagery) -> Pixels:
         return {
             "status": "metadata_only",
             "decoder": None,
-            "max_pixels": preparer.max_pixels,
+            "max_pixels": preparer.pixels,
         }
     shapes: set[tuple[int, ...]] = set()
     low, high = math.inf, -math.inf
     measured = []
     for sample in preparer.dataset:
-        values = sample.decode(decoder, max_pixels=preparer.max_pixels)
+        values = sample.decode(decoder, max_pixels=preparer.pixels)
         shapes.add(tuple(values.shape))
         low = min(low, float(values.min()))
         high = max(high, float(values.max()))
@@ -566,8 +566,8 @@ def decoding(preparer: Imagery) -> Pixels:
             measured.append(float(numpy.equal(values, sample.sentinel).mean()))
     return {
         "status": "decoded",
-        "decoder": preparer.decoder_name,
-        "max_pixels": preparer.max_pixels,
+        "decoder": preparer.codec,
+        "max_pixels": preparer.pixels,
         "shapes": [list(shape) for shape in sorted(shapes)],
         "minimum": low,
         "maximum": high,

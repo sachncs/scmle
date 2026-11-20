@@ -415,7 +415,7 @@ def placebo(
         raise errors.InputError("strata needs one label per row")
     counts = []
     for repeat in range(b):
-        rng = randomness.component_rng(seed, component, repeat)
+        rng = randomness.spawn(seed, component, repeat)
         values = permute(target.to_numpy(), strata, rng)
         shuffled = pandas.Series(values, index=target.index, name=target.name)
         counts.append(int(discoveries(features, shuffled)))
@@ -531,7 +531,7 @@ def control(
     labels = blocks
     counts = []
     for repeat in range(b):
-        rng = randomness.component_rng(seed, component, repeat)
+        rng = randomness.spawn(seed, component, repeat)
         if labels is not None and mode == "blocks":
             changed = jumble(features, labels, rng)
         else:

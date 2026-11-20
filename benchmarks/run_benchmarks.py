@@ -181,7 +181,7 @@ def run_one(
     finally:
         record.completed_seeds = completed_seeds
         record.failure_rate = (seeds - completed_seeds) / seeds
-        record.peak_memory_gb = limits.peak_memory_gb()
+        record.peak_memory_gb = limits.watermark()
         record.machine = platform.platform()
         record.software = (
             f"{platform.python_implementation()} {platform.python_version()}"

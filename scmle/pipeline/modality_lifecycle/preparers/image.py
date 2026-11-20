@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from sklearn.linear_model import LogisticRegression
 
 
-class ImagePreparer(curators.Preparer):
+class Image(curators.Preparer):
     """Adapter for bounded, decoded image samples.
 
     Attributes:
@@ -97,10 +97,10 @@ class ImagePreparer(curators.Preparer):
             for channel in range(channels)
         )
         return containers.Batch(
-            tuple(self.sample_id(sample) for sample in samples), names, values
+            tuple(self.sample(sample) for sample in samples), names, values
         )
 
-    def sample_id(self, sample: image.Sample) -> str:
+    def sample(self, sample: image.Sample) -> str:
         """Gives a source-and-content identity for one image sample.
 
         Args:
@@ -279,9 +279,9 @@ class ImagePreparer(curators.Preparer):
             The drift report as a JSON-native mapping.
 
         Raises:
-            TypeError: If `observed` is not an `ImagePreparer`.
+            TypeError: If `observed` is not an `Image`.
         """
-        if not isinstance(observed, ImagePreparer):
+        if not isinstance(observed, Image):
             raise errors.KindError("observed adapter must be an ImagePreparer")
         report = images.Monitor(self.dataset.curate()).observe(observed.dataset)
         return report.to_dict()

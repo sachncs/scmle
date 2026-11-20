@@ -129,16 +129,14 @@ def blackout() -> recovery.Outcome:
             )
             for n in range(harness.SPOOLED_SAMPLES)
         ]
-        first = spool.MetricsSpool(base / "spool.jsonl", send, batch_size=20)
+        first = spool.Spool(base / "spool.jsonl", send, batch_size=20)
         first.add(samples)
         down = first.flush()
         serving_during = (
             harness.predict(running.base)[0] == http.HTTPStatus.OK
             and demo.retrieve(f"{running.base}/readyz")[0] == http.HTTPStatus.OK
         )
-        restarted = spool.MetricsSpool(
-            base / "spool.jsonl", send, batch_size=20
-        )
+        restarted = spool.Spool(base / "spool.jsonl", send, batch_size=20)
         survived = restarted.pending()
         sink = mocks.MetricsSink(base / "sink.jsonl", port=port)
         fleet.serve(sink)

@@ -204,9 +204,7 @@ def heldout(
             cv=model_selection.StratifiedKFold(
                 folds,
                 shuffle=True,
-                random_state=randomness.derive_int_seed(
-                    seed, "labels.folds", 0
-                ),
+                random_state=randomness.narrow(seed, "labels.folds", 0),
             ),
             method="predict_proba",
         ),
@@ -476,7 +474,7 @@ def detect(
     input_rows = len(features)
     positions = numpy.arange(input_rows)
     if input_rows > MAX_ROWS:
-        rng = randomness.component_rng(seed, "labels.cap", 0)
+        rng = randomness.spawn(seed, "labels.cap", 0)
         audited = (
             numpy.asarray(audit.index, dtype=int) if audit is not None else None
         )

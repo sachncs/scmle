@@ -22,7 +22,7 @@ import scmle.pipeline.stages
 def failing(frame, tmp_path, error):
     """Runs the stock stages with a first stage that raises `error`."""
 
-    first, *rest = scmle.pipeline.stages.default_stages()
+    first, *rest = scmle.pipeline.stages.sequence()
 
     class Failing(type(first)):
         def execute(self, context):

@@ -171,7 +171,7 @@ def modal(tmp_path: pathlib.Path, key: str | None) -> Callable[[], object]:
         "modality": "tabular",
         "dataset_hash": "d" * 64,
         "feature_names": ["a"],
-        "model_sha256": modality_lifecycle.file_digest(payload),
+        "model_sha256": modality_lifecycle.digest(payload),
         "evaluation": {},
     }
     manifest: dict[str, object] = dict(unsigned)
@@ -181,7 +181,7 @@ def modal(tmp_path: pathlib.Path, key: str | None) -> Callable[[], object]:
             "value": signing.mac(unsigned, key),
         }
     (tmp_path / "manifest.json").write_text(json.dumps(manifest))
-    return lambda: modality_lifecycle.load_package(tmp_path, KEY)
+    return lambda: modality_lifecycle.load(tmp_path, KEY)
 
 
 def kept(tmp_path: pathlib.Path, key: str | None) -> Callable[[], object]:
@@ -236,7 +236,7 @@ ATTACKS = {
     ),
     "scmle.models.documents.archive:Archive.load": Attack(packaged(documents)),
     "scmle.models.images.archive:Archive.load": Attack(packaged(images)),
-    "scmle.pipeline.modality_lifecycle.verification:load_package": Attack(
+    "scmle.pipeline.modality_lifecycle.verification:load": Attack(
         modal, errors.InputError
     ),
     "scmle.pipeline.products:Kept.load": Attack(kept, None),

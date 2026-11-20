@@ -502,14 +502,14 @@ def breach() -> slo.Assessment:
     """A breached latency SLO evaluation."""
     target = slo.Slo(
         name="latency",
-        metric_name="p95_latency_ms",
+        metric="p95_latency_ms",
         kind=observability.Indicator.LATENCY,
         maximum=250.0,
-        window_days=7,
-        minimum_samples=1,
+        window=7,
+        samples=1,
         owner="ml-on-call",
         runbook="https://runbooks.example/latency",
-        alert_route="on-call",
+        route="on-call",
     )
     sample = observability.Sample(
         name="p95_latency_ms",
@@ -539,7 +539,7 @@ def test_concurrent_incident_open_keeps_a_valid_chain(tmp_path):
 
     assert not failures
     assert len({incident.identifier for incident in opened}) == 1
-    assert len(workflow.read_events()) == 1
+    assert len(workflow.read()) == 1
 
 
 def test_concurrent_incident_transitions_keep_a_valid_chain(tmp_path):
@@ -562,7 +562,7 @@ def test_concurrent_incident_transitions_keep_a_valid_chain(tmp_path):
     failures = failures_of(THREADS, work)
 
     assert not failures
-    assert [e["event_type"] for e in workflow.read_events()] == [
+    assert [e["event_type"] for e in workflow.read()] == [
         "opened",
         "acknowledged",
     ]
@@ -574,7 +574,7 @@ def test_concurrent_alert_dispatch_delivers_once(tmp_path):
         {"on-call": alerts.Jsonl(sink_path)},
         tmp_path / "deliveries.jsonl",
     )
-    alert = alerts.Alert.from_evidence(
+    alert = alerts.Alert.assemble(
         route="on-call",
         severity="high",
         title="model SLO breached",
@@ -594,7 +594,7 @@ def test_concurrent_alert_dispatch_delivers_once(tmp_path):
 
 
 def test_concurrent_prediction_log_appends_whole_lines(tmp_path):
-    log = events.PredictionLog(tmp_path / "log.jsonl")
+    log = events.Journal(tmp_path / "log.jsonl")
     payload = {"event_id": "x", "blob": "z" * 20000}
 
     def work(index):
@@ -624,8 +624,8 @@ def test_shadow_evaluator_keeps_observations_aligned(trained):
 
     assert not failures
     sizes = [len(rows) for rows in evaluator.rows]
-    assert sizes == [len(out) for out in evaluator.champion_output]
-    assert sizes == [len(out) for out in evaluator.challenger_output]
+    assert sizes == [len(out) for out in evaluator.incumbent]
+    assert sizes == [len(out) for out in evaluator.output]
     assert len(evaluator.gaps) == len(sizes)
     assert [len(g) for g in evaluator.gaps] == sizes
 

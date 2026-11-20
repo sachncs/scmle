@@ -27,7 +27,7 @@ def enrol() -> capabilities.Registry:
     )
 
 
-def extension_capability(
+def describe(
     key: capabilities.Coordinate,
 ) -> capabilities.Capability:
     """Describes an explicitly supplied adapter outside the beta guarantee.

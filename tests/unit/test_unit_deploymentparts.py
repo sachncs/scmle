@@ -343,7 +343,7 @@ def test_challengers_register_then_replay_their_decision():
         book.commit(kinds.CHALLENGER_RESULT, {"name": "c1", "phase": "maybe"})
     with pytest.raises(kinds.MisuseError, match="was not registered"):
         book.commit(kinds.CHALLENGER_RESULT, {"name": "c9", "phase": "decided"})
-    twin = sequential_tests.PromotionSequence("1/20")
+    twin = sequential_tests.Sequence("1/20")
     twin.register("c1")
     step = twin.decide("c1", 50.0)
     good = {

@@ -20,7 +20,7 @@ from scmle.pipeline.modality_lifecycle import constants
 from scmle.pipeline.modality_lifecycle import containers
 
 
-def file_digest(path: Path) -> str:
+def digest(path: Path) -> str:
     """Computes the SHA-256 digest of a file.
 
     Args:
@@ -36,7 +36,7 @@ def file_digest(path: Path) -> str:
     return digest.hexdigest()
 
 
-def require_feature_names(feature_names: object) -> list[str]:
+def validate(feature_names: object) -> list[str]:
     """Checks the feature names that a package manifest declares.
 
     Args:
@@ -87,7 +87,7 @@ def authenticate(
         raise errors.InputError("modality package signature does not verify")
 
 
-def verify_package_manifest(
+def inspect(
     manifest: object, signing_key: str | bytes
 ) -> tuple[list[str], str]:
     """Checks a package manifest's content and signature.
@@ -120,7 +120,7 @@ def verify_package_manifest(
     dataset_hash = unsigned.get("dataset_hash")
     if not isinstance(dataset_hash, str) or not dataset_hash.strip():
         raise errors.InputError("modality package dataset_hash is invalid")
-    feature_names = require_feature_names(unsigned.get("feature_names"))
+    feature_names = validate(unsigned.get("feature_names"))
     model_digest = unsigned.get("model_sha256")
     if not isinstance(model_digest, str) or not containers.hashlike(
         model_digest
@@ -165,9 +165,7 @@ def vet(loaded: object, feature_count: int) -> None:
         )
 
 
-def load_package(
-    path: str | Path, signing_key: str | bytes
-) -> LogisticRegression:
+def load(path: str | Path, signing_key: str | bytes) -> LogisticRegression:
     """Verifies a signed package before deserializing its estimator.
 
     Args:
@@ -188,7 +186,7 @@ def load_package(
     if not manifest_path.is_file() or not model_path.is_file():
         raise errors.InputError("modality package is incomplete")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    feature_names, model_digest = verify_package_manifest(manifest, signing_key)
+    feature_names, model_digest = inspect(manifest, signing_key)
     payload = envelope.fetch(model_path, model_digest)
     loaded = joblib.load(io.BytesIO(payload))
     vet(loaded, len(feature_names))

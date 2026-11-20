@@ -26,11 +26,11 @@ from scmle.pipeline.stages import surveying
 class Admission(identification.Identification):
     """Admissibility of the exploration and the baseline claim's runner.
 
-    Part of `ProfileStage`, which inherits these methods unchanged;
+    Part of `Profiling`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 
-    def baseline_runner(
+    def freeze(
         self,
         board: engine.Board,
         task: tasks.Task,
@@ -93,7 +93,7 @@ class Admission(identification.Identification):
         ceiling, why = scmle.assurance.framing.claim.cap(
             data.framing_draft, charter.digest, model, signed=signed
         )
-        board.journal.write_json(scmle.assurance.framing.claim.PROVENANCE, why)
+        board.journal.write(scmle.assurance.framing.claim.PROVENANCE, why)
         return scmle.assurance.framing.claim.rig(
             rule=rule if subject is None else subject,
             reference=None if subject is None else rule,
@@ -107,7 +107,7 @@ class Admission(identification.Identification):
             seed=charter.seed,
         )
 
-    def qualify_exploration(
+    def qualify(
         self,
         board: engine.Board,
         task: tasks.Task,
@@ -265,14 +265,10 @@ def register(board: engine.Board, found: qualify.Qualification) -> list[str]:
     """
     written: list[str] = []
     if found.table is not None:
-        board.journal.write_json(
-            "admissibility_table.json", found.table.to_dict()
-        )
+        board.journal.write("admissibility_table.json", found.table.to_dict())
         written.append("admissibility_table.json")
     if found.store is not None:
-        board.journal.write_json(
-            "detector_certificates.json", found.store.to_dict()
-        )
+        board.journal.write("detector_certificates.json", found.store.to_dict())
         written.append("detector_certificates.json")
     return written
 
@@ -338,7 +334,7 @@ def amend(
     """
     portrait = board.get(surveying.Portrait)
     profile = dataclasses.replace(portrait.profile, feature_plan=plan)
-    board.journal.write_json("dataset_profile.json", profile.to_dict())
+    board.journal.write("dataset_profile.json", profile.to_dict())
     curation = portrait.curation
     if curation is None:
         surveying.Portrait(profile, None).apply(board)
@@ -353,8 +349,8 @@ def amend(
         dropped_columns=plan.dropped,
     )
     surveying.Portrait(profile, amended).apply(board)
-    board.journal.write_json("curation_report.json", amended.to_dict())
-    board.journal.write_json(
+    board.journal.write("curation_report.json", amended.to_dict())
+    board.journal.write(
         "dataset_card.json",
         scmle.contracts.data.Datasheet.distill(amended).to_dict(),
     )

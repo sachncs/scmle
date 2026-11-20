@@ -23,7 +23,7 @@ def search():
     return training.Search(
         trials=[{"trial_id": "trial_001"}],
         outcomes=[],
-        trial_counter=1,
+        counter=1,
         skipped=[{"work": "tuning", "reason": "late"}],
     )
 
@@ -71,7 +71,7 @@ def test_an_unpicklable_product_has_no_digest_and_leaves_no_file(
     path = tmp_path / "04-trainstage.product"
     search().save(path)
     made = training.Search(
-        trials=[lambda: None], outcomes=[], trial_counter=0, skipped=[]
+        trials=[lambda: None], outcomes=[], counter=0, skipped=[]
     )
     assert made.save(path) is None
     assert not path.exists()
@@ -86,8 +86,8 @@ def test_a_derived_product_is_digested_by_its_identity_and_never_loaded(
             manifest=types.SimpleNamespace(
                 digests={"data": data, "schema": "s"}
             ),
-            cleaning_notes=[],
-            read_seconds=seconds,
+            notes=[],
+            read=seconds,
             stream=None,
         )
 

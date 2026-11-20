@@ -141,10 +141,7 @@ class Predictor:
             raise errors.InputError(
                 "report and capability modalities do not match"
             )
-        if (
-            self.predictor.training_dataset_hash
-            != self.report.digests["dataset"]
-        ):
+        if self.predictor.dataset != self.report.digests["dataset"]:
             raise errors.InputError(
                 "predictor and report dataset identities differ"
             )
@@ -209,12 +206,12 @@ def video_scope(adapter: modality_lifecycle.Footage) -> Scope:
     """
     decoder_policy = (
         "caller-owned bounded frame decoder"
-        if adapter.frame_decoder is not None
+        if adapter.decoder is not None
         else "probed container metadata; no frame decoder"
     )
     representation = (
         "bounded_decoded_frame_statistics"
-        if adapter.frame_decoder is not None
+        if adapter.decoder is not None
         else "bounded_container_metadata"
     )
     return Scope(
@@ -244,7 +241,7 @@ def delimit(adapter: modality_lifecycle.Imagery) -> Scope:
         A scope that depends on whether a raster decoder is set.
     """
     decoder_policy = (
-        f"caller-owned raster decoder {adapter.decoder_name}"
+        f"caller-owned raster decoder {adapter.codec}"
         if adapter.decoder is not None
         else "metadata-only raster representation"
     )
@@ -272,7 +269,7 @@ def delimit(adapter: modality_lifecycle.Imagery) -> Scope:
 
 ASSOCIATIONAL = "The model is associational and not a causal explanation."
 SCOPES: dict[type, Scope] = {
-    modality_lifecycle.ImagePreparer: Scope(
+    modality_lifecycle.Image: Scope(
         modality="image",
         representation="decoded_resized_rgb_pixels",
         decoder_policy="built-in bounded RGB decoder",
@@ -284,7 +281,7 @@ SCOPES: dict[type, Scope] = {
             ASSOCIATIONAL,
         ),
     ),
-    modality_lifecycle.AudioPreparer: Scope(
+    modality_lifecycle.Audio: Scope(
         modality="audio",
         representation="bounded_decoded_wav_signal_statistics",
         decoder_policy="built-in WAV decoder; other codecs are rejected",
@@ -296,7 +293,7 @@ SCOPES: dict[type, Scope] = {
             ASSOCIATIONAL,
         ),
     ),
-    modality_lifecycle.GraphPreparer: Scope(
+    modality_lifecycle.Graph: Scope(
         modality="graph",
         representation="declared_inductive_node_features",
         decoder_policy="caller-declared graph nodes and features",
@@ -308,7 +305,7 @@ SCOPES: dict[type, Scope] = {
             ASSOCIATIONAL,
         ),
     ),
-    modality_lifecycle.GeospatialPreparer: Scope(
+    modality_lifecycle.Geospatial: Scope(
         modality="geospatial",
         representation="declared_crs_geometry_features",
         decoder_policy="caller-declared geometries and CRS",
@@ -339,7 +336,7 @@ def invariant(
     """
     adapter_type = type(adapter)
     if adapter_type in {
-        modality_lifecycle.DocumentPreparer,
+        modality_lifecycle.Document,
         modality_lifecycle.Plaintext,
     }:
         return Scope(
@@ -430,10 +427,8 @@ def conform(
             },
         )
     if isinstance(adapter, modality_lifecycle.Footage) and (
-        adapter.frame_decoder
-        is not cast(
-            "modality_lifecycle.Footage", observed_adapter
-        ).frame_decoder
+        adapter.decoder
+        is not cast("modality_lifecycle.Footage", observed_adapter).decoder
     ):
         raise UnsupportedNonTabularModelError(
             "reference and observed video adapters must share the "
@@ -660,9 +655,7 @@ class Modeler:
             ValueError: If the report's modality or dataset does not match the
                 project.
         """
-        report = modality_lifecycle.Record.read_verified(
-            self.report, self.signing_key
-        )
+        report = modality_lifecycle.Record.load(self.report, self.signing_key)
         if report.modality != self.capability.modality:
             raise errors.InputError(
                 "lifecycle report modality does not match project"
@@ -671,7 +664,7 @@ class Modeler:
             raise errors.InputError(
                 "lifecycle report dataset does not match project"
             )
-        predictor = modality_lifecycle.Predictor.from_package(
+        predictor = modality_lifecycle.Predictor.load(
             self.adapter,
             report.package.path,
             self.signing_key,

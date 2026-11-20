@@ -76,7 +76,7 @@
 "scmle.operations.continuous.evaluation.ContinuousEvaluation.last_proposal_batch" = "proposed"
 "scmle.operations.continuous.evaluation.ContinuousEvaluation.seen_alarms" = "alarms"
 "scmle.operations.continuous.feeding.Feeding.record_training" = "record"
-"scmle.operations.continuous.feeding.Feeding.seen_alarms" = "handled"
+"scmle.operations.continuous.feeding.Feeding.seen_alarms" = "alarms"
 "scmle.operations.continuous.policies.RetrainDecision" = "Decision"
 "scmle.operations.continuous.policies.RetrainDecision.alarm_gates_retrain" = "retrain"
 "scmle.operations.continuous.policies.RetrainDecision.escalation_id" = "escalation"
@@ -97,8 +97,8 @@
 "scmle.operations.lifecycle.Ledger.skip_reason" = "skip"
 "scmle.operations.lifecycle.Maintainer.rollout_decides" = "decides"
 "scmle.operations.lifecycle.Maintainer.work_dir" = "workspace"
-"scmle.operations.lifecycle.Rollback.rollout_decides" = "delegated"
-"scmle.operations.lifecycle.Staging.rollout_decides" = "delegated"
+"scmle.operations.lifecycle.Rollback.rollout_decides" = "decides"
+"scmle.operations.lifecycle.Staging.rollout_decides" = "decides"
 "scmle.operations.lifecycle.Staging.work_dir" = "workspace"
 "scmle.operations.logs.Journal.artifact_digest" = "digest"
 "scmle.operations.logs.Journal.model_version" = "version"
@@ -137,6 +137,7 @@
 "scmle.operations.signals.as_metric_samples" = "convert"
 "scmle.operations.spool.MetricsSpool" = "Spool"
 "scmle.pipeline.engine.Board.check_cancelled" = "check"
+"scmle.pipeline.engine.Holder.check_cancelled" = "check"
 "scmle.pipeline.fingerprint.ml_difficulty" = "gauge"
 "scmle.pipeline.ingest_stage.read_frame" = "read"
 "scmle.pipeline.ingest_stage.resolve_entities" = "resolve"
@@ -293,7 +294,7 @@
 "scmle.workflow.executor.records.Records.step_record" = "step"
 "scmle.workflow.executor.records.run_id_for" = "identify"
 "scmle.workflow.executor.steps.Steps.idempotency_key" = "key"
-"scmle.workflow.executor.steps.Steps.run_step" = "step"
+"scmle.workflow.executor.steps.Steps.run_step" = "process"
 
 [review]
 "scmle.monitoring.abtest.Comparison.control_rows" = ["rows", "control"]  # stored as the nested key `rows.control` (docs/RECORD_KEYS.md); one word needs the field moved into a nested part, a structural change

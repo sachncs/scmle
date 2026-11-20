@@ -97,10 +97,10 @@ def test_diagnostics_get_at_most_what_is_left_before_packaging():
 
     context = timed(20)[0]
     context.services.governor.reserve.parts = {"package": 5.0}
-    assert stages.FinalEvaluationStage.ration(context) <= 15.0
+    assert stages.Assessment.ration(context) <= 15.0
     late = timed(1)[0]
-    late.services.governor.started_at -= 10
-    assert stages.FinalEvaluationStage.ration(late) == 0.0
+    late.services.governor.started -= 10
+    assert stages.Assessment.ration(late) == 0.0
 
 
 def test_a_package_fit_that_cannot_end_in_time_is_halted_on_record():

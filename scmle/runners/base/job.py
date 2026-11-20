@@ -262,7 +262,7 @@ class Job:
             The spec as version 1 wrote it (`run_id`, `project_digest`,
             `timeout_seconds`, the retry policy's field names).
         """
-        return self.layout(dataclasses.asdict(self.retries))
+        return self.layout(self.retries.anchor())
 
     def layout(self, retries: Mapping[str, Any]) -> records.Layout:
         """Builds the version-1 layout around a written retry policy.

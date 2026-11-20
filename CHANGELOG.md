@@ -179,6 +179,31 @@ marked `Breaking:` and listed first in their group.
   runs `python -m scmle.serving.runtime`; folders generated earlier pin the
   scmle version that built them. Logger names follow the module path, so a log
   filter on an old path must change.
+* **Single-word names in `scmle.pipeline`, `scmle.runtime`,
+  `scmle.workflow`, `scmle.operations` and `scmle.monitoring` (phase 6).**
+  Classes, functions, methods and attributes of these packages take
+  single-word names; the full old-to-new list is in
+  [`docs/RENAMES.md`](docs/RENAMES.md) under "Name renames". Stored record
+  keys and artifact file names do not change, so files written earlier still
+  read. The pinned surface changes: `scmle.operations.continuous`
+  `ContinuousEvaluation`, `RetrainDecision`, `RetrainPolicy`,
+  `TrainingHistory` and `post_promotion_check` are `Evaluation`, `Decision`,
+  `Policy`, `History` and `reassess`; `scmle.operations.notify`
+  `WebhookSender` and `verify_signature` are `Sender` and `verify`;
+  `scmle.operations.signals` `SignalMonitor` and `SignalThresholds` are
+  `Monitor` and `Thresholds`; `scmle.operations.spool.MetricsSpool` is
+  `Spool`; `scmle.pipeline.modality_lifecycle` `ExtensionCurator` and
+  `LifecycleCancelledError` are `Extension` and `AbortedError`;
+  `scmle.workflow.definition` `CatchUp`, `StepKind` and `standard_workflow`
+  are `Backfill`, `Kind` and `scaffold`; `scmle.workflow.executor.StepContext`
+  is `Context`. The fields and keywords of the workflow `Step` and
+  `Workflow` (`needs`, `budget`, `timeout`, `expiry`, `concurrency`,
+  `limits`, `parallel`), `Retries` (`attempts`) and the operations classes
+  follow the list (the migration table is in
+  [`docs/API_STABILITY.md`](docs/API_STABILITY.md)). A stage product kept by
+  an earlier version for a resumed run is not loaded when its fields were
+  renamed; that stage runs again. Replace the old name with the new one to
+  migrate; no alias is kept.
 * **Single-word names in `scmle.evaluation`, `scmle.models`,
   `scmle.inference` and `scmle.serving` (phase 6).** Classes, functions,
   methods and attributes of these packages take single-word names; the full

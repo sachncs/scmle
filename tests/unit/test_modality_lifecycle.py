@@ -27,7 +27,7 @@ from scmle.pipeline import modality_lifecycle
 from scmle.pipeline.modality_lifecycle import containers
 
 
-def document_adapter() -> modality_lifecycle.DocumentPreparer:
+def document_adapter() -> modality_lifecycle.Document:
     """Build a labelled document fixture with independent document IDs."""
     samples = tuple(
         document.Sample(
@@ -38,7 +38,7 @@ def document_adapter() -> modality_lifecycle.DocumentPreparer:
         )
         for index in range(12)
     )
-    return modality_lifecycle.DocumentPreparer(document.Dataset(samples))
+    return modality_lifecycle.Document(document.Dataset(samples))
 
 
 def text_adapter() -> modality_lifecycle.Plaintext:
@@ -58,7 +58,7 @@ def text_adapter() -> modality_lifecycle.Plaintext:
 class GroundTruthTextAdapter(modality_lifecycle.Plaintext):
     """Synthetic adapter with a complete feature-ranking reference."""
 
-    def explanation_ground_truth(
+    def corroborate(
         self, sample: object, feature_names: Sequence[str]
     ) -> quality.Truth:
         """Return an oracle covering every declared fixture feature."""
@@ -90,7 +90,7 @@ def image_bytes(value: int) -> bytes:
     return output.getvalue()
 
 
-def image_adapter() -> modality_lifecycle.ImagePreparer:
+def image_adapter() -> modality_lifecycle.Image:
     """Build a labelled image fixture with distinct pixel values."""
     samples = tuple(
         image.Sample.parse(
@@ -101,7 +101,7 @@ def image_adapter() -> modality_lifecycle.ImagePreparer:
         )
         for index in range(12)
     )
-    return modality_lifecycle.ImagePreparer(image.Dataset(samples))
+    return modality_lifecycle.Image(image.Dataset(samples))
 
 
 def wav_bytes(amplitude: int) -> bytes:
@@ -116,7 +116,7 @@ def wav_bytes(amplitude: int) -> bytes:
     return output.getvalue()
 
 
-def audio_adapter() -> modality_lifecycle.AudioPreparer:
+def audio_adapter() -> modality_lifecycle.Audio:
     """Build a labelled WAV fixture with varying signal statistics."""
     samples = tuple(
         audio.Sample.decode(
@@ -127,7 +127,7 @@ def audio_adapter() -> modality_lifecycle.AudioPreparer:
         )
         for index in range(12)
     )
-    return modality_lifecycle.AudioPreparer(audio.Dataset(samples))
+    return modality_lifecycle.Audio(audio.Dataset(samples))
 
 
 def video_adapter() -> modality_lifecycle.Footage:
@@ -178,11 +178,11 @@ def decoded_video_adapter() -> modality_lifecycle.Footage:
         )
 
     return modality_lifecycle.Footage(
-        video.Dataset(samples), frame_decoder=decoder, max_frames=4
+        video.Dataset(samples), decoder=decoder, frames=4
     )
 
 
-def graph_adapter() -> modality_lifecycle.GraphPreparer:
+def graph_adapter() -> modality_lifecycle.Graph:
     """Build an inductive labelled graph fixture."""
     nodes = tuple(
         graph.Node(
@@ -200,10 +200,10 @@ def graph_adapter() -> modality_lifecycle.GraphPreparer:
         edges=edges,
         features=("position", "remainder"),
     )
-    return modality_lifecycle.GraphPreparer(dataset)
+    return modality_lifecycle.Graph(dataset)
 
 
-def geospatial_adapter() -> modality_lifecycle.GeospatialPreparer:
+def geospatial_adapter() -> modality_lifecycle.Geospatial:
     """Build spatially separated labelled point features."""
     features = tuple(
         geospatial.Placemark(
@@ -218,7 +218,7 @@ def geospatial_adapter() -> modality_lifecycle.GeospatialPreparer:
         crs="EPSG:4326",
         source="memory://fixture.geojson",
     )
-    return modality_lifecycle.GeospatialPreparer(dataset, block_size=1.0)
+    return modality_lifecycle.Geospatial(dataset, block_size=1.0)
 
 
 def raster_adapter() -> modality_lifecycle.Imagery:
@@ -285,8 +285,8 @@ def test_raster_adapter_accepts_a_named_bounded_decoder():
         decoder=lambda payload: numpy.full(
             (32, 32, 3), payload[0], dtype=numpy.uint8
         ),
-        decoder_name="fixture-raster-v1",
-        max_pixels=32 * 32 * 3,
+        codec="fixture-raster-v1",
+        pixels=32 * 32 * 3,
     )
 
     report = decoded.curate()
@@ -339,8 +339,8 @@ def test_decoded_raster_lifecycle_emits_pixel_occlusion_evidence(
         decoder=lambda payload: numpy.full(
             (32, 32, 3), payload[0], dtype=numpy.uint8
         ),
-        decoder_name="fixture-raster-v1",
-        max_pixels=32 * 32 * 3,
+        codec="fixture-raster-v1",
+        pixels=32 * 32 * 3,
     )
     report = modality_lifecycle.Lifecycle().run(
         decoded,
@@ -465,7 +465,7 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
     sample_lineage = data_explanation["sample_lineage"]
     assert len(sample_lineage) == len(adapter.samples)
     assert {item["sample_id"] for item in sample_lineage} == {
-        adapter.sample_id(sample) for sample in adapter.samples
+        adapter.sample(sample) for sample in adapter.samples
     }
     assert {item["partition"] for item in sample_lineage} == {
         "train",
@@ -521,10 +521,10 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
     assert json.loads(report_path.read_text()) == report.to_dict()
     assert report.to_dict()["schema_version"] == 3
     assert report.signature
-    assert report.verify_signature("test-signing-key") is True
-    assert report.verify_signature("wrong-key") is False
+    assert report.verify("test-signing-key") is True
+    assert report.verify("wrong-key") is False
     assert (
-        modality_lifecycle.Record.read_verified(report_path, "test-signing-key")
+        modality_lifecycle.Record.load(report_path, "test-signing-key")
         == report
     )
 
@@ -532,7 +532,7 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
     tampered["digests"]["dataset"] = "tampered-dataset"
     report_path.write_text(json.dumps(tampered), encoding="utf-8")
     with pytest.raises(ValueError, match="signature does not verify"):
-        modality_lifecycle.Record.read_verified(report_path, "test-signing-key")
+        modality_lifecycle.Record.load(report_path, "test-signing-key")
 
 
 def test_package_signature_rejects_a_wrong_key(tmp_path: Path):
@@ -546,7 +546,7 @@ def test_package_signature_rejects_a_wrong_key(tmp_path: Path):
     )
 
     with pytest.raises(ValueError, match="signature"):
-        modality_lifecycle.load_package(report.package.path, "wrong-key")
+        modality_lifecycle.load(report.package.path, "wrong-key")
 
 
 def test_lifecycle_report_rejects_a_signed_incomplete_stage_record(
@@ -574,7 +574,7 @@ def test_lifecycle_report_rejects_a_signed_incomplete_stage_record(
     report_path.write_text(json.dumps(record), encoding="utf-8")
 
     with pytest.raises(ValueError, match="every required stage"):
-        modality_lifecycle.Record.read_verified(report_path, "report-key")
+        modality_lifecycle.Record.load(report_path, "report-key")
 
 
 def test_lifecycle_report_rejects_a_stage_without_evidence_links(
@@ -599,7 +599,7 @@ def test_lifecycle_report_rejects_a_stage_without_evidence_links(
     report_path.write_text(json.dumps(record), encoding="utf-8")
 
     with pytest.raises(ValueError, match="evidence links"):
-        modality_lifecycle.Record.read_verified(report_path, "report-key")
+        modality_lifecycle.Record.load(report_path, "report-key")
 
 
 def test_lifecycle_report_signed_before_the_stage_key_rename_verifies(
@@ -626,7 +626,7 @@ def test_lifecycle_report_signed_before_the_stage_key_rename_verifies(
     }
     report_path.write_text(json.dumps(record), encoding="utf-8")
 
-    loaded = modality_lifecycle.Record.read_verified(report_path, "report-key")
+    loaded = modality_lifecycle.Record.load(report_path, "report-key")
 
     assert loaded.signature == report.signature
     assert loaded.to_dict() == report.to_dict()
@@ -647,7 +647,7 @@ def test_package_loader_rejects_an_unsupported_manifest_version(
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
     with pytest.raises(ValueError, match="schema version"):
-        modality_lifecycle.load_package(report.package.path, "package-key")
+        modality_lifecycle.load(report.package.path, "package-key")
 
 
 def test_package_loader_rejects_duplicate_feature_names(
@@ -665,7 +665,7 @@ def test_package_loader_rejects_duplicate_feature_names(
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
     with pytest.raises(ValueError, match="feature_names"):
-        modality_lifecycle.load_package(report.package.path, "package-key")
+        modality_lifecycle.load(report.package.path, "package-key")
 
 
 def test_package_loader_rejects_a_signed_model_schema_mismatch(
@@ -689,7 +689,7 @@ def test_package_loader_rejects_a_signed_model_schema_mismatch(
     manifest_path.write_text(json.dumps(unsigned), encoding="utf-8")
 
     with pytest.raises(ValueError, match="feature schema"):
-        modality_lifecycle.load_package(report.package.path, "package-key")
+        modality_lifecycle.load(report.package.path, "package-key")
 
 
 def test_lifecycle_cancellation_cleans_artifacts_after_a_stage_boundary(
@@ -706,7 +706,7 @@ def test_lifecycle_cancellation_cleans_artifacts_after_a_stage_boundary(
     package_path = tmp_path / "cancelled-package"
     report_path = tmp_path / "cancelled-report.json"
     with pytest.raises(
-        modality_lifecycle.LifecycleCancelledError,
+        modality_lifecycle.AbortedError,
         match="cancelled at a stage boundary",
     ) as raised:
         modality_lifecycle.Lifecycle().run(
@@ -743,14 +743,12 @@ def test_lifecycle_checkpoint_resumes_after_a_post_package_failure(
             checkpoint_path=checkpoint_path,
         )
 
-    checkpoint = modality_lifecycle.Checkpoint.read_verified(
+    checkpoint = modality_lifecycle.Checkpoint.load(
         checkpoint_path, "checkpoint-key"
     )
     assert checkpoint.status == "running"
     assert checkpoint.completed[-1] == "inference"
-    package_digest = modality_lifecycle.file_digest(
-        package_path / "manifest.json"
-    )
+    package_digest = modality_lifecycle.digest(package_path / "manifest.json")
 
     resumed = modality_lifecycle.Lifecycle().run(
         modality_lifecycle.Plaintext(dataset),
@@ -761,11 +759,11 @@ def test_lifecycle_checkpoint_resumes_after_a_post_package_failure(
         resume=True,
     )
 
-    assert resumed.verify_signature("checkpoint-key") is True
-    assert modality_lifecycle.file_digest(package_path / "manifest.json") == (
+    assert resumed.verify("checkpoint-key") is True
+    assert modality_lifecycle.digest(package_path / "manifest.json") == (
         package_digest
     )
-    completed = modality_lifecycle.Checkpoint.read_verified(
+    completed = modality_lifecycle.Checkpoint.load(
         checkpoint_path, "checkpoint-key"
     )
     assert completed.status == "completed"
@@ -927,7 +925,7 @@ def test_modality_predictor_verifies_package_and_predicts_new_samples(
         signing_key="test-signing-key",
     )
 
-    predictor = modality_lifecycle.Predictor.from_package(
+    predictor = modality_lifecycle.Predictor.load(
         adapter,
         report.package.path,
         "test-signing-key",
@@ -941,7 +939,7 @@ def test_modality_predictor_verifies_package_and_predicts_new_samples(
         "package_verified": True,
         "modality": "image",
         "training_dataset_hash": adapter.digest,
-        "feature_names": list(predictor.feature_names),
+        "feature_names": list(predictor.names),
         "model_sha256": report.package.model_sha256,
     }
     with pytest.raises(ValueError, match="samples must not be empty"):
@@ -960,7 +958,7 @@ def test_modality_predictor_rejects_a_different_adapter_modality(
     )
 
     with pytest.raises(ValueError, match="package modality"):
-        modality_lifecycle.Predictor.from_package(
+        modality_lifecycle.Predictor.load(
             document_adapter(),
             report.package.path,
             "test-signing-key",
@@ -995,7 +993,7 @@ def test_image_lifecycle_emits_region_occlusion_evidence(tmp_path: Path):
 def test_image_adapter_curation_hash_matches_declared_identity():
     """Image curation remains attached to source-and-content identity."""
     fixture = image_adapter()
-    adapter = modality_lifecycle.ImagePreparer(
+    adapter = modality_lifecycle.Image(
         image.Dataset(tuple(reversed(fixture.samples)))
     )
 
@@ -1044,7 +1042,7 @@ def test_graph_lifecycle_emits_one_hop_context_evidence(tmp_path: Path):
         )
         for index in range(11)
     )
-    adapter = modality_lifecycle.GraphPreparer(
+    adapter = modality_lifecycle.Graph(
         graph.Dataset(
             nodes=nodes,
             edges=edges,
@@ -1087,7 +1085,7 @@ def test_graph_subgraph_context_is_bounded_and_deterministic():
     """
     nodes = tuple(graph.Node(f"node-{index}") for index in range(5))
     edges = tuple(graph.Edge("center", f"node-{index}") for index in range(5))
-    adapter = modality_lifecycle.GraphPreparer(
+    adapter = modality_lifecycle.Graph(
         graph.Dataset(nodes=(*nodes, graph.Node("center")), edges=edges)
     )
 
@@ -1116,7 +1114,7 @@ def test_geospatial_lifecycle_emits_crs_bound_explanation(tmp_path: Path):
         )
         for index in range(12)
     )
-    adapter = modality_lifecycle.GeospatialPreparer(
+    adapter = modality_lifecycle.Geospatial(
         geospatial.Dataset(features=features, crs="EPSG:4326"),
         block_size=1.0,
     )
@@ -1149,7 +1147,7 @@ def test_geospatial_curation_records_boundary_leakage_warning():
     Also enforces website/src/pages/docs/api.astro:408.
     Also enforces website/src/pages/docs/data.astro:278.
     """
-    adapter = modality_lifecycle.GeospatialPreparer(
+    adapter = modality_lifecycle.Geospatial(
         geospatial.Dataset(
             (
                 geospatial.Placemark(
@@ -1317,7 +1315,7 @@ def test_video_adapter_uses_explicit_temporal_cutoff_for_lifecycle_split():
     )
     adapter = modality_lifecycle.Footage(
         video.Dataset(samples),
-        temporal_cutoff="2026-01-02T00:00:00Z",
+        cutoff="2026-01-02T00:00:00Z",
     )
 
     partitions = adapter.split(seed=99)
@@ -1456,7 +1454,7 @@ def test_blocking_geospatial_curation_stops_before_packaging(tmp_path: Path):
         )
         for index in range(8)
     )
-    adapter = modality_lifecycle.GeospatialPreparer(
+    adapter = modality_lifecycle.Geospatial(
         geospatial.Dataset(features=features, crs=""),
         block_size=1.0,
     )
@@ -1479,7 +1477,7 @@ def test_graph_without_declared_features_stops_before_modelling(tmp_path: Path):
         )
         for index in range(8)
     )
-    adapter = modality_lifecycle.GraphPreparer(graph.Dataset(nodes=nodes))
+    adapter = modality_lifecycle.Graph(graph.Dataset(nodes=nodes))
 
     with pytest.raises(ValueError, match="declared node features"):
         modality_lifecycle.Lifecycle().run(

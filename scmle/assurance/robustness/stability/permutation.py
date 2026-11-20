@@ -124,7 +124,7 @@ def specify(
     """
     qualification.count(permutations, "permutations", minimum=1)
     median, share = summarize(x, y, grid)
-    rng = randomness.component_rng(seed, f"f6.curve.{finding}", 0)
+    rng = randomness.spawn(seed, f"f6.curve.{finding}", 0)
     curves = list(
         map(
             operator.call,

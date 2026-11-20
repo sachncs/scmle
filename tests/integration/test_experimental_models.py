@@ -82,7 +82,7 @@ def test_transformer_and_jepa_are_explicit_opt_in_candidates(monkeypatch):
     )
     project = orchestrator.Orchestrator(spec, frame, registry=registry)
     context = project.start()
-    context.services.capability_registry.bind(
+    context.services.capabilities.bind(
         capabilities.Environment(
             available_extras=frozenset({"core", "deeplearning"}),
             cpu_cores=1,
@@ -92,8 +92,8 @@ def test_transformer_and_jepa_are_explicit_opt_in_candidates(monkeypatch):
             network_available=False,
         )
     )
-    stages.IngestStage().execute(context)
-    stages.ProfileStage().execute(context)
+    stages.Ingest().execute(context)
+    stages.Profiling().execute(context)
 
     plan = stages.devise(context)
 

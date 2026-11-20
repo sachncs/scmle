@@ -41,7 +41,7 @@ NOT_RUN = "not_run"
 TIME_SCALE_ENV = "SCMLE_RECOVERY_TIME_SCALE"
 
 
-def time_scale() -> float:
+def scale() -> float:
     """The factor applied to scenario waits and allowed RTO (default 1.0).
 
     Returns:
@@ -76,7 +76,7 @@ def scaled(seconds: float) -> float:
     Returns:
         `seconds` times the time scale.
     """
-    return seconds * time_scale()
+    return seconds * scale()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -378,10 +378,10 @@ class Measurement:
 
     Attributes:
         component: Component name.
-        rto_seconds: Seconds from the fault (or its detection, per
+        rto: Seconds from the fault (or its detection, per
             ``method``) to the component serving again; None if it did
             not.
-        rpo_lost: Acknowledged units found missing after recovery; None if
+        lost: Acknowledged units found missing after recovery; None if
             not measured.
         method: How both were measured.
         KEYS: Version-1 keys to the written ones (`rto` in seconds, `rpo`);
@@ -393,8 +393,8 @@ class Measurement:
     )
 
     component: str
-    rto_seconds: float | None
-    rpo_lost: int | None
+    rto: float | None
+    lost: int | None
     method: str
 
     def problems(self) -> list[str]:
@@ -415,24 +415,18 @@ class Measurement:
         """
         goal = OBJECTIVE_OF[self.component]
         found = []
-        if self.rto_seconds is None:
+        if self.rto is None:
             found.append(f"{self.component}: did not recover")
-        elif self.rto_seconds > scaled(goal.rto_seconds):
-            note = (
-                ""
-                if time_scale() == 1.0
-                else f" at time scale {time_scale():g}"
-            )
+        elif self.rto > scaled(goal.rto_seconds):
+            note = "" if scale() == 1.0 else f" at time scale {scale():g}"
             found.append(
-                f"{self.component}: RTO {self.rto_seconds:.2f}s exceeds "
+                f"{self.component}: RTO {self.rto:.2f}s exceeds "
                 f"{scaled(goal.rto_seconds):.0f}s{note}"
             )
-        if self.rpo_lost is None:
+        if self.lost is None:
             found.append(f"{self.component}: RPO not measured")
-        elif self.rpo_lost > goal.rpo_lost:
-            found.append(
-                f"{self.component}: {self.rpo_lost} {goal.rpo_unit} lost"
-            )
+        elif self.lost > goal.rpo_lost:
+            found.append(f"{self.component}: {self.lost} {goal.rpo_unit} lost")
         return found
 
     def to_dict(self) -> dict[str, Any]:
@@ -451,14 +445,12 @@ class Measurement:
         return self.KEYS.upgrade(
             {
                 "component": self.component,
-                "rto_seconds": None
-                if self.rto_seconds is None
-                else round(self.rto_seconds, 3),
+                "rto_seconds": None if self.rto is None else round(self.rto, 3),
                 "rto_objective_seconds": OBJECTIVE_OF[
                     self.component
                 ].rto_seconds,
-                "time_scale": time_scale(),
-                "rpo_lost": self.rpo_lost,
+                "time_scale": scale(),
+                "rpo_lost": self.lost,
                 "rpo_objective": OBJECTIVE_OF[self.component].rpo_lost,
                 "rpo_unit": OBJECTIVE_OF[self.component].rpo_unit,
                 "method": self.method,
@@ -471,7 +463,7 @@ class Outcome:
     """The outcome of one fault.
 
     Attributes:
-        fault_id: The catalogue id.
+        fault: The catalogue id.
         status: passed, failed or not_run.
         environment: Where it ran (or why it did not).
         checks: Named boolean observations, all of which must hold.
@@ -487,7 +479,7 @@ class Outcome:
         renames={"fault_id": "fault"}
     )
 
-    fault_id: str
+    fault: str
     status: str = PASSED
     environment: str = ""
     checks: dict[str, bool] = dataclasses.field(default_factory=dict)
@@ -518,7 +510,7 @@ class Outcome:
         """
         return self.KEYS.upgrade(
             {
-                "fault_id": self.fault_id,
+                "fault_id": self.fault,
                 "status": self.status,
                 "environment": self.environment,
                 "seconds": round(self.seconds, 2),
@@ -582,7 +574,7 @@ class Runner:
         for fault in self.catalogue:
             scenario = self.scenarios.get(fault.id)
             if scenario is None or (only is not None and fault.id not in only):
-                results.append(self.not_run(fault, only is not None))
+                results.append(self.skip(fault, only is not None))
                 continue
             started = self.clock()
             try:
@@ -599,7 +591,7 @@ class Runner:
             results.append(result)
         return self.report(results)
 
-    def not_run(self, fault: Fault, selected: bool) -> Outcome:
+    def skip(self, fault: Fault, selected: bool) -> Outcome:
         """Builds the not-run result of a fault.
 
         Args:
@@ -633,7 +625,7 @@ class Runner:
                 catalogue.
 
         Returns:
-            A dict with the declared ``objectives``, the ``time_scale``, the
+            A dict with the declared ``objectives``, the ``scale``, the
             catalogue as ``faults``, the ``results`` as dicts, a ``summary``
             of counts (faults, ran_locally, passed, failed, not_run) and
             ``all_local_passed``, which is true only if at least one fault
@@ -642,7 +634,7 @@ class Runner:
         ran = [r for r in results if r.status != NOT_RUN]
         return {
             "objectives": [dataclasses.asdict(o) for o in OBJECTIVES],
-            "time_scale": time_scale(),
+            "time_scale": scale(),
             "faults": [
                 {
                     "id": f.id,

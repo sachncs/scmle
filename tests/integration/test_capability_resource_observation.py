@@ -65,9 +65,9 @@ def observation(
     )
     return resource_observation.Observation(
         environment,
-        captured_at="2026-01-01T00:00:00+00:00",
-        disk_path="/tmp",
-        extra_observations={"core": True},
+        captured="2026-01-01T00:00:00+00:00",
+        disk="/tmp",
+        observations={"core": True},
         sources={
             "cpu_cores": "test",
             "memory_gb": "test",
@@ -114,7 +114,7 @@ def test_observation_captures_bounded_facts_and_unknowns(monkeypatch, tmp_path):
         ),
     )
 
-    record = resource_observation.observe_runtime_resources(tmp_path).to_dict()
+    record = resource_observation.observe(tmp_path).to_dict()
 
     assert record["environment"] == {
         "available_extras": ["core", "deeplearning"],
@@ -140,7 +140,7 @@ def test_bound_observation_is_used_by_the_capability_gate(monkeypatch):
     registry = capabilities.Registry((record,))
     monkeypatch.setattr(
         resource_observation,
-        "observe_runtime_resources",
+        "observe",
         lambda path=None: observation(
             cpu_cores=2,
             memory_gb=4.0,
@@ -154,8 +154,8 @@ def test_bound_observation_is_used_by_the_capability_gate(monkeypatch):
         capability_registry=registry,
     )
     context = project.start()
-    stages.IngestStage().execute(context)
-    stages.ProfileStage().execute(context)
+    stages.Ingest().execute(context)
+    stages.Profiling().execute(context)
 
     plan = stages.devise(context)
 
@@ -176,7 +176,7 @@ def test_unknown_declared_facts_fail_closed_and_are_persisted(
     registry = capabilities.Registry((record,))
     monkeypatch.setattr(
         resource_observation,
-        "observe_runtime_resources",
+        "observe",
         lambda path=None: observation(
             cpu_cores=None,
             memory_gb=None,

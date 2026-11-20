@@ -115,18 +115,16 @@ def test_ml_difficulty_subsamples_to_fit_its_allowance():
     spec, profile = portrait(frame)
     plan = profile.feature_plan
     allowance = fingerprint.cost(500, len(plan.features), 2)
-    result = fingerprint.ml_difficulty(
-        frame, spec, tasks.Task.BINARY, plan, allowance
-    )
+    result = fingerprint.gauge(frame, spec, tasks.Task.BINARY, plan, allowance)
     assert result["available"] and result["rows"] == 500
-    full = fingerprint.ml_difficulty(frame, spec, tasks.Task.BINARY, plan)
+    full = fingerprint.gauge(frame, spec, tasks.Task.BINARY, plan)
     assert full["rows"] == fingerprint.DIFFICULTY_ROWS
 
 
 def test_ml_difficulty_skips_with_a_reason_when_nothing_fits():
     frame = xor()
     spec, profile = portrait(frame)
-    result = fingerprint.ml_difficulty(
+    result = fingerprint.gauge(
         frame, spec, tasks.Task.BINARY, profile.feature_plan, 0.01
     )
     assert result["available"] is False and result["skipped"] is True

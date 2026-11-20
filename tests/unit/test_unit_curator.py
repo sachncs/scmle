@@ -22,7 +22,7 @@ def adapter(count=6):
         )
         for index in range(count)
     )
-    return document.DocumentPreparer(modalities.document.Dataset(samples))
+    return document.Document(modalities.document.Dataset(samples))
 
 
 def test_emplace_publishes_once_and_leaves_no_temporary_file(tmp_path):

@@ -430,12 +430,12 @@ LOOP = ("fetch", "hold", "put")
 WORKFLOW = definition.Workflow(
     "protocol",
     "1",
-    (definition.Step("work", definition.StepKind.TRAIN),),
+    (definition.Step("work", definition.Kind.TRAIN),),
 )
 RUN = "run"
 
 
-def rest(context: executor.StepContext) -> dict[str, Any]:
+def rest(context: executor.Context) -> dict[str, Any]:
     """The replayed workflow's handler; a replay never runs a step."""
     del context
     return {}
@@ -483,12 +483,12 @@ class Lease(Model):
         Link("put", f"{LEASES}.write", "self.store.put(key, body, if_version="),
         Link("release", f"{LEASES}.relinquish", "meta = self.hold(run_id)[1]"),
         Link("drop", f"{LEASES}.relinquish", "self.store.delete("),
-        Link("beat", f"{LEASES}.renew_lease", "held, meta = self.hold(run_id)"),
-        Link("renew", f"{LEASES}.renew_lease", "if_version=meta.version"),
+        Link("beat", f"{LEASES}.renew", "held, meta = self.hold(run_id)"),
+        Link("renew", f"{LEASES}.renew", "if_version=meta.version"),
         Link(
             "expiry",
             f"{LEASES}.lease",
-            "max(self.clock() + self.lease_seconds, floor)",
+            "max(self.clock() + self.tenure, floor)",
         ),
     )
 
@@ -808,7 +808,7 @@ class Lease(Model):
 
         Each executor runs its drives on a thread (`Leases.acquire`, then
         `Leases.write`, then `Leases.relinquish`) and each renewal on a
-        thread started at its `beat` step (`Leases.renew_lease`; the
+        thread started at its `beat` step (`Leases.renew`; the
         heartbeat starts once the lease is taken), over a `Gate` that lets
         one store call through per step of the path. A tick advances
         their shared clock; a crash ends the executor's threads with no
@@ -899,7 +899,7 @@ class Lease(Model):
         A failed renewal ends the heartbeat, as in `Leases.beat`.
         """
         try:
-            real.renew_lease(RUN)
+            real.renew(RUN)
         except executor.EvictionError:
             # handled: the heartbeat ends, as `Leases.beat` ends it
             return
@@ -1469,7 +1469,7 @@ class Journal(Model):
 
 
 ENGINE = "scmle.pipeline.engine:Pipeline.advance"
-ORCHESTRATOR = "scmle.pipeline.orchestrator:Orchestrator.consult_checkpoints"
+ORCHESTRATOR = "scmle.pipeline.orchestrator:Orchestrator.consult"
 ERASURE = "scmle.api.erasure.erasures:Erasure.execute"
 
 
@@ -1478,7 +1478,7 @@ class Custody(Journal):
 
     Its caller is the orchestrator's gate review: a resumed run consults
     every gate again, restored stages included (`Pipeline.advance`), and
-    `consult_checkpoints` records each verdict with `Journal.decide`
+    `consult` records each verdict with `Journal.decide`
     without looking at the journal, so a resume appends every gate's
     verdict again. The journal is a log of verdicts, read latest first
     (`Journal.rejected`), so a repeated verdict is by design and `single`

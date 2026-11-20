@@ -261,10 +261,10 @@ class Fitted:
 
 def test_reference_scores_are_probabilities_or_first_predictions():
     frame = pandas.DataFrame({"a": [0.25, 0.75]})
-    binary = scoring.reference_scores(Fitted(), frame, tasks.Task.BINARY)
+    binary = scoring.anchor(Fitted(), frame, tasks.Task.BINARY)
     assert binary.name == "score"
     assert binary.tolist() == [0.25, 0.75]
-    multi = scoring.reference_scores(Fitted(), frame, tasks.Task.MULTIOUTPUT)
+    multi = scoring.anchor(Fitted(), frame, tasks.Task.MULTIOUTPUT)
     assert multi.name == "prediction"
     assert multi.tolist() == [0.5, 1.5]
     assert scoring.MATRIX_DIMENSIONS == 2
@@ -276,9 +276,10 @@ def test_reference_scores_keep_one_dimensional_predictions():
             return numpy.array([1.0, 2.0])
 
     frame = pandas.DataFrame({"a": [0.0, 1.0]})
-    assert scoring.reference_scores(
-        Flat(), frame, tasks.Task.REGRESSION
-    ).tolist() == [1.0, 2.0]
+    assert scoring.anchor(Flat(), frame, tasks.Task.REGRESSION).tolist() == [
+        1.0,
+        2.0,
+    ]
 
 
 def test_pin_digests_the_frozen_selection():
@@ -353,10 +354,10 @@ def test_no_threshold_is_chosen_outside_binary_tasks():
         ),
     )
     fitted = object()
-    assert scoring.choose_decision_threshold(board, fitted) == (fitted, None)
+    assert scoring.choose(board, fitted) == (fitted, None)
     partition.task = tasks.Task.BINARY
     board.services.spec.decision.threshold_objective = "none"
-    assert scoring.choose_decision_threshold(board, fitted) == (fitted, None)
+    assert scoring.choose(board, fitted) == (fitted, None)
 
 
 def test_the_threshold_search_is_skipped_on_record_when_late():
@@ -370,7 +371,7 @@ def test_the_threshold_search_is_skipped_on_record_when_late():
         selected=trial(seconds=10.0)
     )
     fitted = object()
-    assert scoring.choose_decision_threshold(board, fitted) == (fitted, None)
+    assert scoring.choose(board, fitted) == (fitted, None)
     assert board.recorded == [("decision threshold", "needs 15.0 s of 0.5 s")]
 
 
@@ -483,7 +484,7 @@ def test_register_writes_only_what_the_qualification_holds():
     written = {}
     board = types.SimpleNamespace(
         journal=types.SimpleNamespace(
-            write_json=lambda path, body: written.update({path: body})
+            write=lambda path, body: written.update({path: body})
         )
     )
     table = types.SimpleNamespace(to_dict=lambda: {"t": 1})
@@ -552,7 +553,7 @@ def test_amend_replaces_the_profile_without_a_curation():
     board = holding(
         {surveying.Portrait: surveying.Portrait(Profile(None), None)},
         journal=types.SimpleNamespace(
-            write_json=lambda path, body: written.update({path: body})
+            write=lambda path, body: written.update({path: body})
         ),
     )
     assert admission.amend(board, plan()) == []

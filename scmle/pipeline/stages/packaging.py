@@ -37,13 +37,13 @@ class Package(products.Derived):
     Attributes:
         bundle: The packaged model.
         result: The run's result.
-        evidence_graph: The graph of the run's evidence.
+        graph: The graph of the run's evidence.
         evaluation: The evaluation record at its current layout.
     """
 
     bundle: scmle.artifacts.bundle.Bundle | None
     result: results.Run | None
-    evidence_graph: lineage.Graph
+    graph: lineage.Graph
     evaluation: records.Layout | None
 
     def summary(self) -> object:
@@ -52,13 +52,14 @@ class Package(products.Derived):
         Returns:
             The graph digest.
         """
-        return self.evidence_graph.digest()
+        return self.graph.digest()
 
 
-class PackageStage(tracing.Tracing):
+class Packaging(tracing.Tracing):
     """Writes the model bundle, leaderboard and report."""
 
-    requires: ClassVar[tuple[type, ...]] = (assessment.FinalEvaluationStage,)
+    recorded: ClassVar[str] = "PackageStage"
+    requires: ClassVar[tuple[type, ...]] = (assessment.Assessment,)
     makes: ClassVar[type[products.Product] | None] = Package
     state: ClassVar[scmle.runtime.state.Progress] = (
         scmle.runtime.state.Progress.PACKAGING
@@ -111,10 +112,8 @@ class PackageStage(tracing.Tracing):
         bundle.quantile = self.bracket(board)
         self.settle(board, bundle)
         if partition.task is tasks.Task.FORECAST:
-            evaluation["forecast_backtest"] = self.forecast_backtest(
-                board, selected
-            )
-            board.journal.write_json(
+            evaluation["forecast_backtest"] = self.forecast(board, selected)
+            board.journal.write(
                 "diagnostics/forecast_backtest.json",
                 evaluation["forecast_backtest"],
             )
@@ -129,7 +128,7 @@ class PackageStage(tracing.Tracing):
         )
         bundle.save(store.path("model"))
         self.certify(board, bundle, evaluation)
-        self.release_evaluation(board, store, evaluation)
+        self.release(board, store, evaluation)
         evaluation = results.evaluation(evaluation)
         store.write_json("evaluation.json", evaluation)
         evidence_graph = self.trace(board, store)
@@ -181,7 +180,7 @@ class PackageStage(tracing.Tracing):
         intake = board.get(ingestion.Intake)
         readings = board.get(examination.Readings)
         return scmle.artifacts.bundle.Bundle.create(
-            exam.shipped if exam.shipped is not None else exam.final_pipeline,
+            exam.shipped if exam.shipped is not None else exam.pipeline,
             profile.feature_plan,
             split.features,
             board.services.spec.data.target,
@@ -261,9 +260,7 @@ class PackageStage(tracing.Tracing):
         ).to_dict()
         evaluation["release_attestation"] = release_attestation
         store.write_json("release_attestation.json", release_attestation)
-        evaluation["explanation_evidence"] = self.explanation_evidence(
-            board, store
-        )
+        evaluation["explanation_evidence"] = self.explain(board, store)
         evaluation["artifact_verification"] = bundle.roundtrip(
             store.path("model"), split.features.head(PARITY_ROWS)
         )

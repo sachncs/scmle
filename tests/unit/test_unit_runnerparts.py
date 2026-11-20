@@ -206,9 +206,7 @@ def store(tmp_path):
 
 def quick(**fields):
     return spec(
-        retries=retry.Retries(
-            max_attempts=3, base_delay_seconds=2.0, factor=2.0
-        ),
+        retries=retry.Retries(attempts=3, base_delay_seconds=2.0, factor=2.0),
         **fields,
     )
 

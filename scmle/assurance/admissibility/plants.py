@@ -192,7 +192,7 @@ def plant(
         KeyError: For an unknown leak type.
     """
     method = DEFECTS[defect]
-    rng = randomness.component_rng(seed, "plants", list(DEFECTS).index(defect))
+    rng = randomness.spawn(seed, "plants", list(DEFECTS).index(defect))
     kind = (Numbers if continuous else Classes)(target, rng)
     column: pandas.Series = getattr(kind, method)()
     return column
@@ -209,7 +209,7 @@ def copy(frame: pandas.DataFrame, seed: int) -> pandas.DataFrame:
         The rows and their copies, in a seeded random order, with a fresh
         index.
     """
-    rng = randomness.component_rng(seed, "plants", len(DEFECTS))
+    rng = randomness.spawn(seed, "plants", len(DEFECTS))
     picked = rng.choice(len(frame), round(COPIES * len(frame)), replace=False)
     # Positions, not `pandas.concat`: concat compares the frames' `attrs`,
     # which fails when they hold a Series (an uplift task's treatment).

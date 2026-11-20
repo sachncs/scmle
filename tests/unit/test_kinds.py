@@ -157,7 +157,7 @@ def provide(spec):
         metrics.CATALOG,
         selection.Averager(spec.selection),
         limits.Governor(spec.resources, 100.0),
-        input_frame=rows(),
+        frame=rows(),
     )
 
 
@@ -166,7 +166,7 @@ def test_a_board_holds_each_applied_product_by_type():
     with pytest.raises(errors.OrderError, match="Intake"):
         board.get(ingestion.Intake)
     assert board.find(ingestion.Intake) is None
-    made = ingestion.IngestStage().execute(board)
+    made = ingestion.Ingest().execute(board)
     assert board.get(ingestion.Intake) is made
     assert board.find(ingestion.Intake) is made
     assert made.kind is kinds.TABULAR

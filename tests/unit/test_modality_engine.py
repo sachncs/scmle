@@ -147,7 +147,7 @@ def test_a_checkpoint_signed_before_the_engine_resumes(
 ):
     monkeypatch.chdir(tmp_path)
     shutil.copy(FIXTURES / f"checkpoint_v{version}.json", "checkpoint.json")
-    before = modality_lifecycle.Checkpoint.read_verified("checkpoint.json", KEY)
+    before = modality_lifecycle.Checkpoint.load("checkpoint.json", KEY)
     assert before.schema_version == version
 
     report = modality_lifecycle.Lifecycle().run(
@@ -159,8 +159,8 @@ def test_a_checkpoint_signed_before_the_engine_resumes(
         resume=True,
     )
 
-    assert report.verify_signature(KEY)
-    after = modality_lifecycle.Checkpoint.read_verified("checkpoint.json", KEY)
+    assert report.verify(KEY)
+    after = modality_lifecycle.Checkpoint.load("checkpoint.json", KEY)
     assert after.status == "completed"
     assert after.schema_version == checkpoints.VERSION
     assert after.digests.stages[: len(before.completed)] == (

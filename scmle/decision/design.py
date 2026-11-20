@@ -218,7 +218,7 @@ def simulate(
     """
     qualification.count(runs, "runs", minimum=1)
     chosen = float(plan.promotion) if level is None else level
-    rng = randomness.component_rng(seed, "decision.design.esn", 0)
+    rng = randomness.spawn(seed, "decision.design.esn", 0)
     q = plan.assignment
     arm = (rng.random((runs, plan.limit)) < q).astype(float)
     y = (rng.random((runs, plan.limit)) < p_control + effect * arm).astype(

@@ -64,11 +64,11 @@ class Footage(curators.Preparer):
 
     Attributes:
         dataset: Immutable video dataset the adapter wraps.
-        frame_decoder: Caller-supplied frame decoder, or None to use container
+        decoder: Caller-supplied frame decoder, or None to use container
             metadata only.
-        max_frames: Maximum number of frames sampled per video.
-        max_frame_pixels: Maximum number of pixels per decoded frame.
-        temporal_cutoff: Canonical observation time that separates training
+        frames: Maximum number of frames sampled per video.
+        pixels: Maximum number of pixels per decoded frame.
+        cutoff: Canonical observation time that separates training
             from later data, or None to split by group.
     """
 
@@ -77,36 +77,32 @@ class Footage(curators.Preparer):
     def __init__(
         self,
         dataset: video.Dataset,
-        frame_decoder: video.VideoFrameDecoder | None = None,
-        max_frames: int = 8,
-        max_frame_pixels: int = 1_000_000,
-        temporal_cutoff: datetime | str | None = None,
+        decoder: video.VideoFrameDecoder | None = None,
+        frames: int = 8,
+        pixels: int = 1_000_000,
+        cutoff: datetime | str | None = None,
     ) -> None:
         """Binds a dataset, decoder, and optional explicit temporal policy.
 
         Args:
             dataset: Videos the lifecycle runs on.
-            frame_decoder: Decoder that turns encoded bytes and a frame index
+            decoder: Decoder that turns encoded bytes and a frame index
                 into pixels; if None, only container metadata is used.
-            max_frames: Maximum number of frames sampled per video.
-            max_frame_pixels: Maximum number of pixels per decoded frame.
-            temporal_cutoff: Time that separates training from later data, if
+            frames: Maximum number of frames sampled per video.
+            pixels: Maximum number of pixels per decoded frame.
+            cutoff: Time that separates training from later data, if
                 the split must be temporal.
 
         Raises:
-            ValueError: If `max_frames` or `max_frame_pixels` is below 1.
+            ValueError: If `frames` or `pixels` is below 1.
         """
-        if max_frames < 1 or max_frame_pixels < 1:
+        if frames < 1 or pixels < 1:
             raise errors.InputError("frame bounds must be positive")
         self.dataset = dataset
-        self.frame_decoder = frame_decoder
-        self.max_frames = max_frames
-        self.max_frame_pixels = max_frame_pixels
-        self.temporal_cutoff = (
-            video.timestamp(temporal_cutoff)
-            if temporal_cutoff is not None
-            else None
-        )
+        self.decoder = decoder
+        self.frames = frames
+        self.pixels = pixels
+        self.cutoff = video.timestamp(cutoff) if cutoff is not None else None
 
     @property
     def digest(self) -> str:
@@ -136,8 +132,8 @@ class Footage(curators.Preparer):
             Train, validation and test partitions with their group IDs. With a
             temporal cutoff, validation is empty and test holds the later data.
         """
-        if self.temporal_cutoff is not None:
-            temporal_result = self.dataset.cutover(self.temporal_cutoff)
+        if self.cutoff is not None:
+            temporal_result = self.dataset.cutover(self.cutoff)
             return containers.Partitions(
                 temporal_result.train,
                 (),
@@ -169,18 +165,18 @@ class Footage(curators.Preparer):
         dataset = video.Dataset(tuple(samples))
         prepared = (
             dataset.summarize(
-                self.frame_decoder,
-                max_frames=self.max_frames,
-                max_frame_pixels=self.max_frame_pixels,
+                self.decoder,
+                max_frames=self.frames,
+                max_frame_pixels=self.pixels,
             )
-            if self.frame_decoder is not None
+            if self.decoder is not None
             else dataset.numerize()
         )
         return containers.Batch(
             tuple(prepared.sources), prepared.names, prepared.materialize()
         )
 
-    def sample_id(self, sample: video.Sample) -> str:
+    def sample(self, sample: video.Sample) -> str:
         """Gives the video source identity.
 
         Args:
@@ -231,7 +227,7 @@ class Footage(curators.Preparer):
         representation = (
             "The baseline uses caller-decoded, evenly sampled frame "
             "statistics with a bounded pixel budget."
-            if self.frame_decoder is not None
+            if self.decoder is not None
             else "The baseline uses probed container metadata and never "
             "silently decodes frames."
         )
@@ -268,13 +264,13 @@ class Footage(curators.Preparer):
         """
         if not isinstance(sample, video.Sample):
             raise errors.KindError("sample must be a Sample")
-        if self.frame_decoder is None:
+        if self.decoder is None:
             return curators.unavailable(
                 "temporal_frame_statistics_occlusion",
                 "an explicit frame decoder is required",
             )
         prepared = self.features((sample,))
-        frame_indices = self.dataset.stride(sample, self.max_frames)
+        frame_indices = self.dataset.stride(sample, self.frames)
         full_score, terms = occlusion(
             sample, model, prepared.values[0], frame_indices
         )
@@ -307,12 +303,12 @@ class Footage(curators.Preparer):
             seconds and score change (masked minus original); or status
             "not_available" if no frame decoder is set.
         """
-        if self.frame_decoder is None:
+        if self.decoder is None:
             return curators.unavailable(
                 "raw_video_frame_occlusion",
                 "an explicit frame decoder is required",
             )
-        frame_indices = self.dataset.stride(sample, self.max_frames)
+        frame_indices = self.dataset.stride(sample, self.frames)
         windows = frames(self, sample, model, frame_indices, original_score)
         return {
             "status": "available",
@@ -409,7 +405,7 @@ def frames(
     Raises:
         RuntimeError: If the preparer has no frame decoder.
     """
-    decoder = preparer.frame_decoder
+    decoder = preparer.decoder
     if decoder is None:
         raise errors.OrderError("an explicit frame decoder is required")
     windows: list[Blank] = []
@@ -427,8 +423,8 @@ def frames(
 
         prepared = video.Dataset((sample,)).summarize(
             blackout,
-            max_frames=preparer.max_frames,
-            max_frame_pixels=preparer.max_frame_pixels,
+            max_frames=preparer.frames,
+            max_frame_pixels=preparer.pixels,
         )
         values = prepared.materialize()[0]
         score = float(

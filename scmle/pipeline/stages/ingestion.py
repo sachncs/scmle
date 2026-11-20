@@ -27,8 +27,8 @@ class Intake(products.Derived):
     Attributes:
         frame: The ingested rows.
         manifest: The dataset's identity.
-        cleaning_notes: Repairs made while reading.
-        read_seconds: Seconds the read took.
+        notes: Repairs made while reading.
+        read: Seconds the read took.
         stream: The chunked source and its totals, when streamed.
         kind: The kind of the rows, which the later stages profile, split
             and decode through; rows given in memory are a table.
@@ -36,8 +36,8 @@ class Intake(products.Derived):
 
     frame: pandas.DataFrame
     manifest: provenance.DatasetManifest
-    cleaning_notes: list[str]
-    read_seconds: float
+    notes: list[str]
+    read: float
     stream: tuple[streaming.Feed, streaming.Totals] | None
     kind: kinds.Kind = kinds.TABULAR
 
@@ -49,14 +49,15 @@ class Intake(products.Derived):
         """
         return {
             "digests": dict(self.manifest.digests),
-            "notes": list(self.cleaning_notes),
+            "notes": list(self.notes),
             "streamed": self.stream is not None,
         }
 
 
-class IngestStage(interface.Stage):
+class Ingest(interface.Stage):
     """Reads the dataset and fingerprints it."""
 
+    recorded: ClassVar[str] = "IngestStage"
     makes: ClassVar[type[products.Product] | None] = Intake
     state: ClassVar[scmle.runtime.state.Progress] = (
         scmle.runtime.state.Progress.VALIDATING
@@ -103,8 +104,8 @@ class IngestStage(interface.Stage):
         started = board.services.clock.monotonic()
         stream = None
         kind: kinds.Kind = kinds.TABULAR
-        if board.services.input_frame is not None:
-            frame = board.services.input_frame.copy(deep=False)
+        if board.services.frame is not None:
+            frame = board.services.frame.copy(deep=False)
         else:
             kind = kinds.pick(data)
             frame, stream = kind.read(spec)
@@ -128,7 +129,7 @@ class IngestStage(interface.Stage):
             )
         frame = self.graph(board, frame)
         self.forbid(board, manifest)
-        board.journal.write_json("dataset_manifest.json", manifest.to_dict())
+        board.journal.write("dataset_manifest.json", manifest.to_dict())
         board.journal.track(
             dataset_id=manifest.identifier, data_hash=manifest.digests["data"]
         )
@@ -215,7 +216,7 @@ class IngestStage(interface.Stage):
         record = registry.to_dict()
         record["current_snapshot_id"] = snapshot.snapshot
         record["schema_compatibility"] = compatibility.to_dict()
-        board.journal.write_json("source_registry.json", record)
+        board.journal.write("source_registry.json", record)
         board.journal.emit(
             "source.snapshot",
             "source identity and schema evolution recorded",

@@ -65,7 +65,7 @@ def test_a_child_process_failure_reaches_the_parent_with_its_frames():
 
 def test_a_lost_trial_records_its_failure():
     class Job:
-        trial_id, model_name, params, strategy = "t1", "m", {}, "default"
+        trial, model, params, strategy = "t1", "m", {}, "default"
 
     class Metric:
         name = "accuracy"

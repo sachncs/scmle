@@ -46,7 +46,7 @@ class Screen(products.Derived):
 class Screening(surveying.Surveying):
     """The leakage policy enforced and the feature set synthesised.
 
-    Part of `ProfileStage`, which inherits these methods unchanged;
+    Part of `Profiling`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 
@@ -157,7 +157,7 @@ class Screening(surveying.Surveying):
         if block.entity is not None:
             merged = self.regroup(board, block.entity, merged)
         for name, document in result.documents.items():
-            board.journal.write_json(name, document)
+            board.journal.write(name, document)
         board.journal.emit(
             "ingest.completed",
             f"{result.declared} features synthesized through the as-of views",
@@ -198,7 +198,7 @@ class Screening(surveying.Surveying):
                 f"the entity group column {entity.column!r} collides with a "
                 "column of the table"
             )
-        groups, document = ingest_stage.resolve_entities(frame, entity)
+        groups, document = ingest_stage.resolve(frame, entity)
         frame = frame.assign(**{entity.column: groups})
         board.amend(
             board.services.spec.model_copy(
@@ -209,7 +209,7 @@ class Screening(surveying.Surveying):
                 }
             )
         )
-        board.journal.write_json("entity_resolution.json", document)
+        board.journal.write("entity_resolution.json", document)
         board.journal.emit(
             "ingest.entities",
             f"{document['records']} rows resolved to {document['groups']} "

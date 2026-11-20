@@ -98,6 +98,6 @@ def summarize(
         n=n,
         decision=decision,
         subset=set_id,
-        seeds=randomness.seed_path(cfg.seed, path, 1),
+        seeds=randomness.seed(cfg.seed, path, 1),
         tier=qualification.Tier.UNVERIFIED,
     )

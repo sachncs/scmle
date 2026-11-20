@@ -455,7 +455,7 @@ def test_the_lifecycle_preparer_derives_its_block_side_by_default():
             zip(points, values, strict=True)
         )
     )
-    preparer = modality_lifecycle.GeospatialPreparer(
+    preparer = modality_lifecycle.Geospatial(
         dataset.Dataset(marks, crs="EPSG:3857")
     )
     assert preparer.side > 1.0

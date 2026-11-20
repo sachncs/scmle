@@ -77,9 +77,9 @@ def test_a_bad_release_is_detected_and_rolled_back():
     result = release.bad_release()
     assert result.checks, result
     assert all(result.checks.values()), result.checks
-    assert result.fault_id == "bad_release"
+    assert result.fault == "bad_release"
     assert result.detail["processes_still_alive_after_close"] == 0
-    assert all(m.rpo_lost == 0 for m in result.measurements)
+    assert all(m.lost == 0 for m in result.measurements)
     detail = result.detail
     assert detail["detected_after_labelled_cases"] % 3 == 0
     assert detail["rollback"]["done"] is True

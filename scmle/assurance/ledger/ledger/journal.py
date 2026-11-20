@@ -169,7 +169,7 @@ class Journal(chain.Replay):
                 else qualification.Decision.PASS
             ),
             subset=qualification.Subset.EXPLORATION,
-            seeds=randomness.seed_path(
+            seeds=randomness.seed(
                 self.seed, f"ledger.{hypothesis.spec.statistic}", index
             ),
             tier=qualification.Tier.UNVERIFIED,

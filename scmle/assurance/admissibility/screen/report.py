@@ -542,7 +542,7 @@ def weigh(
         rest = rival(h, pending, problem, apart)
     if rest is not None and h.data is not None:
         path = f"leakage.screen.margin.{h.feature}"
-        rng = randomness.component_rng(cfg.seed, path, 0)
+        rng = randomness.spawn(cfg.seed, path, 0)
         mine = reading(h, h.data, frame, problem)
         suspect = margin(problem, mine, rest, cfg, groups, rng) >= 0
     return bound, suspect

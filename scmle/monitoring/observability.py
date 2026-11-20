@@ -18,13 +18,13 @@ class Evaluation:
     Attributes:
         passed: True only if nothing is missing, expired, from the future or
             over a threshold.
-        observed_at: Evaluation time as given.
-        missing_signals: Required signal kinds with no metric, sorted.
-        expired_metrics: Names of metrics older than the retention window,
+        observed: Evaluation time as given.
+        signals: Required signal kinds with no metric, sorted.
+        metrics: Names of metrics older than the retention window,
             sorted.
-        future_metrics: Names of metrics timestamped after `observed_at`,
+        future: Names of metrics timestamped after `observed`,
             sorted.
-        threshold_breaches: Metrics over their alert threshold, each with the
+        breaches: Metrics over their alert threshold, each with the
             metric name, observed value, threshold and unit, sorted by name.
         KEYS: Version-1 keys to the written ones (`observed`, `missing`,
             `expired`, `future`, `breaches`); `downgrade` restores version 1.
@@ -41,11 +41,11 @@ class Evaluation:
     )
 
     passed: bool
-    observed_at: str
-    missing_signals: tuple[str, ...]
-    expired_metrics: tuple[str, ...]
-    future_metrics: tuple[str, ...]
-    threshold_breaches: tuple[dict[str, Any], ...]
+    observed: str
+    signals: tuple[str, ...]
+    metrics: tuple[str, ...]
+    future: tuple[str, ...]
+    breaches: tuple[dict[str, Any], ...]
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a deterministic JSON-compatible evaluation.
@@ -56,12 +56,12 @@ class Evaluation:
         return self.KEYS.upgrade(
             {
                 "passed": self.passed,
-                "observed_at": self.observed_at,
-                "missing_signals": list(self.missing_signals),
-                "expired_metrics": list(self.expired_metrics),
-                "future_metrics": list(self.future_metrics),
+                "observed_at": self.observed,
+                "missing_signals": list(self.signals),
+                "expired_metrics": list(self.metrics),
+                "future_metrics": list(self.future),
                 "threshold_breaches": [
-                    dict(breach) for breach in self.threshold_breaches
+                    dict(breach) for breach in self.breaches
                 ],
             }
         )
@@ -89,7 +89,7 @@ def evaluate(
         older than the retention window or later than `observed_at`, or a value
         exceeds its threshold.
     """
-    observed_timestamp = parse_timestamp(observed_at, "observed_at")
+    observed_timestamp = parse(observed_at, "observed_at")
     cutoff = observed_timestamp - datetime.timedelta(days=policy.retention_days)
     observed_signals = {metric.kind for metric in metrics}
     missing = tuple(
@@ -103,7 +103,7 @@ def evaluate(
     future = []
     breaches = []
     for metric in metrics:
-        timestamp = parse_timestamp(metric.timestamp, "metric.timestamp")
+        timestamp = parse(metric.timestamp, "metric.timestamp")
         if timestamp < cutoff:
             expired.append(metric.name)
         if timestamp > observed_timestamp:
@@ -120,17 +120,15 @@ def evaluate(
             )
     return Evaluation(
         passed=not missing and not expired and not future and not breaches,
-        observed_at=observed_at,
-        missing_signals=missing,
-        expired_metrics=tuple(sorted(expired)),
-        future_metrics=tuple(sorted(future)),
-        threshold_breaches=tuple(
-            sorted(breaches, key=lambda breach: breach["metric"])
-        ),
+        observed=observed_at,
+        signals=missing,
+        metrics=tuple(sorted(expired)),
+        future=tuple(sorted(future)),
+        breaches=tuple(sorted(breaches, key=lambda breach: breach["metric"])),
     )
 
 
-def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
+def parse(value: str, field_name: str) -> datetime.datetime:
     """Parses a timezone-aware timestamp for temporal policy checks.
 
     Args:

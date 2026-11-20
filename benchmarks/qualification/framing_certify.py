@@ -149,7 +149,7 @@ def world(
         The outcome `y`, the model's action `a`, the baseline's action `b`
         (each 0/1 per row) and the cluster index of each row.
     """
-    rng = randomness.component_rng(seed, "framing.world", clusters)
+    rng = randomness.spawn(seed, "framing.world", clusters)
     concentration = (1 - RHO) / RHO
     prevalence = rng.beta(
         PREVALENCE * concentration,
@@ -334,7 +334,7 @@ def label_world(
     Returns:
         A boolean array of observed outcomes and the 0/1 array `b`.
     """
-    rng = randomness.component_rng(seed, "framing.labels", int(planted))
+    rng = randomness.spawn(seed, "framing.labels", int(planted))
     b = (rng.random(LABEL_ROWS) < B_SHARE).astype(float)
     if planted:
         keep = rng.uniform(0.0, 0.3)
@@ -373,7 +373,7 @@ def label_certificate(
         detected=detected,
         clean=LABEL_RUNS,
         alarms=alarms,
-        seeds=randomness.seed_path(offset, "framing.certify.labels", 0),
+        seeds=randomness.seed(offset, "framing.certify.labels", 0),
     )
     cert = certificates.certify(
         baseline.DETECTOR_ID,
@@ -503,7 +503,7 @@ def omission_frame(
     Returns:
         The 600-row exploration table and the pilot's 0/1 actions.
     """
-    rng = randomness.component_rng(seed, "framing.omission", int(flips))
+    rng = randomness.spawn(seed, "framing.omission", int(flips))
     n = 600
     y = (rng.random(n) < FLIP_PREVALENCE).astype(int)
     if flips:

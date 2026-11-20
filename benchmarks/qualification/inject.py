@@ -213,7 +213,7 @@ def stream(seed: int, family: str, index: int) -> numpy.random.Generator:
     Returns:
         The generator for `inject.<family>` at that index.
     """
-    return randomness.component_rng(seed, f"inject.{family}", index)
+    return randomness.spawn(seed, f"inject.{family}", index)
 
 
 def blank_mask(frame: pandas.DataFrame) -> pandas.DataFrame:
@@ -270,7 +270,7 @@ def finish(
         frame=frame,
         mask=mask,
         defect_type=defect_type,
-        seed_path=randomness.seed_path(seed, f"inject.{family}", index),
+        seed_path=randomness.seed(seed, f"inject.{family}", index),
         info=dict(info),
     )
 

@@ -178,7 +178,7 @@ def shift_samples(
         Two frames of `SHIFT_ROWS` rows and `SHIFT_COLUMNS` standard normal
         columns `x0`, `x1`, ....
     """
-    rng = randomness.component_rng(seed, "f6.shift.world", int(planted))
+    rng = randomness.spawn(seed, "f6.shift.world", int(planted))
     names = [f"x{k}" for k in range(SHIFT_COLUMNS)]
     first = pandas.DataFrame(
         rng.normal(size=(SHIFT_ROWS, SHIFT_COLUMNS)), columns=names
@@ -242,7 +242,7 @@ def stability_world(
     Raises:
         ValueError: If `kind` is not a known kind.
     """
-    rng = randomness.component_rng(seed, f"f6.stability.world.{kind}", 0)
+    rng = randomness.spawn(seed, f"f6.stability.world.{kind}", 0)
     pool = source_values()
     x = rng.permutation(pool)[:STABILITY_ROWS].copy()
     noise = rng.normal(size=STABILITY_ROWS)
@@ -340,7 +340,7 @@ def shift_certificate(
         detected=detected,
         clean=null_count,
         alarms=false_alarms,
-        seeds=randomness.seed_path(offset, f"f6.certify.{test}", 0),
+        seeds=randomness.seed(offset, f"f6.certify.{test}", 0),
     )
     cert = certificates.certify(
         test,
@@ -424,7 +424,7 @@ def stability_certificate(
                 detected=found,
                 clean=STABLE_REPS,
                 alarms=false_alarms,
-                seeds=randomness.seed_path(offset, "f6.certify.stability", 0),
+                seeds=randomness.seed(offset, "f6.certify.stability", 0),
             )
         )
     pool = pandas.Series(source_values()).to_frame("value")

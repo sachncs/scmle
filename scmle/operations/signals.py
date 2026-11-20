@@ -1,6 +1,6 @@
 """Windowed monitors: service health, feature quality, drift, delayed labels.
 
-`SignalMonitor` turns raw events into `Signal` rows over a sliding window:
+`Monitor` turns raw events into `Signal` rows over a sliding window:
 
 * infrastructure: server error rate, availability and p95 latency from
   request events (every request is counted; none is sampled);
@@ -111,17 +111,17 @@ class Window:
     """The window every monitor looks at.
 
     Attributes:
-        window_seconds: Length of the sliding window.
-        min_samples: Fewest observations a signal needs to be judged.
-        sample_rate: Share of feature rows kept, in (0, 1].
+        window: Length of the sliding window.
+        minimum: Fewest observations a signal needs to be judged.
+        sampling: Share of feature rows kept, in (0, 1].
         seed: Seed of the row sampler (deterministic).
         capacity: Most feature rows kept; past it the oldest go first, so
             memory stays bounded however busy the service is.
     """
 
-    window_seconds: float = 300.0
-    min_samples: int = 30
-    sample_rate: float = 1.0
+    window: float = 300.0
+    minimum: int = 30
+    sampling: float = 1.0
     seed: int = 0
     capacity: int = CAPACITY
 
@@ -133,47 +133,47 @@ class Window:
                 positive, the sample rate is outside (0, 1], or the
                 capacity is below the minimum sample count.
         """
-        if self.window_seconds <= 0 or self.min_samples < 1:
+        if self.window <= 0 or self.minimum < 1:
             raise errors.InputError(
                 "window_seconds and min_samples must be positive"
             )
-        if not 0.0 < self.sample_rate <= 1.0:
+        if not 0.0 < self.sampling <= 1.0:
             raise errors.InputError("sample_rate must be in (0, 1]")
-        if self.capacity < self.min_samples:
+        if self.capacity < self.minimum:
             raise errors.InputError("capacity must be at least min_samples")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SignalThresholds:
+class Thresholds:
     """Limits per signal. The defaults are starting points, not findings.
 
     Attributes:
-        server_error_rate: Largest tolerated share of 5xx.
+        errors: Largest tolerated share of 5xx.
         availability: Smallest tolerated share of requests that were not
             5xx or 429.
-        latency_p95_seconds: Largest tolerated p95 latency.
-        invalid_request_rate: Largest tolerated share of rejected inputs.
-        missing_rate_increase: Largest rise of a feature's missing share over
+        latency: Largest tolerated p95 latency.
+        invalid: Largest tolerated share of rejected inputs.
+        missingness: Largest rise of a feature's missing share over
             its reference.
         drift: Thresholds shared with `scmle.monitoring.monitor`; the
             ``psi_high`` limit applies to the largest feature PSI and the
             ``unseen_category_rate`` limit to the largest unseen-category
             rate.
-        reference_loss: Mean loss at training time.
-        loss_tolerance: Largest tolerated rise of the windowed mean loss
-            over ``reference_loss``; the loss limit is their sum.
+        loss: Mean loss at training time.
+        tolerance: Largest tolerated rise of the windowed mean loss
+            over ``loss``; the loss limit is their sum.
     """
 
-    server_error_rate: float = 0.05
+    errors: float = 0.05
     availability: float = 0.99
-    latency_p95_seconds: float = 1.0
-    invalid_request_rate: float = 0.05
-    missing_rate_increase: float = 0.05
+    latency: float = 1.0
+    invalid: float = 0.05
+    missingness: float = 0.05
     drift: monitor.Thresholds = dataclasses.field(
         default_factory=monitor.Thresholds
     )
-    reference_loss: float = 0.1
-    loss_tolerance: float = 0.05
+    loss: float = 0.1
+    tolerance: float = 0.05
 
 
 KIND_OF = {
@@ -266,7 +266,7 @@ def measure(
 def quality(
     profile: scmle.data.reference.Baseline,
     frames: list[pandas.DataFrame],
-    limits: SignalThresholds,
+    limits: Thresholds,
     minimum: int,
 ) -> list[Signal]:
     """Judges feature quality and drift against the training reference.
@@ -298,14 +298,14 @@ def quality(
             "feature_missing_increase",
             Category.DATA_QUALITY,
             worst_missing,
-            limits.missing_rate_increase,
+            limits.missingness,
             "max",
             count,
             minimum,
             features=sorted(
                 key
                 for key, value in missing.items()
-                if value > limits.missing_rate_increase
+                if value > limits.missingness
             ),
         ),
         judge(
@@ -335,13 +335,13 @@ def quality(
     ]
 
 
-class SignalMonitor:
+class Monitor:
     """Collects events and evaluates every signal over a sliding window."""
 
     def __init__(
         self,
         policy: Window = Window(),  # noqa: B008
-        thresholds: SignalThresholds = SignalThresholds(),  # noqa: B008
+        thresholds: Thresholds = Thresholds(),  # noqa: B008
         profile: scmle.data.reference.Baseline | None = None,
     ) -> None:
         """Creates a monitor.
@@ -406,7 +406,7 @@ class SignalMonitor:
         """
         if frame.empty:
             return 0
-        keep = self.sampler.random(len(frame)) < self.policy.sample_rate
+        keep = self.sampler.random(len(frame)) < self.policy.sampling
         kept = frame.loc[keep].to_dict("records")
         if kept:
             with self.lock:
@@ -427,7 +427,7 @@ class SignalMonitor:
                 self.features[0] = (at, oldest[excess:])
                 self.held -= excess
 
-    def observe_outcomes(
+    def observe(
         self, at: float, losses: Sequence[float] | numpy.ndarray
     ) -> None:
         """Records losses in [0, 1] of cases whose outcome has arrived.
@@ -464,7 +464,7 @@ class SignalMonitor:
         Args:
             now: The current time, in epoch seconds.
         """
-        start = now - self.policy.window_seconds
+        start = now - self.policy.window
         for queue in (self.requests, self.outcomes):
             while queue and queue[0][0] < start:
                 queue.popleft()
@@ -514,7 +514,7 @@ class SignalMonitor:
         """
         size = len(requests)
         limits = self.thresholds
-        minimum = self.policy.min_samples
+        minimum = self.policy.minimum
         statuses = numpy.array([r[2] for r in requests], dtype=int)
         seconds = numpy.array([r[3] for r in requests], dtype=float)
         server = (
@@ -538,7 +538,7 @@ class SignalMonitor:
                 "server_error_rate",
                 Category.INFRASTRUCTURE,
                 server,
-                limits.server_error_rate,
+                limits.errors,
                 "max",
                 size,
                 minimum,
@@ -556,7 +556,7 @@ class SignalMonitor:
                 "latency_p95_seconds",
                 Category.INFRASTRUCTURE,
                 p95,
-                limits.latency_p95_seconds,
+                limits.latency,
                 "max",
                 size,
                 minimum,
@@ -585,7 +585,7 @@ class SignalMonitor:
             sampled rows number at least the minimum.
         """
         limits = self.thresholds
-        minimum = self.policy.min_samples
+        minimum = self.policy.minimum
         size = len(requests)
         invalid = (
             float(numpy.mean([r[2] in INVALID_STATUSES for r in requests]))
@@ -597,7 +597,7 @@ class SignalMonitor:
                 "invalid_request_rate",
                 Category.DATA_QUALITY,
                 invalid,
-                limits.invalid_request_rate,
+                limits.invalid,
                 "max",
                 size,
                 minimum,
@@ -626,11 +626,11 @@ class SignalMonitor:
                 "windowed_loss",
                 Category.MODEL_PERFORMANCE,
                 mean,
-                limits.reference_loss + limits.loss_tolerance,
+                limits.loss + limits.tolerance,
                 "max",
                 int(values.size),
-                self.policy.min_samples,
-                reference_loss=limits.reference_loss,
+                self.policy.minimum,
+                reference_loss=limits.loss,
             )
         ]
 
@@ -658,7 +658,7 @@ def misses(predictions: Sequence[Any], labels: Sequence[Any]) -> numpy.ndarray:
     )
 
 
-def as_metric_samples(
+def convert(
     signals: Sequence[Signal],
     timestamp: str,
     labels: dict[str, str] | None = None,

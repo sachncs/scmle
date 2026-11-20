@@ -43,12 +43,12 @@ class Response:
     """What the desk did for one window.
 
     Attributes:
-        incident_id: Id of the incident, or None when the verdict is none
+        incident: Id of the incident, or None when the verdict is none
             (no signal breached, or no signals at all).
         classification: The verdict and its evidence.
         deliveries: Pager and ticket outcomes.
-        telemetry_digest: SHA-256 of the line retained for the window.
-        audit_head: Hash of the newest audit row: the one that opened the
+        digest: SHA-256 of the line retained for the window.
+        head: Hash of the newest audit row: the one that opened the
             incident, or the current ledger head if none was opened.
         KEYS: Version-1 keys to the written ones (`incident`,
             `digests.telemetry`, `head`); `downgrade` restores version 1.
@@ -59,11 +59,11 @@ class Response:
         groups={"digests": {"telemetry_digest": "telemetry"}},
     )
 
-    incident_id: str | None
+    incident: str | None
     classification: classify.Classification
     deliveries: tuple[notify.Delivery, ...]
-    telemetry_digest: str
-    audit_head: str
+    digest: str
+    head: str
 
     def to_dict(self) -> dict[str, Any]:
         """A JSON-ready record.
@@ -74,11 +74,11 @@ class Response:
         """
         return self.KEYS.upgrade(
             {
-                "incident_id": self.incident_id,
+                "incident_id": self.incident,
                 "classification": self.classification.to_dict(),
                 "deliveries": [d.to_dict() for d in self.deliveries],
-                "telemetry_digest": self.telemetry_digest,
-                "audit_head": self.audit_head,
+                "telemetry_digest": self.digest,
+                "audit_head": self.head,
             }
         )
 
@@ -109,8 +109,8 @@ class Desk:
         self.directory = pathlib.Path(directory)
         self.audit = audit
         self.notifier = notifier
-        self.model_version = model_version
-        self.artifact_digest = artifact_digest
+        self.version = model_version
+        self.digest = artifact_digest
         self.clock = clock
 
     @property
@@ -134,8 +134,8 @@ class Desk:
         line = json.dumps(
             {
                 "at": round(at, 3),
-                "model_version": self.model_version,
-                "artifact_digest": self.artifact_digest,
+                "model_version": self.version,
+                "artifact_digest": self.digest,
                 "signals": [s.to_dict() for s in signal_rows],
             },
             sort_keys=True,
@@ -219,8 +219,8 @@ class Desk:
             classify.notification(
                 found,
                 incident_id,
-                self.model_version,
-                self.artifact_digest,
+                self.version,
+                self.digest,
                 trace,
                 stamp,
             )
@@ -233,8 +233,8 @@ class Desk:
             breached=list(found.breached),
             telemetry_digest=digest,
             trace_id=trace,
-            model_version=self.model_version,
-            artifact_digest=self.artifact_digest,
+            model_version=self.version,
+            artifact_digest=self.digest,
             deliveries=[
                 {"kind": d.kind, "delivered": d.delivered, "reason": d.reason}
                 for d in deliveries

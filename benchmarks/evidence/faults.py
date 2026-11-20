@@ -854,7 +854,7 @@ def admissibility(attest: bool) -> str | None:
         }
         context: Any = types.SimpleNamespace(
             services=types.SimpleNamespace(spec=spec),
-            journal=types.SimpleNamespace(write_json=ignore, emit=ignore),
+            journal=types.SimpleNamespace(write=ignore, emit=ignore),
             get=made.__getitem__,
         )
         charter: Any = types.SimpleNamespace(
@@ -863,7 +863,7 @@ def admissibility(attest: bool) -> str | None:
             digest=scope,
         )
         view = types.SimpleNamespace(features=features, target=target)
-        found = stages.ProfileStage().qualify_exploration(
+        found = stages.Profiling().qualify(
             context, tasks.Task.BINARY, charter, view, ()
         )
     rows = [c for s, c in found.checks if s == qualify.ATTESTATION_SOURCE]
@@ -1277,7 +1277,7 @@ def overrun(spent: bool, part: str = "simulated") -> Any:
     import scmle.api.project
     from scmle.pipeline import stages
 
-    class Late(stages.TrainStage):
+    class Late(stages.Training):
         """Training that first spends the whole budget when `spent`."""
 
         def execute(self, board: Any) -> Any:
@@ -1302,7 +1302,7 @@ def overrun(spent: bool, part: str = "simulated") -> Any:
         **{**FAST, **options},
     )
     project.orchestrator.stages = tuple(
-        Late() if isinstance(stage, stages.TrainStage) else stage
+        Late() if isinstance(stage, stages.Training) else stage
         for stage in project.orchestrator.stages
     )
     return project.run()
@@ -1773,7 +1773,7 @@ def plugin(fault: str) -> type:
         """Reaches for the locked test rows after selection."""
 
         state = scmle.runtime.state.Progress.SELECTING
-        requires = (selecting.SelectStage,)
+        requires = (selecting.Selection,)
 
         def describe(self, context: Any) -> str:
             """Names the stage.

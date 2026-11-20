@@ -96,7 +96,7 @@ class Inspection:
 
         Raises:
             DataError: If a configured column is absent from the data, or
-                the weight column fails `check_weights`.
+                the weight column fails `check`.
         """
         data = self.spec.data
         roles = dict.fromkeys(data.id_columns, "id column")
@@ -123,10 +123,10 @@ class Inspection:
                     f"configured column '{column}' not found in dataset"
                 )
         if data.weight_column:
-            self.check_weights(frame[data.weight_column])
+            self.check(frame[data.weight_column])
         return roles
 
-    def check_weights(self, weights: pandas.Series) -> None:
+    def check(self, weights: pandas.Series) -> None:
         """Requires finite, non-negative weights with a positive total.
 
         Args:
@@ -235,7 +235,7 @@ class Inspection:
                     )
         return nodes
 
-    def duplicate_count(self, frame: pandas.DataFrame) -> int:
+    def count(self, frame: pandas.DataFrame) -> int:
         """Counts rows duplicated apart from their identifier columns.
 
         Args:
@@ -301,7 +301,7 @@ class Inspection:
             combinations that carry more than one label.
         """
         data = self.spec.data
-        duplicates = self.duplicate_count(frame)
+        duplicates = self.count(frame)
         if not duplicates:
             return []
         findings = [f"{duplicates} duplicate rows"]

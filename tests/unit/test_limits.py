@@ -29,25 +29,25 @@ def test_the_trial_window_and_memory_gate_trials(monkeypatch):
     # was admitted only if one fits); memory spares it so a result exists.
     tight = limits.Governor(
         tasks.Resources(time_budget_seconds=1),
-        started_at=time.monotonic() - 5,
+        started=time.monotonic() - 5,
     )
-    assert "trial window" in tight.skip_reason(first=True)
-    assert "trial window" in tight.skip_reason(first=False)
+    assert "trial window" in tight.skip(first=True)
+    assert "trial window" in tight.skip(first=False)
     roomy = governor(time_budget_seconds=1000)
-    assert roomy.skip_reason(first=False) is None
-    monkeypatch.setattr(limits, "peak_memory_gb", lambda: 99.0)
-    assert "memory limit" in roomy.skip_reason(first=False)
-    assert roomy.skip_reason(first=True) is None
+    assert roomy.skip(first=False) is None
+    monkeypatch.setattr(limits, "watermark", lambda: 99.0)
+    assert "memory limit" in roomy.skip(first=False)
+    assert roomy.skip(first=True) is None
 
 
 def test_peak_memory_is_positive_and_plausible():
-    assert 0.01 < limits.peak_memory_gb() < 1024
+    assert 0.01 < limits.watermark() < 1024
 
 
 def test_report_states_enforcement_honestly(monkeypatch):
     # Enforces docs/ARCHITECTURE.md:90.
     # Enforces README.md:157.
-    monkeypatch.setattr(limits, "peak_memory_gb", lambda: 1.5)
+    monkeypatch.setattr(limits, "watermark", lambda: 1.5)
     report = governor(workers=4, cpu_limit=2, memory_limit_gb=1.0).report()
     assert (
         report["cpu"]["workers"] == 2
@@ -63,7 +63,7 @@ def test_report_states_enforcement_honestly(monkeypatch):
 def test_until_splits_the_budget_into_a_trial_window_and_a_finish():
     started = time.monotonic()
     timed = limits.Governor(
-        tasks.Resources(time_budget_seconds=100), started_at=started
+        tasks.Resources(time_budget_seconds=100), started=started
     )
     timed.reserve.parts = {"refit": 10.0, "diagnostics": 6.0, "package": 4.0}
     assert timed.until("finish") == started + 100
@@ -75,7 +75,7 @@ def test_until_splits_the_budget_into_a_trial_window_and_a_finish():
 def test_a_trial_ceiling_ends_at_the_trial_window_with_no_grace():
     started = time.monotonic()
     timed = limits.Governor(
-        tasks.Resources(time_budget_seconds=100), started_at=started
+        tasks.Resources(time_budget_seconds=100), started=started
     )
     timed.reserve.parts = {"refit": 30.0}
     assert 69 < timed.deadline() <= 70
@@ -83,7 +83,7 @@ def test_a_trial_ceiling_ends_at_the_trial_window_with_no_grace():
         tasks.Resources(time_budget_seconds=10), time.monotonic() - 100
     )
     assert late.deadline() == 0.0
-    assert "trial window" in late.skip_reason(first=True)
+    assert "trial window" in late.skip(first=True)
     assert not hasattr(limits, "GRACE_SHARE")
 
 

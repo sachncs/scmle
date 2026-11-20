@@ -66,7 +66,7 @@ GRID_POINTS = 199
 MINIMUM_GRID_POINTS = 3  # fewer points cannot form a grid
 
 
-def validate_unit(value: Any, name: str) -> numpy.ndarray:
+def validate(value: Any, name: str) -> numpy.ndarray:
     """Checks that values are finite and lie in ``[0, 1]``.
 
     Args:
@@ -94,7 +94,7 @@ class Betting:
 
     With ``direction="greater"`` the null is "mean <= null_mean" and the test
     crosses when the mean is evidenced to be larger; with ``"less"`` the null
-    is "mean >= null_mean". `null_mean` may be an array (one test per entry,
+    is "mean >= null_mean". `null` may be an array (one test per entry,
     all fed the same observation), which is how the confidence sequence is
     built.
     """
@@ -128,7 +128,7 @@ class Betting:
             raise errors.InputError(
                 "null_mean must be strictly between 0 and 1"
             )
-        self.null_mean = mean
+        self.null = mean
         self.direction = direction
         self.alpha = alpha
         self.cap = cap
@@ -138,7 +138,7 @@ class Betting:
         self.count = 0
         self.total: Any = numpy.zeros(())
         self.deviation: Any = numpy.zeros(())
-        self.log_capital = numpy.zeros_like(mean)
+        self.capital = numpy.zeros_like(mean)
         self.peak = numpy.zeros_like(mean)
 
     @property
@@ -171,21 +171,21 @@ class Betting:
         Returns:
             The log capital after the observation.
         """
-        value = validate_unit(observation, "observation")
+        value = validate(observation, "observation")
         size = self.bet()
-        factor = 1.0 + self.sign * size * (value - self.null_mean)
-        self.log_capital = self.log_capital + numpy.log(factor)
-        self.peak = numpy.maximum(self.peak, self.log_capital)
+        factor = 1.0 + self.sign * size * (value - self.null)
+        self.capital = self.capital + numpy.log(factor)
+        self.peak = numpy.maximum(self.peak, self.capital)
         self.count += 1
         self.total = self.total + value
         previous = (0.5 + self.total) / (self.count + 1)
         self.deviation = self.deviation + (value - previous) ** 2
-        return self.log_capital
+        return self.capital
 
     @property
     def crossed(self) -> Any:
         """Whether the capital reached ``1 / alpha`` now."""
-        return self.log_capital >= self.threshold
+        return self.capital >= self.threshold
 
     @property
     def surpassed(self) -> Any:
@@ -195,7 +195,7 @@ class Betting:
     @property
     def e_value(self) -> numpy.ndarray:
         """The capital now: an e-value for the null at any stopping time."""
-        return numpy.asarray(numpy.exp(self.log_capital))
+        return numpy.asarray(numpy.exp(self.capital))
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the JSON-ready state (scalar tests only).
@@ -207,17 +207,17 @@ class Betting:
         Raises:
             ValueError: If the test has more than one null mean.
         """
-        if self.null_mean.ndim != 0:
+        if self.null.ndim != 0:
             raise errors.InputError("only a single test can be serialized")
         return {
-            "null_mean": float(self.null_mean),
+            "null_mean": float(self.null),
             "direction": self.direction,
             "alpha": self.alpha,
             "cap": self.cap,
             "count": self.count,
             "total": float(self.total),
             "deviation": float(self.deviation),
-            "log_capital": float(self.log_capital),
+            "log_capital": float(self.capital),
             "peak": float(self.peak),
         }
 
@@ -240,7 +240,7 @@ class Betting:
         test.count = int(record["count"])
         test.total = numpy.asarray(float(record["total"]))
         test.deviation = numpy.asarray(float(record["deviation"]))
-        test.log_capital = numpy.asarray(float(record["log_capital"]))
+        test.capital = numpy.asarray(float(record["log_capital"]))
         test.peak = numpy.asarray(float(record["peak"]))
         return test
 
@@ -275,7 +275,7 @@ class Mixture:
     ) -> None:
         """Creates the test and starts its first term.
 
-        `null_mean`, `direction`, `alpha` and `cap` are validated by the
+        `null`, `direction`, `alpha` and `cap` are validated by the
         `Betting` built for that term, which raises ValueError for a value
         outside the range given for it there.
 
@@ -292,7 +292,7 @@ class Mixture:
         """
         if stride < 1 or terms < 1:
             raise errors.InputError("stride and terms must be positive")
-        self.null_mean = numpy.asarray(null_mean, dtype=float)
+        self.null = numpy.asarray(null_mean, dtype=float)
         self.direction = direction
         self.alpha = alpha
         self.stride = stride
@@ -301,9 +301,9 @@ class Mixture:
         self.count = 0
         self.started = 0
         self.inner: list[Betting] = []
-        self.log_weights: list[float] = []
-        self.peak = numpy.zeros_like(self.null_mean)
-        self.log_capital = numpy.zeros_like(self.null_mean)
+        self.weights: list[float] = []
+        self.peak = numpy.zeros_like(self.null)
+        self.capital = numpy.zeros_like(self.null)
         self.spawn()
 
     def spawn(self) -> None:
@@ -312,15 +312,13 @@ class Mixture:
         The oldest term is dropped when more than `terms` are kept.
         """
         self.inner.append(
-            Betting(self.null_mean, self.direction, self.alpha, self.cap)
+            Betting(self.null, self.direction, self.alpha, self.cap)
         )
-        self.log_weights.append(
-            -math.log((self.started + 1) * (self.started + 2))
-        )
+        self.weights.append(-math.log((self.started + 1) * (self.started + 2)))
         self.started += 1
         if len(self.inner) > self.terms:
             self.inner.pop(0)
-            self.log_weights.pop(0)
+            self.weights.pop(0)
 
     @property
     def threshold(self) -> float:
@@ -345,19 +343,19 @@ class Mixture:
         self.count += 1
         stacked = numpy.stack(
             [
-                w + t.log_capital
-                for w, t in zip(self.log_weights, self.inner, strict=True)
+                w + t.capital
+                for w, t in zip(self.weights, self.inner, strict=True)
             ]
         )
         top = stacked.max(axis=0)
-        self.log_capital = top + numpy.log(numpy.exp(stacked - top).sum(axis=0))
-        self.peak = numpy.maximum(self.peak, self.log_capital)
-        return self.log_capital
+        self.capital = top + numpy.log(numpy.exp(stacked - top).sum(axis=0))
+        self.peak = numpy.maximum(self.peak, self.capital)
+        return self.capital
 
     @property
     def crossed(self) -> Any:
         """Whether the mixture reached ``1 / alpha`` now."""
-        return self.log_capital >= self.threshold
+        return self.capital >= self.threshold
 
     @property
     def surpassed(self) -> Any:
@@ -367,7 +365,7 @@ class Mixture:
     @property
     def e_value(self) -> numpy.ndarray:
         """The mixture now: an e-value at any stopping time."""
-        return numpy.asarray(numpy.exp(self.log_capital))
+        return numpy.asarray(numpy.exp(self.capital))
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the JSON-ready state (scalar tests only).
@@ -379,10 +377,10 @@ class Mixture:
         Raises:
             ValueError: If the test has more than one null mean.
         """
-        if self.null_mean.ndim != 0:
+        if self.null.ndim != 0:
             raise errors.InputError("only a single test can be serialized")
         return {
-            "null_mean": float(self.null_mean),
+            "null_mean": float(self.null),
             "direction": self.direction,
             "alpha": self.alpha,
             "stride": self.stride,
@@ -390,9 +388,9 @@ class Mixture:
             "cap": self.cap,
             "count": self.count,
             "started": self.started,
-            "log_weights": list(self.log_weights),
+            "log_weights": list(self.weights),
             "inner": [t.to_dict() for t in self.inner],
-            "log_capital": float(self.log_capital),
+            "log_capital": float(self.capital),
             "peak": float(self.peak),
         }
 
@@ -416,9 +414,9 @@ class Mixture:
         )
         test.count = int(record["count"])
         test.started = int(record["started"])
-        test.log_weights = [float(w) for w in record["log_weights"]]
+        test.weights = [float(w) for w in record["log_weights"]]
         test.inner = [Betting.from_dict(t) for t in record["inner"]]
-        test.log_capital = numpy.asarray(float(record["log_capital"]))
+        test.capital = numpy.asarray(float(record["log_capital"]))
         test.peak = numpy.asarray(float(record["peak"]))
         return test
 
@@ -434,8 +432,8 @@ class Confidence:
     Attributes:
         alpha: Level of the sequence.
         grid: The grid of candidate means.
-        upper_tests: Tests of the null "mean at most the grid value".
-        lower_tests: Tests of the null "mean at least the grid value".
+        upper: Tests of the null "mean at most the grid value".
+        lower: Tests of the null "mean at least the grid value".
         alive: Grid points not yet excluded.
     """
 
@@ -453,8 +451,8 @@ class Confidence:
             raise errors.InputError("points must be at least 3")
         self.alpha = alpha
         self.grid = (numpy.arange(points) + 1.0) / (points + 1.0)
-        self.upper_tests = Betting(self.grid, GREATER, alpha / 2.0)
-        self.lower_tests = Betting(self.grid, LESS, alpha / 2.0)
+        self.upper = Betting(self.grid, GREATER, alpha / 2.0)
+        self.lower = Betting(self.grid, LESS, alpha / 2.0)
         self.alive = numpy.ones(points, dtype=bool)
 
     def update(self, observation: Any) -> tuple[float, float]:
@@ -466,9 +464,9 @@ class Confidence:
         Returns:
             The interval ``(low, high)``.
         """
-        self.upper_tests.update(observation)
-        self.lower_tests.update(observation)
-        self.alive &= ~(self.upper_tests.crossed | self.lower_tests.crossed)
+        self.upper.update(observation)
+        self.lower.update(observation)
+        self.alive &= ~(self.upper.crossed | self.lower.crossed)
         return self.interval
 
     @property
@@ -625,8 +623,8 @@ class Comparison:
         Raises:
             ValueError: On mismatched or out-of-range losses.
         """
-        first = validate_unit(champion_loss, "champion_loss")
-        second = validate_unit(other_loss, "other_loss")
+        first = validate(champion_loss, "champion_loss")
+        second = validate(other_loss, "other_loss")
         if first.shape != second.shape or first.size == 0:
             raise errors.InputError(
                 "paired losses must be non-empty and aligned"
@@ -692,7 +690,7 @@ class Comparison:
         return process
 
 
-class PromotionSequence:
+class Sequence:
     """E-LOND across challengers, decided in registration order.
 
     e-LOND controls the false-discovery rate over the sequence under arbitrary

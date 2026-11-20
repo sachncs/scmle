@@ -153,9 +153,9 @@ class Tracker(Machine[Progress]):
     """The tabular run's machine (`TABLE`); every transition emits an event.
 
     Attributes:
-        run_id: Identifier attached to every event.
+        run: Identifier attached to every event.
         log: Destination for transition events.
-        config_hash: Configuration hash attached to every event.
+        config: Configuration hash attached to every event.
     """
 
     def __init__(
@@ -174,9 +174,9 @@ class Tracker(Machine[Progress]):
             reason: Why the machine was created (for example a resume).
         """
         super().__init__(TABLE, Progress.CREATED)
-        self.run_id = run_id
+        self.run = run_id
         self.log = log
-        self.config_hash = config_hash
+        self.config = config_hash
         self.enter(self.state, reason, ())
 
     def enter(
@@ -191,10 +191,10 @@ class Tracker(Machine[Progress]):
         """
         self.log.emit(
             events.Event(
-                run_id=self.run_id,
+                run_id=self.run,
                 kind=f"state.{state.value}",
                 reason=reason,
-                config_hash=self.config_hash,
+                config_hash=self.config,
                 artifacts=artifacts,
             )
         )

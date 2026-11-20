@@ -20,7 +20,7 @@ DATA_FAULTS = frozenset(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class RetrainPolicy:
+class Policy:
     """When retraining is recommended or triggered.
 
     A *primary* reason is needed: a windowed loss above the reference plus
@@ -64,16 +64,16 @@ class RetrainPolicy:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class RetrainDecision:
+class Decision:
     """What the policy decided for one review.
 
     Attributes:
         action: ``none``, ``recommend`` or ``trigger``.
         reasons: Primary and supporting reasons.
-        held_back: Why a proposal was not made though a reason existed.
-        escalation_id: The pending escalation carrying the question.
+        withheld: Why a proposal was not made though a reason existed.
+        escalation: The pending escalation carrying the question.
         challenger: Name of the challenger a trigger started.
-        alarm_gates_retrain: Copied from the loop policy, for the record.
+        retrain: Copied from the loop policy, for the record.
         KEYS: Version-1 keys to the written ones (`withheld`, `escalation`,
             `retrain`); `downgrade` restores version 1.
     """
@@ -90,10 +90,10 @@ class RetrainDecision:
 
     action: str
     reasons: tuple[str, ...]
-    held_back: str | None
-    escalation_id: str | None
+    withheld: str | None
+    escalation: str | None
     challenger: str | None
-    alarm_gates_retrain: bool
+    retrain: bool
 
     def to_dict(self) -> dict[str, Any]:
         """A JSON-ready record.
@@ -105,7 +105,7 @@ class RetrainDecision:
 
 
 def decide(
-    policy: RetrainPolicy,
+    policy: Policy,
     rows: Sequence[signals.Signal],
     alarm_since_last: bool,
     age_days: float | None,

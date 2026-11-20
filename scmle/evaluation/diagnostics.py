@@ -76,7 +76,7 @@ class Input:
             finish; diagnostics check it before each unit of work and
             reduce or skip what cannot fit, saying so (None = no limit).
         pace: Seconds one prediction over the evaluation rows takes, as
-            timed by `suite.run_suite` (None = not timed).
+            timed by `suite.run` (None = not timed).
     """
 
     estimator: Any

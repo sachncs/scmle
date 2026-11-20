@@ -431,9 +431,9 @@ def measure(
         The observed skill, its out-of-fold predictions, and the skill of
         each of `cfg.permutations` permuted fits.
     """
-    seed = randomness.derive_int_seed(cfg.seed, path, 0)
+    seed = randomness.narrow(cfg.seed, path, 0)
     skill, pred = crossfit(x, y, task, cfg, groups, block_size, seed)
-    rng = randomness.component_rng(cfg.seed, path, 1)
+    rng = randomness.spawn(cfg.seed, path, 1)
     null = list(
         map(
             operator.call,

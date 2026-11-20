@@ -70,19 +70,18 @@ class Executor(loop.Loop):
         missing = [
             s.name
             for s in workflow.steps
-            if s.kind is not definition.StepKind.APPROVAL
-            and s.name not in handlers
+            if s.kind is not definition.Kind.APPROVAL and s.name not in handlers
         ]
         if missing:
             raise errors.ConfigError(f"no handler for steps {missing}")
         self.workflow = workflow
         self.store = store
         self.handlers = dict(handlers)
-        self.approver_keys = dict(approver_keys or {})
+        self.approvers = dict(approver_keys or {})
         self.clock = clock
         self.timer = time.monotonic
         self.sleep = sleep
-        self.lease_seconds = lease_seconds
+        self.tenure = lease_seconds
         self.owner = owner
         self.guard = threading.Lock()
         self.fences = {}
@@ -94,7 +93,7 @@ class Executor(loop.Loop):
 
         Invoking the same trigger again returns the finished record without
         running anything, or continues an unfinished run after its lease
-        expired. Driving a run can raise `ConcurrencyLimitError` (the workflow
+        expired. Driving a run can raise `CapacityError` (the workflow
         has its maximum of runs in flight), `BusyError` (another
         executor holds the run's lease) and ConfigError (the run was started
         with a different workflow definition).
@@ -106,8 +105,8 @@ class Executor(loop.Loop):
         Returns:
             The run record when this call stops (finished or waiting).
         """
-        run_id = records.run_id_for(self.workflow, trigger_key)
-        existing = self.run_record(run_id)
+        run_id = records.identify(self.workflow, trigger_key)
+        existing = self.record(run_id)
         if existing is not None and existing["state"] in {
             s.value for s in status.FINISHED
         }:
@@ -131,7 +130,7 @@ class Executor(loop.Loop):
         Raises:
             ConfigError: If the run does not exist.
         """
-        record = self.run_record(run_id)
+        record = self.record(run_id)
         if record is None:
             raise errors.ConfigError(f"no run {run_id}")
         if not status.TABLE[status.Progress(record["state"])]:
@@ -159,17 +158,17 @@ class Executor(loop.Loop):
                 definition.
         """
         others = [r for r in self.scan() if r != run_id]
-        if len(others) >= self.workflow.max_concurrent_runs:
-            raise failures.ConcurrencyLimitError(
+        if len(others) >= self.workflow.concurrency:
+            raise failures.CapacityError(
                 f"{len(others)} runs of {self.workflow.name} are in flight"
             )
         self.acquire(run_id)
         try:
-            if len(self.scan()) > self.workflow.max_concurrent_runs:
-                raise failures.ConcurrencyLimitError(
+            if len(self.scan()) > self.workflow.concurrency:
+                raise failures.CapacityError(
                     f"too many runs of {self.workflow.name} in flight"
                 )
-            record = self.run_record(run_id) or {
+            record = self.record(run_id) or {
                 "run_id": run_id,
                 "workflow": self.workflow.name,
                 "workflow_version": self.workflow.version,

@@ -60,7 +60,7 @@ class Reservation(interface.Stage):
     (`Governor.until`).
     """
 
-    requires: ClassVar[tuple[type, ...]] = (ingestion.IngestStage,)
+    requires: ClassVar[tuple[type, ...]] = (ingestion.Ingest,)
     makes: ClassVar[type[products.Product] | None] = Reserve
     state: ClassVar[scmle.runtime.state.Progress] = (
         scmle.runtime.state.Progress.VALIDATING

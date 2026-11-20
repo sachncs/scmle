@@ -31,9 +31,9 @@ class Approvals(steps.Steps):
             True when every step it depends on succeeded and its
             concurrency group (if any) is below its limit.
         """
-        if any(states[d] != status.Phase.SUCCEEDED for d in step.depends_on):
+        if any(states[d] != status.Phase.SUCCEEDED for d in step.needs):
             return False
-        group = step.concurrency_group
+        group = step.concurrency
         return group is None or group_use.get(group, 0) < self.workflow.quota(
             group
         )
@@ -59,7 +59,7 @@ class Approvals(steps.Steps):
         settled = self.settle(run_id, step)
         states[step.name] = settled.value
         if settled is status.Phase.SUCCEEDED:
-            saved = self.step_record(run_id, step.name) or {}
+            saved = self.step(run_id, step.name) or {}
             outputs[step.name] = saved.get("outputs", {})
         return settled is not status.Phase.WAITING
 
@@ -129,13 +129,13 @@ class Approvals(steps.Steps):
                 already recorded, or the run does not exist.
         """
         run_id, name = str(decision["run_id"]), str(decision["step"])
-        record = self.run_record(run_id)
+        record = self.record(run_id)
         if record is None:
             raise failures.ApprovalError("no such run")
         step = self.workflow.step(name)
         approver = str(decision["approver"])
         if (
-            step.kind is not definition.StepKind.APPROVAL
+            step.kind is not definition.Kind.APPROVAL
             or approver not in step.approvers
         ):
             raise failures.ApprovalError("approver is not listed for this step")
@@ -143,7 +143,7 @@ class Approvals(steps.Steps):
             raise failures.ApprovalError(
                 "the requester cannot approve their own run"
             )
-        key = self.approver_keys.get(approver)
+        key = self.approvers.get(approver)
         payload = self.compose(
             run_id,
             name,
@@ -198,13 +198,13 @@ class Approvals(steps.Steps):
                 approver=decision["approver"],
             )
             return status.Phase.REJECTED
-        waiting = self.step_record(run_id, step.name)
+        waiting = self.step(run_id, step.name)
         since = (
             waiting["waiting_since"]
             if waiting and waiting["state"] == status.Phase.WAITING
             else self.clock()
         )
-        if self.clock() - since > step.expires_seconds:
+        if self.clock() - since > step.expiry:
             self.stash(run_id, step, status.Phase.EXPIRED, waiting_since=since)
             return status.Phase.EXPIRED
         self.stash(run_id, step, status.Phase.WAITING, waiting_since=since)

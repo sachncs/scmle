@@ -20,7 +20,7 @@ from scmle.preparation import strategies
 class Remedy(examination.Examination):
     """Group thresholds and the incremental refit.
 
-    Part of `FinalEvaluationStage`, which inherits these methods unchanged;
+    Part of `Assessment`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 

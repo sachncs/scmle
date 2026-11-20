@@ -66,7 +66,7 @@ class Uncertainty:
 class Bracketing(diagnosis.Diagnosis):
     """Quantile brackets, interval coverage and the opening of `C`.
 
-    Part of `PackageStage`, which inherits these methods unchanged;
+    Part of `Packaging`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 
@@ -89,7 +89,7 @@ class Bracketing(diagnosis.Diagnosis):
             bundle: The frozen model bundle, whose conformal calibration the
                 coverage claim tests.
         """
-        pending = board.get(selecting.Choice).pending_ledger
+        pending = board.get(selecting.Choice).ledger
         if pending is None:
             return
         task = board.get(profiling.Partition).task
@@ -98,16 +98,14 @@ class Bracketing(diagnosis.Diagnosis):
         if claim is not None:
             runner = coverage_confirm.rig(bundle, task.value, claim)
         if runner is None:
-            board.journal.write_json(
+            board.journal.write(
                 coverage_confirm.DOCUMENT,
                 coverage_confirm.abstain(
                     "the bundle holds no conformal calibration, so there is "
                     "no interval or set to test on C"
                 ),
             )
-        profiling.ProfileStage().conclude(
-            board, pending, pending.subject, runner
-        )
+        profiling.Profiling().conclude(board, pending, pending.subject, runner)
 
     def bracket(self, board: engine.Board) -> quantile.Intervals | None:
         """Fits and calibrates the low and high quantile models (regression).
@@ -193,7 +191,7 @@ class Bracketing(diagnosis.Diagnosis):
         Returns:
             The bundle's uncertainty evidence with what was measured.
         """
-        rows = board.get(assessment.Exam).test_rows
+        rows = board.get(assessment.Exam).rows
         if rows is None:
             return Uncertainty(bundle.conformal, bundle.quantile)
         curve = (
@@ -225,7 +223,7 @@ class Bracketing(diagnosis.Diagnosis):
             slices=slices,
         )
         if measured is not None:
-            board.journal.write_json("coverage_report.json", measured)
+            board.journal.write("coverage_report.json", measured)
             board.journal.emit(
                 "coverage.reported",
                 "coverage of the stored intervals or sets was measured "

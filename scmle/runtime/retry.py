@@ -84,7 +84,7 @@ class Retries:
     """How often and how patiently an operation is retried.
 
     Attributes:
-        max_attempts: Total attempts including the first (at least 1).
+        attempts: Total attempts including the first (at least 1).
         base_delay_seconds: Wait after the first failure.
         factor: Growth of the wait per failure (at least 1).
         max_delay_seconds: Ceiling of one wait.
@@ -103,7 +103,7 @@ class Retries:
         },
     )
 
-    max_attempts: int = 3
+    attempts: int = 3
     base_delay_seconds: float = 0.5
     factor: float = 2.0
     max_delay_seconds: float = 30.0
@@ -114,7 +114,7 @@ class Retries:
         Raises:
             ConfigError: If a value is out of range.
         """
-        if self.max_attempts < 1:
+        if self.attempts < 1:
             raise errors.ConfigError("max_attempts must be at least 1")
         for name in ("base_delay_seconds", "factor", "max_delay_seconds"):
             value = getattr(self, name)
@@ -143,7 +143,7 @@ class Retries:
             The waits in seconds between consecutive attempts, in order; one
             fewer than the maximum number of attempts.
         """
-        return [self.delay(n) for n in range(1, self.max_attempts)]
+        return [self.delay(n) for n in range(1, self.attempts)]
 
     def to_dict(self) -> dict[str, float | int]:
         """Returns the JSON-ready form.
@@ -172,7 +172,21 @@ class Retries:
         layout = dict(stored)
         if set(layout) - fields:
             layout = cls.KEYS.downgrade(layout)
+        if "max_attempts" in layout:
+            layout["attempts"] = layout.pop("max_attempts")
         return cls(**layout)
+
+    def anchor(self) -> dict[str, float | int]:
+        """Returns the policy under its version-1 field names.
+
+        Returns:
+            The fields as version 1 named them (`max_attempts`,
+            `base_delay_seconds`, `factor`, `max_delay_seconds`), the
+            layout that digests of recorded definitions name.
+        """
+        layout: dict[str, float | int] = dataclasses.asdict(self)
+        layout["max_attempts"] = layout.pop("attempts")
+        return layout
 
 
 def transient(error: BaseException) -> bool:
@@ -229,7 +243,7 @@ def call(
     """
     last: Exception | None = None
     judge = is_transient or transient
-    for attempt in range(1, policy.max_attempts + 1):
+    for attempt in range(1, policy.attempts + 1):
         try:
             return operation()
         except Exception as error:
@@ -239,12 +253,12 @@ def call(
             LOGGER.warning(
                 "attempt %d of %d failed transiently: %r",
                 attempt,
-                policy.max_attempts,
+                policy.attempts,
                 error,
             )
-            if attempt < policy.max_attempts:
+            if attempt < policy.attempts:
                 sleep(policy.delay(attempt))
     raise RetryError(
-        policy.max_attempts,
-        f"{policy.max_attempts} attempts failed; last: {last!r}",
+        policy.attempts,
+        f"{policy.attempts} attempts failed; last: {last!r}",
     ) from last

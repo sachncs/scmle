@@ -27,7 +27,7 @@ BASELINE = "dummy"
 class Summary(reporting.Reporting):
     """The test scores, diagnostic reports and evaluation record.
 
-    Part of `FinalEvaluationStage`, which inherits these methods unchanged;
+    Part of `Assessment`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 
@@ -91,7 +91,7 @@ class Summary(reporting.Reporting):
         data = board.services.spec.data
         custody = board.find(exploration.Custody)
         clustered = custody is not None and custody.column is not None
-        reports = suite.run_suite(
+        reports = suite.run(
             diagnostics.Input(
                 pipeline,
                 features,
@@ -116,7 +116,7 @@ class Summary(reporting.Reporting):
             - board.services.governor.reserve.parts.get("package", 0.0),
         )
         for name, report_body in reports.items():
-            board.journal.write_json(f"diagnostics/{name}.json", report_body)
+            board.journal.write(f"diagnostics/{name}.json", report_body)
             if report_body.get("skipped") is True:
                 board.journal.forgo(
                     f"diagnostic {name}", report_body.get("reason", "")
@@ -127,7 +127,7 @@ class Summary(reporting.Reporting):
                     str(report_body.get("reason", "")),
                 )
         return examination.Readings(
-            scoring.reference_scores(pipeline, features, task), reports
+            scoring.anchor(pipeline, features, task), reports
         )
 
     def document(
@@ -184,7 +184,7 @@ class Summary(reporting.Reporting):
             "semi_supervised": pseudolabels.record,
             "fairness_mitigation": remedy.record,
             "execution_backend": board.services.backend.name,
-            "pareto_front": choice.pareto_front,
+            "pareto_front": choice.front,
             "evaluation_prevalence": {
                 "natural": True,
                 "note": "resampling strategies change only training folds; "
@@ -200,7 +200,7 @@ class Summary(reporting.Reporting):
                 )
             ],
             "streamed_locked": self.tally(board, pipeline),
-            "uplift": self.uplift_report(board, pipeline, features, target),
+            "uplift": self.report(board, pipeline, features, target),
             "n_dev": len(split.features),
             "n_test": len(features),
             "split_fingerprint": split.manifest.fingerprint,

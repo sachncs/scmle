@@ -188,7 +188,7 @@ def torn_world(
     Returns:
         The connector and the database it reads.
     """
-    rng = randomness.component_rng(seed, "ingest.world.torn", 0)
+    rng = randomness.spawn(seed, "ingest.world.torn", 0)
     rows = int(rng.integers(20, 80))
     db = new_database("torn")
     load(
@@ -254,7 +254,7 @@ def reconcile_world(seed: int, kind: str) -> Extract:
     Returns:
         The extract with its source database.
     """
-    rng = randomness.component_rng(seed, f"ingest.world.reconcile.{kind}", 0)
+    rng = randomness.spawn(seed, f"ingest.world.reconcile.{kind}", 0)
     customers = int(rng.integers(30, 80))
     orders = int(rng.integers(120, 400))
     db = new_database("rec")
@@ -338,7 +338,7 @@ def late_world(seed: int) -> LateWorld:
     Returns:
         The world.
     """
-    rng = randomness.component_rng(seed, "ingest.world.late", 0)
+    rng = randomness.spawn(seed, "ingest.world.late", 0)
     entities = int(rng.integers(5, 15))
     targets = pandas.DataFrame(
         {
@@ -399,7 +399,7 @@ def grain_world(seed: int, shape: str) -> tuple[Database, str]:
     Returns:
         The database and the name of its single table.
     """
-    rng = randomness.component_rng(seed, f"ingest.world.grain.{shape}", 0)
+    rng = randomness.spawn(seed, f"ingest.world.grain.{shape}", 0)
     customers = int(rng.integers(60, 200))
     months = int(rng.integers(3, 8))
     db = new_database("grain")
@@ -457,7 +457,7 @@ def surrogate_world(seed: int) -> JoinWorld:
     Returns:
         The world with its true foreign keys.
     """
-    rng = randomness.component_rng(seed, "ingest.world.surrogate", 0)
+    rng = randomness.spawn(seed, "ingest.world.surrogate", 0)
     db = new_database("sur")
     names = ["customer", "product", "store", "region", "account", "user"]
     sizes = {name: int(rng.integers(40, 200)) for name in names}
@@ -594,7 +594,7 @@ def er_world(seed: int, entities: int = 300) -> pandas.DataFrame:
         A frame with `entity` (the true identity), `first`, `last`, `dob` and
         `addr`; a person has two records with probability one half.
     """
-    rng = randomness.component_rng(seed, "ingest.world.er", 0)
+    rng = randomness.spawn(seed, "ingest.world.er", 0)
     rows = []
     for entity in range(entities):
         first = str(rng.choice(FIRST)) + str(rng.choice(FIRST))[:2]

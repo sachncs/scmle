@@ -80,9 +80,8 @@ class Stacker:
             evaluated: All trials produced before the ensemble step.
         """
         size = self.board.services.spec.ensemble.size
-        if (
-            size < ensembles.MIN_MEMBERS
-            or self.board.services.governor.skip_reason(first=False)
+        if size < ensembles.MIN_MEMBERS or self.board.services.governor.skip(
+            first=False
         ):
             return
         members = self.members(evaluated, size)
@@ -102,7 +101,7 @@ class Stacker:
         }
         task = self.task
         for combiner in COMBINERS:
-            if self.board.services.governor.skip_reason(first=False):
+            if self.board.services.governor.skip(first=False):
                 return
             reason = self.board.services.registry.get(combiner).objection(task)
             if reason is not None:

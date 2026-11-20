@@ -37,10 +37,10 @@ class Exam(products.Derived):
 
     Attributes:
         evaluation: The evaluation record.
-        final_pipeline: The model refit on the development data.
+        pipeline: The model refit on the development data.
         shipped: The model the bundle serves: the same choice refit on
-            every row, or `final_pipeline` when it was not refit.
-        test_rows: The opened test rows and labels.
+            every row, or `pipeline` when it was not refit.
+        rows: The opened test rows and labels.
         pseudolabels: The self-training judgement of the final fit.
         remedy: The group-threshold judgement of the final model.
         decision: The decision threshold, its net benefit and the coverage
@@ -49,9 +49,9 @@ class Exam(products.Derived):
     """
 
     evaluation: records.Layout | None
-    final_pipeline: models.Estimator | None
+    pipeline: models.Estimator | None
     shipped: models.Estimator | None
-    test_rows: tuple[pandas.DataFrame, pandas.Series] | None
+    rows: tuple[pandas.DataFrame, pandas.Series] | None
     pseudolabels: examination.Pseudolabels = dataclasses.field(
         default_factory=examination.Pseudolabels
     )
@@ -86,13 +86,14 @@ class Exam(products.Derived):
         Returns:
             The evaluation and the opening.
         """
-        return {"evaluation": self.evaluation, "opened": bool(self.test_rows)}
+        return {"evaluation": self.evaluation, "opened": bool(self.rows)}
 
 
-class FinalEvaluationStage(summary.Summary):
+class Assessment(summary.Summary):
     """Refits the frozen candidate and opens the locked test set once."""
 
-    requires: ClassVar[tuple[type, ...]] = (selecting.SelectStage,)
+    recorded: ClassVar[str] = "FinalEvaluationStage"
+    requires: ClassVar[tuple[type, ...]] = (selecting.Selection,)
     makes: ClassVar[type[products.Product] | None] = Exam
     state: ClassVar[scmle.runtime.state.Progress] = (
         scmle.runtime.state.Progress.TESTING
@@ -145,7 +146,7 @@ class FinalEvaluationStage(summary.Summary):
         pipeline = self.refit(board, selected, task)
         pipeline, pseudolabels = self.pseudolabel(board, selected, pipeline)
         pipeline = self.relearn(board, pipeline)
-        pipeline, threshold = scoring.choose_decision_threshold(board, pipeline)
+        pipeline, threshold = scoring.choose(board, pipeline)
         unmitigated = pipeline
         pipeline, remedy = self.mitigate(board, selected, pipeline, threshold)
         claim = self.pledge(board)

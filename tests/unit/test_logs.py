@@ -106,7 +106,7 @@ def test_a_retried_transient_failure_is_logged(caplog):
 
     with caplog.at_level(logging.WARNING, logger="scmle.runtime.retry"):
         result = retry.call(
-            operation, retry.Retries(max_attempts=2), sleep=lambda seconds: None
+            operation, retry.Retries(attempts=2), sleep=lambda seconds: None
         )
     assert result == "done"
     assert any("slow" in r.getMessage() for r in caplog.records)

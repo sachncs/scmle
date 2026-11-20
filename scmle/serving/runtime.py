@@ -181,13 +181,13 @@ def cadence(environ: Mapping[str, str]) -> dict[str, Any]:
         "path": environ.get("SCMLE_SIGNALS_FILE") or None,
         "interval": number(environ, "SCMLE_SIGNALS_INTERVAL", INTERVAL),
         "window": number(
-            environ, "SCMLE_SIGNALS_WINDOW", signals.Window().window_seconds
+            environ, "SCMLE_SIGNALS_WINDOW", signals.Window().window
         ),
     }
 
 
 def emit(
-    monitor: signals.SignalMonitor,
+    monitor: signals.Monitor,
     now: float,
     path: pathlib.Path | str | None,
 ) -> int:
@@ -216,7 +216,7 @@ def emit(
 
 
 def pulse(
-    monitor: signals.SignalMonitor,
+    monitor: signals.Monitor,
     stop: threading.Event,
     path: pathlib.Path | str | None,
     interval: float,
@@ -330,7 +330,7 @@ def refresh(adapter: server.Service, loader: server.Loader | None) -> None:
 
 def hold(
     adapter: server.Service,
-    monitor: signals.SignalMonitor,
+    monitor: signals.Monitor,
     path: pathlib.Path | str | None,
     interval: float,
     loader: server.Loader | None = None,
@@ -410,9 +410,7 @@ def run(folder: pathlib.Path, environ: Mapping[str, str]) -> None:
     if environ.get(tracing.SWITCH):
         tracing.TRACING.enable(environ=environ)
     chosen = cadence(environ)
-    monitor = signals.SignalMonitor(
-        signals.Window(window_seconds=chosen["window"])
-    )
+    monitor = signals.Monitor(signals.Window(window=chosen["window"]))
     adapter = server.Service(
         loader=prime(folder, environ),
         monitor=monitor,

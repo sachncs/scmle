@@ -52,7 +52,7 @@ class Context:
         )
         pending = list(reasons or [])
         self.governor = SimpleNamespace(
-            skip_reason=lambda first: pending.pop(0) if pending else None
+            skip=lambda first: pending.pop(0) if pending else None
         )
         self.metric = SimpleNamespace(name="accuracy", greater_is_better=better)
         self.task = tasks.Task.BINARY
@@ -95,13 +95,13 @@ class Runner:
         self.task = board.task
         self.profile = board.profile
 
-    def run_many(self, jobs) -> list[experiments.Trial]:
+    def dispatch(self, jobs) -> list[experiments.Trial]:
         self.jobs.extend(jobs)
         return [
             trial(
-                job.model_name,
+                job.model,
                 self.scores[job.strategy],
-                trial_id=job.trial_id,
+                trial_id=job.trial,
                 strategy=job.strategy,
             )
             for job in jobs
@@ -148,14 +148,14 @@ def test_the_best_default_non_baseline_trials_lead(seen) -> None:
     context = Context(["w"])
     runner = Runner({"w": 0.5}, context)
     strategy_search.Strategist(context, runner).search(SCREENED)
-    assert [job.model_name for job in runner.jobs] == ["c", "a"]
+    assert [job.model for job in runner.jobs] == ["c", "a"]
 
 
 def test_a_lower_is_better_metric_leads_with_the_lowest(seen) -> None:
     context = Context(["w"], better=False)
     runner = Runner({"w": 0.5}, context)
     strategy_search.Strategist(context, runner).search(SCREENED)
-    assert [job.model_name for job in runner.jobs] == ["b", "a"]
+    assert [job.model for job in runner.jobs] == ["b", "a"]
 
 
 def test_no_strategies_or_no_leaders_search_nothing(seen) -> None:
@@ -170,7 +170,7 @@ def test_a_skipped_leader_is_forgone_and_the_next_still_runs(seen) -> None:
     runner = Runner({"w": 0.5}, context)
     strategy_search.Strategist(context, runner).search(SCREENED)
     assert context.forgone == [("strategy search for c", "trial window closed")]
-    assert [job.model_name for job in runner.jobs] == ["a"]
+    assert [job.model for job in runner.jobs] == ["a"]
 
 
 def test_an_inapplicable_strategy_is_rejected_and_not_run(seen) -> None:
@@ -184,7 +184,7 @@ def test_an_inapplicable_strategy_is_rejected_and_not_run(seen) -> None:
     ]
     assert context.counts == [2]
     assert [
-        (job.trial_id, job.model_name, dict(job.params), job.strategy)
+        (job.trial, job.model, dict(job.params), job.strategy)
         for job in runner.jobs
     ] == [("s1-0", "c", {}, "w"), ("s1-1", "c", {}, "y")]
     assert [t.trial_id for t in context.transcribed] == ["s1-0", "s1-1"]

@@ -254,7 +254,7 @@ class Checkpoint:
             signature=signing.mac(self.preimage(), signing_key),
         )
 
-    def verify_signature(self, signing_key: str | bytes) -> bool:
+    def verify(self, signing_key: str | bytes) -> bool:
         """Checks the persisted checkpoint signature.
 
         Args:
@@ -375,7 +375,7 @@ class Checkpoint:
         return cls.from_dict(record)
 
     @classmethod
-    def read_verified(cls, path: str | Path, signing_key: str | bytes) -> Self:
+    def load(cls, path: str | Path, signing_key: str | bytes) -> Self:
         """Reads a checkpoint and rejects it unless its signature verifies.
 
         Args:
@@ -389,7 +389,7 @@ class Checkpoint:
             ValueError: If the signature does not verify.
         """
         checkpoint = cls.read(path)
-        if not checkpoint.verify_signature(signing_key):
+        if not checkpoint.verify(signing_key):
             raise errors.InputError(
                 "lifecycle checkpoint signature does not verify"
             )

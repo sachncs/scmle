@@ -87,14 +87,14 @@ class Plan:
         observed: Adapter over the data to monitor.
         package_target: Directory the model package is written to.
         report_target: File the signed report is written to, if any.
-        checkpoint_target: File where signed checkpoints are kept, if any.
-        signing_key: Key that signs the package, report and checkpoints.
+        target: File where signed checkpoints are kept, if any.
+        key: Key that signs the package, report and checkpoints.
         seed: Random seed of the run.
-        require_independent_ground_truth: Whether the run demands
+        independent: Whether the run demands
             independently authored explanation ground truth.
         manifest: Modality manifest to check against the adapter, if any.
-        cancellation_check: Callable polled at stage boundaries, if any.
-        package_preexisting: Whether the package directory existed before
+        check: Callable polled at stage boundaries, if any.
+        preexisting: Whether the package directory existed before
             the run.
         report_preexisting: Whether the report file existed before the run.
     """
@@ -103,13 +103,13 @@ class Plan:
     observed: curators.Preparer
     package_target: Path
     report_target: Path | None
-    checkpoint_target: Path | None
-    signing_key: str | bytes
+    target: Path | None
+    key: str | bytes
     seed: int
-    require_independent_ground_truth: bool
+    independent: bool
     manifest: data.Passport | None
-    cancellation_check: Callable[[], bool] | None
-    package_preexisting: bool
+    check: Callable[[], bool] | None
+    preexisting: bool
     report_preexisting: bool
 
     @property
@@ -127,21 +127,21 @@ class Plan:
         unless they existed before the run.
 
         Raises:
-            LifecycleCancelledError: If `cancellation_check` reports
+            LifecycleCancelledError: If `check` reports
                 cancellation.
         """
-        if self.cancellation_check is None or not self.cancellation_check():
+        if self.check is None or not self.check():
             return
         self.discard()
         if self.report_target is not None and not self.report_preexisting:
             self.report_target.unlink(missing_ok=True)
-        raise containers.LifecycleCancelledError(
+        raise containers.AbortedError(
             "modality lifecycle cancelled at a stage boundary"
         )
 
     def discard(self) -> None:
         """Deletes the package directory unless it existed before the run."""
-        if not self.package_preexisting:
+        if not self.preexisting:
             shutil.rmtree(self.package_target, ignore_errors=True)
 
     def conform(self) -> None:
@@ -182,7 +182,7 @@ class Plan:
             FileExistsError: If the checkpoint exists and `resume` is False.
             FileNotFoundError: If `resume` is True and it does not exist.
         """
-        target = self.checkpoint_target
+        target = self.target
         if target is None:
             return
         if target.exists() and not resume:
@@ -203,7 +203,7 @@ class Plan:
             "package": str(self.package_target),
             "report": str(self.report_target),
             "seed": self.seed,
-            "independent": self.require_independent_ground_truth,
+            "independent": self.independent,
             "manifest": self.digest,
         }
 
@@ -220,8 +220,8 @@ class Plan:
             ValueError: If the checkpoint identity or stage order does not
                 match this run.
         """
-        checkpoint = checkpoints.Checkpoint.read_verified(
-            cast("Path", self.checkpoint_target), self.signing_key
+        checkpoint = checkpoints.Checkpoint.load(
+            cast("Path", self.target), self.key
         )
         actual_identity = {
             "modality": checkpoint.modality,
@@ -259,9 +259,7 @@ class Plan:
             raise errors.InputError(
                 "completed lifecycle checkpoint has no report"
             )
-        completed_report = reporting.Record.read_verified(
-            report_target, self.signing_key
-        )
+        completed_report = reporting.Record.load(report_target, self.key)
         if (
             completed_report.modality
             != modalities.serialise(self.adapter.modality)
@@ -271,10 +269,10 @@ class Plan:
             raise errors.InputError(
                 "completed lifecycle report does not match the requested resume"
             )
-        predictors.Predictor.from_package(
+        predictors.Predictor.load(
             self.adapter,
             completed_report.package.path,
-            self.signing_key,
+            self.key,
             lifecycle_report_path=report_target,
         )
         return completed_report
@@ -294,7 +292,7 @@ class Plan:
             stage_digests: Digest of each finished stage's evidence.
             status: "running" or "completed".
         """
-        if self.checkpoint_target is None:
+        if self.target is None:
             return
         record = checkpoints.Checkpoint(
             modality=modalities.serialise(self.adapter.modality),
@@ -308,11 +306,11 @@ class Plan:
             report=str(self.report_target),
             seed=self.seed,
             completed=tuple(completed_stages),
-            independent=self.require_independent_ground_truth,
+            independent=self.independent,
             status=status,
-        ).sign(self.signing_key)
+        ).sign(self.key)
         durability.write_atomically(
-            self.checkpoint_target,
+            self.target,
             (
                 json.dumps(record.to_dict(), indent=2, sort_keys=True) + "\n"
             ).encode("utf-8"),
@@ -444,13 +442,13 @@ def prepare(
         observed=observed_adapter or adapter,
         package_target=package_target,
         report_target=report_target,
-        checkpoint_target=checkpoint_target,
-        signing_key=signing_key,
+        target=checkpoint_target,
+        key=signing_key,
         seed=seed,
-        require_independent_ground_truth=require_independent_ground_truth,
+        independent=require_independent_ground_truth,
         manifest=manifest,
-        cancellation_check=cancellation_check,
-        package_preexisting=package_target.exists(),
+        check=cancellation_check,
+        preexisting=package_target.exists(),
         report_preexisting=(
             report_target.exists() if report_target is not None else False
         ),
@@ -506,7 +504,7 @@ def publish(
         monitoring=board.get(state.Drift).evidence,
         documentation=board.get(state.Card).evidence,
         recovery=board.get(state.Resilience).evidence,
-    ).sign(plan.signing_key)
+    ).sign(plan.key)
     if plan.report_target is not None:
         durability.write_atomically(
             plan.report_target,

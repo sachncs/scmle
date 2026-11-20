@@ -36,7 +36,7 @@ def test_no_success_criteria_blocks_the_release_and_invents_none():
     )
     store = Store()
     evaluation = {"test_metrics": {"roc_auc": 0.99}}
-    stages.PackageStage().release_evaluation(context, store, evaluation)
+    stages.Packaging().release(context, store, evaluation)
     record = evaluation["release_evaluation"]
     assert record["status"] == "policy_not_declared"
     assert record["blocked"] is True and record["passed"] is False

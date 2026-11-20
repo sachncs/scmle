@@ -35,7 +35,7 @@ MARGINLESS = (
 class Calibration(documentation.Documentation):
     """Prediction intervals and sets calibrated from out-of-fold predictions.
 
-    Part of `PackageStage`, which inherits these methods unchanged;
+    Part of `Packaging`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 

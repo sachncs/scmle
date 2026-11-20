@@ -72,7 +72,7 @@ class Holder(Protocol):
         """Limits the math-library threads while a stage runs."""
         ...
 
-    def check_cancelled(self) -> None:
+    def check(self) -> None:
         """Raises if the run was cancelled."""
         ...
 
@@ -153,7 +153,7 @@ class Board:
         """The governor, which caps the threads while a stage runs."""
         return self.services.governor
 
-    def check_cancelled(self) -> None:
+    def check(self) -> None:
         """Raises if cancellation was requested (`Services.check`).
 
         Raises:
@@ -398,7 +398,7 @@ class Pipeline(Generic[HolderT]):
         """
         stages = self.stages if until is None else self.select(until)
         for index, stage in enumerate(stages):
-            board.check_cancelled()
+            board.check()
             name = self.dependency.title(stage)
             restored = self.restore(stage)
             if machine is not None and stage.state is not machine.state:
@@ -429,9 +429,7 @@ class Pipeline(Generic[HolderT]):
                     )
                 if made is not None:
                     made.apply(board)
-                lap = Lap(
-                    time.perf_counter() - started, limits.peak_memory_gb()
-                )
+                lap = Lap(time.perf_counter() - started, limits.watermark())
                 self.timings[name] = lap
             following = stages[index + 1] if index + 1 < len(stages) else None
             if review is not None and (

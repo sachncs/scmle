@@ -12,7 +12,7 @@ from scmle.monitoring import alerts
 
 def make_alert(route: str = "on-call") -> alerts.Alert:
     """Build deterministic alert evidence."""
-    return alerts.Alert.from_evidence(
+    return alerts.Alert.assemble(
         route=route,
         severity="high",
         title="model SLO breached",
@@ -87,8 +87,8 @@ def test_webhook_delivers_json_with_bounded_attempts():
         sink = alerts.Pager(
             f"http://127.0.0.1:{receiver.server_port}/alerts",
             token="test-token",
-            timeout_seconds=1.0,
-            max_attempts=2,
+            timeout=1.0,
+            attempts=2,
             allow_insecure_localhost=True,
         )
         delivery = sink.deliver(make_alert())
@@ -99,4 +99,4 @@ def test_webhook_delivers_json_with_bounded_attempts():
 
     assert delivery.status == "delivered"
     assert delivery.attempts == 1
-    assert received[0]["identifier"] == make_alert().alert_id
+    assert received[0]["identifier"] == make_alert().identifier

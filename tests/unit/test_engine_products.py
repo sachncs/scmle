@@ -49,7 +49,7 @@ class Board:
     def count(self):
         return self.made[Tally].count
 
-    def check_cancelled(self):
+    def check(self):
         pass
 
 

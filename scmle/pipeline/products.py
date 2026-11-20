@@ -187,7 +187,8 @@ class Kept(Product):
 
         Returns:
             The product, or None when the file is missing, unsigned, not
-            authentic, of another product or not the recorded one.
+            authentic, of another product, not the recorded one or kept
+            with other field names (a product written before a rename).
         """
         try:
             meta, payload = envelope.read(path)
@@ -196,7 +197,11 @@ class Kept(Product):
             return None
         if meta.get("product") != cls.__name__ or digest(payload) != expected:
             return None
-        return cls(**joblib.load(io.BytesIO(payload)))
+        values = joblib.load(io.BytesIO(payload))
+        if set(values) != {field.name for field in dataclasses.fields(cls)}:
+            # handled: a product kept before a field was renamed runs again
+            return None
+        return cls(**values)
 
 
 @dataclasses.dataclass(frozen=True)

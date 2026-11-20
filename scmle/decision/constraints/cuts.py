@@ -323,7 +323,7 @@ def toll(
         """
         return (m[..., 0] - w * m[..., 1]) - (m[..., 2] - w * m[..., 3])
 
-    rng = randomness.component_rng(seed, "decision.constraints.price", 0)
+    rng = randomness.spawn(seed, "decision.constraints.price", 0)
     boot = price(
         netbenefit.redraw(
             stats_matrix, netbenefit.factorize(clusters), replicates, rng

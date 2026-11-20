@@ -157,9 +157,9 @@ class Scheduler:
         slots = self.due(now)
         policy = self.schedule.catch_up
         grace = self.schedule.interval_seconds * GRACE_FRACTION
-        if policy is definition.CatchUp.RUN_ALL:
+        if policy is definition.Backfill.RUN_ALL:
             chosen = slots[: self.schedule.max_catch_up]
-        elif policy is definition.CatchUp.LATEST_ONLY:
+        elif policy is definition.Backfill.LATEST_ONLY:
             chosen = slots[-1:]
         else:
             chosen = [s for s in slots[-1:] if now - s <= grace]
@@ -171,7 +171,7 @@ class Scheduler:
                 record = executor.start(f"slot-{int(slot)}", "scheduler")
             except (
                 scmle.workflow.executor.BusyError,
-                scmle.workflow.executor.ConcurrencyLimitError,
+                scmle.workflow.executor.CapacityError,
             ):
                 # handled: slot recorded as deferred
                 deferred.append(slot)

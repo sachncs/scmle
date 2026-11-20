@@ -15,11 +15,11 @@ def test_only_feature_rows_are_sampled():
 
     Also enforces website/src/learn/observability.html:14.
     """
-    watch = signals.SignalMonitor(
-        signals.Window(sample_rate=0.1, seed=3), profile=support_ops.profile()
+    watch = signals.Monitor(
+        signals.Window(sampling=0.1, seed=3), profile=support_ops.profile()
     )
     support_ops.healthy_traffic(watch, count=200)
-    watch.observe_outcomes(support_ops.START, [0.0] * 100)
+    watch.observe(support_ops.START, [0.0] * 100)
     kept = watch.sense(support_ops.START, support_ops.frame(1000, seed=1))
     rows = watch.evaluate(support_ops.START + 20)
     assert 50 < kept < 150
@@ -63,7 +63,7 @@ def test_every_answer_says_two_periods_cannot_separate_the_model(
     Also enforces website/src/learn/observability.html:34.
     """
     before, after = test_continuous_evaluation.periods(**changes)
-    result = continuous.post_promotion_check(
+    result = continuous.reassess(
         test_continuous_evaluation.SPECS, before, after
     )
     assert result["overall"] == overall

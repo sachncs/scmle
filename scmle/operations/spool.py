@@ -39,7 +39,7 @@ class Flush:
     error: str | None
 
 
-class MetricsSpool:
+class Spool:
     """Spools samples to a file and drains them to a destination."""
 
     def __init__(

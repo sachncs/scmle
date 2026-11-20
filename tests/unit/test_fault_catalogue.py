@@ -175,7 +175,7 @@ class Destination:
 def test_samples_survive_an_outage_and_a_restart_and_arrive_in_order(tmp_path):
     destination = Destination()
     path = tmp_path / "spool.jsonl"
-    first = spool.MetricsSpool(path, destination, batch_size=4)
+    first = spool.Spool(path, destination, batch_size=4)
     first.add([sample(n) for n in range(10)])
     down = first.flush()
     assert (
@@ -183,7 +183,7 @@ def test_samples_survive_an_outage_and_a_restart_and_arrive_in_order(tmp_path):
         and down.remaining == 10
         and "ConnectionError" in down.error
     )
-    again = spool.MetricsSpool(path, destination, batch_size=4)
+    again = spool.Spool(path, destination, batch_size=4)
     assert again.pending() == 10
     destination.up = True
     done = again.flush()
@@ -201,7 +201,7 @@ def test_a_partial_failure_keeps_exactly_what_was_not_accepted(tmp_path):
             raise OSError("reset")
         return len(samples)
 
-    held = spool.MetricsSpool(tmp_path / "s.jsonl", flaky, batch_size=3)
+    held = spool.Spool(tmp_path / "s.jsonl", flaky, batch_size=3)
     held.add([sample(n) for n in range(7)])
     result = held.flush()
     assert result.sent == 3 and result.remaining == 4
@@ -214,7 +214,7 @@ def test_a_partial_failure_keeps_exactly_what_was_not_accepted(tmp_path):
 
 
 def test_a_destination_that_accepts_fewer_than_sent_is_not_trusted(tmp_path):
-    held = spool.MetricsSpool(tmp_path / "s.jsonl", lambda s: len(s) - 1)
+    held = spool.Spool(tmp_path / "s.jsonl", lambda s: len(s) - 1)
     held.add([sample(1), sample(2)])
     result = held.flush()
     assert result.sent == 0 and result.remaining == 2
@@ -223,7 +223,7 @@ def test_a_destination_that_accepts_fewer_than_sent_is_not_trusted(tmp_path):
 
 def test_an_empty_spool_and_bad_batch_sizes():
     with pytest.raises(ValueError):
-        spool.MetricsSpool("x", lambda s: 0, batch_size=0)
+        spool.Spool("x", lambda s: 0, batch_size=0)
 
 
 # ---- a finding from the job-interruption fault --------------------------
@@ -244,11 +244,11 @@ def test_a_killed_writers_temp_file_does_not_make_the_store_unlistable(
 
 def test_the_time_scale_defaults_to_one_and_is_validated(monkeypatch):
     monkeypatch.delenv(recovery.TIME_SCALE_ENV, raising=False)
-    assert recovery.time_scale() == 1.0
+    assert recovery.scale() == 1.0
     for bad in ("0", "-1", "fast", "nan", "inf"):
         monkeypatch.setenv(recovery.TIME_SCALE_ENV, bad)
         with pytest.raises(ValueError, match=recovery.TIME_SCALE_ENV):
-            recovery.time_scale()
+            recovery.scale()
 
 
 def test_a_scaled_run_widens_the_limit_but_not_the_declared_objective(

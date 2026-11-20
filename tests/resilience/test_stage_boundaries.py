@@ -37,14 +37,15 @@ from scmle.pipeline import archive
 from scmle.pipeline import products
 import scmle.pipeline.orchestrator
 import scmle.pipeline.stages
+from scmle.runtime import engine
 
 CHILD = pathlib.Path(__file__).with_name("stage_child.py")
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PHASES = ("before", "after")
-DEFAULT = scmle.pipeline.stages.default_stages()
+DEFAULT = scmle.pipeline.stages.sequence()
 STAGES = len(DEFAULT)
 KEPT = [
-    type(stage).__name__
+    engine.recorded(type(stage))
     for stage in DEFAULT
     if stage.makes is not None and issubclass(stage.makes, products.Kept)
 ]
@@ -152,7 +153,7 @@ def test_a_run_killed_at_a_stage_boundary_resumes_or_is_refused(
     assert executed == [
         type(stage).__name__
         for stage in DEFAULT
-        if type(stage).__name__ not in restored
+        if engine.recorded(type(stage)) not in restored
     ]
     after = archive.Directory(directory, config).read()
     assert len(after) == STAGES

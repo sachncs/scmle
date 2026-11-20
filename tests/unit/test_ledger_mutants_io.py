@@ -217,8 +217,8 @@ def test_the_direction_and_seed_path_reach_the_check():
     )
     assert up.check.p_value + down.check.p_value == pytest.approx(1.0)
     assert up.check.p_value != both.p
-    assert up.check.seeds == randomness.seed_path(7, "ledger.spearman", 0)
-    assert down.check.seeds == randomness.seed_path(7, "ledger.spearman", 1)
+    assert up.check.seeds == randomness.seed(7, "ledger.spearman", 0)
+    assert down.check.seeds == randomness.seed(7, "ledger.spearman", 1)
 
 
 # --- confirmation record ----------------------------------------------------
@@ -331,7 +331,7 @@ def test_reasons_and_event_names_are_exact():
     check = result.checks[0]
     assert check.decision is qualification.Decision.WARN
     assert check.tier is qualification.Tier.CONFIRMED
-    assert check.seeds == randomness.seed_path(7, "confirm.spearman", 0)
+    assert check.seeds == randomness.seed(7, "confirm.spearman", 0)
     # A repeat is denied on set C with a reason.
     with pytest.raises(errors.LeakageError):
         confirm.confirm(ledger, source, alpha_confirm=Fraction(1, 20))
@@ -645,8 +645,8 @@ def test_every_check_on_c_has_its_own_seed_index():
         ledger, locate(cfeatures, ctarget), alpha_confirm=Fraction(1, 20)
     )
     assert [c.seeds for c in result.checks] == [
-        randomness.seed_path(7, "confirm.spearman", 0),
-        randomness.seed_path(7, "confirm.spearman", 1),
+        randomness.seed(7, "confirm.spearman", 0),
+        randomness.seed(7, "confirm.spearman", 1),
     ]
 
 

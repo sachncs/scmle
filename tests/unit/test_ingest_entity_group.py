@@ -37,7 +37,7 @@ def duplicated_table():
 
 def test_duplicates_under_different_keys_share_a_group():
     frame = duplicated_table()
-    groups, document = ingest_stage.resolve_entities(frame, spec())
+    groups, document = ingest_stage.resolve(frame, spec())
     assert len(groups) == len(frame)
     for first in range(0, len(frame), 2):
         assert groups.iloc[first] == groups.iloc[first + 1]
@@ -47,11 +47,11 @@ def test_duplicates_under_different_keys_share_a_group():
 
 def test_distinct_people_are_not_merged():
     frame = duplicated_table()
-    groups, ignored = ingest_stage.resolve_entities(frame, spec())
+    groups, ignored = ingest_stage.resolve(frame, spec())
     assert not groups.eq(groups.iloc[0]).all()
 
 
 def test_a_missing_entity_field_is_a_config_error():
     frame = duplicated_table().drop(columns=["email"])
     with pytest.raises(errors.ConfigError, match="email"):
-        ingest_stage.resolve_entities(frame, spec())
+        ingest_stage.resolve(frame, spec())

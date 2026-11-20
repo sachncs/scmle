@@ -1,6 +1,6 @@
 """The post-selection diagnostic suite and its scheduling.
 
-`run_suite` runs diagnostics against the run's finish deadline: it times
+`run` runs diagnostics against the run's finish deadline: it times
 the model once (`gauge`) and shares the time left among the diagnostics by
 their cost models (`Diagnostic.estimate`).
 """
@@ -62,7 +62,7 @@ def panoply() -> tuple[diagnostics.Diagnostic, ...]:
     )
 
 
-def run_suite(
+def run(
     inputs: diagnostics.Input,
     suite: tuple[diagnostics.Diagnostic, ...] | None = None,
     total_seconds: float | None = None,

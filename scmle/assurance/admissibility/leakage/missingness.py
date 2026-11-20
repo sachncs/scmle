@@ -140,7 +140,7 @@ def test(
         n=len(feature),
         decision=decide(suspect, not powered, gate),
         subset=set_id,
-        seeds=randomness.seed_path(cfg.seed, path, 0),
+        seeds=randomness.seed(cfg.seed, path, 0),
         tier=qualification.Tier.UNVERIFIED,
     )
     return Missingness(

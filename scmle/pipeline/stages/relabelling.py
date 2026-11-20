@@ -19,7 +19,7 @@ from scmle.preparation import strategies
 class Relabelling(remedy.Remedy):
     """Confident pseudo-labels added to the final fit when they help.
 
-    Part of `FinalEvaluationStage`, which inherits these methods unchanged;
+    Part of `Assessment`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 

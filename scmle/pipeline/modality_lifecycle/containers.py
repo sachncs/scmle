@@ -16,7 +16,7 @@ from scmle.contracts import records
 from scmle.pipeline.modality_lifecycle import constants
 
 
-class LifecycleCancelledError(errors.CancelledError):
+class AbortedError(errors.CancelledError):
     """Raised when a modality lifecycle receives a cancellation request."""
 
     def __init__(self, message: str) -> None:

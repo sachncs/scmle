@@ -311,7 +311,7 @@ def refuse(url: str) -> tuple[float, list[int], classify.Classification]:
         {k: v for k, v in r.items() if k != "age"} for r in harness.records(3)
     ]
     started = time.monotonic()
-    watch = signals.SignalMonitor(signals.Window(min_samples=30))
+    watch = signals.Monitor(signals.Window(minimum=30))
     statuses = []
     for step in range(40):
         code = demo.post_json(url, {"records": missing})[0]

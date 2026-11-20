@@ -74,12 +74,12 @@ def test_drain_returns_once_enough_requests_were_answered():
 def test_a_rolling_restart_never_routes_to_an_unready_copy():
     result = service.restart()
     passed(result)
-    assert result.fault_id == "unhealthy_container_rolling_restart"
+    assert result.fault == "unhealthy_container_rolling_restart"
     assert result.detail["requests_failed"] == 0
     assert result.detail["requests_sent"] > 0
     assert harness.unready(result.detail["unready_replacement"])
     measured = result.measurements[0]
-    assert (measured.component, measured.rpo_lost) == ("service", 0)
+    assert (measured.component, measured.lost) == ("service", 0)
 
 
 def test_a_wrong_key_leaves_the_service_unready_without_leaking_it():
@@ -93,7 +93,7 @@ def test_a_wrong_key_leaves_the_service_unready_without_leaking_it():
 def test_a_rotated_key_serves_and_is_audited():
     result = service.rekey()
     passed(result)
-    assert result.fault_id == "secret_rotation_recovery"
+    assert result.fault == "secret_rotation_recovery"
     assert result.measurements[0].component == "secrets"
     assert harness.ROTATED_KEY not in str(result.to_dict())
 
@@ -101,7 +101,7 @@ def test_a_rotated_key_serves_and_is_audited():
 def test_a_corrupted_bundle_is_refused_and_restored():
     result = service.corrupted_bundle()
     passed(result)
-    assert result.fault_id == "corrupted_bundle"
+    assert result.fault == "corrupted_bundle"
     assert harness.unready(result.detail["tampered_verdict"])
     assert result.measurements[0].component == "service"
 
@@ -115,4 +115,4 @@ def test_an_incompatible_schema_is_refused_and_recovered():
     }
     assert result.detail["classification"]["verdict"] == "data_quality"
     measured = result.measurements[0]
-    assert (measured.component, measured.rpo_lost) == ("service", 0)
+    assert (measured.component, measured.lost) == ("service", 0)

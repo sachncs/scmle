@@ -7,7 +7,6 @@
   "from_records": "pandas",
   "is_available": "pyarrow",
   "is_loopback": "ipaddress",
-  "learning_curve": "sklearn.model_selection",
   "load_model": "xgboost",
   "mean_absolute_error": "sklearn.metrics",
   "read_bytes": "importlib.metadata",

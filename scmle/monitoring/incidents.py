@@ -66,7 +66,7 @@ class Phase(enum.StrEnum):
     RESOLVED = "resolved"
 
 
-def require_text(value: object, field_name: str) -> str:
+def require(value: object, field_name: str) -> str:
     """Returns non-empty incident metadata.
 
     Args:
@@ -84,7 +84,7 @@ def require_text(value: object, field_name: str) -> str:
     return value.strip()
 
 
-def incident_id(target: slo.Slo, observed_at: str) -> str:
+def identify(target: slo.Slo, observed_at: str) -> str:
     """Returns an idempotent identity for one target evaluation window.
 
     Args:
@@ -98,7 +98,7 @@ def incident_id(target: slo.Slo, observed_at: str) -> str:
         {
             "target": target.name,
             "observed_at": observed_at,
-            "route": target.alert_route,
+            "route": target.route,
         },
         separators=(",", ":"),
         sort_keys=True,
@@ -190,20 +190,20 @@ class Incident:
             "run",
             "rollback",
         ):
-            require_text(getattr(self, field_name), field_name)
+            require(getattr(self, field_name), field_name)
         status: Any = self.status  # may be text from a persisted record
         if not isinstance(status, Phase):
             object.__setattr__(self, "status", Phase(status))
-        slo.parse_timestamp(self.opened, "opened")
-        slo.parse_timestamp(self.observed, "observed")
+        slo.parse(self.opened, "opened")
+        slo.parse(self.observed, "observed")
         if self.acknowledged is not None:
-            slo.parse_timestamp(self.acknowledged, "acknowledged")
-            require_text(self.acknowledger or "", "acknowledger")
+            slo.parse(self.acknowledged, "acknowledged")
+            require(self.acknowledger or "", "acknowledger")
         if self.resolved is not None:
-            slo.parse_timestamp(self.resolved, "resolved")
-            require_text(self.resolver or "", "resolver")
-            require_text(self.resolution or "", "resolution")
-            require_text(self.digests.get("evidence") or "", "digests.evidence")
+            slo.parse(self.resolved, "resolved")
+            require(self.resolver or "", "resolver")
+            require(self.resolution or "", "resolution")
+            require(self.digests.get("evidence") or "", "digests.evidence")
         if self.status is Phase.OPEN and self.acknowledged:
             raise errors.InputError(
                 "open incidents must not have acknowledgement"
@@ -231,7 +231,7 @@ class Incident:
     def from_dict(cls, record: Mapping[str, Any]) -> "Incident":
         """Rebuilds an incident from a journal snapshot.
 
-        Journal rows are verified as stored (`Incidents.read_events`) before
+        Journal rows are verified as stored (`Incidents.read`) before
         they are rebuilt; a snapshot without `schema_version` is version 1
         and is migrated.
 
@@ -316,9 +316,9 @@ def proceed(incident: Incident, previous: Incident) -> None:
     )
     if transition_at is None or previous_at is None:
         raise errors.InputError("incident journal timestamps are invalid")
-    if slo.parse_timestamp(
-        transition_at, "incident.transition_at"
-    ) < slo.parse_timestamp(previous_at, "incident.previous_at"):
+    if slo.parse(transition_at, "incident.transition_at") < slo.parse(
+        previous_at, "incident.previous_at"
+    ):
         raise errors.InputError("incident journal timestamps are invalid")
 
 
@@ -342,7 +342,7 @@ class Incidents:
         self.lock = durability.latch(self.path)
 
     @serialized
-    def read_events(self) -> tuple[dict[str, Any], ...]:
+    def read(self) -> tuple[dict[str, Any], ...]:
         """Reads and verifies the complete journal, failing closed on tamper.
 
         Returns:
@@ -412,7 +412,7 @@ class Incidents:
             One incident per identity, in the order first opened.
         """
         latest: dict[str, Incident] = {}
-        for record in self.read_events():
+        for record in self.read():
             incident = Incident.from_dict(record["incident"])
             latest[incident.identifier] = incident
         return tuple(latest.values())
@@ -444,12 +444,12 @@ class Incidents:
         """
         if not isinstance(evaluation, slo.Assessment):
             raise errors.KindError("evaluation must be Assessment")
-        if not evaluation.incident_required:
+        if not evaluation.required:
             raise errors.InputError("a passing SLO cannot open an incident")
-        slo.parse_timestamp(opened_at, "opened_at")
-        require_text(run_id, "run_id")
-        require_text(rollback_target, "rollback_target")
-        identity = incident_id(evaluation.target, evaluation.observed_at)
+        slo.parse(opened_at, "opened_at")
+        require(run_id, "run_id")
+        require(rollback_target, "rollback_target")
+        identity = identify(evaluation.target, evaluation.observed)
         current = {record.identifier: record for record in self.records()}
         if identity in current:
             return current[identity]
@@ -458,10 +458,10 @@ class Incidents:
             target=evaluation.target.name,
             status=Phase.OPEN,
             opened=opened_at,
-            observed=evaluation.observed_at,
+            observed=evaluation.observed,
             owner=evaluation.target.owner,
             runbook=evaluation.target.runbook,
-            route=evaluation.target.alert_route,
+            route=evaluation.target.route,
             reason=evaluation.reason,
             run=run_id,
             rollback=rollback_target,
@@ -496,9 +496,9 @@ class Incidents:
             return incident
         if incident.status is not Phase.OPEN:
             raise errors.InputError("only open incidents can be acknowledged")
-        require_text(actor, "actor")
-        timestamp = slo.parse_timestamp(acknowledged_at, "acknowledged_at")
-        if timestamp < slo.parse_timestamp(incident.opened, "opened"):
+        require(actor, "actor")
+        timestamp = slo.parse(acknowledged_at, "acknowledged_at")
+        if timestamp < slo.parse(incident.opened, "opened"):
             raise errors.InputError("acknowledgement cannot precede opening")
         updated = dataclasses.replace(
             incident,
@@ -542,13 +542,11 @@ class Incidents:
             raise errors.InputError(
                 "only acknowledged incidents can be resolved"
             )
-        require_text(actor, "actor")
-        require_text(resolution, "resolution")
-        require_text(evidence_digest, "evidence_digest")
-        timestamp = slo.parse_timestamp(resolved_at, "resolved_at")
-        if timestamp < slo.parse_timestamp(
-            incident.acknowledged or "", "acknowledged"
-        ):
+        require(actor, "actor")
+        require(resolution, "resolution")
+        require(evidence_digest, "evidence_digest")
+        timestamp = slo.parse(resolved_at, "resolved_at")
+        if timestamp < slo.parse(incident.acknowledged or "", "acknowledged"):
             raise errors.InputError("resolution cannot precede acknowledgement")
         updated = dataclasses.replace(
             incident,
@@ -564,7 +562,7 @@ class Incidents:
     def require(self, identity: str) -> Incident:
         """Returns the incident with the given identity.
 
-        A blank or non-string identity raises ValueError from `require_text`.
+        A blank or non-string identity raises ValueError from `require`.
 
         Args:
             identity: Identity of the incident.
@@ -575,7 +573,7 @@ class Incidents:
         Raises:
             KeyError: If no incident has that identity.
         """
-        require_text(identity, "identifier")
+        require(identity, "identifier")
         for record in self.records():
             if record.identifier == identity:
                 return record
@@ -589,8 +587,8 @@ class Incidents:
             event_type: `opened`, `acknowledged` or `resolved`.
             incident: The incident state to record.
         """
-        require_text(event_type, "event_type")
-        existing = self.read_events()
+        require(event_type, "event_type")
+        existing = self.read()
         previous_digest = str(existing[-1]["event_digest"]) if existing else ""
         event: dict[str, Any] = {
             "event_type": event_type,
@@ -613,6 +611,6 @@ __all__ = [
     "Incidents",
     "Phase",
     "digest",
-    "incident_id",
-    "require_text",
+    "identify",
+    "require",
 ]

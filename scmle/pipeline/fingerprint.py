@@ -38,7 +38,7 @@ TEXT_MEAN_LENGTH = 40
 DIFFICULTY_ROWS = 2000
 DIFFICULTY_FOLDS = 3
 BINARY_CLASSES = 2
-# Cost model of `ml_difficulty` (seconds, one thread), fitted 2026-11-17 on
+# Cost model of `gauge` (seconds, one thread), fitted 2026-11-17 on
 # the 15 evidence tables (OMP_NUM_THREADS=1, two runs at a time):
 #   seconds = BASE + CELL x rows x columns x C'^CLASS_POWER,
 # rows capped at DIFFICULTY_ROWS, C' the classes above two, else 1. The
@@ -211,7 +211,7 @@ def ways(classes: int) -> int:
 
 
 def cost(rows: int, columns: int, classes: int) -> float:
-    """Predicts an upper bound on the seconds of `ml_difficulty`.
+    """Predicts an upper bound on the seconds of `gauge`.
 
     Args:
         rows: Rows available; at most `DIFFICULTY_ROWS` are used.
@@ -323,7 +323,7 @@ def crossval(
     return scores
 
 
-def ml_difficulty(
+def gauge(
     frame: pandas.DataFrame,
     spec: tasks.Config,
     task: tasks.Task,
@@ -607,7 +607,7 @@ def imprint(
         leakage_flags: Number of leakage hypotheses raised.
         total_rows: Rows in the whole dataset when `frame` is only the
             development partition.
-        allowance: Seconds `ml_difficulty` may take, or None for no cap.
+        allowance: Seconds `gauge` may take, or None for no cap.
 
     Returns:
         A JSON-serializable mapping grouped by fingerprint dimension.
@@ -637,7 +637,7 @@ def imprint(
         "target": target_block,
         "features": characterise(frame, plan, column_statistics),
         "relationships": relate(frame, plan, column_statistics),
-        "ml_difficulty": ml_difficulty(frame, spec, task, plan, allowance),
+        "ml_difficulty": gauge(frame, spec, task, plan, allowance),
         "structure": structure(frame, spec),
         "quality": {
             "duplicate_rows": duplicate_rows,

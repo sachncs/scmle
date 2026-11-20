@@ -154,7 +154,7 @@ def real_columns(frame: pandas.DataFrame, count: int, seed: int) -> list[str]:
     Returns:
         The chosen column names, in table order.
     """
-    rng = randomness.component_rng(seed, "screen.columns", 0)
+    rng = randomness.spawn(seed, "screen.columns", 0)
     names = [c for c in frame.columns if c != f4_certify.TARGET]
     return [
         names[i] for i in sorted(rng.choice(len(names), count, replace=False))
@@ -172,7 +172,7 @@ def with_gaps(features: pandas.DataFrame, seed: int) -> pandas.DataFrame:
         A copy in which `GAP_RATE` of the values of the first `GAP_COLUMNS`
         columns are missing.
     """
-    rng = randomness.component_rng(seed, "screen.gaps", 0)
+    rng = randomness.spawn(seed, "screen.gaps", 0)
     out = features.copy()
     for name in list(out.columns)[:GAP_COLUMNS]:
         out.loc[rng.random(len(out)) < GAP_RATE, name] = numpy.nan
@@ -452,7 +452,7 @@ def measure(kind: str, workers: int = 1) -> tuple[Any, dict[str, Any]]:
                 detected=detected,
                 clean=worlds,
                 alarms=false_alarms,
-                seeds=randomness.seed_path(0, "screen.certify", 0),
+                seeds=randomness.seed(0, "screen.certify", 0),
             )
         )
     cert = certificates.certify(
@@ -517,7 +517,7 @@ def closing(frame: pandas.DataFrame, seed: int, *, late: bool) -> pandas.Series:
     Returns:
         One date per row, aligned to `frame`.
     """
-    rng = randomness.component_rng(seed, "screen.dated", 0)
+    rng = randomness.spawn(seed, "screen.dated", 0)
     ranks = frame[f4_certify.TARGET].rank(pct=True).to_numpy()
     days = benchmarks.evidence.leakage.SHIFT * ranks + rng.exponential(
         benchmarks.evidence.leakage.JITTER, len(frame)
@@ -582,7 +582,7 @@ def measure_dated() -> tuple[Any, dict[str, Any]]:
         detected=detected,
         clean=worlds,
         alarms=alarms,
-        seeds=randomness.seed_path(0, "screen.dated", 0),
+        seeds=randomness.seed(0, "screen.dated", 0),
     )
     cert = certificates.certify(
         screen.DATED_ID,

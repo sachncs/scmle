@@ -81,7 +81,7 @@ class Hyperband:
         for index, rungs in enumerate(brackets):
             if remaining <= 0:
                 return
-            reason = self.board.services.governor.skip_reason(first=False)
+            reason = self.board.services.governor.skip(first=False)
             if reason:
                 self.board.journal.forgo(
                     f"tuning {name}: {remaining} configurations", reason
@@ -117,7 +117,7 @@ class Hyperband:
             map(operator.call, itertools.repeat(optimizer.ask, size))
         )
         ids = self.board.journal.allocate(len(proposals))
-        current = self.runner.run_many(
+        current = self.runner.dispatch(
             [
                 trials.Job(trial_id, name, params, rungs[0], strategy)
                 for trial_id, params in zip(ids, proposals, strict=True)
@@ -132,7 +132,7 @@ class Hyperband:
             winners = sorted(alive, key=lambda t: -sign * t.score_mean)[:keep]
             finished = {
                 t.trial_id: t
-                for t in self.runner.run_many(
+                for t in self.runner.dispatch(
                     [
                         trials.Job(
                             t.trial_id, t.model_name, t.params, rung, t.strategy

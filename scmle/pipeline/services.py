@@ -71,7 +71,7 @@ class Random:
         Returns:
             A generator that depends only on the three arguments.
         """
-        return randomness.component_rng(seed, component, index)
+        return randomness.spawn(seed, component, index)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -88,9 +88,9 @@ class Services:
         policy: Model selection policy.
         governor: Applies and reports the resource limits; its start time
             starts the time budget.
-        capability_registry: Declared capabilities that planning checks the
+        capabilities: Declared capabilities that planning checks the
             run against (the tabular beta registry by default).
-        capability_observation: Runtime resource facts captured before the
+        observation: Runtime resource facts captured before the
             capability gate.
         store: Run directory, or None for previews.
         log: Event log, or None for previews.
@@ -98,9 +98,9 @@ class Services:
         checkpoints: Completed trials from an interrupted run, by trial id,
             reused instead of recomputed when resuming.
         backend: Where independent trials run (sequential by default).
-        cancel_event: Set to request cancellation.
-        input_frame: In-memory data, if the project was built from one.
-        approved_plan: Human-approved plan restricting candidates.
+        event: Set to request cancellation.
+        frame: In-memory data, if the project was built from one.
+        plan: Human-approved plan restricting candidates.
         history: Past runs available for meta-learning.
         clock: Where the stages read the time.
         random: Where the stages draw random streams.
@@ -111,10 +111,10 @@ class Services:
     catalog: metrics.Repertoire
     policy: selection.Selector
     governor: limits.Governor
-    capability_registry: capabilities.Registry = dataclasses.field(
+    capabilities: capabilities.Registry = dataclasses.field(
         default_factory=roster.enrol
     )
-    capability_observation: resource_observation.Observation | None = None
+    observation: resource_observation.Observation | None = None
     store: scmle.artifacts.store.Workspace | None = None
     log: events.Log | None = None
     tracker: stores.Store = dataclasses.field(default_factory=stores.Null)
@@ -124,11 +124,9 @@ class Services:
     backend: scheduler.Executor = dataclasses.field(
         default_factory=scheduler.Serial
     )
-    cancel_event: threading.Event = dataclasses.field(
-        default_factory=threading.Event
-    )
-    input_frame: pandas.DataFrame | None = None
-    approved_plan: experiments.Plan | None = None
+    event: threading.Event = dataclasses.field(default_factory=threading.Event)
+    frame: pandas.DataFrame | None = None
+    plan: experiments.Plan | None = None
     history: tuple[experiments.Precedent, ...] = ()
     clock: Clock = dataclasses.field(default_factory=Clock)
     random: Random = dataclasses.field(default_factory=Random)
@@ -136,9 +134,7 @@ class Services:
     @property
     def deadline(self) -> float:
         """Monotonic time at which the budget is exhausted."""
-        return (
-            self.governor.started_at + self.spec.resources.time_budget_seconds
-        )
+        return self.governor.started + self.spec.resources.time_budget_seconds
 
     @property
     def workspace(self) -> scmle.artifacts.store.Workspace:
@@ -160,7 +156,7 @@ class Services:
 
     def elapsed(self) -> float:
         """Returns the seconds the run has spent of its time budget."""
-        return self.clock.monotonic() - self.governor.started_at
+        return self.clock.monotonic() - self.governor.started
 
     def check(self) -> None:
         """Raises if cancellation was requested.
@@ -168,7 +164,7 @@ class Services:
         Raises:
             CancelledError: Carrying the run directory in its details.
         """
-        if self.cancel_event.is_set():
+        if self.event.is_set():
             raise errors.CancelledError(
                 "run cancelled", {"run_dir": self.directory}
             )
@@ -204,7 +200,7 @@ def start(
     Returns:
         The services, with the metric catalog.
     """
-    observation = resource_observation.observe_runtime_resources(
+    observation = resource_observation.observe(
         store.directory if store is not None else None
     )
     declared = capability_registry or roster.enrol()
@@ -220,8 +216,8 @@ def start(
         metrics.CATALOG,
         policy,
         governor,
-        capability_registry=declared,
-        capability_observation=observation,
+        capabilities=declared,
+        observation=observation,
         store=store,
         backend=scheduler.select(
             limits.Governor(spec.resources).workers,

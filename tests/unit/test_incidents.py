@@ -11,14 +11,14 @@ def evaluation() -> slo.Assessment:
     """Build one breached SLO evaluation."""
     target = slo.Slo(
         name="latency",
-        metric_name="p95_latency_ms",
+        metric="p95_latency_ms",
         kind=observability.Indicator.LATENCY,
         maximum=250.0,
-        window_days=7,
-        minimum_samples=1,
+        window=7,
+        samples=1,
         owner="ml-on-call",
         runbook="https://runbooks.example/latency",
-        alert_route="on-call",
+        route="on-call",
     )
     sample = observability.Sample(
         name="p95_latency_ms",
@@ -52,7 +52,7 @@ def test_workflow_is_idempotent_and_preserves_runbook_and_rollback(tmp_path):
     assert first.status is incidents.Phase.OPEN
     assert first.run == "run-42"
     assert first.rollback == "model-previous"
-    assert len(workflow.read_events()) == 1
+    assert len(workflow.read()) == 1
 
 
 def test_workflow_requires_acknowledgement_before_evidence_backed_resolution(
@@ -126,12 +126,12 @@ def test_passing_evaluation_cannot_open_an_incident(tmp_path):
     current = evaluation()
     passing = slo.Assessment(
         target=current.target,
-        observed_at=current.observed_at,
+        observed=current.observed,
         status=slo.Status.PASS,
-        sample_count=1,
-        in_window_count=1,
-        observed_maximum=100.0,
-        error_budget_remaining=0.6,
+        samples=1,
+        windowed=1,
+        maximum=100.0,
+        remaining=0.6,
         reason="maximum 100 is within 250",
     )
 

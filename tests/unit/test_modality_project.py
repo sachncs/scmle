@@ -50,7 +50,7 @@ def test_modality_project_runs_and_persists_all_stages(tmp_path):
     assert project.declaration().status.value == "experimental"
     assert (tmp_path / "run" / "model" / "manifest.json").is_file()
     assert (tmp_path / "run" / "modality_lifecycle.json").is_file()
-    predictor = scmle.pipeline.modality_lifecycle.Predictor.from_package(
+    predictor = scmle.pipeline.modality_lifecycle.Predictor.load(
         project.adapter,
         report.package.path,
         "test-signing-key",
@@ -106,7 +106,7 @@ def test_modality_project_can_cancel_before_publication(tmp_path):
     project.cancel()
 
     with pytest.raises(
-        modality_lifecycle.LifecycleCancelledError,
+        modality_lifecycle.AbortedError,
         match="cancelled at a stage boundary",
     ):
         project.run()
@@ -200,7 +200,7 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
     assert result.card["manifest"]["task"] == "not_declared"
     assert Path(result.path).is_file()
 
-    restored = scmle.pipeline.modality_lifecycle.Curation.read_verified(
+    restored = scmle.pipeline.modality_lifecycle.Curation.load(
         result.path, "test-signing-key"
     )
     assert restored == result
@@ -214,7 +214,7 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
         ValueError,
         match=r"signature does not verify|digest does not match evidence",
     ):
-        scmle.pipeline.modality_lifecycle.Curation.read_verified(
+        scmle.pipeline.modality_lifecycle.Curation.load(
             result.path, "test-signing-key"
         )
     with pytest.raises(
@@ -310,11 +310,11 @@ def test_extension_curation_adapter_accepts_arbitrary_records_without_model_hook
         samples=len(records),
         profile={"record_type": "point", "dimensions": 2},
     )
-    adapter = scmle.pipeline.modality_lifecycle.ExtensionCurator(
+    adapter = scmle.pipeline.modality_lifecycle.Extension(
         extension=extension,
-        sample_values=records,
-        dataset_hash_value=dataset_hash,
-        curation_callback=lambda: report,
+        records=records,
+        identity=dataset_hash,
+        callback=lambda: report,
         limitations=("The caller owns point-cloud decoding and validation.",),
     )
 
@@ -342,11 +342,11 @@ def test_extension_curation_adapter_rejects_detached_report():
         samples=1,
         profile={},
     )
-    adapter = scmle.pipeline.modality_lifecycle.ExtensionCurator(
+    adapter = scmle.pipeline.modality_lifecycle.Extension(
         extension=extension,
-        sample_values=({"x": 1},),
-        dataset_hash_value=hashlib.sha256(b"declared-snapshot").hexdigest(),
-        curation_callback=lambda: report,
+        records=({"x": 1},),
+        identity=hashlib.sha256(b"declared-snapshot").hexdigest(),
+        callback=lambda: report,
         limitations=("The caller owns validation.",),
     )
 
@@ -362,11 +362,11 @@ def test_extension_curation_adapter_rejects_non_digest_identity():
     """
     extension = modalities.Bespoke("acme/point-cloud")
     with pytest.raises(ValueError, match="SHA-256 hex digest"):
-        scmle.pipeline.modality_lifecycle.ExtensionCurator(
+        scmle.pipeline.modality_lifecycle.Extension(
             extension=extension,
-            sample_values=({"x": 1},),
-            dataset_hash_value="sha256-of-the-immutable-snapshot",
-            curation_callback=lambda: None,
+            records=({"x": 1},),
+            identity="sha256-of-the-immutable-snapshot",
+            callback=lambda: None,
             limitations=("The caller owns validation.",),
         )
 
@@ -378,11 +378,11 @@ def test_extension_curation_adapter_accepts_empty_raw_snapshot(tmp_path):
     """
     extension = modalities.Bespoke("acme/empty-stream")
     dataset_hash = hashlib.sha256(b"empty-snapshot").hexdigest()
-    adapter = scmle.pipeline.modality_lifecycle.ExtensionCurator(
+    adapter = scmle.pipeline.modality_lifecycle.Extension(
         extension=extension,
-        sample_values=(),
-        dataset_hash_value=dataset_hash,
-        curation_callback=lambda: curation.Curation(
+        records=(),
+        identity=dataset_hash,
+        callback=lambda: curation.Curation(
             modality=extension.value,
             dataset_hash=dataset_hash,
             samples=0,

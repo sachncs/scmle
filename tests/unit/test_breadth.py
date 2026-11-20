@@ -186,7 +186,7 @@ def test_an_extension_adapter_never_inherits_supported():
         explainability=capabilities.Explainability.NONE,
         inference=capabilities.Inference.LIBRARY,
     )
-    declared = roster.extension_capability(key)
+    declared = roster.describe(key)
     assert declared.status is capabilities.Status.EXTENSION_ONLY
 
 

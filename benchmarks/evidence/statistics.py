@@ -552,7 +552,7 @@ def censored(case: Case) -> Values:
 
 def stream(name: str, index: int) -> numpy.random.Generator:
     """The seeded generator of one simulated input."""
-    return randomness.component_rng(0, f"evidence.statistics.{name}", index)
+    return randomness.spawn(0, f"evidence.statistics.{name}", index)
 
 
 def bundled(loader: str) -> tuple[pandas.DataFrame, pandas.Series]:
@@ -1591,7 +1591,7 @@ def draw(
     done = batch = 0
     while done < total and any(h.active for h in live):
         count = min(settings.BATCH, total - done)
-        rng = randomness.component_rng(seed, "leakage.screen.batch", batch)
+        rng = randomness.spawn(seed, "leakage.screen.batch", batch)
         index = permutation(fitting.permute(strata, count, rng))
         for h in live:
             if not h.active or h.measure is None:
@@ -1682,7 +1682,7 @@ def bound(
         )[0]
         return standard(float(limit), base[chosen], size)
     path = f"leakage.screen.{f.mechanism}.{f.feature}"
-    rng = randomness.component_rng(cfg.seed, path, 0)
+    rng = randomness.spawn(cfg.seed, path, 0)
     replicate = resampler(h, sample, problem, codes, flavour)
     values = []
     for _ in range(cfg.bootstrap):

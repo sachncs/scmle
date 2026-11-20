@@ -291,7 +291,7 @@ def test_reload_recovers_a_service_whose_first_load_failed(folders):
 def test_hold_reloads_on_sighup_and_drains_on_sigterm(
     bundle, folders, tmp_path
 ):
-    monitor = signals.SignalMonitor()
+    monitor = signals.Monitor()
     adapter = server.Service(bundle, monitor=monitor)
     written = tmp_path / "signals.jsonl"
     before = signal.getsignal(signal.SIGTERM)
@@ -346,7 +346,7 @@ def test_hold_keeps_serving_out_of_rotation_for_the_linger(golden, bundle):
     driver = threading.Thread(target=drive)
     driver.start()
     started = time.monotonic()
-    runtime.hold(adapter, signals.SignalMonitor(), None, 60.0, linger=1.5)
+    runtime.hold(adapter, signals.Monitor(), None, 60.0, linger=1.5)
     elapsed = time.monotonic() - started
     driver.join(20)
     status, body = seen["readyz"]
@@ -372,7 +372,7 @@ def test_a_second_stop_signal_ends_the_linger(bundle):
     driver = threading.Thread(target=drive)
     driver.start()
     started = time.monotonic()
-    runtime.hold(adapter, signals.SignalMonitor(), None, 60.0, linger=30.0)
+    runtime.hold(adapter, signals.Monitor(), None, 60.0, linger=30.0)
     driver.join(20)
     assert time.monotonic() - started < 10
     assert adapter.httpd is None
@@ -390,7 +390,7 @@ def test_the_linger_comes_from_the_environment(monkeypatch):
 
 def test_hold_refuses_a_bad_interval_and_a_worker_thread(bundle):
     adapter = server.Service(bundle)
-    monitor = signals.SignalMonitor()
+    monitor = signals.Monitor()
     with pytest.raises(errors.ConfigError, match="interval"):
         runtime.hold(adapter, monitor, None, 0)
     found = []
@@ -482,7 +482,7 @@ def test_the_serve_command_reloads_and_drains_as_a_process(
 
 
 def test_the_monitor_keeps_the_newest_rows_up_to_its_capacity():
-    monitor = signals.SignalMonitor(signals.Window(min_samples=5, capacity=50))
+    monitor = signals.Monitor(signals.Window(minimum=5, capacity=50))
     for step in range(5):
         frame = pandas.DataFrame({"age": range(step * 20, step * 20 + 20)})
         assert monitor.sense(1000.0 + step, frame) == 20
@@ -490,13 +490,13 @@ def test_the_monitor_keeps_the_newest_rows_up_to_its_capacity():
     assert monitor.held == 50
     assert kept == list(range(50, 100))
     assert [at for at, rows in monitor.features] == [1002.0, 1003.0, 1004.0]
-    monitor.prune(1003.5 + monitor.policy.window_seconds)
+    monitor.prune(1003.5 + monitor.policy.window)
     assert monitor.held == 20
     assert [at for at, rows in monitor.features] == [1004.0]
     assert signals.CAPACITY == 9604
     assert signals.Window().capacity == signals.CAPACITY
     with pytest.raises(errors.InputError, match="capacity"):
-        signals.Window(min_samples=30, capacity=29)
+        signals.Window(minimum=30, capacity=29)
 
 
 def test_the_monitor_follows_the_reference_of_the_bundle_served(
@@ -507,7 +507,7 @@ def test_the_monitor_follows_the_reference_of_the_bundle_served(
     second = parity.handwrite({**golden.spec, "model_version": "golden-2"})
     second.reference = support_ops.profile(seed=2)
     folder = pathlib.Path(second.save(tmp_path / "two"))
-    monitor = signals.SignalMonitor()
+    monitor = signals.Monitor()
     adapter = server.Service(first, monitor=monitor)
     assert monitor.profile is first.reference
     adapter.reload(runtime.fetch(folder, trusted=True))
@@ -524,7 +524,7 @@ def test_a_lazily_loaded_bundle_gives_the_monitor_its_reference(
     model = parity.handwrite(golden.spec)
     model.reference = support_ops.profile()
     folder = pathlib.Path(model.save(tmp_path / "one"))
-    monitor = signals.SignalMonitor()
+    monitor = signals.Monitor()
     adapter = server.Service(
         loader=runtime.fetch(folder, trusted=True), monitor=monitor
     )

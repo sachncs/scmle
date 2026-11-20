@@ -158,9 +158,7 @@ def test_degradation_ignores_good_performance() -> None:
 
 def test_feature_drift_names_only_the_strongly_drifted_features() -> None:
     drift = make_drift([feature("a", 0.5), feature("b", 0.15)])
-    verdict = monitor.FeatureDriftAdvisor().evaluate(
-        drift, None, monitor.Thresholds()
-    )
+    verdict = monitor.Inputs().evaluate(drift, None, monitor.Thresholds())
     assert verdict == (
         "retrain",
         "50% of features drifted strongly: 'a' (PSI 0.50)",
@@ -172,9 +170,7 @@ def test_feature_drift_investigates_the_worst_moderate_feature() -> None:
         [feature("c", 0.0), feature("a", 0.2), feature("b", 0.15)]
         + [feature(str(n), 0.0) for n in range(3)]
     )
-    verdict = monitor.FeatureDriftAdvisor().evaluate(
-        drift, None, monitor.Thresholds()
-    )
+    verdict = monitor.Inputs().evaluate(drift, None, monitor.Thresholds())
     assert verdict == ("investigate", "feature 'a' drifted (PSI 0.20)")
 
 
@@ -183,7 +179,7 @@ def test_feature_drift_investigates_the_worst_moderate_feature() -> None:
     [(None, "retrain"), (performance("ok", {}), "investigate")],
 )
 def test_output_drift_retrains_only_without_performance(given, action) -> None:
-    verdict = monitor.OutputDriftAdvisor().evaluate(
+    verdict = monitor.Outputs().evaluate(
         make_drift(output=monitor.HIGH), given, monitor.Thresholds()
     )
     assert verdict == (action, "model output drifted strongly (PSI 0.30)")

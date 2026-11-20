@@ -33,12 +33,12 @@ class Comparison:
     Attributes:
         metric: Metric used.
         rows: Rows compared.
-        champion_score: Champion's score.
-        challenger_score: Challenger's score.
+        champion: Champion's score.
+        challenger: Challenger's score.
         advantage: Challenger minus champion in the metric's favour
             (positive means the challenger is better).
         interval: 95% bootstrap interval of the advantage.
-        probability_better: Share of resamples where the challenger won.
+        better: Share of resamples where the challenger won.
         decision: `promote` or `keep`.
         dropped: Resamples that could not be scored (a resample missing a
             class) and are not in the interval.
@@ -46,11 +46,11 @@ class Comparison:
 
     metric: str
     rows: int
-    champion_score: float
-    challenger_score: float
+    champion: float
+    challenger: float
     advantage: float
     interval: tuple[float, float]
-    probability_better: float
+    better: float
     decision: str
     dropped: int = 0
 
@@ -173,13 +173,11 @@ class Referee:
         return Comparison(
             metric=metric.name,
             rows=len(target),
-            champion_score=champion_score,
-            challenger_score=challenger_score,
+            champion=champion_score,
+            challenger=challenger_score,
             advantage=sign * (challenger_score - champion_score),
             interval=(float(low), float(high)),
-            probability_better=(
-                math.nan if scant else float((samples > 0).mean())
-            ),
+            better=(math.nan if scant else float((samples > 0).mean())),
             decision="promote" if not scant and low > 0 else "keep",
             dropped=self.bootstraps - len(samples),
         )

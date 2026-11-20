@@ -384,7 +384,7 @@ def test_the_noise_probe_decodes_only_the_frames_it_scores(tmp_path):
         source="short",
         label="b",
     )
-    preparer = modality_lifecycle.AudioPreparer(
+    preparer = modality_lifecycle.Audio(
         modalities.audio.Dataset((sample, other))
     )
     batch = preparer.features((sample, other))
@@ -394,7 +394,7 @@ def test_the_noise_probe_decodes_only_the_frames_it_scores(tmp_path):
 
     tracemalloc.start()
     try:
-        probe = preparer.background_noise_robustness(sample, model, 0.0)
+        probe = preparer.perturb(sample, model, 0.0)
         peak = tracemalloc.get_traced_memory()[1]
     finally:
         tracemalloc.stop()

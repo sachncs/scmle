@@ -36,7 +36,7 @@ AUTOMATIC = "automatic"
 APPROVED = "approved"
 
 
-class StepKind(enum.StrEnum):
+class Kind(enum.StrEnum):
     """What a step does.
 
     Attributes:
@@ -56,7 +56,7 @@ class StepKind(enum.StrEnum):
     APPROVAL = "approval"
 
 
-class CatchUp(enum.StrEnum):
+class Backfill(enum.StrEnum):
     """What to do about schedule slots that were missed.
 
     Attributes:
@@ -98,16 +98,16 @@ class Step:
     Attributes:
         name: Unique name within the workflow.
         kind: What it does.
-        depends_on: Names of steps that must have succeeded first.
-        timeout_seconds: Limit for one attempt.
+        needs: Names of steps that must have succeeded first.
+        timeout: Limit for one attempt.
         retries: Attempts and backoff.
-        cost_budget: Ceiling for this step's cost, if any.
-        concurrency_group: Steps of one group never run at the same time
-            beyond the group's limit (see `Workflow.group_limits`).
+        budget: Ceiling for this step's cost, if any.
+        concurrency: Steps of one group never run at the same time
+            beyond the group's limit (see `Workflow.limits`).
         effect: `automatic`, or `approved` (needs an approval upstream).
         parameters: JSON-ready parameters for the handler.
         approvers: For an approval step, the identities that may decide.
-        expires_seconds: For an approval step, how long it waits.
+        expiry: For an approval step, how long it waits.
         KEYS: Version-1 keys to the written ones (`needs`, `timeout` and
             `expiry` in seconds, `budget`, `concurrency`); `downgrade`
             restores version 1.
@@ -124,18 +124,18 @@ class Step:
     )
 
     name: str
-    kind: StepKind
-    depends_on: tuple[str, ...] = ()
-    timeout_seconds: float = 3600.0
+    kind: Kind
+    needs: tuple[str, ...] = ()
+    timeout: float = 3600.0
     retries: retry.Retries = dataclasses.field(
         default_factory=lambda: retry.Retries(3, 5.0, 2.0, 300.0)
     )
-    cost_budget: float | None = None
-    concurrency_group: str | None = None
+    budget: float | None = None
+    concurrency: str | None = None
     effect: str = AUTOMATIC
     parameters: Mapping[str, Any] = dataclasses.field(default_factory=dict)
     approvers: tuple[str, ...] = ()
-    expires_seconds: float = 86400.0
+    expiry: float = 86400.0
 
     def __post_init__(self) -> None:
         """Validates the step.
@@ -145,17 +145,17 @@ class Step:
                 no approvers.
         """
         vet(self.name, "step name")
-        if self.timeout_seconds <= 0 or self.expires_seconds <= 0:
+        if self.timeout <= 0 or self.expiry <= 0:
             raise errors.ConfigError("timeouts must be positive")
-        if self.cost_budget is not None and self.cost_budget <= 0:
+        if self.budget is not None and self.budget <= 0:
             raise errors.ConfigError("cost_budget must be positive")
         if self.effect not in (AUTOMATIC, APPROVED):
             raise errors.ConfigError("effect must be automatic or approved")
-        if self.name in self.depends_on:
+        if self.name in self.needs:
             raise errors.ConfigError(f"step {self.name} depends on itself")
-        if self.kind is StepKind.APPROVAL and not self.approvers:
+        if self.kind is Kind.APPROVAL and not self.approvers:
             raise errors.ConfigError("an approval step needs approvers")
-        if self.kind is StepKind.APPROVAL and self.effect == APPROVED:
+        if self.kind is Kind.APPROVAL and self.effect == APPROVED:
             raise errors.ConfigError("an approval step is itself automatic")
 
     def to_dict(self) -> dict[str, Any]:
@@ -174,7 +174,7 @@ class Step:
             The step as version 1 wrote it, with the retry policy's field
             names.
         """
-        return self.layout(dataclasses.asdict(self.retries))
+        return self.layout(self.retries.anchor())
 
     def layout(self, retries: Mapping[str, Any]) -> records.Layout:
         """Builds the version-1 layout around a written retry policy.
@@ -188,15 +188,15 @@ class Step:
         return {
             "name": self.name,
             "kind": self.kind.value,
-            "depends_on": list(self.depends_on),
-            "timeout_seconds": self.timeout_seconds,
+            "depends_on": list(self.needs),
+            "timeout_seconds": self.timeout,
             "retries": dict(retries),
-            "cost_budget": self.cost_budget,
-            "concurrency_group": self.concurrency_group,
+            "cost_budget": self.budget,
+            "concurrency_group": self.concurrency,
             "effect": self.effect,
             "parameters": dict(self.parameters),
             "approvers": list(self.approvers),
-            "expires_seconds": self.expires_seconds,
+            "expires_seconds": self.expiry,
         }
 
 
@@ -213,7 +213,7 @@ class Schedule:
 
     interval_seconds: float
     start_epoch: float = 0.0
-    catch_up: CatchUp = CatchUp.LATEST_ONLY
+    catch_up: Backfill = Backfill.LATEST_ONLY
     max_catch_up: int = 10
 
     def __post_init__(self) -> None:
@@ -237,11 +237,11 @@ class Workflow:
         version: Version label; part of every run's identity.
         steps: The steps.
         schedule: When runs start, if scheduled.
-        max_concurrent_runs: Runs of this workflow allowed at once.
-        cost_budget: Ceiling for one run's total cost, if any.
-        group_limits: Concurrency group name to the steps allowed at once (a
+        concurrency: Runs of this workflow allowed at once.
+        budget: Ceiling for one run's total cost, if any.
+        limits: Concurrency group name to the steps allowed at once (a
             group not listed allows one).
-        max_parallel: Steps the local executor runs at once.
+        parallel: Steps the local executor runs at once.
         KEYS: Version-1 keys to the written ones (`concurrency`, `budget`,
             `limits`, `parallel`, and each step's own); `downgrade`
             restores version 1.
@@ -261,10 +261,10 @@ class Workflow:
     version: str
     steps: tuple[Step, ...]
     schedule: Schedule | None = None
-    max_concurrent_runs: int = 1
-    cost_budget: float | None = None
-    group_limits: Mapping[str, int] = dataclasses.field(default_factory=dict)
-    max_parallel: int = 4
+    concurrency: int = 1
+    budget: float | None = None
+    limits: Mapping[str, int] = dataclasses.field(default_factory=dict)
+    parallel: int = 4
 
     def __post_init__(self) -> None:
         """Validates the whole definition.
@@ -276,15 +276,15 @@ class Workflow:
         vet(self.name, "workflow name")
         if not self.version or not self.steps:
             raise errors.ConfigError("a workflow needs a version and steps")
-        if self.max_concurrent_runs < 1 or self.max_parallel < 1:
+        if self.concurrency < 1 or self.parallel < 1:
             raise errors.ConfigError("concurrency limits must be positive")
-        if self.cost_budget is not None and self.cost_budget <= 0:
+        if self.budget is not None and self.budget <= 0:
             raise errors.ConfigError("cost_budget must be positive")
         names = [step.name for step in self.steps]
         if len(set(names)) != len(names):
             raise errors.ConfigError("step names must be unique")
         for step in self.steps:
-            missing = [d for d in step.depends_on if d not in names]
+            missing = [d for d in step.needs if d not in names]
             if missing:
                 raise errors.ConfigError(
                     f"step {step.name} depends on unknown steps {missing}"
@@ -346,12 +346,12 @@ class Workflow:
             The names of all upstream steps.
         """
         found: set[str] = set()
-        pending = list(self.step(name).depends_on)
+        pending = list(self.step(name).needs)
         while pending:
             current = pending.pop()
             if current not in found:
                 found.add(current)
-                pending.extend(self.step(current).depends_on)
+                pending.extend(self.step(current).needs)
         return frozenset(found)
 
     def gated(self, name: str) -> bool:
@@ -364,7 +364,7 @@ class Workflow:
             True if any upstream step is an approval step.
         """
         return any(
-            self.step(a).kind is StepKind.APPROVAL for a in self.ancestors(name)
+            self.step(a).kind is Kind.APPROVAL for a in self.ancestors(name)
         )
 
     def quota(self, group: str) -> int:
@@ -376,7 +376,7 @@ class Workflow:
         Returns:
             The configured limit, or 1 for a group that is not listed.
         """
-        return int(self.group_limits.get(group, 1))
+        return int(self.limits.get(group, 1))
 
     def to_dict(self) -> dict[str, Any]:
         """Builds a JSON-ready form.
@@ -418,10 +418,10 @@ class Workflow:
                 "catch_up": self.schedule.catch_up.value,
                 "max_catch_up": self.schedule.max_catch_up,
             },
-            "max_concurrent_runs": self.max_concurrent_runs,
-            "cost_budget": self.cost_budget,
-            "group_limits": dict(self.group_limits),
-            "max_parallel": self.max_parallel,
+            "max_concurrent_runs": self.concurrency,
+            "cost_budget": self.budget,
+            "group_limits": dict(self.limits),
+            "max_parallel": self.parallel,
         }
 
     def digest(self) -> str:
@@ -437,7 +437,7 @@ class Workflow:
         return hashlib.sha256(text.encode()).hexdigest()
 
 
-def standard_workflow(
+def scaffold(
     name: str = "scmle-pipeline",
     version: str = "1",
     schedule: Schedule | None = None,
@@ -463,23 +463,21 @@ def standard_workflow(
         name=name,
         version=version,
         schedule=schedule,
-        cost_budget=cost_budget,
+        budget=cost_budget,
         steps=(
-            Step("ingest", StepKind.INGEST),
-            Step(
-                "train", StepKind.TRAIN, ("ingest",), concurrency_group="train"
-            ),
-            Step("evaluate", StepKind.EVALUATE, ("train",)),
-            Step("monitor", StepKind.MONITOR, ("evaluate",)),
+            Step("ingest", Kind.INGEST),
+            Step("train", Kind.TRAIN, ("ingest",), concurrency="train"),
+            Step("evaluate", Kind.EVALUATE, ("train",)),
+            Step("monitor", Kind.MONITOR, ("evaluate",)),
             Step(
                 "approve",
-                StepKind.APPROVAL,
+                Kind.APPROVAL,
                 ("evaluate",),
                 approvers=tuple(approvers),
             ),
             Step(
                 "batch_predict",
-                StepKind.BATCH_PREDICT,
+                Kind.BATCH_PREDICT,
                 ("approve", "monitor"),
                 effect=APPROVED,
             ),

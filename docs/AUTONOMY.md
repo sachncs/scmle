@@ -33,7 +33,7 @@ the loop's own rules (F13); the controller adds only the following.
 |---|---|
 | Exactly once | A file is identified by the SHA-256 of its bytes. An `intent` row is chained before the loop is called and an `applied` row after. A tick that is killed and run again reads the loop's batch counter to see whether the file was applied; if the counter fits neither case it halts and escalates. |
 | Bad input | An unreadable or malformed file is `rejected` once, escalated, and never retried. The rest of the inbox is still applied. |
-| Silence | After `max_idle_ticks` ticks with no new batch, or `max_unlabelled_ticks` ticks with no usable labels, it opens one escalation. It does not stop the loop. |
+| Silence | After `Limits.idle` ticks with no new batch, or `Limits.unlabelled` ticks with no usable labels, it opens one escalation. It does not stop the loop. |
 | A halted loop | While the ledger is halted, or the saved state disagrees with the ledger, a tick changes nothing and reports `halted`. Only a passing recalibration releases a halt. |
 
 ## What needs a person

@@ -84,7 +84,7 @@ def moment(line: str) -> datetime.datetime:
         raise errors.InputError(
             "observability records must have type inference"
         )
-    return scmle.monitoring.observability.parse_timestamp(
+    return scmle.monitoring.observability.parse(
         str(record["timestamp"]), "event.timestamp"
     )
 
@@ -116,37 +116,37 @@ def fingerprint(frame: pandas.DataFrame) -> str:
     return scheme + hashlib.sha256(payload).hexdigest()
 
 
-class PredictionLog:
+class Journal:
     """Append-only JSONL log of predictions and outcomes.
 
     Attributes:
         path: The JSONL file.
-        observability_policy: Policy enabling the redacted sidecar, if any.
-        run_id: Serving-run identity used in observability events, if given.
+        policy: Policy enabling the redacted sidecar, if any.
+        run: Serving-run identity used in observability events, if given.
     """
 
     def __init__(
         self,
         path: str | pathlib.Path,
         *,
-        observability_policy: observability.Requirements | None = None,
-        run_id: str | None = None,
+        policy: observability.Requirements | None = None,
+        run: str | None = None,
     ) -> None:
         """Initializes the log.
 
         Args:
             path: JSONL file; created on first write.
-            observability_policy: Optional policy enabling a redacted
+            policy: Optional policy enabling a redacted
                 observability sidecar beside the prediction log.
-            run_id: Stable serving-run identity used in observability events;
+            run: Stable serving-run identity used in observability events;
                 the model version is used when omitted.
         """
         self.path = pathlib.Path(path)
-        self.observability_policy = observability_policy
-        self.run_id = run_id
+        self.policy = policy
+        self.run = run
 
     @property
-    def observability_path(self) -> pathlib.Path:
+    def sidecar(self) -> pathlib.Path:
         """The path of the redacted sidecar, next to the prediction log."""
         return self.path.with_suffix(".observability.jsonl")
 
@@ -201,7 +201,7 @@ class PredictionLog:
                 else [None] * len(frame)
             )
         except Exception as error:
-            self.log_observability(
+            self.log(
                 bundle,
                 ids[0] if ids else uuid.uuid4().hex,
                 started,
@@ -212,7 +212,7 @@ class PredictionLog:
             raise
         input_fingerprint = fingerprint(frame)
         for event_id in ids:
-            self.log_observability(
+            self.log(
                 bundle,
                 event_id,
                 started,
@@ -236,7 +236,7 @@ class PredictionLog:
             logged.append(event)
         return logged
 
-    def log_observability(
+    def log(
         self,
         bundle: scmle.artifacts.bundle.Bundle,
         request_id: str,
@@ -256,24 +256,24 @@ class PredictionLog:
             input_fingerprint: Digest of the input rows, or None.
             error_category: Name of the error type for a failure.
         """
-        if self.observability_policy is None:
+        if self.policy is None:
             return
         model_fingerprint = bundle.info.files.get(
             scmle.artifacts.bundle.MODEL_FILE, bundle.info.model_version
         )
         event = observability.Inference(
             request_id=request_id,
-            run_id=self.run_id or bundle.info.model_version,
+            run_id=self.run or bundle.info.model_version,
             model_fingerprint=model_fingerprint,
             outcome=outcome,
             latency_ms=(time.perf_counter() - started) * 1000.0,
             timestamp=events.stamp(),
             input_fingerprint=input_fingerprint,
             error_category=error_category,
-            redacted_fields=self.observability_policy.redacted_fields,
+            redacted_fields=self.policy.redacted_fields,
         )
         durability.append_text(
-            self.observability_path,
+            self.sidecar,
             json.dumps(
                 {"type": "inference", **event.to_dict()},
                 ensure_ascii=True,
@@ -299,7 +299,7 @@ class PredictionLog:
             The evaluation time, the cutoff and the number of events retained
             and removed.
         """
-        with durability.latch(self.observability_path):
+        with durability.latch(self.sidecar):
             return self.prune(observed_at)
 
     def prune(self, observed_at: str | None) -> dict[str, Any]:
@@ -317,18 +317,18 @@ class PredictionLog:
             ValueError: If no observability policy is set, or a sidecar record
                 is not a JSON object of type `inference`.
         """
-        if self.observability_policy is None:
+        if self.policy is None:
             raise errors.InputError(
                 "retention enforcement requires an observability policy"
             )
         observed_text = observed_at or events.stamp()
-        observed_timestamp = scmle.monitoring.observability.parse_timestamp(
+        observed_timestamp = scmle.monitoring.observability.parse(
             observed_text, "observed_at"
         )
         cutoff = observed_timestamp - datetime.timedelta(
-            days=self.observability_policy.retention_days
+            days=self.policy.retention_days
         )
-        path = self.observability_path
+        path = self.sidecar
         if not path.exists():
             return {
                 "observed_at": observed_text,
@@ -367,7 +367,7 @@ class PredictionLog:
             "removed": removed,
         }
 
-    def record_outcomes(self, outcomes: dict[str, Any]) -> list[Outcome]:
+    def record(self, outcomes: dict[str, Any]) -> list[Outcome]:
         """Logs outcomes that became known.
 
         Args:

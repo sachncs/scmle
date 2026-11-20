@@ -204,7 +204,7 @@ def register(
 
 def degradation(
     plane: Processes,
-    watch: signals.SignalMonitor,
+    watch: signals.Monitor,
     rng: numpy.random.Generator,
     known_good: list[Any] | None,
 ) -> tuple[int | None, float | None]:
@@ -232,7 +232,7 @@ def degradation(
             p if rng.random() > harness.LABEL_NOISE_RATE else 1 - p
             for p in known_good
         ]
-        watch.observe_outcomes(float(step), signals.misses(served, truth))
+        watch.observe(float(step), signals.misses(served, truth))
         verdict = classify.classify(watch.evaluate(float(step)))
         if verdict.verdict is classify.Verdict.MODEL_PERFORMANCE:
             return (step + 1) * 3, time.monotonic()
@@ -334,9 +334,9 @@ def recover(
         runtime agree.
     """
     rng = numpy.random.default_rng(3)
-    watch = signals.SignalMonitor(
-        signals.Window(window_seconds=1000.0, min_samples=30),
-        signals.SignalThresholds(reference_loss=0.05, loss_tolerance=0.05),
+    watch = signals.Monitor(
+        signals.Window(window=1000.0, minimum=30),
+        signals.Thresholds(loss=0.05, tolerance=0.05),
     )
     detected_after, detected_at = degradation(plane, watch, rng, known_good)
     rolled = release.rollback(

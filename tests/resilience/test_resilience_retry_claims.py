@@ -13,7 +13,7 @@ import pytest
 from scmle.runtime import retry
 from scmle.storage import objectstore
 
-POLICY = retry.Retries(max_attempts=4, base_delay_seconds=0.5, factor=2.0)
+POLICY = retry.Retries(attempts=4, base_delay_seconds=0.5, factor=2.0)
 
 
 @pytest.fixture

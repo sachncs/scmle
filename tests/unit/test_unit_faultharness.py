@@ -142,7 +142,7 @@ def test_stage_closes_the_fleet_and_removes_the_folder_even_on_error():
     assert kept["existed"] is True
     assert kept["base"].name.startswith("scmle-recovery-t-")
     assert not kept["base"].exists()
-    assert kept["result"].fault_id == "fault"
+    assert kept["result"].fault == "fault"
     assert kept["result"].environment == "here"
     assert kept["result"].detail["processes_still_alive_after_close"] == 0
 
@@ -187,22 +187,22 @@ def passed(result):
 def test_the_object_store_outage_recovers_without_loss():
     result = outages.object_store_loss()
     passed(result)
-    assert result.fault_id == "lost_object_store_access"
+    assert result.fault == "lost_object_store_access"
     assert result.environment == "local emulator + subprocess"
     measured = result.measurements[0]
     assert measured.component == "object_store"
-    assert measured.rpo_lost == 0
-    assert measured.rto_seconds > 0
+    assert measured.lost == 0
+    assert measured.rto > 0
     assert result.detail["objects"] > 0
 
 
 def test_a_metrics_outage_spools_and_drains_every_sample():
     result = outages.blackout()
     passed(result)
-    assert result.fault_id == "dependency_outage"
+    assert result.fault == "dependency_outage"
     measured = result.measurements[0]
     assert measured.component == "telemetry_spool"
-    assert measured.rpo_lost == 0
+    assert measured.lost == 0
     down = result.detail["flush_while_down"]
     assert down["sent"] == 0
     assert down["remaining"] == harness.SPOOLED_SAMPLES

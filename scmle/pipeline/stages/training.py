@@ -29,13 +29,13 @@ class Search(products.Kept):
     Attributes:
         trials: The trial results, in order.
         outcomes: The evidence-based decisions so far.
-        trial_counter: The trial identifiers handed out.
+        counter: The trial identifiers handed out.
         skipped: The work reduced or skipped for the budget so far.
     """
 
     trials: list[experiments.Trial]
     outcomes: list[experiments.Decision]
-    trial_counter: int
+    counter: int
     skipped: list[dict[str, str]]
 
     def apply(self, board: object) -> None:
@@ -52,7 +52,7 @@ class Search(products.Kept):
         with board.journal.lock:
             board.journal.trials = self.trials
             board.journal.outcomes = self.outcomes
-            board.journal.trial_counter = self.trial_counter
+            board.journal.counter = self.counter
             board.journal.skipped = self.skipped
         super().apply(board)
 
@@ -70,14 +70,15 @@ class Search(products.Kept):
             return cls(
                 list(journal.trials),
                 list(journal.outcomes),
-                journal.trial_counter,
+                journal.counter,
                 list(journal.skipped),
             )
 
 
-class TrainStage(interface.Stage):
+class Training(interface.Stage):
     """Cross-validates every candidate within the time budget."""
 
+    recorded: ClassVar[str] = "TrainStage"
     requires: ClassVar[tuple[type, ...]] = (
         planning.Planning,
         reservation.Reservation,
@@ -140,7 +141,7 @@ class TrainStage(interface.Stage):
                 trials.Job(trial_id, name)
                 for trial_id, name in zip(ids, chunk, strict=True)
             ]
-            outcomes = runner.run_many(jobs, first=start == 0)
+            outcomes = runner.dispatch(jobs, first=start == 0)
             if start == 0 and all(
                 o.status is experiments.Termination.SKIPPED for o in outcomes
             ):

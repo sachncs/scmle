@@ -41,7 +41,7 @@ def test_every_finished_request_is_recorded_with_route_status_and_time(
     reference,
 ):
     bundle, golden = reference
-    monitor = signals.SignalMonitor()
+    monitor = signals.Monitor()
     adapter = server.Service(bundle, monitor=monitor)
     adapter.start()
     try:
@@ -64,7 +64,7 @@ def test_every_finished_request_is_recorded_with_route_status_and_time(
 
 def test_scored_features_are_sampled_into_the_monitor(reference):
     bundle, golden = reference
-    monitor = signals.SignalMonitor(signals.Window(sample_rate=1.0, seed=1))
+    monitor = signals.Monitor(signals.Window(sampling=1.0, seed=1))
     adapter = server.Service(bundle, monitor=monitor)
     adapter.start()
     try:
@@ -95,7 +95,7 @@ def test_a_failing_monitor_never_breaks_serving(reference):
 
 
 def test_the_runtime_writes_evaluated_signals_as_json_lines(tmp_path):
-    monitor = signals.SignalMonitor()
+    monitor = signals.Monitor()
     for second in range(50):
         monitor.tally(1000.0 + second, "/predict", 200, 0.01)
     target = tmp_path / "signals.jsonl"

@@ -29,7 +29,7 @@ class Status(enum.StrEnum):
     INVALID = "invalid"
 
 
-def require_text(value: object, field_name: str) -> str:
+def require(value: object, field_name: str) -> str:
     """Returns a non-empty SLO field.
 
     Args:
@@ -47,7 +47,7 @@ def require_text(value: object, field_name: str) -> str:
     return value.strip()
 
 
-def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
+def parse(value: str, field_name: str) -> datetime.datetime:
     """Parses a timezone-aware timestamp for SLO window checks.
 
     Args:
@@ -77,14 +77,14 @@ class Slo:
 
     Attributes:
         name: Objective name.
-        metric_name: Name of the metric samples to evaluate.
+        metric: Name of the metric samples to evaluate.
         kind: Kind of signal the samples carry.
         maximum: Largest acceptable value.
-        window_days: Length of the evaluation window, in days.
-        minimum_samples: Fewest in-window samples for a decision.
+        window: Length of the evaluation window, in days.
+        samples: Fewest in-window samples for a decision.
         owner: Who answers for the objective.
         runbook: Where the response procedure is described.
-        alert_route: Where alerts are sent.
+        route: Where alerts are sent.
         KEYS: Version-1 keys to the written ones (`metric`, `window` in
             days, `samples`, `route`); `downgrade` restores version 1.
     """
@@ -99,38 +99,38 @@ class Slo:
     )
 
     name: str
-    metric_name: str
+    metric: str
     kind: observability.Indicator
     maximum: float
-    window_days: int
-    minimum_samples: int
+    window: int
+    samples: int
     owner: str
     runbook: str
-    alert_route: str
+    route: str
 
     def __post_init__(self) -> None:
         """Validates the measurable target and response path.
 
         Raises:
             ValueError: If a text field is blank, `maximum` is negative or not
-                finite, or `window_days` or `minimum_samples` is below 1.
+                finite, or `window` or `samples` is below 1.
         """
         for field_name in (
             "name",
-            "metric_name",
+            "metric",
             "owner",
             "runbook",
-            "alert_route",
+            "route",
         ):
-            require_text(getattr(self, field_name), field_name)
+            require(getattr(self, field_name), field_name)
         kind: Any = self.kind  # may be text from a persisted record
         if not isinstance(kind, observability.Indicator):
             object.__setattr__(self, "kind", observability.Indicator(kind))
         if not math.isfinite(self.maximum) or self.maximum < 0:
             raise errors.InputError("maximum must be finite and non-negative")
-        if self.window_days < 1:
+        if self.window < 1:
             raise errors.InputError("window_days must be at least 1")
-        if self.minimum_samples < 1:
+        if self.samples < 1:
             raise errors.InputError("minimum_samples must be at least 1")
 
     def to_dict(self) -> dict[str, Any]:
@@ -142,14 +142,14 @@ class Slo:
         return self.KEYS.upgrade(
             {
                 "name": self.name,
-                "metric_name": self.metric_name,
+                "metric_name": self.metric,
                 "kind": self.kind.value,
                 "maximum": self.maximum,
-                "window_days": self.window_days,
-                "minimum_samples": self.minimum_samples,
+                "window_days": self.window,
+                "minimum_samples": self.samples,
                 "owner": self.owner,
                 "runbook": self.runbook,
-                "alert_route": self.alert_route,
+                "alert_route": self.route,
             }
         )
 
@@ -160,12 +160,12 @@ class Assessment:
 
     Attributes:
         target: The objective evaluated.
-        observed_at: Evaluation time as given.
+        observed: Evaluation time as given.
         status: The outcome.
-        sample_count: Samples matching the target's metric and kind.
-        in_window_count: Matching samples inside the window.
-        observed_maximum: Largest in-window value, or None without a decision.
-        error_budget_remaining: Share of the allowed maximum not yet used, in
+        samples: Samples matching the target's metric and kind.
+        windowed: Matching samples inside the window.
+        maximum: Largest in-window value, or None without a decision.
+        remaining: Share of the allowed maximum not yet used, in
             [0, 1], or None without a decision.
         reason: One sentence explaining the status.
         KEYS: Version-1 keys to the written ones (`observed`, `samples`,
@@ -185,12 +185,12 @@ class Assessment:
     )
 
     target: Slo
-    observed_at: str
+    observed: str
     status: Status
-    sample_count: int
-    in_window_count: int
-    observed_maximum: float | None
-    error_budget_remaining: float | None
+    samples: int
+    windowed: int
+    maximum: float | None
+    remaining: float | None
     reason: str
 
     def __post_init__(self) -> None:
@@ -204,34 +204,30 @@ class Assessment:
         """
         if not isinstance(self.target, Slo):
             raise errors.KindError("target must be Slo")
-        parse_timestamp(self.observed_at, "observed_at")
+        parse(self.observed, "observed_at")
         status: Any = self.status  # may be text from a persisted record
         if not isinstance(status, Status):
             object.__setattr__(self, "status", Status(status))
-        if self.sample_count < 0 or self.in_window_count < 0:
+        if self.samples < 0 or self.windowed < 0:
             raise errors.InputError("sample counts must not be negative")
-        if self.in_window_count > self.sample_count:
+        if self.windowed > self.samples:
             raise errors.InputError(
                 "in_window_count cannot exceed sample_count"
             )
-        if self.observed_maximum is not None and (
-            not math.isfinite(self.observed_maximum)
-            or self.observed_maximum < 0
+        if self.maximum is not None and (
+            not math.isfinite(self.maximum) or self.maximum < 0
         ):
             raise errors.InputError(
                 "observed_maximum must be finite and non-negative"
             )
-        if (
-            self.error_budget_remaining is not None
-            and not 0 <= self.error_budget_remaining <= 1
-        ):
+        if self.remaining is not None and not 0 <= self.remaining <= 1:
             raise errors.InputError(
                 "error_budget_remaining must be between 0 and 1"
             )
-        require_text(self.reason, "reason")
+        require(self.reason, "reason")
 
     @property
-    def incident_required(self) -> bool:
+    def required(self) -> bool:
         """Whether the operator must follow the target's incident path."""
         return self.status in {
             Status.BREACHED,
@@ -250,16 +246,16 @@ class Assessment:
         return self.KEYS.upgrade(
             {
                 "target": self.target.to_dict(),
-                "observed_at": self.observed_at,
+                "observed_at": self.observed,
                 "status": self.status.value,
-                "sample_count": self.sample_count,
-                "in_window_count": self.in_window_count,
-                "observed_maximum": self.observed_maximum,
-                "error_budget_remaining": self.error_budget_remaining,
-                "incident_required": self.incident_required,
+                "sample_count": self.samples,
+                "in_window_count": self.windowed,
+                "observed_maximum": self.maximum,
+                "error_budget_remaining": self.remaining,
+                "incident_required": self.required,
                 "owner": self.target.owner,
                 "runbook": self.target.runbook,
-                "alert_route": self.target.alert_route,
+                "alert_route": self.target.route,
                 "reason": self.reason,
             }
         )
@@ -281,23 +277,21 @@ def partition(
         The samples with the target's metric name and kind; those of them
         later than `observed`; and those inside the window ending at it.
     """
-    start = observed - datetime.timedelta(days=target.window_days)
+    start = observed - datetime.timedelta(days=target.window)
     matching = tuple(
         sample
         for sample in samples
-        if sample.name == target.metric_name and sample.kind is target.kind
+        if sample.name == target.metric and sample.kind is target.kind
     )
     future = tuple(
         sample
         for sample in matching
-        if parse_timestamp(sample.timestamp, "metric.timestamp") > observed
+        if parse(sample.timestamp, "metric.timestamp") > observed
     )
     in_window = tuple(
         sample
         for sample in matching
-        if start
-        <= parse_timestamp(sample.timestamp, "metric.timestamp")
-        <= observed
+        if start <= parse(sample.timestamp, "metric.timestamp") <= observed
     )
     return matching, future, in_window
 
@@ -332,31 +326,30 @@ def evaluate(
     if not isinstance(target, Slo):
         raise errors.KindError("target must be Slo")
     matching, future, in_window = partition(
-        target, samples, parse_timestamp(observed_at, "observed_at")
+        target, samples, parse(observed_at, "observed_at")
     )
     if future:
         return Assessment(
             target=target,
-            observed_at=observed_at,
+            observed=observed_at,
             status=Status.INVALID,
-            sample_count=len(matching),
-            in_window_count=len(in_window),
-            observed_maximum=None,
-            error_budget_remaining=None,
+            samples=len(matching),
+            windowed=len(in_window),
+            maximum=None,
+            remaining=None,
             reason="future metric samples cannot support an SLO decision",
         )
-    if len(in_window) < target.minimum_samples:
+    if len(in_window) < target.samples:
         return Assessment(
             target=target,
-            observed_at=observed_at,
+            observed=observed_at,
             status=Status.INSUFFICIENT_DATA,
-            sample_count=len(matching),
-            in_window_count=len(in_window),
-            observed_maximum=None,
-            error_budget_remaining=None,
+            samples=len(matching),
+            windowed=len(in_window),
+            maximum=None,
+            remaining=None,
             reason=(
-                f"{len(in_window)} in-window samples; "
-                f"{target.minimum_samples} required"
+                f"{len(in_window)} in-window samples; {target.samples} required"
             ),
         )
     observed_maximum = max(sample.value for sample in in_window)
@@ -371,12 +364,12 @@ def evaluate(
     )
     return Assessment(
         target=target,
-        observed_at=observed_at,
+        observed=observed_at,
         status=status,
-        sample_count=len(matching),
-        in_window_count=len(in_window),
-        observed_maximum=observed_maximum,
-        error_budget_remaining=remaining,
+        samples=len(matching),
+        windowed=len(in_window),
+        maximum=observed_maximum,
+        remaining=remaining,
         reason=reason,
     )
 
@@ -386,6 +379,6 @@ __all__ = [
     "Slo",
     "Status",
     "evaluate",
-    "parse_timestamp",
-    "require_text",
+    "parse",
+    "require",
 ]

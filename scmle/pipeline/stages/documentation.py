@@ -19,11 +19,11 @@ from scmle.pipeline.stages import releasing
 class Documentation(releasing.Releasing):
     """Explanation evidence, provenance, SBOM and fault-injection plan.
 
-    Part of `PackageStage`, which inherits these methods unchanged;
+    Part of `Packaging`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 
-    def explanation_evidence(
+    def explain(
         self,
         board: engine.Board,
         store: Any,

@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from sklearn.linear_model import LogisticRegression
 
 
-class DocumentPreparer(curators.Preparer):
+class Document(curators.Preparer):
     """Adapter for UTF-8, Markdown, and caller-decoded document samples.
 
     Attributes:
@@ -103,12 +103,12 @@ class DocumentPreparer(curators.Preparer):
             dtype=numpy.float64,
         )
         return containers.Batch(
-            tuple(self.sample_id(sample) for sample in samples),
+            tuple(self.sample(sample) for sample in samples),
             ("character_count", "token_count"),
             rows,
         )
 
-    def sample_id(self, sample: document.Sample) -> str:
+    def sample(self, sample: document.Sample) -> str:
         """Gives a stable identity for one document sample or chunk.
 
         Args:
@@ -278,9 +278,9 @@ class DocumentPreparer(curators.Preparer):
             The drift report as a JSON-native mapping.
 
         Raises:
-            TypeError: If `observed` is not a `DocumentPreparer`.
+            TypeError: If `observed` is not a `Document`.
         """
-        if not isinstance(observed, DocumentPreparer):
+        if not isinstance(observed, Document):
             raise errors.KindError(
                 "observed adapter must be a DocumentPreparer"
             )
@@ -306,7 +306,7 @@ class DocumentPreparer(curators.Preparer):
         )
 
 
-class Plaintext(DocumentPreparer):
+class Plaintext(Document):
     """Document adapter with an explicit text modality declaration."""
 
     modality = modalities.Modality.TEXT

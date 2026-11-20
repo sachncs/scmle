@@ -100,7 +100,7 @@ def test_the_stage_reads_the_cap_from_the_charter(tmp_path):
     sealing.inscribe(path, with_cap(1234), signing_key="k")
     plain = tmp_path / "plain.json"
     sealing.inscribe(plain, make_charter(), signing_key="k")
-    package = stages.PackageStage()
+    package = stages.Packaging()
 
     assert package.allowance(stage_context(str(path))) == 1234
     assert package.allowance(stage_context(str(plain))) == cv_plus.MAX_BYTES

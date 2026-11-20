@@ -62,7 +62,7 @@ class Escrow:
         causal: The primary causal claim, or None.
         subject: The rule the baseline claim is about once the model is
             selected, or None.
-        holds_for_coverage: Whether `C` stays sealed until the bundle and its
+        sealed: Whether `C` stays sealed until the bundle and its
             calibration exist, so the coverage claim can be tested on it.
     """
 
@@ -78,7 +78,7 @@ class Escrow:
     baseline: confirm.Docket | None
     causal: confirm.Docket | None
     subject: Any = None
-    holds_for_coverage: bool = False
+    sealed: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -150,14 +150,14 @@ class Claims(products.Derived):
         return {
             "pending": True,
             "charter": self.pending.charter.digest,
-            "coverage": self.pending.holds_for_coverage,
+            "coverage": self.pending.sealed,
         }
 
 
 class Exploration(admission.Admission):
     """The claim ledger of a charter run, from exploration to conclusion.
 
-    Part of `ProfileStage`, which inherits these methods unchanged;
+    Part of `Profiling`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 
@@ -203,9 +203,7 @@ class Exploration(admission.Admission):
         )
         block = charter.estimand.causal
         graph = claim.unseal(block.dag) if block is not None else None
-        found = self.qualify_exploration(
-            board, task, charter, view, structure, graph
-        )
+        found = self.qualify(board, task, charter, view, structure, graph)
         rules = charter.rules
         stage = prefilter.Prefilter(
             lambda columns: self.stress(board, task, charter, view, columns),
@@ -214,7 +212,7 @@ class Exploration(admission.Admission):
             seed=charter.seed,
         )
         # Declarations are validated before the expensive exploration.
-        baseline = self.baseline_runner(
+        baseline = self.freeze(
             board, task, charter, view, structure, signed=verified.signed
         )
         causal = self.hypothesise(board, charter, view, graph, found)
@@ -231,7 +229,7 @@ class Exploration(admission.Admission):
             verified.signed,
             baseline,
             causal,
-            holds_for_coverage=coverage_on_confirmation(charter, task),
+            sealed=coverage_on_confirmation(charter, task),
         )
         if self.defer(board, pending):
             return Claims(pending)
@@ -306,14 +304,14 @@ class Exploration(admission.Admission):
         selected = bool(
             data.baseline_column and data.baseline_subject == "selected_model"
         )
-        if selected or pending.holds_for_coverage:
+        if selected or pending.sealed:
             board.journal.emit(
                 "ledger.deferred",
                 "the confirmation set stays sealed until "
                 + (
                     "the model and its calibration are frozen, so the "
                     "coverage claim can be tested on it"
-                    if pending.holds_for_coverage
+                    if pending.sealed
                     else "the model selection is frozen, so the baseline "
                     "claim can be about that model"
                 ),
@@ -347,7 +345,7 @@ class Exploration(admission.Admission):
         rules = charter.rules
         baseline = pending.baseline
         if subject is not None:
-            baseline = self.baseline_runner(
+            baseline = self.freeze(
                 board,
                 pending.task,
                 charter,
@@ -394,7 +392,7 @@ class Exploration(admission.Admission):
                 "rules": "chartered" if rules else "not chartered",
             },
         )
-        self.assess_robustness(board, pending.stage)
+        self.assess(board, pending.stage)
         self.ground(board, charter, view)
         self.identify(board, charter, view, run, pending.graph, pending.found)
 

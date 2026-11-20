@@ -200,7 +200,7 @@ class Serve(command.Command):
         parser.add_argument(
             "--signals-window",
             type=float,
-            default=signals.Window().window_seconds,
+            default=signals.Window().window,
             help="seconds of traffic each evaluation of the signals covers",
         )
 
@@ -216,9 +216,7 @@ class Serve(command.Command):
         """
         path = pathlib.Path(args.bundle)
         model = bundle.Bundle.load(path, trusted=args.trusted)
-        monitor = signals.SignalMonitor(
-            signals.Window(window_seconds=args.signals_window)
-        )
+        monitor = signals.Monitor(signals.Window(window=args.signals_window))
         adapter = server.Service(
             model,
             args.host,

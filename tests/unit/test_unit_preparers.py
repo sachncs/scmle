@@ -34,7 +34,7 @@ def label(index):
     return "alpha" if index % 2 else "beta"
 
 
-def documents(kind=document.DocumentPreparer):
+def documents(kind=document.Document):
     samples = tuple(
         modalities.document.Sample(
             identifier=f"document-{index}",
@@ -65,7 +65,7 @@ def images():
         )
         for index in range(12)
     )
-    return image.ImagePreparer(modalities.image.Dataset(samples))
+    return image.Image(modalities.image.Dataset(samples))
 
 
 def wav(amplitude, frames=40):
@@ -89,7 +89,7 @@ def sounds():
         )
         for index in range(12)
     )
-    return audio.AudioPreparer(modalities.audio.Dataset(samples))
+    return audio.Audio(modalities.audio.Dataset(samples))
 
 
 def clips(decoded=False):
@@ -114,7 +114,7 @@ def clips(decoded=False):
         )
 
     return video.Footage(
-        modalities.video.Dataset(samples), frame_decoder=decoder, max_frames=4
+        modalities.video.Dataset(samples), decoder=decoder, frames=4
     )
 
 
@@ -131,7 +131,7 @@ def nodes():
         modalities.graph.Edge(f"node-{index}", f"node-{index + 1}")
         for index in range(11)
     )
-    return graph.GraphPreparer(
+    return graph.Graph(
         modalities.graph.Dataset(
             nodes=made, edges=edges, features=("position", "remainder")
         )
@@ -150,7 +150,7 @@ def placemarks():
     dataset = modalities.geospatial.Dataset(
         features=features, crs="EPSG:4326", source="memory://fixture.geojson"
     )
-    return geospatial.GeospatialPreparer(dataset, block_size=1.0)
+    return geospatial.Geospatial(dataset, block_size=1.0)
 
 
 def tiles():
@@ -204,7 +204,7 @@ def test_a_preparer_names_one_row_per_sample(name):
         len(batch.feature_names),
     )
     assert batch.sample_ids == tuple(
-        preparer.sample_id(sample) for sample in preparer.samples
+        preparer.sample(sample) for sample in preparer.samples
     )
     assert len(set(batch.sample_ids)) == len(preparer.samples)
     assert [preparer.label(s) for s in preparer.samples] == [
@@ -218,13 +218,13 @@ def test_a_preparer_splits_every_sample_once(name):
     preparer = BUILDERS[name]()
     parts = preparer.split(7)
     together = [*parts.train, *parts.validation, *parts.test]
-    ids = sorted(preparer.sample_id(sample) for sample in together)
-    assert ids == sorted(preparer.sample_id(s) for s in preparer.samples)
+    ids = sorted(preparer.sample(sample) for sample in together)
+    assert ids == sorted(preparer.sample(s) for s in preparer.samples)
     assert parts.train
     assert parts.test
     again = preparer.split(7)
-    assert [preparer.sample_id(s) for s in again.train] == [
-        preparer.sample_id(s) for s in parts.train
+    assert [preparer.sample(s) for s in again.train] == [
+        preparer.sample(s) for s in parts.train
     ]
 
 
@@ -290,7 +290,7 @@ def test_the_image_sample_id_joins_source_and_hash():
     sample = preparer.samples[0]
     # A bare file name is a local path, so its source is its file URI.
     source = pathlib.Path("image-0.png").resolve().as_uri()
-    assert preparer.sample_id(sample) == f"{source}:{sample.content_hash}"
+    assert preparer.sample(sample) == f"{source}:{sample.content_hash}"
 
 
 def test_the_raster_headers_name_four_statistics_per_band():
@@ -524,18 +524,18 @@ def test_rank_keeps_the_ten_largest_changes_ties_by_name():
 def test_file_digest_is_the_sha256_of_the_file(tmp_path):
     path = tmp_path / "f"
     path.write_bytes(b"abc" * 1000)
-    assert verification.file_digest(path) == (
+    assert verification.digest(path) == (
         hashlib.sha256(b"abc" * 1000).hexdigest()
     )
 
 
 def test_feature_names_must_be_distinct_non_blank_strings():
-    assert verification.require_feature_names(["a", "b"]) == ["a", "b"]
+    assert verification.validate(["a", "b"]) == ["a", "b"]
     for bad in ([], ("a",), ["a", "a"], ["a", " "], ["a", 1], None):
         with pytest.raises(
             errors.InputError, match="feature_names are invalid"
         ):
-            verification.require_feature_names(bad)
+            verification.validate(bad)
 
 
 KEY = "k" * 32
@@ -561,7 +561,7 @@ def manifest(**changes):
 
 
 def test_a_signed_manifest_yields_its_features_and_digest():
-    assert verification.verify_package_manifest(manifest(), KEY) == (
+    assert verification.inspect(manifest(), KEY) == (
         ["a", "b"],
         "0" * 64,
     )
@@ -581,25 +581,25 @@ def test_a_signed_manifest_yields_its_features_and_digest():
 )
 def test_a_malformed_manifest_names_the_field(change, message):
     with pytest.raises(errors.InputError, match=message):
-        verification.verify_package_manifest(manifest(**change), KEY)
+        verification.inspect(manifest(**change), KEY)
 
 
 def test_the_manifest_signature_must_verify():
     with pytest.raises(errors.InputError, match="must be an object"):
-        verification.verify_package_manifest([], KEY)
+        verification.inspect([], KEY)
     forged = manifest()
     forged["dataset_hash"] = "e"
     with pytest.raises(errors.InputError, match="does not verify"):
-        verification.verify_package_manifest(forged, KEY)
+        verification.inspect(forged, KEY)
     with pytest.raises(errors.InputError, match="does not verify"):
-        verification.verify_package_manifest(manifest(), "other" * 8)
+        verification.inspect(manifest(), "other" * 8)
     unsigned = manifest()
     unsigned["signature"] = {"algorithm": "md5", "value": "x"}
     with pytest.raises(errors.InputError, match="missing or unsupported"):
-        verification.verify_package_manifest(unsigned, KEY)
+        verification.inspect(unsigned, KEY)
     unsigned["signature"] = {"algorithm": signing.SIGNATURE_ALGORITHM}
     with pytest.raises(errors.InputError, match="signature is empty"):
-        verification.verify_package_manifest(unsigned, KEY)
+        verification.inspect(unsigned, KEY)
 
 
 def test_vet_checks_the_classifier_against_the_schema():
@@ -620,7 +620,7 @@ def test_vet_checks_the_classifier_against_the_schema():
 
 def test_load_package_refuses_an_incomplete_package(tmp_path):
     with pytest.raises(errors.InputError, match="incomplete"):
-        verification.load_package(tmp_path, KEY)
+        verification.load(tmp_path, KEY)
     (tmp_path / "manifest.json").write_text(json.dumps(manifest()))
     with pytest.raises(errors.InputError, match="incomplete"):
-        verification.load_package(tmp_path, KEY)
+        verification.load(tmp_path, KEY)

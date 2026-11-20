@@ -406,7 +406,7 @@ def test_the_modality_service_is_gated_the_same_way(tmp_path):
     report = modality_lifecycle.Lifecycle().run(
         reference, tmp_path / "package", signing_key="serving-key"
     )
-    predictor = modality_lifecycle.Predictor.from_package(
+    predictor = modality_lifecycle.Predictor.load(
         reference, report.package.path, "serving-key"
     )
     open_host = modality.ModalityHttpServing(

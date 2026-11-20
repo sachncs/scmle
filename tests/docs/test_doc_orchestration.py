@@ -31,7 +31,7 @@ def test_a_transient_failure_is_retried_and_dependents_are_skipped(store):
 
     recorder.behaviour["monitor"] = flaky
     record = executor.start("req-1", "alice")
-    attempts = executor.step_record(record["run_id"], "monitor")["attempts"]
+    attempts = executor.step(record["run_id"], "monitor")["attempts"]
     assert len(attempts) == 3
     assert record["steps"]["monitor"] == "failed"
     assert record["steps"]["batch_predict"] == "skipped"
@@ -72,7 +72,7 @@ def test_a_deferred_slot_stays_due_and_runs_on_a_later_tick(store):
 
     Also enforces website/src/pages/docs/orchestration.astro:31.
     """
-    schedule = definition.Schedule(3600.0, 0.0, definition.CatchUp.LATEST_ONLY)
+    schedule = definition.Schedule(3600.0, 0.0, definition.Backfill.LATEST_ONLY)
     base = test_workflow.pipeline()
     flow = definition.Workflow(base.name, base.version, base.steps, schedule)
     clock = test_workflow.Clock(3600.0 + 1.0)

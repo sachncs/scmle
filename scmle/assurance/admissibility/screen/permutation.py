@@ -67,7 +67,7 @@ def draw(
     batch = 0
     while done < total and any(h.active for h in live):
         count = min(BATCH, total - done)
-        rng = randomness.component_rng(seed, "leakage.screen.batch", batch)
+        rng = randomness.spawn(seed, "leakage.screen.batch", batch)
         index = permute(strata, count, rng)
         permuted = labels[index]
         permuted_bins = binned[index]

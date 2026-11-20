@@ -71,8 +71,8 @@ def test_shadow_serves_the_champion_and_measures_disagreement(good, weak):
 
     assert (served == good.predict(rows)).all()
     agreement = evaluator.agreement()
-    assert agreement.rows == 400 and 0.0 < agreement.disagreement_rate < 1.0
-    assert agreement.mean_probability_gap > 0
+    assert agreement.rows == 400 and 0.0 < agreement.disagreement < 1.0
+    assert agreement.gap > 0
 
 
 def test_shadow_settles_with_the_known_outcomes(good, weak):
@@ -83,7 +83,7 @@ def test_shadow_settles_with_the_known_outcomes(good, weak):
     comparison = evaluator.settle(fresh.y)
 
     assert comparison.decision == "keep"  # The weak challenger is not better.
-    assert comparison.champion_score > comparison.challenger_score
+    assert comparison.champion > comparison.challenger
 
 
 def test_an_empty_shadow_has_nothing_to_report(good, weak):
@@ -105,9 +105,7 @@ def test_a_clearly_better_treatment_is_adopted(good, weak):
     control = arm_of(weak, traffic(1500, seed=10))
     treatment = arm_of(good, traffic(1500, seed=11))
 
-    result = abtest.compare_arms(
-        tasks.Task.BINARY, "roc_auc", control, treatment
-    )
+    result = abtest.compare(tasks.Task.BINARY, "roc_auc", control, treatment)
 
     assert result.decision == "adopt" and result.interval[0] > 0
 
@@ -116,9 +114,7 @@ def test_a_clearly_worse_treatment_is_kept_out(good, weak):
     control = arm_of(good, traffic(1500, seed=12))
     treatment = arm_of(weak, traffic(1500, seed=13))
 
-    result = abtest.compare_arms(
-        tasks.Task.BINARY, "roc_auc", control, treatment
-    )
+    result = abtest.compare(tasks.Task.BINARY, "roc_auc", control, treatment)
 
     assert result.decision == "keep" and result.interval[1] < 0
 
@@ -127,9 +123,7 @@ def test_identical_models_are_inconclusive(good):
     control = arm_of(good, traffic(1200, seed=14))
     treatment = arm_of(good, traffic(1200, seed=15))
 
-    result = abtest.compare_arms(
-        tasks.Task.BINARY, "roc_auc", control, treatment
-    )
+    result = abtest.compare(tasks.Task.BINARY, "roc_auc", control, treatment)
 
     assert result.decision == "inconclusive"
 
@@ -138,9 +132,7 @@ def test_too_few_requests_never_decide(good, weak):
     control = arm_of(weak, traffic(60, seed=16))
     treatment = arm_of(good, traffic(60, seed=17))
 
-    result = abtest.compare_arms(
-        tasks.Task.BINARY, "roc_auc", control, treatment
-    )
+    result = abtest.compare(tasks.Task.BINARY, "roc_auc", control, treatment)
 
     assert result.decision == "inconclusive"
 

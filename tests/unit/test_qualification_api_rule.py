@@ -21,7 +21,7 @@ NEW_NAMES = {
     "ExplorationBudget",
     "ConfirmationBudget",
     "Correction",
-    "component_rng",
+    "spawn",
 }
 
 
@@ -44,4 +44,4 @@ def test_new_types_are_not_package_root_names():
 def test_new_modules_expose_the_documented_names():
     assert qualification.Check and qualification.Claim
     assert qualification.Certificate and qualification.Tier
-    assert budget.Alpha and randomness.component_rng
+    assert budget.Alpha and randomness.spawn

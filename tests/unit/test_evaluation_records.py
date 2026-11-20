@@ -155,7 +155,7 @@ def test_unfold_refuses_unknown_nested_keys():
 def test_an_old_checkpoint_still_verifies_and_is_not_resigned(tmp_path):
     old = stored("checkpoint")
     path = OLD / "checkpoint.json"
-    checkpoint = modality_lifecycle.Checkpoint.read_verified(path, KEY)
+    checkpoint = modality_lifecycle.Checkpoint.load(path, KEY)
     assert checkpoint.schema_version == 1
     assert checkpoint.digests.stages == tuple(old["stage_digests"])
     assert checkpoint.independent is old["require_independent_ground_truth"]
@@ -164,7 +164,7 @@ def test_an_old_checkpoint_still_verifies_and_is_not_resigned(tmp_path):
     copy = tmp_path / "checkpoint.json"
     copy.write_text(json.dumps(tampered), encoding="utf-8")
     with pytest.raises(ValueError, match="signature does not verify"):
-        modality_lifecycle.Checkpoint.read_verified(copy, KEY)
+        modality_lifecycle.Checkpoint.load(copy, KEY)
 
 
 def test_a_new_checkpoint_is_signed_in_the_current_layout():
@@ -177,7 +177,7 @@ def test_a_new_checkpoint_is_signed_in_the_current_layout():
     assert record["digests"]["dataset"] == old.digests.dataset
     assert "dataset_hash" not in record
     assert modality_lifecycle.Checkpoint.from_dict(record) == current
-    assert current.verify_signature(KEY)
+    assert current.verify(KEY)
     assert current.signature != old.signature
 
 
@@ -195,14 +195,12 @@ def test_a_checkpoint_survives_a_round_trip(seed, independent, version):
     record = json.loads(json.dumps(checkpoint.to_dict()))
     again = modality_lifecycle.Checkpoint.from_dict(record)
     assert again == checkpoint
-    assert again.verify_signature(KEY)
+    assert again.verify(KEY)
 
 
 def test_an_old_curation_still_verifies_and_keeps_its_content_digest():
     old = stored("curation")
-    curation = modality_lifecycle.Curation.read_verified(
-        OLD / "curation.json", KEY
-    )
+    curation = modality_lifecycle.Curation.load(OLD / "curation.json", KEY)
     assert curation.schema_version == 1
     assert curation.digests == {"dataset": old["dataset_hash"]}
     assert curation.samples == old["sample_count"]
@@ -236,13 +234,13 @@ def test_a_curation_survives_a_round_trip(samples, version):
     record = json.loads(json.dumps(curation.to_dict()))
     again = modality_lifecycle.Curation.from_dict(record)
     assert again == curation
-    assert again.verify_signature(KEY)
+    assert again.verify(KEY)
 
 
 def test_a_previous_version_report_still_verifies():
     old = stored("report")
     assert old[records.KEY] == reporting.PREVIOUS
-    report = modality_lifecycle.Record.read_verified(OLD / "report.json", KEY)
+    report = modality_lifecycle.Record.load(OLD / "report.json", KEY)
     assert report.digests == {"dataset": old["dataset_hash"]}
     assert len(report.evidence) == len(old["stage_evidence"])
     assert report.to_dict() == old
@@ -261,5 +259,5 @@ def test_a_report_survives_a_round_trip(accuracy, version):
     record = json.loads(json.dumps(report.to_dict()))
     again = modality_lifecycle.Record.from_dict(record)
     assert again == report
-    assert again.verify_signature(KEY)
+    assert again.verify(KEY)
     assert ("evidence" in record) is (version == 3)

@@ -94,7 +94,7 @@ def verify(
             differs from the candidate in modality, dataset hash, sample count
             or canonical content.
     """
-    existing = modality_lifecycle.Curation.read_verified(path, signing_key)
+    existing = modality_lifecycle.Curation.load(path, signing_key)
     if existing.modality != candidate.modality:
         raise errors.InputError(
             "existing curation modality does not match current adapter"

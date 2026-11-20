@@ -85,7 +85,7 @@ Online (level `alpha_promote = 1/50` for one experiment, `alpha_rollback =
 * Optional stopping (gate B1 `gate_b1`). Control 0.10, challenger 0.12
   (`Delta = delta_min = 0.02`), `q = 0.5`, a look after every unit up to
   `n_max = 3000`, `R = 10000`. Pass: share of runs that ever promote
-  `<= 0.02 + tol(0.02, R)`. The same world with `abtest.compare_arms` after
+  `<= 0.02 + tol(0.02, R)`. The same world with `abtest.compare` after
   each batch of 500 (6 looks, `R = 100`, null `Delta = 0`) is run and its
   false-adopt rate filed, not gated. 100 runs are also passed through the
   `Rollout` class and must agree with the vectorised computation exactly.
@@ -350,7 +350,7 @@ def rng_for(base: int, name: str, index: int = 0) -> numpy.random.Generator:
     Returns:
         A generator seeded from `base + index` and `name`.
     """
-    return randomness.component_rng(base + index, f"f11.{name}", 0)
+    return randomness.spawn(base + index, f"f11.{name}", 0)
 
 
 def cost_model() -> costs.Tariff:
@@ -1385,7 +1385,7 @@ def compare_arms_rate(base: int) -> dict[str, Any]:
                 seen_y[seen_arm],
                 classes=classes,
             )
-            result = abtest.compare_arms(
+            result = abtest.compare(
                 tasks.Task.BINARY,
                 "accuracy",
                 control,

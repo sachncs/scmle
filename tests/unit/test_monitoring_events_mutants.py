@@ -58,14 +58,14 @@ def records(path):
 
 
 def test_the_sidecar_sits_beside_the_log_with_its_own_suffix(tmp_path):
-    log = events.PredictionLog(tmp_path / "p.jsonl")
-    assert log.observability_path == tmp_path / "p.observability.jsonl"
-    assert log.observability_policy is None
-    assert log.run_id is None
+    log = events.Journal(tmp_path / "p.jsonl")
+    assert log.sidecar == tmp_path / "p.observability.jsonl"
+    assert log.policy is None
+    assert log.run is None
 
 
 def test_append_writes_one_typed_json_line(tmp_path):
-    log = events.PredictionLog(tmp_path / "p.jsonl")
+    log = events.Journal(tmp_path / "p.jsonl")
     log.append("note", {"when": pandas.Timestamp("2026-01-02"), "n": 3})
     log.append("note", {"n": 4})
     text = (tmp_path / "p.jsonl").read_text()
@@ -82,7 +82,7 @@ def test_append_writes_one_typed_json_line(tmp_path):
 def test_predictions_are_logged_with_features_probability_and_version(
     tmp_path,
 ):
-    log = events.PredictionLog(tmp_path / "p.jsonl")
+    log = events.Journal(tmp_path / "p.jsonl")
     data = pandas.DataFrame({"a": [1.5, None], "b": ["x", "y"]})
     logged = log.chronicle(make_bundle(), data, ["e1", "e2"])
     assert [e.event_id for e in logged] == ["e1", "e2"]
@@ -99,7 +99,7 @@ def test_predictions_are_logged_with_features_probability_and_version(
 
 
 def test_a_regression_bundle_logs_no_probability(tmp_path):
-    log = events.PredictionLog(tmp_path / "p.jsonl")
+    log = events.Journal(tmp_path / "p.jsonl")
     data = pandas.DataFrame({"a": [1.0, 2.0, 3.0]})
     logged = log.chronicle(make_bundle("regression"), data, None)
     assert [e.probability for e in logged] == [None, None, None]
@@ -108,7 +108,7 @@ def test_a_regression_bundle_logs_no_probability(tmp_path):
 
 
 def test_event_ids_must_match_the_rows(tmp_path):
-    log = events.PredictionLog(tmp_path / "p.jsonl")
+    log = events.Journal(tmp_path / "p.jsonl")
     data = pandas.DataFrame({"a": [1.0, 2.0]})
     with pytest.raises(
         ValueError, match="event_ids must have one id per input row"
@@ -120,17 +120,17 @@ def test_event_ids_must_match_the_rows(tmp_path):
 
 
 def test_the_sidecar_carries_one_redacted_success_event_per_request(tmp_path):
-    log = events.PredictionLog(
+    log = events.Journal(
         tmp_path / "p.jsonl",
-        observability_policy=make_policy(redacted=("email", "features")),
-        run_id="serve-9",
+        policy=make_policy(redacted=("email", "features")),
+        run="serve-9",
     )
     data = pandas.DataFrame({"a": [1.0, 2.0]})
     bundle = make_bundle(
         files={scmle.artifacts.bundle.MODEL_FILE: "model-digest"}
     )
     log.chronicle(bundle, data, ["x", "y"])
-    sidecar = records(log.observability_path)
+    sidecar = records(log.sidecar)
     assert [r["request"] for r in sidecar] == ["x", "y"]
     for record in sidecar:
         assert record["type"] == "inference"
@@ -148,18 +148,16 @@ def test_the_sidecar_carries_one_redacted_success_event_per_request(tmp_path):
         .tobytes()
     ).hexdigest()
     assert sidecar[0]["digests"]["payload"] == expected
-    assert log.observability_path.read_text().count("\n") == 2
-    assert ", " not in log.observability_path.read_text().splitlines()[0]
+    assert log.sidecar.read_text().count("\n") == 2
+    assert ", " not in log.sidecar.read_text().splitlines()[0]
 
 
 def test_the_run_id_and_model_fingerprint_fall_back_to_the_model_version(
     tmp_path,
 ):
-    log = events.PredictionLog(
-        tmp_path / "p.jsonl", observability_policy=make_policy()
-    )
+    log = events.Journal(tmp_path / "p.jsonl", policy=make_policy())
     log.chronicle(make_bundle(), pandas.DataFrame({"a": [1.0]}), ["only"])
-    (record,) = records(log.observability_path)
+    (record,) = records(log.sidecar)
     assert record["run"] == "v7"
     assert record["digests"]["model"] == "v7"
 
@@ -172,12 +170,10 @@ def test_unhashable_cells_fall_back_to_a_json_fingerprint(
         raise failure("unhashable")
 
     monkeypatch.setattr(pandas.util, "hash_pandas_object", refuse)
-    log = events.PredictionLog(
-        tmp_path / "p.jsonl", observability_policy=make_policy()
-    )
+    log = events.Journal(tmp_path / "p.jsonl", policy=make_policy())
     data = pandas.DataFrame({"a": [1.5, 2.5]})
     log.chronicle(make_bundle(), data, ["u", "v"])
-    (first, second) = records(log.observability_path)
+    (first, second) = records(log.sidecar)
     payload = data.to_json(
         orient="split", date_format="iso", default_handler=str
     ).encode("utf-8")
@@ -188,15 +184,13 @@ def test_unhashable_cells_fall_back_to_a_json_fingerprint(
 
 
 def test_a_failure_is_logged_as_an_error_event_and_propagates(tmp_path):
-    log = events.PredictionLog(
-        tmp_path / "p.jsonl", observability_policy=make_policy()
-    )
+    log = events.Journal(tmp_path / "p.jsonl", policy=make_policy())
     data = pandas.DataFrame({"a": [1.0, 2.0]})
     with pytest.raises(KeyError):
         log.chronicle(
             make_bundle(fail=KeyError("boom")), data, ["first", "second"]
         )
-    (record,) = records(log.observability_path)
+    (record,) = records(log.sidecar)
     assert record["request"] == "first"
     assert record["outcome"] == "error"
     assert record["error"] == "KeyError"
@@ -205,42 +199,34 @@ def test_a_failure_is_logged_as_an_error_event_and_propagates(tmp_path):
 
 
 def test_a_failure_without_event_ids_still_gets_a_request_id(tmp_path):
-    log = events.PredictionLog(
-        tmp_path / "p.jsonl", observability_policy=make_policy()
-    )
+    log = events.Journal(tmp_path / "p.jsonl", policy=make_policy())
     with pytest.raises(ValueError, match="bad"):
         log.chronicle(
             make_bundle(fail=ValueError("bad")),
             pandas.DataFrame({"a": [1.0]}),
         )
-    (record,) = records(log.observability_path)
+    (record,) = records(log.sidecar)
     assert len(record["request"]) == 32
     assert record["error"] == "ValueError"
-    empty = events.PredictionLog(
-        tmp_path / "q.jsonl", observability_policy=make_policy()
-    )
+    empty = events.Journal(tmp_path / "q.jsonl", policy=make_policy())
     with pytest.raises(ValueError, match="bad"):
         empty.chronicle(
             make_bundle(fail=ValueError("bad")),
             pandas.DataFrame({"a": []}),
         )
-    (record,) = records(empty.observability_path)
+    (record,) = records(empty.sidecar)
     assert len(record["request"]) == 32
 
 
 def test_log_observability_does_nothing_without_a_policy(tmp_path):
-    log = events.PredictionLog(tmp_path / "p.jsonl")
-    log.log_observability(
-        make_bundle(), "r", 0.0, "success", input_fingerprint=None
-    )
-    assert not log.observability_path.exists()
+    log = events.Journal(tmp_path / "p.jsonl")
+    log.log(make_bundle(), "r", 0.0, "success", input_fingerprint=None)
+    assert not log.sidecar.exists()
 
 
 def test_the_error_category_and_latency_are_recorded(tmp_path):
-    log = events.PredictionLog(
-        tmp_path / "p.jsonl", observability_policy=make_policy()
-    )
-    log.log_observability(
+    log = events.Journal(tmp_path / "p.jsonl", policy=make_policy())
+    log.log(
         make_bundle(),
         "r1",
         0.0,
@@ -248,7 +234,7 @@ def test_the_error_category_and_latency_are_recorded(tmp_path):
         input_fingerprint="fp",
         error_category="OSError",
     )
-    (record,) = records(log.observability_path)
+    (record,) = records(log.sidecar)
     assert record["error"] == "OSError"
     assert record["digests"]["payload"] == "fp"
     assert record["latency"] > 0.0
@@ -259,11 +245,9 @@ def sidecar_line(timestamp):
 
 
 def test_retention_reports_the_window_and_keeps_the_boundary_event(tmp_path):
-    log = events.PredictionLog(
-        tmp_path / "p.jsonl", observability_policy=make_policy(2)
-    )
+    log = events.Journal(tmp_path / "p.jsonl", policy=make_policy(2))
     kept = sidecar_line("2026-10-18T10:00:00+00:00")
-    log.observability_path.write_text(
+    log.sidecar.write_text(
         sidecar_line("2026-10-18T09:59:59+00:00")
         + kept
         + sidecar_line("2026-10-20T10:00:00+00:00"),
@@ -276,15 +260,13 @@ def test_retention_reports_the_window_and_keeps_the_boundary_event(tmp_path):
         "retained": 2,
         "removed": 1,
     }
-    assert log.observability_path.read_text(encoding="utf-8").startswith(kept)
+    assert log.sidecar.read_text(encoding="utf-8").startswith(kept)
     leftovers = [p.name for p in tmp_path.iterdir()]
     assert sorted(leftovers) == ["p.observability.jsonl"]
 
 
 def test_retention_without_a_sidecar_reports_zero_counts(tmp_path):
-    log = events.PredictionLog(
-        tmp_path / "p.jsonl", observability_policy=make_policy(1)
-    )
+    log = events.Journal(tmp_path / "p.jsonl", policy=make_policy(1))
     assert log.purge("2026-10-20T10:00:00+00:00") == {
         "observed_at": "2026-10-20T10:00:00+00:00",
         "cutoff": "2026-10-19T10:00:00+00:00",
@@ -296,27 +278,23 @@ def test_retention_without_a_sidecar_reports_zero_counts(tmp_path):
 
 
 def test_retention_demands_a_policy_and_a_valid_time(tmp_path):
-    bare = events.PredictionLog(tmp_path / "p.jsonl")
+    bare = events.Journal(tmp_path / "p.jsonl")
     with pytest.raises(
         ValueError, match="retention enforcement requires an observability"
     ):
         bare.purge("2026-10-20T10:00:00+00:00")
-    log = events.PredictionLog(
-        tmp_path / "p.jsonl", observability_policy=make_policy()
-    )
+    log = events.Journal(tmp_path / "p.jsonl", policy=make_policy())
     with pytest.raises(ValueError, match="observed_at"):
         log.purge("not-a-time")
 
 
 def test_retention_keeps_every_event_when_the_policy_is_not_expired(tmp_path):
-    log = events.PredictionLog(
-        tmp_path / "p.jsonl", observability_policy=make_policy(30)
-    )
+    log = events.Journal(tmp_path / "p.jsonl", policy=make_policy(30))
     original = sidecar_line("2026-10-19T10:00:00+00:00") * 2
-    log.observability_path.write_text(original, encoding="utf-8")
+    log.sidecar.write_text(original, encoding="utf-8")
     result = log.purge("2026-10-20T10:00:00+00:00")
     assert (result["retained"], result["removed"]) == (2, 0)
-    assert log.observability_path.read_text(encoding="utf-8") == original
+    assert log.sidecar.read_text(encoding="utf-8") == original
 
 
 def test_inference_timestamp_accepts_only_inference_objects():
@@ -335,10 +313,10 @@ def test_inference_timestamp_accepts_only_inference_objects():
 
 
 def test_outcomes_are_logged_in_order_and_joined_by_event_id(tmp_path):
-    log = events.PredictionLog(tmp_path / "p.jsonl")
+    log = events.Journal(tmp_path / "p.jsonl")
     data = pandas.DataFrame({"a": [1.0, 2.0, 3.0]})
     log.chronicle(make_bundle(), data, ["a", "b", "c"])
-    logged = log.record_outcomes({"c": numpy.int64(1), "a": 0})
+    logged = log.record({"c": numpy.int64(1), "a": 0})
     assert [e.event_id for e in logged] == ["c", "a"]
     assert [e.actual for e in logged] == [1, 0]
     assert type(logged[0].actual) is int
@@ -354,9 +332,9 @@ def test_outcomes_are_logged_in_order_and_joined_by_event_id(tmp_path):
 
 
 def test_a_later_record_replaces_an_earlier_one_for_the_same_event(tmp_path):
-    log = events.PredictionLog(tmp_path / "p.jsonl")
-    log.record_outcomes({"a": 0})
-    log.record_outcomes({"a": 1})
+    log = events.Journal(tmp_path / "p.jsonl")
+    log.record({"a": 0})
+    log.record({"a": 1})
     log.append(
         "prediction",
         {"event_id": "a", "features": {"f": 1}, "prediction": "old"},

@@ -132,10 +132,10 @@ def test_resume_of_tuned_run_recomputes_nothing(
         )
     )
     calls = []
-    real = trials.evaluate_payload
+    real = trials.evaluate
     monkeypatch.setattr(
         trials,
-        "evaluate_payload",
+        "evaluate",
         lambda *a, **k: calls.append(1) or real(*a, **k),
     )
     resumed = scmle.api.project.Project.resume(directory, data=binary_frame)

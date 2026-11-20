@@ -52,11 +52,11 @@ class Verdict:
 class Releasing(interface.Stage):
     """The success criteria evaluated against the release evidence.
 
-    Part of `PackageStage`, which inherits these methods unchanged;
+    Part of `Packaging`, which inherits these methods unchanged;
     abstract, never run on its own.
     """
 
-    def evidence_index(
+    def index(
         self,
         board: engine.Board,
         store: Any,
@@ -120,7 +120,7 @@ class Releasing(interface.Stage):
             )
         return scmle.contracts.evidence.Index(records)
 
-    def release_evaluation(
+    def release(
         self,
         board: engine.Board,
         store: Any,
@@ -174,7 +174,7 @@ class Releasing(interface.Stage):
         if policy is None:
             return self.abstain(store)
 
-        evidence_index = self.evidence_index(board, store, policy)
+        evidence_index = self.index(board, store, policy)
         signing_key = signing.keying(None)
         if signing_key is not None:
             evidence_index.sign(signing_key)

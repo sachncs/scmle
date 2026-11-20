@@ -1,7 +1,7 @@
 """Trial execution: cross-validate complete candidate pipelines.
 
 A trial is described by a picklable `Payload` and evaluated by the
-module-level `evaluate_payload`, so the same code runs in-process or in a
+module-level `evaluate`, so the same code runs in-process or in a
 worker process depending on the execution backend.
 """
 
@@ -42,18 +42,18 @@ class Job:
     """What to evaluate.
 
     Attributes:
-        trial_id: Identifier of the resulting trial.
-        model_name: Registered model to evaluate.
+        trial: Identifier of the resulting trial.
+        model: Registered model to evaluate.
         params: Hyperparameter overrides.
-        fold_count: Evaluate only the first N folds (a cheaper rung for
+        folds: Evaluate only the first N folds (a cheaper rung for
             pruning); None evaluates all folds.
         strategy: Name of the data strategy that builds the candidate.
     """
 
-    trial_id: str
-    model_name: str
+    trial: str
+    model: str
     params: Mapping[str, Any] = dataclasses.field(default_factory=dict)
-    fold_count: int | None = None
+    folds: int | None = None
     strategy: str = experiments.DEFAULT_STRATEGY
 
 
@@ -65,17 +65,17 @@ class Payload:
         job: The job.
         adapter: Model adapter that builds the estimator.
         strategy: Data strategy that assembles the candidate pipeline.
-        feature_plan: Feature columns by kind.
+        plan: Feature columns by kind.
         task: Resolved task type.
         seed: Random seed.
         metric: Metric to optimize.
-        positive_label: Positive class of a binary target, else None.
+        positive: Positive class of a binary target, else None.
         features: Development features.
         target: Development labels.
         folds: Cross-validation folds (positions in the development data).
         threadcap: Threads each worker may use (None = library default).
-        ceiling_seconds: Hard time ceiling for the trial (None = none).
-        memory_gb: Hard memory cap for the trial (None = none).
+        ceiling: Hard time ceiling for the trial (None = none).
+        memory: Hard memory cap for the trial (None = none).
         weighted: Score folds with the feature plan's weight column.
         featurise: Builds the featuriser of the plan: the data kind's
             (`kinds.Kind.featurise`).
@@ -84,17 +84,17 @@ class Payload:
     job: Job
     adapter: models.Model
     strategy: strategies.Strategy
-    feature_plan: data.Blueprint
+    plan: data.Blueprint
     task: tasks.Task
     seed: int
     metric: scmle.contracts.metrics.Metric
-    positive_label: Any
+    positive: Any
     features: pandas.DataFrame
     target: pandas.Series
     folds: Sequence[tuple[list[int], list[int]]]
     threadcap: int | None
-    ceiling_seconds: float | None = None
-    memory_gb: float | None = None
+    ceiling: float | None = None
+    memory: float | None = None
     weighted: bool = False
     featurise: preprocessing.Featuriser | None = None
 
@@ -152,7 +152,7 @@ def weigh(
     """
     if not payload.weighted:
         return {}
-    column = payload.feature_plan.weight_column
+    column = payload.plan.weight_column
     values = payload.features[column].iloc[positions].to_numpy(dtype=float)
     return {"sample_weight": values}
 
@@ -171,11 +171,11 @@ def crossfit(
         The raw held-out scores and the raw training scores (on at most
         `TRAIN_SCORE_ROWS` fitted rows), one per fold.
     """
-    scorer = payload.metric.scorer(payload.positive_label)
+    scorer = payload.metric.scorer(payload.positive)
     raw_scores = []
     raw_train_scores = []
     with threadpoolctl.threadpool_limits(limits=payload.threadcap):
-        for fit_list, evaluate_list in payload.folds[: payload.job.fold_count]:
+        for fit_list, evaluate_list in payload.folds[: payload.job.folds]:
             fit = numpy.asarray(fit_list)
             evaluate = numpy.asarray(evaluate_list)
             candidate = cast("models.Estimator", base.clone(pipeline))
@@ -208,7 +208,7 @@ def crossfit(
     return raw_scores, raw_train_scores
 
 
-def evaluate_payload(payload: Payload) -> experiments.Trial:
+def evaluate(payload: Payload) -> experiments.Trial:
     """Cross-validates one job; never raises for model failures.
 
     Args:
@@ -219,11 +219,11 @@ def evaluate_payload(payload: Payload) -> experiments.Trial:
         error, so one broken candidate never ends the run.
     """
     job, metric = payload.job, payload.metric
-    folds = payload.folds[: job.fold_count]
+    folds = payload.folds[: job.folds]
     started = time.monotonic()
     result = experiments.Trial(
-        job.trial_id,
-        job.model_name,
+        job.trial,
+        job.model,
         experiments.Termination.FAILED,
         metric.name,
         params=dict(job.params),
@@ -238,7 +238,7 @@ def evaluate_payload(payload: Payload) -> experiments.Trial:
     )
     try:
         pipeline = payload.strategy.build(
-            payload.feature_plan,
+            payload.plan,
             payload.adapter,
             payload.task,
             payload.seed,
@@ -276,8 +276,8 @@ def lose(payload: Payload, error: Exception) -> experiments.Trial:
     job = payload.job
     failure = errors.Failure.of(error)
     return experiments.Trial(
-        job.trial_id,
-        job.model_name,
+        job.trial,
+        job.model,
         experiments.Termination.FAILED,
         payload.metric.name,
         params=dict(job.params),
@@ -300,16 +300,16 @@ def supervise(payload: Payload) -> experiments.Trial:
         The trial result, `FAILED` with a `TrialError` message if a limit
         was exceeded.
     """
-    supervisor = limits.Supervisor(payload.ceiling_seconds, payload.memory_gb)
+    supervisor = limits.Supervisor(payload.ceiling, payload.memory)
     try:
-        trial: experiments.Trial = supervisor.run(evaluate_payload, payload)
+        trial: experiments.Trial = supervisor.run(evaluate, payload)
     except limits.TrialError as error:
         # handled: limit breach returned as FAILED trial with TrialError
         # text
         job = payload.job
         return experiments.Trial(
-            job.trial_id,
-            job.model_name,
+            job.trial,
+            job.model,
             experiments.Termination.FAILED,
             payload.metric.name,
             params=dict(job.params),
@@ -329,7 +329,7 @@ class Runner:
         task: The resolved task.
         metric: The metric being optimized.
         profile: The development-set profile.
-        feature_plan: Feature columns by kind.
+        plan: Feature columns by kind.
         folds: Cross-validation folds as lists of positions.
         featurise: Builds the featuriser of the plan: the data kind's.
     """
@@ -354,7 +354,7 @@ class Runner:
         self.task = partition.task
         self.metric = partition.metric
         self.profile = partition.profile
-        self.feature_plan = partition.profile.feature_plan
+        self.plan = partition.profile.feature_plan
         self.folds = [
             (list(train), list(val)) for train, val in self.split.manifest.folds
         ]
@@ -378,22 +378,22 @@ class Runner:
         governor = board.services.governor
         return Payload(
             job=job,
-            adapter=board.services.registry.get(job.model_name),
+            adapter=board.services.registry.get(job.model),
             strategy=strategies.lookup(job.strategy),
-            feature_plan=self.feature_plan,
+            plan=self.plan,
             task=self.task,
             seed=board.services.spec.validation.seed,
             metric=self.metric,
-            positive_label=metrics.positive_label(self.split.target, self.task),
+            positive=metrics.positive_label(self.split.target, self.task),
             features=self.split.features,
             target=self.split.target,
             folds=self.folds,
             threadcap=governor.threadcap,
-            ceiling_seconds=governor.deadline(),
-            memory_gb=board.services.spec.resources.memory_limit_gb,
+            ceiling=governor.deadline(),
+            memory=board.services.spec.resources.memory_limit_gb,
             weighted=bool(
                 board.services.spec.selection.weighted
-                and self.feature_plan.weight_column
+                and self.plan.weight_column
                 and self.metric.weightable()
             ),
             featurise=self.featurise,
@@ -418,9 +418,9 @@ class Runner:
             The trial result.
         """
         job = Job(trial_id, model_name, dict(params or {}), fold_count)
-        return self.run_many([job])[0]
+        return self.dispatch([job])[0]
 
-    def run_many(
+    def dispatch(
         self, jobs: Sequence[Job], first: bool = False
     ) -> list[experiments.Trial]:
         """Evaluates independent jobs, concurrently if the backend allows.
@@ -434,7 +434,7 @@ class Runner:
         Args:
             jobs: Independent jobs.
             first: True when the first group holds the run's first trial,
-                which runs above the memory limit (`Governor.skip_reason`).
+                which runs above the memory limit (`Governor.skip`).
 
         Returns:
             Results in the order of `jobs`.
@@ -448,11 +448,11 @@ class Runner:
             else:
                 pending.append(index)
         governor = self.board.services.governor
-        function = supervise if governor.hard else evaluate_payload
+        function = supervise if governor.hard else evaluate
         size = max(self.workers, 1)
         for start in range(0, len(pending), size):
             slots = pending[start : start + size]
-            reason = governor.skip_reason(first=first and start == 0)
+            reason = governor.skip(first=first and start == 0)
             if reason is not None:
                 for index in slots:
                     results[index] = self.forgo(jobs[index], reason)
@@ -478,23 +478,23 @@ class Runner:
         Returns:
             A result view with exactly the requested folds, or None.
         """
-        checkpoint = self.board.services.checkpoints.get(job.trial_id)
+        checkpoint = self.board.services.checkpoints.get(job.trial)
         usable = (experiments.Termination.OK, experiments.Termination.PRUNED)
         if (
             checkpoint is None
             or checkpoint.status not in usable
-            or checkpoint.model_name != job.model_name
+            or checkpoint.model_name != job.model
             or checkpoint.params != dict(job.params)
             or checkpoint.strategy != job.strategy
         ):
             return None
-        wanted = len(self.folds) if job.fold_count is None else job.fold_count
+        wanted = len(self.folds) if job.folds is None else job.folds
         if len(checkpoint.fold_scores) < wanted:
             return None
         scores = checkpoint.fold_scores[:wanted]
         return experiments.Trial(
-            job.trial_id,
-            job.model_name,
+            job.trial,
+            job.model,
             experiments.Termination.OK,
             checkpoint.metric,
             float(numpy.mean(scores)),
@@ -545,8 +545,8 @@ class Runner:
             reason as its error text.
         """
         return experiments.Trial(
-            job.trial_id,
-            job.model_name,
+            job.trial,
+            job.model,
             experiments.Termination.SKIPPED,
             self.metric.name,
             params=dict(job.params),

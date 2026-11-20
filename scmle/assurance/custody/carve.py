@@ -470,9 +470,7 @@ def divide(
         times=times,
         duplicates=duplicates,
     )
-    rng = randomness.component_rng(
-        derive(charter_hash, data_hash, seed), COMPONENT
-    )
+    rng = randomness.spawn(derive(charter_hash, data_hash, seed), COMPONENT)
     units = unitize(size, groups, duplicates)
     notes: list[str] = []
     if times is not None:

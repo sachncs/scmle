@@ -18,7 +18,7 @@ class Retraining(feeding.Feeding):
         self,
         rows: Sequence[signals.Signal],
         age_days: float | None = None,
-    ) -> policies.RetrainDecision:
+    ) -> policies.Decision:
         """Applies the policy to a window of signals.
 
         A proposal always goes through `Loop.escalate`. In ``trigger`` mode a
@@ -44,20 +44,16 @@ class Retraining(feeding.Feeding):
             for r in self.loop.ledger.rows
             if r["kind"] == deployment_ledger.ALARM
         )
-        fresh_alarm = alarms > self.seen_alarms
+        fresh_alarm = alarms > self.alarms
         batch = self.loop.batch
-        since = (
-            None
-            if self.last_proposal_batch is None
-            else batch - self.last_proposal_batch
-        )
+        since = None if self.proposed is None else batch - self.proposed
         primary, support, held = policies.decide(
             self.policy, rows, fresh_alarm, age_days, since
         )
         gates = self.loop.policy.retrain
         reasons = tuple(primary + support)
         if not primary or held is not None:
-            decision = policies.RetrainDecision(
+            decision = policies.Decision(
                 "none", reasons, held if primary else None, None, None, gates
             )
             self.history.record(
@@ -67,7 +63,7 @@ class Retraining(feeding.Feeding):
                 **decision.to_dict(),
             )
             return decision
-        self.seen_alarms = alarms
+        self.alarms = alarms
         pending = self.loop.escalate(
             policies.RETRAIN_QUESTION,
             {"reasons": list(reasons), "mode": self.policy.mode},
@@ -78,10 +74,10 @@ class Retraining(feeding.Feeding):
         challenger = None
         if self.policy.mode == policies.TRIGGER:
             challenger = self.train(reasons)
-        decision = policies.RetrainDecision(
+        decision = policies.Decision(
             self.policy.mode, reasons, None, identity, challenger, gates
         )
-        self.last_proposal_batch = batch
+        self.proposed = batch
         self.history.record(
             "retrain_decision", self.clock(), batch=batch, **decision.to_dict()
         )
@@ -127,7 +123,7 @@ class Retraining(feeding.Feeding):
             self.loop.enroll(name)
         return name
 
-    def run_approved_retrain(self, escalation_id: str) -> str | None:
+    def execute(self, escalation_id: str) -> str | None:
         """Trains a challenger once a person has approved the recommendation.
 
         Args:

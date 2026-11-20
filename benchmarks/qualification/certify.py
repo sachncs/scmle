@@ -146,9 +146,7 @@ def certify_detector(
                 detected=detected,
                 clean=len(frame),
                 alarms=int(clean_flags.sum()),
-                seeds=randomness.seed_path(
-                    seeds[0], f"certify.{detector_id}", 0
-                ),
+                seeds=randomness.seed(seeds[0], f"certify.{detector_id}", 0),
             )
         )
     return certificates.certify(

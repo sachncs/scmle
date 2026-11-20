@@ -268,7 +268,7 @@ def certify(
             else certificates.demote(qualification.Decision.QUARANTINE, gate)
         ),
         subset=qualification.Subset.EXPLORATION,
-        seeds=randomness.seed_path(seed, f"f6.stability.{name}", 0),
+        seeds=randomness.seed(seed, f"f6.stability.{name}", 0),
         tier=qualification.Tier.UNVERIFIED,
     )
 

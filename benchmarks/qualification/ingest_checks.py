@@ -11,7 +11,7 @@
 * Late arrival: on worlds with late arrivals and backfills, an event-time-only
   filter leaks rows recorded after the cutoff, and the view does not.
 
-All three draw only from `randomness.component_rng`.
+All three draw only from `randomness.spawn`.
 """
 
 import dataclasses
@@ -81,7 +81,7 @@ def random_schema(seed: int, name: str = "ingest.check.schema") -> Schema:
     Returns:
         The schema, drawn only from `randomness.component_rng(seed, name, 0)`.
     """
-    rng = randomness.component_rng(seed, name, 0)
+    rng = randomness.spawn(seed, name, 0)
     n_targets = int(rng.integers(3, 12))
     keys = int(rng.integers(2, 6))
     targets = pandas.DataFrame(
@@ -307,7 +307,7 @@ def metamorphic_unchanged(seed: int) -> bool:
         True if the feature of target 0 is the same before and after.
     """
     schema = random_schema(seed, "ingest.check.meta")
-    rng = randomness.component_rng(seed, "ingest.check.meta.noise", 0)
+    rng = randomness.spawn(seed, "ingest.check.meta.noise", 0)
     schema.targets = schema.targets.iloc[:1].reset_index(drop=True)
     schema.known = True
     schema.leaf_known = True

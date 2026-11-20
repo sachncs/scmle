@@ -24,7 +24,7 @@ def governor(**changes) -> limits.Governor:
 def late(**changes) -> limits.Governor:
     """A governor whose budget ran out long ago."""
     found = governor(**changes)
-    found.started_at = time.monotonic() - 10 * found.spec.time_budget_seconds
+    found.started = time.monotonic() - 10 * found.spec.time_budget_seconds
     return found
 
 
@@ -43,21 +43,21 @@ def test_late_work_reports_no_negative_time_left() -> None:
 
 
 def test_work_that_fits_is_stopped_by_the_memory_limit(monkeypatch) -> None:
-    monkeypatch.setattr(limits, "peak_memory_gb", lambda: HUGE)
+    monkeypatch.setattr(limits, "watermark", lambda: HUGE)
     assert governor().overdue(0.0) == "memory limit reached"
 
 
 def test_the_first_trial_runs_above_the_memory_limit(monkeypatch) -> None:
-    monkeypatch.setattr(limits, "peak_memory_gb", lambda: HUGE)
+    monkeypatch.setattr(limits, "watermark", lambda: HUGE)
     found = governor()
-    assert found.skip_reason(first=True) is None
-    assert found.skip_reason(first=False) == (
+    assert found.skip(first=True) is None
+    assert found.skip(first=False) == (
         "memory limit reached before this trial started"
     )
 
 
 def test_a_closed_trial_window_is_named() -> None:
-    reason = late().skip_reason(first=True)
+    reason = late().skip(first=True)
     assert reason is not None
     assert reason.startswith("trial window closed: 0.0 s left")
 
@@ -78,7 +78,7 @@ def test_the_report_names_every_limit_and_its_enforcement() -> None:
 
 
 def test_peak_memory_is_a_positive_number_of_gigabytes() -> None:
-    assert 0.0 < limits.peak_memory_gb() < HUGE
+    assert 0.0 < limits.watermark() < HUGE
 
 
 def test_the_footprint_follows_children_only(monkeypatch) -> None:
@@ -229,7 +229,7 @@ def test_a_cpu_cap_is_reported_word_for_word() -> None:
 
 
 def test_a_closed_trial_window_names_what_the_reserve_is_for() -> None:
-    reason = late().skip_reason(first=True)
+    reason = late().skip(first=True)
     assert reason is not None
     assert reason.endswith(
         "reserved for the final refit, diagnostics and packaging"

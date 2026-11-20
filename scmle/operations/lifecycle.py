@@ -195,7 +195,7 @@ class Ledger:
             self.statefile, json.dumps(state).encode("utf-8")
         )
 
-    def skip_reason(
+    def skip(
         self, state: dict[str, Any], fresh: pandas.DataFrame
     ) -> str | None:
         """Why a recommended retrain should not run now, if any reason holds.
@@ -245,7 +245,7 @@ class Rollback:
 
     registry: scmle.governance.registry.ModelRegistryStore
     model: str
-    rollout_decides: bool
+    decides: bool
 
     def revertible(
         self,
@@ -310,7 +310,7 @@ class Rollback:
         )
         worse = comparison.interval[1] < -rule.tolerance
         serving = aliases[scmle.governance.registry.CHAMPION]
-        if self.rollout_decides:
+        if self.decides:
             return self.describe(serving, previous, comparison, worse)
         return self.settle(
             serving, previous, comparison, worse, approval, signing_key
@@ -486,8 +486,8 @@ class Staging:
 
     registry: scmle.governance.registry.ModelRegistryStore
     model: str
-    work_dir: str
-    rollout_decides: bool
+    workspace: str
+    decides: bool
 
     def enlist(
         self,
@@ -566,13 +566,13 @@ class Staging:
         options.setdefault("task", current.schema.task)
         options.setdefault("metric", current.info.metric)
         challenger_run = scmle.api.project.Project(
-            train, target, output_dir=self.work_dir, **options
+            train, target, output_dir=self.workspace, **options
         ).run()
         comparison = champion.Referee(current, challenger_run.bundle).compare(
             holdout.drop(columns=[target]), holdout[target]
         )
         evidence = dataclasses.asdict(comparison)
-        if self.rollout_decides:
+        if self.decides:
             self.registry.audit(
                 "lifecycle.bootstrap_diagnostic",
                 model=self.model,
@@ -581,7 +581,7 @@ class Staging:
                 decides=False,
                 **evidence,
             )
-        if comparison.decision != "promote" and not self.rollout_decides:
+        if comparison.decision != "promote" and not self.decides:
             self.registry.audit(
                 "lifecycle.challenger_rejected",
                 model=self.model,
@@ -600,7 +600,7 @@ class Staging:
             version=record.version,
             **evidence,
         )
-        if self.rollout_decides:
+        if self.decides:
             notes.append(
                 f"bootstrap comparison says {comparison.decision!r} "
                 "(descriptive only); the rollout e-process decides promotion"
@@ -632,9 +632,9 @@ class Maintainer(Ledger, Staging, Rollback):
         """
         self.registry = registry
         self.model = model
-        self.work_dir = work_dir
+        self.workspace = work_dir
         self.policy = policy or Cadence()
-        self.rollout_decides = False
+        self.decides = False
 
     def delegate(self) -> None:
         """Makes the bootstrap promotion and rollback rules descriptive.
@@ -647,7 +647,7 @@ class Maintainer(Ledger, Staging, Rollback):
         bootstrap result as a descriptive diagnostic (`descriptive: true`,
         `decides: false`). Without a bound rollout nothing changes.
         """
-        self.rollout_decides = True
+        self.decides = True
 
     def elevate(
         self,
@@ -752,7 +752,7 @@ class Maintainer(Ledger, Staging, Rollback):
             rows=len(fresh),
         )
         wanted = report.recommendation.action == "retrain" and retrain
-        skip = self.skip_reason(state, fresh) if wanted else None
+        skip = self.skip(state, fresh) if wanted else None
         if not wanted or skip is not None:
             if skip is not None:
                 self.registry.audit(

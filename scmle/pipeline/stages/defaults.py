@@ -13,7 +13,7 @@ from scmle.runtime import engine
 from scmle.runtime import plugins
 
 
-def default_stages() -> tuple[interface.Stage, ...]:
+def sequence() -> tuple[interface.Stage, ...]:
     """Returns the standard stage sequence, in lifecycle order.
 
     Several stages may share a lifecycle state: the reservation runs in the
@@ -30,14 +30,14 @@ def default_stages() -> tuple[interface.Stage, ...]:
     )
     return engine.order(
         (
-            ingestion.IngestStage(),
+            ingestion.Ingest(),
             reservation.Reservation(),
-            profiling.ProfileStage(),
+            profiling.Profiling(),
             planning.Planning(),
-            training.TrainStage(),
-            selecting.SelectStage(),
-            assessment.FinalEvaluationStage(),
-            packaging.PackageStage(),
+            training.Training(),
+            selecting.Selection(),
+            assessment.Assessment(),
+            packaging.Packaging(),
             *enrolled,
         )
     )

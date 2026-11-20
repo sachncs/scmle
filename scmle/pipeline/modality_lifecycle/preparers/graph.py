@@ -51,7 +51,7 @@ LIMITATIONS = (
 )
 
 
-class GraphPreparer(curators.Preparer):
+class Graph(curators.Preparer):
     """Adapter for inductive node classification on graph node features.
 
     Attributes:
@@ -135,7 +135,7 @@ class GraphPreparer(curators.Preparer):
             rows,
         )
 
-    def sample_id(self, sample: graph.Node) -> str:
+    def sample(self, sample: graph.Node) -> str:
         """Gives a node identity.
 
         Args:
@@ -309,9 +309,9 @@ class GraphPreparer(curators.Preparer):
             value differs.
 
         Raises:
-            TypeError: If `observed` is not a `GraphPreparer`.
+            TypeError: If `observed` is not a `Graph`.
         """
-        if not isinstance(observed, GraphPreparer):
+        if not isinstance(observed, Graph):
             raise errors.KindError("observed adapter must be a GraphPreparer")
         reference = self.dataset.profile().to_dict()
         current = observed.dataset.profile().to_dict()
@@ -334,7 +334,7 @@ class GraphPreparer(curators.Preparer):
 
 
 def knockouts(
-    preparer: GraphPreparer,
+    preparer: Graph,
     sample: graph.Node,
     model: LogisticRegression,
     feature_names: Sequence[str],

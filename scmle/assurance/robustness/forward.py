@@ -184,7 +184,7 @@ def evaluate(
     effect = stability.rankcorr(values, target)
     if not math.isfinite(effect):
         return Finding(name, effect_x, None, INCONCLUSIVE, None)
-    rng = randomness.component_rng(seed, f"{CHECK_ID}.{name}", 0)
+    rng = randomness.spawn(seed, f"{CHECK_ID}.{name}", 0)
     rows = len(values)
     picks = list(
         map(
@@ -220,7 +220,7 @@ def evaluate(
             else qualification.Decision.PASS
         ),
         subset=qualification.Subset.FORWARD,
-        seeds=randomness.seed_path(seed, f"{CHECK_ID}.{name}", 0),
+        seeds=randomness.seed(seed, f"{CHECK_ID}.{name}", 0),
         tier=qualification.Tier.UNVERIFIED,
     )
     return Finding(name, effect_x, effect, label, check)

@@ -85,7 +85,7 @@ def judge(
     resamples: int,
     seed: int,
 ) -> Mapping[str, Any]:
-    """The verdict and interval of one metric for `post_promotion_check`.
+    """The verdict and interval of one metric for `reassess`.
 
     Args:
         spec: The metric.
@@ -134,7 +134,7 @@ def judge(
     }
 
 
-def post_promotion_check(
+def reassess(
     specs: Sequence[Indicator],
     before: Mapping[str, Sequence[float]],
     after: Mapping[str, Sequence[float]],
@@ -323,7 +323,7 @@ def attribute(
     )
 
 
-def holdback_check(
+def check(
     specs: Sequence[Indicator],
     holdback: Mapping[str, Sequence[float]],
     promoted: Mapping[str, Sequence[float]],
@@ -350,7 +350,7 @@ def holdback_check(
     verdict is then capped at ``inconclusive`` (the per-metric verdicts are
     left as computed) and the statement says so.
     Otherwise the metric intervals and verdicts are those of
-    `post_promotion_check`, with the holdback as the reference period.
+    `reassess`, with the holdback as the reference period.
 
     Args:
         specs: The metrics to judge.
@@ -367,12 +367,12 @@ def holdback_check(
         ratio_level: Level of the sample-ratio test.
 
     Returns:
-        The result of `post_promotion_check` with the design, the
+        The result of `reassess` with the design, the
         sample-ratio check and a statement added; the overall verdict is
         capped at inconclusive when the split does not match.
 
     Raises:
-        ValueError: As `post_promotion_check`, and for an
+        ValueError: As `reassess`, and for an
             ``expected_fraction`` outside the open unit interval.
     """
     if not 0.0 < expected_fraction < 1.0:
@@ -380,7 +380,7 @@ def holdback_check(
             "expected_fraction must lie strictly between 0 and 1"
         )
     check = balance(specs, holdback, promoted, expected_fraction, ratio_level)
-    result = post_promotion_check(
+    result = reassess(
         specs,
         holdback,
         promoted,

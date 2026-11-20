@@ -91,7 +91,7 @@ def plant_leak(
         The leak column.
     """
     if defect == "leak_threshold":
-        rng = randomness.component_rng(seed, "f4.threshold", 0)
+        rng = randomness.spawn(seed, "f4.threshold", 0)
         values = frame[TARGET].to_numpy(dtype=float) + rng.normal(
             scale=THRESHOLD_NOISE, size=len(frame)
         )
@@ -246,7 +246,7 @@ def certify_leakage(workers: int = 1) -> tuple[Any, dict[str, Any]]:
                 detected=detected,
                 clean=NULL_REPLICATES,
                 alarms=false_alarms,
-                seeds=randomness.seed_path(0, "f4.certify.leakage", 0),
+                seeds=randomness.seed(0, "f4.certify.leakage", 0),
             )
         )
     cert = certificates.certify(
@@ -287,7 +287,7 @@ def asof_world(seed: int) -> tuple[pandas.DataFrame, pandas.DataFrame]:
         The rows (`key`, `moment`, `stored`, `backfill`, the latest log
         value) and the change log (`key`, `written_at`, `value`).
     """
-    rng = randomness.component_rng(seed, "f4.asof.world", 0)
+    rng = randomness.spawn(seed, "f4.asof.world", 0)
     keys = numpy.arange(LOG_ROWS)
     times = numpy.sort(
         rng.uniform(0.0, 100.0, size=(LOG_ROWS, VERSIONS)), axis=1
@@ -352,7 +352,7 @@ def overwrite_plan() -> certify.DefectPlan:
         Returns:
             The injection; only rows whose latest value differs actually change.
         """
-        rng = randomness.component_rng(seed, "f4.asof.plant", 0)
+        rng = randomness.spawn(seed, "f4.asof.plant", 0)
         pick = rng.random(len(frame)) < OVERWRITE_RATE
         changed = pick & (frame["backfill"] != frame["stored"]).to_numpy()
         out = frame.copy()
@@ -394,7 +394,7 @@ def gap_frame(seed: int) -> pandas.DataFrame:
         A frame with `source`, `extract` and `explained` (the signed
         difference that a correct explanation accounts for).
     """
-    rng = randomness.component_rng(seed, "f4.gap.world", 0)
+    rng = randomness.spawn(seed, "f4.gap.world", 0)
     source = rng.integers(1_000, 100_000, size=LOG_ROWS).astype(float)
     explained = numpy.zeros(LOG_ROWS)
     pick = rng.random(LOG_ROWS) < 1 / 3
@@ -465,7 +465,7 @@ def gap_plan() -> certify.DefectPlan:
         Returns:
             The injection; the cut is 1 to 10 percent of the source.
         """
-        rng = randomness.component_rng(seed, "f4.gap.plant", 0)
+        rng = randomness.spawn(seed, "f4.gap.plant", 0)
         pick = rng.random(len(frame)) < GAP_RATE
         cut = numpy.round(
             frame["source"].to_numpy() * rng.uniform(0.01, 0.1, len(frame))

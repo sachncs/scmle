@@ -143,9 +143,9 @@ def test_services_start_observes_and_binds_the_resources(tmp_path):
         store=store,
         started=12.0,
     )
-    assert given.governor.started_at == 12.0
+    assert given.governor.started == 12.0
     assert given.catalog is metrics.CATALOG
-    assert given.capability_observation is not None
+    assert given.observation is not None
     assert given.backend.workers >= 1
     assert given.store is store
 
@@ -161,7 +161,7 @@ def test_check_raises_once_cancelled_with_the_run_directory(tmp_path):
     store = scmle.artifacts.store.Workspace("r1", tmp_path)
     given = provide(store=store)
     given.check()
-    given.cancel_event.set()
+    given.event.set()
     with pytest.raises(errors.CancelledError) as caught:
         given.check()
     assert str(caught.value) == "run cancelled"
@@ -177,7 +177,7 @@ def test_the_system_clock_reads_monotonic_and_utc_time():
 
 def test_the_random_streams_are_the_keyed_streams():
     drawn = services.Random().generator(7, "conformal.entity", 2).random(4)
-    expected = randomness.component_rng(7, "conformal.entity", 2).random(4)
+    expected = randomness.spawn(7, "conformal.entity", 2).random(4)
     assert drawn.tolist() == expected.tolist()
 
 
@@ -214,7 +214,7 @@ def test_the_journal_records_eight_threads_without_loss(tmp_path):
         thread.join()
     total = THREADS * EACH
     names = [f"trial_{index:03d}" for index in range(1, total + 1)]
-    assert record.trial_counter == total
+    assert record.counter == total
     assert sorted(t.trial_id for t in record.trials) == names
     assert len(record.outcomes) == total
     written = lines(tmp_path / "run")
@@ -241,7 +241,7 @@ def test_a_preview_journal_keeps_records_but_writes_nothing():
     record = journal.Journal(config())
     record.transcribe(trial("t1"))
     record.forgo("x", "y")
-    record.write_json("a.json", {})
+    record.write("a.json", {})
     record.emit("z")
     assert [t.trial_id for t in record.trials] == ["t1"]
     assert record.skipped == [{"work": "x", "reason": "y"}]
@@ -253,11 +253,11 @@ def test_a_search_reaches_the_journal_when_applied():
     held.journal.allocate(1)
     made = training.Search.copy(held.journal)
     assert made.trials == [trial("trial_001")]
-    assert made.trial_counter == 1
+    assert made.counter == 1
     fresh = board()
     made.apply(fresh)
     assert fresh.journal.trials == [trial("trial_001")]
-    assert fresh.journal.trial_counter == 1
+    assert fresh.journal.counter == 1
     assert fresh.journal.allocate(1) == ["trial_002"]
     assert fresh.get(training.Search) is made
 
@@ -299,8 +299,8 @@ def test_amend_restamps_the_later_events(tmp_path):
 
 def test_the_board_checks_cancellation_and_caps_threads(tmp_path):
     held = board()
-    held.check_cancelled()
-    held.services.cancel_event.set()
+    held.check()
+    held.services.event.set()
     with pytest.raises(errors.CancelledError):
-        held.check_cancelled()
+        held.check()
     assert held.regulator is held.services.governor

@@ -38,7 +38,7 @@ class Situation:
         spec: Project specification.
         profile: Dataset profile.
         task: Resolved task type.
-        approved_models: Models a human approved, or None for no restriction.
+        models: Models a human approved, or None for no restriction.
         history: Past runs available for meta-learning.
         cost: The preparation cost model of the data's kind
             (`kinds.Kind.cost`): seconds from rows, columns, classes and
@@ -48,7 +48,7 @@ class Situation:
     spec: tasks.Config
     profile: data.Portrait
     task: tasks.Task
-    approved_models: tuple[str, ...] | None = None
+    models: tuple[str, ...] | None = None
     history: tuple[experiments.Precedent, ...] = ()
     cost: Callable[[int, int, int, float], float] = profiler.estimate
 

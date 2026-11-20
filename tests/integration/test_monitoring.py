@@ -94,7 +94,7 @@ def test_concept_drift_is_caught_by_performance_not_features(trained):
 
 
 def test_prediction_log_joins_late_outcomes(trained, tmp_path):
-    log = events.PredictionLog(tmp_path / "log" / "events.jsonl")
+    log = events.Journal(tmp_path / "log" / "events.jsonl")
     frame = make_frame(60, 6)
     logged = log.chronicle(trained.bundle, frame.drop(columns="y"))
     assert (
@@ -106,7 +106,7 @@ def test_prediction_log_joins_late_outcomes(trained, tmp_path):
         e.event_id: int(y)
         for e, y in zip(logged[:40], frame["y"][:40], strict=True)
     }
-    log.record_outcomes(truth)
+    log.record(truth)
     features, predictions, outcomes = log.load()
     assert len(features) == len(predictions) == len(outcomes) == 60
     assert outcomes.notna().sum() == 40 and outcomes.isna().sum() == 20
@@ -128,17 +128,16 @@ def test_prediction_log_can_emit_redacted_observability_sidecar(
         redacted_fields=("features",),
         alert_thresholds={},
     )
-    log = events.PredictionLog(
+    log = events.Journal(
         tmp_path / "log" / "events.jsonl",
-        observability_policy=policy,
-        run_id="serve-1",
+        policy=policy,
+        run="serve-1",
     )
     frame = make_frame(3, 7).drop(columns="y")
     log.chronicle(trained.bundle, frame, event_ids=["a", "b", "c"])
 
     records = [
-        json.loads(line)
-        for line in log.observability_path.read_text().splitlines()
+        json.loads(line) for line in log.sidecar.read_text().splitlines()
     ]
     assert [record["request"] for record in records] == ["a", "b", "c"]
     assert all(record["run"] == "serve-1" for record in records)
@@ -148,7 +147,7 @@ def test_prediction_log_can_emit_redacted_observability_sidecar(
 
 
 def test_empty_log_is_empty(tmp_path):
-    features, predictions, outcomes = events.PredictionLog(
+    features, predictions, outcomes = events.Journal(
         tmp_path / "none.jsonl"
     ).load()
     assert features.empty and predictions.empty and outcomes.empty

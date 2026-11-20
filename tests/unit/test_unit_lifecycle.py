@@ -73,8 +73,8 @@ def test_every_stage_is_evidenced_in_the_required_order(ran):
 
 def test_the_report_is_signed_and_written(ran):
     report, source, root = ran
-    assert report.verify_signature(KEY) is True
-    assert report.verify_signature("other") is False
+    assert report.verify(KEY) is True
+    assert report.verify("other") is False
     assert json.loads((root / "report.json").read_text("utf-8")) == (
         report.to_dict()
     )
@@ -126,7 +126,7 @@ def test_data_explanation_traces_every_sample(ran):
     found = evidence(report)[modalities.Phase.DATA_EXPLAINABILITY]
     lineage = found["sample_lineage"]
     assert {item["sample_id"] for item in lineage} == {
-        source.sample_id(sample) for sample in source.samples
+        source.sample(sample) for sample in source.samples
     }
     assert sum(found["partition_counts"].values()) == 12
     assert all(
@@ -137,7 +137,7 @@ def test_data_explanation_traces_every_sample(ran):
 
 def test_the_predictor_loads_the_package_and_scores_samples(ran):
     source, root = ran[1], ran[2]
-    predictor = predictors.Predictor.from_package(
+    predictor = predictors.Predictor.load(
         source,
         root / "package",
         signing_key=KEY,
@@ -148,15 +148,15 @@ def test_the_predictor_loads_the_package_and_scores_samples(ran):
     assert set(map(str, predicted)) <= {"alpha", "beta"}
     probabilities = predictor.predict_proba(source.samples[:4])
     numpy.testing.assert_allclose(probabilities.sum(axis=1), 1.0)
-    batch = predictor.features_for(source.samples[:2])
+    batch = predictor.featurize(source.samples[:2])
     assert batch.sample_ids == tuple(
-        source.sample_id(sample) for sample in source.samples[:2]
+        source.sample(sample) for sample in source.samples[:2]
     )
     health = predictor.health()
     assert health["package_verified"] is True
     assert health["modality"] == "text"
     assert health["training_dataset_hash"] == source.digest
-    assert health["feature_names"] == list(predictor.feature_names)
+    assert health["feature_names"] == list(predictor.names)
     assert health["lifecycle_report_verified"] is True
     assert len(health["lifecycle_report_digest"]) == 64
 
@@ -164,16 +164,14 @@ def test_the_predictor_loads_the_package_and_scores_samples(ran):
 def test_the_predictor_refuses_a_wrong_key(ran):
     source, root = ran[1], ran[2]
     with pytest.raises(errors.InputError, match="does not verify"):
-        predictors.Predictor.from_package(
-            source, root / "package", signing_key="wrong"
-        )
+        predictors.Predictor.load(source, root / "package", signing_key="wrong")
 
 
 def test_the_package_must_be_for_the_adapter_modality(ran):
     source, root = ran[1], ran[2]
-    other = document.DocumentPreparer(source.dataset)
+    other = document.Document(source.dataset)
     with pytest.raises(errors.InputError, match="does not match adapter"):
-        predictors.Predictor.from_package(other, root / "package", KEY)
+        predictors.Predictor.load(other, root / "package", KEY)
 
 
 def test_typecheck_rejects_options_of_the_wrong_type():
@@ -224,9 +222,9 @@ def test_prepare_fixes_the_inputs_and_what_existed(tmp_path):
         False,
     )
     assert plan.observed is source
-    assert plan.package_preexisting is True
+    assert plan.preexisting is True
     assert plan.report_preexisting is False
-    assert plan.checkpoint_target is None
+    assert plan.target is None
     assert plan.digest is None
     assert plan.seed == 3
 
@@ -290,9 +288,9 @@ def test_perturb_evaluates_the_leading_rows():
     found = explanation.perturb(model, rows, numpy.array([1e-6, 1e-6]), 3)
     assert len(found.stabilities) == 3
     assert len(found.reports) == 3
-    assert len(found.perturbation_reports) == 5
+    assert len(found.perturbed) == 5
     numpy.testing.assert_array_equal(found.coefficients, model.coef_[0])
-    assert found.perturbation_stability == found.stabilities[0]
+    assert found.stability == found.stabilities[0]
     with pytest.raises(RuntimeError, match="produced no report"):
         explanation.perturb(model, rows, numpy.array([0.1, 0.1]), 0)
 
@@ -303,7 +301,7 @@ def test_each_stage_belongs_to_the_state_of_its_phase():
     assert set(state.STATES) == set(modalities.REQUIRED_LIFECYCLE_STAGES)
     assert steps.Packaging.state is state.STATES[modalities.Phase.PACKAGING]
     assert (
-        explanation.ModelExplainabilityStage.state
+        explanation.Explainability.state
         is state.STATES[modalities.Phase.MODEL_EXPLAINABILITY]
     )
 

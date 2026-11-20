@@ -23,15 +23,15 @@ class Agreement:
 
     Attributes:
         rows: Requests observed.
-        disagreement_rate: Share of rows where predictions differ (values
+        disagreement: Share of rows where predictions differ (values
             further than a tenth of the champion's spread for regression).
-        mean_probability_gap: Mean absolute difference in the positive-class
+        gap: Mean absolute difference in the positive-class
             probability (binary classification), else None.
     """
 
     rows: int
-    disagreement_rate: float
-    mean_probability_gap: float | None
+    disagreement: float
+    gap: float | None
 
 
 class Understudy:
@@ -41,8 +41,8 @@ class Understudy:
         champion: The model that answers requests.
         challenger: The model that scores silently.
         rows: Observed request frames, in order.
-        champion_output: The champion's predictions per frame.
-        challenger_output: The challenger's predictions per frame.
+        incumbent: The champion's predictions per frame.
+        output: The challenger's predictions per frame.
         gaps: Absolute positive-class probability differences per frame (binary
             classification only).
         lock: Keeps the parallel lists growing together.
@@ -67,8 +67,8 @@ class Understudy:
         self.champion = champion_bundle
         self.challenger = challenger_bundle
         self.rows: list[pandas.DataFrame] = []
-        self.champion_output: list[numpy.ndarray] = []
-        self.challenger_output: list[numpy.ndarray] = []
+        self.incumbent: list[numpy.ndarray] = []
+        self.output: list[numpy.ndarray] = []
         self.gaps: list[numpy.ndarray] = []
         self.lock = threading.Lock()
 
@@ -93,8 +93,8 @@ class Understudy:
         )
         with self.lock:  # The parallel lists must grow together.
             self.rows.append(data.reset_index(drop=True))
-            self.champion_output.append(served)
-            self.challenger_output.append(shadowed)
+            self.incumbent.append(served)
+            self.output.append(shadowed)
             if gap is not None:
                 self.gaps.append(gap)
         return served
@@ -111,8 +111,8 @@ class Understudy:
             ConfigError: If nothing has been observed yet.
         """
         with self.lock:
-            champion_output = list(self.champion_output)
-            challenger_output = list(self.challenger_output)
+            champion_output = list(self.incumbent)
+            challenger_output = list(self.output)
             all_gaps = list(self.gaps)
         if not champion_output:
             raise errors.ConfigError("nothing has been observed yet")

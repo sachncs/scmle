@@ -114,7 +114,7 @@ class ModalityHttpServing:
         if payload < 1 or batch < 1:
             raise errors.InputError("request bounds must be positive")
         self.gateway: access.Gateway | None = None
-        if audited and (predictor.lifecycle_report_digest is None):
+        if audited and (predictor.report is None):
             raise errors.InputError(
                 "release-bound serving requires a verified lifecycle report"
             )
@@ -200,10 +200,8 @@ class ModalityHttpServing:
             "probabilities": numpy.asarray(probabilities).tolist(),
             "sample_count": len(samples),
             "package_verified": True,
-            "lifecycle_report_verified": (
-                self.predictor.lifecycle_report_digest is not None
-            ),
-            "lifecycle_report_digest": self.predictor.lifecycle_report_digest,
+            "lifecycle_report_verified": (self.predictor.report is not None),
+            "lifecycle_report_digest": self.predictor.report,
         }
 
     def probe(self, path: str) -> tuple[int, Mapping[str, object]]:
@@ -468,7 +466,7 @@ class Responder(server.BaseHTTPRequestHandler):
                         modalities.serialise(adapter.predictor.adapter.modality)
                     ),
                     "decoder": adapter.decoder.schema(),
-                    "feature_names": list(adapter.predictor.feature_names),
+                    "feature_names": list(adapter.predictor.names),
                 },
                 request_id,
             )

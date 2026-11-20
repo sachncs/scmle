@@ -335,7 +335,7 @@ class Record:
             signature=signing.mac(self.preimage(), signing_key),
         )
 
-    def verify_signature(self, signing_key: str | bytes) -> bool:
+    def verify(self, signing_key: str | bytes) -> bool:
         """Checks the report signature against its current content.
 
         Args:
@@ -436,7 +436,7 @@ class Record:
         return cls.from_dict(record)
 
     @classmethod
-    def read_verified(cls, path: str | Path, signing_key: str | bytes) -> Self:
+    def load(cls, path: str | Path, signing_key: str | bytes) -> Self:
         """Reads a report and rejects it unless its content signature verifies.
 
         Args:
@@ -450,7 +450,7 @@ class Record:
             ValueError: If the signature is missing or does not verify.
         """
         report = cls.read(path)
-        if not report.verify_signature(signing_key):
+        if not report.verify(signing_key):
             raise errors.InputError(
                 "lifecycle report signature does not verify"
             )

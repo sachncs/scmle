@@ -67,20 +67,20 @@ def kinds(result):
 
 
 def test_the_default_sequence_is_in_lifecycle_order():
-    assert [type(s).__name__ for s in defaults.default_stages()] == [
-        "IngestStage",
+    assert [type(s).__name__ for s in defaults.sequence()] == [
+        "Ingest",
         "Reservation",
-        "ProfileStage",
+        "Profiling",
         "Planning",
-        "TrainStage",
-        "SelectStage",
-        "FinalEvaluationStage",
-        "PackageStage",
+        "Training",
+        "Selection",
+        "Assessment",
+        "Packaging",
     ]
 
 
 def test_the_profile_stage_inherits_the_charter_work_in_order():
-    assert profiling.ProfileStage.__mro__[1:10] == (
+    assert profiling.Profiling.__mro__[1:10] == (
         impounding.Impounding,
         exploration.Exploration,
         admission.Admission,
@@ -89,12 +89,12 @@ def test_the_profile_stage_inherits_the_charter_work_in_order():
         screening.Screening,
         surveying.Surveying,
         labelling.Labelling,
-        profiling.ProfileStage.__mro__[9],
+        profiling.Profiling.__mro__[9],
     )
 
 
 def test_the_final_evaluation_inherits_scoring_and_remedies_in_order():
-    assert assessment.FinalEvaluationStage.__mro__[1:6] == (
+    assert assessment.Assessment.__mro__[1:6] == (
         summary.Summary,
         reporting.Reporting,
         relabelling.Relabelling,
@@ -104,7 +104,7 @@ def test_the_final_evaluation_inherits_scoring_and_remedies_in_order():
 
 
 def test_packaging_inherits_the_diagnostics_and_release_in_order():
-    assert packaging.PackageStage.__mro__[1:7] == (
+    assert packaging.Packaging.__mro__[1:7] == (
         tracing.Tracing,
         bracketing.Bracketing,
         diagnosis.Diagnosis,
@@ -116,11 +116,11 @@ def test_packaging_inherits_the_diagnostics_and_release_in_order():
 
 def test_each_stage_names_what_it_needs_and_makes():
     assert reservation.Reservation.makes is reservation.Reserve
-    assert selecting.SelectStage.makes is selecting.Choice
+    assert selecting.Selection.makes is selecting.Choice
     assert planning.Planning.makes is planning.Blueprint
-    assert profiling.ProfileStage.makes is profiling.Partition
-    assert assessment.FinalEvaluationStage.makes is assessment.Exam
-    assert packaging.PackageStage.makes is packaging.Package
+    assert profiling.Profiling.makes is profiling.Partition
+    assert assessment.Assessment.makes is assessment.Exam
+    assert packaging.Packaging.makes is packaging.Package
 
 
 def test_every_stage_left_a_record_in_order(run):

@@ -46,13 +46,13 @@ def fast():
 def pipeline(**changes):
     values = {"approvers": ("ml-owner", "second")}
     values.update(changes)
-    flow = definition.standard_workflow(**values)
+    flow = definition.scaffold(**values)
     steps = tuple(
         dataclasses.replace(
             step,
             retries=fast(),
-            expires_seconds=7200.0,
-            timeout_seconds=600.0,
+            expiry=7200.0,
+            timeout=600.0,
         )
         for step in flow.steps
     )
@@ -61,7 +61,7 @@ def pipeline(**changes):
         flow.version,
         steps,
         flow.schedule,
-        cost_budget=flow.cost_budget,
+        budget=flow.budget,
     )
 
 
@@ -81,7 +81,7 @@ class Recorder:
             action = self.behaviour.get(name)
             if action is not None:
                 return action(context)
-            return {"step": name, "key": context.idempotency_key[:8]}
+            return {"step": name, "key": context.key[:8]}
 
         return run
 
@@ -89,7 +89,7 @@ class Recorder:
         return {
             s.name: self.handler(s.name)
             for s in workflow.steps
-            if s.kind is not definition.StepKind.APPROVAL
+            if s.kind is not definition.Kind.APPROVAL
         }
 
     def names(self):
@@ -122,7 +122,7 @@ def approve(executor, record, who="ml-owner", decision="approve"):
 
 
 def test_the_standard_pipeline_is_valid_and_ordered():
-    flow = definition.standard_workflow()
+    flow = definition.scaffold()
     assert flow.order() == (
         "ingest",
         "train",
@@ -139,15 +139,15 @@ def test_the_standard_pipeline_is_valid_and_ordered():
         ("batch_predict",),
     )
     assert flow.gated("batch_predict")
-    assert flow.digest() == definition.standard_workflow().digest()
-    assert flow.digest() != definition.standard_workflow(version="2").digest()
+    assert flow.digest() == definition.scaffold().digest()
+    assert flow.digest() != definition.scaffold(version="2").digest()
 
 
 def test_invalid_definitions_are_refused():
     # Enforces docs/ORCHESTRATION.md:14 and docs/ORCHESTRATION.md:17.
     # Enforces website/src/pages/docs/orchestration.astro:25.
     # Enforces website/src/pages/docs/orchestration.astro:26.
-    s = definition.StepKind
+    s = definition.Kind
     with pytest.raises(errors.ConfigError, match="cycle"):
         definition.Workflow(
             "w",
@@ -188,7 +188,7 @@ def test_invalid_definitions_are_refused():
         definition.Schedule(0)
     with pytest.raises(errors.ConfigError):
         definition.Workflow(
-            "w", "1", (definition.Step("a", s.TRAIN),), max_concurrent_runs=0
+            "w", "1", (definition.Step("a", s.TRAIN),), concurrency=0
         )
 
 
@@ -210,7 +210,7 @@ def test_a_run_waits_for_approval_and_the_approved_step_follows_it(store):
     assert done["state"] == "succeeded"
     assert recorder.names().count("ingest") == 1
     assert recorder.names()[-1] == "batch_predict"
-    saved = executor.step_record(record["run_id"], "batch_predict")
+    saved = executor.step(record["run_id"], "batch_predict")
     assert saved["state"] == "succeeded" and saved["idempotency_key"]
 
 
@@ -237,7 +237,7 @@ def test_a_second_executor_cannot_work_on_a_run_in_flight(store):
     seen = []
 
     def during(context):
-        run_id = scmle.workflow.executor.run_id_for(flow, "req-1")
+        run_id = scmle.workflow.executor.identify(flow, "req-1")
         try:
             second.start("req-1", "alice")
         except scmle.workflow.executor.BusyError as error:
@@ -260,13 +260,13 @@ def test_max_concurrent_runs_is_enforced(store):
     def during(context):
         try:
             other.start("req-2", "alice")
-        except scmle.workflow.executor.ConcurrencyLimitError as error:
+        except scmle.workflow.executor.CapacityError as error:
             outcome.append(type(error).__name__)
         return {}
 
     recorder.behaviour["ingest"] = during
     executor_for(store, flow, recorder, clock).start("req-1", "alice")
-    assert outcome == ["ConcurrencyLimitError"]
+    assert outcome == ["CapacityError"]
 
 
 def test_partial_failure_skips_dependents_and_resume_runs_only_the_rest(store):
@@ -289,7 +289,7 @@ def test_partial_failure_skips_dependents_and_resume_runs_only_the_rest(store):
         "monitor": "skipped",
         "batch_predict": "skipped",
     }
-    failed = executor.step_record(record["run_id"], "evaluate")
+    failed = executor.step(record["run_id"], "evaluate")
     assert "bad metric" in failed["error"] and len(failed["attempts"]) == 1
     recorder.behaviour.pop("evaluate")
     before = list(recorder.calls)
@@ -314,7 +314,7 @@ def test_a_failed_step_keeps_a_framework_error_whole(store, kind, kept):
 
     recorder.behaviour["evaluate"] = broken
     record = executor.start("req-1", "alice")
-    failed = executor.step_record(record["run_id"], "evaluate")
+    failed = executor.step(record["run_id"], "evaluate")
     assert len(failed["error"]) == kept
     assert len(failed["attempts"][0]["failure"]["message"]) == 1000
 
@@ -325,7 +325,7 @@ def test_interrupted_steps_retry_with_backoff_and_the_same_key(store):
     keys = []
 
     def flaky(context):
-        keys.append(context.idempotency_key)
+        keys.append(context.key)
         if context.attempt < 3:
             raise scmle.workflow.executor.PreemptedError("preempted")
         return {"ok": True}
@@ -336,7 +336,7 @@ def test_interrupted_steps_retry_with_backoff_and_the_same_key(store):
     assert record["steps"]["train"] == "succeeded"
     assert len(set(keys)) == 1 and len(keys) == 3
     assert clock.sleeps == [2.0, 4.0]
-    saved = executor.step_record(record["run_id"], "train")
+    saved = executor.step(record["run_id"], "train")
     assert [a["state"] for a in saved["attempts"]] == [
         "retryable",
         "retryable",
@@ -369,7 +369,7 @@ def test_a_crashed_executor_is_taken_over_after_its_lease(store):
     recorder.behaviour["train"] = dies
     with pytest.raises(support_runners.Killed):
         executor.start("req-1", "alice")
-    run_id = scmle.workflow.executor.run_id_for(flow, "req-1")
+    run_id = scmle.workflow.executor.identify(flow, "req-1")
     # A killed process cannot release its lease.
     store.put(
         f"workflows/{flow.name}/runs/{run_id}/lock",
@@ -397,7 +397,7 @@ def test_an_executor_that_outlives_its_lease_cannot_write_over_the_successor(
     flow = pipeline()
     first = executor_for(store, flow, slow, clock, lease_seconds=300.0)
     second = executor_for(store, flow, fresh, clock, owner="second")
-    run_id = scmle.workflow.executor.run_id_for(flow, "req-1")
+    run_id = scmle.workflow.executor.identify(flow, "req-1")
     lock = f"workflows/{flow.name}/runs/{run_id}/lock"
     taken = []
 
@@ -437,7 +437,7 @@ def test_a_lease_is_renewed_and_released_only_by_its_holder(store):
         second.acquire(run_id)
     second.fences[run_id] = 1
     with pytest.raises(scmle.workflow.executor.EvictionError):
-        second.renew_lease(run_id)
+        second.renew(run_id)
     second.relinquish(run_id)
     assert store.exists(lock)
     clock.now += 301
@@ -448,7 +448,7 @@ def test_a_lease_is_renewed_and_released_only_by_its_holder(store):
         "fence": 2,
     }
     with pytest.raises(scmle.workflow.executor.EvictionError):
-        first.renew_lease(run_id)
+        first.renew(run_id)
     first.relinquish(run_id)
     assert json.loads(store.get(lock)[0])["owner"] == "second"
     second.relinquish(run_id)
@@ -565,7 +565,7 @@ def test_a_renewal_never_moves_the_lease_expiry_back(store):
     holder.acquire(run_id)
     before = json.loads(store.get(lock)[0])["expires"]
     clock.now -= 1_000
-    holder.renew_lease(run_id)
+    holder.renew(run_id)
     assert json.loads(store.get(lock)[0])["expires"] >= before
 
 
@@ -600,7 +600,7 @@ def test_timeouts_budgets_and_the_run_budget(store):
     assert record["state"] == "budget_stopped"
     assert record["cost"] >= 4.0
     assert recorder2.names() == ["ingest", "train"]
-    skipped = executor_for(store, flow, recorder2, clock2).step_record(
+    skipped = executor_for(store, flow, recorder2, clock2).step(
         record["run_id"], "evaluate"
     )
     assert skipped["state"] == "skipped"
@@ -612,8 +612,8 @@ def test_a_step_over_its_own_budget_fails(store):
     steps = [
         definition.Step(
             "ingest",
-            definition.StepKind.INGEST,
-            cost_budget=1.0,
+            definition.Kind.INGEST,
+            budget=1.0,
             retries=fast(),
         ),
     ]
@@ -621,10 +621,10 @@ def test_a_step_over_its_own_budget_fails(store):
     recorder.behaviour["ingest"] = lambda context: context.spend(2.0)
     record = executor_for(store, flow, recorder, clock).start("x", "a")
     assert record["state"] == "failed"
-    saved = executor_for(store, flow, recorder, clock).step_record(
+    saved = executor_for(store, flow, recorder, clock).step(
         record["run_id"], "ingest"
     )
-    assert "StepBudgetError" in saved["error"]
+    assert "BudgetError" in saved["error"]
 
 
 def test_a_resume_keeps_the_cost_of_steps_that_failed(store):
@@ -635,8 +635,8 @@ def test_a_resume_keeps_the_cost_of_steps_that_failed(store):
     flow = definition.Workflow(
         "spend",
         "1",
-        (definition.Step("a", definition.StepKind.INGEST, retries=fast()),),
-        cost_budget=10.0,
+        (definition.Step("a", definition.Kind.INGEST, retries=fast()),),
+        budget=10.0,
     )
     broken = {"on": True}
 
@@ -655,8 +655,8 @@ def test_a_resume_keeps_the_cost_of_steps_that_failed(store):
     again = executor.resume(record["run_id"])
     assert again["cost"] >= 12.0
     assert again["state"] == "budget_stopped"
-    saved = executor.step_record(record["run_id"], "a")
-    assert "StepBudgetError" in saved["error"]
+    saved = executor.step(record["run_id"], "a")
+    assert "BudgetError" in saved["error"]
 
 
 def test_parallel_steps_reserve_their_declared_cost(store):
@@ -664,16 +664,16 @@ def test_parallel_steps_reserve_their_declared_cost(store):
     time, so together they could pass the run's budget."""
     clock = Clock()
     recorder = Recorder(clock)
-    kind = definition.StepKind.INGEST
+    kind = definition.Kind.INGEST
     flow = definition.Workflow(
         "pair",
         "1",
         (
-            definition.Step("a", kind, cost_budget=6.0, retries=fast()),
-            definition.Step("b", kind, cost_budget=6.0, retries=fast()),
+            definition.Step("a", kind, budget=6.0, retries=fast()),
+            definition.Step("b", kind, budget=6.0, retries=fast()),
         ),
-        cost_budget=10.0,
-        max_parallel=2,
+        budget=10.0,
+        parallel=2,
     )
     barrier = threading.Barrier(2, timeout=10)
 
@@ -692,21 +692,17 @@ def test_parallel_steps_reserve_their_declared_cost(store):
 def test_independent_steps_run_in_parallel_and_a_group_limit_holds(store):
     # Enforces website/src/pages/docs/orchestration.astro:34.
     clock = Clock()
-    s = definition.StepKind
+    s = definition.Kind
     flow = definition.Workflow(
         "par",
         "1",
         (
             definition.Step("a", s.INGEST, retries=fast()),
             definition.Step("b", s.INGEST, retries=fast()),
-            definition.Step(
-                "c", s.TRAIN, concurrency_group="gpu", retries=fast()
-            ),
-            definition.Step(
-                "d", s.TRAIN, concurrency_group="gpu", retries=fast()
-            ),
+            definition.Step("c", s.TRAIN, concurrency="gpu", retries=fast()),
+            definition.Step("d", s.TRAIN, concurrency="gpu", retries=fast()),
         ),
-        max_parallel=4,
+        parallel=4,
     )
     barrier = threading.Barrier(2, timeout=10)
     inside = []
@@ -758,10 +754,10 @@ def test_a_crash_before_the_run_record_keeps_every_attempt_spend(tmp_path):
         "1",
         (
             definition.Step(
-                "a", definition.StepKind.INGEST, retries=retry.Retries(1)
+                "a", definition.Kind.INGEST, retries=retry.Retries(1)
             ),
         ),
-        cost_budget=10.0,
+        budget=10.0,
     )
 
     def costly(context):
@@ -779,7 +775,7 @@ def test_a_crash_before_the_run_record_keeps_every_attempt_spend(tmp_path):
     with pytest.raises(SystemExit):
         executor().resume(record["run_id"])
     store.armed = False
-    saved = executor().step_record(record["run_id"], "a")
+    saved = executor().step(record["run_id"], "a")
     assert saved["spend"] == [4.0, 4.0]
     assert saved["cost"] == 8.0
     assert executor().tally(record["run_id"]) == 8.0
@@ -860,7 +856,7 @@ def test_a_changed_definition_cannot_continue_an_old_run(store):
         changed.name, "2", changed.steps, changed.schedule
     )
     assert (
-        scmle.workflow.executor.run_id_for(changed, "req-1") != record["run_id"]
+        scmle.workflow.executor.identify(changed, "req-1") != record["run_id"]
     )
     other = executor_for(store, changed, recorder, clock)
     with pytest.raises(errors.ConfigError, match="different workflow"):
@@ -869,9 +865,7 @@ def test_a_changed_definition_cannot_continue_an_old_run(store):
 
 def test_every_non_approval_step_needs_a_handler(store):
     with pytest.raises(errors.ConfigError, match="no handler"):
-        scmle.workflow.executor.Executor(
-            definition.standard_workflow(), store, {}
-        )
+        scmle.workflow.executor.Executor(definition.scaffold(), store, {})
 
 
 # ---- schedule -------------------------------------------------------------
@@ -887,9 +881,9 @@ def scheduled(policy, name=None, **options):
 
 def test_missed_slots_follow_the_declared_policy(store):
     for policy, expected_runs, expected_missed in (
-        (definition.CatchUp.RUN_ALL, 5, 0),
-        (definition.CatchUp.LATEST_ONLY, 1, 4),
-        (definition.CatchUp.SKIP, 0, 5),
+        (definition.Backfill.RUN_ALL, 5, 0),
+        (definition.Backfill.LATEST_ONLY, 1, 4),
+        (definition.Backfill.SKIP, 0, 5),
     ):
         flow = scheduled(policy, f"wf-{policy.value}")
         clock = Clock(5 * 3600.0 + 2000.0)
@@ -901,7 +895,7 @@ def test_missed_slots_follow_the_declared_policy(store):
         assert len(report.missed) == expected_missed, policy
         slots = [slot for slot, ignored in report.ran]
         assert slots == sorted(slots)
-    current = scheduled(definition.CatchUp.SKIP, "wf-current")
+    current = scheduled(definition.Backfill.SKIP, "wf-current")
     clock = Clock(5 * 3600.0 + 10.0)
     executor = executor_for(store, current, Recorder(clock), clock)
     scheduler = scmle.workflow.schedule.Scheduler(current, store)
@@ -912,7 +906,7 @@ def test_missed_slots_follow_the_declared_policy(store):
 
 
 def test_the_first_tick_does_not_backfill_and_a_second_tick_is_quiet(store):
-    flow = scheduled(definition.CatchUp.RUN_ALL)
+    flow = scheduled(definition.Backfill.RUN_ALL)
     clock = Clock(10 * 3600.0 + 1.0)
     recorder = Recorder(clock)
     executor = executor_for(store, flow, recorder, clock)
@@ -930,7 +924,7 @@ def test_the_first_tick_does_not_backfill_and_a_second_tick_is_quiet(store):
 def test_a_scheduler_that_lost_its_state_does_not_repeat_finished_slots(store):
     # Enforces docs/ORCHESTRATION.md:41.
     # Enforces website/src/pages/docs/orchestration.astro:31.
-    flow = scheduled(definition.CatchUp.LATEST_ONLY)
+    flow = scheduled(definition.Backfill.LATEST_ONLY)
     clock = Clock(3600.0 + 1.0)
     recorder = Recorder(clock)
     executor = executor_for(store, flow, recorder, clock)
@@ -942,7 +936,7 @@ def test_a_scheduler_that_lost_its_state_does_not_repeat_finished_slots(store):
 
 
 def test_a_slot_that_cannot_start_is_deferred_and_stays_due(store):
-    flow = scheduled(definition.CatchUp.LATEST_ONLY)
+    flow = scheduled(definition.Backfill.LATEST_ONLY)
     clock = Clock(3600.0 + 1.0)
     recorder = Recorder(clock)
     executor = executor_for(store, flow, recorder, clock)
@@ -984,7 +978,7 @@ def test_a_training_step_runs_through_a_runner_and_resumes_inside_it(tmp_path):
 
     def spec_for(context):
         return base.Job(
-            run_id="job-" + context.idempotency_key[:16],
+            run_id="job-" + context.key[:16],
             name="train",
             project={"data": "d", "target": "y"},
             identity="train",
@@ -1005,7 +999,7 @@ def test_a_training_step_runs_through_a_runner_and_resumes_inside_it(tmp_path):
     )
     record = executor.start("req-1", "alice")
     assert record["steps"]["train"] == "succeeded"
-    saved = executor.step_record(record["run_id"], "train")
+    saved = executor.step(record["run_id"], "train")
     assert saved["outputs"]["attempts"] == 2
     assert record["cost"] > 0
 
@@ -1020,10 +1014,10 @@ def test_a_corrupt_record_names_its_key(store):
     with pytest.raises(
         errors.ArtifactError, match=r"run-c/run\.json is corrupt"
     ):
-        executor.run_record("run-c")
+        executor.record("run-c")
     store.put(key, b"[1, 2]")
     with pytest.raises(errors.ArtifactError, match="not a JSON object"):
-        executor.run_record("run-c")
+        executor.record("run-c")
     lock = f"workflows/{flow.name}/runs/run-c/lock"
     store.put(lock, b"{torn")
     with pytest.raises(errors.ArtifactError, match="corrupt"):
@@ -1226,7 +1220,7 @@ def test_records_written_before_the_engine_load_and_resume(tmp_path):
     recorder = Recorder(clock)
     flow = pipeline()
     executor = executor_for(store, flow, recorder, clock)
-    failed = scmle.workflow.executor.run_id_for(flow, "failed")
+    failed = scmle.workflow.executor.identify(flow, "failed")
     assert (
         executor.start("failed", "alice")
         == stored[f"workflows/{flow.name}/runs/{failed}/run.json"]
@@ -1235,8 +1229,8 @@ def test_records_written_before_the_engine_load_and_resume(tmp_path):
     assert healed["state"] == "waiting_approval"
     assert recorder.names() == ["evaluate", "monitor"]
     assert healed["cost"] == 3.5
-    assert executor.step_record(failed, "evaluate")["spend"] == [0.5, 0.0]
-    waiting = scmle.workflow.executor.run_id_for(flow, "waiting")
+    assert executor.step(failed, "evaluate")["spend"] == [0.5, 0.0]
+    waiting = scmle.workflow.executor.identify(flow, "waiting")
     approve(executor, {"run_id": waiting})
     done = executor.resume(waiting)
     assert done["state"] == "succeeded"

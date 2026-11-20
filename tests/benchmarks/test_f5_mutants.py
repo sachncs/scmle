@@ -235,9 +235,7 @@ def test_certify_missingness_counts_one_replicate_per_seed(demo):
         assert (record.planted, record.clean) == (4, 4)
         assert record.detected == 4
         assert record.alarms == 0
-        assert record.seeds == randomness.seed_path(
-            4, "certify.f5-missingness", 0
-        )
+        assert record.seeds == randomness.seed(4, "certify.f5-missingness", 0)
     assert (
         certificate.digests["code"] == registry.SPECS["f5-missingness"].digest()
     )

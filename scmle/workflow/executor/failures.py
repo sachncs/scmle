@@ -16,7 +16,7 @@ class EvictionError(BusyError):
     category = "lease_lost"
 
 
-class ConcurrencyLimitError(errors.ScmleError):
+class CapacityError(errors.ScmleError):
     """The workflow already has its maximum number of runs in flight."""
 
     category = "concurrency_limit"
@@ -28,7 +28,7 @@ class DeadlineError(errors.ScmleError):
     category = "timeout"
 
 
-class StepBudgetError(errors.ScmleError):
+class BudgetError(errors.ScmleError):
     """A step or the run passed its cost budget."""
 
     category = "budget"

@@ -58,10 +58,10 @@ class Sentinel:
     ledger: deployment_ledger.DeploymentLedger
     budget: scmle.assurance.ledger.budget.Decision
     log: rollout.Journal
-    experiment_id: str | None
+    study: str | None
     decision: rollout.Decision | None
     monitor: rollout.Watchdog | None
-    champion_id: str | None
+    champion: str | None
 
     def promote(
         self,
@@ -91,9 +91,9 @@ class Sentinel:
                 "the experiment has no promote decision; nothing to promote"
             )
         record = self.manager.elevate(approval, signing_key)
-        self.champion_id = f"{self.manager.model}:v{record.version}"
+        self.champion = f"{self.manager.model}:v{record.version}"
         budget, level = scmle.assurance.ledger.budget.watch(
-            self.budget, self.champion_id
+            self.budget, self.champion
         )
         self.budget = budget
         self.monitor = rollout.Watchdog(
@@ -105,7 +105,7 @@ class Sentinel:
         )
         self.log.append(
             "promoted",
-            {"champion": self.champion_id, "rollback_level": str(level)},
+            {"champion": self.champion, "rollback_level": str(level)},
         )
         return record
 
@@ -132,9 +132,9 @@ class Sentinel:
             self.ledger.commit(
                 deployment_ledger.ROLLBACK_PROPOSAL,
                 {
-                    "experiment_id": self.experiment_id,
+                    "experiment_id": self.study,
                     "model": self.manager.model,
-                    "champion": self.champion_id,
+                    "champion": self.champion,
                     "source": "rollback e-process",
                     "units": self.monitor.done_at,
                 },
@@ -142,16 +142,16 @@ class Sentinel:
             self.ledger.commit(
                 deployment_ledger.ROLLOUT_DECISION,
                 {
-                    "experiment_id": self.experiment_id,
+                    "experiment_id": self.study,
                     "stage": "rollback",
                     "status": status,
                     "units": self.monitor.done_at,
-                    "champion": self.champion_id,
+                    "champion": self.champion,
                 },
             )
             self.log.append(
                 "rollback_decision",
-                {"champion": self.champion_id, "units": self.monitor.done_at},
+                {"champion": self.champion, "units": self.monitor.done_at},
             )
         return status
 
@@ -216,11 +216,11 @@ class Hook(Sentinel):
         self.budget = budget if budget is not None else plan.budget()
         self.log = log if log is not None else rollout.Journal()
         self.experiment: rollout.Rollout | None = None
-        self.experiment_id: str | None = None
+        self.study: str | None = None
         self.decision: rollout.Decision | None = None
         self.challenger: registry.Release | None = None
         self.monitor: rollout.Watchdog | None = None
-        self.champion_id: str | None = None
+        self.champion: str | None = None
         self.units = 0
 
     def diagnose(self, stage: str, comparison: Any) -> None:
@@ -343,7 +343,7 @@ class Hook(Sentinel):
         )
         self.budget = budget
         self.challenger = challenger
-        self.experiment_id = experiment_id
+        self.study = experiment_id
         self.experiment = rollout.Rollout(
             self.plan, experiment_id, float(level)
         )
@@ -390,7 +390,7 @@ class Hook(Sentinel):
         self.ledger.commit(
             deployment_ledger.ROLLOUT_ASSIGNMENT,
             {
-                "experiment_id": self.experiment_id,
+                "experiment_id": self.study,
                 "first_unit": self.units,
                 "units": names,
                 "arm": [int(a) for a in arms],
@@ -425,7 +425,7 @@ class Hook(Sentinel):
         decision = experiment.observe(arm, primary, guardrails)
         self.decision = decision
         body = {
-            "experiment_id": self.experiment_id,
+            "experiment_id": self.study,
             "stage": "promotion",
             **decision.to_dict(),
         }
@@ -435,7 +435,7 @@ class Hook(Sentinel):
             self.ledger.commit(
                 deployment_ledger.PROMOTION_PROPOSAL,
                 {
-                    "experiment_id": self.experiment_id,
+                    "experiment_id": self.study,
                     "model": self.manager.model,
                     "version": self.challenger.version
                     if self.challenger

@@ -255,6 +255,33 @@ Phase 6 lane `models` renamed these pinned names, with no alias:
 | `custom.unregister_estimator` | `custom.unregister` |
 | `modality.ModalitySampleDecoder` | `modality.Decoder` |
 
+Phase 6 lane `pipeline` renamed these pinned names, with no alias:
+
+| Old name | New name |
+|---|---|
+| `continuous.ContinuousEvaluation` | `continuous.Evaluation` |
+| `continuous.RetrainDecision` | `continuous.Decision` |
+| `continuous.RetrainPolicy` | `continuous.Policy` |
+| `continuous.TrainingHistory` | `continuous.History` |
+| `continuous.post_promotion_check` | `continuous.reassess` |
+| `notify.WebhookSender` | `notify.Sender` |
+| `notify.verify_signature` | `notify.verify` |
+| `signals.SignalMonitor` | `signals.Monitor` |
+| `signals.SignalThresholds` | `signals.Thresholds` |
+| `spool.MetricsSpool` | `spool.Spool` |
+| `modality_lifecycle.ExtensionCurator` | `modality_lifecycle.Extension` |
+| `modality_lifecycle.LifecycleCancelledError` | `modality_lifecycle.AbortedError` |
+| `definition.CatchUp` | `definition.Backfill` |
+| `definition.StepKind` | `definition.Kind` |
+| `definition.standard_workflow` | `definition.scaffold` |
+| `executor.StepContext` | `executor.Context` |
+
+The fields, methods and keywords of `Step`, `Workflow`, `Retries`, `Window`,
+`Monitor`, `Thresholds`, `Sender`, `Delivery`, `Measurement`, `Outcome`,
+`Runner`, `Extension` and `Predictor` changed with them;
+[RENAMES](RENAMES.md) lists
+every renamed member.
+
 ## Training runners
 
 `scmle.runners` (`base`, `local`, `roles`, `checkpoint`,
@@ -263,8 +290,8 @@ entrypoint, project workload and fakes are not pinned.
 
 ## Workflow surface
 
-`scmle.workflow.definition` (`Workflow`, `Step`, `StepKind`, `Schedule`,
-`CatchUp`), `executor` (`Executor`) and `schedule` (`Scheduler`) are
+`scmle.workflow.definition` (`Workflow`, `Step`, `Kind`, `Schedule`,
+`Backfill`), `executor` (`Executor`) and `schedule` (`Scheduler`) are
 extension surfaces pinned like the others.
 
 ## Release surfaces
@@ -282,13 +309,13 @@ ledgers and registries load unchanged.
 
 ## Operations surfaces
 
-`scmle.operations.signals` (`SignalMonitor`, `Signal`, `SignalThresholds`,
+`scmle.operations.signals` (`Monitor`, `Signal`, `Thresholds`,
 `Window`, `Category`, `Status`), `classify` (`classify`,
-`Classification`, `Verdict`), `notify` (`WebhookSender`, `Notifier`,
-`Request`, `Delivery`, `sign`, `verify_signature`) and `continuous` (`ContinuousEvaluation`, `RetrainPolicy`,
-`RetrainDecision`, `Indicator`, `Replacement`, `TrainingHistory`,
-`post_promotion_check`), `recovery` (`Fault`, `Objective`, `Measurement`,
-`Result`, `Runner`) and `spool` (`MetricsSpool`, `Flush`) are extension
+`Classification`, `Verdict`), `notify` (`Sender`, `Notifier`,
+`Request`, `Delivery`, `sign`, `verify`) and `continuous` (`Evaluation`,
+`Policy`, `Decision`, `Indicator`, `Replacement`, `History`,
+`reassess`), `recovery` (`Fault`, `Objective`, `Measurement`,
+`Result`, `Runner`) and `spool` (`Spool`, `Flush`) are extension
 surfaces pinned like the others. The metrics
 registry, the log writer, the cost report and the response desk are not
 pinned.

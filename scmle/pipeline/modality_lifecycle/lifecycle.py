@@ -31,7 +31,7 @@ def measure(
 ) -> tuple[performance.Observation, ...]:
     """The measured operations of a finished run, in operation order.
 
-    The engine timed every stage; a stage with a `performance_operation`
+    The engine timed every stage; a stage with a `operation`
     reports its time, and inference reports its load and predict times.
 
     Args:
@@ -46,7 +46,7 @@ def measure(
         for observation in board.get(state.Reproduction).observations
     }
     for stage in pipeline.stages:
-        operation = cast("state.Stage", stage).performance_operation
+        operation = cast("state.Stage", stage).operation
         if operation is not None:
             found[operation] = state.observe(
                 operation,
@@ -77,7 +77,7 @@ class Lifecycle:
         steps.Modelling(),
         steps.Evaluation(),
         steps.Composition(),
-        explanation.ModelExplainabilityStage(),
+        explanation.Explainability(),
         steps.Packaging(),
         steps.Inference(),
         steps.Monitoring(),
@@ -124,7 +124,7 @@ class Lifecycle:
                 passes.
             cancellation_check: Callable polled at stage boundaries. When it
                 returns True, artifacts created by this run are removed and
-                `LifecycleCancelledError` is raised.
+                `AbortedError` is raised.
             checkpoint_path: File where signed stage checkpoints are kept, if
                 any; requires `report_path` and must differ from it.
             resume: Whether to resume from an existing checkpoint at
@@ -202,7 +202,7 @@ class Lifecycle:
         if stage_names != required_stage_names:
             raise RuntimeError("modality lifecycle stage order is invalid")
         checkpoint: checkpoints.Checkpoint | None = None
-        if plan.checkpoint_target is not None:
+        if plan.target is not None:
             plan.expect(resume=resume)
             if resume:
                 checkpoint = plan.reload(stage_names)

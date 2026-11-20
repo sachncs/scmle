@@ -29,7 +29,7 @@ def serialize(frame: pandas.DataFrame) -> bytes:
     return ordered.to_csv(index=False, lineterminator="\n").encode("utf-8")
 
 
-def dataset_version(frame: pandas.DataFrame) -> str:
+def stamp(frame: pandas.DataFrame) -> str:
     """``sha256:<hex>`` of the canonical CSV of a dataset.
 
     Args:
@@ -41,14 +41,12 @@ def dataset_version(frame: pandas.DataFrame) -> str:
     return "sha256:" + hashlib.sha256(serialize(frame)).hexdigest()
 
 
-def load_dataset(
-    directory: str | pathlib.Path, version: str
-) -> pandas.DataFrame:
+def load(directory: str | pathlib.Path, version: str) -> pandas.DataFrame:
     """Reads a preserved dataset back and checks its digest.
 
     Args:
         directory: The directory holding the preserved datasets.
-        version: The dataset version, as returned by `dataset_version`. The
+        version: The dataset version, as returned by `stamp`. The
             file read is named after it, with the colon replaced by a hyphen.
 
     Returns:
@@ -63,12 +61,12 @@ def load_dataset(
         path / (version.replace(":", "-") + ".csv"),
         float_precision="round_trip",
     )
-    if dataset_version(frame) != version:
+    if stamp(frame) != version:
         raise errors.InputError(f"the stored copy of {version} has changed")
     return frame
 
 
-class TrainingHistory:
+class History:
     """An append-only, hash-chained record of what was trained and decided."""
 
     __module__ = "scmle.operations.continuous"

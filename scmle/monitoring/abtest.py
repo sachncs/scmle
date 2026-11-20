@@ -135,7 +135,7 @@ def tally(
     )
 
 
-def compare_arms(
+def compare(
     task: tasks.Task,
     metric_name: str,
     control: Arm,

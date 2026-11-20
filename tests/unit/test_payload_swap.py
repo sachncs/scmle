@@ -111,7 +111,7 @@ def test_a_modality_payload_swapped_after_hashing_never_loads(tmp_path, swap):
         "modality": "tabular",
         "dataset_hash": "d" * 64,
         "feature_names": ["a"],
-        "model_sha256": modality_lifecycle.file_digest(model),
+        "model_sha256": modality_lifecycle.digest(model),
         "evaluation": {},
     }
     manifest = {
@@ -124,5 +124,5 @@ def test_a_modality_payload_swapped_after_hashing_never_loads(tmp_path, swap):
     (tmp_path / "manifest.json").write_text(json.dumps(manifest))
     swap(model)
     with pytest.raises(errors.KindError):
-        modality_lifecycle.load_package(tmp_path, KEY)
+        modality_lifecycle.load(tmp_path, KEY)
     assert not TRIPPED

@@ -313,7 +313,7 @@ def test_the_label_certificate_counts_detections_and_false_alarms(
     assert result.defect == baseline.DEFECT_TYPE
     assert (result.planted, result.detected) == (4, 4)
     assert (result.clean, result.alarms) == (4, 0)
-    assert result.seeds == randomness.seed_path(9, "framing.certify.labels", 0)
+    assert result.seeds == randomness.seed(9, "framing.certify.labels", 0)
     assert result.seeds == (9, "framing.certify.labels", 0)
 
 

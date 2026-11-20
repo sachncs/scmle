@@ -50,7 +50,7 @@ def test_cpu_limit_caps_the_worker_pool(binary_frame, tmp_path):
 def test_memory_limit_stops_new_trials_but_keeps_the_first(
     binary_frame, tmp_path, monkeypatch
 ):
-    monkeypatch.setattr(limits, "peak_memory_gb", lambda: 50.0)
+    monkeypatch.setattr(limits, "watermark", lambda: 50.0)
     result = run_with(
         binary_frame, tmp_path, time_budget_seconds=600, memory_limit_gb=1.0
     )
@@ -150,7 +150,7 @@ def test_memory_of_subprocesses_a_trial_starts_counts_and_is_cleaned_up(
 ):
     # Enforces README.md:157.
     marker = tmp_path / "child.pid"
-    supervisor = limits.Supervisor(ceiling_seconds=60, memory_gb=0.4)
+    supervisor = limits.Supervisor(ceiling=60, memory=0.4)
 
     with pytest.raises(limits.TrialError, match="memory limit"):
         supervisor.run(spawn_memory_hungry_subprocess, marker)

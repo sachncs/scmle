@@ -281,7 +281,7 @@ class Board:
         default_factory=dict
     )
 
-    def check_cancelled(self) -> None:
+    def check(self) -> None:
         """Polls the run's cancellation check (`plans.Plan.poll`)."""
         self.plan.poll()
 
@@ -350,7 +350,7 @@ class Stage(abc.ABC):
         requires: The stages whose products this one reads.
         makes: The product the stage returns, a `Proof` (typed as the
             engine node's product, which a class variable cannot narrow).
-        performance_operation: Operation the engine's timing of this stage
+        operation: Operation the engine's timing of this stage
             reports, or None if it is not reported.
     """
 
@@ -358,7 +358,7 @@ class Stage(abc.ABC):
     state: ClassVar[scmle.runtime.state.Progress]
     requires: ClassVar[tuple[type, ...]] = ()
     makes: ClassVar[type[products.Product] | None]
-    performance_operation: ClassVar[performance.Operation | None] = None
+    operation: ClassVar[performance.Operation | None] = None
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """Gives a stage the run state of its phase.

@@ -42,7 +42,7 @@ import scmle.runtime.engine
 from scmle.storage import stores
 
 
-def environment_lock() -> str:
+def lock() -> str:
     """Lists installed distributions as sorted `name==version` lines.
 
     Returns:
@@ -95,18 +95,18 @@ class Orchestrator:
         self.registry = registry
         self.policy = policy or selection.Averager(spec.selection)
         self.stages = scmle.runtime.engine.order(
-            stages or scmle.pipeline.stages.default_stages()
+            stages or scmle.pipeline.stages.sequence()
         )
         self.pipeline = engine.Pipeline(self.stages)
         self.tracker = tracker
         self.checkpoints = checkpoints
-        self.capability_registry = capability_registry
-        self.tracking_path: pathlib.Path | None = None
-        self.cancel_event = threading.Event()
+        self.capabilities = capability_registry
+        self.tracking: pathlib.Path | None = None
+        self.event = threading.Event()
 
     def cancel(self) -> None:
         """Requests cooperative cancellation of a running workflow."""
-        self.cancel_event.set()
+        self.event.set()
 
     def start(
         self,
@@ -132,11 +132,11 @@ class Orchestrator:
                 self.registry,
                 self.policy,
                 store=store,
-                capability_registry=self.capability_registry,
+                capability_registry=self.capabilities,
                 log=log,
-                approved_plan=approved_plan,
-                cancel_event=self.cancel_event,
-                input_frame=self.frame,
+                plan=approved_plan,
+                event=self.event,
+                frame=self.frame,
                 **fields,
             )
         )
@@ -157,7 +157,7 @@ class Orchestrator:
             (`profiling.Partition`) and the blueprint (`planning.Blueprint`).
         """
         self.spec = bind(self.spec, approved)
-        history = recall(self.tracker, self.tracking_path)
+        history = recall(self.tracker, self.tracking)
         board = self.start(approved_plan=approved, history=history)
         self.pipeline = engine.Pipeline(self.stages)
         self.pipeline.advance(board, until=scmle.pipeline.stages.Planning)
@@ -193,7 +193,7 @@ class Orchestrator:
         store = scmle.artifacts.store.Workspace.create(output_dir)
         declare(store, parameter_estimation_declaration, self.spec)
         store.write_json("config.json", json.loads(self.spec.canonize()))
-        store.write_text("environment.lock", environment_lock())
+        store.write_text("environment.lock", lock())
         journal.Journal.locate(store.directory).start(self.spec.config_hash())
         docket = archive.Directory(store.directory, self.spec.config_hash())
         with logs.bind(run=store.run_id):
@@ -248,9 +248,7 @@ class Orchestrator:
         store = scmle.artifacts.store.Workspace.open(run_directory)
         return cls(archive.saved(store.directory), **kwargs)
 
-    def consult_checkpoints(
-        self, gate: state.Progress, board: engine.Board
-    ) -> None:
+    def consult(self, gate: state.Progress, board: engine.Board) -> None:
         """Asks every checkpoint registered for `gate` and audits the verdicts.
 
         Args:
@@ -331,7 +329,7 @@ class Orchestrator:
             log=log,
             approved_plan=approved,
             tracker=tracker,
-            history=recall(tracker, self.tracking_path),
+            history=recall(tracker, self.tracking),
             checkpoints=docket.trials(),
             started=docket.started,
         )
@@ -342,7 +340,7 @@ class Orchestrator:
             self.pipeline.run(
                 board,
                 machine,
-                self.consult_checkpoints,
+                self.consult,
                 lambda: {
                     "run_dir": str(store.directory),
                     "recoverable_trials": docket.recoverable(),

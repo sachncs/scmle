@@ -204,7 +204,7 @@ def watched(tmp_path_factory):
     data = reliability.binary_data(240)
     data.loc[5, "a"] = MARKER
     calls = []
-    stage = assessment.FinalEvaluationStage
+    stage = assessment.Assessment
     measure, ship = stage.measure, stage.ship
 
     def measuring(self, context, pipeline, *rows):

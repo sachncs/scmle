@@ -34,7 +34,7 @@ def test_betting_test_matches_a_plain_loop(direction):
     for value in values:
         test.update(value)
     expected = brute_force_log_capital(values, 0.3, direction, 0.05)
-    assert float(test.log_capital) == pytest.approx(expected, rel=1e-12)
+    assert float(test.capital) == pytest.approx(expected, rel=1e-12)
 
 
 def test_vector_test_equals_scalar_tests():
@@ -51,9 +51,7 @@ def test_vector_test_equals_scalar_tests():
         vector.update(row)
         for index, scalar in enumerate(scalars):
             scalar.update(row[index])
-    assert numpy.allclose(
-        vector.log_capital, [float(s.log_capital) for s in scalars]
-    )
+    assert numpy.allclose(vector.capital, [float(s.capital) for s in scalars])
 
 
 def test_false_alarm_rate_is_below_the_level_at_every_look():
@@ -116,11 +114,11 @@ def test_state_round_trips():
     again = sequential_tests.Betting.from_dict(test.to_dict())
     again.update(0.3)
     test.update(0.3)
-    assert float(again.log_capital) == pytest.approx(float(test.log_capital))
+    assert float(again.capital) == pytest.approx(float(test.capital))
 
 
 def test_promotion_sequence_enforces_registration_order():
-    sequence = sequential_tests.PromotionSequence("1/20")
+    sequence = sequential_tests.Sequence("1/20")
     sequence.register("a")
     sequence.register("b")
     with pytest.raises(ValueError, match="registration order"):
@@ -167,8 +165,8 @@ def test_scaled_gaps_and_state_round_trip_for_processes_and_alarms():
     alarm.update(0.5)
     restored = sequential_tests.Tripwire.from_dict(alarm.to_dict())
     assert restored.update(0.9) == alarm.update(0.9)
-    assert float(restored.test.log_capital) == pytest.approx(
-        float(alarm.test.log_capital)
+    assert float(restored.test.capital) == pytest.approx(
+        float(alarm.test.capital)
     )
 
 
@@ -206,9 +204,9 @@ def test_mixture_weights_add_to_at_most_one_and_old_terms_are_dropped():
     for ignored in range(30):
         test.update(0.3)
     assert len(test.inner) == 3
-    assert sum(math.exp(w) for w in test.log_weights) < 1.0
+    assert sum(math.exp(w) for w in test.weights) < 1.0
     fresh = sequential_tests.Mixture(0.3, sequential_tests.GREATER, 0.05)
-    assert math.exp(fresh.log_weights[0]) == pytest.approx(0.5)
+    assert math.exp(fresh.weights[0]) == pytest.approx(0.5)
 
 
 def test_mixture_state_round_trips():
@@ -220,7 +218,7 @@ def test_mixture_state_round_trips():
     again = sequential_tests.Mixture.from_dict(test.to_dict())
     test.update(0.25)
     again.update(0.25)
-    assert float(again.log_capital) == pytest.approx(float(test.log_capital))
+    assert float(again.capital) == pytest.approx(float(test.capital))
     with pytest.raises(ValueError, match="positive"):
         sequential_tests.Mixture(0.2, sequential_tests.LESS, 0.1, stride=0)
 

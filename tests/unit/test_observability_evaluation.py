@@ -74,10 +74,10 @@ def test_evaluation_fails_closed_for_missing_stale_future_and_breached_metrics()
     )
 
     assert not result.passed
-    assert result.missing_signals == ("error",)
-    assert result.expired_metrics == ("old_latency",)
-    assert result.future_metrics == ("future_latency",)
-    assert result.threshold_breaches[0]["metric"] == "latency_p95_ms"
+    assert result.signals == ("error",)
+    assert result.metrics == ("old_latency",)
+    assert result.future == ("future_latency",)
+    assert result.breaches[0]["metric"] == "latency_p95_ms"
 
 
 def test_prediction_log_enforces_sidecar_retention_atomically(tmp_path):
@@ -87,10 +87,8 @@ def test_prediction_log_enforces_sidecar_retention_atomically(tmp_path):
         redacted_fields=(),
         alert_thresholds={},
     )
-    log = events.PredictionLog(
-        tmp_path / "predictions.jsonl", observability_policy=policy
-    )
-    log.observability_path.write_text(
+    log = events.Journal(tmp_path / "predictions.jsonl", policy=policy)
+    log.sidecar.write_text(
         '{"type":"inference","timestamp":"2026-10-18T10:00:00+00:00"}\n'
         '{"type":"inference","timestamp":"2026-10-20T10:00:00+00:00"}\n',
         encoding="utf-8",
@@ -100,21 +98,16 @@ def test_prediction_log_enforces_sidecar_retention_atomically(tmp_path):
 
     assert result["removed"] == 1
     assert result["retained"] == 1
-    assert (
-        log.observability_path.read_text(encoding="utf-8").count("inference")
-        == 1
-    )
+    assert log.sidecar.read_text(encoding="utf-8").count("inference") == 1
 
 
 def test_prediction_log_does_not_replace_malformed_sidecar(tmp_path):
     policy = make_policy()
-    log = events.PredictionLog(
-        tmp_path / "predictions.jsonl", observability_policy=policy
-    )
+    log = events.Journal(tmp_path / "predictions.jsonl", policy=policy)
     original = "not-json\n"
-    log.observability_path.write_text(original, encoding="utf-8")
+    log.sidecar.write_text(original, encoding="utf-8")
 
     with pytest.raises(ValueError):
         log.purge("2026-10-20T10:00:00+00:00")
 
-    assert log.observability_path.read_text(encoding="utf-8") == original
+    assert log.sidecar.read_text(encoding="utf-8") == original

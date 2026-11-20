@@ -2,14 +2,14 @@
   "modules_over": 0,
   "classes_over": 0,
   "functions_over": 0,
-  "compound_functions": 906,
-  "compound_classes": 113,
-  "compound_attributes": 1699,
+  "compound_functions": 805,
+  "compound_classes": 80,
+  "compound_attributes": 1537,
   "private_names": 0,
   "loose_dicts": 1125,
   "largest_module": 795,
   "bare_raises": 23,
   "value_catches": 167,
   "import_aliases": 0,
-  "external_names": 16
+  "external_names": 15
 }

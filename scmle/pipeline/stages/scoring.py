@@ -29,7 +29,7 @@ COVERAGE_LEVELS = (0.5, 0.8, 0.9, 0.95)
 MATRIX_DIMENSIONS = 2
 
 
-def reference_scores(
+def anchor(
     fitted: Any, features: pandas.DataFrame, task: tasks.Task
 ) -> pandas.Series:
     """Returns model outputs on held-out rows, the output-drift reference.
@@ -185,7 +185,7 @@ def pin(selected: Any, decision: Mapping[str, Any] | None) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def choose_decision_threshold(
+def choose(
     board: engine.Board, fitted: Any
 ) -> tuple[Any, records.Layout | None]:
     """Optimizes the binary decision threshold on out-of-fold predictions.

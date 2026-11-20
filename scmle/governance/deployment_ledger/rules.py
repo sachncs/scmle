@@ -31,7 +31,7 @@ class Oversight:
         self.closed: dict[str, str] = {}
         self.attestations: dict[str, dict[str, Any]] = {}
         self.used: dict[str, dict[str, Any]] = {}
-        self.promotion: sequential_tests.PromotionSequence | None = None
+        self.promotion: sequential_tests.Sequence | None = None
         self.registered: list[str] = []
         self.decided: dict[str, dict[str, Any]] = {}
         self.halted = False
@@ -71,9 +71,9 @@ class Oversight:
             raise kinds.MisuseError("policy does not match its hash")
         self.header = dict(body)
         self.system_keys = frozenset(body["system_keys"])
-        self.promotion = sequential_tests.PromotionSequence(body["alpha_promo"])
+        self.promotion = sequential_tests.Sequence(body["alpha_promo"])
 
-    def elond(self) -> sequential_tests.PromotionSequence:
+    def elond(self) -> sequential_tests.Sequence:
         """The e-LOND sequence, which exists once `open` is in.
 
         Returns:
